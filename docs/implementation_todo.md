@@ -41,14 +41,14 @@ implemented, tested, and documented where relevant.
 
 - [x] Add MongoDB native driver dependency.
 - [x] Add database connection module.
-- [ ] Add repository interfaces.
-- [ ] Add `matches` collection repository.
-- [ ] Add `games` collection repository.
-- [ ] Add `gameEvents` collection repository.
-- [ ] Add `deckSnapshots` collection repository.
-- [ ] Add `cardCatalogVersions` collection repository.
-- [ ] Add tests or integration checks for repository serialization.
-- [ ] Confirm Mongoose is not installed or imported.
+- [x] Add repository interfaces.
+- [x] Add `matches` collection repository.
+- [x] Add `games` collection repository.
+- [x] Add `gameEvents` collection repository.
+- [x] Add `deckSnapshots` collection repository.
+- [x] Add `cardCatalogVersions` collection repository.
+- [x] Add tests or integration checks for repository serialization.
+- [x] Confirm Mongoose is not installed or imported.
 
 ## 5. Card Catalog
 

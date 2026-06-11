@@ -2,6 +2,10 @@ import { MongoClient } from "mongodb";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
+export function getMongoDatabaseName() {
+  return process.env.MONGODB_DB_NAME ?? "hextech_simulator";
+}
+
 export function getMongoClient() {
   if (!clientPromise) {
     const uri = process.env.MONGODB_URI;
@@ -15,4 +19,9 @@ export function getMongoClient() {
   }
 
   return clientPromise;
+}
+
+export async function getMongoDatabase() {
+  const client = await getMongoClient();
+  return client.db(getMongoDatabaseName());
 }
