@@ -40,6 +40,64 @@ Clients must not:
 The MVP has no chat and no deck editor. Players provide deck lists in the strict
 official text format. The first supported format is 1v1 best-of-3.
 
+## Technical Stack And Boundaries
+
+The implementation stack is:
+
+- Next.js 15 App Router.
+- React 19.
+- TypeScript.
+- Tailwind CSS 4.
+- shadcn/ui for reusable UI primitives.
+- MongoDB with the official native Node.js driver.
+- Zod for schema and payload validation.
+- Socket.IO on a custom long-running Node server for realtime gameplay.
+
+Mongoose must not be used.
+
+The backend must remain pure Node.js/TypeScript code. The game engine,
+repositories, deck validation, card catalog, seeded RNG, event log, realtime
+room orchestration, and match/game services must not import React, Next.js, or UI
+modules.
+
+Next.js responsibilities:
+
+- Render the web client.
+- Provide thin HTTP route adapters when useful.
+- Serve static assets and application shell.
+- Call into pure server modules rather than implementing rules directly.
+
+Pure backend responsibilities:
+
+- Load and validate card catalog data.
+- Parse and validate deck lists.
+- Own canonical match/game state.
+- Validate and resolve player intents.
+- Enforce visibility projections.
+- Persist snapshots and events.
+- Broadcast accepted state changes to match rooms.
+
+Recommended source layout:
+
+```txt
+src/
+  app/                  Next.js App Router routes, layouts, and route adapters
+  components/           shadcn/ui components and game UI components
+  server/               framework-free backend modules
+    catalog/            set JSON loading and catalog contracts
+    db/                 MongoDB native driver connection and repositories
+    deck/               parser, zod schemas, and validation
+    engine/             rules engine, primitives, zones, visibility, RNG
+    events/             canonical event log and viewer-safe projections
+    match/              match/game orchestration
+    realtime/           Socket.IO rooms and gameplay broadcasts
+  shared/               shared zod schemas, DTOs, and transport types
+```
+
+The initial deployment assumption is local-first on a long-running Node process.
+This avoids serverless constraints while realtime gameplay, replay, and
+persistence contracts are still changing.
+
 ## Core Challenge: Primitives Are Not Only Zone Moves
 
 The simulator should use primitives, but the primitive vocabulary must not
@@ -364,6 +422,45 @@ coverage can be bounded without guessing.
 
 ## Server/Client Contract
 
+### Player Identity
+
+The MVP uses anonymous player tokens.
+
+Rules:
+
+- Match creation creates or accepts two player seats.
+- Each seat has a server-generated player token.
+- A player token authorizes that seat's intents.
+- Tokens are stored by the client for the session.
+- Every protected intent must include credentials that resolve to exactly one
+  player seat.
+- The server must reject intents from the wrong player, unknown token, or player
+  that is not allowed to act in the current state.
+
+This is not full account authentication. It is the minimum identity layer needed
+to prevent one client from acting as both players or mutating a match it does not
+own.
+
+### Realtime Transport
+
+Gameplay uses Socket.IO on the custom Node server.
+
+Socket responsibilities:
+
+- Join a match room after token validation.
+- Send accepted intent results to relevant viewers.
+- Broadcast viewer-specific projected state, not canonical hidden state.
+- Broadcast human-readable log updates.
+- Notify clients when waiting on opponent, priority, focus, mulligan, battlefield
+  lock, or starting-player choice.
+- Support reconnect by resending the current projected state and recent log
+  position.
+
+HTTP routes can still be used for setup or tooling flows such as deck
+validation, match creation, and loading initial app data. Gameplay state changes
+should flow through the same pure intent-handling service regardless of whether
+the adapter is HTTP or Socket.IO.
+
 ### Player Intents
 
 Player intents are high-level requests. They are never direct state mutations.
@@ -409,6 +506,74 @@ Required server outputs:
 
 Viewer projection must be computed server-side. The API/socket layer must never
 serialize canonical hidden information and rely on the client to hide it.
+
+### UI Interaction Model
+
+The MVP client uses click-driven interactions.
+
+Expected flow:
+
+1. Player clicks a card, zone, or prompt.
+2. Client asks the current projection which actions are available, or displays
+   actions already included in the projection.
+3. Player clicks an action.
+4. Player selects targets or modes when required.
+5. Client submits one explicit intent.
+6. Server accepts or rejects the intent.
+
+Drag and drop may be added later as a visual shortcut, but it must not become
+the source of truth for rules. The submitted intent remains explicit and
+server-validated.
+
+The board UI should use the attached screenshot as layout inspiration, not as an
+exact implementation target.
+
+Required MVP UI regions:
+
+- Opponent area at the top.
+- Shared battlefield area across the middle.
+- Player base/board area near the bottom.
+- Player hand at the bottom.
+- Legend, champion, deck, rune deck, trash, and banishment zones on side rails
+  or stable board positions.
+- Score display for both players.
+- Current turn, phase, priority, and focus indicator.
+- Chain/showdown panel.
+- Event log panel.
+- Legal action prompt area.
+- Waiting-for-opponent state.
+- Rejected intent/error feedback.
+- Hidden/private card placeholders that match viewer permissions.
+
+Card images should use `media.image_url` from `data/sets/*.json` directly for
+the MVP. A proxy/cache can be added later if remote image loading becomes slow,
+unreliable, or unsuitable for deployment.
+
+## Persistence
+
+MongoDB is the persistence backend for the MVP. Use the native MongoDB Node.js
+driver directly and validate application payloads with Zod at module boundaries.
+
+Initial collections:
+
+| Collection | Purpose |
+| --- | --- |
+| `matches` | Match metadata, players, current game, match score, status, and timestamps. |
+| `games` | Current canonical game snapshot for fast reads and reconnects. |
+| `gameEvents` | Append-only canonical event stream for replay, audit, and debugging. |
+| `deckSnapshots` | Parsed and validated deck submissions, expanded runtime card instances, and source deck text. |
+| `cardCatalogVersions` | Loaded set metadata version/hash so matches can be tied to the catalog used at creation. |
+
+Persistence rules:
+
+- Store canonical snapshots for fast current-state reads.
+- Store append-only events for replay and debugging.
+- Do not persist only deck text; persist validated deck snapshots and expanded
+  runtime card instances.
+- Persist enough catalog version information to know which set data was used for
+  a match.
+- Repository modules live under pure backend code and expose typed methods to the
+  engine and match services.
 
 ## Replayable Event Log
 
@@ -500,19 +665,158 @@ Required tests:
 - Score reaching 8 wins the game immediately.
 - Showdown can be entered, passed through, and closed.
 
-## Open Questions
+### Technical Acceptance
 
-The following items must remain undecided until the rules documents, card data,
-or an explicit product decision resolves them:
+Required tests/checks:
 
-- Exact first Annie vs Lux acceptance scenario script.
-- Exact RNG algorithm and seed serialization.
-- Whether facedown slots are implemented as distinct zones or battlefield
-  sub-objects.
-- Whether opponent projection shows mulligan selected count before resolution.
-- Which Action/Reaction branches, if any, are included in the first showdown MVP.
-- Exact API route names, socket event names, and wire schemas.
-- Persistence backend for canonical events and match state.
-- Sideboarding/reconfiguration implementation timing beyond "documented, not
-  first playable MVP."
+- Pure engine and deck modules run in Node tests without importing Next.js or
+  React.
+- Zod schemas reject malformed transport payloads.
+- MongoDB repositories use the native driver and do not import Mongoose.
+- Socket.IO room join rejects invalid player tokens.
+- Socket.IO broadcasts viewer-specific projections, not canonical state.
+- Reconnect returns the latest projected game state for that player.
+- UI renders public, private, and secret zones differently according to viewer
+  permissions.
 
+## Implementation Order
+
+Build in this order:
+
+1. Scaffold Next.js 15, React 19, TypeScript, Tailwind CSS 4, and shadcn/ui.
+2. Add custom long-running Node server with Next request handling and Socket.IO.
+3. Add pure backend module skeleton under `src/server`.
+4. Add MongoDB native driver connection and repository interfaces.
+5. Implement card catalog loading from `data/sets/*.json`.
+6. Implement Zod-backed deck parsing and strict deck validation.
+7. Persist validated deck snapshots.
+8. Create match and game setup state.
+9. Implement seeded RNG and replay event append.
+10. Implement viewer-safe state projections.
+11. Build basic board UI from projected fixture state.
+12. Add Socket.IO match rooms and reconnect flow.
+13. Add first gameplay intents: draw, channel, pass, end turn.
+14. Add event log panel.
+15. Add showdown enter, pass, and close shell.
+
+## Resolved Implementation Decisions
+
+The following decisions are accepted for the first implementation pass.
+
+### First Annie Vs Lux Scenario
+
+The first acceptance scenario is a scripted "setup to first showdown shell"
+path:
+
+1. Validate Annie and Lux decks.
+2. Create a best-of-3 match.
+3. Select and reveal battlefields through commit-then-reveal.
+4. Determine game 1 starting-player chooser by seeded RNG.
+5. Chooser selects the starting player.
+6. Shuffle decks with seeded RNG.
+7. Draw opening hands.
+8. Both players commit mulligan with zero selected cards.
+9. Start the first turn.
+10. Resolve first turn channel and draw behavior.
+11. Play one simple supported unit.
+12. Move a unit to an empty battlefield.
+13. Enter showdown shell.
+14. Both players pass.
+15. Close showdown.
+
+This scenario intentionally proves setup, projections, turn start, basic intent
+resolution, movement into showdown, and pass/close flow without requiring full
+combat or broad card-effect coverage.
+
+### RNG
+
+Use `seedrandom` with a string seed for MVP deterministic randomness.
+
+Persist:
+
+- `seed`
+- `rngAlgorithm: "seedrandom"`
+- `rngStep`
+- Random event purpose
+- Random event result
+
+This is sufficient for replay and debugging. Competitive entropy or
+cryptographic player commitments can be revisited later.
+
+### Facedown Slots
+
+Model facedown slots as battlefield sub-objects, not independent top-level
+zones.
+
+Each battlefield state should include:
+
+```ts
+facedownSlot: {
+  controllerId: string;
+  cardInstanceId: string;
+} | null;
+```
+
+This preserves the rule shape that each facedown zone is associated with a
+specific battlefield and has maximum occupancy of one card.
+
+### Mulligan Visibility
+
+Before mulligans resolve, opponent projection shows only whether each player is
+locked or not locked.
+
+Do not expose selected card identities or selected count before resolution. After
+resolution, normal public information such as hand count is visible.
+
+### Showdown MVP Branches
+
+The first showdown MVP does not include Action/Reaction card play inside
+showdown.
+
+It includes:
+
+- Enter showdown.
+- Establish relevant players.
+- Establish focus and priority.
+- Pass focus/priority.
+- Track pass sequence.
+- Close showdown after all relevant players pass.
+
+Attempting to play or activate an Action/Reaction during showdown returns an
+unsupported-feature rejection until the chain and card-runtime branches are
+implemented.
+
+### API And Socket Names
+
+Initial HTTP routes:
+
+- `POST /api/decks/validate`
+- `POST /api/matches`
+- `GET /api/matches/:matchId`
+
+Initial Socket.IO events:
+
+- `match:join`
+- `match:intent`
+- `match:state`
+- `match:events`
+- `match:error`
+
+Use one generic `match:intent` event for gameplay actions so validation and
+dispatch stay centralized in the pure intent-handling service.
+
+### Sideboarding Timing
+
+Sideboarding and best-of-3 deck reconfiguration remain out of the MVP
+implementation.
+
+The first implementation repeats games using the original validated deck
+snapshots and enforces battlefield reuse rules. Add sideboarding only after
+setup, projections, replay, and the basic game loop are stable.
+
+## Remaining Open Questions
+
+No open product or implementation questions are currently blocking the first
+implementation pass. New questions should be added here only when they cannot be
+answered from the rules reference, deck validation document, set data, or the
+decisions above.
