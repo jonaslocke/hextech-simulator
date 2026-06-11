@@ -1,0 +1,213 @@
+# Implementation TODO
+
+This checklist follows the accepted implementation order in
+`docs/game_definition.md`. Keep tasks checked only when the behavior is
+implemented, tested, and documented where relevant.
+
+## 1. Project Scaffold
+
+- [x] Create Next.js 15 App Router project structure.
+- [x] Configure React 19 and TypeScript.
+- [x] Install and configure Tailwind CSS 4.
+- [x] Install and initialize shadcn/ui.
+- [x] Add baseline scripts for dev, build, lint, typecheck, and test.
+- [x] Add initial app shell route.
+
+## 2. Custom Node Server And Realtime
+
+- [x] Add custom long-running Node server entrypoint.
+- [x] Wire Next request handling into the custom server.
+- [x] Add Socket.IO server.
+- [x] Add `match:join` socket event.
+- [x] Add `match:intent` socket event.
+- [x] Add `match:state` socket event.
+- [ ] Add `match:events` socket event.
+- [x] Add `match:error` socket event.
+- [ ] Add reconnect flow that returns the latest projected state.
+
+## 3. Backend Module Skeleton
+
+- [x] Create `src/server/catalog`.
+- [x] Create `src/server/db`.
+- [x] Create `src/server/deck`.
+- [x] Create `src/server/engine`.
+- [x] Create `src/server/events`.
+- [x] Create `src/server/match`.
+- [x] Create `src/server/realtime`.
+- [x] Create `src/shared`.
+- [ ] Add boundary tests ensuring pure backend modules do not import Next.js or React.
+
+## 4. MongoDB Persistence
+
+- [x] Add MongoDB native driver dependency.
+- [x] Add database connection module.
+- [ ] Add repository interfaces.
+- [ ] Add `matches` collection repository.
+- [ ] Add `games` collection repository.
+- [ ] Add `gameEvents` collection repository.
+- [ ] Add `deckSnapshots` collection repository.
+- [ ] Add `cardCatalogVersions` collection repository.
+- [ ] Add tests or integration checks for repository serialization.
+- [ ] Confirm Mongoose is not installed or imported.
+
+## 5. Card Catalog
+
+- [x] Load all JSON files from `data/sets`.
+- [x] Validate card metadata shape with Zod.
+- [x] Index cards by name.
+- [x] Index cards by public code.
+- [x] Preserve set ID, type, supertype, domains, tags, attributes, text, and media URL.
+- [x] Compute catalog version/hash.
+- [ ] Persist catalog version metadata.
+- [x] Add tests for Annie/Lux card lookup.
+
+## 6. Deck Parsing And Validation
+
+- [x] Parse official deck sections: `Legend:`, `Champion:`, `Runes:`, `Battlefields:`, `MainDeck:`, optional `Sideboard:`.
+- [x] Reject `Main Deck:` spelling.
+- [x] Resolve every listed card against the catalog.
+- [x] Enforce exactly one Legend.
+- [x] Enforce exactly one Chosen Champion Unit.
+- [x] Enforce main deck size of at least 40 cards counting the chosen champion.
+- [x] Enforce 1-3 copies per MainDeck entry.
+- [x] Enforce max 3 copies across Champion, MainDeck, and Sideboard.
+- [x] Enforce exactly 12 runes.
+- [x] Enforce exactly 3 unique battlefields.
+- [x] Reject duplicate names in MainDeck and Sideboard sections.
+- [x] Enforce section placement by card type.
+- [x] Enforce champion tag compatibility.
+- [x] Enforce domain identity.
+- [x] Enforce signature card limits.
+- [x] Validate `data/decks/annie.dec.txt`.
+- [x] Validate `data/decks/lux.dec.txt`.
+- [x] Add negative validation tests.
+
+## 7. Deck Snapshots
+
+- [x] Expand validated deck entries into stable runtime card instances.
+- [x] Preserve source deck text.
+- [x] Store parsed deck structure.
+- [x] Store catalog version/hash used for validation.
+- [ ] Persist deck snapshots in MongoDB.
+- [x] Add tests that runtime card instance IDs are stable for replay.
+
+## 8. Match And Game Setup
+
+- [ ] Create best-of-3 match model.
+- [ ] Create player seat model.
+- [ ] Generate anonymous player tokens.
+- [ ] Create game model.
+- [ ] Implement game 1 starting-player chooser by seeded RNG.
+- [ ] Implement game 2/3 chooser as previous game loser.
+- [ ] Implement starting player choice intent.
+- [ ] Implement battlefield commit.
+- [ ] Implement battlefield reveal after both players lock.
+- [ ] Enforce used battlefield cannot be reused by same player.
+- [ ] Shuffle main decks with seeded RNG.
+- [ ] Shuffle rune decks with seeded RNG.
+- [ ] Place Legend, Champion, Main Deck, Rune Deck, and Battlefields into zones.
+- [ ] Draw opening hands.
+- [ ] Implement zero-card mulligan for first acceptance scenario.
+- [ ] Add setup tests.
+
+## 9. Seeded RNG And Events
+
+- [ ] Add `seedrandom`.
+- [ ] Store string seed.
+- [ ] Store `rngAlgorithm: "seedrandom"`.
+- [ ] Track `rngStep`.
+- [ ] Log every random operation purpose.
+- [ ] Log every random operation result.
+- [ ] Add deterministic replay tests for chooser selection and deck shuffles.
+
+## 10. Visibility Projections
+
+- [ ] Define canonical state shape.
+- [ ] Define viewer projection shape.
+- [ ] Hide opponent hand identities.
+- [ ] Hide main deck order.
+- [ ] Hide rune deck order.
+- [ ] Show public trash and banishment.
+- [ ] Show face-up board objects.
+- [ ] Model facedown slots as battlefield sub-objects.
+- [ ] Show facedown identity only to controller.
+- [ ] Show mulligan lock state without selected count or identities.
+- [ ] Add projection tests for both players.
+
+## 11. Basic Board UI
+
+- [x] Build app shell with game board route.
+- [x] Add opponent area.
+- [x] Add shared battlefield area.
+- [x] Add player base/board area.
+- [ ] Add player hand area.
+- [x] Add legend and champion zones.
+- [ ] Add deck, rune deck, trash, and banishment zones.
+- [x] Add score display.
+- [x] Add current turn and phase indicator.
+- [x] Add priority and focus indicator.
+- [ ] Add hidden/private placeholders.
+- [x] Render card images from `media.image_url`.
+- [ ] Add responsive layout checks for desktop and mobile.
+
+## 12. Socket Rooms And Reconnect
+
+- [ ] Validate player token on `match:join`.
+- [x] Join socket to match room and player-specific viewer context.
+- [ ] Broadcast viewer-specific `match:state`.
+- [ ] Broadcast viewer-safe `match:events`.
+- [ ] Return latest projected state on reconnect.
+- [x] Reject invalid join attempts with `match:error`.
+- [ ] Add socket tests or integration smoke checks.
+
+## 13. First Gameplay Intents
+
+- [ ] Implement draw intent/action.
+- [ ] Implement channel intent/action.
+- [ ] Implement pass priority/focus intent.
+- [ ] Implement end turn intent.
+- [ ] Enforce state version checks.
+- [ ] Reject unsupported card behavior at intent time.
+- [ ] Keep state unchanged on rejected intents.
+- [ ] Add tests for draw visibility.
+- [ ] Add tests for channel.
+- [ ] Add tests for end turn.
+
+## 14. Event Log Panel
+
+- [ ] Derive human-readable log entries from canonical events.
+- [ ] Add event log UI panel.
+- [ ] Show setup events.
+- [ ] Show draw/channel/pass/end-turn events without leaking hidden identities.
+- [ ] Show rejected intent feedback separately from accepted event log.
+- [ ] Add replay/log projection tests.
+
+## 15. Showdown Shell
+
+- [ ] Detect supported movement into empty battlefield.
+- [ ] Enter showdown state.
+- [ ] Establish relevant players.
+- [ ] Establish focus.
+- [ ] Establish priority.
+- [ ] Track pass sequence.
+- [ ] Close showdown after all relevant players pass.
+- [ ] Reject Action/Reaction play during showdown as unsupported.
+- [ ] Add Annie vs Lux scripted acceptance test through showdown close.
+
+## 16. First End-To-End Acceptance
+
+- [ ] Validate Annie and Lux decks.
+- [ ] Create best-of-3 match.
+- [ ] Select and reveal battlefields.
+- [ ] Choose starting player.
+- [ ] Shuffle decks.
+- [ ] Draw opening hands.
+- [ ] Mulligan zero cards for both players.
+- [ ] Resolve first turn channel and draw.
+- [ ] Play one simple supported unit.
+- [ ] Move a unit to an empty battlefield.
+- [ ] Enter showdown shell.
+- [ ] Both players pass.
+- [ ] Close showdown.
+- [ ] Confirm replay determinism for the scenario.
+- [ ] Confirm both player projections preserve hidden information.
