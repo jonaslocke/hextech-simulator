@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { loadCardCatalog } from "../src/server/catalog";
-import { validateDeckList } from "../src/server/deck";
+import {
+  createDeckSnapshotDocument,
+  persistDeckSnapshot,
+  validateDeckList
+} from "../src/server/deck";
 
 async function loadDeck(filename: string) {
   return readFile(path.join(process.cwd(), "data", "decks", filename), "utf8");
@@ -59,4 +63,56 @@ test("rejects champion that does not match the legend tag", async () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.issues.some((issue) => issue.code === "deck.championTag"), true);
+});
+
+test("creates and persists deck snapshot documents", async () => {
+  const catalog = await loadCardCatalog();
+  const validation = validateDeckList(await loadDeck("annie.dec.txt"), catalog, {
+    ownerId: "annie"
+  });
+  const now = new Date("2026-06-11T00:00:00.000Z");
+
+  assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+
+  if (!validation.ok) {
+    return;
+  }
+
+  const document = createDeckSnapshotDocument({
+    snapshot: validation.snapshot,
+    playerId: "annie",
+    matchId: "match-1",
+    now
+  });
+  let persisted = null as typeof document | null;
+
+  assert.match(document.id, /^deck:annie:[a-f0-9]{64}$/);
+  assert.equal(document.playerId, "annie");
+  assert.equal(document.matchId, "match-1");
+  assert.equal(document.catalogVersionHash, catalog.versionHash);
+  assert.equal(document.snapshot.instances.length, 56);
+  assert.equal(document.createdAt, now.toISOString());
+
+  const result = await persistDeckSnapshot(
+    {
+      async findById() {
+        return null;
+      },
+      async insert() {
+        throw new Error("persistDeckSnapshot should upsert.");
+      },
+      async upsert(nextDocument) {
+        persisted = nextDocument;
+      }
+    },
+    {
+      snapshot: validation.snapshot,
+      playerId: "annie",
+      matchId: "match-1",
+      now
+    }
+  );
+
+  assert.deepEqual(result, document);
+  assert.deepEqual(persisted, document);
 });

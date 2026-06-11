@@ -7,6 +7,7 @@ export type CardCatalog = {
   cards: Card[];
   byName: Map<string, Card>;
   byPublicCode: Map<string, Card>;
+  setFiles: string[];
   versionHash: string;
 };
 
@@ -45,6 +46,7 @@ export async function loadCardCatalog(
     cards,
     byName,
     byPublicCode,
+    setFiles: filenames,
     versionHash: hash.digest("hex")
   };
 }

@@ -35,7 +35,7 @@ implemented, tested, and documented where relevant.
 - [x] Create `src/server/match`.
 - [x] Create `src/server/realtime`.
 - [x] Create `src/shared`.
-- [ ] Add boundary tests ensuring pure backend modules do not import Next.js or React.
+- [x] Add boundary tests ensuring pure backend modules do not import Next.js or React.
 
 ## 4. MongoDB Persistence
 
@@ -58,7 +58,7 @@ implemented, tested, and documented where relevant.
 - [x] Index cards by public code.
 - [x] Preserve set ID, type, supertype, domains, tags, attributes, text, and media URL.
 - [x] Compute catalog version/hash.
-- [ ] Persist catalog version metadata.
+- [x] Persist catalog version metadata.
 - [x] Add tests for Annie/Lux card lookup.
 
 ## 6. Deck Parsing And Validation
@@ -88,7 +88,7 @@ implemented, tested, and documented where relevant.
 - [x] Preserve source deck text.
 - [x] Store parsed deck structure.
 - [x] Store catalog version/hash used for validation.
-- [ ] Persist deck snapshots in MongoDB.
+- [x] Persist deck snapshots in MongoDB.
 - [x] Add tests that runtime card instance IDs are stable for replay.
 
 ## 8. Match And Game Setup
