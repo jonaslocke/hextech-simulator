@@ -1,0 +1,42 @@
+Legend:
+1 Irelia, Blade Dancer
+
+Champion:
+1 Irelia, Fervent
+
+MainDeck:
+3 En Garde
+3 Discipline
+3 Sneaky Deckhand
+3 Not So Fast
+3 Stellacorn Herder
+3 Guardian Angel
+3 Defiant Dance
+2 Charm
+2 Defy
+2 Fight or Flight
+2 Ride the Wind
+2 Lonely Poro
+2 Boots of Swiftness
+1 Rebuke
+1 Stacked Deck
+1 Flash
+1 Hard Bargain
+2 Draven, Audacious
+
+Battlefields:
+1 Obelisk of Power
+1 The Dreaming Tree
+1 Sunken Temple
+
+Runes:
+6 Calm Rune
+6 Chaos Rune
+
+Sideboard:
+2 Tideturner
+2 Factory Recall
+1 Charm
+1 Defy
+1 Zhonya's Hourglass
+1 Rebuke
