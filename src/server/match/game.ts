@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  chooseRandomItem,
+  createRngState,
+  randomOperationSchema,
+  rngStateSchema,
+  type RandomOperation
+} from "../engine";
 
 export const gameStatuses = ["setup_pending", "ready", "in_progress", "complete"] as const;
 
@@ -19,6 +26,7 @@ export const gameSetupStateSchema = z.object({
 });
 
 export const canonicalGameStateSchema = z.object({
+  rng: rngStateSchema,
   setup: gameSetupStateSchema
 });
 
@@ -46,13 +54,21 @@ export type CreateGameInput = {
   matchId: string;
   gameNumber: number;
   playerIds: [string, string];
+  rngSeed?: string;
+};
+
+export type AssignStartingPlayerChooserResult = {
+  game: Game;
+  randomOperation: RandomOperation;
 };
 
 export function createGame(input: CreateGameInput): Game {
   assertDistinctPlayerIds(input.playerIds);
 
+  const id = input.id ?? randomUUID();
   const now = input.now ?? new Date().toISOString();
   const canonicalState: CanonicalGameState = {
+    rng: createRngState(input.rngSeed ?? id),
     setup: {
       playerIds: input.playerIds,
       startingPlayerChooserId: null,
@@ -62,7 +78,7 @@ export function createGame(input: CreateGameInput): Game {
   };
 
   return gameSchema.parse({
-    id: input.id ?? randomUUID(),
+    id,
     createdAt: now,
     updatedAt: now,
     matchId: input.matchId,
@@ -72,6 +88,43 @@ export function createGame(input: CreateGameInput): Game {
     canonicalState,
     winnerPlayerId: null
   });
+}
+
+export function assignGameOneStartingPlayerChooser(
+  game: Game,
+  now = new Date().toISOString()
+): AssignStartingPlayerChooserResult {
+  if (game.gameNumber !== 1) {
+    throw new Error("Only game 1 starting-player chooser is selected by RNG.");
+  }
+
+  if (game.canonicalState.setup.startingPlayerChooserId !== null) {
+    throw new Error("Starting-player chooser has already been assigned.");
+  }
+
+  const choice = chooseRandomItem(
+    game.canonicalState.rng,
+    game.canonicalState.setup.playerIds,
+    "game-1-starting-player-chooser"
+  );
+  const updatedGame = gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      rng: choice.rngState,
+      setup: {
+        ...game.canonicalState.setup,
+        startingPlayerChooserId: choice.value
+      }
+    }
+  });
+
+  return {
+    game: updatedGame,
+    randomOperation: randomOperationSchema.parse(choice.operation)
+  };
 }
 
 function createInitialBattlefieldChoices(

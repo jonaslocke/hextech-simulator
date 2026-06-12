@@ -97,7 +97,7 @@ implemented, tested, and documented where relevant.
 - [x] Create player seat model.
 - [x] Generate anonymous player tokens.
 - [x] Create game model.
-- [ ] Implement game 1 starting-player chooser by seeded RNG.
+- [x] Implement game 1 starting-player chooser by seeded RNG.
 - [ ] Implement game 2/3 chooser as previous game loser.
 - [ ] Implement starting player choice intent.
 - [ ] Implement battlefield commit.
@@ -112,10 +112,10 @@ implemented, tested, and documented where relevant.
 
 ## 9. Seeded RNG And Events
 
-- [ ] Add `seedrandom`.
-- [ ] Store string seed.
-- [ ] Store `rngAlgorithm: "seedrandom"`.
-- [ ] Track `rngStep`.
+- [x] Add `seedrandom`.
+- [x] Store string seed.
+- [x] Store `rngAlgorithm: "seedrandom"`.
+- [x] Track `rngStep`.
 - [ ] Log every random operation purpose.
 - [ ] Log every random operation result.
 - [ ] Add deterministic replay tests for chooser selection and deck shuffles.
