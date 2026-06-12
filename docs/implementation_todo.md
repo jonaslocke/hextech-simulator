@@ -140,14 +140,18 @@ implemented, tested, and documented where relevant.
 - [x] Add opponent area.
 - [x] Add shared battlefield area.
 - [x] Add player base/board area.
-- [ ] Add player hand area.
+- [x] Add player hand area.
 - [x] Add legend and champion zones.
-- [ ] Add deck, rune deck, trash, and banishment zones.
+- [x] Add deck, rune deck, trash, and banishment zones.
 - [x] Add score display.
 - [x] Add current turn and phase indicator.
 - [x] Add priority and focus indicator.
-- [ ] Add hidden/private placeholders.
+- [x] Add hidden/private placeholders.
 - [x] Render card images from `media.image_url`.
+- [x] Keep preview functional and not driven by screenshot-only details.
+- [x] Add temporary action-zone buttons for chain, banish, and game log.
+- [x] Mirror opponent/player board structure.
+- [x] Render player-selected and opponent-selected battlefield zones separately.
 - [ ] Add responsive layout checks for desktop and mobile.
 
 ## 12. Socket Rooms And Reconnect
@@ -176,7 +180,7 @@ implemented, tested, and documented where relevant.
 ## 14. Event Log Panel
 
 - [ ] Derive human-readable log entries from canonical events.
-- [ ] Add event log UI panel.
+- [x] Add event log UI panel.
 - [ ] Show setup events.
 - [ ] Show draw/channel/pass/end-turn events without leaking hidden identities.
 - [ ] Show rejected intent feedback separately from accepted event log.
