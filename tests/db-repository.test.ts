@@ -22,12 +22,14 @@ test("maps application documents to Mongo _id documents and back", () => {
     playerSeats: [
       {
         playerId: "player-a",
-        displayName: "Annie",
+        seat: "player-1",
+        deckSnapshotId: "deck-a",
         tokenHash: "hash-a"
       },
       {
         playerId: "player-b",
-        displayName: "Lux",
+        seat: "player-2",
+        deckSnapshotId: "deck-b",
         tokenHash: "hash-b"
       }
     ],

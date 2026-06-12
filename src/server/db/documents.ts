@@ -1,4 +1,5 @@
 import type { DeckSnapshot } from "../deck";
+import type { MatchFormat, MatchStatus, PlayerSeat } from "../match";
 
 export type BaseDocument = {
   id: string;
@@ -6,15 +7,11 @@ export type BaseDocument = {
   updatedAt: string;
 };
 
-export type PlayerSeatDocument = {
-  playerId: string;
-  displayName: string;
-  tokenHash: string;
-};
+export type PlayerSeatDocument = PlayerSeat;
 
 export type MatchDocument = BaseDocument & {
-  format: "best-of-3";
-  status: "setup_pending" | "ready" | "in_progress" | "complete";
+  format: MatchFormat;
+  status: MatchStatus;
   playerSeats: [PlayerSeatDocument, PlayerSeatDocument];
   currentGameId: string | null;
   gameIds: string[];

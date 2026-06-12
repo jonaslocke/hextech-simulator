@@ -93,8 +93,8 @@ implemented, tested, and documented where relevant.
 
 ## 8. Match And Game Setup
 
-- [ ] Create best-of-3 match model.
-- [ ] Create player seat model.
+- [x] Create best-of-3 match model.
+- [x] Create player seat model.
 - [ ] Generate anonymous player tokens.
 - [ ] Create game model.
 - [ ] Implement game 1 starting-player chooser by seeded RNG.
