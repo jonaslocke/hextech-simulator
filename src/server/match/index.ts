@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  generateAnonymousPlayerToken,
+  type AnonymousPlayerToken
+} from "./tokens";
+
+export * from "./tokens";
 
 export const matchFormats = ["best-of-3"] as const;
 export const matchStatuses = ["setup_pending", "ready", "in_progress", "complete"] as const;
@@ -44,6 +50,13 @@ export type CreateBestOfThreeMatchInput = {
   playerSeats: [CreatePlayerSeatInput, CreatePlayerSeatInput];
 };
 
+export type CreateAnonymousPlayerSeatInput = Omit<CreatePlayerSeatInput, "tokenHash">;
+
+export type AnonymousPlayerSeat = {
+  seat: PlayerSeat;
+  token: AnonymousPlayerToken["token"];
+};
+
 export function createPlayerSeat(input: CreatePlayerSeatInput): PlayerSeat {
   return playerSeatSchema.parse({
     playerId: input.playerId ?? randomUUID(),
@@ -51,6 +64,20 @@ export function createPlayerSeat(input: CreatePlayerSeatInput): PlayerSeat {
     tokenHash: input.tokenHash,
     deckSnapshotId: input.deckSnapshotId ?? null
   });
+}
+
+export function createAnonymousPlayerSeat(
+  input: CreateAnonymousPlayerSeatInput
+): AnonymousPlayerSeat {
+  const token = generateAnonymousPlayerToken();
+
+  return {
+    seat: createPlayerSeat({
+      ...input,
+      tokenHash: token.tokenHash
+    }),
+    token: token.token
+  };
 }
 
 export function createBestOfThreeMatch(input: CreateBestOfThreeMatchInput): Match {

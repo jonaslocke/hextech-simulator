@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  createAnonymousPlayerSeat,
   createBestOfThreeMatch,
   createPlayerSeat,
-  matchSchema
+  generateAnonymousPlayerToken,
+  hashPlayerToken,
+  matchSchema,
+  verifyPlayerToken
 } from "../src/server/match";
 
 test("creates a best-of-3 match with two anonymous player seats", () => {
@@ -54,6 +58,34 @@ test("creates a player seat without requiring a deck snapshot yet", () => {
     tokenHash: "token-hash-a",
     deckSnapshotId: null
   });
+});
+
+test("generates anonymous player tokens as one-time client secrets", () => {
+  const first = generateAnonymousPlayerToken();
+  const second = generateAnonymousPlayerToken();
+
+  assert.notEqual(first.token, second.token);
+  assert.notEqual(first.tokenHash, second.tokenHash);
+  assert.equal(first.tokenHash, hashPlayerToken(first.token));
+  assert.equal(first.tokenHash.length, 64);
+  assert.match(first.token, /^[A-Za-z0-9_-]+$/);
+  assert.equal(verifyPlayerToken(first.token, first.tokenHash), true);
+  assert.equal(verifyPlayerToken(second.token, first.tokenHash), false);
+  assert.equal(verifyPlayerToken(first.token, "not-a-valid-hash"), false);
+});
+
+test("creates an anonymous player seat without storing the raw token", () => {
+  const result = createAnonymousPlayerSeat({
+    playerId: "player-a",
+    seat: "player-1",
+    deckSnapshotId: "deck-a"
+  });
+
+  assert.equal(result.seat.playerId, "player-a");
+  assert.equal(result.seat.seat, "player-1");
+  assert.equal(result.seat.deckSnapshotId, "deck-a");
+  assert.equal(result.seat.tokenHash, hashPlayerToken(result.token));
+  assert.equal("token" in result.seat, false);
 });
 
 test("rejects a match with duplicate seat ids", () => {
