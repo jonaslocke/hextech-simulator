@@ -119,6 +119,7 @@ implemented, tested, and documented where relevant.
 - [ ] Log every random operation purpose.
 - [ ] Log every random operation result.
 - [ ] Add deterministic replay tests for chooser selection and deck shuffles.
+- [ ] Add deterministic replay tests for simultaneous Main Deck recycle ordering.
 
 ## 10. Visibility Projections
 
@@ -166,6 +167,11 @@ implemented, tested, and documented where relevant.
 
 ## 13. First Gameplay Intents
 
+- [ ] Implement recycle action/event.
+- [ ] Recycle Main Deck cards to the bottom of their owner's Main Deck.
+- [ ] Randomize simultaneous 2+ card Main Deck recycle order with seeded RNG.
+- [ ] Recycle Runes to the bottom of their owner's Rune Deck.
+- [ ] Preserve owner-chosen order for simultaneous 2+ Rune Deck recycle.
 - [ ] Implement draw intent/action.
 - [ ] Implement channel intent/action.
 - [ ] Implement pass priority/focus intent.
@@ -175,6 +181,7 @@ implemented, tested, and documented where relevant.
 - [ ] Keep state unchanged on rejected intents.
 - [ ] Add tests for draw visibility.
 - [ ] Add tests for channel.
+- [ ] Add tests for Recycle ordering rules.
 - [ ] Add tests for end turn.
 
 ## 14. Event Log Panel

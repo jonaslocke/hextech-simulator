@@ -162,6 +162,7 @@ Required initial action/event vocabulary:
 | `Hide` | Places an eligible card facedown at a controlled battlefield according to Hidden rules. |
 | `Discard` | Moves cards from hand to owner trash without executing their normal text. |
 | `Reveal` | Temporarily exposes private or secret cards to all players while they remain in their zone. |
+| `Recycle` | Takes one or more cards from a specified zone and places them on the bottom of the corresponding owner deck. Main Deck cards recycle to Main Deck. Runes recycle to Rune Deck. If 2+ cards recycle to Main Deck simultaneously, their bottom-deck order is randomized by seeded server RNG. If 2+ cards recycle to Rune Deck simultaneously, their bottom-deck order is chosen by the owner. |
 | `Counter` | Negates a card or ability on the chain according to rules and puts countered cards into trash. |
 | `Buff` | Adds a buff object/counter to a unit if it does not already have one. |
 | `Banish` | Places cards or permanents into owner banishment. Not Kill or Discard. |
@@ -309,6 +310,9 @@ Mulligan is commit-then-resolve:
 - Server resolves mulligans in turn order.
 - For each player, selected cards are set aside, that player draws the same
   number of cards, then selected cards are recycled.
+- If two selected Main Deck cards are recycled simultaneously, the server uses
+  seeded RNG to place them on the bottom of that player's Main Deck in random
+  order.
 - Canonical log records exact identities.
 - Opponent projection must not reveal selected card identities unless a rule
   explicitly reveals them.
@@ -409,7 +413,7 @@ Required card-runtime workflow:
 Known Annie/Lux surface area includes:
 
 - Verbs/actions: play, draw, move, deal damage, return, ready, channel, conquer,
-  choose, discard, kill, add, cost modification.
+  choose, discard, kill, add, recycle, cost modification.
 - Keywords: Action, Reaction, Add, Vision, Deflect, Assault, Tank.
 
 The presence of a verb or keyword in a fixture deck does not mean the first MVP
@@ -595,7 +599,8 @@ Random operations that must use seeded server RNG:
 - Initial chooser selection for game 1.
 - Main deck shuffles.
 - Rune deck shuffles.
-- Any random ordering required by Recycle or future card effects.
+- Any random ordering required when 2+ cards are Recycled to the Main Deck
+  simultaneously.
 
 Open question: exact RNG algorithm and seed serialization format are not defined
 in the support documents. Implementation must choose and document them before
@@ -657,6 +662,11 @@ Required tests:
 
 - Opening draw draws 4 for each player.
 - Mulligan chooses up to 2, draws replacements, then recycles selected cards.
+- Recycle puts Main Deck cards on the bottom of the Main Deck and Rune cards on
+  the bottom of the Rune Deck.
+- Recycle randomizes simultaneous 2+ card Main Deck recycle order with seeded
+  RNG.
+- Recycle lets the owner choose simultaneous 2+ card Rune Deck recycle order.
 - Draw moves top main-deck card to hand and preserves visibility.
 - Channel moves top rune cards to board.
 - Player going second channels one extra rune on their first Channel Phase.
