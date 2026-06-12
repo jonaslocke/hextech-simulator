@@ -96,7 +96,7 @@ implemented, tested, and documented where relevant.
 - [x] Create best-of-3 match model.
 - [x] Create player seat model.
 - [x] Generate anonymous player tokens.
-- [ ] Create game model.
+- [x] Create game model.
 - [ ] Implement game 1 starting-player chooser by seeded RNG.
 - [ ] Implement game 2/3 chooser as previous game loser.
 - [ ] Implement starting player choice intent.

@@ -1,5 +1,5 @@
 import type { DeckSnapshot } from "../deck";
-import type { MatchFormat, MatchStatus, PlayerSeat } from "../match";
+import type { Game, MatchFormat, MatchStatus, PlayerSeat } from "../match";
 
 export type BaseDocument = {
   id: string;
@@ -19,14 +19,7 @@ export type MatchDocument = BaseDocument & {
   winnerPlayerId: string | null;
 };
 
-export type GameDocument = BaseDocument & {
-  matchId: string;
-  gameNumber: number;
-  status: "setup_pending" | "ready" | "in_progress" | "complete";
-  stateVersion: number;
-  canonicalState: unknown;
-  winnerPlayerId: string | null;
-};
+export type GameDocument = Game;
 
 export type GameEventDocument = BaseDocument & {
   matchId: string;

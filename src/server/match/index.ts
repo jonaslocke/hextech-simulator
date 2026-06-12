@@ -5,6 +5,7 @@ import {
   type AnonymousPlayerToken
 } from "./tokens";
 
+export * from "./game";
 export * from "./tokens";
 
 export const matchFormats = ["best-of-3"] as const;
