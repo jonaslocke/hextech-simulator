@@ -13,17 +13,13 @@ implemented, tested, and documented where relevant.
 - [x] Add baseline scripts for dev, build, lint, typecheck, and test.
 - [x] Add initial app shell route.
 
-## 2. Custom Node Server And Realtime
+## 2. Custom Node Server
 
 - [x] Add custom long-running Node server entrypoint.
 - [x] Wire Next request handling into the custom server.
-- [x] Add Socket.IO server.
-- [x] Add `match:join` socket event.
-- [x] Add `match:intent` socket event.
-- [x] Add `match:state` socket event.
-- [ ] Add `match:events` socket event.
-- [x] Add `match:error` socket event.
-- [ ] Add reconnect flow that returns the latest projected state.
+- [x] Add Socket.IO server scaffold.
+- [x] Add initial socket event scaffold.
+- [x] Defer remaining Socket.IO implementation until the game loop works through pure services and local/HTTP adapters.
 
 ## 3. Backend Module Skeleton
 
@@ -157,17 +153,7 @@ implemented, tested, and documented where relevant.
 - [x] Use neutral, subtle zone labels in mirrored player areas.
 - [ ] Add responsive layout checks for desktop and mobile.
 
-## 12. Socket Rooms And Reconnect
-
-- [ ] Validate player token on `match:join`.
-- [x] Join socket to match room and player-specific viewer context.
-- [ ] Broadcast viewer-specific `match:state`.
-- [ ] Broadcast viewer-safe `match:events`.
-- [ ] Return latest projected state on reconnect.
-- [x] Reject invalid join attempts with `match:error`.
-- [ ] Add socket tests or integration smoke checks.
-
-## 13. First Gameplay Intents
+## 12. First Gameplay Intents
 
 - [ ] Implement recycle action/event.
 - [ ] Recycle Main Deck cards to the bottom of their owner's Main Deck.
@@ -186,7 +172,7 @@ implemented, tested, and documented where relevant.
 - [ ] Add tests for Recycle ordering rules.
 - [ ] Add tests for end turn.
 
-## 14. Event Log Panel
+## 13. Event Log Panel
 
 - [ ] Derive human-readable log entries from canonical events.
 - [x] Add event log UI panel.
@@ -195,7 +181,7 @@ implemented, tested, and documented where relevant.
 - [ ] Show rejected intent feedback separately from accepted event log.
 - [ ] Add game-log projection tests.
 
-## 15. Showdown Shell
+## 14. Showdown Shell
 
 - [ ] Detect supported movement into empty battlefield.
 - [ ] Enter showdown state.
@@ -207,7 +193,7 @@ implemented, tested, and documented where relevant.
 - [ ] Reject Action/Reaction play during showdown as unsupported.
 - [ ] Add Annie vs Lux scripted acceptance test through showdown close.
 
-## 16. First End-To-End Acceptance
+## 15. First End-To-End Acceptance
 
 - [ ] Validate Annie and Lux decks.
 - [ ] Create best-of-3 match.
@@ -224,3 +210,13 @@ implemented, tested, and documented where relevant.
 - [ ] Close showdown.
 - [ ] Confirm game-log audit trail for the scenario.
 - [ ] Confirm both player projections preserve hidden information.
+
+## 16. Deferred Socket Multiplayer
+
+- [ ] Validate player token on `match:join`.
+- [x] Join socket to match room and player-specific viewer context.
+- [ ] Broadcast viewer-specific `match:state`.
+- [ ] Broadcast viewer-safe `match:events`.
+- [ ] Return latest projected state on reconnect.
+- [x] Reject invalid join attempts with `match:error`.
+- [ ] Add socket tests or integration smoke checks.

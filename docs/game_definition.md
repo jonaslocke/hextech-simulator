@@ -51,14 +51,14 @@ The implementation stack is:
 - shadcn/ui for reusable UI primitives.
 - MongoDB with the official native Node.js driver.
 - Zod for schema and payload validation.
-- Socket.IO on a custom long-running Node server for realtime gameplay.
+- Socket.IO on a custom long-running Node server for later realtime multiplayer.
 
 Mongoose must not be used.
 
 The backend must remain pure Node.js/TypeScript code. The game engine,
 repositories, deck validation, card catalog, seeded RNG, event log, realtime
 room orchestration, and match/game services must not import React, Next.js, or UI
-modules.
+modules. Realtime room orchestration is deferred until after the game loop works.
 
 Next.js responsibilities:
 
@@ -75,7 +75,8 @@ Pure backend responsibilities:
 - Validate and resolve player intents.
 - Enforce visibility projections.
 - Persist snapshots and events.
-- Broadcast accepted state changes to match rooms.
+- Produce accepted state changes and projections that can later be broadcast to
+  match rooms.
 
 Recommended source layout:
 
@@ -95,8 +96,8 @@ src/
 ```
 
 The initial deployment assumption is local-first on a long-running Node process.
-This avoids serverless constraints while realtime gameplay, game-log, and
-persistence contracts are still changing.
+This avoids serverless constraints while gameplay, game-log, persistence, and
+later realtime multiplayer contracts are still changing.
 
 ## Core Challenge: Primitives Are Not Only Zone Moves
 
@@ -448,9 +449,12 @@ own.
 
 ### Realtime Transport
 
-Gameplay uses Socket.IO on the custom Node server.
+Socket.IO is the intended realtime multiplayer transport, but it is no longer on
+the critical path for the first working game loop. The MVP should first prove
+the game through pure services, persisted snapshots, canonical game-log events,
+viewer-safe projections, and direct HTTP or local UI adapters.
 
-Socket responsibilities:
+Later Socket responsibilities:
 
 - Join a match room after token validation.
 - Send accepted intent results to relevant viewers.
@@ -461,10 +465,10 @@ Socket responsibilities:
 - Support reconnect by resending the current projected state and recent log
   position.
 
-HTTP routes can still be used for setup or tooling flows such as deck
-validation, match creation, and loading initial app data. Gameplay state changes
-should flow through the same pure intent-handling service regardless of whether
-the adapter is HTTP or Socket.IO.
+HTTP routes can be used for setup, local testing, match creation, loading initial
+app data, and driving gameplay while multiplayer transport is postponed. Gameplay
+state changes must flow through the same pure intent-handling service regardless
+of whether the adapter is HTTP, test code, local UI, or later Socket.IO.
 
 ### Player Intents
 
@@ -688,9 +692,7 @@ Required tests/checks:
   React.
 - Zod schemas reject malformed transport payloads.
 - MongoDB repositories use the native driver and do not import Mongoose.
-- Socket.IO room join rejects invalid player tokens.
-- Socket.IO broadcasts viewer-specific projections, not canonical state.
-- Reconnect returns the latest projected game state for that player.
+- Adapter boundaries call pure services rather than duplicating rules.
 - UI renders public, private, and secret zones differently according to viewer
   permissions.
 
@@ -699,7 +701,7 @@ Required tests/checks:
 Build in this order:
 
 1. Scaffold Next.js 15, React 19, TypeScript, Tailwind CSS 4, and shadcn/ui.
-2. Add custom long-running Node server with Next request handling and Socket.IO.
+2. Add custom long-running Node server with Next request handling.
 3. Add pure backend module skeleton under `src/server`.
 4. Add MongoDB native driver connection and repository interfaces.
 5. Implement card catalog loading from `data/sets/*.json`.
@@ -709,10 +711,11 @@ Build in this order:
 9. Implement seeded RNG and game-log event append.
 10. Implement viewer-safe state projections.
 11. Build basic board UI from projected fixture state.
-12. Add Socket.IO match rooms and reconnect flow.
-13. Add first gameplay intents: draw, channel, pass, end turn.
-14. Add event log panel.
-15. Add showdown enter, pass, and close shell.
+12. Add first gameplay intents: draw, channel, pass, end turn.
+13. Add event log panel.
+14. Add showdown enter, pass, and close shell.
+15. Complete first end-to-end Annie vs Lux acceptance path.
+16. Add Socket.IO match rooms and reconnect flow after the game loop works.
 
 ## Resolved Implementation Decisions
 
@@ -818,7 +821,8 @@ Initial Socket.IO events:
 - `match:error`
 
 Use one generic `match:intent` event for gameplay actions so validation and
-dispatch stay centralized in the pure intent-handling service.
+dispatch stay centralized in the pure intent-handling service. These socket
+events are deferred until after the first working game loop.
 
 ### Sideboarding Timing
 
