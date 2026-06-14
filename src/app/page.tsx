@@ -1,7 +1,11 @@
-import { BoardPreview } from "@/components/game/board-preview";
 import { gameEventTypes, projectGameEventsForPlayer } from "@/server/events";
-import { loadCardCatalog, requireCardByName, type Card } from "@/server/catalog";
+import {
+  loadCardCatalog,
+  requireCardByName,
+  type Card,
+} from "@/server/catalog";
 import { createGame, gameSchema, projectGameForPlayer } from "@/server/match";
+import { BoardPreview } from "../../features/game-board";
 
 export default async function Home() {
   const catalog = await loadCardCatalog();
@@ -11,7 +15,7 @@ export default async function Home() {
     matchId: "ui-match-1",
     gameNumber: 1,
     playerIds: ["player-a", "player-b"],
-    rngSeed: "ui-fixture-seed"
+    rngSeed: "ui-fixture-seed",
   });
   const game = gameSchema.parse({
     ...baseGame,
@@ -23,14 +27,14 @@ export default async function Home() {
         turnNumber: 3,
         activePlayerId: "player-a",
         phase: "action",
-        passedPlayerIds: []
+        passedPlayerIds: [],
       },
       showdown: {
         battlefieldId: "battlefield-a",
         relevantPlayerIds: ["player-a", "player-b"],
         focusPlayerId: "player-a",
         priorityPlayerId: "player-a",
-        passedPlayerIds: []
+        passedPlayerIds: [],
       },
       battlefields: [
         {
@@ -38,15 +42,15 @@ export default async function Home() {
           selectedByPlayerId: "player-a",
           cardInstanceId: "player-a-battlefield",
           units: ["player-a-unit-1"],
-          facedownSlot: null
+          facedownSlot: null,
         },
         {
           battlefieldId: "battlefield-b",
           selectedByPlayerId: "player-b",
           cardInstanceId: "player-b-battlefield",
           units: ["player-b-unit-1"],
-          facedownSlot: null
-        }
+          facedownSlot: null,
+        },
       ],
       players: {
         "player-a": {
@@ -60,12 +64,12 @@ export default async function Home() {
               "player-a-hand-1",
               "player-a-hand-2",
               "player-a-hand-3",
-              "player-a-hand-4"
+              "player-a-hand-4",
             ],
             trash: [],
             banishment: [],
-            base: ["player-a-rune-1", "player-a-rune-2", "player-a-unit-2"]
-          }
+            base: ["player-a-rune-1", "player-a-rune-2", "player-a-unit-2"],
+          },
         },
         "player-b": {
           playerId: "player-b",
@@ -77,11 +81,11 @@ export default async function Home() {
             hand: ["player-b-hand-1", "player-b-hand-2", "player-b-hand-3"],
             trash: [],
             banishment: [],
-            base: ["player-b-rune-1", "player-b-unit-2"]
-          }
-        }
-      }
-    }
+            base: ["player-b-rune-1", "player-b-unit-2"],
+          },
+        },
+      },
+    },
   });
   const projection = projectGameForPlayer(game, "player-a");
   const logEntries = projectGameEventsForPlayer(
@@ -100,10 +104,10 @@ export default async function Home() {
             type: "game.moveUnitToBattlefield",
             payload: {
               unitCardInstanceId: "player-a-unit-1",
-              battlefieldId: "battlefield-a"
-            }
-          }
-        }
+              battlefieldId: "battlefield-a",
+            },
+          },
+        },
       },
       {
         id: "ui-event-2",
@@ -116,24 +120,20 @@ export default async function Home() {
         actorPlayerId: null,
         payload: {
           decision: {
-            type: "showdown.enter"
-          }
-        }
-      }
+            type: "showdown.enter",
+          },
+        },
+      },
     ],
-    "player-a"
+    "player-a",
   );
 
-  return (
-    <BoardPreview
-      cardsByInstanceId={cardsByInstanceId}
-      logEntries={logEntries}
-      projection={projection}
-    />
-  );
+  return <BoardPreview />;
 }
 
-function createFixtureCards(catalog: Awaited<ReturnType<typeof loadCardCatalog>>) {
+function createFixtureCards(
+  catalog: Awaited<ReturnType<typeof loadCardCatalog>>,
+) {
   const cards = {
     annieChampion: requireCardByName(catalog, "Annie, Stubborn"),
     annieLegend: requireCardByName(catalog, "Dark Child - Starter"),
@@ -147,7 +147,7 @@ function createFixtureCards(catalog: Awaited<ReturnType<typeof loadCardCatalog>>
     mysticPoro: requireCardByName(catalog, "Mystic Poro"),
     obelisk: requireCardByName(catalog, "Obelisk of Power"),
     reaversRow: requireCardByName(catalog, "Reaver's Row"),
-    sneakyDeckhand: requireCardByName(catalog, "Sneaky Deckhand")
+    sneakyDeckhand: requireCardByName(catalog, "Sneaky Deckhand"),
   };
 
   return {
@@ -167,6 +167,6 @@ function createFixtureCards(catalog: Awaited<ReturnType<typeof loadCardCatalog>>
     "player-b-legend": cards.luxLegend,
     "player-b-rune-1": cards.chaosRune,
     "player-b-unit-1": cards.luxChampion,
-    "player-b-unit-2": cards.mysticPoro
+    "player-b-unit-2": cards.mysticPoro,
   } satisfies Record<string, Card>;
 }

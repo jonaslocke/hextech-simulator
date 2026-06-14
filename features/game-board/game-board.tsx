@@ -1,6 +1,5 @@
 "use client";
 
-import type { Card } from "@/server/catalog";
 import { ComponentProps, useState } from "react";
 import { ActionRail } from "./components/ActionRail";
 import { ScoreHeader } from "./components/ScoreHeader";
@@ -26,31 +25,7 @@ const ASPIRANTS_CLIMB = {
 
 type TemporaryZone = "chain" | "banish" | "log" | null;
 
-type BoardPreviewProps = {
-  annieLegend: Card;
-  luxLegend: Card;
-  annieChampion: Card;
-  luxChampion: Card;
-  playerBattlefield: Card;
-  opponentBattlefield: Card;
-  playerHand: Card[];
-  playerRunes: Card[];
-  playerUnits: Card[];
-  opponentUnits: Card[];
-};
-
-export function BoardPreview({
-  annieLegend,
-  luxLegend,
-  annieChampion,
-  luxChampion,
-  playerBattlefield,
-  opponentBattlefield,
-  playerHand,
-  playerRunes,
-  playerUnits,
-  opponentUnits,
-}: BoardPreviewProps) {
+export function BoardPreview() {
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
 
   return (
