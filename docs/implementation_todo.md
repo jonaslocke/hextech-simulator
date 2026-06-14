@@ -89,7 +89,7 @@ implemented, tested, and documented where relevant.
 - [x] Store parsed deck structure.
 - [x] Store catalog version/hash used for validation.
 - [x] Persist deck snapshots in MongoDB.
-- [x] Add tests that runtime card instance IDs are stable for replay.
+- [x] Add tests that runtime card instance IDs are stable for audit/log correlation.
 
 ## 8. Match And Game Setup
 
@@ -118,8 +118,8 @@ implemented, tested, and documented where relevant.
 - [x] Track `rngStep`.
 - [x] Log every random operation purpose.
 - [x] Log every random operation result.
-- [ ] Add deterministic replay tests for chooser selection and deck shuffles.
-- [ ] Add deterministic replay tests for simultaneous Main Deck recycle ordering.
+- [x] Add game-log event tests for chooser selection and deck shuffles.
+- [ ] Add game-log event tests for simultaneous Main Deck recycle ordering.
 
 ## 10. Visibility Projections
 
@@ -193,7 +193,7 @@ implemented, tested, and documented where relevant.
 - [ ] Show setup events.
 - [ ] Show draw/channel/pass/end-turn events without leaking hidden identities.
 - [ ] Show rejected intent feedback separately from accepted event log.
-- [ ] Add replay/log projection tests.
+- [ ] Add game-log projection tests.
 
 ## 15. Showdown Shell
 
@@ -222,5 +222,5 @@ implemented, tested, and documented where relevant.
 - [ ] Enter showdown shell.
 - [ ] Both players pass.
 - [ ] Close showdown.
-- [ ] Confirm replay determinism for the scenario.
+- [ ] Confirm game-log audit trail for the scenario.
 - [ ] Confirm both player projections preserve hidden information.

@@ -95,7 +95,7 @@ src/
 ```
 
 The initial deployment assumption is local-first on a long-running Node process.
-This avoids serverless constraints while realtime gameplay, replay, and
+This avoids serverless constraints while realtime gameplay, game-log, and
 persistence contracts are still changing.
 
 ## Core Challenge: Primitives Are Not Only Zone Moves
@@ -145,7 +145,8 @@ Required low-level transition families:
   buffs, and delayed effects.
 
 Low-level transitions must be deterministic, validated by the rules action that
-requested them, and recorded in enough detail for replay.
+requested them, and recorded in enough detail for the player-facing game log and
+server-side audit trail.
 
 ### Rules Actions And Events
 
@@ -215,8 +216,8 @@ Zone definitions must record:
 
 Open question: whether the implementation should model `facedown` as a separate
 zone collection or as a property of the battlefield's facedown slot. Either is
-acceptable only if the visibility, capacity, cleanup, and replay behavior above
-are preserved.
+acceptable only if the visibility, capacity, cleanup, and future reconstruction
+compatibility above are preserved. Replay is not MVP scope.
 
 ## Deck Validation
 
@@ -564,14 +565,14 @@ Initial collections:
 | --- | --- |
 | `matches` | Match metadata, players, current game, match score, status, and timestamps. |
 | `games` | Current canonical game snapshot for fast reads and reconnects. |
-| `gameEvents` | Append-only canonical event stream for replay, audit, and debugging. |
+| `gameEvents` | Append-only canonical event stream for player-facing game log, audit, and debugging. |
 | `deckSnapshots` | Parsed and validated deck submissions, expanded runtime card instances, and source deck text. |
 | `cardCatalogVersions` | Loaded set metadata version/hash so matches can be tied to the catalog used at creation. |
 
 Persistence rules:
 
 - Store canonical snapshots for fast current-state reads.
-- Store append-only events for replay and debugging.
+- Store append-only events for player-facing game log, audit, and debugging.
 - Do not persist only deck text; persist validated deck snapshots and expanded
   runtime card instances.
 - Persist enough catalog version information to know which set data was used for
@@ -579,20 +580,21 @@ Persistence rules:
 - Repository modules live under pure backend code and expose typed methods to the
   engine and match services.
 
-## Replayable Event Log
+## Game Log And Audit Event Stream
 
-The event log is the primary audit and replay source.
+The event log is the primary audit and player-facing game-log source.
 
 Requirements:
 
 - Log every accepted player intent.
 - Log deterministic server decisions.
-- Log RNG seed and random operation results, or enough RNG operation metadata to
-  replay exactly.
+- Log RNG seed, random operation purpose, and random operation result so the game
+  log can explain random decisions.
 - Log zone/object changes at canonical identity level.
-- Log hidden information canonically for replay.
+- Log hidden information canonically server-side for audit/debugging.
 - Derive viewer-safe event projections for clients.
 - Derive human-readable game log from canonical events.
+- Do not expose hidden card identities in opponent event projections.
 
 Random operations that must use seeded server RNG:
 
@@ -602,9 +604,9 @@ Random operations that must use seeded server RNG:
 - Any random ordering required when 2+ cards are Recycled to the Main Deck
   simultaneously.
 
-Open question: exact RNG algorithm and seed serialization format are not defined
-in the support documents. Implementation must choose and document them before
-writing replay tests.
+Replay/reconstruction is explicitly out of MVP scope. Event detail should not be
+reduced in a way that blocks future replay, but no replay engine or replay tests
+are required for MVP.
 
 ## Testing And Acceptance
 
@@ -648,13 +650,16 @@ Required tests:
 - Facedown battlefield cards reveal identity only to their controller.
 - Mulligan committed card identities are not exposed to opponent projection.
 
-### Replay
+### Game Log And Audit
 
 Required tests:
 
-- Same seed plus same accepted intents reconstructs the same canonical state.
+- Accepted intents append canonical events.
 - Rejected intents do not alter event stream or state.
-- Viewer-safe replay projections do not leak hidden identities.
+- Viewer-safe event projections do not leak hidden identities.
+- RNG events include seed, algorithm, step, purpose, and result.
+- Human-readable game log entries are derived from canonical events without
+  leaking hidden information.
 
 ### MVP Gameplay
 
@@ -701,7 +706,7 @@ Build in this order:
 6. Implement Zod-backed deck parsing and strict deck validation.
 7. Persist validated deck snapshots.
 8. Create match and game setup state.
-9. Implement seeded RNG and replay event append.
+9. Implement seeded RNG and game-log event append.
 10. Implement viewer-safe state projections.
 11. Build basic board UI from projected fixture state.
 12. Add Socket.IO match rooms and reconnect flow.
@@ -750,8 +755,8 @@ Persist:
 - Random event purpose
 - Random event result
 
-This is sufficient for replay and debugging. Competitive entropy or
-cryptographic player commitments can be revisited later.
+This is sufficient for game-log audit/debugging and future replay compatibility.
+Competitive entropy or cryptographic player commitments can be revisited later.
 
 ### Facedown Slots
 
@@ -822,7 +827,7 @@ implementation.
 
 The first implementation repeats games using the original validated deck
 snapshots and enforces battlefield reuse rules. Add sideboarding only after
-setup, projections, replay, and the basic game loop are stable.
+setup, projections, game-log audit, and the basic game loop are stable.
 
 ## Remaining Open Questions
 
