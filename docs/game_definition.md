@@ -452,7 +452,7 @@ own.
 Socket.IO is the intended realtime multiplayer transport, but it is no longer on
 the critical path for the first working game loop. The MVP should first prove
 the game through pure services, persisted snapshots, canonical game-log events,
-viewer-safe projections, and direct HTTP or local UI adapters.
+viewer-safe projections, and an HTTP intent API.
 
 Later Socket responsibilities:
 
@@ -465,10 +465,11 @@ Later Socket responsibilities:
 - Support reconnect by resending the current projected state and recent log
   position.
 
-HTTP routes can be used for setup, local testing, match creation, loading initial
-app data, and driving gameplay while multiplayer transport is postponed. Gameplay
-state changes must flow through the same pure intent-handling service regardless
-of whether the adapter is HTTP, test code, local UI, or later Socket.IO.
+HTTP routes are the accepted adapter for setup, local testing, match creation,
+loading initial app data, and driving gameplay while multiplayer transport is
+postponed. Gameplay state changes must flow through the same pure
+intent-handling service regardless of whether the adapter is HTTP, test code, or
+later Socket.IO.
 
 ### Player Intents
 
@@ -503,6 +504,30 @@ The server response must be one of:
 - Accepted with resulting events and updated projected state.
 - Rejected with stable error code, message, source rule/card if known, and no
   state change.
+
+### Intent HTTP API
+
+The MVP uses a single gameplay intent API route before Socket.IO multiplayer is
+implemented.
+
+Initial route:
+
+- `POST /api/matches/:matchId/intents`
+
+Responsibilities:
+
+- Validate request shape with Zod.
+- Validate the player token and resolve it to exactly one match seat.
+- Check the client-known state version.
+- Call the pure intent-handling service.
+- Persist the updated canonical game snapshot when accepted.
+- Append canonical game-log events when accepted.
+- Return only the acting viewer's legal projection and viewer-safe log entries.
+- Return a stable rejection response with no state or event mutation when
+  illegal or unsupported.
+
+The route must not implement rules directly. Later Socket.IO `match:intent`
+handling must call the same pure intent-handling service.
 
 ### Server Outputs
 
@@ -811,6 +836,7 @@ Initial HTTP routes:
 - `POST /api/decks/validate`
 - `POST /api/matches`
 - `GET /api/matches/:matchId`
+- `POST /api/matches/:matchId/intents`
 
 Initial Socket.IO events:
 

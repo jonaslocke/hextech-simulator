@@ -19,7 +19,7 @@ implemented, tested, and documented where relevant.
 - [x] Wire Next request handling into the custom server.
 - [x] Add Socket.IO server scaffold.
 - [x] Add initial socket event scaffold.
-- [x] Defer remaining Socket.IO implementation until the game loop works through pure services and local/HTTP adapters.
+- [x] Defer remaining Socket.IO implementation until the game loop works through pure services and the HTTP intent API.
 
 ## 3. Backend Module Skeleton
 
@@ -155,6 +155,13 @@ implemented, tested, and documented where relevant.
 
 ## 12. First Gameplay Intents
 
+- [ ] Define Zod schema for `POST /api/matches/:matchId/intents`.
+- [ ] Implement HTTP intent route that validates token, match, game, payload, and state version.
+- [ ] Implement pure intent-handling service shared by HTTP now and Socket.IO later.
+- [ ] Persist accepted intent game snapshots.
+- [ ] Append accepted intent game-log events.
+- [ ] Return viewer-safe projection and log entries from accepted intents.
+- [ ] Return stable rejection response without mutating state or events.
 - [ ] Implement recycle action/event.
 - [ ] Recycle Main Deck cards to the bottom of their owner's Main Deck.
 - [ ] Randomize simultaneous 2+ card Main Deck recycle order with seeded RNG.
