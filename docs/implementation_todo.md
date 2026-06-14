@@ -99,7 +99,7 @@ implemented, tested, and documented where relevant.
 - [x] Create game model.
 - [x] Implement game 1 starting-player chooser by seeded RNG.
 - [x] Implement game 2/3 chooser as previous game loser.
-- [ ] Implement starting player choice intent.
+- [x] Implement starting player choice intent.
 - [ ] Implement battlefield commit.
 - [ ] Implement battlefield reveal after both players lock.
 - [ ] Enforce used battlefield cannot be reused by same player.

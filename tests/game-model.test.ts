@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   assignGameOneStartingPlayerChooser,
   assignPreviousGameLoserStartingPlayerChooser,
+  chooseStartingPlayer,
   createGame,
   type Game,
   gameSchema
@@ -265,11 +266,150 @@ test("rejects previous game loser chooser assignment for different players", () 
   );
 });
 
+test("lets the assigned chooser choose either player as starting player", () => {
+  const game = withStartingPlayerChooser(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+
+  const result = chooseStartingPlayer(game, {
+    actorPlayerId: "player-a",
+    startingPlayerId: "player-b",
+    now: "2026-06-12T03:00:00.000Z"
+  });
+
+  assert.equal(result.canonicalState.setup.startingPlayerId, "player-b");
+  assert.equal(result.stateVersion, game.stateVersion + 1);
+  assert.equal(result.updatedAt, "2026-06-12T03:00:00.000Z");
+});
+
+test("rejects starting player choice before chooser assignment", () => {
+  const game = createGame({
+    matchId: "match-1",
+    gameNumber: 1,
+    playerIds: ["player-a", "player-b"]
+  });
+
+  assert.throws(
+    () =>
+      chooseStartingPlayer(game, {
+        actorPlayerId: "player-a",
+        startingPlayerId: "player-a"
+      }),
+    /chooser has not been assigned/
+  );
+});
+
+test("rejects starting player choice from non-chooser", () => {
+  const game = withStartingPlayerChooser(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+
+  assert.throws(
+    () =>
+      chooseStartingPlayer(game, {
+        actorPlayerId: "player-b",
+        startingPlayerId: "player-b"
+      }),
+    /Only the assigned/
+  );
+});
+
+test("rejects starting player choice for a non-player", () => {
+  const game = withStartingPlayerChooser(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+
+  assert.throws(
+    () =>
+      chooseStartingPlayer(game, {
+        actorPlayerId: "player-a",
+        startingPlayerId: "player-c"
+      }),
+    /one of the game players/
+  );
+});
+
+test("rejects choosing starting player twice", () => {
+  const game = withStartingPlayerChooser(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+  const result = chooseStartingPlayer(game, {
+    actorPlayerId: "player-a",
+    startingPlayerId: "player-b"
+  });
+
+  assert.throws(
+    () =>
+      chooseStartingPlayer(result, {
+        actorPlayerId: "player-a",
+        startingPlayerId: "player-a"
+      }),
+    /already been chosen/
+  );
+});
+
+test("rejects starting player choice outside setup", () => {
+  const game = gameSchema.parse({
+    ...withStartingPlayerChooser(
+      createGame({
+        matchId: "match-1",
+        gameNumber: 1,
+        playerIds: ["player-a", "player-b"]
+      }),
+      "player-a"
+    ),
+    status: "in_progress"
+  });
+
+  assert.throws(
+    () =>
+      chooseStartingPlayer(game, {
+        actorPlayerId: "player-a",
+        startingPlayerId: "player-a"
+      }),
+    /during setup/
+  );
+});
+
 function completeGame(game: Game, winnerPlayerId: string): Game {
   return gameSchema.parse({
     ...game,
     status: "complete",
     winnerPlayerId,
     stateVersion: game.stateVersion + 1
+  });
+}
+
+function withStartingPlayerChooser(game: Game, chooserId: string): Game {
+  return gameSchema.parse({
+    ...game,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      setup: {
+        ...game.canonicalState.setup,
+        startingPlayerChooserId: chooserId
+      }
+    }
   });
 }

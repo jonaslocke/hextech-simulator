@@ -7,6 +7,13 @@ export const playerCredentialsSchema = z.object({
 
 export const matchJoinPayloadSchema = playerCredentialsSchema;
 
+export const chooseStartingPlayerIntentSchema = z.object({
+  type: z.literal("setup.chooseStartingPlayer"),
+  payload: z.object({
+    startingPlayerId: z.string().min(1)
+  })
+});
+
 export const matchIntentPayloadSchema = playerCredentialsSchema.extend({
   gameId: z.string().min(1).optional(),
   stateVersion: z.number().int().nonnegative(),
@@ -18,3 +25,6 @@ export const matchIntentPayloadSchema = playerCredentialsSchema.extend({
 
 export type MatchJoinPayload = z.infer<typeof matchJoinPayloadSchema>;
 export type MatchIntentPayload = z.infer<typeof matchIntentPayloadSchema>;
+export type ChooseStartingPlayerIntent = z.infer<
+  typeof chooseStartingPlayerIntentSchema
+>;

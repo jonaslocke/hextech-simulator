@@ -67,6 +67,12 @@ export type AssignPreviousGameLoserChooserResult = {
   previousGameLoserId: string;
 };
 
+export type ChooseStartingPlayerInput = {
+  actorPlayerId: string;
+  startingPlayerId: string;
+  now?: string;
+};
+
 export function createGame(input: CreateGameInput): Game {
   assertDistinctPlayerIds(input.playerIds);
 
@@ -178,6 +184,46 @@ export function assignPreviousGameLoserStartingPlayerChooser(
     }),
     previousGameLoserId
   };
+}
+
+export function chooseStartingPlayer(
+  game: Game,
+  input: ChooseStartingPlayerInput
+): Game {
+  const chooserId = game.canonicalState.setup.startingPlayerChooserId;
+
+  if (game.status !== "setup_pending") {
+    throw new Error("Starting player can only be chosen during setup.");
+  }
+
+  if (chooserId === null) {
+    throw new Error("Starting-player chooser has not been assigned.");
+  }
+
+  if (game.canonicalState.setup.startingPlayerId !== null) {
+    throw new Error("Starting player has already been chosen.");
+  }
+
+  if (input.actorPlayerId !== chooserId) {
+    throw new Error("Only the assigned starting-player chooser can choose.");
+  }
+
+  if (!game.canonicalState.setup.playerIds.includes(input.startingPlayerId)) {
+    throw new Error("Starting player must be one of the game players.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      setup: {
+        ...game.canonicalState.setup,
+        startingPlayerId: input.startingPlayerId
+      }
+    }
+  });
 }
 
 function createInitialBattlefieldChoices(
