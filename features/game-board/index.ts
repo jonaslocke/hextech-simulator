@@ -1,1 +1,1 @@
-export { BoardPreview } from "./game-board";
+export { GameBoard } from "./game-board";

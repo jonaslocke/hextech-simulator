@@ -1,11 +1,44 @@
-import { gameEventTypes, projectGameEventsForPlayer } from "@/server/events";
 import {
   loadCardCatalog,
   requireCardByName,
   type Card,
 } from "@/server/catalog";
+import { gameEventTypes, projectGameEventsForPlayer } from "@/server/events";
 import { createGame, gameSchema, projectGameForPlayer } from "@/server/match";
-import { BoardPreview } from "../../features/game-board";
+import { GameBoard } from "../../features/game-board";
+import { GameObject } from "../../features/game-board/types";
+import { ComponentProps } from "react";
+import { BattlefieldBoard } from "../../features/game-board/components/battlefield-board";
+
+const EMPERORS_DAIS = {
+  name: "Emperor's Dais",
+  description:
+    "When you conquer here, you may pay [1] and return a unit you control here to its owner's hand. If you do, play a 2 [Might] Sand Soldier unit token here.",
+  opponentUnits: [],
+  playerUnits: [],
+  img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c1ea4f6f58a62fc2b62647aa3459109e3d10297a-1039x744.png",
+} as ComponentProps<typeof BattlefieldBoard>["battlefield"];
+
+const ASPIRANTS_CLIMB = {
+  name: "Aspirant's Climb",
+  description: "Increase the points needed to win the game by 1.",
+  opponentUnits: [],
+  playerUnits: [],
+  img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/9301593f3800e68427469d38181b578a672473c3-1038x744.png",
+} as ComponentProps<typeof BattlefieldBoard>["battlefield"];
+
+const GAME_OBJECT = {
+  opponent: {
+    name: "Alanzq1",
+    score: 0,
+    battlefield: EMPERORS_DAIS,
+  },
+  player: {
+    name: "Prismaticician",
+    score: 1,
+    battlefield: ASPIRANTS_CLIMB,
+  },
+} as GameObject;
 
 export default async function Home() {
   const catalog = await loadCardCatalog();
@@ -128,7 +161,7 @@ export default async function Home() {
     "player-a",
   );
 
-  return <BoardPreview />;
+  return <GameBoard {...GAME_OBJECT} />;
 }
 
 function createFixtureCards(
