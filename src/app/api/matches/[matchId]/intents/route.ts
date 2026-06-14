@@ -31,5 +31,16 @@ export async function POST(
     matchId
   });
 
-  return NextResponse.json(result, { status: result.accepted ? 200 : 400 });
+  if (!result.accepted) {
+    return NextResponse.json(result, { status: 400 });
+  }
+
+  return NextResponse.json(
+    {
+      accepted: true,
+      projection: result.projection,
+      logEntries: result.logEntries
+    },
+    { status: 200 }
+  );
 }

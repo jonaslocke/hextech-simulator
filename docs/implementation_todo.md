@@ -181,12 +181,12 @@ implemented, tested, and documented where relevant.
 
 ## 13. Event Log Panel
 
-- [ ] Derive human-readable log entries from canonical events.
+- [x] Derive human-readable log entries from canonical events.
 - [x] Add event log UI panel.
-- [ ] Show setup events.
-- [ ] Show draw/channel/pass/end-turn events without leaking hidden identities.
-- [ ] Show rejected intent feedback separately from accepted event log.
-- [ ] Add game-log projection tests.
+- [x] Show setup events.
+- [x] Show draw/channel/pass/end-turn events without leaking hidden identities.
+- [x] Show rejected intent feedback separately from accepted event log.
+- [x] Add game-log projection tests.
 
 ## 14. Showdown Shell
 

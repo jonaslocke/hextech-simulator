@@ -64,6 +64,10 @@ test("intent service accepts setup intents, persists game, appends event, and re
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0]?.type, gameEventTypes.playerIntentAccepted);
   assert.equal(result.events[0]?.actorPlayerId, "player-a");
+  assert.deepEqual(
+    result.logEntries.map((entry) => entry.message),
+    ["You chose the starting player."]
+  );
   assert.deepEqual(result.events[0]?.payload, {
     intent: {
       type: "setup.chooseStartingPlayer",

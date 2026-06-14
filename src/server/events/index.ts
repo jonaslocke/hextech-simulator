@@ -96,3 +96,150 @@ export function createServerDecisionEvent(
     }
   };
 }
+
+export type GameLogEntry = {
+  id: string;
+  sequence: number;
+  createdAt: string;
+  type: string;
+  actorPlayerId: string | null;
+  message: string;
+};
+
+export function projectGameEventsForPlayer(
+  events: GameEventDocument[],
+  viewerPlayerId: string
+): GameLogEntry[] {
+  return events.map((event) => ({
+    id: event.id,
+    sequence: event.sequence,
+    createdAt: event.createdAt,
+    type: event.type,
+    actorPlayerId: event.actorPlayerId,
+    message: renderEventMessage(event, viewerPlayerId)
+  }));
+}
+
+function renderEventMessage(event: GameEventDocument, viewerPlayerId: string): string {
+  if (event.type === gameEventTypes.playerIntentAccepted) {
+    return renderIntentMessage(event, viewerPlayerId);
+  }
+
+  if (event.type === gameEventTypes.serverDecision) {
+    return renderServerDecisionMessage(event);
+  }
+
+  if (event.type === gameEventTypes.rngOperation) {
+    return renderRandomOperationMessage(event);
+  }
+
+  return "Game event recorded.";
+}
+
+function renderIntentMessage(
+  event: GameEventDocument,
+  viewerPlayerId: string
+): string {
+  const payload = event.payload as {
+    intent?: {
+      type?: string;
+      payload?: unknown;
+    };
+  };
+  const actor = formatActor(event.actorPlayerId, viewerPlayerId);
+  const intent = payload.intent;
+
+  switch (intent?.type) {
+    case "setup.chooseStartingPlayer":
+      return `${actor} chose the starting player.`;
+    case "setup.lockBattlefieldChoice":
+      return `${actor} locked a battlefield choice.`;
+    case "setup.commitMulligan":
+      return `${actor} committed mulligan.`;
+    case "game.draw":
+      return `${actor} drew ${formatCount(readCount(intent.payload), "card")}.`;
+    case "game.channel":
+      return `${actor} channeled ${formatCount(readCount(intent.payload), "rune")}.`;
+    case "game.recycle": {
+      const recyclePayload = intent.payload as
+        | {
+            cardInstanceIds?: unknown[];
+            destinationDeck?: string;
+          }
+        | undefined;
+      const count = recyclePayload?.cardInstanceIds?.length ?? 0;
+      const destination =
+        recyclePayload?.destinationDeck === "runeDeck" ? "Rune Deck" : "Main Deck";
+
+      return `${actor} recycled ${formatCount(count, "card")} to ${destination}.`;
+    }
+    case "game.pass":
+      return `${actor} passed.`;
+    case "game.endTurn":
+      return `${actor} ended the turn.`;
+    default:
+      return `${actor} submitted an unsupported intent.`;
+  }
+}
+
+function renderServerDecisionMessage(event: GameEventDocument): string {
+  const payload = event.payload as {
+    decision?: {
+      type?: string;
+    };
+  };
+
+  switch (payload.decision?.type) {
+    case "setup.revealBattlefieldChoices":
+      return "Server revealed battlefield choices.";
+    case "game.start":
+      return "Server started the game.";
+    default:
+      return "Server decision recorded.";
+  }
+}
+
+function renderRandomOperationMessage(event: GameEventDocument): string {
+  const payload = event.payload as {
+    operation?: {
+      purpose?: string;
+    };
+  };
+  const purpose = payload.operation?.purpose;
+
+  if (purpose?.startsWith("shuffle-main-deck")) {
+    return "Server shuffled a Main Deck.";
+  }
+
+  if (purpose?.startsWith("shuffle-rune-deck")) {
+    return "Server shuffled a Rune Deck.";
+  }
+
+  if (purpose?.startsWith("recycle-main-deck")) {
+    return "Server randomized recycled Main Deck card order.";
+  }
+
+  if (purpose === "game-1-starting-player-chooser") {
+    return "Server randomly selected the starting-player chooser.";
+  }
+
+  return "Server used seeded randomness.";
+}
+
+function formatActor(actorPlayerId: string | null, viewerPlayerId: string): string {
+  if (actorPlayerId === null) {
+    return "Server";
+  }
+
+  return actorPlayerId === viewerPlayerId ? "You" : "Opponent";
+}
+
+function readCount(payload: unknown): number {
+  const count = (payload as { count?: unknown } | undefined)?.count;
+
+  return typeof count === "number" && Number.isInteger(count) && count > 0 ? count : 1;
+}
+
+function formatCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}

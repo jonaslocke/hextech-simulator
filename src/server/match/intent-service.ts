@@ -3,7 +3,9 @@ import type { RandomOperation } from "../engine";
 import {
   createPlayerIntentAcceptedEvent,
   createRandomOperationEvent,
-  createServerDecisionEvent
+  createServerDecisionEvent,
+  projectGameEventsForPlayer,
+  type GameLogEntry
 } from "../events";
 import {
   channelRunesIntentSchema,
@@ -43,6 +45,7 @@ export type IntentServiceAcceptedResult = {
   game: Game;
   projection: GameProjection;
   events: GameEventDocument[];
+  logEntries: GameLogEntry[];
 };
 
 export type IntentServiceRejectedResult = {
@@ -169,7 +172,8 @@ export async function handleMatchIntent(
     accepted: true,
     game: transition.game,
     projection: projectGameForPlayer(transition.game, seat.playerId),
-    events
+    events,
+    logEntries: projectGameEventsForPlayer(events, seat.playerId)
   };
 }
 
