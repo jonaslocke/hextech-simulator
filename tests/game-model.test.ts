@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   assignGameOneStartingPlayerChooser,
+  assignPreviousGameLoserStartingPlayerChooser,
   createGame,
+  type Game,
   gameSchema
 } from "../src/server/match";
 
@@ -149,3 +151,125 @@ test("rejects RNG chooser assignment outside game 1", () => {
 
   assert.throws(() => assignGameOneStartingPlayerChooser(game), /Only game 1/);
 });
+
+test("assigns game 2 starting-player chooser as previous game loser", () => {
+  const previousGame = completeGame(
+    createGame({
+      id: "game-1",
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+  const game = createGame({
+    id: "game-2",
+    matchId: "match-1",
+    gameNumber: 2,
+    playerIds: ["player-a", "player-b"]
+  });
+
+  const result = assignPreviousGameLoserStartingPlayerChooser(
+    game,
+    previousGame,
+    "2026-06-12T02:00:00.000Z"
+  );
+
+  assert.equal(result.previousGameLoserId, "player-b");
+  assert.equal(result.game.canonicalState.setup.startingPlayerChooserId, "player-b");
+  assert.equal(result.game.stateVersion, 1);
+  assert.equal(result.game.updatedAt, "2026-06-12T02:00:00.000Z");
+  assert.equal(result.game.canonicalState.rng.rngStep, 0);
+});
+
+test("assigns game 3 starting-player chooser as game 2 loser", () => {
+  const previousGame = completeGame(
+    createGame({
+      id: "game-2",
+      matchId: "match-1",
+      gameNumber: 2,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-b"
+  );
+  const game = createGame({
+    id: "game-3",
+    matchId: "match-1",
+    gameNumber: 3,
+    playerIds: ["player-a", "player-b"]
+  });
+
+  const result = assignPreviousGameLoserStartingPlayerChooser(game, previousGame);
+
+  assert.equal(result.previousGameLoserId, "player-a");
+  assert.equal(result.game.canonicalState.setup.startingPlayerChooserId, "player-a");
+});
+
+test("rejects previous game loser chooser assignment for non-sequential games", () => {
+  const previousGame = completeGame(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+  const game = createGame({
+    matchId: "match-1",
+    gameNumber: 3,
+    playerIds: ["player-a", "player-b"]
+  });
+
+  assert.throws(
+    () => assignPreviousGameLoserStartingPlayerChooser(game, previousGame),
+    /immediately precede/
+  );
+});
+
+test("rejects previous game loser chooser assignment without a completed winner", () => {
+  const previousGame = createGame({
+    matchId: "match-1",
+    gameNumber: 1,
+    playerIds: ["player-a", "player-b"]
+  });
+  const game = createGame({
+    matchId: "match-1",
+    gameNumber: 2,
+    playerIds: ["player-a", "player-b"]
+  });
+
+  assert.throws(
+    () => assignPreviousGameLoserStartingPlayerChooser(game, previousGame),
+    /complete with a winner/
+  );
+});
+
+test("rejects previous game loser chooser assignment for different players", () => {
+  const previousGame = completeGame(
+    createGame({
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+  const game = createGame({
+    matchId: "match-1",
+    gameNumber: 2,
+    playerIds: ["player-a", "player-c"]
+  });
+
+  assert.throws(
+    () => assignPreviousGameLoserStartingPlayerChooser(game, previousGame),
+    /same players/
+  );
+});
+
+function completeGame(game: Game, winnerPlayerId: string): Game {
+  return gameSchema.parse({
+    ...game,
+    status: "complete",
+    winnerPlayerId,
+    stateVersion: game.stateVersion + 1
+  });
+}

@@ -62,6 +62,11 @@ export type AssignStartingPlayerChooserResult = {
   randomOperation: RandomOperation;
 };
 
+export type AssignPreviousGameLoserChooserResult = {
+  game: Game;
+  previousGameLoserId: string;
+};
+
 export function createGame(input: CreateGameInput): Game {
   assertDistinctPlayerIds(input.playerIds);
 
@@ -127,6 +132,54 @@ export function assignGameOneStartingPlayerChooser(
   };
 }
 
+export function assignPreviousGameLoserStartingPlayerChooser(
+  game: Game,
+  previousGame: Game,
+  now = new Date().toISOString()
+): AssignPreviousGameLoserChooserResult {
+  if (game.gameNumber !== 2 && game.gameNumber !== 3) {
+    throw new Error("Only games 2 and 3 use the previous game loser as chooser.");
+  }
+
+  if (previousGame.gameNumber !== game.gameNumber - 1) {
+    throw new Error("Previous game must immediately precede the game being set up.");
+  }
+
+  if (previousGame.status !== "complete" || previousGame.winnerPlayerId === null) {
+    throw new Error("Previous game must be complete with a winner.");
+  }
+
+  if (game.canonicalState.setup.startingPlayerChooserId !== null) {
+    throw new Error("Starting-player chooser has already been assigned.");
+  }
+
+  assertSamePlayers(game, previousGame);
+
+  const previousGameLoserId = game.canonicalState.setup.playerIds.find(
+    (playerId) => playerId !== previousGame.winnerPlayerId
+  );
+
+  if (!previousGameLoserId) {
+    throw new Error("Previous game winner must be one of the current game players.");
+  }
+
+  return {
+    game: gameSchema.parse({
+      ...game,
+      updatedAt: now,
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...game.canonicalState,
+        setup: {
+          ...game.canonicalState.setup,
+          startingPlayerChooserId: previousGameLoserId
+        }
+      }
+    }),
+    previousGameLoserId
+  };
+}
+
 function createInitialBattlefieldChoices(
   playerIds: [string, string]
 ): Record<string, BattlefieldChoice> {
@@ -147,5 +200,17 @@ function createInitialBattlefieldChoices(
 function assertDistinctPlayerIds(playerIds: [string, string]) {
   if (playerIds[0] === playerIds[1]) {
     throw new Error("A game cannot use the same playerId for both players.");
+  }
+}
+
+function assertSamePlayers(game: Game, previousGame: Game) {
+  const currentPlayers = new Set(game.canonicalState.setup.playerIds);
+  const previousPlayers = new Set(previousGame.canonicalState.setup.playerIds);
+
+  if (
+    currentPlayers.size !== previousPlayers.size ||
+    [...currentPlayers].some((playerId) => !previousPlayers.has(playerId))
+  ) {
+    throw new Error("Current game and previous game must contain the same players.");
   }
 }
