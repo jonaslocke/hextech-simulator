@@ -153,6 +153,8 @@ implemented, tested, and documented where relevant.
 - [x] Add temporary action-zone buttons for chain, banish, and game log.
 - [x] Mirror opponent/player board structure.
 - [x] Render player-selected and opponent-selected battlefield zones separately.
+- [x] Use local card back art for hidden/non-visible cards.
+- [x] Use neutral, subtle zone labels in mirrored player areas.
 - [ ] Add responsive layout checks for desktop and mobile.
 
 ## 12. Socket Rooms And Reconnect

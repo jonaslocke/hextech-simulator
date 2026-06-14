@@ -7,6 +7,7 @@ import {
   X
 } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
+import cardBackImage from "../../../assets/cardback.jpg";
 import type { Card } from "@/server/catalog";
 
 type TemporaryZone = "chain" | "banish" | "log" | null;
@@ -117,26 +118,26 @@ function OpponentArea({
   return (
     <section className="grid min-h-0 grid-rows-2 gap-2">
       <div className="grid min-h-0 grid-cols-[130px_1fr_130px] gap-2">
-        <DeckSlot count={runeDeckCount} title="Opponent Rune Deck" />
-        <BoardSlot title={`Opponent Runes ${runeCountLabel}`}>
+        <DeckSlot count={runeDeckCount} title="Rune Deck" />
+        <BoardSlot title={`Runes ${runeCountLabel}`}>
           <HiddenHandAndRunes handCount={handCount} />
         </BoardSlot>
-        <BoardSlot title="Opponent Trash">
+        <BoardSlot title="Trash">
           <ZoneCount value={0} />
         </BoardSlot>
       </div>
 
       <div className="grid min-h-0 grid-cols-[130px_130px_1fr_130px] gap-2">
-        <BoardSlot title="Opponent Champion">
+        <BoardSlot title="Champion">
           <CardImage card={champion} className="w-20 rotate-180" />
         </BoardSlot>
-        <BoardSlot title="Opponent Legend">
+        <BoardSlot title="Legend">
           <CardImage card={legend} className="w-20 rotate-180" />
         </BoardSlot>
-        <BoardSlot title="Opponent Base">
+        <BoardSlot title="Base">
           <EmptyState label="No base objects in preview state" />
         </BoardSlot>
-        <DeckSlot count={mainDeckCount} title="Opponent Main Deck" />
+        <DeckSlot count={mainDeckCount} title="Main Deck" />
       </div>
     </section>
   );
@@ -363,7 +364,7 @@ function BoardSlot({
 }) {
   return (
     <div className={`min-h-0 rounded-md bg-[#2f3a4d] p-2 ${className}`}>
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+      <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-slate-400/80">
         {title}
       </div>
       <div className="h-[calc(100%-20px)]">{children}</div>
@@ -479,13 +480,12 @@ function EmptyState({ label }: { label: string }) {
 
 function CardBack({ className = "" }: { className?: string }) {
   return (
-    <div
-      className={`aspect-[744/1039] rounded-md border border-cyan-300/50 bg-[#15586b] shadow shadow-black/30 ${className}`}
-    >
-      <div className="flex h-full items-center justify-center p-2 text-center text-[10px] font-bold uppercase tracking-wide text-cyan-100">
-        League of Legends
-      </div>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element -- Local static asset is used directly for the MVP board preview.
+    <img
+      alt="Hidden card"
+      className={`aspect-[744/1039] rounded-md border border-black/60 object-cover shadow shadow-black/30 ${className}`}
+      src={cardBackImage.src}
+    />
   );
 }
 
