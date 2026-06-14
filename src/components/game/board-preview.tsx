@@ -1,83 +1,73 @@
 "use client";
 
-import {
-  History,
-  Layers3,
-  PanelRightOpen,
-  X
-} from "lucide-react";
+import { History, Layers3, PanelRightOpen, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import type { Card } from "@/server/catalog";
+import type { GameLogEntry } from "@/server/events";
+import type { GameProjection, ProjectedZone } from "@/server/match";
 
 type TemporaryZone = "chain" | "banish" | "log" | null;
 
 type BoardPreviewProps = {
-  annieLegend: Card;
-  luxLegend: Card;
-  annieChampion: Card;
-  luxChampion: Card;
-  playerBattlefield: Card;
-  opponentBattlefield: Card;
-  playerHand: Card[];
-  playerRunes: Card[];
-  playerUnits: Card[];
-  opponentUnits: Card[];
+  cardsByInstanceId: Record<string, Card>;
+  logEntries: GameLogEntry[];
+  projection: GameProjection;
 };
 
 export function BoardPreview({
-  annieLegend,
-  luxLegend,
-  annieChampion,
-  luxChampion,
-  playerBattlefield,
-  opponentBattlefield,
-  playerHand,
-  playerRunes,
-  playerUnits,
-  opponentUnits
+  cardsByInstanceId,
+  logEntries,
+  projection
 }: BoardPreviewProps) {
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
+  const viewerPlayerId = projection.viewerPlayerId;
+  const opponentPlayerId = projection.setup.playerIds.find(
+    (playerId) => playerId !== viewerPlayerId
+  )!;
+  const player = projection.players[viewerPlayerId]!;
+  const opponent = projection.players[opponentPlayerId]!;
+  const playerBattlefield = projection.battlefields.find(
+    (battlefield) => battlefield.selectedByPlayerId === viewerPlayerId
+  );
+  const opponentBattlefield = projection.battlefields.find(
+    (battlefield) => battlefield.selectedByPlayerId === opponentPlayerId
+  );
 
   return (
     <main className="h-screen overflow-hidden bg-[#111827] text-slate-100">
       <div className="grid h-full grid-cols-[1fr_56px]">
         <section className="grid min-h-0 grid-rows-[52px_1fr]">
-          <ScoreHeader playerScore={0} opponentScore={1} />
+          <ScoreHeader playerScore={0} opponentScore={0} />
 
           <section className="grid min-h-0 grid-rows-[1fr_1.08fr_1.12fr] gap-2 p-2">
             <OpponentArea
-              champion={luxChampion}
-              handCount={3}
-              legend={luxLegend}
-              mainDeckCount={32}
-              runeCountLabel="0/5"
-              runeDeckCount={7}
+              cardsByInstanceId={cardsByInstanceId}
+              player={opponent}
             />
 
             <BattlefieldArea
+              cardsByInstanceId={cardsByInstanceId}
               opponentBattlefield={opponentBattlefield}
-              opponentUnits={opponentUnits}
               playerBattlefield={playerBattlefield}
-              playerUnits={playerUnits}
             />
 
-            <PlayerArea
-              champion={annieChampion}
-              hand={playerHand}
-              legend={annieLegend}
-              mainDeckCount={32}
-              runes={playerRunes}
-              runeCountLabel="2/5"
-              runeDeckCount={7}
-            />
+            <PlayerArea cardsByInstanceId={cardsByInstanceId} player={player} />
           </section>
         </section>
 
         <ActionRail openZone={openZone} setOpenZone={setOpenZone} />
       </div>
 
-      <TemporaryZoneOverlay openZone={openZone} onClose={() => setOpenZone(null)} />
+      <StatusPrompt projection={projection} />
+      <TemporaryZoneOverlay
+        cardsByInstanceId={cardsByInstanceId}
+        logEntries={logEntries}
+        onClose={() => setOpenZone(null)}
+        openZone={openZone}
+        playerBanishment={player.zones.banishment}
+        opponentBanishment={opponent.zones.banishment}
+      />
     </main>
   );
 }
@@ -101,69 +91,69 @@ function ScoreHeader({
 }
 
 function OpponentArea({
-  champion,
-  handCount,
-  legend,
-  mainDeckCount,
-  runeCountLabel,
-  runeDeckCount
+  cardsByInstanceId,
+  player
 }: {
-  champion: Card;
-  handCount: number;
-  legend: Card;
-  mainDeckCount: number;
-  runeCountLabel: string;
-  runeDeckCount: number;
+  cardsByInstanceId: Record<string, Card>;
+  player: GameProjection["players"][string];
 }) {
+  const baseRunes = zoneCards(player.zones.base, cardsByInstanceId).filter(
+    (card) => card.classification.type === "Rune"
+  );
+  const baseObjects = zoneCards(player.zones.base, cardsByInstanceId).filter(
+    (card) => card.classification.type !== "Rune"
+  );
+
   return (
     <section className="grid min-h-0 grid-rows-2 gap-2">
       <div className="grid min-h-0 grid-cols-[130px_1fr_130px] gap-2">
-        <DeckSlot count={runeDeckCount} title="Rune Deck" />
-        <BoardSlot title={`Runes ${runeCountLabel}`}>
-          <HiddenHandAndRunes handCount={handCount} />
+        <DeckSlot count={player.zones.runeDeck.count} title="Rune Deck" />
+        <BoardSlot title="Runes">
+          <HiddenHandAndRunes handCount={player.zones.hand.count} runes={baseRunes} />
         </BoardSlot>
         <BoardSlot title="Trash">
-          <ZoneCount value={0} />
+          <ZoneCards cards={zoneCards(player.zones.trash, cardsByInstanceId)} mirrored />
         </BoardSlot>
       </div>
 
       <div className="grid min-h-0 grid-cols-[130px_130px_1fr_130px] gap-2">
         <BoardSlot title="Champion">
-          <CardImage card={champion} className="w-20 rotate-180" />
+          <ZoneCards cards={zoneCards(player.zones.champion, cardsByInstanceId)} mirrored />
         </BoardSlot>
         <BoardSlot title="Legend">
-          <CardImage card={legend} className="w-20 rotate-180" />
+          <ZoneCards cards={zoneCards(player.zones.legend, cardsByInstanceId)} mirrored />
         </BoardSlot>
         <BoardSlot title="Base">
-          <EmptyState label="No base objects in preview state" />
+          <UnitRow cards={baseObjects} mirrored />
         </BoardSlot>
-        <DeckSlot count={mainDeckCount} title="Main Deck" />
+        <DeckSlot count={player.zones.mainDeck.count} title="Main Deck" />
       </div>
     </section>
   );
 }
 
 function BattlefieldArea({
+  cardsByInstanceId,
   opponentBattlefield,
-  opponentUnits,
-  playerBattlefield,
-  playerUnits
+  playerBattlefield
 }: {
-  opponentBattlefield: Card;
-  opponentUnits: Card[];
-  playerBattlefield: Card;
-  playerUnits: Card[];
+  cardsByInstanceId: Record<string, Card>;
+  opponentBattlefield: GameProjection["battlefields"][number] | undefined;
+  playerBattlefield: GameProjection["battlefields"][number] | undefined;
 }) {
   return (
     <section className="grid min-h-0 grid-cols-2 gap-2">
-      <BoardSlot title="Player 1 Battlefield">
-        <BattlefieldContent battlefield={playerBattlefield} units={playerUnits} />
+      <BoardSlot title="Battlefield">
+        <BattlefieldContent
+          battlefield={playerBattlefield}
+          cardsByInstanceId={cardsByInstanceId}
+        />
       </BoardSlot>
-      <BoardSlot title="Player 2 Battlefield">
+      <BoardSlot title="Battlefield">
         <BattlefieldContent
           battlefield={opponentBattlefield}
+          cardsByInstanceId={cardsByInstanceId}
           mirrored
-          units={opponentUnits}
         />
       </BoardSlot>
     </section>
@@ -171,44 +161,42 @@ function BattlefieldArea({
 }
 
 function PlayerArea({
-  champion,
-  hand,
-  legend,
-  mainDeckCount,
-  runes,
-  runeCountLabel,
-  runeDeckCount
+  cardsByInstanceId,
+  player
 }: {
-  champion: Card;
-  hand: Card[];
-  legend: Card;
-  mainDeckCount: number;
-  runes: Card[];
-  runeCountLabel: string;
-  runeDeckCount: number;
+  cardsByInstanceId: Record<string, Card>;
+  player: GameProjection["players"][string];
 }) {
+  const baseCards = zoneCards(player.zones.base, cardsByInstanceId);
+  const baseRunes = baseCards.filter((card) => card.classification.type === "Rune");
+  const baseObjects = baseCards.filter((card) => card.classification.type !== "Rune");
+
   return (
     <section className="grid min-h-0 grid-rows-[0.86fr_1fr] gap-2">
       <div className="grid min-h-0 grid-cols-[130px_130px_1fr_130px] gap-2">
         <BoardSlot title="Champion">
-          <CardImage card={champion} className="w-20" />
+          <ZoneCards cards={zoneCards(player.zones.champion, cardsByInstanceId)} />
         </BoardSlot>
         <BoardSlot title="Legend">
-          <CardImage card={legend} className="w-20" />
+          <ZoneCards cards={zoneCards(player.zones.legend, cardsByInstanceId)} />
         </BoardSlot>
         <BoardSlot title="Base">
-          <EmptyState label="No base objects in preview state" />
+          <UnitRow cards={baseObjects} />
         </BoardSlot>
-        <DeckSlot count={mainDeckCount} title="Main Deck" />
+        <DeckSlot count={player.zones.mainDeck.count} title="Main Deck" />
       </div>
 
       <div className="grid min-h-0 grid-cols-[130px_1fr_130px] gap-2">
-        <DeckSlot count={runeDeckCount} title="Rune Deck" />
-        <BoardSlot title={`Runes and Hand ${runeCountLabel}`}>
-          <RuneAndHandZone hand={hand} runes={runes} />
+        <DeckSlot count={player.zones.runeDeck.count} title="Rune Deck" />
+        <BoardSlot title="Runes and Hand">
+          <RuneAndHandZone
+            hand={zoneCards(player.zones.hand, cardsByInstanceId)}
+            handCount={player.zones.hand.count}
+            runes={baseRunes}
+          />
         </BoardSlot>
         <BoardSlot title="Trash">
-          <ZoneCount value={0} />
+          <ZoneCards cards={zoneCards(player.zones.trash, cardsByInstanceId)} />
         </BoardSlot>
       </div>
     </section>
@@ -217,26 +205,48 @@ function PlayerArea({
 
 function BattlefieldContent({
   battlefield,
-  mirrored = false,
-  units
+  cardsByInstanceId,
+  mirrored = false
 }: {
-  battlefield: Card;
+  battlefield: GameProjection["battlefields"][number] | undefined;
+  cardsByInstanceId: Record<string, Card>;
   mirrored?: boolean;
-  units: Card[];
 }) {
+  if (!battlefield) {
+    return <EmptyState label="No battlefield selected" />;
+  }
+
   return (
     <div className="grid h-full grid-cols-[96px_1fr] items-center gap-3">
-      <CardImage card={battlefield} className={`w-20 ${mirrored ? "rotate-180" : ""}`} />
-      <UnitRow cards={units} mirrored={mirrored} />
+      <CardFromId
+        cardInstanceId={battlefield.cardInstanceId}
+        cardsByInstanceId={cardsByInstanceId}
+        className={`w-20 ${mirrored ? "rotate-180" : ""}`}
+      />
+      <UnitRow
+        cards={battlefield.units.flatMap((cardInstanceId) =>
+          cardFromId(cardInstanceId, cardsByInstanceId)
+        )}
+        mirrored={mirrored}
+      />
     </div>
   );
 }
 
-function HiddenHandAndRunes({ handCount }: { handCount: number }) {
+function HiddenHandAndRunes({ handCount, runes }: { handCount: number; runes: Card[] }) {
   return (
     <div className="relative h-full overflow-hidden">
       <div className="absolute inset-x-0 top-2 flex justify-center">
         <div className="text-xs font-semibold text-slate-300">Hand: {handCount} hidden</div>
+      </div>
+      <div className="absolute bottom-3 left-4 flex gap-2">
+        {runes.map((rune, index) => (
+          <CardImage
+            key={`${rune.name}-${index}`}
+            card={rune}
+            className="w-16 rotate-180"
+          />
+        ))}
       </div>
       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
         {Array.from({ length: handCount }).map((_, index) => (
@@ -247,7 +257,15 @@ function HiddenHandAndRunes({ handCount }: { handCount: number }) {
   );
 }
 
-function RuneAndHandZone({ hand, runes }: { hand: Card[]; runes: Card[] }) {
+function RuneAndHandZone({
+  hand,
+  handCount,
+  runes
+}: {
+  hand: Card[];
+  handCount: number;
+  runes: Card[];
+}) {
   return (
     <div className="relative h-full min-h-40 overflow-visible">
       <div className="absolute bottom-2 left-4 flex gap-2">
@@ -257,15 +275,39 @@ function RuneAndHandZone({ hand, runes }: { hand: Card[]; runes: Card[] }) {
       </div>
 
       <div className="absolute bottom-8 left-[58%] flex -translate-x-1/2 items-end gap-1">
-        {hand.map((card, index) => (
-          <CardImage
-            key={`${card.name}-${index}`}
-            card={card}
-            className="w-24 origin-bottom rotate-[var(--hand-rotate)] transition-transform duration-150 hover:z-20 hover:scale-125 hover:-translate-y-12"
-            style={handStyle(index, hand.length)}
-          />
-        ))}
+        {hand.length > 0
+          ? hand.map((card, index) => (
+              <CardImage
+                key={`${card.name}-${index}`}
+                card={card}
+                className="w-24 origin-bottom rotate-[var(--hand-rotate)] transition-transform duration-150 hover:z-20 hover:scale-125 hover:-translate-y-12"
+                style={handStyle(index, hand.length)}
+              />
+            ))
+          : Array.from({ length: handCount }).map((_, index) => (
+              <CardBack
+                key={index}
+                className="w-20 origin-bottom rotate-[var(--hand-rotate)]"
+                style={handStyle(index, handCount)}
+              />
+            ))}
       </div>
+    </div>
+  );
+}
+
+function StatusPrompt({ projection }: { projection: GameProjection }) {
+  const turn = projection.turn;
+  const showdown = projection.showdown;
+  const text = showdown
+    ? `Showdown: focus ${showdown.focusPlayerId}, priority ${showdown.priorityPlayerId}`
+    : turn
+      ? `Turn ${turn.turnNumber}: ${turn.phase}, active ${turn.activePlayerId}`
+      : "Waiting for server-authoritative setup state";
+
+  return (
+    <div className="absolute left-4 top-16 rounded-md border border-white/10 bg-[#172033]/95 px-3 py-2 text-xs text-slate-200 shadow-lg shadow-black/30">
+      {text}
     </div>
   );
 }
@@ -305,11 +347,19 @@ function ActionRail({
 }
 
 function TemporaryZoneOverlay({
+  cardsByInstanceId,
+  logEntries,
+  onClose,
   openZone,
-  onClose
+  opponentBanishment,
+  playerBanishment
 }: {
-  openZone: TemporaryZone;
+  cardsByInstanceId: Record<string, Card>;
+  logEntries: GameLogEntry[];
   onClose: () => void;
+  openZone: TemporaryZone;
+  opponentBanishment: ProjectedZone;
+  playerBanishment: ProjectedZone;
 }) {
   if (!openZone) {
     return null;
@@ -317,15 +367,9 @@ function TemporaryZoneOverlay({
 
   const title =
     openZone === "chain" ? "Chain" : openZone === "banish" ? "Banished Cards" : "Game Log";
-  const message =
-    openZone === "chain"
-      ? "The chain is empty in the current preview state."
-      : openZone === "banish"
-        ? ""
-        : "No accepted server events are present in the current preview state.";
 
   return (
-    <div className="absolute right-16 top-20 z-30 w-72 rounded-lg border border-white/10 bg-[#111827]/95 p-3 shadow-2xl shadow-black/50">
+    <div className="absolute right-16 top-20 z-30 w-80 rounded-lg border border-white/10 bg-[#111827]/95 p-3 shadow-2xl shadow-black/50">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold">{title}</div>
         <button
@@ -339,17 +383,36 @@ function TemporaryZoneOverlay({
       </div>
       {openZone === "banish" ? (
         <div className="grid gap-2">
-          <BoardSlot title="Player 1 Banish">
-            <EmptyState label="No banished cards in preview state" />
+          <BoardSlot title="Player Banish">
+            <ZoneCards cards={zoneCards(playerBanishment, cardsByInstanceId)} />
           </BoardSlot>
-          <BoardSlot title="Player 2 Banish">
-            <EmptyState label="No banished cards in preview state" />
+          <BoardSlot title="Opponent Banish">
+            <ZoneCards cards={zoneCards(opponentBanishment, cardsByInstanceId)} mirrored />
           </BoardSlot>
         </div>
+      ) : openZone === "log" ? (
+        <LogList entries={logEntries} />
       ) : (
-        <EmptyState label={message} />
+        <EmptyState label="The chain is empty in the current projected state" />
       )}
     </div>
+  );
+}
+
+function LogList({ entries }: { entries: GameLogEntry[] }) {
+  if (entries.length === 0) {
+    return <EmptyState label="No accepted server events yet" />;
+  }
+
+  return (
+    <ol className="grid max-h-80 gap-2 overflow-auto text-xs text-slate-200">
+      {entries.map((entry) => (
+        <li key={entry.id} className="rounded bg-white/5 p-2">
+          <div className="text-[10px] uppercase text-slate-500">Event {entry.sequence}</div>
+          <div>{entry.message}</div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -385,6 +448,24 @@ function DeckSlot({ count, title }: { count: number; title: string }) {
   );
 }
 
+function ZoneCards({ cards, mirrored = false }: { cards: Card[]; mirrored?: boolean }) {
+  if (cards.length === 0) {
+    return <EmptyState label="Empty" />;
+  }
+
+  return (
+    <div className="flex h-full items-center justify-center gap-2">
+      {cards.map((card, index) => (
+        <CardImage
+          key={`${card.name}-${index}`}
+          card={card}
+          className={`w-20 ${mirrored ? "rotate-180" : ""}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 function UnitRow({ cards, mirrored = false }: { cards: Card[]; mirrored?: boolean }) {
   if (cards.length === 0) {
     return <EmptyState label="No units here" />;
@@ -399,14 +480,6 @@ function UnitRow({ cards, mirrored = false }: { cards: Card[]; mirrored?: boolea
           className={`w-20 ${mirrored ? "-rotate-90" : "rotate-90"}`}
         />
       ))}
-    </div>
-  );
-}
-
-function ZoneCount({ value }: { value: number }) {
-  return (
-    <div className="flex h-full items-center justify-center text-4xl font-bold">
-      {value}
     </div>
   );
 }
@@ -478,13 +551,20 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function CardBack({ className = "" }: { className?: string }) {
+function CardBack({
+  className = "",
+  style
+}: {
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Local static asset is used directly for the MVP board preview.
+    // eslint-disable-next-line @next/next/no-img-element -- Local static asset is used directly for hidden cards.
     <img
       alt="Hidden card"
       className={`aspect-[744/1039] rounded-md border border-black/60 object-cover shadow shadow-black/30 ${className}`}
       src={cardBackImage.src}
+      style={style}
     />
   );
 }
@@ -495,6 +575,24 @@ function CountBadge({ value }: { value: number }) {
       {value}
     </div>
   );
+}
+
+function CardFromId({
+  cardInstanceId,
+  cardsByInstanceId,
+  className
+}: {
+  cardInstanceId: string;
+  cardsByInstanceId: Record<string, Card>;
+  className?: string;
+}) {
+  const card = cardsByInstanceId[cardInstanceId];
+
+  if (!card) {
+    return <CardBack className={className} />;
+  }
+
+  return <CardImage card={card} className={className} />;
 }
 
 function CardImage({
@@ -515,6 +613,21 @@ function CardImage({
       style={style}
     />
   );
+}
+
+function zoneCards(zone: ProjectedZone, cardsByInstanceId: Record<string, Card>): Card[] {
+  return zone.cardInstanceIds.flatMap((cardInstanceId) =>
+    cardFromId(cardInstanceId, cardsByInstanceId)
+  );
+}
+
+function cardFromId(
+  cardInstanceId: string,
+  cardsByInstanceId: Record<string, Card>
+): Card[] {
+  const card = cardsByInstanceId[cardInstanceId];
+
+  return card ? [card] : [];
 }
 
 function handStyle(index: number, total: number): CSSProperties {

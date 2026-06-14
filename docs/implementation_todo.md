@@ -151,6 +151,8 @@ implemented, tested, and documented where relevant.
 - [x] Render player-selected and opponent-selected battlefield zones separately.
 - [x] Use local card back art for hidden/non-visible cards.
 - [x] Use neutral, subtle zone labels in mirrored player areas.
+- [x] Render board from viewer-safe `GameProjection` instead of component-only fixture arrays.
+- [x] Resolve projected card instance IDs to catalog card media for visible cards.
 - [ ] Add responsive layout checks for desktop and mobile.
 
 ## 12. First Gameplay Intents
