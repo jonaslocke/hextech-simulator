@@ -6,6 +6,7 @@ import {
 } from "./tokens";
 
 export * from "./game";
+export * from "./setup-service";
 export * from "./tokens";
 
 export const matchFormats = ["best-of-3"] as const;

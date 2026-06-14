@@ -116,8 +116,8 @@ implemented, tested, and documented where relevant.
 - [x] Store string seed.
 - [x] Store `rngAlgorithm: "seedrandom"`.
 - [x] Track `rngStep`.
-- [ ] Log every random operation purpose.
-- [ ] Log every random operation result.
+- [x] Log every random operation purpose.
+- [x] Log every random operation result.
 - [ ] Add deterministic replay tests for chooser selection and deck shuffles.
 - [ ] Add deterministic replay tests for simultaneous Main Deck recycle ordering.
 
