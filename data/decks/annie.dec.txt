@@ -9,8 +9,8 @@ Runes:
 6 Chaos Rune
 
 Battlefields:
-1 Obelisk of Power
-1 Reaver's Row
+1 Aspirant's Climb
+1 The Papertree
 1 Targon's Peak
 
 MainDeck:
