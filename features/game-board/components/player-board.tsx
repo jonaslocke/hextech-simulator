@@ -24,7 +24,22 @@ const BaseLine = () => (
         name="back card"
       />
     </ZoneArea>
-    <div className="bg-white/5 rounded-md">B</div>
+    <ZoneArea>
+      {Array.from({ length: 2 }).map((_, index) => (
+        <CardTile
+          key={index}
+          img="https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png"
+          name="Watchful Sentry"
+        />
+      ))}
+      {Array.from({ length: 2 }).map((_, index) => (
+        <CardTile
+          key={index}
+          img="https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png"
+          name="Soaring Scout"
+        />
+      ))}
+    </ZoneArea>
     <ZoneArea isCentered>
       <CardTile img="./cardback.jpg" name="back card" />
     </ZoneArea>
