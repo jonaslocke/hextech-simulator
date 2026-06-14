@@ -6,6 +6,7 @@ import {
 } from "./tokens";
 
 export * from "./game";
+export * from "./projections";
 export * from "./setup-service";
 export * from "./tokens";
 

@@ -119,17 +119,17 @@ implemented, tested, and documented where relevant.
 
 ## 10. Visibility Projections
 
-- [ ] Define canonical state shape.
-- [ ] Define viewer projection shape.
-- [ ] Hide opponent hand identities.
-- [ ] Hide main deck order.
-- [ ] Hide rune deck order.
-- [ ] Show public trash and banishment.
-- [ ] Show face-up board objects.
-- [ ] Model facedown slots as battlefield sub-objects.
-- [ ] Show facedown identity only to controller.
-- [ ] Show mulligan lock state without selected count or identities.
-- [ ] Add projection tests for both players.
+- [x] Define canonical state shape.
+- [x] Define viewer projection shape.
+- [x] Hide opponent hand identities.
+- [x] Hide main deck order.
+- [x] Hide rune deck order.
+- [x] Show public trash and banishment.
+- [x] Show face-up board objects.
+- [x] Model facedown slots as battlefield sub-objects.
+- [x] Show facedown identity only to controller.
+- [x] Show mulligan lock state without selected count or identities.
+- [x] Add projection tests for both players.
 
 ## 11. Basic Board UI
 
