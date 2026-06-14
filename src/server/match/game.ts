@@ -5,6 +5,7 @@ import {
   createRngState,
   randomOperationSchema,
   rngStateSchema,
+  shuffleItems,
   type RandomOperation
 } from "../engine";
 
@@ -18,15 +19,61 @@ export const battlefieldChoiceSchema = z.object({
   revealedAt: z.string().datetime().nullable()
 });
 
+export const playerBattlefieldPoolSchema = z.object({
+  playerId: z.string().min(1),
+  registeredCardInstanceIds: z.array(z.string().min(1)),
+  usedCardInstanceIds: z.array(z.string().min(1))
+});
+
+export const mulliganChoiceSchema = z.object({
+  playerId: z.string().min(1),
+  status: z.enum(["unlocked", "locked"]),
+  selectedCardInstanceIds: z.array(z.string().min(1)).max(2),
+  lockedAt: z.string().datetime().nullable()
+});
+
 export const gameSetupStateSchema = z.object({
   playerIds: z.tuple([z.string().min(1), z.string().min(1)]),
   startingPlayerChooserId: z.string().min(1).nullable(),
   startingPlayerId: z.string().min(1).nullable(),
-  battlefieldChoices: z.record(z.string().min(1), battlefieldChoiceSchema)
+  battlefieldChoices: z.record(z.string().min(1), battlefieldChoiceSchema),
+  battlefieldPools: z.record(z.string().min(1), playerBattlefieldPoolSchema),
+  mulliganChoices: z.record(z.string().min(1), mulliganChoiceSchema)
+});
+
+export const playerZonesSchema = z.object({
+  legend: z.string().min(1).nullable(),
+  champion: z.string().min(1).nullable(),
+  mainDeck: z.array(z.string().min(1)),
+  runeDeck: z.array(z.string().min(1)),
+  hand: z.array(z.string().min(1)),
+  trash: z.array(z.string().min(1)),
+  banishment: z.array(z.string().min(1)),
+  base: z.array(z.string().min(1))
+});
+
+export const gamePlayerStateSchema = z.object({
+  playerId: z.string().min(1),
+  zones: playerZonesSchema
+});
+
+export const battlefieldStateSchema = z.object({
+  battlefieldId: z.string().min(1),
+  selectedByPlayerId: z.string().min(1),
+  cardInstanceId: z.string().min(1),
+  units: z.array(z.string().min(1)),
+  facedownSlot: z
+    .object({
+      controllerId: z.string().min(1),
+      cardInstanceId: z.string().min(1)
+    })
+    .nullable()
 });
 
 export const canonicalGameStateSchema = z.object({
+  battlefields: z.array(battlefieldStateSchema),
   rng: rngStateSchema,
+  players: z.record(z.string().min(1), gamePlayerStateSchema),
   setup: gameSetupStateSchema
 });
 
@@ -44,6 +91,11 @@ export const gameSchema = z.object({
 
 export type GameStatus = (typeof gameStatuses)[number];
 export type BattlefieldChoice = z.infer<typeof battlefieldChoiceSchema>;
+export type PlayerBattlefieldPool = z.infer<typeof playerBattlefieldPoolSchema>;
+export type MulliganChoice = z.infer<typeof mulliganChoiceSchema>;
+export type PlayerZones = z.infer<typeof playerZonesSchema>;
+export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
+export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
 export type CanonicalGameState = z.infer<typeof canonicalGameStateSchema>;
 export type Game = z.infer<typeof gameSchema>;
@@ -55,6 +107,10 @@ export type CreateGameInput = {
   gameNumber: number;
   playerIds: [string, string];
   rngSeed?: string;
+  battlefieldCardInstanceIdsByPlayer?: Partial<Record<string, string[]>>;
+  usedBattlefieldCardInstanceIdsByPlayer?: Partial<Record<string, string[]>>;
+  mainDeckCardInstanceIdsByPlayer?: Partial<Record<string, string[]>>;
+  runeDeckCardInstanceIdsByPlayer?: Partial<Record<string, string[]>>;
 };
 
 export type AssignStartingPlayerChooserResult = {
@@ -67,9 +123,32 @@ export type AssignPreviousGameLoserChooserResult = {
   previousGameLoserId: string;
 };
 
+export type ShuffleDecksResult = {
+  game: Game;
+  randomOperations: RandomOperation[];
+};
+
 export type ChooseStartingPlayerInput = {
   actorPlayerId: string;
   startingPlayerId: string;
+  now?: string;
+};
+
+export type LockBattlefieldChoiceInput = {
+  actorPlayerId: string;
+  cardInstanceId: string;
+  now?: string;
+};
+
+export type PlaceStartingObjectsInput = {
+  legendCardInstanceIdsByPlayer: Record<string, string>;
+  championCardInstanceIdsByPlayer: Record<string, string>;
+  now?: string;
+};
+
+export type CommitMulliganInput = {
+  actorPlayerId: string;
+  selectedCardInstanceIds: string[];
   now?: string;
 };
 
@@ -79,12 +158,16 @@ export function createGame(input: CreateGameInput): Game {
   const id = input.id ?? randomUUID();
   const now = input.now ?? new Date().toISOString();
   const canonicalState: CanonicalGameState = {
+    battlefields: [],
     rng: createRngState(input.rngSeed ?? id),
+    players: createInitialPlayerStates(input),
     setup: {
       playerIds: input.playerIds,
       startingPlayerChooserId: null,
       startingPlayerId: null,
-      battlefieldChoices: createInitialBattlefieldChoices(input.playerIds)
+      battlefieldChoices: createInitialBattlefieldChoices(input.playerIds),
+      battlefieldPools: createInitialBattlefieldPools(input),
+      mulliganChoices: createInitialMulliganChoices(input.playerIds)
     }
   };
 
@@ -226,6 +309,312 @@ export function chooseStartingPlayer(
   });
 }
 
+export function lockBattlefieldChoice(
+  game: Game,
+  input: LockBattlefieldChoiceInput
+): Game {
+  const now = input.now ?? new Date().toISOString();
+
+  if (game.status !== "setup_pending") {
+    throw new Error("Battlefield choice can only be locked during setup.");
+  }
+
+  if (!game.canonicalState.setup.playerIds.includes(input.actorPlayerId)) {
+    throw new Error("Only game players can lock a battlefield choice.");
+  }
+
+  const choice = game.canonicalState.setup.battlefieldChoices[input.actorPlayerId];
+  const pool = game.canonicalState.setup.battlefieldPools[input.actorPlayerId];
+
+  if (!choice || !pool) {
+    throw new Error("Battlefield setup state is missing for player.");
+  }
+
+  if (choice.status !== "unlocked") {
+    throw new Error("Battlefield choice has already been locked.");
+  }
+
+  if (!pool.registeredCardInstanceIds.includes(input.cardInstanceId)) {
+    throw new Error("Battlefield choice must be one of the player's registered battlefields.");
+  }
+
+  if (pool.usedCardInstanceIds.includes(input.cardInstanceId)) {
+    throw new Error("Battlefield choice has already been used in this match.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      setup: {
+        ...game.canonicalState.setup,
+        battlefieldChoices: {
+          ...game.canonicalState.setup.battlefieldChoices,
+          [input.actorPlayerId]: {
+            ...choice,
+            status: "locked",
+            cardInstanceId: input.cardInstanceId,
+            lockedAt: now
+          }
+        }
+      }
+    }
+  });
+}
+
+export function revealBattlefieldChoices(
+  game: Game,
+  now = new Date().toISOString()
+): Game {
+  if (game.status !== "setup_pending") {
+    throw new Error("Battlefield choices can only be revealed during setup.");
+  }
+
+  const choices = game.canonicalState.setup.battlefieldChoices;
+  const pools = game.canonicalState.setup.battlefieldPools;
+
+  for (const playerId of game.canonicalState.setup.playerIds) {
+    const choice = choices[playerId];
+
+    if (!choice || choice.status !== "locked" || choice.cardInstanceId === null) {
+      throw new Error("Both players must lock battlefield choices before reveal.");
+    }
+  }
+
+  const revealedChoices = Object.fromEntries(
+    game.canonicalState.setup.playerIds.map((playerId) => [
+      playerId,
+      {
+        ...choices[playerId]!,
+        status: "revealed",
+        revealedAt: now
+      }
+    ])
+  );
+  const updatedPools = Object.fromEntries(
+    game.canonicalState.setup.playerIds.map((playerId) => {
+      const pool = pools[playerId]!;
+      const choice = choices[playerId]!;
+      const usedCardInstanceIds = pool.usedCardInstanceIds.includes(
+        choice.cardInstanceId!
+      )
+        ? pool.usedCardInstanceIds
+        : [...pool.usedCardInstanceIds, choice.cardInstanceId!];
+
+      return [
+        playerId,
+        {
+          ...pool,
+          usedCardInstanceIds
+        }
+      ];
+    })
+  );
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      setup: {
+        ...game.canonicalState.setup,
+        battlefieldChoices: revealedChoices,
+        battlefieldPools: updatedPools
+      }
+    }
+  });
+}
+
+export function shuffleMainDecks(
+  game: Game,
+  now = new Date().toISOString()
+): ShuffleDecksResult {
+  return shuffleDeckZone(game, "mainDeck", "shuffle-main-deck", now);
+}
+
+export function shuffleRuneDecks(
+  game: Game,
+  now = new Date().toISOString()
+): ShuffleDecksResult {
+  return shuffleDeckZone(game, "runeDeck", "shuffle-rune-deck", now);
+}
+
+export function placeStartingObjects(
+  game: Game,
+  input: PlaceStartingObjectsInput
+): Game {
+  const now = input.now ?? new Date().toISOString();
+
+  if (game.status !== "setup_pending") {
+    throw new Error("Starting objects can only be placed during setup.");
+  }
+
+  if (game.canonicalState.battlefields.length > 0) {
+    throw new Error("Starting battlefields have already been placed.");
+  }
+
+  const players = { ...game.canonicalState.players };
+  const battlefields: BattlefieldState[] = [];
+
+  for (const playerId of game.canonicalState.setup.playerIds) {
+    const player = players[playerId];
+    const choice = game.canonicalState.setup.battlefieldChoices[playerId];
+    const legend = input.legendCardInstanceIdsByPlayer[playerId];
+    const champion = input.championCardInstanceIdsByPlayer[playerId];
+
+    if (!player) {
+      throw new Error("Player zone state is missing.");
+    }
+
+    if (!legend || !champion) {
+      throw new Error("Legend and champion instance IDs are required for each player.");
+    }
+
+    if (player.zones.legend !== null || player.zones.champion !== null) {
+      throw new Error("Legend or champion has already been placed.");
+    }
+
+    if (!choice || choice.status !== "revealed" || choice.cardInstanceId === null) {
+      throw new Error("Battlefields must be revealed before starting objects are placed.");
+    }
+
+    players[playerId] = {
+      ...player,
+      zones: {
+        ...player.zones,
+        legend,
+        champion
+      }
+    };
+    battlefields.push({
+      battlefieldId: `${game.id}:battlefield:${playerId}`,
+      selectedByPlayerId: playerId,
+      cardInstanceId: choice.cardInstanceId,
+      units: [],
+      facedownSlot: null
+    });
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      battlefields,
+      players
+    }
+  });
+}
+
+export function drawOpeningHands(
+  game: Game,
+  now = new Date().toISOString()
+): Game {
+  if (game.status !== "setup_pending") {
+    throw new Error("Opening hands can only be drawn during setup.");
+  }
+
+  if (game.canonicalState.battlefields.length !== game.canonicalState.setup.playerIds.length) {
+    throw new Error("Starting objects must be placed before opening hands are drawn.");
+  }
+
+  const players = { ...game.canonicalState.players };
+
+  for (const playerId of game.canonicalState.setup.playerIds) {
+    const player = players[playerId];
+
+    if (!player || player.zones.legend === null || player.zones.champion === null) {
+      throw new Error("Legend and champion must be placed before opening hands are drawn.");
+    }
+
+    if (player.zones.hand.length > 0) {
+      throw new Error("Opening hand has already been drawn.");
+    }
+
+    if (player.zones.mainDeck.length < 4) {
+      throw new Error("Main deck must contain at least four cards for opening draw.");
+    }
+
+    players[playerId] = {
+      ...player,
+      zones: {
+        ...player.zones,
+        mainDeck: player.zones.mainDeck.slice(4),
+        hand: player.zones.mainDeck.slice(0, 4)
+      }
+    };
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      players
+    }
+  });
+}
+
+export function commitMulligan(
+  game: Game,
+  input: CommitMulliganInput
+): Game {
+  const now = input.now ?? new Date().toISOString();
+
+  if (game.status !== "setup_pending") {
+    throw new Error("Mulligan can only be committed during setup.");
+  }
+
+  if (!game.canonicalState.setup.playerIds.includes(input.actorPlayerId)) {
+    throw new Error("Only game players can commit a mulligan.");
+  }
+
+  if (input.selectedCardInstanceIds.length > 0) {
+    throw new Error("Only zero-card mulligans are supported in the first MVP path.");
+  }
+
+  const choice = game.canonicalState.setup.mulliganChoices[input.actorPlayerId];
+  const player = game.canonicalState.players[input.actorPlayerId];
+
+  if (!choice || !player) {
+    throw new Error("Mulligan setup state is missing for player.");
+  }
+
+  if (choice.status !== "unlocked") {
+    throw new Error("Mulligan has already been committed.");
+  }
+
+  if (player.zones.hand.length === 0) {
+    throw new Error("Opening hand must be drawn before mulligan commit.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now,
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      setup: {
+        ...game.canonicalState.setup,
+        mulliganChoices: {
+          ...game.canonicalState.setup.mulliganChoices,
+          [input.actorPlayerId]: {
+            ...choice,
+            status: "locked",
+            selectedCardInstanceIds: [],
+            lockedAt: now
+          }
+        }
+      }
+    }
+  });
+}
+
 function createInitialBattlefieldChoices(
   playerIds: [string, string]
 ): Record<string, BattlefieldChoice> {
@@ -238,6 +627,115 @@ function createInitialBattlefieldChoices(
         cardInstanceId: null,
         lockedAt: null,
         revealedAt: null
+      }
+    ])
+  );
+}
+
+function createInitialMulliganChoices(
+  playerIds: [string, string]
+): Record<string, MulliganChoice> {
+  return Object.fromEntries(
+    playerIds.map((playerId) => [
+      playerId,
+      {
+        playerId,
+        status: "unlocked",
+        selectedCardInstanceIds: [],
+        lockedAt: null
+      }
+    ])
+  );
+}
+
+function createInitialPlayerStates(
+  input: CreateGameInput
+): Record<string, GamePlayerState> {
+  return Object.fromEntries(
+    input.playerIds.map((playerId) => [
+      playerId,
+      {
+        playerId,
+        zones: {
+          legend: null,
+          champion: null,
+          mainDeck: input.mainDeckCardInstanceIdsByPlayer?.[playerId] ?? [],
+          runeDeck: input.runeDeckCardInstanceIdsByPlayer?.[playerId] ?? [],
+          hand: [],
+          trash: [],
+          banishment: [],
+          base: []
+        }
+      }
+    ])
+  );
+}
+
+function shuffleDeckZone(
+  game: Game,
+  zone: "mainDeck" | "runeDeck",
+  purposePrefix: string,
+  now: string
+): ShuffleDecksResult {
+  if (game.status !== "setup_pending") {
+    throw new Error("Decks can only be shuffled during setup.");
+  }
+
+  let rngState = game.canonicalState.rng;
+  const randomOperations: RandomOperation[] = [];
+  const players = { ...game.canonicalState.players };
+
+  for (const playerId of game.canonicalState.setup.playerIds) {
+    const player = players[playerId];
+
+    if (!player) {
+      throw new Error("Player zone state is missing.");
+    }
+
+    const result = shuffleItems(
+      rngState,
+      player.zones[zone],
+      `${purposePrefix}:${playerId}`
+    );
+
+    rngState = result.rngState;
+    randomOperations.push(result.operation);
+    players[playerId] = {
+      ...player,
+      zones: {
+        ...player.zones,
+        [zone]: result.values
+      }
+    };
+  }
+
+  return {
+    game: gameSchema.parse({
+      ...game,
+      updatedAt: now,
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...game.canonicalState,
+        rng: rngState,
+        players
+      }
+    }),
+    randomOperations
+  };
+}
+
+function createInitialBattlefieldPools(
+  input: CreateGameInput
+): Record<string, PlayerBattlefieldPool> {
+  return Object.fromEntries(
+    input.playerIds.map((playerId) => [
+      playerId,
+      {
+        playerId,
+        registeredCardInstanceIds:
+          input.battlefieldCardInstanceIdsByPlayer?.[playerId] ?? [],
+        usedCardInstanceIds:
+          input.usedBattlefieldCardInstanceIdsByPlayer?.[playerId] ?? []
       }
     ])
   );

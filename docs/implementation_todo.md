@@ -100,15 +100,15 @@ implemented, tested, and documented where relevant.
 - [x] Implement game 1 starting-player chooser by seeded RNG.
 - [x] Implement game 2/3 chooser as previous game loser.
 - [x] Implement starting player choice intent.
-- [ ] Implement battlefield commit.
-- [ ] Implement battlefield reveal after both players lock.
-- [ ] Enforce used battlefield cannot be reused by same player.
-- [ ] Shuffle main decks with seeded RNG.
-- [ ] Shuffle rune decks with seeded RNG.
-- [ ] Place Legend, Champion, Main Deck, Rune Deck, and Battlefields into zones.
-- [ ] Draw opening hands.
-- [ ] Implement zero-card mulligan for first acceptance scenario.
-- [ ] Add setup tests.
+- [x] Implement battlefield commit.
+- [x] Implement battlefield reveal after both players lock.
+- [x] Enforce used battlefield cannot be reused by same player.
+- [x] Shuffle main decks with seeded RNG.
+- [x] Shuffle rune decks with seeded RNG.
+- [x] Place Legend, Champion, Main Deck, Rune Deck, and Battlefields into zones.
+- [x] Draw opening hands.
+- [x] Implement zero-card mulligan for first acceptance scenario.
+- [x] Add setup tests.
 
 ## 9. Seeded RNG And Events
 

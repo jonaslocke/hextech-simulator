@@ -27,6 +27,12 @@ export type RandomChoiceResult<T> = {
   operation: RandomOperation;
 };
 
+export type ShuffleResult<T> = {
+  values: T[];
+  rngState: RngState;
+  operation: RandomOperation;
+};
+
 export function createRngState(seed: string): RngState {
   return rngStateSchema.parse({
     seed,
@@ -60,6 +66,43 @@ export function chooseRandomItem<T>(
       result: {
         index,
         value
+      }
+    })
+  };
+}
+
+export function shuffleItems<T>(
+  rngState: RngState,
+  values: readonly T[],
+  purpose: string
+): ShuffleResult<T> {
+  let nextState = rngState;
+  const shuffled = [...values];
+  const swaps: Array<{ from: number; to: number }> = [];
+
+  for (let from = shuffled.length - 1; from > 0; from -= 1) {
+    const randomValue = readRandomFloat(nextState);
+    const to = Math.floor(randomValue * (from + 1));
+    [shuffled[from], shuffled[to]] = [shuffled[to]!, shuffled[from]!];
+    swaps.push({ from, to });
+    nextState = {
+      ...nextState,
+      rngStep: nextState.rngStep + 1
+    };
+  }
+
+  return {
+    values: shuffled,
+    rngState: nextState,
+    operation: randomOperationSchema.parse({
+      seed: rngState.seed,
+      rngAlgorithm: rngState.rngAlgorithm,
+      rngStep: rngState.rngStep,
+      purpose,
+      result: {
+        inputCount: values.length,
+        output: shuffled,
+        swaps
       }
     })
   };
