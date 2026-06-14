@@ -177,6 +177,8 @@ function renderIntentMessage(
       return `${actor} passed.`;
     case "game.endTurn":
       return `${actor} ended the turn.`;
+    case "game.moveUnitToBattlefield":
+      return `${actor} moved a unit to a battlefield.`;
     default:
       return `${actor} submitted an unsupported intent.`;
   }
@@ -194,6 +196,10 @@ function renderServerDecisionMessage(event: GameEventDocument): string {
       return "Server revealed battlefield choices.";
     case "game.start":
       return "Server started the game.";
+    case "showdown.enter":
+      return "Server opened a showdown.";
+    case "showdown.close":
+      return "Server closed the showdown.";
     default:
       return "Server decision recorded.";
   }

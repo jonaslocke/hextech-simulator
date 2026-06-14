@@ -6,7 +6,9 @@ import {
   drawCards,
   endTurn,
   gameSchema,
+  moveUnitToBattlefield,
   passPriority,
+  passShowdown,
   projectGameForPlayer,
   recycleCards,
   startGame,
@@ -194,6 +196,67 @@ test("end turn advances active player and clears passes", () => {
   });
 });
 
+test("moving a unit to an empty battlefield opens a showdown", () => {
+  const game = createInProgressGameWithBattlefield();
+
+  const result = moveUnitToBattlefield(game, {
+    actorPlayerId: "player-a",
+    unitCardInstanceId: "a-base-1",
+    battlefieldId: "battlefield-a"
+  });
+
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.base, [
+    "a-base-2"
+  ]);
+  assert.deepEqual(result.canonicalState.battlefields[0]?.units, ["a-base-1"]);
+  assert.deepEqual(result.canonicalState.showdown, {
+    battlefieldId: "battlefield-a",
+    relevantPlayerIds: ["player-a", "player-b"],
+    focusPlayerId: "player-a",
+    priorityPlayerId: "player-a",
+    passedPlayerIds: []
+  });
+});
+
+test("showdown pass moves focus to the next relevant player", () => {
+  const showdownGame = moveUnitToBattlefield(createInProgressGameWithBattlefield(), {
+    actorPlayerId: "player-a",
+    unitCardInstanceId: "a-base-1",
+    battlefieldId: "battlefield-a"
+  });
+
+  const result = passShowdown(showdownGame, {
+    actorPlayerId: "player-a"
+  });
+
+  assert.deepEqual(result.canonicalState.showdown, {
+    battlefieldId: "battlefield-a",
+    relevantPlayerIds: ["player-a", "player-b"],
+    focusPlayerId: "player-b",
+    priorityPlayerId: "player-b",
+    passedPlayerIds: ["player-a"]
+  });
+});
+
+test("showdown closes after all relevant players pass", () => {
+  const firstPass = passShowdown(
+    moveUnitToBattlefield(createInProgressGameWithBattlefield(), {
+      actorPlayerId: "player-a",
+      unitCardInstanceId: "a-base-1",
+      battlefieldId: "battlefield-a"
+    }),
+    {
+      actorPlayerId: "player-a"
+    }
+  );
+
+  const result = passShowdown(firstPass, {
+    actorPlayerId: "player-b"
+  });
+
+  assert.equal(result.canonicalState.showdown, null);
+});
+
 function createSetupCompleteGame(): Game {
   const base = createGame({
     id: "game-1",
@@ -272,6 +335,26 @@ function createInProgressGame(): Game {
           }
         }
       }
+    }
+  });
+}
+
+function createInProgressGameWithBattlefield(): Game {
+  const game = createInProgressGame();
+
+  return gameSchema.parse({
+    ...game,
+    canonicalState: {
+      ...game.canonicalState,
+      battlefields: [
+        {
+          battlefieldId: "battlefield-a",
+          selectedByPlayerId: "player-a",
+          cardInstanceId: "battlefield-card-a",
+          units: [],
+          facedownSlot: null
+        }
+      ]
     }
   });
 }

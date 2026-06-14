@@ -56,6 +56,14 @@ export const gameTurnStateSchema = z.object({
   passedPlayerIds: z.array(z.string().min(1))
 });
 
+export const showdownStateSchema = z.object({
+  battlefieldId: z.string().min(1),
+  relevantPlayerIds: z.array(z.string().min(1)).min(1),
+  focusPlayerId: z.string().min(1),
+  priorityPlayerId: z.string().min(1),
+  passedPlayerIds: z.array(z.string().min(1))
+});
+
 export const playerZonesSchema = z.object({
   legend: z.string().min(1).nullable(),
   champion: z.string().min(1).nullable(),
@@ -90,7 +98,8 @@ export const canonicalGameStateSchema = z.object({
   rng: rngStateSchema,
   players: z.record(z.string().min(1), gamePlayerStateSchema),
   setup: gameSetupStateSchema,
-  turn: gameTurnStateSchema.nullable()
+  turn: gameTurnStateSchema.nullable(),
+  showdown: showdownStateSchema.nullable()
 });
 
 export const gameSchema = z.object({
@@ -115,6 +124,7 @@ export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
 export type GameTurnPhase = (typeof gameTurnPhases)[number];
 export type GameTurnState = z.infer<typeof gameTurnStateSchema>;
+export type ShowdownState = z.infer<typeof showdownStateSchema>;
 export type CanonicalGameState = z.infer<typeof canonicalGameStateSchema>;
 export type Game = z.infer<typeof gameSchema>;
 
@@ -210,6 +220,18 @@ export type EndTurnInput = {
   now?: string;
 };
 
+export type MoveUnitToBattlefieldInput = {
+  actorPlayerId: string;
+  unitCardInstanceId: string;
+  battlefieldId: string;
+  now?: string;
+};
+
+export type PassShowdownInput = {
+  actorPlayerId: string;
+  now?: string;
+};
+
 export function createGame(input: CreateGameInput): Game {
   assertDistinctPlayerIds(input.playerIds);
 
@@ -227,7 +249,8 @@ export function createGame(input: CreateGameInput): Game {
       battlefieldPools: createInitialBattlefieldPools(input),
       mulliganChoices: createInitialMulliganChoices(input.playerIds)
     },
-    turn: null
+    turn: null,
+    showdown: null
   };
 
   return gameSchema.parse({
@@ -913,6 +936,114 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
   });
 }
 
+export function moveUnitToBattlefield(
+  game: Game,
+  input: MoveUnitToBattlefieldInput
+): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  if (game.canonicalState.showdown !== null) {
+    throw new Error("Units cannot move while a showdown is in progress.");
+  }
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+
+  if (!player.zones.base.includes(input.unitCardInstanceId)) {
+    throw new Error("Unit must be in the acting player's base.");
+  }
+
+  const battlefield = game.canonicalState.battlefields.find(
+    (candidate) => candidate.battlefieldId === input.battlefieldId
+  );
+
+  if (!battlefield) {
+    throw new Error("Battlefield was not found.");
+  }
+
+  if (battlefield.units.length > 0) {
+    throw new Error("Only movement to an empty battlefield is supported.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      players: {
+        ...game.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...player,
+          zones: {
+            ...player.zones,
+            base: player.zones.base.filter(
+              (cardInstanceId) => cardInstanceId !== input.unitCardInstanceId
+            )
+          }
+        }
+      },
+      battlefields: game.canonicalState.battlefields.map((candidate) =>
+        candidate.battlefieldId === input.battlefieldId
+          ? {
+              ...candidate,
+              units: [...candidate.units, input.unitCardInstanceId]
+            }
+          : candidate
+      ),
+      showdown: {
+        battlefieldId: input.battlefieldId,
+        relevantPlayerIds: [...game.canonicalState.setup.playerIds],
+        focusPlayerId: input.actorPlayerId,
+        priorityPlayerId: input.actorPlayerId,
+        passedPlayerIds: []
+      }
+    }
+  });
+}
+
+export function passShowdown(game: Game, input: PassShowdownInput): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const showdown = game.canonicalState.showdown;
+
+  if (showdown === null) {
+    throw new Error("No showdown is in progress.");
+  }
+
+  if (showdown.focusPlayerId !== input.actorPlayerId) {
+    throw new Error("Only the player with focus can pass in showdown.");
+  }
+
+  const passedPlayerIds = showdown.passedPlayerIds.includes(input.actorPlayerId)
+    ? showdown.passedPlayerIds
+    : [...showdown.passedPlayerIds, input.actorPlayerId];
+  const shouldClose = showdown.relevantPlayerIds.every((playerId) =>
+    passedPlayerIds.includes(playerId)
+  );
+  const nextFocusPlayerId = shouldClose
+    ? input.actorPlayerId
+    : nextRelevantPlayer(showdown.relevantPlayerIds, input.actorPlayerId);
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      showdown: shouldClose
+        ? null
+        : {
+            ...showdown,
+            focusPlayerId: nextFocusPlayerId,
+            priorityPlayerId: nextFocusPlayerId,
+            passedPlayerIds
+          }
+    }
+  });
+}
+
 function createInitialBattlefieldChoices(
   playerIds: [string, string]
 ): Record<string, BattlefieldChoice> {
@@ -1073,4 +1204,14 @@ function assertPositiveCount(count: number) {
   if (!Number.isInteger(count) || count < 1) {
     throw new Error("Count must be a positive integer.");
   }
+}
+
+function nextRelevantPlayer(relevantPlayerIds: string[], currentPlayerId: string): string {
+  const currentIndex = relevantPlayerIds.indexOf(currentPlayerId);
+
+  if (currentIndex === -1) {
+    throw new Error("Current focus player must be relevant.");
+  }
+
+  return relevantPlayerIds[(currentIndex + 1) % relevantPlayerIds.length]!;
 }

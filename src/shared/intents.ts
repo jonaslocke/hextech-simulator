@@ -66,6 +66,14 @@ export const endTurnIntentSchema = z.object({
   payload: z.object({}).optional()
 });
 
+export const moveUnitToBattlefieldIntentSchema = z.object({
+  type: z.literal("game.moveUnitToBattlefield"),
+  payload: z.object({
+    unitCardInstanceId: z.string().min(1),
+    battlefieldId: z.string().min(1)
+  })
+});
+
 export const matchIntentPayloadSchema = playerCredentialsSchema.extend({
   gameId: z.string().min(1).optional(),
   stateVersion: z.number().int().nonnegative(),
@@ -94,3 +102,6 @@ export type ChannelRunesIntent = z.infer<typeof channelRunesIntentSchema>;
 export type RecycleCardsIntent = z.infer<typeof recycleCardsIntentSchema>;
 export type PassPriorityIntent = z.infer<typeof passPriorityIntentSchema>;
 export type EndTurnIntent = z.infer<typeof endTurnIntentSchema>;
+export type MoveUnitToBattlefieldIntent = z.infer<
+  typeof moveUnitToBattlefieldIntentSchema
+>;

@@ -15,6 +15,7 @@ import {
   endTurnIntentSchema,
   lockBattlefieldChoiceIntentSchema,
   matchIntentPayloadSchema,
+  moveUnitToBattlefieldIntentSchema,
   passPriorityIntentSchema,
   recycleCardsIntentSchema,
   type MatchIntentPayload
@@ -26,7 +27,9 @@ import {
   drawCards,
   endTurn,
   lockBattlefieldChoice,
+  moveUnitToBattlefield,
   passPriority,
+  passShowdown,
   recycleCards,
   revealBattlefieldChoices,
   startGame,
@@ -330,14 +333,30 @@ function applyIntent(
 
       case "game.pass": {
         passPriorityIntentSchema.parse(input.intent);
+        const passedGame =
+          game.canonicalState.showdown === null
+            ? passPriority(game, {
+                actorPlayerId,
+                now
+              })
+            : passShowdown(game, {
+                actorPlayerId,
+                now
+              });
+        const closedShowdown =
+          game.canonicalState.showdown !== null &&
+          passedGame.canonicalState.showdown === null;
 
         return {
           accepted: true,
-          game: passPriority(game, {
-            actorPlayerId,
-            now
-          }),
-          serverDecisions: [],
+          game: passedGame,
+          serverDecisions: closedShowdown
+            ? [
+                {
+                  type: "showdown.close"
+                }
+              ]
+            : [],
           randomOperations: []
         };
       }
@@ -355,6 +374,50 @@ function applyIntent(
           randomOperations: []
         };
       }
+
+      case "game.moveUnitToBattlefield": {
+        const intent = moveUnitToBattlefieldIntentSchema.parse(input.intent);
+        const movedGame = moveUnitToBattlefield(game, {
+          actorPlayerId,
+          unitCardInstanceId: intent.payload.unitCardInstanceId,
+          battlefieldId: intent.payload.battlefieldId,
+          now
+        });
+
+        return {
+          accepted: true,
+          game: movedGame,
+          serverDecisions:
+            game.canonicalState.showdown === null &&
+            movedGame.canonicalState.showdown !== null
+              ? [
+                  {
+                    type: "showdown.enter",
+                    payload: {
+                      battlefieldId: intent.payload.battlefieldId
+                    }
+                  }
+                ]
+              : [],
+          randomOperations: []
+        };
+      }
+
+      case "game.playCard":
+      case "game.activateAbility":
+        if (game.canonicalState.showdown !== null) {
+          return reject(
+            "unsupported_intent",
+            "Action/Reaction play during showdown is not implemented.",
+            input.intent.type
+          );
+        }
+
+        return reject(
+          "unsupported_intent",
+          `Intent type is not supported: ${input.intent.type}`,
+          input.intent.type
+        );
 
       default:
         return reject(

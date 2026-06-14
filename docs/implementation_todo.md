@@ -190,14 +190,14 @@ implemented, tested, and documented where relevant.
 
 ## 14. Showdown Shell
 
-- [ ] Detect supported movement into empty battlefield.
-- [ ] Enter showdown state.
-- [ ] Establish relevant players.
-- [ ] Establish focus.
-- [ ] Establish priority.
-- [ ] Track pass sequence.
-- [ ] Close showdown after all relevant players pass.
-- [ ] Reject Action/Reaction play during showdown as unsupported.
+- [x] Detect supported movement into empty battlefield.
+- [x] Enter showdown state.
+- [x] Establish relevant players.
+- [x] Establish focus.
+- [x] Establish priority.
+- [x] Track pass sequence.
+- [x] Close showdown after all relevant players pass.
+- [x] Reject Action/Reaction play during showdown as unsupported.
 - [ ] Add Annie vs Lux scripted acceptance test through showdown close.
 
 ## 15. First End-To-End Acceptance

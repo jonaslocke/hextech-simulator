@@ -336,6 +336,130 @@ test("intent service appends RNG event for simultaneous main deck recycle", asyn
   );
 });
 
+test("intent service opens showdown when moving to an empty battlefield", async () => {
+  const game = createInProgressIntentGameWithBattlefield();
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(repositories, {
+    matchId: "match-1",
+    gameId: "game-1",
+    playerToken: "token-a",
+    stateVersion: game.stateVersion,
+    intent: {
+      type: "game.moveUnitToBattlefield",
+      payload: {
+        unitCardInstanceId: "a-unit-1",
+        battlefieldId: "battlefield-a"
+      }
+    }
+  });
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.equal(result.game.canonicalState.showdown?.focusPlayerId, "player-a");
+  assert.deepEqual(
+    result.events.map((event) => event.type),
+    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+  );
+  assert.deepEqual(result.events[1]?.payload, {
+    decision: {
+      type: "showdown.enter",
+      payload: {
+        battlefieldId: "battlefield-a"
+      }
+    }
+  });
+});
+
+test("intent service closes showdown after both relevant players pass", async () => {
+  const game = gameSchema.parse({
+    ...createInProgressIntentGameWithBattlefield(),
+    canonicalState: {
+      ...createInProgressIntentGameWithBattlefield().canonicalState,
+      showdown: {
+        battlefieldId: "battlefield-a",
+        relevantPlayerIds: ["player-a", "player-b"],
+        focusPlayerId: "player-b",
+        priorityPlayerId: "player-b",
+        passedPlayerIds: ["player-a"]
+      }
+    }
+  });
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(repositories, {
+    matchId: "match-1",
+    gameId: "game-1",
+    playerToken: "token-b",
+    stateVersion: game.stateVersion,
+    intent: {
+      type: "game.pass"
+    }
+  });
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.equal(result.game.canonicalState.showdown, null);
+  assert.deepEqual(
+    result.events.map((event) => event.type),
+    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+  );
+  assert.deepEqual(result.events[1]?.payload, {
+    decision: {
+      type: "showdown.close"
+    }
+  });
+});
+
+test("intent service rejects action or reaction play during showdown as unsupported", async () => {
+  const game = gameSchema.parse({
+    ...createInProgressIntentGameWithBattlefield(),
+    canonicalState: {
+      ...createInProgressIntentGameWithBattlefield().canonicalState,
+      showdown: {
+        battlefieldId: "battlefield-a",
+        relevantPlayerIds: ["player-a", "player-b"],
+        focusPlayerId: "player-a",
+        priorityPlayerId: "player-a",
+        passedPlayerIds: []
+      }
+    }
+  });
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(repositories, {
+    matchId: "match-1",
+    gameId: "game-1",
+    playerToken: "token-a",
+    stateVersion: game.stateVersion,
+    intent: {
+      type: "game.playCard",
+      payload: {
+        cardInstanceId: "a-action-card"
+      }
+    }
+  });
+
+  assert.equal(result.accepted, false);
+
+  if (result.accepted) {
+    return;
+  }
+
+  assert.equal(result.error.code, "unsupported_intent");
+  assert.equal(result.error.source, "game.playCard");
+  assert.deepEqual(await repositories.games.findById("game-1"), game);
+  assert.deepEqual(await repositories.gameEvents.findByGameId("game-1"), []);
+});
+
 function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
   const game =
     input.game ??
@@ -573,6 +697,36 @@ function createInProgressIntentGame(): Game {
           }
         }
       }
+    }
+  });
+}
+
+function createInProgressIntentGameWithBattlefield(): Game {
+  const game = createInProgressIntentGame();
+
+  return gameSchema.parse({
+    ...game,
+    canonicalState: {
+      ...game.canonicalState,
+      players: {
+        ...game.canonicalState.players,
+        "player-a": {
+          ...game.canonicalState.players["player-a"]!,
+          zones: {
+            ...game.canonicalState.players["player-a"]!.zones,
+            base: ["a-unit-1"]
+          }
+        }
+      },
+      battlefields: [
+        {
+          battlefieldId: "battlefield-a",
+          selectedByPlayerId: "player-a",
+          cardInstanceId: "battlefield-card-a",
+          units: [],
+          facedownSlot: null
+        }
+      ]
     }
   });
 }

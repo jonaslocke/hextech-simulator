@@ -71,6 +71,16 @@ export const projectedTurnStateSchema = z
   })
   .nullable();
 
+export const projectedShowdownStateSchema = z
+  .object({
+    battlefieldId: z.string().min(1),
+    relevantPlayerIds: z.array(z.string().min(1)).min(1),
+    focusPlayerId: z.string().min(1),
+    priorityPlayerId: z.string().min(1),
+    passedPlayerIds: z.array(z.string().min(1))
+  })
+  .nullable();
+
 export const gameProjectionSchema = z.object({
   id: z.string().min(1),
   matchId: z.string().min(1),
@@ -81,6 +91,7 @@ export const gameProjectionSchema = z.object({
   winnerPlayerId: z.string().min(1).nullable(),
   setup: projectedSetupStateSchema,
   turn: projectedTurnStateSchema,
+  showdown: projectedShowdownStateSchema,
   players: z.record(z.string().min(1), projectedPlayerStateSchema),
   battlefields: z.array(projectedBattlefieldSchema)
 });
@@ -91,6 +102,7 @@ export type ProjectedPlayerState = z.infer<typeof projectedPlayerStateSchema>;
 export type ProjectedBattlefield = z.infer<typeof projectedBattlefieldSchema>;
 export type ProjectedSetupState = z.infer<typeof projectedSetupStateSchema>;
 export type ProjectedTurnState = z.infer<typeof projectedTurnStateSchema>;
+export type ProjectedShowdownState = z.infer<typeof projectedShowdownStateSchema>;
 export type GameProjection = z.infer<typeof gameProjectionSchema>;
 
 export function projectGameForPlayer(game: Game, viewerPlayerId: string): GameProjection {
@@ -108,6 +120,7 @@ export function projectGameForPlayer(game: Game, viewerPlayerId: string): GamePr
     winnerPlayerId: game.winnerPlayerId,
     setup: projectSetup(game, viewerPlayerId),
     turn: game.canonicalState.turn,
+    showdown: game.canonicalState.showdown,
     players: Object.fromEntries(
       game.canonicalState.setup.playerIds.map((playerId) => {
         const player = game.canonicalState.players[playerId];

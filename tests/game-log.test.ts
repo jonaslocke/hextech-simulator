@@ -161,6 +161,58 @@ test("renders server decisions for game log", () => {
   assert.equal(entries[0]?.message, "Server started the game.");
 });
 
+test("renders showdown movement and server decisions", () => {
+  const entries = projectGameEventsForPlayer(
+    [
+      createEvent({
+        sequence: 1,
+        type: gameEventTypes.playerIntentAccepted,
+        actorPlayerId: "player-a",
+        payload: {
+          intent: {
+            type: "game.moveUnitToBattlefield",
+            payload: {
+              unitCardInstanceId: "unit-secret",
+              battlefieldId: "battlefield-a"
+            }
+          }
+        }
+      }),
+      createEvent({
+        sequence: 2,
+        type: gameEventTypes.serverDecision,
+        actorPlayerId: null,
+        payload: {
+          decision: {
+            type: "showdown.enter"
+          }
+        }
+      }),
+      createEvent({
+        sequence: 3,
+        type: gameEventTypes.serverDecision,
+        actorPlayerId: null,
+        payload: {
+          decision: {
+            type: "showdown.close"
+          }
+        }
+      })
+    ],
+    "player-b"
+  );
+
+  assert.deepEqual(
+    entries.map((entry) => entry.message),
+    [
+      "Opponent moved a unit to a battlefield.",
+      "Server opened a showdown.",
+      "Server closed the showdown."
+    ]
+  );
+  assert.equal(entries.some((entry) => entry.message.includes("unit-secret")), false);
+});
+
 function createEvent(
   input: Partial<GameEventDocument> & Pick<GameEventDocument, "type" | "payload">
 ): GameEventDocument {

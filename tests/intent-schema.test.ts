@@ -8,6 +8,7 @@ import {
   endTurnIntentSchema,
   lockBattlefieldChoiceIntentSchema,
   matchIntentRequestBodySchema,
+  moveUnitToBattlefieldIntentSchema,
   passPriorityIntentSchema,
   recycleCardsIntentSchema
 } from "../src/shared/intents";
@@ -153,5 +154,15 @@ test("validates core gameplay intent payloads", () => {
       type: "game.endTurn"
     }).type,
     "game.endTurn"
+  );
+  assert.equal(
+    moveUnitToBattlefieldIntentSchema.parse({
+      type: "game.moveUnitToBattlefield",
+      payload: {
+        unitCardInstanceId: "unit-1",
+        battlefieldId: "battlefield-1"
+      }
+    }).payload.battlefieldId,
+    "battlefield-1"
   );
 });
