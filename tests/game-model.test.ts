@@ -66,6 +66,7 @@ test("creates a setup-pending game with initial setup state", () => {
       }
     }
   });
+  assert.equal(game.canonicalState.turn, null);
   assert.deepEqual(game.canonicalState.setup.playerIds, ["player-a", "player-b"]);
   assert.equal(game.canonicalState.setup.startingPlayerChooserId, null);
   assert.equal(game.canonicalState.setup.startingPlayerId, null);

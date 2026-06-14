@@ -1,20 +1,33 @@
 import type { GameEventDocument, Repositories } from "../db";
+import type { RandomOperation } from "../engine";
 import {
   createPlayerIntentAcceptedEvent,
+  createRandomOperationEvent,
   createServerDecisionEvent
 } from "../events";
 import {
+  channelRunesIntentSchema,
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
+  drawCardsIntentSchema,
+  endTurnIntentSchema,
   lockBattlefieldChoiceIntentSchema,
   matchIntentPayloadSchema,
+  passPriorityIntentSchema,
+  recycleCardsIntentSchema,
   type MatchIntentPayload
 } from "../../shared/intents";
 import {
+  channelRunes,
   chooseStartingPlayer,
   commitMulligan,
+  drawCards,
+  endTurn,
   lockBattlefieldChoice,
+  passPriority,
+  recycleCards,
   revealBattlefieldChoices,
+  startGame,
   type Game
 } from "./game";
 import { projectGameForPlayer, type GameProjection } from "./projections";
@@ -132,6 +145,20 @@ export async function handleMatchIntent(
     );
   }
 
+  for (const operation of transition.randomOperations) {
+    sequence += 1;
+    events.push(
+      createRandomOperationEvent({
+        id: createEventId(game.id, sequence, options),
+        now,
+        matchId: game.matchId,
+        gameId: game.id,
+        sequence,
+        operation
+      })
+    );
+  }
+
   await repositories.games.upsert(transition.game);
 
   for (const event of events) {
@@ -154,6 +181,7 @@ type AppliedIntentResult =
         type: string;
         payload?: unknown;
       }>;
+      randomOperations: RandomOperation[];
     }
   | IntentServiceRejectedResult;
 
@@ -175,7 +203,8 @@ function applyIntent(
             startingPlayerId: intent.payload.startingPlayerId,
             now
           }),
-          serverDecisions: []
+          serverDecisions: [],
+          randomOperations: []
         };
       }
 
@@ -195,7 +224,8 @@ function applyIntent(
           return {
             accepted: true,
             game: lockedGame,
-            serverDecisions: []
+            serverDecisions: [],
+            randomOperations: []
           };
         }
 
@@ -206,21 +236,119 @@ function applyIntent(
             {
               type: "setup.revealBattlefieldChoices"
             }
-          ]
+          ],
+          randomOperations: []
         };
       }
 
       case "setup.commitMulligan": {
         const intent = commitMulliganIntentSchema.parse(input.intent);
+        const committedGame = commitMulligan(game, {
+          actorPlayerId,
+          selectedCardInstanceIds: intent.payload.selectedCardInstanceIds,
+          now
+        });
+        const shouldStart = committedGame.canonicalState.setup.playerIds.every(
+          (playerId) =>
+            committedGame.canonicalState.setup.mulliganChoices[playerId]?.status ===
+            "locked"
+        );
+
+        if (!shouldStart) {
+          return {
+            accepted: true,
+            game: committedGame,
+            serverDecisions: [],
+            randomOperations: []
+          };
+        }
 
         return {
           accepted: true,
-          game: commitMulligan(game, {
+          game: startGame(committedGame, { now }),
+          serverDecisions: [
+            {
+              type: "game.start"
+            }
+          ],
+          randomOperations: []
+        };
+      }
+
+      case "game.draw": {
+        const intent = drawCardsIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: drawCards(game, {
             actorPlayerId,
-            selectedCardInstanceIds: intent.payload.selectedCardInstanceIds,
+            count: intent.payload?.count,
             now
           }),
-          serverDecisions: []
+          serverDecisions: [],
+          randomOperations: []
+        };
+      }
+
+      case "game.channel": {
+        const intent = channelRunesIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: channelRunes(game, {
+            actorPlayerId,
+            count: intent.payload?.count,
+            now
+          }),
+          serverDecisions: [],
+          randomOperations: []
+        };
+      }
+
+      case "game.recycle": {
+        const intent = recycleCardsIntentSchema.parse(input.intent);
+        const result = recycleCards(game, {
+          actorPlayerId,
+          ownerPlayerId: intent.payload.ownerPlayerId,
+          cardInstanceIds: intent.payload.cardInstanceIds,
+          sourceZone: intent.payload.sourceZone,
+          destinationDeck: intent.payload.destinationDeck,
+          now
+        });
+
+        return {
+          accepted: true,
+          game: result.game,
+          serverDecisions: [],
+          randomOperations: result.randomOperations
+        };
+      }
+
+      case "game.pass": {
+        passPriorityIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: passPriority(game, {
+            actorPlayerId,
+            now
+          }),
+          serverDecisions: [],
+          randomOperations: []
+        };
+      }
+
+      case "game.endTurn": {
+        endTurnIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: endTurn(game, {
+            actorPlayerId,
+            now
+          }),
+          serverDecisions: [],
+          randomOperations: []
         };
       }
 

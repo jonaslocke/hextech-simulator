@@ -10,6 +10,14 @@ import {
 } from "../engine";
 
 export const gameStatuses = ["setup_pending", "ready", "in_progress", "complete"] as const;
+export const gameTurnPhases = [
+  "awaken",
+  "beginning",
+  "channel",
+  "draw",
+  "action",
+  "end"
+] as const;
 
 export const battlefieldChoiceSchema = z.object({
   playerId: z.string().min(1),
@@ -39,6 +47,13 @@ export const gameSetupStateSchema = z.object({
   battlefieldChoices: z.record(z.string().min(1), battlefieldChoiceSchema),
   battlefieldPools: z.record(z.string().min(1), playerBattlefieldPoolSchema),
   mulliganChoices: z.record(z.string().min(1), mulliganChoiceSchema)
+});
+
+export const gameTurnStateSchema = z.object({
+  turnNumber: z.number().int().min(1),
+  activePlayerId: z.string().min(1),
+  phase: z.enum(gameTurnPhases),
+  passedPlayerIds: z.array(z.string().min(1))
 });
 
 export const playerZonesSchema = z.object({
@@ -74,7 +89,8 @@ export const canonicalGameStateSchema = z.object({
   battlefields: z.array(battlefieldStateSchema),
   rng: rngStateSchema,
   players: z.record(z.string().min(1), gamePlayerStateSchema),
-  setup: gameSetupStateSchema
+  setup: gameSetupStateSchema,
+  turn: gameTurnStateSchema.nullable()
 });
 
 export const gameSchema = z.object({
@@ -97,6 +113,8 @@ export type PlayerZones = z.infer<typeof playerZonesSchema>;
 export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
 export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
+export type GameTurnPhase = (typeof gameTurnPhases)[number];
+export type GameTurnState = z.infer<typeof gameTurnStateSchema>;
 export type CanonicalGameState = z.infer<typeof canonicalGameStateSchema>;
 export type Game = z.infer<typeof gameSchema>;
 
@@ -152,6 +170,46 @@ export type CommitMulliganInput = {
   now?: string;
 };
 
+export type StartGameInput = {
+  now?: string;
+};
+
+export type DrawCardsInput = {
+  actorPlayerId: string;
+  count?: number;
+  now?: string;
+};
+
+export type ChannelRunesInput = {
+  actorPlayerId: string;
+  count?: number;
+  now?: string;
+};
+
+export type RecycleCardsInput = {
+  actorPlayerId: string;
+  ownerPlayerId: string;
+  cardInstanceIds: string[];
+  sourceZone: "hand" | "trash" | "banishment" | "base";
+  destinationDeck: "mainDeck" | "runeDeck";
+  now?: string;
+};
+
+export type RecycleCardsResult = {
+  game: Game;
+  randomOperations: RandomOperation[];
+};
+
+export type PassPriorityInput = {
+  actorPlayerId: string;
+  now?: string;
+};
+
+export type EndTurnInput = {
+  actorPlayerId: string;
+  now?: string;
+};
+
 export function createGame(input: CreateGameInput): Game {
   assertDistinctPlayerIds(input.playerIds);
 
@@ -168,7 +226,8 @@ export function createGame(input: CreateGameInput): Game {
       battlefieldChoices: createInitialBattlefieldChoices(input.playerIds),
       battlefieldPools: createInitialBattlefieldPools(input),
       mulliganChoices: createInitialMulliganChoices(input.playerIds)
-    }
+    },
+    turn: null
   };
 
   return gameSchema.parse({
@@ -615,6 +674,245 @@ export function commitMulligan(
   });
 }
 
+export function startGame(game: Game, input: StartGameInput = {}): Game {
+  if (game.status !== "setup_pending") {
+    throw new Error("Game can only start from setup.");
+  }
+
+  const startingPlayerId = game.canonicalState.setup.startingPlayerId;
+
+  if (startingPlayerId === null) {
+    throw new Error("Starting player must be chosen before the game starts.");
+  }
+
+  for (const playerId of game.canonicalState.setup.playerIds) {
+    const mulligan = game.canonicalState.setup.mulliganChoices[playerId];
+
+    if (!mulligan || mulligan.status !== "locked") {
+      throw new Error("Both players must commit mulligans before the game starts.");
+    }
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    status: "in_progress",
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        turnNumber: 1,
+        activePlayerId: startingPlayerId,
+        phase: "awaken",
+        passedPlayerIds: []
+      }
+    }
+  });
+}
+
+export function drawCards(game: Game, input: DrawCardsInput): Game {
+  const count = input.count ?? 1;
+
+  assertPositiveCount(count);
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+
+  if (player.zones.mainDeck.length < count) {
+    throw new Error("Burn Out is not implemented for empty Main Deck draws.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        ...game.canonicalState.turn!,
+        passedPlayerIds: []
+      },
+      players: {
+        ...game.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...player,
+          zones: {
+            ...player.zones,
+            mainDeck: player.zones.mainDeck.slice(count),
+            hand: [...player.zones.hand, ...player.zones.mainDeck.slice(0, count)]
+          }
+        }
+      }
+    }
+  });
+}
+
+export function channelRunes(game: Game, input: ChannelRunesInput): Game {
+  const count = input.count ?? 1;
+
+  assertPositiveCount(count);
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+
+  if (player.zones.runeDeck.length < count) {
+    throw new Error("Rune Deck does not contain enough runes to channel.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        ...game.canonicalState.turn!,
+        passedPlayerIds: []
+      },
+      players: {
+        ...game.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...player,
+          zones: {
+            ...player.zones,
+            runeDeck: player.zones.runeDeck.slice(count),
+            base: [...player.zones.base, ...player.zones.runeDeck.slice(0, count)]
+          }
+        }
+      }
+    }
+  });
+}
+
+export function recycleCards(
+  game: Game,
+  input: RecycleCardsInput
+): RecycleCardsResult {
+  if (input.cardInstanceIds.length === 0) {
+    throw new Error("Recycle requires at least one card.");
+  }
+
+  assertGamePlayer(game, input.actorPlayerId);
+  assertGamePlayer(game, input.ownerPlayerId);
+
+  const player = game.canonicalState.players[input.ownerPlayerId]!;
+  const sourceCards = player.zones[input.sourceZone];
+  const sourceSet = new Set(sourceCards);
+
+  for (const cardInstanceId of input.cardInstanceIds) {
+    if (!sourceSet.has(cardInstanceId)) {
+      throw new Error("Recycle source zone does not contain every selected card.");
+    }
+  }
+
+  let rngState = game.canonicalState.rng;
+  let recycledCardInstanceIds = input.cardInstanceIds;
+  const randomOperations: RandomOperation[] = [];
+
+  if (input.destinationDeck === "mainDeck" && input.cardInstanceIds.length > 1) {
+    const result = shuffleItems(
+      rngState,
+      input.cardInstanceIds,
+      `recycle-main-deck:${input.ownerPlayerId}`
+    );
+
+    rngState = result.rngState;
+    recycledCardInstanceIds = result.values;
+    randomOperations.push(result.operation);
+  }
+
+  const selectedSet = new Set(input.cardInstanceIds);
+  const nextSourceCards = sourceCards.filter(
+    (cardInstanceId) => !selectedSet.has(cardInstanceId)
+  );
+
+  return {
+    game: gameSchema.parse({
+      ...game,
+      updatedAt: input.now ?? new Date().toISOString(),
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...game.canonicalState,
+        rng: rngState,
+        players: {
+          ...game.canonicalState.players,
+          [input.ownerPlayerId]: {
+            ...player,
+            zones: {
+              ...player.zones,
+              [input.sourceZone]: nextSourceCards,
+              [input.destinationDeck]: [
+                ...player.zones[input.destinationDeck],
+                ...recycledCardInstanceIds
+              ]
+            }
+          }
+        }
+      }
+    }),
+    randomOperations
+  };
+}
+
+export function passPriority(game: Game, input: PassPriorityInput): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const turn = game.canonicalState.turn!;
+  const passedPlayerIds = turn.passedPlayerIds.includes(input.actorPlayerId)
+    ? turn.passedPlayerIds
+    : [...turn.passedPlayerIds, input.actorPlayerId];
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        ...turn,
+        passedPlayerIds
+      }
+    }
+  });
+}
+
+export function endTurn(game: Game, input: EndTurnInput): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const turn = game.canonicalState.turn!;
+
+  if (turn.activePlayerId !== input.actorPlayerId) {
+    throw new Error("Only the active player can end the turn.");
+  }
+
+  const nextPlayerId = game.canonicalState.setup.playerIds.find(
+    (playerId) => playerId !== input.actorPlayerId
+  );
+
+  if (!nextPlayerId) {
+    throw new Error("Next player could not be determined.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        turnNumber: turn.turnNumber + 1,
+        activePlayerId: nextPlayerId,
+        phase: "awaken",
+        passedPlayerIds: []
+      }
+    }
+  });
+}
+
 function createInitialBattlefieldChoices(
   playerIds: [string, string]
 ): Record<string, BattlefieldChoice> {
@@ -756,5 +1054,23 @@ function assertSamePlayers(game: Game, previousGame: Game) {
     [...currentPlayers].some((playerId) => !previousPlayers.has(playerId))
   ) {
     throw new Error("Current game and previous game must contain the same players.");
+  }
+}
+
+function assertGamePlayer(game: Game, playerId: string) {
+  if (!game.canonicalState.setup.playerIds.includes(playerId)) {
+    throw new Error("Player must be one of the game players.");
+  }
+}
+
+function assertInProgressTurn(game: Game) {
+  if (game.status !== "in_progress" || game.canonicalState.turn === null) {
+    throw new Error("Game must be in progress.");
+  }
+}
+
+function assertPositiveCount(count: number) {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error("Count must be a positive integer.");
   }
 }

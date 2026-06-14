@@ -28,6 +28,44 @@ export const commitMulliganIntentSchema = z.object({
   })
 });
 
+export const drawCardsIntentSchema = z.object({
+  type: z.literal("game.draw"),
+  payload: z
+    .object({
+      count: z.number().int().positive().optional()
+    })
+    .optional()
+});
+
+export const channelRunesIntentSchema = z.object({
+  type: z.literal("game.channel"),
+  payload: z
+    .object({
+      count: z.number().int().positive().optional()
+    })
+    .optional()
+});
+
+export const recycleCardsIntentSchema = z.object({
+  type: z.literal("game.recycle"),
+  payload: z.object({
+    ownerPlayerId: z.string().min(1),
+    cardInstanceIds: z.array(z.string().min(1)).min(1),
+    sourceZone: z.enum(["hand", "trash", "banishment", "base"]),
+    destinationDeck: z.enum(["mainDeck", "runeDeck"])
+  })
+});
+
+export const passPriorityIntentSchema = z.object({
+  type: z.literal("game.pass"),
+  payload: z.object({}).optional()
+});
+
+export const endTurnIntentSchema = z.object({
+  type: z.literal("game.endTurn"),
+  payload: z.object({}).optional()
+});
+
 export const matchIntentPayloadSchema = playerCredentialsSchema.extend({
   gameId: z.string().min(1).optional(),
   stateVersion: z.number().int().nonnegative(),
@@ -51,3 +89,8 @@ export type LockBattlefieldChoiceIntent = z.infer<
   typeof lockBattlefieldChoiceIntentSchema
 >;
 export type CommitMulliganIntent = z.infer<typeof commitMulliganIntentSchema>;
+export type DrawCardsIntent = z.infer<typeof drawCardsIntentSchema>;
+export type ChannelRunesIntent = z.infer<typeof channelRunesIntentSchema>;
+export type RecycleCardsIntent = z.infer<typeof recycleCardsIntentSchema>;
+export type PassPriorityIntent = z.infer<typeof passPriorityIntentSchema>;
+export type EndTurnIntent = z.infer<typeof endTurnIntentSchema>;

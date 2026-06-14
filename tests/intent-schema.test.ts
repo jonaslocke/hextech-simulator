@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  channelRunesIntentSchema,
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
+  drawCardsIntentSchema,
+  endTurnIntentSchema,
   lockBattlefieldChoiceIntentSchema,
-  matchIntentRequestBodySchema
+  matchIntentRequestBodySchema,
+  passPriorityIntentSchema,
+  recycleCardsIntentSchema
 } from "../src/shared/intents";
 
 test("validates choose starting player intent payload", () => {
@@ -103,5 +108,50 @@ test("rejects HTTP match intent request body with malformed intent", () => {
       }
     }).success,
     false
+  );
+});
+
+test("validates core gameplay intent payloads", () => {
+  assert.equal(
+    drawCardsIntentSchema.parse({
+      type: "game.draw",
+      payload: {
+        count: 1
+      }
+    }).payload?.count,
+    1
+  );
+  assert.equal(
+    channelRunesIntentSchema.parse({
+      type: "game.channel",
+      payload: {
+        count: 2
+      }
+    }).payload?.count,
+    2
+  );
+  assert.deepEqual(
+    recycleCardsIntentSchema.parse({
+      type: "game.recycle",
+      payload: {
+        ownerPlayerId: "player-a",
+        cardInstanceIds: ["a1"],
+        sourceZone: "hand",
+        destinationDeck: "mainDeck"
+      }
+    }).payload.cardInstanceIds,
+    ["a1"]
+  );
+  assert.equal(
+    passPriorityIntentSchema.parse({
+      type: "game.pass"
+    }).type,
+    "game.pass"
+  );
+  assert.equal(
+    endTurnIntentSchema.parse({
+      type: "game.endTurn"
+    }).type,
+    "game.endTurn"
   );
 });

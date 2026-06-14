@@ -115,7 +115,7 @@ implemented, tested, and documented where relevant.
 - [x] Log every random operation purpose.
 - [x] Log every random operation result.
 - [x] Add game-log event tests for chooser selection and deck shuffles.
-- [ ] Add game-log event tests for simultaneous Main Deck recycle ordering.
+- [x] Add game-log event tests for simultaneous Main Deck recycle ordering.
 
 ## 10. Visibility Projections
 
@@ -162,22 +162,22 @@ implemented, tested, and documented where relevant.
 - [x] Append accepted intent game-log events.
 - [x] Return viewer-safe projection and log entries from accepted intents.
 - [x] Return stable rejection response without mutating state or events.
-- [ ] Implement recycle action/event.
-- [ ] Recycle Main Deck cards to the bottom of their owner's Main Deck.
-- [ ] Randomize simultaneous 2+ card Main Deck recycle order with seeded RNG.
-- [ ] Recycle Runes to the bottom of their owner's Rune Deck.
-- [ ] Preserve owner-chosen order for simultaneous 2+ Rune Deck recycle.
-- [ ] Implement draw intent/action.
-- [ ] Implement channel intent/action.
-- [ ] Implement pass priority/focus intent.
-- [ ] Implement end turn intent.
-- [ ] Enforce state version checks.
-- [ ] Reject unsupported card behavior at intent time.
-- [ ] Keep state unchanged on rejected intents.
-- [ ] Add tests for draw visibility.
-- [ ] Add tests for channel.
-- [ ] Add tests for Recycle ordering rules.
-- [ ] Add tests for end turn.
+- [x] Implement recycle action/event.
+- [x] Recycle Main Deck cards to the bottom of their owner's Main Deck.
+- [x] Randomize simultaneous 2+ card Main Deck recycle order with seeded RNG.
+- [x] Recycle Runes to the bottom of their owner's Rune Deck.
+- [x] Preserve owner-chosen order for simultaneous 2+ Rune Deck recycle.
+- [x] Implement draw intent/action.
+- [x] Implement channel intent/action.
+- [x] Implement pass priority/focus intent.
+- [x] Implement end turn intent.
+- [x] Enforce state version checks.
+- [x] Reject unsupported card behavior at intent time.
+- [x] Keep state unchanged on rejected intents.
+- [x] Add tests for draw visibility.
+- [x] Add tests for channel.
+- [x] Add tests for Recycle ordering rules.
+- [x] Add tests for end turn.
 
 ## 13. Event Log Panel
 

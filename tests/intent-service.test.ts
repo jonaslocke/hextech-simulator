@@ -207,6 +207,131 @@ test("intent service rejects unsupported intents without mutation", async () => 
   assert.deepEqual(await repositories.gameEvents.findByGameId("game-1"), []);
 });
 
+test("intent service starts the game after both mulligans are committed", async () => {
+  const game = createOneMulliganCommittedGame();
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-b",
+      stateVersion: game.stateVersion,
+      intent: {
+        type: "setup.commitMulligan",
+        payload: {
+          selectedCardInstanceIds: []
+        }
+      }
+    },
+    {
+      now: () => "2026-06-14T06:00:00.000Z"
+    }
+  );
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.equal(result.game.status, "in_progress");
+  assert.equal(result.game.canonicalState.turn?.activePlayerId, "player-a");
+  assert.deepEqual(
+    result.events.map((event) => event.type),
+    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+  );
+  assert.deepEqual(result.events[1]?.payload, {
+    decision: {
+      type: "game.start"
+    }
+  });
+});
+
+test("intent service accepts draw intents and returns updated projection", async () => {
+  const game = createInProgressIntentGame();
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(repositories, {
+    matchId: "match-1",
+    gameId: "game-1",
+    playerToken: "token-a",
+    stateVersion: game.stateVersion,
+    intent: {
+      type: "game.draw",
+      payload: {
+        count: 1
+      }
+    }
+  });
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, [
+    "a-hand-1",
+    "a-main-1"
+  ]);
+  assert.equal(result.projection.players["player-a"]?.zones.hand.count, 2);
+  assert.equal(result.events[0]?.type, gameEventTypes.playerIntentAccepted);
+});
+
+test("intent service appends RNG event for simultaneous main deck recycle", async () => {
+  const game = gameSchema.parse({
+    ...createInProgressIntentGame(),
+    canonicalState: {
+      ...createInProgressIntentGame().canonicalState,
+      players: {
+        ...createInProgressIntentGame().canonicalState.players,
+        "player-a": {
+          ...createInProgressIntentGame().canonicalState.players["player-a"]!,
+          zones: {
+            ...createInProgressIntentGame().canonicalState.players["player-a"]!.zones,
+            hand: ["a-hand-1", "a-hand-2"]
+          }
+        }
+      }
+    }
+  });
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(repositories, {
+    matchId: "match-1",
+    gameId: "game-1",
+    playerToken: "token-a",
+    stateVersion: game.stateVersion,
+    intent: {
+      type: "game.recycle",
+      payload: {
+        ownerPlayerId: "player-a",
+        sourceZone: "hand",
+        destinationDeck: "mainDeck",
+        cardInstanceIds: ["a-hand-1", "a-hand-2"]
+      }
+    }
+  });
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.deepEqual(
+    result.events.map((event) => event.type),
+    [gameEventTypes.playerIntentAccepted, gameEventTypes.rngOperation]
+  );
+  assert.equal(
+    (result.events[1]?.payload as { operation: { purpose: string } }).operation
+      .purpose,
+    "recycle-main-deck:player-a"
+  );
+});
+
 function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
   const game =
     input.game ??
@@ -325,6 +450,124 @@ function withStartingPlayerChooser(game: Game, chooserId: string): Game {
       setup: {
         ...game.canonicalState.setup,
         startingPlayerChooserId: chooserId
+      }
+    }
+  });
+}
+
+function createOneMulliganCommittedGame(): Game {
+  const base = withStartingPlayerChooser(
+    createGame({
+      id: "game-1",
+      matchId: "match-1",
+      gameNumber: 1,
+      playerIds: ["player-a", "player-b"]
+    }),
+    "player-a"
+  );
+
+  return gameSchema.parse({
+    ...base,
+    canonicalState: {
+      ...base.canonicalState,
+      setup: {
+        ...base.canonicalState.setup,
+        startingPlayerId: "player-a",
+        mulliganChoices: {
+          "player-a": {
+            playerId: "player-a",
+            status: "locked",
+            selectedCardInstanceIds: [],
+            lockedAt: "2026-06-14T05:00:00.000Z"
+          },
+          "player-b": {
+            playerId: "player-b",
+            status: "unlocked",
+            selectedCardInstanceIds: [],
+            lockedAt: null
+          }
+        }
+      },
+      players: {
+        "player-a": {
+          playerId: "player-a",
+          zones: {
+            legend: "a-legend",
+            champion: "a-champion",
+            mainDeck: [],
+            runeDeck: [],
+            hand: ["a-hand-1"],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        },
+        "player-b": {
+          playerId: "player-b",
+          zones: {
+            legend: "b-legend",
+            champion: "b-champion",
+            mainDeck: [],
+            runeDeck: [],
+            hand: ["b-hand-1"],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        }
+      }
+    }
+  });
+}
+
+function createInProgressIntentGame(): Game {
+  const base = createGame({
+    id: "game-1",
+    matchId: "match-1",
+    gameNumber: 1,
+    playerIds: ["player-a", "player-b"],
+    rngSeed: "intent-gameplay-seed"
+  });
+
+  return gameSchema.parse({
+    ...base,
+    status: "in_progress",
+    stateVersion: 8,
+    canonicalState: {
+      ...base.canonicalState,
+      turn: {
+        turnNumber: 1,
+        activePlayerId: "player-a",
+        phase: "action",
+        passedPlayerIds: []
+      },
+      players: {
+        "player-a": {
+          playerId: "player-a",
+          zones: {
+            legend: "a-legend",
+            champion: "a-champion",
+            mainDeck: ["a-main-1", "a-main-2"],
+            runeDeck: ["a-rune-1"],
+            hand: ["a-hand-1"],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        },
+        "player-b": {
+          playerId: "player-b",
+          zones: {
+            legend: "b-legend",
+            champion: "b-champion",
+            mainDeck: ["b-main-1"],
+            runeDeck: ["b-rune-1"],
+            hand: [],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        }
       }
     }
   });
