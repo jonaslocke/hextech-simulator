@@ -3,7 +3,8 @@ import { test } from "node:test";
 import {
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
-  lockBattlefieldChoiceIntentSchema
+  lockBattlefieldChoiceIntentSchema,
+  matchIntentRequestBodySchema
 } from "../src/shared/intents";
 
 test("validates choose starting player intent payload", () => {
@@ -68,6 +69,37 @@ test("rejects commit mulligan intent with more than two selections", () => {
       type: "setup.commitMulligan",
       payload: {
         selectedCardInstanceIds: ["a1", "a2", "a3"]
+      }
+    }).success,
+    false
+  );
+});
+
+test("validates HTTP match intent request body without route match id", () => {
+  const result = matchIntentRequestBodySchema.parse({
+    gameId: "game-1",
+    playerToken: "token-a",
+    stateVersion: 3,
+    intent: {
+      type: "setup.commitMulligan",
+      payload: {
+        selectedCardInstanceIds: []
+      }
+    }
+  });
+
+  assert.equal(result.gameId, "game-1");
+  assert.equal(result.playerToken, "token-a");
+  assert.equal(result.stateVersion, 3);
+});
+
+test("rejects HTTP match intent request body with malformed intent", () => {
+  assert.equal(
+    matchIntentRequestBodySchema.safeParse({
+      playerToken: "token-a",
+      stateVersion: 3,
+      intent: {
+        payload: {}
       }
     }).success,
     false

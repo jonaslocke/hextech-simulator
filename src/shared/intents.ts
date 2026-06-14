@@ -37,8 +37,13 @@ export const matchIntentPayloadSchema = playerCredentialsSchema.extend({
   })
 });
 
+export const matchIntentRequestBodySchema = matchIntentPayloadSchema.omit({
+  matchId: true
+});
+
 export type MatchJoinPayload = z.infer<typeof matchJoinPayloadSchema>;
 export type MatchIntentPayload = z.infer<typeof matchIntentPayloadSchema>;
+export type MatchIntentRequestBody = z.infer<typeof matchIntentRequestBodySchema>;
 export type ChooseStartingPlayerIntent = z.infer<
   typeof chooseStartingPlayerIntentSchema
 >;
