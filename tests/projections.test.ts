@@ -6,6 +6,7 @@ import {
   projectGameForPlayer,
   type Game
 } from "../src/server/match";
+import type { Card } from "../src/server/catalog";
 
 test("projects own hand identities and hides opponent hand identities", () => {
   const game = createProjectionFixture();
@@ -139,6 +140,28 @@ test("mulligan projection exposes lock state without selected card identities", 
   );
 });
 
+test("projection exposes viewer payment modes without leaking opponent modes", () => {
+  const game = createPaymentProjectionFixture();
+
+  const projection = projectGameForPlayer(game, "player-a", projectionCardLookup);
+
+  assert.deepEqual(projection.players["player-a"]?.availablePaymentModes, {
+    "a-payable-unit": [
+      {
+        id: "regular",
+        label: "Regular",
+        optionalCosts: [],
+        resourceCosts: {
+          energy: 1,
+          power: []
+        },
+        isDefault: true
+      }
+    ]
+  });
+  assert.deepEqual(projection.players["player-b"]?.availablePaymentModes, {});
+});
+
 test("rejects projections for non-game viewers", () => {
   assert.throws(
     () => projectGameForPlayer(createProjectionFixture(), "player-c"),
@@ -225,4 +248,113 @@ function createProjectionFixture(): Game {
       }
     }
   });
+}
+
+function createPaymentProjectionFixture(): Game {
+  const baseGame = createProjectionFixture();
+
+  return gameSchema.parse({
+    ...baseGame,
+    status: "in_progress",
+    canonicalState: {
+      ...baseGame.canonicalState,
+      turn: {
+        turnNumber: 1,
+        activePlayerId: "player-a",
+        phase: "action",
+        passedPlayerIds: []
+      },
+      cardStates: {
+        "a-chaos-rune": {
+          exhausted: false
+        }
+      },
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-a": {
+          ...baseGame.canonicalState.players["player-a"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-a"]!.zones,
+            hand: ["a-payable-unit"],
+            base: ["a-chaos-rune"]
+          }
+        },
+        "player-b": {
+          ...baseGame.canonicalState.players["player-b"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-b"]!.zones,
+            hand: ["b-payable-unit"],
+            base: ["b-chaos-rune"]
+          }
+        }
+      }
+    }
+  });
+}
+
+const projectionCardLookup: Record<string, Card> = {
+  "a-payable-unit": createProjectionCard({
+    domain: ["Chaos"],
+    energy: 1,
+    name: "A Payable Unit",
+    power: null,
+    type: "Unit"
+  }),
+  "b-payable-unit": createProjectionCard({
+    domain: ["Chaos"],
+    energy: 1,
+    name: "B Payable Unit",
+    power: null,
+    type: "Unit"
+  }),
+  "a-chaos-rune": createProjectionCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "A Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "b-chaos-rune": createProjectionCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "B Chaos Rune",
+    power: null,
+    type: "Rune"
+  })
+};
+
+function createProjectionCard(input: {
+  domain: string[];
+  energy: number | null;
+  name: string;
+  power: number | null;
+  text?: string;
+  type: Card["classification"]["type"];
+}): Card {
+  return {
+    id: input.name,
+    name: input.name,
+    public_code: input.name,
+    attributes: {
+      energy: input.energy,
+      might: input.type === "Unit" ? 2 : null,
+      power: input.power
+    },
+    classification: {
+      type: input.type,
+      supertype: null,
+      rarity: null,
+      domain: input.domain
+    },
+    text: {
+      plain: input.text ?? ""
+    },
+    set: {
+      set_id: "test",
+      label: "Test"
+    },
+    media: {},
+    tags: [],
+    metadata: {}
+  };
 }

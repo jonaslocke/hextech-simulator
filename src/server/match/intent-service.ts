@@ -191,7 +191,11 @@ export async function handleMatchIntent(
   return {
     accepted: true,
     game: transition.game,
-    projection: projectGameForPlayer(transition.game, seat.playerId),
+    projection: projectGameForPlayer(
+      transition.game,
+      seat.playerId,
+      cardsByInstanceId
+    ),
     events,
     logEntries: projectGameEventsForPlayer(events, seat.playerId)
   };

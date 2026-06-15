@@ -14,6 +14,7 @@ import {
   domains,
   rainbowPower,
   type Domain,
+  type PaymentMode,
   type PaymentPlan,
   type PowerRequirement,
   type ResourcePayment
@@ -253,6 +254,8 @@ export type PlayCardResult = {
   payment: PaymentPlan;
   randomOperations: RandomOperation[];
 };
+
+export type AvailablePaymentModesByCard = Record<string, PaymentMode[]>;
 
 export type PassPriorityInput = {
   actorPlayerId: string;
@@ -1127,6 +1130,52 @@ export function playCard(
     payment,
     randomOperations: paidResult.randomOperations
   };
+}
+
+export function getAvailablePaymentModesForPlayer(
+  game: Game,
+  playerId: string,
+  cardsByInstanceId: CardLookup
+): AvailablePaymentModesByCard {
+  assertGamePlayer(game, playerId);
+
+  if (game.status !== "in_progress" || game.canonicalState.showdown !== null) {
+    return {};
+  }
+
+  const player = game.canonicalState.players[playerId]!;
+  const candidateCardInstanceIds = [
+    ...player.zones.hand,
+    ...(player.zones.champion === null ? [] : [player.zones.champion])
+  ];
+  const modesByCard: AvailablePaymentModesByCard = {};
+
+  for (const cardInstanceId of candidateCardInstanceIds) {
+    const card = cardsByInstanceId[cardInstanceId];
+
+    if (!card || card.classification.type !== "Unit") {
+      continue;
+    }
+
+    try {
+      assertSupportedMvpCardPlay(card);
+      const resourceCosts = readCardCost(card);
+      buildAutomaticPaymentPlan(game, playerId, resourceCosts, cardsByInstanceId);
+      modesByCard[cardInstanceId] = [
+        {
+          id: "regular",
+          label: "Regular",
+          optionalCosts: [],
+          resourceCosts,
+          isDefault: true
+        }
+      ];
+    } catch {
+      continue;
+    }
+  }
+
+  return modesByCard;
 }
 
 export function passPriority(game: Game, input: PassPriorityInput): Game {

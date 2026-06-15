@@ -1,5 +1,12 @@
 import { z } from "zod";
-import type { BattlefieldState, Game, PlayerZones } from "./game";
+import {
+  getAvailablePaymentModesForPlayer,
+  type BattlefieldState,
+  type CardLookup,
+  type Game,
+  type PlayerZones
+} from "./game";
+import { paymentModeSchema } from "./payment";
 
 export const projectedRunePoolSchema = z.object({
   energy: z.number().int().nonnegative(),
@@ -31,6 +38,10 @@ export const projectedPlayerStateSchema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
   runePool: projectedRunePoolSchema,
+  availablePaymentModes: z.record(
+    z.string().min(1),
+    z.array(paymentModeSchema)
+  ),
   zones: projectedPlayerZonesSchema
 });
 
@@ -118,7 +129,11 @@ export type ProjectedTurnState = z.infer<typeof projectedTurnStateSchema>;
 export type ProjectedShowdownState = z.infer<typeof projectedShowdownStateSchema>;
 export type GameProjection = z.infer<typeof gameProjectionSchema>;
 
-export function projectGameForPlayer(game: Game, viewerPlayerId: string): GameProjection {
+export function projectGameForPlayer(
+  game: Game,
+  viewerPlayerId: string,
+  cardsByInstanceId?: CardLookup
+): GameProjection {
   if (!game.canonicalState.setup.playerIds.includes(viewerPlayerId)) {
     throw new Error("Viewer must be one of the game players.");
   }
@@ -137,6 +152,10 @@ export function projectGameForPlayer(game: Game, viewerPlayerId: string): GamePr
           playerId,
           isViewer: playerId === viewerPlayerId,
           runePool: player.runePool,
+          availablePaymentModes:
+            playerId === viewerPlayerId && cardsByInstanceId
+              ? getAvailablePaymentModesForPlayer(game, playerId, cardsByInstanceId)
+              : {},
           zones: projectZones(player.zones, playerId === viewerPlayerId)
         }
       ];
