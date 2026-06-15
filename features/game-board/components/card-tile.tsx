@@ -99,12 +99,16 @@ export const CardTile: FC<CardTileProps> = ({
 
   return (
     <div
-      className="relative z-10 shrink-0"
+      className={cn(
+        "relative shrink-0",
+        previewPosition ? "z-[2147483647]" : "z-10",
+      )}
       onBlur={clearPreview}
       onFocus={schedulePreview}
       onPointerEnter={schedulePreview}
       onPointerLeave={clearPreview}
       ref={tileRef}
+      style={{ zIndex: previewPosition ? 2147483647 : undefined }}
       tabIndex={enableHoverPreview && focusablePreview ? 0 : undefined}
     >
       <div
@@ -131,16 +135,17 @@ export const CardTile: FC<CardTileProps> = ({
       </div>
       {previewPosition && (
         <div
-          className="pointer-events-none fixed z-[10000] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-2xl ring-1 ring-yellow-300/40"
+          className="pointer-events-none fixed z-[2147483647] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-[0_28px_80px_rgba(0,0,0,0.88)] ring-1 ring-yellow-300/40 drop-shadow-[0_18px_30px_rgba(0,0,0,0.75)]"
           style={{
             left: previewPosition.left,
             top: previewPosition.top,
+            zIndex: 2147483647,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
           <img
             alt={name}
-            className="block w-[220px] shrink-0 rounded-md object-contain"
+            className="block w-[220px] shrink-0 rounded-md object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)]"
             src={img}
           />
           <CardSummary

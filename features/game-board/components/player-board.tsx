@@ -269,7 +269,7 @@ function HiddenZone({ count, label }: { count: number; label: string }) {
   return (
     <div className="relative">
       <CardTile img={cardBackImage.src} name={label} />
-      <span className="-top-2 left-1/2 absolute bg-[#111827] px-1.5 py-0.5 rounded font-bold text-xs -translate-x-1/2">
+      <span className="-top-2 left-1/2 z-30 absolute bg-[#111827] px-1.5 py-0.5 rounded font-bold text-xs shadow-md shadow-black/50 -translate-x-1/2">
         {count}
       </span>
     </div>
