@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import { FC } from "react";
+import { Card } from "../types";
+import { CardTile } from "./card-tile";
 
 type Unit = {
   name: string;
@@ -11,8 +13,8 @@ type Unit = {
 type Battlefield = {
   name: string;
   description: string;
-  playerUnits: Unit[];
-  opponentUnits: Unit[];
+  playerUnits: Card[];
+  opponentUnits: Card[];
   img: HTMLImageElement["src"];
 };
 
@@ -27,9 +29,12 @@ export const BattlefieldBoard: FC<Props> = ({
   owner,
   showdownState = "neutral",
 }) => {
-  const playerTotalMight = playerUnits.reduce((acc, cur) => acc + cur.might, 0);
+  const playerTotalMight = playerUnits.reduce(
+    (acc, cur) => acc + (cur.might ?? 0),
+    0,
+  );
   const opponentTotalMight = opponentUnits.reduce(
-    (acc, cur) => acc + cur.might,
+    (acc, cur) => acc + (cur.might ?? 0),
     0,
   );
   const hasMightToShow = playerTotalMight + opponentTotalMight > 0;
@@ -49,7 +54,7 @@ export const BattlefieldBoard: FC<Props> = ({
         }}
       />
       <div className="relative grid grid-rows-2 p-2">
-        <div className="top-1 left-2 absolute bg-white/10 px-1 py-0.5 text-[10px] uppercase">
+        <div className="top-1 left-2 z-99 absolute bg-black/50 px-1 py-0.5 text-[10px] uppercase">
           {name}
         </div>
         {/* this might work better with a monospaced font */}
@@ -61,9 +66,32 @@ export const BattlefieldBoard: FC<Props> = ({
           </div>
         )}
         {/* opponent's units */}
-        <div className="border-white/10 border-b border-dashed"></div>
+        <div className="flex flex-wrap items-end pb-2 border-white/10 border-b border-dashed overflow-auto">
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+          {opponentUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+        </div>
         {/* player's units */}
-        <div className=""></div>
+        <div className="flex pt-2">
+          {playerUnits.map((unit, index) => (
+            <CardTile key={index} {...unit} />
+          ))}
+        </div>
       </div>
       <div className="relative h-9">
         <div className="bottom-0 hover:absolute flex justify-center items-center bg-white/15 px-2 hover:py-2 rounded-b-md w-full h-full hover:h-auto text-[10px] hover:text-base text-center transition">

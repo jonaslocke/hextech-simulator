@@ -16,6 +16,7 @@ export interface GameScore {
 export type Card = {
   name: string;
   img: HTMLImageElement["src"];
+  might?: number;
   isExhausted?: boolean;
   comesToPlayReady?: boolean;
 };

@@ -10,20 +10,78 @@ import { GameObject } from "../../features/game-board/types";
 import { ComponentProps } from "react";
 import { BattlefieldBoard } from "../../features/game-board/components/battlefield-board";
 
+/*
+        <CardTile
+          key={index}
+          img="https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png"
+          name="Soaring Scout"
+        />
+                <CardTile
+          key={index}
+          img="https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png"
+          name="Watchful Sentry"
+        />
+
+*/
+
 const EMPERORS_DAIS = {
   name: "Emperor's Dais",
   description:
     "When you conquer here, you may pay [1] and return a unit you control here to its owner's hand. If you do, play a 2 [Might] Sand Soldier unit token here.",
-  opponentUnits: [],
-  playerUnits: [],
+  opponentUnits: [
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png",
+      name: "Soaring Scout",
+      might: 1,
+    },
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png",
+      name: "Watchful Sentry",
+      might: 1,
+    },
+  ],
+  playerUnits: [
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png",
+      name: "Soaring Scout",
+      might: 1,
+    },
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png",
+      name: "Watchful Sentry",
+      might: 1,
+    },
+  ],
   img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c1ea4f6f58a62fc2b62647aa3459109e3d10297a-1039x744.png",
 } as ComponentProps<typeof BattlefieldBoard>["battlefield"];
 
 const ASPIRANTS_CLIMB = {
   name: "Aspirant's Climb",
   description: "Increase the points needed to win the game by 1.",
-  opponentUnits: [],
-  playerUnits: [],
+  opponentUnits: [
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png",
+      name: "Soaring Scout",
+      might: 1,
+    },
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png",
+      name: "Watchful Sentry",
+      might: 1,
+    },
+  ],
+  playerUnits: [
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/75b6ce420888035b566c3795cabe0999a9a918b0-744x1039.png",
+      name: "Soaring Scout",
+      might: 1,
+    },
+    {
+      img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d84da2c62b1e218a0a74b227c49ce8a953918ebd-744x1039.png",
+      name: "Watchful Sentry",
+      might: 1,
+    },
+  ],
   img: "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/9301593f3800e68427469d38181b578a672473c3-1038x744.png",
 } as ComponentProps<typeof BattlefieldBoard>["battlefield"];
 
