@@ -249,12 +249,20 @@ export const GameBoard: FC<GameBoardProps> = ({
         onTuck={closeCardActionMenu}
       />
       {cardActionMenu && (
-        <CardActionMenu
-          items={cardActionMenu.items}
-          left={cardActionMenu.left}
-          onClose={closeCardActionMenu}
-          top={cardActionMenu.top}
-        />
+        <>
+          <button
+            aria-label="Close card action menu"
+            className="fixed inset-0 z-[2147483646] cursor-default bg-transparent"
+            onPointerDown={closeCardActionMenu}
+            type="button"
+          />
+          <CardActionMenu
+            items={cardActionMenu.items}
+            left={cardActionMenu.left}
+            onClose={closeCardActionMenu}
+            top={cardActionMenu.top}
+          />
+        </>
       )}
     </main>
   );
