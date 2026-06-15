@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { ComponentProps, FC } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { cn } from "@/lib/utils";
 import { CardTile } from "./card-tile";
@@ -7,46 +7,58 @@ import { ArchiveX, Hand, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
+type BaseLineProps = {
+  player: PlayerData;
+  isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
+};
+
 type Props = {
   isMirrored?: boolean;
   onOpenBanish?: () => void;
   onOpenTrash?: () => void;
   player: PlayerData;
+  isActivePlayer: boolean;
 };
 
-const BaseLine = ({ player }: { player: PlayerData }) => {
-  const baseUnits = player.zones.base.cards.filter((card) => card.type !== "Rune");
+const BaseLine = ({ player, isHightlighted }: BaseLineProps) => {
+  const baseUnits = player.zones.base.cards.filter(
+    (card) => card.type !== "Rune",
+  );
 
   return (
     <div className="gap-2 grid grid-cols-[130px_130px_minmax(0,1fr)_130px]">
-      <ZoneArea isCentered>
+      <ZoneArea isCentered isHightlighted={isHightlighted}>
         <ZoneCards zone={player.zones.champion} />
       </ZoneArea>
-      <ZoneArea isCentered>
+      <ZoneArea isCentered isHightlighted={isHightlighted}>
         <ZoneCards zone={player.zones.legend} />
       </ZoneArea>
-      <ZoneArea>
+      <ZoneArea isHightlighted={isHightlighted}>
         <CardList cards={baseUnits} />
       </ZoneArea>
-      <ZoneArea isCentered>
+      <ZoneArea isCentered isHightlighted={isHightlighted}>
         <HiddenZone count={player.zones.mainDeck.count} label="Main deck" />
       </ZoneArea>
     </div>
   );
 };
 
+interface RunesProps extends BaseLineProps {
+  isMirrored?: boolean;
+  onOpenBanish?: () => void;
+  onOpenTrash?: () => void;
+}
+
 const RunesLine = ({
   isMirrored = false,
   onOpenBanish,
   onOpenTrash,
   player,
-}: {
-  isMirrored?: boolean;
-  onOpenBanish?: () => void;
-  onOpenTrash?: () => void;
-  player: PlayerData;
-}) => {
-  const baseRunes = player.zones.base.cards.filter((card) => card.type === "Rune");
+  isHightlighted,
+}: RunesProps) => {
+  const baseRunes = player.zones.base.cards.filter(
+    (card) => card.type === "Rune",
+  );
   const hasBanishment = player.zones.banishment.count > 0;
 
   return (
@@ -57,13 +69,13 @@ const RunesLine = ({
         !hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px]",
       )}
     >
-      <ZoneArea isCentered>
+      <ZoneArea isCentered isHightlighted={isHightlighted}>
         <HiddenZone count={player.zones.runeDeck.count} label="Rune deck" />
       </ZoneArea>
-      <ZoneArea>
+      <ZoneArea isHightlighted={isHightlighted}>
         <CardList cards={baseRunes} />
       </ZoneArea>
-      <ZoneArea isCentered>
+      <ZoneArea isCentered isHightlighted={isHightlighted}>
         <TrashZone
           handCount={isMirrored ? player.zones.hand.count : undefined}
           onClick={onOpenTrash}
@@ -71,7 +83,7 @@ const RunesLine = ({
         />
       </ZoneArea>
       {hasBanishment && (
-        <ZoneArea isCentered>
+        <ZoneArea isCentered isHightlighted={isHightlighted}>
           <Button
             aria-label={`${player.name} banished cards`}
             className="relative p-2"
@@ -96,6 +108,7 @@ export const PlayerBoard: FC<Props> = ({
   onOpenBanish,
   onOpenTrash,
   player,
+  isActivePlayer,
 }) => {
   if (isMirrored) {
     return (
@@ -105,18 +118,20 @@ export const PlayerBoard: FC<Props> = ({
           onOpenBanish={onOpenBanish}
           onOpenTrash={onOpenTrash}
           player={player}
+          isHightlighted={isActivePlayer}
         />
-        <BaseLine player={player} />
+        <BaseLine player={player} isHightlighted={isActivePlayer} />
       </>
     );
   }
   return (
     <>
-      <BaseLine player={player} />
+      <BaseLine player={player} isHightlighted={isActivePlayer} />
       <RunesLine
         onOpenBanish={onOpenBanish}
         onOpenTrash={onOpenTrash}
         player={player}
+        isHightlighted={isActivePlayer}
       />
     </>
   );

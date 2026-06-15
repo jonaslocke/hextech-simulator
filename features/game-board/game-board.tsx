@@ -53,6 +53,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("opponentTrash")}
             player={board.opponent}
+            //TODO have to be wired to the active player
+            isActivePlayer={false}
             isMirrored
           />
           <div className="flex gap-2">
@@ -71,6 +73,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("playerTrash")}
             player={board.player}
+            //TODO have to be wired to the active player
+            isActivePlayer={true}
           />
           {/* this gives enough space to card hand fan do not get in the way of hover and clicking on runes */}
           <div className="h-16" />
