@@ -177,7 +177,7 @@ implemented, tested, and documented where relevant.
 - [x] Add canonical visible card exhaustion state.
 - [x] Implement manual Rune-to-Energy resource generation.
 - [x] Implement manual Rune-to-Power resource generation.
-- [x] Implement MVP cost model for metadata energy and domain power costs.
+- [x] Implement structured cost model for metadata Energy and Power requirements.
 - [x] Implement automatic `playCard` payment from rune pool and ready Runes.
 - [x] Implement supported Unit play from hand/champion zone to base.
 - [x] Reject unsupported immediate play text, additional costs, and unsupported card types before mutation.

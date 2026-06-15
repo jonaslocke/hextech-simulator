@@ -164,7 +164,7 @@ Required initial action/event vocabulary:
 | `Hide` | Places an eligible card facedown at a controlled battlefield according to Hidden rules. |
 | `Discard` | Moves cards from hand to owner trash without executing their normal text. |
 | `Reveal` | Temporarily exposes private or secret cards to all players while they remain in their zone. |
-| `Recycle` | Takes one or more cards from a specified zone and places them on the bottom of the corresponding owner deck. Main Deck cards recycle to Main Deck. Runes recycle to Rune Deck. If 2+ cards recycle to Main Deck simultaneously, their bottom-deck order is randomized by seeded server RNG. If 2+ cards recycle to Rune Deck simultaneously, their bottom-deck order is chosen by the owner. |
+| `Recycle` | Takes one or more cards from a specified zone and places them on the bottom of the corresponding owner deck. Main Deck cards recycle to Main Deck. Runes recycle to Rune Deck. If 2+ cards recycle to either deck simultaneously, their bottom-deck order is randomized by seeded server RNG. This intentionally diverges from the official Rune Deck owner-choice ordering rule for simulator automation. |
 | `Counter` | Negates a card or ability on the chain according to rules and puts countered cards into trash. |
 | `Buff` | Adds a buff object/counter to a unit if it does not already have one. |
 | `Banish` | Places cards or permanents into owner banishment. Not Kill or Discard. |
@@ -365,16 +365,16 @@ Unsupported behavior:
 - A valid deck may contain unsupported cards. Unsupported behavior only blocks
   the attempted intent that needs it.
 
-### Rune Pool MVP
+### Rune Pool And Payment System
 
 The rune pool is a per-player canonical state object, not a UI-only counter.
 
 It stores:
 
 - Energy as a numeric amount.
-- Power as domain-keyed amounts.
+- Power as domain-keyed amounts, including `Rainbow` Power.
 
-Supported MVP resource generation:
+Supported resource generation:
 
 - A ready Rune in a player's base can be exhausted to add 1 Energy to that
   player's rune pool.
@@ -384,63 +384,45 @@ Supported MVP resource generation:
 - End-turn advancement readies the next active player's board objects for the
   next turn's Awaken state.
 
-The complete rune-pool target intentionally diverges from official Rune Deck
-recycle ordering: whenever 2 or more Runes are recycled simultaneously, those
-Runes are placed on the bottom of the Rune Deck in seeded random order. This
-differs from the official rule that the owner chooses simultaneous Rune Deck
-order. This divergence is accepted for Hextech automation.
-
-The MVP does not yet implement non-Rune Add abilities, universal/rainbow Power,
-or generated resources from card text other than the supported basic Rune
-abilities. Add-Reaction opportunities during payment are intentionally out of
-scope; payment is resolved from the player intent and the current canonical
-state, not through an interactive payment window.
-
-### Card Cost Payment MVP
-
 Cost payment is a distinct rules subsystem from zone movement.
 
-Supported MVP payment behavior:
-
-- Card costs are read from authoritative card metadata.
-- Energy and Power costs are separate.
-- Power costs are payable with Power matching one of the played card's
-  non-colorless domains.
-- A player may manually add resources to their rune pool before playing a card.
-- `PlayCard` automatically spends available rune-pool resources first.
-- If more Energy is needed, `PlayCard` automatically exhausts ready Runes in
-  the player's base in deterministic board order.
-- If more Power is needed, `PlayCard` automatically recycles a matching Rune
-  from the player's base when exactly one recycled Rune is required.
-- Supported MVP Unit cards can be played from hand or champion zone to that
-  player's base and enter exhausted.
-
-Unsupported MVP payment behavior rejects before state mutation:
-
-- Additional costs.
-- Alternative costs.
-- Cost increases and discounts.
-- Multi-rune automatic Power payment that would require owner-selected Rune Deck
-  ordering.
-- Spell and Gear play.
-- Card text with immediate "when you play" or "enter ready" behavior.
-- Playing cards during showdown.
-
-### Complete Rune Pool And Payment Target
-
-This target replaces the temporary MVP payment model. Future implementation
-should remove or refactor the current flat `PaymentPlan` and narrow auto-payment
-logic rather than layering the complete system on top of it.
-
-The complete implementation should be split into three subsystems:
+The payment implementation is split into three subsystems:
 
 - Rune Pool subsystem: stores, adds, spends, and clears Energy and Power.
 - Cost subsystem: computes payable costs from card metadata, current object
   state, chosen optional costs, overrides, cost increases, and discounts.
 - Payment subsystem: validates and applies the chosen payment plan atomically.
 
-Power costs are represented as requirements that can be satisfied by one or more
-Power domains:
+Supported payment behavior:
+
+- Card costs are read from authoritative card metadata.
+- Energy and Power costs are separate.
+- Power costs are represented as requirements that can be satisfied by one or
+  more Power domains, by any domain, or by `Rainbow` Power.
+- A player may manually add resources to their rune pool before playing a card.
+- `PlayCard` automatically spends available rune-pool resources first.
+- If more Energy is needed, `PlayCard` automatically exhausts ready Runes in the
+  player's base in deterministic board order.
+- If more Power is needed, `PlayCard` automatically recycles matching Runes from
+  the player's base.
+- Multi-domain Power requirements use the played card's metadata domain order
+  for auto-payment.
+- Domain-specific Power is spent before `Rainbow` Power.
+- Any simultaneous recycle of 2 or more Runes places those Runes on the bottom
+  of the Rune Deck in seeded random order and logs the random operation.
+- Supported MVP Unit cards can be played from hand or champion zone to that
+  player's base and enter exhausted.
+
+Current unsupported payment behavior rejects before state mutation:
+
+- Additional costs.
+- Alternative costs.
+- Cost increases and discounts.
+- Spell and Gear play.
+- Card text with immediate "when you play" or "enter ready" behavior.
+- Playing cards during showdown.
+
+Power requirement shape:
 
 ```ts
 type PowerRequirement = {
@@ -813,6 +795,8 @@ Random operations that must use seeded server RNG:
 - Rune deck shuffles.
 - Any random ordering required when 2+ cards are Recycled to the Main Deck
   simultaneously.
+- Any random ordering required when 2+ Runes are Recycled to the Rune Deck
+  simultaneously.
 
 Replay/reconstruction is explicitly out of MVP scope. Event detail should not be
 reduced in a way that blocks future replay, but no replay engine or replay tests
@@ -881,7 +865,7 @@ Required tests:
   the bottom of the Rune Deck.
 - Recycle randomizes simultaneous 2+ card Main Deck recycle order with seeded
   RNG.
-- Recycle lets the owner choose simultaneous 2+ card Rune Deck recycle order.
+- Recycle randomizes simultaneous 2+ Rune Deck recycle order with seeded RNG.
 - Draw moves top main-deck card to hand and preserves visibility.
 - Channel moves top rune cards to board.
 - Player going second channels one extra rune on their first Channel Phase.
