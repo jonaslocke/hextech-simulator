@@ -3,7 +3,7 @@ import cardBackImage from "../../../assets/cardback.jpg";
 import { cn } from "@/lib/utils";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
-import { ArchiveX, Trash2 } from "lucide-react";
+import { ArchiveX, Hand, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
@@ -36,10 +36,12 @@ const BaseLine = ({ player }: { player: PlayerData }) => {
 };
 
 const RunesLine = ({
+  isMirrored = false,
   onOpenBanish,
   onOpenTrash,
   player,
 }: {
+  isMirrored?: boolean;
   onOpenBanish?: () => void;
   onOpenTrash?: () => void;
   player: PlayerData;
@@ -62,7 +64,11 @@ const RunesLine = ({
         <CardList cards={baseRunes} />
       </ZoneArea>
       <ZoneArea isCentered>
-        <TrashZone onClick={onOpenTrash} zone={player.zones.trash} />
+        <TrashZone
+          handCount={isMirrored ? player.zones.hand.count : undefined}
+          onClick={onOpenTrash}
+          zone={player.zones.trash}
+        />
       </ZoneArea>
       {hasBanishment && (
         <ZoneArea isCentered>
@@ -95,6 +101,7 @@ export const PlayerBoard: FC<Props> = ({
     return (
       <>
         <RunesLine
+          isMirrored
           onOpenBanish={onOpenBanish}
           onOpenTrash={onOpenTrash}
           player={player}
@@ -142,28 +149,54 @@ function ZoneCards({
 }
 
 function TrashZone({
+  handCount,
   onClick,
   zone,
 }: {
+  handCount?: number;
   onClick?: () => void;
   zone: ZoneData;
 }) {
   if (zone.cards.length > 0) {
-    return <ZoneCards onClick={onClick} showCount zone={zone} />;
+    return (
+      <div className="flex items-center gap-2">
+        <ZoneCards onClick={onClick} showCount zone={zone} />
+        {handCount !== undefined && <HandCount value={handCount} />}
+      </div>
+    );
   }
 
   return (
-    <button
-      aria-label="Open trash"
+    <div className="flex items-center gap-2">
+      <button
+        aria-label="Open trash"
+        className="relative flex justify-center items-center p-2 text-slate-100"
+        onClick={onClick}
+        title={`${zone.count} cards in trash`}
+        type="button"
+      >
+        <Trash2 className="size-5" />
+        <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
+          {zone.count}
+        </span>
+      </button>
+      {handCount !== undefined && <HandCount value={handCount} />}
+    </div>
+  );
+}
+
+function HandCount({ value }: { value: number }) {
+  return (
+    <div
+      aria-label={`${value} cards in hand`}
       className="relative flex justify-center items-center p-2 text-slate-100"
-      onClick={onClick}
-      type="button"
+      title={`${value} cards in hand`}
     >
-      <Trash2 className="size-5" />
+      <Hand className="size-5" />
       <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
-        {zone.count}
+        {value}
       </span>
-    </button>
+    </div>
   );
 }
 

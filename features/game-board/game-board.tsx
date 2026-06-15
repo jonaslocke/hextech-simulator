@@ -11,6 +11,7 @@ import { ActionRail } from "./components/ActionRail";
 import { ScoreHeader } from "./components/ScoreHeader";
 import { TemporaryZoneOverlay } from "./components/TemporaryZoneOverlay";
 import { BattlefieldBoard } from "./components/battlefield-board";
+import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
 import {
   BattlefieldData,
@@ -44,7 +45,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   });
 
   return (
-    <main className="relative flex flex-col h-screen text-slate-100">
+    <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
       <ScoreHeader opponent={board.opponent} player={board.player} />
       <section className="flex flex-1">
         <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px] p-2">
@@ -84,6 +85,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerBanishment={board.player.zones.banishment}
         playerTrash={board.player.zones.trash}
       />
+      <PlayerHandFan cards={board.player.zones.hand.cards} />
     </main>
   );
 };

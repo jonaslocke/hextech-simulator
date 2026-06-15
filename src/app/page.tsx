@@ -261,7 +261,7 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
     throw new Error("Fixture deck must include one legend and one champion.");
   }
 
-  const hand = allMainDeck.slice(0, 4);
+  const hand = allMainDeck.slice(0, 15);
   const battlefieldUnit = allMainDeck
     .slice(4)
     .find((instanceId) => cardFor(snapshot, instanceId).classification.type === "Unit");
