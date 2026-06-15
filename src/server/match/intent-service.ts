@@ -398,12 +398,19 @@ function applyIntent(
             {
               type: "game.payCosts",
               payload: {
-                energyCost: result.payment.energyCost,
-                powerCost: result.payment.powerCost,
+                energyCost: result.payment.resourceCosts.energy,
+                powerCost: result.payment.resourceCosts.power.reduce(
+                  (total, requirement) => total + requirement.amount,
+                  0
+                ),
                 exhaustedRuneCount:
-                  result.payment.exhaustedRuneCardInstanceIds.length,
+                  result.payment.resourcePayments.filter(
+                    (payment) => payment.type === "exhaustRuneForEnergy"
+                  ).length,
                 recycledRuneCount:
-                  result.payment.recycledRuneCardInstanceIds.length
+                  result.payment.resourcePayments.filter(
+                    (payment) => payment.type === "recycleRuneForPower"
+                  ).length
               }
             }
           ],

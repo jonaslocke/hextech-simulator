@@ -165,13 +165,24 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   );
 
   assert.deepEqual(result.payment, {
-    energyCost: 2,
-    powerCost: 0,
-    powerDomains: ["Chaos"],
-    spentEnergyFromPool: 1,
-    spentPowerFromPool: {},
-    exhaustedRuneCardInstanceIds: ["a-rune-base-1"],
-    recycledRuneCardInstanceIds: []
+    selectedModeId: "regular",
+    resourceCosts: {
+      energy: 2,
+      power: []
+    },
+    resourcePayments: [
+      {
+        type: "spendEnergy",
+        amount: 1
+      },
+      {
+        type: "exhaustRuneForEnergy",
+        cardInstanceId: "a-rune-base-1"
+      }
+    ],
+    nonResourceCosts: [],
+    optionalCostsChosen: [],
+    costModifiersApplied: []
   });
   assert.equal(result.game.canonicalState.players["player-a"]?.runePool.energy, 0);
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
@@ -183,6 +194,154 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   assert.deepEqual(result.game.canonicalState.cardStates["a-unit-hand-1"], {
     exhausted: true
   });
+});
+
+test("playCard spends multi-domain Power in card metadata domain order", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          runePool: {
+            energy: 0,
+            power: {
+              Calm: 1,
+              Chaos: 1,
+              Rainbow: 1
+            }
+          },
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-multi-domain-unit-hand"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-multi-domain-unit-hand"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.payment.resourcePayments, [
+    {
+      type: "spendPower",
+      domain: "Calm",
+      amount: 1
+    }
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.runePool.power, {
+    Chaos: 1,
+    Rainbow: 1
+  });
+});
+
+test("playCard uses Rainbow Power only after specific domains", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          runePool: {
+            energy: 0,
+            power: {
+              Rainbow: 1
+            }
+          },
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-multi-domain-unit-hand"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-multi-domain-unit-hand"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.payment.resourcePayments, [
+    {
+      type: "spendPower",
+      domain: "Rainbow",
+      amount: 1
+    }
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.runePool.power, {});
+});
+
+test("playCard recycles runes for Power using card metadata domain order", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      cardStates: {
+        ...baseGame.canonicalState.cardStates,
+        "a-chaos-rune-base": {
+          exhausted: false
+        },
+        "a-calm-rune-base": {
+          exhausted: false
+        }
+      },
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-a": {
+          ...baseGame.canonicalState.players["player-a"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-a"]!.zones,
+            hand: ["a-multi-domain-unit-hand"],
+            base: ["a-chaos-rune-base", "a-calm-rune-base"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-multi-domain-unit-hand"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.payment.resourcePayments, [
+    {
+      type: "recycleRuneForPower",
+      cardInstanceId: "a-calm-rune-base",
+      producedDomain: "Calm"
+    }
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+    "a-chaos-rune-base",
+    "a-multi-domain-unit-hand"
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.runeDeck, [
+    "a-rune-deck-1",
+    "a-calm-rune-base"
+  ]);
 });
 
 test("playCard rejects unsupported immediate play behavior", () => {
@@ -591,6 +750,20 @@ const cardLookup: Record<string, Card> = {
     power: null,
     type: "Rune"
   }),
+  "a-chaos-rune-base": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-calm-rune-base": createCard({
+    domain: ["Calm"],
+    energy: null,
+    name: "Calm Rune",
+    power: null,
+    type: "Rune"
+  }),
   "b-rune-base-1": createCard({
     domain: ["Order"],
     energy: null,
@@ -603,6 +776,13 @@ const cardLookup: Record<string, Card> = {
     energy: 2,
     name: "Simple Unit",
     power: null,
+    type: "Unit"
+  }),
+  "a-multi-domain-unit-hand": createCard({
+    domain: ["Calm", "Chaos"],
+    energy: 0,
+    name: "Multi Domain Unit",
+    power: 1,
     type: "Unit"
   }),
   "a-unit-on-play": createCard({

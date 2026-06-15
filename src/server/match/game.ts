@@ -9,6 +9,15 @@ import {
   type RandomOperation
 } from "../engine";
 import type { Card } from "../catalog";
+import {
+  cardDomainsInMetadataOrder,
+  domains,
+  rainbowPower,
+  type Domain,
+  type PaymentPlan,
+  type PowerRequirement,
+  type ResourcePayment
+} from "./payment";
 
 export const gameStatuses = ["setup_pending", "ready", "in_progress", "complete"] as const;
 export const gameTurnPhases = [
@@ -232,16 +241,6 @@ export type AddRuneResourceInput = {
   now?: string;
 };
 
-export type AutomaticPaymentPlan = {
-  energyCost: number;
-  powerCost: number;
-  powerDomains: string[];
-  spentEnergyFromPool: number;
-  spentPowerFromPool: Record<string, number>;
-  exhaustedRuneCardInstanceIds: string[];
-  recycledRuneCardInstanceIds: string[];
-};
-
 export type PlayCardInput = {
   actorPlayerId: string;
   cardInstanceId: string;
@@ -251,7 +250,7 @@ export type PlayCardInput = {
 
 export type PlayCardResult = {
   game: Game;
-  payment: AutomaticPaymentPlan;
+  payment: PaymentPlan;
 };
 
 export type PassPriorityInput = {
@@ -1515,14 +1514,11 @@ function addPower(
 
 function readCardCost(card: Card): {
   energy: number;
-  power: number;
-  powerDomains: string[];
+  power: PowerRequirement[];
 } {
   const energy = card.attributes.energy ?? 0;
   const power = card.attributes.power ?? 0;
-  const powerDomains = card.classification.domain.filter(
-    (domain) => domain !== "Colorless"
-  );
+  const powerDomains = cardDomainsInMetadataOrder(card.classification.domain);
 
   if (energy < 0 || power < 0) {
     throw new Error("Negative costs are not supported.");
@@ -1534,8 +1530,15 @@ function readCardCost(card: Card): {
 
   return {
     energy,
-    power,
-    powerDomains
+    power:
+      power === 0
+        ? []
+        : [
+            {
+              amount: power,
+              payableBy: powerDomains
+            }
+          ]
   };
 }
 
@@ -1565,33 +1568,26 @@ function buildAutomaticPaymentPlan(
   playerId: string,
   cost: {
     energy: number;
-    power: number;
-    powerDomains: string[];
+    power: PowerRequirement[];
   },
   cardsByInstanceId: CardLookup
-): AutomaticPaymentPlan {
+): PaymentPlan {
   const player = game.canonicalState.players[playerId]!;
   let remainingEnergy = cost.energy;
-  let remainingPower = cost.power;
-  const spentPowerFromPool: Record<string, number> = {};
-  const exhaustedRuneCardInstanceIds: string[] = [];
-  const recycledRuneCardInstanceIds: string[] = [];
+  const resourcePayments: ResourcePayment[] = [];
+  const recycledRuneCardInstanceIds = new Set<string>();
+  const availablePoolPower = { ...player.runePool.power };
 
   const spentEnergyFromPool = Math.min(player.runePool.energy, remainingEnergy);
-  remainingEnergy -= spentEnergyFromPool;
 
-  for (const domain of cost.powerDomains) {
-    if (remainingPower === 0) {
-      break;
-    }
-
-    const spent = Math.min(player.runePool.power[domain] ?? 0, remainingPower);
-
-    if (spent > 0) {
-      spentPowerFromPool[domain] = spent;
-      remainingPower -= spent;
-    }
+  if (spentEnergyFromPool > 0) {
+    resourcePayments.push({
+      type: "spendEnergy",
+      amount: spentEnergyFromPool
+    });
   }
+
+  remainingEnergy -= spentEnergyFromPool;
 
   for (const runeCardInstanceId of player.zones.base) {
     if (remainingEnergy === 0) {
@@ -1604,7 +1600,10 @@ function buildAutomaticPaymentPlan(
     };
 
     if (card?.classification.type === "Rune" && !state.exhausted) {
-      exhaustedRuneCardInstanceIds.push(runeCardInstanceId);
+      resourcePayments.push({
+        type: "exhaustRuneForEnergy",
+        cardInstanceId: runeCardInstanceId
+      });
       remainingEnergy -= 1;
     }
   }
@@ -1613,77 +1612,94 @@ function buildAutomaticPaymentPlan(
     throw new Error("Not enough Energy to pay this card's cost.");
   }
 
-  for (const runeCardInstanceId of player.zones.base) {
-    if (remainingPower === 0) {
-      break;
+  for (const requirement of cost.power) {
+    let remainingPower = requirement.amount;
+    const poolPayments = spendPowerFromPool(
+      availablePoolPower,
+      requirement,
+      remainingPower
+    );
+
+    for (const payment of poolPayments) {
+      resourcePayments.push(payment);
+      availablePoolPower[payment.domain] =
+        (availablePoolPower[payment.domain] ?? 0) - payment.amount;
+      remainingPower -= payment.amount;
     }
 
-    const card = cardsByInstanceId[runeCardInstanceId];
+    if (remainingPower > 0) {
+      const runePayments = recycleRunesForPower(
+        game,
+        playerId,
+        requirement,
+        remainingPower,
+        recycledRuneCardInstanceIds,
+        cardsByInstanceId
+      );
 
-    if (!card || card.classification.type !== "Rune") {
-      continue;
+      for (const payment of runePayments) {
+        resourcePayments.push(payment);
+        recycledRuneCardInstanceIds.add(payment.cardInstanceId);
+        remainingPower -= 1;
+      }
     }
 
-    const domain = requireSingleRuneDomain(card);
-
-    if (cost.powerDomains.includes(domain)) {
-      recycledRuneCardInstanceIds.push(runeCardInstanceId);
-      remainingPower -= 1;
+    if (remainingPower > 0) {
+      throw new Error("Not enough Power to pay this card's cost.");
     }
-  }
-
-  if (remainingPower > 0) {
-    throw new Error("Not enough Power to pay this card's cost.");
-  }
-
-  if (recycledRuneCardInstanceIds.length > 1) {
-    throw new Error("Automatic payment for multiple recycled runes is not implemented.");
   }
 
   return {
-    energyCost: cost.energy,
-    powerCost: cost.power,
-    powerDomains: cost.powerDomains,
-    spentEnergyFromPool,
-    spentPowerFromPool,
-    exhaustedRuneCardInstanceIds,
-    recycledRuneCardInstanceIds
+    selectedModeId: "regular",
+    resourceCosts: cost,
+    resourcePayments,
+    nonResourceCosts: [],
+    optionalCostsChosen: [],
+    costModifiersApplied: []
   };
 }
 
 function applyPaymentPlan(
   game: Game,
   playerId: string,
-  payment: AutomaticPaymentPlan,
+  payment: PaymentPlan,
   cardsByInstanceId: CardLookup,
   now?: string
 ): Game {
   const player = game.canonicalState.players[playerId]!;
-  const recycledSet = new Set(payment.recycledRuneCardInstanceIds);
+  const recycledRuneCardInstanceIds = payment.resourcePayments
+    .filter((resourcePayment) => resourcePayment.type === "recycleRuneForPower")
+    .map((resourcePayment) => resourcePayment.cardInstanceId);
+  const recycledSet = new Set(recycledRuneCardInstanceIds);
   const cardStates = { ...game.canonicalState.cardStates };
   const power = { ...player.runePool.power };
+  let energy = player.runePool.energy;
 
-  for (const [domain, spent] of Object.entries(payment.spentPowerFromPool)) {
-    power[domain] = Math.max(0, (power[domain] ?? 0) - spent);
-  }
-
-  for (const runeCardInstanceId of payment.recycledRuneCardInstanceIds) {
-    const runeCard = requireCard(cardsByInstanceId, runeCardInstanceId);
-    const domain = requireSingleRuneDomain(runeCard);
-    const current = power[domain] ?? 0;
-
-    if (current > 0) {
-      power[domain] = current - 1;
+  for (const resourcePayment of payment.resourcePayments) {
+    if (resourcePayment.type === "spendEnergy") {
+      energy -= resourcePayment.amount;
+      continue;
     }
 
-    delete cardStates[runeCardInstanceId];
-  }
+    if (resourcePayment.type === "spendPower") {
+      power[resourcePayment.domain] = Math.max(
+        0,
+        (power[resourcePayment.domain] ?? 0) - resourcePayment.amount
+      );
+      continue;
+    }
 
-  for (const runeCardInstanceId of payment.exhaustedRuneCardInstanceIds) {
-    if (!recycledSet.has(runeCardInstanceId)) {
-      cardStates[runeCardInstanceId] = {
-        exhausted: true
-      };
+    if (resourcePayment.type === "recycleRuneForPower") {
+      delete cardStates[resourcePayment.cardInstanceId];
+      continue;
+    }
+
+    if (resourcePayment.type === "exhaustRuneForEnergy") {
+      if (!recycledSet.has(resourcePayment.cardInstanceId)) {
+        cardStates[resourcePayment.cardInstanceId] = {
+          exhausted: true
+        };
+      }
     }
   }
 
@@ -1698,7 +1714,7 @@ function applyPaymentPlan(
         [playerId]: {
           ...player,
           runePool: {
-            energy: player.runePool.energy - payment.spentEnergyFromPool,
+            energy,
             power: Object.fromEntries(
               Object.entries(power).filter(([, amount]) => amount > 0)
             )
@@ -1710,13 +1726,106 @@ function applyPaymentPlan(
             ),
             runeDeck: [
               ...player.zones.runeDeck,
-              ...payment.recycledRuneCardInstanceIds
+              ...recycledRuneCardInstanceIds
             ]
           }
         }
       }
     }
   });
+}
+
+function spendPowerFromPool(
+  powerPool: Record<string, number>,
+  requirement: PowerRequirement,
+  maxAmount: number
+): Extract<ResourcePayment, { type: "spendPower" }>[] {
+  let remaining = maxAmount;
+  const payments: Extract<ResourcePayment, { type: "spendPower" }>[] = [];
+
+  for (const domain of payableDomainsInPriorityOrder(requirement)) {
+    if (remaining === 0) {
+      break;
+    }
+
+    const spent = Math.min(powerPool[domain] ?? 0, remaining);
+
+    if (spent > 0) {
+      payments.push({
+        type: "spendPower",
+        domain,
+        amount: spent
+      });
+      remaining -= spent;
+    }
+  }
+
+  if (remaining > 0) {
+    const spentRainbow = Math.min(powerPool[rainbowPower] ?? 0, remaining);
+
+    if (spentRainbow > 0) {
+      payments.push({
+        type: "spendPower",
+        domain: rainbowPower,
+        amount: spentRainbow
+      });
+    }
+  }
+
+  return payments;
+}
+
+function recycleRunesForPower(
+  game: Game,
+  playerId: string,
+  requirement: PowerRequirement,
+  maxAmount: number,
+  alreadyRecycled: Set<string>,
+  cardsByInstanceId: CardLookup
+): Extract<ResourcePayment, { type: "recycleRuneForPower" }>[] {
+  const player = game.canonicalState.players[playerId]!;
+  let remaining = maxAmount;
+  const payments: Extract<ResourcePayment, { type: "recycleRuneForPower" }>[] = [];
+
+  for (const domain of payableDomainsInPriorityOrder(requirement)) {
+    if (remaining === 0) {
+      break;
+    }
+
+    for (const runeCardInstanceId of player.zones.base) {
+      if (remaining === 0) {
+        break;
+      }
+
+      if (alreadyRecycled.has(runeCardInstanceId)) {
+        continue;
+      }
+
+      const card = cardsByInstanceId[runeCardInstanceId];
+
+      if (!card || card.classification.type !== "Rune") {
+        continue;
+      }
+
+      const runeDomain = requireSingleRuneDomain(card);
+
+      if (runeDomain === domain) {
+        payments.push({
+          type: "recycleRuneForPower",
+          cardInstanceId: runeCardInstanceId,
+          producedDomain: domain
+        });
+        alreadyRecycled.add(runeCardInstanceId);
+        remaining -= 1;
+      }
+    }
+  }
+
+  return payments;
+}
+
+function payableDomainsInPriorityOrder(requirement: PowerRequirement): Domain[] {
+  return requirement.payableBy === "any" ? [...domains] : requirement.payableBy;
 }
 
 function readyPlayerBoardCards(
