@@ -1282,6 +1282,14 @@ export function moveUnitToBattlefield(
     throw new Error("Unit must be in the acting player's base.");
   }
 
+  const unitState = game.canonicalState.cardStates[input.unitCardInstanceId] ?? {
+    exhausted: false
+  };
+
+  if (unitState.exhausted) {
+    throw new Error("Exhausted units cannot move.");
+  }
+
   const battlefield = game.canonicalState.battlefields.find(
     (candidate) => candidate.battlefieldId === input.battlefieldId
   );
@@ -1300,6 +1308,12 @@ export function moveUnitToBattlefield(
     stateVersion: game.stateVersion + 1,
     canonicalState: {
       ...game.canonicalState,
+      cardStates: {
+        ...game.canonicalState.cardStates,
+        [input.unitCardInstanceId]: {
+          exhausted: true
+        }
+      },
       players: {
         ...game.canonicalState.players,
         [input.actorPlayerId]: {

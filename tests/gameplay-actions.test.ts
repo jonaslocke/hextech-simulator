@@ -645,6 +645,9 @@ test("moving a unit to an empty battlefield opens a showdown", () => {
     "a-base-2"
   ]);
   assert.deepEqual(result.canonicalState.battlefields[0]?.units, ["a-base-1"]);
+  assert.deepEqual(result.canonicalState.cardStates["a-base-1"], {
+    exhausted: true
+  });
   assert.deepEqual(result.canonicalState.showdown, {
     battlefieldId: "battlefield-a",
     relevantPlayerIds: ["player-a", "player-b"],
@@ -652,6 +655,37 @@ test("moving a unit to an empty battlefield opens a showdown", () => {
     priorityPlayerId: "player-a",
     passedPlayerIds: []
   });
+});
+
+test("moving an exhausted unit is rejected", () => {
+  const baseGame = createInProgressGameWithBattlefield();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      cardStates: {
+        ...baseGame.canonicalState.cardStates,
+        "a-base-1": {
+          exhausted: true
+        }
+      }
+    }
+  });
+
+  assert.throws(
+    () =>
+      moveUnitToBattlefield(game, {
+        actorPlayerId: "player-a",
+        unitCardInstanceId: "a-base-1",
+        battlefieldId: "battlefield-a"
+      }),
+    /Exhausted units cannot move/
+  );
+  assert.deepEqual(game.canonicalState.players["player-a"]?.zones.base, [
+    "a-base-1",
+    "a-base-2"
+  ]);
+  assert.deepEqual(game.canonicalState.battlefields[0]?.units, []);
 });
 
 test("showdown pass moves focus to the next relevant player", () => {

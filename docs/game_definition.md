@@ -926,11 +926,13 @@ path:
 8. Both players commit mulligan with zero selected cards.
 9. Start the first turn.
 10. Resolve first turn channel and draw behavior.
-11. Play one simple supported unit.
-12. Move a unit to an empty battlefield.
-13. Enter showdown shell.
-14. Both players pass.
-15. Close showdown.
+11. Play one simple supported unit. Units enter the board exhausted.
+12. Advance turns until that unit is readied by normal turn progression.
+13. Move the ready unit to an empty battlefield, exhausting it as the Standard
+    Move cost.
+14. Enter showdown shell.
+15. Both players pass.
+16. Close showdown.
 
 This scenario intentionally proves setup, projections, turn start, basic intent
 resolution, movement into showdown, and pass/close flow without requiring full

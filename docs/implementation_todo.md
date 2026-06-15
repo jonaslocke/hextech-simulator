@@ -239,25 +239,27 @@ implemented, tested, and documented where relevant.
 - [x] Track pass sequence.
 - [x] Close showdown after all relevant players pass.
 - [x] Reject Action/Reaction play during showdown as unsupported.
-- [ ] Add Annie vs Lux scripted acceptance test through showdown close.
+- [x] Add Annie vs Lux scripted acceptance test through showdown close.
 
 ## 15. First End-To-End Acceptance
 
-- [ ] Validate Annie and Lux decks.
-- [ ] Create best-of-3 match.
-- [ ] Select and reveal battlefields.
-- [ ] Choose starting player.
-- [ ] Shuffle decks.
-- [ ] Draw opening hands.
-- [ ] Mulligan zero cards for both players.
-- [ ] Resolve first turn channel and draw.
-- [ ] Play one simple supported unit.
-- [ ] Move a unit to an empty battlefield.
-- [ ] Enter showdown shell.
-- [ ] Both players pass.
-- [ ] Close showdown.
-- [ ] Confirm game-log audit trail for the scenario.
-- [ ] Confirm both player projections preserve hidden information.
+- [x] Validate Annie and Lux decks.
+- [x] Create best-of-3 match.
+- [x] Select and reveal battlefields.
+- [x] Choose starting player.
+- [x] Shuffle decks.
+- [x] Draw opening hands.
+- [x] Mulligan zero cards for both players.
+- [x] Resolve first turn channel and draw.
+- [x] Play one simple supported unit.
+- [x] Advance turns until the played unit is ready.
+- [x] Reject movement by exhausted units.
+- [x] Move a ready unit to an empty battlefield and exhaust it as the Standard Move cost.
+- [x] Enter showdown shell.
+- [x] Both players pass.
+- [x] Close showdown.
+- [x] Confirm game-log audit trail for the scenario.
+- [x] Confirm both player projections preserve hidden information.
 
 ## 16. Deferred Socket Multiplayer
 
