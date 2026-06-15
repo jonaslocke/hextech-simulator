@@ -134,7 +134,7 @@ implemented, tested, and documented where relevant.
 ## 11. Basic Board UI
 
 - [x] Build app shell with game board route.
-- [ ] Replace static fixture-only home page with fixed Annie/Lux deck selection.
+- [x] Replace static fixture-only home page with fixed Annie/Lux deck selection.
 - [x] Add opponent area.
 - [x] Add shared battlefield area.
 - [x] Add player base/board area.
@@ -272,7 +272,7 @@ implemented, tested, and documented where relevant.
 - [ ] Auto-complete non-player-facing setup steps required to start the game, including zero-card keep for mulligan until mulligan UI is implemented.
 - [x] Return both player tokens for local/manual testing.
 - [x] Return viewer-safe projections and game-log entries from match creation.
-- [ ] Connect the UI to the match creation API.
+- [x] Connect the UI to the match creation API.
 - [ ] Let the UI submit gameplay intents through the HTTP intent API.
 - [ ] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
 - [ ] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.

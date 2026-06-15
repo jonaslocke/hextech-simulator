@@ -1,368 +1,204 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { loadCardCatalog, type Card, type CardCatalog } from "@/server/catalog";
-import { validateDeckList, type DeckSnapshot } from "@/server/deck";
-import { gameEventTypes, projectGameEventsForPlayer } from "@/server/events";
-import { createGame, gameSchema, projectGameForPlayer } from "@/server/match";
+"use client";
+
+import { useState } from "react";
+import type { Card as CatalogCard } from "@/server/catalog";
+import type { GameLogEntry } from "@/server/events";
+import type { GameProjection } from "@/server/match";
+import { Button } from "@/components/ui/button";
 import { GameBoard } from "../../features/game-board";
 
-export default async function Home() {
-  const catalog = await loadCardCatalog();
-  const fixture = await createFixture(catalog);
-  const baseGame = createGame({
-    id: "ui-game-1",
-    matchId: "ui-match-1",
-    gameNumber: 1,
-    battlefieldCardInstanceIdsByPlayer: {
-      "player-a": fixture.playerA.battlefieldPool,
-      "player-b": fixture.playerB.battlefieldPool,
-    },
-    mainDeckCardInstanceIdsByPlayer: {
-      "player-a": fixture.playerA.allMainDeck,
-      "player-b": fixture.playerB.allMainDeck,
-    },
-    playerIds: ["player-a", "player-b"],
-    rngSeed: "ui-fixture-seed",
-    runeDeckCardInstanceIdsByPlayer: {
-      "player-a": fixture.playerA.allRunes,
-      "player-b": fixture.playerB.allRunes,
-    },
+type FixedDeckId = "annie" | "lux";
+type SeatKey = "player1" | "player2";
+
+type CreatedPlayer = {
+  playerId: string;
+  seat: "player-1" | "player-2";
+  deckId: FixedDeckId;
+  playerToken: string;
+};
+
+type CreateMatchResponse =
+  | {
+      accepted: true;
+      matchId: string;
+      gameId: string;
+      gameStatus: string;
+      stateVersion: number;
+      players: Record<SeatKey, CreatedPlayer>;
+      projections: Record<string, GameProjection>;
+      cardsByInstanceId: Record<string, CatalogCard>;
+      logEntries: Record<string, GameLogEntry[]>;
+    }
+  | {
+      accepted: false;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
+
+const deckOptions: Array<{ id: FixedDeckId; label: string }> = [
+  {
+    id: "annie",
+    label: "Annie"
+  },
+  {
+    id: "lux",
+    label: "Lux"
+  }
+];
+
+export default function Home() {
+  const [playerDecks, setPlayerDecks] = useState<Record<SeatKey, FixedDeckId>>({
+    player1: "annie",
+    player2: "lux"
   });
-  const game = gameSchema.parse({
-    ...baseGame,
-    status: "in_progress",
-    stateVersion: 12,
-    canonicalState: {
-      ...baseGame.canonicalState,
-      turn: {
-        turnNumber: 3,
-        activePlayerId: "player-a",
-        phase: "action",
-        passedPlayerIds: [],
-      },
-      showdown: null,
-      setup: {
-        ...baseGame.canonicalState.setup,
-        startingPlayerChooserId: "player-a",
-        startingPlayerId: "player-a",
-        battlefieldChoices: {
-          "player-a": {
-            playerId: "player-a",
-            status: "revealed",
-            cardInstanceId: fixture.playerA.selectedBattlefield,
-            lockedAt: "2026-06-14T08:59:00.000Z",
-            revealedAt: "2026-06-14T08:59:01.000Z",
-          },
-          "player-b": {
-            playerId: "player-b",
-            status: "revealed",
-            cardInstanceId: fixture.playerB.selectedBattlefield,
-            lockedAt: "2026-06-14T08:59:00.000Z",
-            revealedAt: "2026-06-14T08:59:01.000Z",
-          },
-        },
-        battlefieldPools: {
-          "player-a": {
-            ...baseGame.canonicalState.setup.battlefieldPools["player-a"]!,
-            usedCardInstanceIds: [fixture.playerA.selectedBattlefield],
-          },
-          "player-b": {
-            ...baseGame.canonicalState.setup.battlefieldPools["player-b"]!,
-            usedCardInstanceIds: [fixture.playerB.selectedBattlefield],
-          },
-        },
-        mulliganChoices: {
-          "player-a": {
-            playerId: "player-a",
-            status: "locked",
-            selectedCardInstanceIds: [],
-            lockedAt: "2026-06-14T08:59:30.000Z",
-          },
-          "player-b": {
-            playerId: "player-b",
-            status: "locked",
-            selectedCardInstanceIds: [],
-            lockedAt: "2026-06-14T08:59:30.000Z",
-          },
-        },
-      },
-      battlefields: [
-        {
-          battlefieldId: "ui-game-1:battlefield:player-a",
-          selectedByPlayerId: "player-a",
-          cardInstanceId: fixture.playerA.selectedBattlefield,
-          units: [fixture.playerA.battlefieldUnit],
-          facedownSlot: null,
-        },
-        {
-          battlefieldId: "ui-game-1:battlefield:player-b",
-          selectedByPlayerId: "player-b",
-          cardInstanceId: fixture.playerB.selectedBattlefield,
-          units: [fixture.playerB.battlefieldUnit],
-          facedownSlot: null,
-        },
-      ],
-      players: {
-        "player-a": {
-          playerId: "player-a",
-          zones: {
-            legend: fixture.playerA.legend,
-            champion: fixture.playerA.champion,
-            mainDeck: fixture.playerA.mainDeck,
-            runeDeck: fixture.playerA.runeDeck,
-            hand: fixture.playerA.hand,
-            trash: fixture.playerA.trash,
-            banishment: fixture.playerA.banishment,
-            base: fixture.playerA.base,
-          },
-        },
-        "player-b": {
-          playerId: "player-b",
-          zones: {
-            legend: fixture.playerB.legend,
-            champion: fixture.playerB.champion,
-            mainDeck: fixture.playerB.mainDeck,
-            runeDeck: fixture.playerB.runeDeck,
-            hand: fixture.playerB.hand,
-            trash: fixture.playerB.trash,
-            banishment: fixture.playerB.banishment,
-            base: fixture.playerB.base,
-          },
-        },
-      },
-    },
-  });
-  const projection = projectGameForPlayer(game, "player-a");
-  const logEntries = projectGameEventsForPlayer(
-    [
-      {
-        id: "ui-event-1",
-        createdAt: "2026-06-14T09:00:00.000Z",
-        updatedAt: "2026-06-14T09:00:00.000Z",
-        matchId: game.matchId,
-        gameId: game.id,
-        sequence: 1,
-        type: gameEventTypes.playerIntentAccepted,
-        actorPlayerId: "player-a",
-        payload: {
-          intent: {
-            type: "game.moveUnitToBattlefield",
-            payload: {
-              unitCardInstanceId: fixture.playerA.battlefieldUnit,
-              battlefieldId: "ui-game-1:battlefield:player-a",
-            },
-          },
-        },
-      },
-      {
-        id: "ui-event-2",
-        createdAt: "2026-06-14T09:00:01.000Z",
-        updatedAt: "2026-06-14T09:00:01.000Z",
-        matchId: game.matchId,
-        gameId: game.id,
-        sequence: 2,
-        type: gameEventTypes.serverDecision,
-        actorPlayerId: null,
-        payload: {
-          decision: {
-            type: "showdown.enter",
-          },
-        },
-      },
-    ],
-    "player-a",
+  const [viewerSeat, setViewerSeat] = useState<SeatKey>("player1");
+  const [match, setMatch] = useState<Extract<CreateMatchResponse, { accepted: true }> | null>(
+    null
   );
+  const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
-  return (
-    <GameBoard
-      chainCardInstanceIds={fixture.playerA.chain}
-      cardsByInstanceId={fixture.cardsByInstanceId}
-      logEntries={logEntries}
-      playerNames={{
-        "player-a": "Prismaticician",
-        "player-b": "Alanzq1",
-      }}
-      projection={projection}
-      scores={{
-        "player-a": 1,
-        "player-b": 0,
-      }}
-    />
-  );
-}
+  async function createMatch() {
+    setIsCreating(true);
+    setError(null);
 
-async function createFixture(catalog: CardCatalog) {
-  const playerA = await loadFixtureDeck({
-    battlefieldName: "Aspirant's Climb",
-    catalog,
-    deckFile: "annie.dec.txt",
-    ownerId: "player-a",
-  });
-  const playerB = await loadFixtureDeck({
-    battlefieldName: "Targon's Peak",
-    catalog,
-    deckFile: "lux.dec.txt",
-    ownerId: "player-b",
-  });
+    try {
+      const response = await fetch("/api/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          playerDecks
+        })
+      });
+      const payload = (await response.json()) as CreateMatchResponse;
 
-  return {
-    cardsByInstanceId: Object.fromEntries(
-      [...playerA.snapshot.instances, ...playerB.snapshot.instances].map((instance) => [
-        instance.instanceId,
-        instance.card,
-      ]),
-    ) satisfies Record<string, Card>,
-    playerA,
-    playerB,
-  };
-}
+      if (!payload.accepted) {
+        setError(payload.error.message);
+        return;
+      }
 
-async function loadFixtureDeck({
-  battlefieldName,
-  catalog,
-  deckFile,
-  ownerId,
-}: {
-  battlefieldName: string;
-  catalog: CardCatalog;
-  deckFile: string;
-  ownerId: string;
-}) {
-  const deckSource = await readFile(
-    path.join(process.cwd(), "data", "decks", deckFile),
-    "utf8",
-  );
-  const validation = validateDeckList(deckSource, catalog, { ownerId });
+      setMatch(payload);
+      setViewerSeat("player1");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to create match.");
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
-  if (!validation.ok) {
-    throw new Error(
-      `${deckFile} is invalid: ${validation.issues
-        .map((issue) => issue.message)
-        .join("; ")}`,
+  if (!match) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-slate-100">
+        <section className="w-full max-w-xl rounded-lg border border-white/10 bg-slate-900 p-5 shadow-xl">
+          <div className="mb-5">
+            <h1 className="text-xl font-semibold">Riftbound Simulator</h1>
+            <p className="mt-1 text-sm text-slate-400">
+              Select fixed MVP decks for both seats. Uploads are out of scope for now.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DeckSelect
+              label="Player 1 deck"
+              value={playerDecks.player1}
+              onChange={(deckId) =>
+                setPlayerDecks((current) => ({
+                  ...current,
+                  player1: deckId
+                }))
+              }
+            />
+            <DeckSelect
+              label="Player 2 deck"
+              value={playerDecks.player2}
+              onChange={(deckId) =>
+                setPlayerDecks((current) => ({
+                  ...current,
+                  player2: deckId
+                }))
+              }
+            />
+          </div>
+          {error && (
+            <p className="mt-4 rounded border border-red-400/40 bg-red-950/60 px-3 py-2 text-sm text-red-100">
+              {error}
+            </p>
+          )}
+          <Button
+            className="mt-5 w-full"
+            disabled={isCreating}
+            onClick={createMatch}
+            type="button"
+          >
+            {isCreating ? "Creating match..." : "Create match"}
+          </Button>
+        </section>
+      </main>
     );
   }
 
-  return createPlayerFixture(validation.snapshot, battlefieldName);
+  const viewer = match.players[viewerSeat];
+  const projection = match.projections[viewer.playerId];
+
+  return (
+    <main className="relative min-h-screen bg-slate-950">
+      <div className="absolute left-14 top-2 z-50 flex items-center gap-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-slate-100 shadow">
+        <span className="text-slate-400">Viewer</span>
+        <Button
+          size="sm"
+          variant={viewerSeat === "player1" ? "default" : "secondary"}
+          onClick={() => setViewerSeat("player1")}
+          type="button"
+        >
+          Player 1
+        </Button>
+        <Button
+          size="sm"
+          variant={viewerSeat === "player2" ? "default" : "secondary"}
+          onClick={() => setViewerSeat("player2")}
+          type="button"
+        >
+          Player 2
+        </Button>
+        <span className="text-slate-400">
+          Match {match.matchId} - State {projection.stateVersion}
+        </span>
+      </div>
+      <GameBoard
+        cardsByInstanceId={match.cardsByInstanceId}
+        logEntries={match.logEntries[viewer.playerId] ?? []}
+        projection={projection}
+      />
+    </main>
+  );
 }
 
-function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
-  const legend = sourceIds(snapshot, "legend")[0];
-  const champion = sourceIds(snapshot, "champion")[0];
-  const allMainDeck = sourceIds(snapshot, "mainDeck");
-  const allRunes = sourceIds(snapshot, "runeDeck");
-  const battlefieldPool = sourceIds(snapshot, "battlefield");
-  const selectedBattlefield = requireInstanceByName(
-    snapshot,
-    "battlefield",
-    battlefieldName,
+function DeckSelect({
+  label,
+  onChange,
+  value
+}: {
+  label: string;
+  onChange: (deckId: FixedDeckId) => void;
+  value: FixedDeckId;
+}) {
+  return (
+    <label className="grid gap-2 text-sm">
+      <span className="font-medium text-slate-300">{label}</span>
+      <select
+        className="rounded border border-white/10 bg-slate-950 px-3 py-2 text-slate-100"
+        value={value}
+        onChange={(event) => onChange(event.target.value as FixedDeckId)}
+      >
+        {deckOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
-
-  if (!legend || !champion) {
-    throw new Error("Fixture deck must include one legend and one champion.");
-  }
-
-  const hand = allMainDeck.slice(0, 15);
-  const battlefieldUnit = allMainDeck
-    .slice(4)
-    .find((instanceId) => cardFor(snapshot, instanceId).classification.type === "Unit");
-
-  if (!battlefieldUnit) {
-    throw new Error("Fixture deck must include a main-deck unit for battlefield state.");
-  }
-
-  const unavailableMainDeckIds = new Set([battlefieldUnit, ...hand]);
-  const baseUnit = firstLegalCard(
-    snapshot,
-    allMainDeck,
-    unavailableMainDeckIds,
-    (card) => card.classification.type === "Unit",
-  );
-
-  if (!baseUnit) {
-    throw new Error("Fixture deck must include a main-deck unit for base state.");
-  }
-
-  unavailableMainDeckIds.add(baseUnit);
-
-  const chain = allMainDeck
-    .filter((instanceId) => !unavailableMainDeckIds.has(instanceId))
-    .filter((instanceId) => cardFor(snapshot, instanceId).classification.type === "Spell")
-    .slice(0, 2);
-
-  const mainDeck = allMainDeck.filter(
-    (instanceId) => !unavailableMainDeckIds.has(instanceId),
-  );
-  const runesInPlay = allRunes.slice(0, 2);
-  const runeDeck = allRunes.slice(2);
-
-  return {
-    allMainDeck,
-    allRunes,
-    banishment: [],
-    base: [...runesInPlay, baseUnit],
-    battlefieldPool,
-    battlefieldUnit,
-    champion,
-    chain,
-    hand,
-    legend,
-    mainDeck,
-    runeDeck,
-    runesInPlay,
-    selectedBattlefield,
-    snapshot,
-    trash: [],
-  };
-}
-
-function firstLegalCard(
-  snapshot: DeckSnapshot,
-  instanceIds: string[],
-  unavailableInstanceIds: Set<string>,
-  isLegal: (card: Card) => boolean,
-) {
-  return instanceIds.find((instanceId) => {
-    if (unavailableInstanceIds.has(instanceId)) {
-      return false;
-    }
-
-    return isLegal(cardFor(snapshot, instanceId));
-  });
-}
-
-function sourceIds(
-  snapshot: DeckSnapshot,
-  source: DeckSnapshot["instances"][number]["source"],
-) {
-  return snapshot.instances
-    .filter((instance) => instance.source === source)
-    .map((instance) => instance.instanceId);
-}
-
-function requireInstanceByName(
-  snapshot: DeckSnapshot,
-  source: DeckSnapshot["instances"][number]["source"],
-  name: string,
-) {
-  const instance = snapshot.instances.find(
-    (candidate) => candidate.source === source && candidate.card.name === name,
-  );
-
-  if (!instance) {
-    throw new Error(`Fixture deck is missing ${source} card "${name}".`);
-  }
-
-  return instance.instanceId;
-}
-
-function cardFor(snapshot: DeckSnapshot, instanceId: string) {
-  const instance = snapshot.instances.find(
-    (candidate) => candidate.instanceId === instanceId,
-  );
-
-  if (!instance) {
-    throw new Error(`Fixture deck is missing instance "${instanceId}".`);
-  }
-
-  return instance.card;
 }
