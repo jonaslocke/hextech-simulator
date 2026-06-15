@@ -273,8 +273,8 @@ implemented, tested, and documented where relevant.
 - [x] Return both player tokens for local/manual testing.
 - [x] Return viewer-safe projections and game-log entries from match creation.
 - [x] Connect the UI to the match creation API.
-- [ ] Let the UI submit gameplay intents through the HTTP intent API.
-- [ ] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
+- [x] Let the UI submit gameplay intents through the HTTP intent API.
+- [x] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
 - [ ] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.
 - [ ] Add an end-to-end Annie/Lux service test for setup through non-showdown gameplay.
 

@@ -73,6 +73,16 @@ export const projectedSetupStateSchema = z.object({
       revealedAt: z.string().datetime().nullable()
     })
   ),
+  battlefieldPools: z.record(
+    z.string().min(1),
+    z.object({
+      playerId: z.string().min(1),
+      registeredCardInstanceIds: z.array(z.string().min(1)),
+      registeredCount: z.number().int().nonnegative(),
+      usedCardInstanceIds: z.array(z.string().min(1)),
+      visibility: z.enum(["private", "secret"])
+    })
+  ),
   mulliganChoices: z.record(
     z.string().min(1),
     z.object({
@@ -203,6 +213,28 @@ function projectSetup(game: Game, viewerPlayerId: string): ProjectedSetupState {
               choice.status === "revealed" || playerId === viewerPlayerId
                 ? choice.cardInstanceId
                 : null
+          }
+        ];
+      })
+    ),
+    battlefieldPools: Object.fromEntries(
+      game.canonicalState.setup.playerIds.map((playerId) => {
+        const pool = game.canonicalState.setup.battlefieldPools[playerId];
+
+        if (!pool) {
+          throw new Error("Battlefield pool state is missing.");
+        }
+
+        const isViewer = playerId === viewerPlayerId;
+
+        return [
+          playerId,
+          {
+            playerId,
+            registeredCardInstanceIds: isViewer ? pool.registeredCardInstanceIds : [],
+            registeredCount: pool.registeredCardInstanceIds.length,
+            usedCardInstanceIds: isViewer ? pool.usedCardInstanceIds : [],
+            visibility: isViewer ? "private" : "secret"
           }
         ];
       })
