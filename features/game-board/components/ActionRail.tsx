@@ -23,18 +23,18 @@ export function ActionRail({
         <Layers3 className="size-5" />
       </ActionButton>
       <ActionButton
-        active={false}
-        label="Pass Turn"
-        onClick={onPassTurn ?? (() => undefined)}
-      >
-        <SkipForward className="size-5" />
-      </ActionButton>
-      <ActionButton
         active={openZone === "log"}
         label="Game Log"
         onClick={() => setOpenZone(openZone === "log" ? null : "log")}
       >
         <History className="size-5" />
+      </ActionButton>
+      <ActionButton
+        active={false}
+        label="Pass Turn"
+        onClick={onPassTurn ?? (() => undefined)}
+      >
+        <SkipForward className="size-5" />
       </ActionButton>
     </aside>
   );

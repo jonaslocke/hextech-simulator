@@ -2,23 +2,29 @@
 
 import type { GameLogEntry } from "@/server/events";
 import { X } from "lucide-react";
-import { TemporaryZone, ZoneData } from "../types";
+import { Card, TemporaryZone, ZoneData } from "../types";
 import { BoardSlot } from "./BoardSlot";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./EmptyState";
 
 export function TemporaryZoneOverlay({
+  chainCards,
   logEntries,
   openZone,
   onClose,
   opponentBanishment,
+  opponentTrash,
   playerBanishment,
+  playerTrash,
 }: {
+  chainCards: Card[];
   logEntries: GameLogEntry[];
   openZone: TemporaryZone;
   onClose: () => void;
   opponentBanishment: ZoneData;
+  opponentTrash: ZoneData;
   playerBanishment: ZoneData;
+  playerTrash: ZoneData;
 }) {
   if (!openZone) {
     return null;
@@ -29,10 +35,14 @@ export function TemporaryZoneOverlay({
       ? "Chain"
       : openZone === "banish"
         ? "Banished Cards"
-        : "Game Log";
+        : openZone === "playerTrash"
+          ? "Player Trash"
+          : openZone === "opponentTrash"
+            ? "Opponent Trash"
+            : "Game Log";
   const message =
     openZone === "chain"
-      ? "The chain is empty in the current preview state."
+      ? "The chain is empty."
       : openZone === "banish"
         ? ""
         : "No accepted server events are present in the current preview state.";
@@ -53,14 +63,20 @@ export function TemporaryZoneOverlay({
       {openZone === "banish" ? (
         <div className="gap-2 grid">
           <BoardSlot title="Player 1 Banish">
-            <BanishmentCards zone={playerBanishment} />
+            <ZoneCards emptyLabel="No banished cards" cards={playerBanishment.cards} />
           </BoardSlot>
           <BoardSlot title="Player 2 Banish">
-            <BanishmentCards zone={opponentBanishment} />
+            <ZoneCards emptyLabel="No banished cards" cards={opponentBanishment.cards} />
           </BoardSlot>
         </div>
       ) : openZone === "log" ? (
         <LogList entries={logEntries} />
+      ) : openZone === "playerTrash" ? (
+        <ZoneCards emptyLabel="No cards in trash" cards={playerTrash.cards} />
+      ) : openZone === "opponentTrash" ? (
+        <ZoneCards emptyLabel="No cards in trash" cards={opponentTrash.cards} />
+      ) : openZone === "chain" ? (
+        <ZoneCards emptyLabel={message} cards={chainCards} />
       ) : (
         <EmptyState label={message} />
       )}
@@ -68,14 +84,20 @@ export function TemporaryZoneOverlay({
   );
 }
 
-function BanishmentCards({ zone }: { zone: ZoneData }) {
-  if (zone.cards.length === 0) {
-    return <EmptyState label="No banished cards" />;
+function ZoneCards({
+  cards,
+  emptyLabel,
+}: {
+  cards: Card[];
+  emptyLabel: string;
+}) {
+  if (cards.length === 0) {
+    return <EmptyState label={emptyLabel} />;
   }
 
   return (
     <div className="flex gap-2 overflow-auto">
-      {zone.cards.map((card, index) => (
+      {cards.map((card, index) => (
         <CardTile key={card.instanceId ?? `${card.name}-${index}`} {...card} />
       ))}
     </div>

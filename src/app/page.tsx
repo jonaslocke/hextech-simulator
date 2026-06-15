@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { loadCardCatalog, type Card, type CardCatalog } from "@/server/catalog";
 import { validateDeckList, type DeckSnapshot } from "@/server/deck";
+import { gameEventTypes, projectGameEventsForPlayer } from "@/server/events";
 import { createGame, gameSchema, projectGameForPlayer } from "@/server/match";
 import { GameBoard } from "../../features/game-board";
 
@@ -110,9 +111,9 @@ export default async function Home() {
             mainDeck: fixture.playerA.mainDeck,
             runeDeck: fixture.playerA.runeDeck,
             hand: fixture.playerA.hand,
-            trash: [],
-            banishment: [],
-            base: fixture.playerA.runesInPlay,
+            trash: fixture.playerA.trash,
+            banishment: fixture.playerA.banishment,
+            base: fixture.playerA.base,
           },
         },
         "player-b": {
@@ -123,19 +124,60 @@ export default async function Home() {
             mainDeck: fixture.playerB.mainDeck,
             runeDeck: fixture.playerB.runeDeck,
             hand: fixture.playerB.hand,
-            trash: [],
-            banishment: [],
-            base: fixture.playerB.runesInPlay,
+            trash: fixture.playerB.trash,
+            banishment: fixture.playerB.banishment,
+            base: fixture.playerB.base,
           },
         },
       },
     },
   });
   const projection = projectGameForPlayer(game, "player-a");
+  const logEntries = projectGameEventsForPlayer(
+    [
+      {
+        id: "ui-event-1",
+        createdAt: "2026-06-14T09:00:00.000Z",
+        updatedAt: "2026-06-14T09:00:00.000Z",
+        matchId: game.matchId,
+        gameId: game.id,
+        sequence: 1,
+        type: gameEventTypes.playerIntentAccepted,
+        actorPlayerId: "player-a",
+        payload: {
+          intent: {
+            type: "game.moveUnitToBattlefield",
+            payload: {
+              unitCardInstanceId: fixture.playerA.battlefieldUnit,
+              battlefieldId: "ui-game-1:battlefield:player-a",
+            },
+          },
+        },
+      },
+      {
+        id: "ui-event-2",
+        createdAt: "2026-06-14T09:00:01.000Z",
+        updatedAt: "2026-06-14T09:00:01.000Z",
+        matchId: game.matchId,
+        gameId: game.id,
+        sequence: 2,
+        type: gameEventTypes.serverDecision,
+        actorPlayerId: null,
+        payload: {
+          decision: {
+            type: "showdown.enter",
+          },
+        },
+      },
+    ],
+    "player-a",
+  );
 
   return (
     <GameBoard
+      chainCardInstanceIds={fixture.playerA.chain}
       cardsByInstanceId={fixture.cardsByInstanceId}
+      logEntries={logEntries}
       playerNames={{
         "player-a": "Prismaticician",
         "player-b": "Alanzq1",
@@ -228,8 +270,53 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
     throw new Error("Fixture deck must include a main-deck unit for battlefield state.");
   }
 
+  const unavailableMainDeckIds = new Set([battlefieldUnit, ...hand]);
+  const baseUnit = firstLegalCard(
+    snapshot,
+    allMainDeck,
+    unavailableMainDeckIds,
+    (card) => card.classification.type === "Unit",
+  );
+
+  if (!baseUnit) {
+    throw new Error("Fixture deck must include a main-deck unit for base state.");
+  }
+
+  unavailableMainDeckIds.add(baseUnit);
+
+  const trashCard = firstLegalCard(
+    snapshot,
+    allMainDeck,
+    unavailableMainDeckIds,
+    isMainDeckCard,
+  );
+
+  if (!trashCard) {
+    throw new Error("Fixture deck must include a main-deck card for trash state.");
+  }
+
+  unavailableMainDeckIds.add(trashCard);
+
+  const banishmentCard = firstLegalCard(
+    snapshot,
+    allMainDeck,
+    unavailableMainDeckIds,
+    isMainDeckCard,
+  );
+
+  if (!banishmentCard) {
+    throw new Error("Fixture deck must include a main-deck card for banishment state.");
+  }
+
+  unavailableMainDeckIds.add(banishmentCard);
+
+  const chain = allMainDeck
+    .filter((instanceId) => !unavailableMainDeckIds.has(instanceId))
+    .filter((instanceId) => cardFor(snapshot, instanceId).classification.type === "Spell")
+    .slice(0, 2);
+
   const mainDeck = allMainDeck.filter(
-    (instanceId) => !hand.includes(instanceId) && instanceId !== battlefieldUnit,
+    (instanceId) => !unavailableMainDeckIds.has(instanceId),
   );
   const runesInPlay = allRunes.slice(0, 2);
   const runeDeck = allRunes.slice(2);
@@ -237,9 +324,12 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
   return {
     allMainDeck,
     allRunes,
+    banishment: [banishmentCard],
+    base: [...runesInPlay, baseUnit],
     battlefieldPool,
     battlefieldUnit,
     champion,
+    chain,
     hand,
     legend,
     mainDeck,
@@ -247,7 +337,31 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
     runesInPlay,
     selectedBattlefield,
     snapshot,
+    trash: [trashCard],
   };
+}
+
+function firstLegalCard(
+  snapshot: DeckSnapshot,
+  instanceIds: string[],
+  unavailableInstanceIds: Set<string>,
+  isLegal: (card: Card) => boolean,
+) {
+  return instanceIds.find((instanceId) => {
+    if (unavailableInstanceIds.has(instanceId)) {
+      return false;
+    }
+
+    return isLegal(cardFor(snapshot, instanceId));
+  });
+}
+
+function isMainDeckCard(card: Card) {
+  return (
+    card.classification.type === "Gear" ||
+    card.classification.type === "Spell" ||
+    card.classification.type === "Unit"
+  );
 }
 
 function sourceIds(

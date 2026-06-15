@@ -2,7 +2,13 @@ import type { Card as CatalogCard, CardType } from "@/server/catalog";
 import type { GameLogEntry } from "@/server/events";
 import type { GameProjection } from "@/server/match";
 
-export type TemporaryZone = "chain" | "banish" | "log" | null;
+export type TemporaryZone =
+  | "chain"
+  | "banish"
+  | "log"
+  | "opponentTrash"
+  | "playerTrash"
+  | null;
 
 export type ZoneVisibility = "public" | "private" | "secret";
 export type ZoneKind =
@@ -17,6 +23,7 @@ export type ZoneKind =
   | "trash";
 
 export type GameBoardProps = {
+  chainCardInstanceIds?: string[];
   cardsByInstanceId: Record<string, CatalogCard>;
   logEntries?: GameLogEntry[];
   playerNames?: Partial<Record<string, string>>;

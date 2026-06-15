@@ -25,6 +25,7 @@ import {
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
 
 export const GameBoard: FC<GameBoardProps> = ({
+  chainCardInstanceIds = [],
   cardsByInstanceId,
   logEntries = [],
   playerNames = {},
@@ -32,6 +33,9 @@ export const GameBoard: FC<GameBoardProps> = ({
   scores = {},
 }) => {
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
+  const chainCards = chainCardInstanceIds.flatMap((cardInstanceId) =>
+    buildCard(cardInstanceId, cardsByInstanceId),
+  );
   const board = createBoardModel({
     cardsByInstanceId,
     playerNames,
@@ -46,6 +50,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px] p-2">
           <PlayerBoard
             onOpenBanish={() => setOpenZone("banish")}
+            onOpenTrash={() => setOpenZone("opponentTrash")}
             player={board.opponent}
             isMirrored
           />
@@ -63,17 +68,21 @@ export const GameBoard: FC<GameBoardProps> = ({
           </div>
           <PlayerBoard
             onOpenBanish={() => setOpenZone("banish")}
+            onOpenTrash={() => setOpenZone("playerTrash")}
             player={board.player}
           />
         </div>
         <ActionRail openZone={openZone} setOpenZone={setOpenZone} />
       </section>
       <TemporaryZoneOverlay
+        chainCards={chainCards}
         logEntries={logEntries}
         onClose={() => setOpenZone(null)}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
+        opponentTrash={board.opponent.zones.trash}
         playerBanishment={board.player.zones.banishment}
+        playerTrash={board.player.zones.trash}
       />
     </main>
   );

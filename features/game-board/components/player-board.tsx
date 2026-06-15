@@ -9,6 +9,7 @@ import { Card, PlayerData, ZoneData } from "../types";
 type Props = {
   isMirrored?: boolean;
   onOpenBanish?: () => void;
+  onOpenTrash?: () => void;
   player: PlayerData;
 };
 
@@ -18,13 +19,13 @@ const BaseLine = ({ player }: { player: PlayerData }) => {
   return (
     <div className="gap-2 grid grid-cols-[130px_130px_minmax(0,1fr)_130px]">
       <ZoneArea isCentered>
-        <ZoneCards zone={player.zones.champion} emptyLabel="No champion" />
+        <ZoneCards zone={player.zones.champion} />
       </ZoneArea>
       <ZoneArea isCentered>
-        <ZoneCards zone={player.zones.legend} emptyLabel="No legend" />
+        <ZoneCards zone={player.zones.legend} />
       </ZoneArea>
       <ZoneArea>
-        <CardList cards={baseUnits} emptyLabel="No base units" />
+        <CardList cards={baseUnits} />
       </ZoneArea>
       <ZoneArea isCentered>
         <HiddenZone count={player.zones.mainDeck.count} label="Main deck" />
@@ -35,9 +36,11 @@ const BaseLine = ({ player }: { player: PlayerData }) => {
 
 const RunesLine = ({
   onOpenBanish,
+  onOpenTrash,
   player,
 }: {
   onOpenBanish?: () => void;
+  onOpenTrash?: () => void;
   player: PlayerData;
 }) => {
   const baseRunes = player.zones.base.cards.filter((card) => card.type === "Rune");
@@ -48,11 +51,10 @@ const RunesLine = ({
         <HiddenZone count={player.zones.runeDeck.count} label="Rune deck" />
       </ZoneArea>
       <ZoneArea>
-        <CardList cards={baseRunes} emptyLabel="No runes" />
-        <HandCards zone={player.zones.hand} />
+        <CardList cards={baseRunes} />
       </ZoneArea>
       <ZoneArea isCentered>
-        <ZoneCards zone={player.zones.trash} emptyLabel="Trash" />
+        <ZoneCards onClick={onOpenTrash} showCount zone={player.zones.trash} />
       </ZoneArea>
       <ZoneArea isCentered>
         <Button
@@ -75,11 +77,20 @@ const RunesLine = ({
   );
 };
 
-export const PlayerBoard: FC<Props> = ({ isMirrored, onOpenBanish, player }) => {
+export const PlayerBoard: FC<Props> = ({
+  isMirrored,
+  onOpenBanish,
+  onOpenTrash,
+  player,
+}) => {
   if (isMirrored) {
     return (
       <>
-        <RunesLine onOpenBanish={onOpenBanish} player={player} />
+        <RunesLine
+          onOpenBanish={onOpenBanish}
+          onOpenTrash={onOpenTrash}
+          player={player}
+        />
         <BaseLine player={player} />
       </>
     );
@@ -87,68 +98,84 @@ export const PlayerBoard: FC<Props> = ({ isMirrored, onOpenBanish, player }) => 
   return (
     <>
       <BaseLine player={player} />
-      <RunesLine onOpenBanish={onOpenBanish} player={player} />
+      <RunesLine
+        onOpenBanish={onOpenBanish}
+        onOpenTrash={onOpenTrash}
+        player={player}
+      />
     </>
   );
 };
 
 function ZoneCards({
-  emptyLabel,
+  onClick,
+  showCount = false,
   zone,
 }: {
-  emptyLabel: string;
+  onClick?: () => void;
+  showCount?: boolean;
   zone: ZoneData;
 }) {
   if (zone.cards.length > 0) {
-    return <CardList cards={zone.cards} emptyLabel={emptyLabel} />;
+    return (
+      <CardList
+        cards={zone.cards}
+        count={showCount ? zone.count : undefined}
+        onClick={onClick}
+      />
+    );
   }
 
   if (zone.count > 0) {
-    return <HiddenZone count={zone.count} label={emptyLabel} />;
+    return <HiddenZone count={zone.count} label={zone.kind} />;
   }
 
-  return <ZoneEmpty label={emptyLabel} />;
-}
-
-function HandCards({ zone }: { zone: ZoneData }) {
-  if (zone.cards.length > 0) {
-    return <CardList cards={zone.cards} emptyLabel="No hand cards" />;
-  }
-
-  if (zone.count === 0) {
-    return null;
-  }
-
-  return (
-    <>
-      {Array.from({ length: zone.count }).map((_, index) => (
-        <CardTile
-          key={`hidden-hand-${index}`}
-          img={cardBackImage.src}
-          name="Hidden card"
-        />
-      ))}
-    </>
-  );
+  return null;
 }
 
 function CardList({
   cards,
-  emptyLabel,
+  count,
+  onClick,
 }: {
   cards: Card[];
-  emptyLabel: string;
+  count?: number;
+  onClick?: () => void;
 }) {
   if (cards.length === 0) {
-    return <ZoneEmpty label={emptyLabel} />;
+    return null;
   }
 
-  return (
+  const content = (
     <>
       {cards.map((card, index) => (
         <CardTile key={card.instanceId ?? `${card.name}-${index}`} {...card} />
       ))}
+      {count !== undefined && count > 0 && (
+        <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
+          {count}
+        </span>
+      )}
     </>
+  );
+
+  if (!onClick && count === undefined) {
+    return content;
+  }
+
+  if (!onClick) {
+    return <div className="relative flex">{content}</div>;
+  }
+
+  return (
+    <button
+      aria-label={`Open ${cards[0]?.name ?? "zone"}`}
+      className="relative flex"
+      onClick={onClick}
+      type="button"
+    >
+      {content}
+    </button>
   );
 }
 
@@ -160,13 +187,5 @@ function HiddenZone({ count, label }: { count: number; label: string }) {
         {count}
       </span>
     </div>
-  );
-}
-
-function ZoneEmpty({ label }: { label: string }) {
-  return (
-    <span className="px-1 text-center text-[10px] text-slate-500">
-      {label}
-    </span>
   );
 }
