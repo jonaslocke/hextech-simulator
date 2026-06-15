@@ -344,6 +344,58 @@ test("playCard recycles runes for Power using card metadata domain order", () =>
   ]);
 });
 
+test("playCard randomizes simultaneous rune recycle payment order with seeded RNG", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-power-two-unit-hand"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-power-two-unit-hand"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.payment.resourcePayments, [
+    {
+      type: "recycleRuneForPower",
+      cardInstanceId: "a-rune-base-1",
+      producedDomain: "Chaos"
+    },
+    {
+      type: "recycleRuneForPower",
+      cardInstanceId: "a-rune-base-2",
+      producedDomain: "Chaos"
+    }
+  ]);
+  assert.equal(result.randomOperations.length, 1);
+  assert.equal(result.randomOperations[0]?.purpose, "recycle-rune-deck:player-a");
+  assert.equal(
+    result.game.canonicalState.rng.rngStep,
+    game.canonicalState.rng.rngStep + 1
+  );
+  assert.deepEqual(
+    new Set(result.game.canonicalState.players["player-a"]?.zones.runeDeck),
+    new Set(["a-rune-deck-1", "a-rune-base-1", "a-rune-base-2"])
+  );
+});
+
 test("playCard rejects unsupported immediate play behavior", () => {
   const game = gameSchema.parse({
     ...createInProgressGameWithRunes(),
@@ -440,7 +492,7 @@ test("recycle randomizes simultaneous main deck recycle order with seeded RNG", 
   );
 });
 
-test("recycle preserves chosen order for rune deck recycle", () => {
+test("recycle randomizes simultaneous rune deck recycle order with seeded RNG", () => {
   const game = createInProgressGame();
 
   const result = recycleCards(game, {
@@ -451,15 +503,23 @@ test("recycle preserves chosen order for rune deck recycle", () => {
     cardInstanceIds: ["a-base-2", "a-base-1"]
   });
 
-  assert.deepEqual(result.randomOperations, []);
+  assert.equal(result.randomOperations.length, 1);
+  assert.equal(result.randomOperations[0]?.purpose, "recycle-rune-deck:player-a");
+  assert.equal(
+    result.game.canonicalState.rng.rngStep,
+    game.canonicalState.rng.rngStep + 1
+  );
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, []);
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.runeDeck, [
-    "a-rune-1",
-    "a-rune-2",
-    "a-rune-3",
-    "a-base-2",
-    "a-base-1"
-  ]);
+  assert.deepEqual(
+    result.game.canonicalState.players["player-a"]?.zones.runeDeck.slice(0, 3),
+    ["a-rune-1", "a-rune-2", "a-rune-3"]
+  );
+  assert.deepEqual(
+    new Set(
+      result.game.canonicalState.players["player-a"]?.zones.runeDeck.slice(3)
+    ),
+    new Set(["a-base-2", "a-base-1"])
+  );
 });
 
 test("pass records the acting player for the current turn", () => {
@@ -783,6 +843,13 @@ const cardLookup: Record<string, Card> = {
     energy: 0,
     name: "Multi Domain Unit",
     power: 1,
+    type: "Unit"
+  }),
+  "a-power-two-unit-hand": createCard({
+    domain: ["Chaos"],
+    energy: 0,
+    name: "Power Two Unit",
+    power: 2,
     type: "Unit"
   }),
   "a-unit-on-play": createCard({

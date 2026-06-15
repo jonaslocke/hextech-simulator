@@ -414,7 +414,7 @@ function applyIntent(
               }
             }
           ],
-          randomOperations: []
+          randomOperations: result.randomOperations
         };
       }
 

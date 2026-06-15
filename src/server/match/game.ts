@@ -251,6 +251,7 @@ export type PlayCardInput = {
 export type PlayCardResult = {
   game: Game;
   payment: PaymentPlan;
+  randomOperations: RandomOperation[];
 };
 
 export type PassPriorityInput = {
@@ -888,17 +889,15 @@ export function recycleCards(
   let recycledCardInstanceIds = input.cardInstanceIds;
   const randomOperations: RandomOperation[] = [];
 
-  if (input.destinationDeck === "mainDeck" && input.cardInstanceIds.length > 1) {
-    const result = shuffleItems(
-      rngState,
-      input.cardInstanceIds,
-      `recycle-main-deck:${input.ownerPlayerId}`
-    );
-
-    rngState = result.rngState;
-    recycledCardInstanceIds = result.values;
-    randomOperations.push(result.operation);
-  }
+  const recycleOrder = orderRecycledCardsForBottom(
+    rngState,
+    input.cardInstanceIds,
+    input.destinationDeck,
+    input.ownerPlayerId
+  );
+  rngState = recycleOrder.rngState;
+  recycledCardInstanceIds = recycleOrder.cardInstanceIds;
+  randomOperations.push(...recycleOrder.randomOperations);
 
   const selectedSet = new Set(input.cardInstanceIds);
   const nextSourceCards = sourceCards.filter(
@@ -1075,13 +1074,14 @@ export function playCard(
     readCardCost(card),
     cardsByInstanceId
   );
-  const paidGame = applyPaymentPlan(
+  const paidResult = applyPaymentPlan(
     game,
     input.actorPlayerId,
     payment,
     cardsByInstanceId,
     input.now
   );
+  const paidGame = paidResult.game;
   const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
   const zones =
     sourceZone === "hand"
@@ -1124,7 +1124,8 @@ export function playCard(
         }
       }
     }),
-    payment
+    payment,
+    randomOperations: paidResult.randomOperations
   };
 }
 
@@ -1665,12 +1666,18 @@ function applyPaymentPlan(
   payment: PaymentPlan,
   cardsByInstanceId: CardLookup,
   now?: string
-): Game {
+): RecycleCardsResult {
   const player = game.canonicalState.players[playerId]!;
   const recycledRuneCardInstanceIds = payment.resourcePayments
     .filter((resourcePayment) => resourcePayment.type === "recycleRuneForPower")
     .map((resourcePayment) => resourcePayment.cardInstanceId);
   const recycledSet = new Set(recycledRuneCardInstanceIds);
+  const recycleOrder = orderRecycledCardsForBottom(
+    game.canonicalState.rng,
+    recycledRuneCardInstanceIds,
+    "runeDeck",
+    playerId
+  );
   const cardStates = { ...game.canonicalState.cardStates };
   const power = { ...player.runePool.power };
   let energy = player.runePool.energy;
@@ -1703,36 +1710,73 @@ function applyPaymentPlan(
     }
   }
 
-  return gameSchema.parse({
-    ...game,
-    updatedAt: now ?? new Date().toISOString(),
-    canonicalState: {
-      ...game.canonicalState,
-      cardStates,
-      players: {
-        ...game.canonicalState.players,
-        [playerId]: {
-          ...player,
-          runePool: {
-            energy,
-            power: Object.fromEntries(
-              Object.entries(power).filter(([, amount]) => amount > 0)
-            )
-          },
-          zones: {
-            ...player.zones,
-            base: player.zones.base.filter(
-              (cardInstanceId) => !recycledSet.has(cardInstanceId)
-            ),
-            runeDeck: [
-              ...player.zones.runeDeck,
-              ...recycledRuneCardInstanceIds
-            ]
+  return {
+    game: gameSchema.parse({
+      ...game,
+      updatedAt: now ?? new Date().toISOString(),
+      canonicalState: {
+        ...game.canonicalState,
+        cardStates,
+        rng: recycleOrder.rngState,
+        players: {
+          ...game.canonicalState.players,
+          [playerId]: {
+            ...player,
+            runePool: {
+              energy,
+              power: Object.fromEntries(
+                Object.entries(power).filter(([, amount]) => amount > 0)
+              )
+            },
+            zones: {
+              ...player.zones,
+              base: player.zones.base.filter(
+                (cardInstanceId) => !recycledSet.has(cardInstanceId)
+              ),
+              runeDeck: [
+                ...player.zones.runeDeck,
+                ...recycleOrder.cardInstanceIds
+              ]
+            }
           }
         }
       }
-    }
-  });
+    }),
+    randomOperations: recycleOrder.randomOperations
+  };
+}
+
+function orderRecycledCardsForBottom(
+  rngState: Game["canonicalState"]["rng"],
+  cardInstanceIds: string[],
+  destinationDeck: "mainDeck" | "runeDeck",
+  ownerPlayerId: string
+): {
+  rngState: Game["canonicalState"]["rng"];
+  cardInstanceIds: string[];
+  randomOperations: RandomOperation[];
+} {
+  if (cardInstanceIds.length <= 1) {
+    return {
+      rngState,
+      cardInstanceIds,
+      randomOperations: []
+    };
+  }
+
+  const purposeDeck =
+    destinationDeck === "mainDeck" ? "main-deck" : "rune-deck";
+  const result = shuffleItems(
+    rngState,
+    cardInstanceIds,
+    `recycle-${purposeDeck}:${ownerPlayerId}`
+  );
+
+  return {
+    rngState: result.rngState,
+    cardInstanceIds: result.values,
+    randomOperations: [result.operation]
+  };
 }
 
 function spendPowerFromPool(
