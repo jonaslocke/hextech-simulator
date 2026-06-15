@@ -1,6 +1,13 @@
 "use client";
 
-import { FC, ReactNode, useEffect, useRef, useState } from "react";
+import {
+  FC,
+  MouseEvent,
+  ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "../types";
 import {
@@ -14,6 +21,8 @@ import {
 type CardTileProps = Card & {
   enableHoverPreview?: boolean;
   focusablePreview?: boolean;
+  onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
+  onPrimaryAction?: () => void;
   showMight?: boolean;
 };
 
@@ -26,6 +35,8 @@ export const CardTile: FC<CardTileProps> = ({
   img,
   might,
   name,
+  onContextAction,
+  onPrimaryAction,
   power,
   publicCode,
   rulesText,
@@ -101,10 +112,31 @@ export const CardTile: FC<CardTileProps> = ({
     <div
       className={cn(
         "relative shrink-0",
+        (onPrimaryAction || onContextAction) && "cursor-pointer",
         previewPosition ? "z-[2147483647]" : "z-10",
       )}
       onBlur={clearPreview}
+      onClick={() => {
+        onPrimaryAction?.();
+      }}
+      onContextMenu={(event) => {
+        if (!onContextAction) {
+          return;
+        }
+
+        event.preventDefault();
+        clearPreview();
+        onContextAction(event);
+      }}
       onFocus={schedulePreview}
+      onKeyDown={(event) => {
+        if (!onPrimaryAction || (event.key !== "Enter" && event.key !== " ")) {
+          return;
+        }
+
+        event.preventDefault();
+        onPrimaryAction();
+      }}
       onPointerEnter={schedulePreview}
       onPointerLeave={clearPreview}
       ref={tileRef}

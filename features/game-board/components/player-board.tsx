@@ -1,4 +1,4 @@
-import { ComponentProps, FC } from "react";
+import { ComponentProps, FC, MouseEvent } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { cn } from "@/lib/utils";
 import { CardTile } from "./card-tile";
@@ -14,6 +14,8 @@ type BaseLineProps = {
 
 type Props = {
   isMirrored?: boolean;
+  onRuneContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onRunePrimaryAction?: (card: Card) => void;
   onOpenBanish?: () => void;
   onOpenTrash?: () => void;
   player: PlayerData;
@@ -45,12 +47,16 @@ const BaseLine = ({ player, isHightlighted }: BaseLineProps) => {
 
 interface RunesProps extends BaseLineProps {
   isMirrored?: boolean;
+  onRuneContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onRunePrimaryAction?: (card: Card) => void;
   onOpenBanish?: () => void;
   onOpenTrash?: () => void;
 }
 
 const RunesLine = ({
   isMirrored = false,
+  onRuneContextAction,
+  onRunePrimaryAction,
   onOpenBanish,
   onOpenTrash,
   player,
@@ -73,7 +79,11 @@ const RunesLine = ({
         <HiddenZone count={player.zones.runeDeck.count} label="Rune deck" />
       </ZoneArea>
       <ZoneArea isHightlighted={isHightlighted}>
-        <CardList cards={baseRunes} />
+        <CardList
+          cards={baseRunes}
+          onCardContextAction={onRuneContextAction}
+          onCardPrimaryAction={onRunePrimaryAction}
+        />
       </ZoneArea>
       <ZoneArea isCentered isHightlighted={isHightlighted}>
         <TrashZone
@@ -105,6 +115,8 @@ const RunesLine = ({
 
 export const PlayerBoard: FC<Props> = ({
   isMirrored,
+  onRuneContextAction,
+  onRunePrimaryAction,
   onOpenBanish,
   onOpenTrash,
   player,
@@ -128,6 +140,8 @@ export const PlayerBoard: FC<Props> = ({
     <>
       <BaseLine player={player} isHightlighted={isActivePlayer} />
       <RunesLine
+        onRuneContextAction={onRuneContextAction}
+        onRunePrimaryAction={onRunePrimaryAction}
         onOpenBanish={onOpenBanish}
         onOpenTrash={onOpenTrash}
         player={player}
@@ -218,10 +232,14 @@ function HandCount({ value }: { value: number }) {
 function CardList({
   cards,
   count,
+  onCardContextAction,
+  onCardPrimaryAction,
   onClick,
 }: {
   cards: Card[];
   count?: number;
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onCardPrimaryAction?: (card: Card) => void;
   onClick?: () => void;
 }) {
   if (cards.length === 0) {
@@ -234,6 +252,14 @@ function CardList({
         <CardTile
           enableHoverPreview={!onClick}
           key={card.instanceId ?? `${card.name}-${index}`}
+          onContextAction={
+            onCardContextAction
+              ? (event) => onCardContextAction(card, event)
+              : undefined
+          }
+          onPrimaryAction={
+            onCardPrimaryAction ? () => onCardPrimaryAction(card) : undefined
+          }
           {...card}
         />
       ))}

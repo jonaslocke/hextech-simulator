@@ -310,6 +310,21 @@ export default function Home() {
       }
     });
   };
+  const addRuneResourceFromBoard = ({
+    cardInstanceId,
+    resourceType
+  }: {
+    cardInstanceId: string;
+    resourceType: "energy" | "power";
+  }) => {
+    void submitIntent({
+      type: "game.addRuneResource",
+      payload: {
+        runeCardInstanceId: cardInstanceId,
+        resourceType
+      }
+    });
+  };
 
   return (
     <main className="relative min-h-screen bg-slate-950">
@@ -346,6 +361,7 @@ export default function Home() {
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
+        onAddRuneResource={addRuneResourceFromBoard}
         onPlayCard={playCardFromHand}
         projection={projection}
       />

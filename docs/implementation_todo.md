@@ -292,7 +292,9 @@ implemented, tested, and documented where relevant.
 - [x] Connect the UI to the match creation API.
 - [x] Let the UI submit gameplay intents through the HTTP intent API.
 - [x] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
-- [x] Let clicking a playable card in hand submit a `game.playCard` intent.
+- [x] Let clicking a card in hand open its action menu, then submit `game.playCard` from the selected menu option.
+- [x] Add default left-click card actions and right-click context menus for multi-option card actions.
+- [x] Let clicking a ready Rune in base add Energy and right-clicking a Rune choose Energy or Power.
 - [x] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.
 - [x] Add an end-to-end Annie/Lux service test for setup through non-showdown gameplay.
 

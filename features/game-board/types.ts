@@ -26,6 +26,10 @@ export type GameBoardProps = {
   chainCardInstanceIds?: string[];
   cardsByInstanceId: Record<string, CatalogCard>;
   logEntries?: GameLogEntry[];
+  onAddRuneResource?: (input: {
+    cardInstanceId: string;
+    resourceType: "energy" | "power";
+  }) => void;
   onPlayCard?: (input: {
     canPlay: boolean;
     cardInstanceId: string;

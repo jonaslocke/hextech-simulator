@@ -3,6 +3,7 @@
 import {
   CSSProperties,
   KeyboardEvent,
+  MouseEvent,
   useRef,
   useState,
 } from "react";
@@ -11,10 +12,17 @@ import { CardTile } from "./card-tile";
 
 type PlayerHandFanProps = {
   cards: Card[];
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onPlayCard?: (card: Card) => void;
+  onTuck?: () => void;
 };
 
-export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
+export function PlayerHandFan({
+  cards,
+  onCardContextAction,
+  onPlayCard,
+  onTuck,
+}: PlayerHandFanProps) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const tuckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,6 +42,7 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
     tuckTimeoutRef.current = setTimeout(() => {
       setExpanded(false);
       setHoveredIndex(null);
+      onTuck?.();
     }, 3000);
   };
   const expandHand = () => {
@@ -42,6 +51,17 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
   };
   const selectCardAtIndex = (index: number) => {
     onPlayCard?.(cards[index]!);
+  };
+  const openCardMenu = (
+    card: Card,
+    event: MouseEvent<HTMLDivElement>,
+    index: number,
+  ) => {
+    event.preventDefault();
+    clearTuckTimeout();
+    setHoveredIndex(index);
+    expandHand();
+    onCardContextAction?.(card, event);
   };
 
   return (
@@ -75,11 +95,11 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
               <div
                 className="bottom-0 left-1/2 absolute transition-transform duration-200 ease-out"
                 key={card.instanceId ?? `${card.name}-${index}`}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  clearTuckTimeout();
-                  setHoveredIndex(index);
-                  selectCardAtIndex(index);
+                onClick={(event) => {
+                  openCardMenu(card, event, index);
+                }}
+                onContextMenu={(event) => {
+                  openCardMenu(card, event, index);
                 }}
                 onPointerEnter={() => {
                   clearTuckTimeout();

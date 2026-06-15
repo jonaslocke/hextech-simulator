@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, MouseEvent, useEffect, useState } from "react";
 import type { Card as CatalogCard } from "@/server/catalog";
 import type {
   ProjectedBattlefield,
@@ -24,17 +24,30 @@ import {
 } from "./types";
 
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
+type CardActionMenuItem = {
+  disabled?: boolean;
+  label: string;
+  onSelect?: () => void;
+};
+type CardActionMenuState = {
+  items: CardActionMenuItem[];
+  left: number;
+  top: number;
+} | null;
 
 export const GameBoard: FC<GameBoardProps> = ({
   chainCardInstanceIds = [],
   cardsByInstanceId,
   logEntries = [],
+  onAddRuneResource,
   onPlayCard,
   playerNames = {},
   projection,
   scores = {},
 }) => {
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
+  const [cardActionMenu, setCardActionMenu] =
+    useState<CardActionMenuState>(null);
   const chainCards = chainCardInstanceIds.flatMap((cardInstanceId) =>
     buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
   );
@@ -45,8 +58,31 @@ export const GameBoard: FC<GameBoardProps> = ({
     scores,
   });
   const viewerState = projection.players[projection.viewerPlayerId];
+  const closeCardActionMenu = () => setCardActionMenu(null);
+  const openCardActionMenu = (
+    event: MouseEvent<HTMLElement>,
+    items: CardActionMenuItem[],
+  ) => {
+    const menuWidth = 180;
+    const menuHeight = Math.max(44, items.length * 36 + 12);
+    const gutter = 8;
+
+    setCardActionMenu({
+      items,
+      left: Math.min(
+        event.clientX,
+        Math.max(gutter, window.innerWidth - menuWidth - gutter),
+      ),
+      top: Math.min(
+        event.clientY,
+        Math.max(gutter, window.innerHeight - menuHeight - gutter),
+      ),
+    });
+  };
 
   const handlePlayCardFromHand = (card: Card) => {
+    closeCardActionMenu();
+
     if (!card.instanceId || !onPlayCard || !viewerState) {
       return;
     }
@@ -59,6 +95,97 @@ export const GameBoard: FC<GameBoardProps> = ({
       selectedModeId: modes[0]?.id,
     });
   };
+  const handleCardContextFromHand = (
+    card: Card,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    if (!card.instanceId || !viewerState) {
+      return;
+    }
+
+    const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+
+    openCardActionMenu(
+      event,
+      modes.length > 0
+        ? modes.map((mode) => ({
+            label: `Play ${mode.label}`,
+            onSelect: () =>
+              onPlayCard?.({
+                canPlay: true,
+                cardInstanceId: card.instanceId!,
+                selectedModeId: mode.id,
+              }),
+          }))
+        : [
+            {
+              disabled: true,
+              label: "Not playable",
+            },
+          ],
+    );
+  };
+  const handleRunePrimaryAction = (card: Card) => {
+    closeCardActionMenu();
+
+    if (!card.instanceId) {
+      return;
+    }
+
+    onAddRuneResource?.({
+      cardInstanceId: card.instanceId,
+      resourceType: "energy",
+    });
+  };
+  const handleRuneContextAction = (
+    card: Card,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    if (!card.instanceId) {
+      return;
+    }
+
+    openCardActionMenu(event, [
+      {
+        disabled: card.isExhausted,
+        label: card.isExhausted ? "Add Energy (exhausted)" : "Add Energy",
+        onSelect: () =>
+          onAddRuneResource?.({
+            cardInstanceId: card.instanceId!,
+            resourceType: "energy",
+          }),
+      },
+      {
+        label: "Add Power",
+        onSelect: () =>
+          onAddRuneResource?.({
+            cardInstanceId: card.instanceId!,
+            resourceType: "power",
+          }),
+      },
+    ]);
+  };
+
+  useEffect(() => {
+    if (!cardActionMenu) {
+      return;
+    }
+
+    const close = () => closeCardActionMenu();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [cardActionMenu]);
 
   return (
     <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
@@ -88,6 +215,8 @@ export const GameBoard: FC<GameBoardProps> = ({
           <PlayerBoard
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("playerTrash")}
+            onRuneContextAction={handleRuneContextAction}
+            onRunePrimaryAction={handleRunePrimaryAction}
             player={board.player}
             //TODO have to be wired to the active player
             isActivePlayer={true}
@@ -110,11 +239,56 @@ export const GameBoard: FC<GameBoardProps> = ({
 
       <PlayerHandFan
         cards={board.player.zones.hand.cards}
+        onCardContextAction={handleCardContextFromHand}
         onPlayCard={handlePlayCardFromHand}
+        onTuck={closeCardActionMenu}
       />
+      {cardActionMenu && (
+        <CardActionMenu
+          items={cardActionMenu.items}
+          left={cardActionMenu.left}
+          onClose={closeCardActionMenu}
+          top={cardActionMenu.top}
+        />
+      )}
     </main>
   );
 };
+
+function CardActionMenu({
+  items,
+  left,
+  onClose,
+  top,
+}: {
+  items: CardActionMenuItem[];
+  left: number;
+  onClose: () => void;
+  top: number;
+}) {
+  return (
+    <div
+      className="fixed z-[2147483647] min-w-44 overflow-hidden rounded-md border border-white/10 bg-slate-950/95 p-1 text-sm text-slate-100 shadow-[0_18px_45px_rgba(0,0,0,0.75)] ring-1 ring-cyan-300/20"
+      onPointerDown={(event) => event.stopPropagation()}
+      style={{ left, top }}
+    >
+      {items.map((item) => (
+        <button
+          className="flex w-full items-center rounded px-3 py-2 text-left text-xs transition enabled:hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:text-slate-500"
+          disabled={item.disabled}
+          key={item.label}
+          onClick={() => {
+            onClose();
+            item.onSelect?.();
+          }}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function createBoardModel({
   cardsByInstanceId,
