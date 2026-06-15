@@ -216,7 +216,11 @@ function CardList({
   const content = (
     <>
       {cards.map((card, index) => (
-        <CardTile key={card.instanceId ?? `${card.name}-${index}`} {...card} />
+        <CardTile
+          enableHoverPreview={!onClick}
+          key={card.instanceId ?? `${card.name}-${index}`}
+          {...card}
+        />
       ))}
       {count !== undefined && count > 0 && (
         <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
@@ -231,13 +235,13 @@ function CardList({
   }
 
   if (!onClick) {
-    return <div className="relative flex">{content}</div>;
+    return <div className="relative flex gap-2">{content}</div>;
   }
 
   return (
     <button
       aria-label={`Open ${cards[0]?.name ?? "zone"}`}
-      className="relative flex"
+      className="relative flex gap-2"
       onClick={onClick}
       type="button"
     >

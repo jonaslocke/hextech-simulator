@@ -98,7 +98,11 @@ function ZoneCards({
   return (
     <div className="flex gap-2 overflow-auto">
       {cards.map((card, index) => (
-        <CardTile key={card.instanceId ?? `${card.name}-${index}`} {...card} />
+        <CardTile
+          enableHoverPreview
+          key={card.instanceId ?? `${card.name}-${index}`}
+          {...card}
+        />
       ))}
     </div>
   );

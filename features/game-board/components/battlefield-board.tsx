@@ -101,15 +101,23 @@ export const BattlefieldBoard: FC<Props> = ({
           </div>
         )}
         {/* opponent's units */}
-        <div className="flex flex-wrap items-end pb-2 border-white/10 border-b border-dashed overflow-auto">
+        <div className="flex flex-wrap items-end gap-2 pb-2 border-white/10 border-b border-dashed overflow-auto">
           {opponentUnits.map((unit, index) => (
-            <CardTile key={unit.instanceId ?? `${unit.name}-${index}`} {...unit} />
+            <CardTile
+              enableHoverPreview
+              key={unit.instanceId ?? `${unit.name}-${index}`}
+              {...unit}
+            />
           ))}
         </div>
         {/* player's units */}
-        <div className="flex pt-2">
+        <div className="flex flex-wrap gap-2 pt-2 overflow-auto">
           {playerUnits.map((unit, index) => (
-            <CardTile key={unit.instanceId ?? `${unit.name}-${index}`} {...unit} />
+            <CardTile
+              enableHoverPreview
+              key={unit.instanceId ?? `${unit.name}-${index}`}
+              {...unit}
+            />
           ))}
         </div>
       </div>
