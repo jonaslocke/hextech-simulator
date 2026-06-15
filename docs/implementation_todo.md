@@ -246,7 +246,7 @@ implemented, tested, and documented where relevant.
 
 ## 15. First End-To-End Acceptance
 
-- [ ] Replace the first playable acceptance path with a no-upload Annie/Lux deck-selection path that does not require player-facing mulligan or showdown.
+- [x] Replace the first playable acceptance path with a no-upload Annie/Lux deck-selection path that does not require player-facing mulligan or showdown.
 - [x] Validate Annie and Lux decks.
 - [x] Create best-of-3 match.
 - [x] Select and reveal battlefields.
@@ -275,8 +275,8 @@ implemented, tested, and documented where relevant.
 - [x] Connect the UI to the match creation API.
 - [x] Let the UI submit gameplay intents through the HTTP intent API.
 - [x] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
-- [ ] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.
-- [ ] Add an end-to-end Annie/Lux service test for setup through non-showdown gameplay.
+- [x] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.
+- [x] Add an end-to-end Annie/Lux service test for setup through non-showdown gameplay.
 
 ## 16. Deferred Socket Multiplayer
 
