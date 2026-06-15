@@ -1,8 +1,15 @@
 "use client";
 
-import { FC, useEffect, useRef, useState } from "react";
+import { FC, ReactNode, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card } from "../types";
+import {
+  EnergyResource,
+  formatDomain,
+  getDomainIcon,
+  MightResource,
+  transpileCardDescription,
+} from "../lib/transpile-card-description";
 
 type CardTileProps = Card & {
   enableHoverPreview?: boolean;
@@ -124,7 +131,7 @@ export const CardTile: FC<CardTileProps> = ({
       </div>
       {previewPosition && (
         <div
-          className="pointer-events-none fixed z-[250] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-2xl ring-1 ring-yellow-300/40"
+          className="pointer-events-none fixed z-[10000] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-2xl ring-1 ring-yellow-300/40"
           style={{
             left: previewPosition.left,
             top: previewPosition.top,
@@ -178,11 +185,8 @@ function CardSummary({
   type?: Card["type"];
 }) {
   const typeLine = [supertype, type].filter(Boolean).join(" ");
-  const stats = [
-    energy !== undefined ? `Energy ${energy}` : null,
-    power !== undefined ? `Power ${power}` : null,
-    might !== undefined ? `Might ${might}` : null,
-  ].filter(Boolean);
+  const hasStats =
+    energy !== undefined || power !== undefined || might !== undefined;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-auto pr-1">
@@ -194,28 +198,45 @@ function CardSummary({
           </div>
         )}
       </div>
-      {(domains.length > 0 || stats.length > 0) && (
+      {(domains.length > 0 || hasStats) && (
         <div className="flex flex-wrap gap-1.5">
           {domains.map((domain) => (
             <span
-              className="rounded border border-white/10 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200"
+              className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200"
               key={domain}
             >
-              {domain}
+              {getDomainIcon(domain.toLowerCase()) && (
+                // eslint-disable-next-line @next/next/no-img-element -- Domain icons are local imported UI assets.
+                <img
+                  alt=""
+                  className="h-3.5 w-auto object-contain"
+                  src={getDomainIcon(domain.toLowerCase()) ?? undefined}
+                />
+              )}
+              {formatDomain(domain)}
             </span>
           ))}
-          {stats.map((stat) => (
-            <span
-              className="rounded border border-yellow-300/30 bg-yellow-300/10 px-2 py-0.5 text-[11px] text-yellow-100"
-              key={stat}
-            >
-              {stat}
-            </span>
-          ))}
+          {energy !== undefined && (
+            <SummaryStatChip label="Energy">
+              <EnergyResource compact value={energy} />
+            </SummaryStatChip>
+          )}
+          {power !== undefined && (
+            <SummaryStatChip label="Power">{power}</SummaryStatChip>
+          )}
+          {might !== undefined && (
+            <SummaryStatChip label="Might">
+              <MightResource compact value={might} />
+            </SummaryStatChip>
+          )}
         </div>
       )}
-      <div className="whitespace-pre-line rounded border border-white/10 bg-black/25 p-2 text-sm leading-snug text-slate-100">
-        {rulesText?.trim() ? rulesText : "No rules text."}
+      <div className="grid gap-1.5 rounded border border-white/10 bg-black/25 p-2 text-sm text-slate-100">
+        {rulesText?.trim() ? (
+          transpileCardDescription(rulesText)
+        ) : (
+          <p className="text-slate-400">No rules text.</p>
+        )}
       </div>
       {(setLabel || publicCode) && (
         <div className="mt-auto text-[11px] text-slate-500">
@@ -223,5 +244,20 @@ function CardSummary({
         </div>
       )}
     </div>
+  );
+}
+
+function SummaryStatChip({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-yellow-300/30 bg-yellow-300/10 px-2 py-0.5 text-[11px] text-yellow-100">
+      <span>{label}</span>
+      {children}
+    </span>
   );
 }
