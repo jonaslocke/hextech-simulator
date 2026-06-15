@@ -1,13 +1,15 @@
 "use client";
 
-import { History, Layers3, PanelRightOpen } from "lucide-react";
+import { History, Layers3, SkipForward } from "lucide-react";
 import { TemporaryZone } from "../types";
 import { ActionButton } from "./ActionButton";
 
 export function ActionRail({
+  onPassTurn,
   openZone,
   setOpenZone,
 }: {
+  onPassTurn?: () => void;
   openZone: TemporaryZone;
   setOpenZone: (zone: TemporaryZone) => void;
 }) {
@@ -21,11 +23,11 @@ export function ActionRail({
         <Layers3 className="size-5" />
       </ActionButton>
       <ActionButton
-        active={openZone === "banish"}
-        label="Banish"
-        onClick={() => setOpenZone(openZone === "banish" ? null : "banish")}
+        active={false}
+        label="Pass Turn"
+        onClick={onPassTurn ?? (() => undefined)}
       >
-        <PanelRightOpen className="size-5" />
+        <SkipForward className="size-5" />
       </ActionButton>
       <ActionButton
         active={openZone === "log"}

@@ -1,25 +1,10 @@
 import { cn } from "@/lib/utils";
 import { FC } from "react";
-import { Card } from "../types";
+import { BattlefieldData } from "../types";
 import { CardTile } from "./card-tile";
 
-type Unit = {
-  name: string;
-  might: number;
-  exhausted: boolean;
-  img: HTMLImageElement["src"];
-};
-
-type Battlefield = {
-  name: string;
-  description: string;
-  playerUnits: Card[];
-  opponentUnits: Card[];
-  img: HTMLImageElement["src"];
-};
-
 type Props = {
-  battlefield: Battlefield;
+  battlefield: BattlefieldData;
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred"; //tied to the game state open or neutral - 'deferred' due to be smaller when other BF is on showdown state open -- betternaming is needed
 };
@@ -40,6 +25,7 @@ export const BattlefieldBoard: FC<Props> = ({
   const hasMightToShow = playerTotalMight + opponentTotalMight > 0;
   return (
     <div
+      data-owner={owner}
       className={cn(
         "relative grid grid-rows-[minmax(0,1fr)_36px] bg-white/5 rounded-md overflow-hidden",
         showdownState === "neutral" && "w-1/2",
@@ -68,28 +54,13 @@ export const BattlefieldBoard: FC<Props> = ({
         {/* opponent's units */}
         <div className="flex flex-wrap items-end pb-2 border-white/10 border-b border-dashed overflow-auto">
           {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
-          ))}
-          {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
-          ))}
-          {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
-          ))}
-          {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
-          ))}
-          {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
-          ))}
-          {opponentUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
+            <CardTile key={unit.instanceId ?? `${unit.name}-${index}`} {...unit} />
           ))}
         </div>
         {/* player's units */}
         <div className="flex pt-2">
           {playerUnits.map((unit, index) => (
-            <CardTile key={index} {...unit} />
+            <CardTile key={unit.instanceId ?? `${unit.name}-${index}`} {...unit} />
           ))}
         </div>
       </div>

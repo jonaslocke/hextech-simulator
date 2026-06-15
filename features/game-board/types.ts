@@ -1,24 +1,74 @@
-import { ComponentProps } from "react";
-import { BattlefieldBoard } from "./components/battlefield-board";
+import type { Card as CatalogCard, CardType } from "@/server/catalog";
+import type { GameLogEntry } from "@/server/events";
+import type { GameProjection } from "@/server/match";
 
 export type TemporaryZone = "chain" | "banish" | "log" | null;
 
+export type ZoneVisibility = "public" | "private" | "secret";
+export type ZoneKind =
+  | "banishment"
+  | "base"
+  | "battlefield"
+  | "champion"
+  | "hand"
+  | "legend"
+  | "mainDeck"
+  | "runeDeck"
+  | "trash";
+
+export type GameBoardProps = {
+  cardsByInstanceId: Record<string, CatalogCard>;
+  logEntries?: GameLogEntry[];
+  playerNames?: Partial<Record<string, string>>;
+  projection: GameProjection;
+  scores?: Partial<Record<string, number>>;
+};
+
 export type PlayerData = {
+  playerId: string;
   name: string;
   score: number;
-  battlefield: ComponentProps<typeof BattlefieldBoard>["battlefield"];
+  zones: {
+    banishment: ZoneData;
+    base: ZoneData;
+    champion: ZoneData;
+    hand: ZoneData;
+    legend: ZoneData;
+    mainDeck: ZoneData;
+    runeDeck: ZoneData;
+    trash: ZoneData;
+  };
 };
+
 export interface GameScore {
   player: PlayerData;
   opponent: PlayerData;
 }
 
 export type Card = {
+  instanceId?: string;
   name: string;
   img: HTMLImageElement["src"];
   might?: number;
+  supertype?: CatalogCard["classification"]["supertype"];
+  type?: CardType;
   isExhausted?: boolean;
   comesToPlayReady?: boolean;
 };
 
-export interface GameObject extends GameScore {}
+export type ZoneData = {
+  cards: Card[];
+  count: number;
+  kind: ZoneKind;
+  visibility: ZoneVisibility;
+};
+
+export type BattlefieldData = {
+  id: string;
+  selectedByPlayerId: string;
+  name: string;
+  description: string;
+  playerUnits: Card[];
+  opponentUnits: Card[];
+  img: HTMLImageElement["src"];
+};
