@@ -267,11 +267,11 @@ implemented, tested, and documented where relevant.
 
 ## 15A. No-Upload Playable MVP Path
 
-- [ ] Expose only fixed deck choices: Annie and Lux.
-- [ ] Create a persisted match from selected fixed decks.
+- [x] Expose only fixed deck choices: Annie and Lux.
+- [x] Create a persisted match from selected fixed decks.
 - [ ] Auto-complete non-player-facing setup steps required to start the game, including zero-card keep for mulligan until mulligan UI is implemented.
-- [ ] Return both player tokens for local/manual testing.
-- [ ] Return viewer-safe projections and game-log entries from match creation.
+- [x] Return both player tokens for local/manual testing.
+- [x] Return viewer-safe projections and game-log entries from match creation.
 - [ ] Connect the UI to the match creation API.
 - [ ] Let the UI submit gameplay intents through the HTTP intent API.
 - [ ] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
