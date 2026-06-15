@@ -14,6 +14,11 @@ import { BattlefieldBoard } from "./components/battlefield-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
 import {
+  EnergyResource,
+  formatDomain,
+  getDomainIcon,
+} from "./lib/transpile-card-description";
+import {
   BattlefieldData,
   Card,
   GameBoardProps,
@@ -58,6 +63,9 @@ export const GameBoard: FC<GameBoardProps> = ({
     scores,
   });
   const viewerState = projection.players[projection.viewerPlayerId];
+  const activePlayerId = projection.turn?.activePlayerId;
+  const isOpponentActive = activePlayerId === board.opponent.playerId;
+  const isPlayerActive = activePlayerId === board.player.playerId;
   const closeCardActionMenu = () => setCardActionMenu(null);
   const openCardActionMenu = (
     event: MouseEvent<HTMLElement>,
@@ -191,13 +199,12 @@ export const GameBoard: FC<GameBoardProps> = ({
     <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
       <ScoreHeader opponent={board.opponent} player={board.player} />
       <section className="flex flex-1">
-        <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px] p-2">
+        <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px_64px] p-2">
           <PlayerBoard
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("opponentTrash")}
             player={board.opponent}
-            //TODO have to be wired to the active player
-            isActivePlayer={false}
+            isActivePlayer={isOpponentActive}
             isMirrored
           />
           <div className="flex gap-2">
@@ -218,11 +225,9 @@ export const GameBoard: FC<GameBoardProps> = ({
             onRuneContextAction={handleRuneContextAction}
             onRunePrimaryAction={handleRunePrimaryAction}
             player={board.player}
-            //TODO have to be wired to the active player
-            isActivePlayer={true}
+            isActivePlayer={isPlayerActive}
           />
-          {/* this gives enough space to card hand fan do not get in the way of hover and clicking on runes */}
-          <div className="h-16" />
+          <RunePoolBar runePool={viewerState?.runePool} />
         </div>
         <ActionRail openZone={openZone} setOpenZone={setOpenZone} />
       </section>
@@ -255,6 +260,64 @@ export const GameBoard: FC<GameBoardProps> = ({
   );
 };
 
+function RunePoolBar({
+  runePool,
+}: {
+  runePool: ProjectedPlayerState["runePool"] | undefined;
+}) {
+  const energy = runePool?.energy ?? 0;
+  const power = runePool?.power ?? {};
+  const powerEntries = Object.entries(power)
+    .filter(([, amount]) => amount > 0)
+    .sort(
+      ([left], [right]) => powerDomainOrder(left) - powerDomainOrder(right),
+    );
+
+  if (energy === 0 && powerEntries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-2 border border-white/15 rounded-md overflow-auto text-slate-100 text-xs">
+      <span className="font-semibold text-slate-400 uppercase tracking-wide">
+        Rune pool
+      </span>
+      {energy > 0 && (
+        <span className="inline-flex items-center gap-1 bg-yellow-300/10 px-2 py-1 border border-yellow-300/25 rounded text-yellow-100">
+          <span>Energy</span>
+          <EnergyResource compact value={energy} />
+        </span>
+      )}
+      {powerEntries.map(([domain, amount]) => {
+        const icon = getDomainIcon(domain.toLowerCase());
+
+        return (
+          <span
+            className="inline-flex items-center gap-1 bg-violet-300/10 px-2 py-1 border border-violet-300/25 rounded text-violet-100"
+            key={domain}
+            title={`${formatDomain(domain)} Power`}
+          >
+            {icon && (
+              // eslint-disable-next-line @next/next/no-img-element -- Domain icons are local imported UI assets.
+              <img alt="" className="w-auto h-4 object-contain" src={icon} />
+            )}
+            <span>{formatDomain(domain)}</span>
+            <span className="font-bold text-white">{amount}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function powerDomainOrder(domain: string) {
+  const order = ["Body", "Calm", "Chaos", "Fury", "Mind", "Order", "Rainbow"];
+
+  return order.indexOf(formatDomain(domain)) === -1
+    ? order.length
+    : order.indexOf(formatDomain(domain));
+}
+
 function CardActionMenu({
   items,
   left,
@@ -268,13 +331,13 @@ function CardActionMenu({
 }) {
   return (
     <div
-      className="fixed z-[2147483647] min-w-44 overflow-hidden rounded-md border border-white/10 bg-slate-950/95 p-1 text-sm text-slate-100 shadow-[0_18px_45px_rgba(0,0,0,0.75)] ring-1 ring-cyan-300/20"
+      className="z-[2147483647] fixed bg-slate-950/95 shadow-[0_18px_45px_rgba(0,0,0,0.75)] p-1 border border-white/10 rounded-md ring-1 ring-cyan-300/20 min-w-44 overflow-hidden text-slate-100 text-sm"
       onPointerDown={(event) => event.stopPropagation()}
       style={{ left, top }}
     >
       {items.map((item) => (
         <button
-          className="flex w-full items-center rounded px-3 py-2 text-left text-xs transition enabled:hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:text-slate-500"
+          className="flex items-center enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full disabled:text-slate-500 text-xs text-left transition disabled:cursor-not-allowed"
           disabled={item.disabled}
           key={item.label}
           onClick={() => {
