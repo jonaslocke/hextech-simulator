@@ -191,6 +191,33 @@ implemented, tested, and documented where relevant.
 - [x] Add tests for rune-pool resource generation.
 - [x] Add tests for automatic cost payment and supported card play.
 
+## 12A. Complete Rune Pool And Payment System
+
+- [ ] Replace flat `PaymentPlan` with resource costs, resource payments, non-resource costs, selected modes, optional costs, and applied modifiers.
+- [ ] Represent Power costs as requirements payable by one or more domains or by any domain.
+- [ ] Add Rainbow Power to rune-pool state and payment validation.
+- [ ] Support multi-domain Power payment, using `Defiant Dance` as a fixture.
+- [ ] Prefer domain-specific Power before Rainbow Power during auto-payment.
+- [ ] Use card metadata domain order for multi-domain Power auto-payment.
+- [ ] Spend rune-pool resources before auto-exhausting or auto-recycling Runes.
+- [ ] Auto-exhaust ready Runes for missing Energy in deterministic board order.
+- [ ] Auto-recycle matching Runes for missing Power in deterministic board order.
+- [ ] Intentionally randomize the bottom-deck order when any simultaneous Rune recycle recycles 2 or more Runes.
+- [ ] Log seeded RNG operations for multi-Rune auto-payment recycle order.
+- [ ] Expose legal play/payment modes in viewer-safe projection, including regular play and optional additional-cost modes.
+- [ ] Support selected optional additional-cost modes such as Accelerate and Repeat.
+- [ ] Enforce Repeat as a once-only optional additional cost.
+- [ ] Treat Deflect on spells as mandatory additional Power cost.
+- [ ] Allow ability flows that target Deflect objects to opt out before payment when the rules permit cancellation.
+- [ ] Add canonical computed temporary cost modifiers for ignore-cost effects, increases, discounts, and modified object costs.
+- [ ] Let player intent supply non-resource cost order only when order can affect legality or outcome.
+- [ ] Apply non-resource costs in canonical engine order when order is not material.
+- [ ] Reject payment plans that would make already-chosen play placement, targets, or later required legality checks fail.
+- [ ] Keep Add-Reaction opportunities during payment intentionally unsupported.
+- [ ] Add tests for Bellows Breath regular vs Repeat payment modes.
+- [ ] Add tests for multi-domain Power payment and Rainbow fallback.
+- [ ] Add tests for simultaneous multi-Rune recycle randomization.
+
 ## 13. Event Log Panel
 
 - [x] Derive human-readable log entries from canonical events.

@@ -384,10 +384,17 @@ Supported MVP resource generation:
 - End-turn advancement readies the next active player's board objects for the
   next turn's Awaken state.
 
-The MVP does not yet implement non-Rune Add abilities, resource reactions while
-paying a cost, universal/rainbow Power, player-selected multi-rune payment
-ordering, or generated resources from card text other than the supported basic
-Rune abilities.
+The complete rune-pool target intentionally diverges from official Rune Deck
+recycle ordering: whenever 2 or more Runes are recycled simultaneously, those
+Runes are placed on the bottom of the Rune Deck in seeded random order. This
+differs from the official rule that the owner chooses simultaneous Rune Deck
+order. This divergence is accepted for Hextech automation.
+
+The MVP does not yet implement non-Rune Add abilities, universal/rainbow Power,
+or generated resources from card text other than the supported basic Rune
+abilities. Add-Reaction opportunities during payment are intentionally out of
+scope; payment is resolved from the player intent and the current canonical
+state, not through an interactive payment window.
 
 ### Card Cost Payment MVP
 
@@ -418,6 +425,126 @@ Unsupported MVP payment behavior rejects before state mutation:
 - Spell and Gear play.
 - Card text with immediate "when you play" or "enter ready" behavior.
 - Playing cards during showdown.
+
+### Complete Rune Pool And Payment Target
+
+This target replaces the temporary MVP payment model. Future implementation
+should remove or refactor the current flat `PaymentPlan` and narrow auto-payment
+logic rather than layering the complete system on top of it.
+
+The complete implementation should be split into three subsystems:
+
+- Rune Pool subsystem: stores, adds, spends, and clears Energy and Power.
+- Cost subsystem: computes payable costs from card metadata, current object
+  state, chosen optional costs, overrides, cost increases, and discounts.
+- Payment subsystem: validates and applies the chosen payment plan atomically.
+
+Power costs are represented as requirements that can be satisfied by one or more
+Power domains:
+
+```ts
+type PowerRequirement = {
+  amount: number;
+  payableBy: "any" | Domain[];
+};
+```
+
+Examples:
+
+- `Singularity`: 2 Mind Power.
+- `Defiant Dance`: 1 Power payable by Calm or Chaos.
+- Deflect 1: 1 Power payable by any domain.
+- Rainbow Power in the rune pool can pay any Power requirement.
+
+Automatic payment rules:
+
+- Spend matching domain-specific rune-pool Power before Rainbow Power.
+- Spend Rainbow Power last.
+- For multi-domain Power requirements, spend domains in the card metadata domain
+  order.
+- Spend rune-pool Energy before exhausting ready Runes.
+- Exhaust ready Runes in deterministic board order for missing Energy.
+- Recycle matching Runes in deterministic board order for missing Power.
+- Any simultaneous recycle of 2 or more Runes places those Runes on the bottom
+  of the Rune Deck in seeded random order and logs the random operation. This
+  intentional simulator rule applies beyond auto-payment and diverges from the
+  official owner-chosen Rune Deck order rule.
+- Do not choose optional costs automatically.
+- Do not choose non-resource costs automatically unless a selected payment mode
+  requires them and there is only one legal way to pay them.
+
+Optional payment modes are selected before payment validation. The payment
+system does not ask strategic questions; it validates the selected payment mode
+and applies costs. Viewer-safe projections expose legal available actions and
+payment modes for the current game state so the client can present choices such
+as:
+
+- Pay regular card cost.
+- Pay Accelerate.
+- Pay Repeat once.
+- Pay Hidden alternative cost.
+- Pay other optional additional costs exposed by card text.
+
+When a card can be played in multiple modes, projection should expose legal
+payment options to the client. For example, `Bellows Breath` should offer
+regular play and play-with-Repeat when both are legal. Repeat can be paid at
+most once. The player chooses the intended mode, then the payment system
+validates and applies that mode's costs.
+
+Payment plan shape must support all cost categories:
+
+```ts
+type PaymentPlan = {
+  selectedModeId: string;
+  resourceCosts: {
+    energy: number;
+    power: PowerRequirement[];
+  };
+  resourcePayments: Array<
+    | { type: "spendEnergy"; amount: number }
+    | { type: "spendPower"; domain: Domain | "Rainbow"; amount: number }
+    | { type: "exhaustRuneForEnergy"; cardInstanceId: string }
+    | { type: "recycleRuneForPower"; cardInstanceId: string; producedDomain: Domain | "Rainbow" }
+  >;
+  nonResourceCosts: NonResourceCostPayment[];
+  optionalCostsChosen: string[];
+  costModifiersApplied: string[];
+};
+```
+
+Cost overrides and modifiers:
+
+- Card metadata is only the printed/base blueprint.
+- Runtime game objects may have modified Energy Cost, Power Cost, domains, or
+  text-derived additional costs.
+- Runtime cost modifiers are stored in canonical game state as computed
+  temporary modifiers. The game state must be aware of active cost changes
+  rather than relying only on card metadata.
+- Ignore-cost effects, discounts, increases, Deflect, Repeat, Accelerate, and
+  similar rules must be applied by the Cost subsystem before payment validation.
+- Energy and Power costs cannot be reduced below zero.
+
+Non-resource cost ordering:
+
+- The player intent supplies cost order only when order can affect legality or
+  outcome.
+- Otherwise the engine applies non-resource costs in a canonical order.
+
+Deflect behavior:
+
+- Deflect imposed by a spell being played is a mandatory additional Power cost.
+  If the player cannot pay it, the spell cannot be played.
+- If an activated or triggered ability would choose a Deflect object and the
+  rules allow the player to decline or cancel that choice, the player may opt
+  out before payment is applied.
+
+Cancellation:
+
+- A no-choice payment attempt either succeeds atomically or rejects with no state
+  change.
+- Cancellation exists only before payment is applied, when the player is
+  selecting among modes, optional costs, targets, or other choices.
+- Add-Reaction payment windows are intentionally not implemented.
 
 ## Showdown MVP
 
