@@ -232,7 +232,7 @@ export type AddRuneResourceInput = {
   now?: string;
 };
 
-export type PaymentPlan = {
+export type AutomaticPaymentPlan = {
   energyCost: number;
   powerCost: number;
   powerDomains: string[];
@@ -251,7 +251,7 @@ export type PlayCardInput = {
 
 export type PlayCardResult = {
   game: Game;
-  payment: PaymentPlan;
+  payment: AutomaticPaymentPlan;
 };
 
 export type PassPriorityInput = {
@@ -1569,7 +1569,7 @@ function buildAutomaticPaymentPlan(
     powerDomains: string[];
   },
   cardsByInstanceId: CardLookup
-): PaymentPlan {
+): AutomaticPaymentPlan {
   const player = game.canonicalState.players[playerId]!;
   let remainingEnergy = cost.energy;
   let remainingPower = cost.power;
@@ -1654,7 +1654,7 @@ function buildAutomaticPaymentPlan(
 function applyPaymentPlan(
   game: Game,
   playerId: string,
-  payment: PaymentPlan,
+  payment: AutomaticPaymentPlan,
   cardsByInstanceId: CardLookup,
   now?: string
 ): Game {

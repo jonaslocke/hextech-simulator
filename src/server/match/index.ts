@@ -7,6 +7,7 @@ import {
 
 export * from "./game";
 export * from "./intent-service";
+export * from "./payment";
 export * from "./projections";
 export * from "./setup-service";
 export * from "./tokens";
