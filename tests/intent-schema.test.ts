@@ -160,10 +160,11 @@ test("validates core gameplay intent payloads", () => {
       type: "game.playCard",
       payload: {
         cardInstanceId: "card-1",
+        selectedModeId: "regular",
         destination: "base"
       }
-    }).payload.destination,
-    "base"
+    }).payload.selectedModeId,
+    "regular"
   );
   assert.equal(
     passPriorityIntentSchema.parse({

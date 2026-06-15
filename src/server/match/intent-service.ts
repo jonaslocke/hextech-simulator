@@ -389,6 +389,7 @@ function applyIntent(
           {
             actorPlayerId,
             cardInstanceId: intent.payload.cardInstanceId,
+            selectedModeId: intent.payload.selectedModeId,
             destination: intent.payload.destination,
             now
           },

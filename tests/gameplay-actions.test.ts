@@ -429,6 +429,43 @@ test("playCard rejects unsupported immediate play behavior", () => {
   );
 });
 
+test("playCard rejects unsupported payment modes", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-unit-hand-1"]
+          }
+        }
+      }
+    }
+  });
+
+  assert.throws(
+    () =>
+      playCard(
+        game,
+        {
+          actorPlayerId: "player-a",
+          cardInstanceId: "a-unit-hand-1",
+          selectedModeId: "repeat"
+        },
+        cardLookup
+      ),
+    /Unsupported payment mode/
+  );
+  assert.deepEqual(game.canonicalState.players["player-a"]?.zones.hand, [
+    "a-unit-hand-1"
+  ]);
+});
+
 test("recycle puts one main deck card on bottom without RNG", () => {
   const game = createInProgressGame();
 

@@ -68,6 +68,7 @@ export const playCardIntentSchema = z.object({
   type: z.literal("game.playCard"),
   payload: z.object({
     cardInstanceId: z.string().min(1),
+    selectedModeId: z.string().min(1).optional(),
     destination: z.literal("base").optional()
   })
 });

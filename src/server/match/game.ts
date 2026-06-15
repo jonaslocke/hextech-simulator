@@ -245,6 +245,7 @@ export type AddRuneResourceInput = {
 export type PlayCardInput = {
   actorPlayerId: string;
   cardInstanceId: string;
+  selectedModeId?: string;
   destination?: "base";
   now?: string;
 };
@@ -1052,6 +1053,12 @@ export function playCard(
     throw new Error("Only playing units to base is supported.");
   }
 
+  const selectedModeId = input.selectedModeId ?? "regular";
+
+  if (selectedModeId !== "regular") {
+    throw new Error("Unsupported payment mode.");
+  }
+
   const player = game.canonicalState.players[input.actorPlayerId]!;
   const sourceZone = player.zones.hand.includes(input.cardInstanceId)
     ? "hand"
@@ -1075,7 +1082,8 @@ export function playCard(
     game,
     input.actorPlayerId,
     readCardCost(card),
-    cardsByInstanceId
+    cardsByInstanceId,
+    selectedModeId
   );
   const paidResult = applyPaymentPlan(
     game,
@@ -1620,7 +1628,8 @@ function buildAutomaticPaymentPlan(
     energy: number;
     power: PowerRequirement[];
   },
-  cardsByInstanceId: CardLookup
+  cardsByInstanceId: CardLookup,
+  selectedModeId = "regular"
 ): PaymentPlan {
   const player = game.canonicalState.players[playerId]!;
   let remainingEnergy = cost.energy;
@@ -1700,7 +1709,7 @@ function buildAutomaticPaymentPlan(
   }
 
   return {
-    selectedModeId: "regular",
+    selectedModeId,
     resourceCosts: cost,
     resourcePayments,
     nonResourceCosts: [],
