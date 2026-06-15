@@ -29,6 +29,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   chainCardInstanceIds = [],
   cardsByInstanceId,
   logEntries = [],
+  onPlayCard,
   playerNames = {},
   projection,
   scores = {},
@@ -43,6 +44,21 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const viewerState = projection.players[projection.viewerPlayerId];
+
+  const handlePlayCardFromHand = (card: Card) => {
+    if (!card.instanceId || !onPlayCard || !viewerState) {
+      return;
+    }
+
+    const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+
+    onPlayCard({
+      canPlay: modes.length > 0,
+      cardInstanceId: card.instanceId,
+      selectedModeId: modes[0]?.id,
+    });
+  };
 
   return (
     <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
@@ -92,7 +108,10 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerTrash={board.player.zones.trash}
       />
 
-      <PlayerHandFan cards={board.player.zones.hand.cards} />
+      <PlayerHandFan
+        cards={board.player.zones.hand.cards}
+        onPlayCard={handlePlayCardFromHand}
+      />
     </main>
   );
 };

@@ -41,11 +41,6 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
     setExpanded(true);
   };
   const selectCardAtIndex = (index: number) => {
-    if (!expanded) {
-      expandHand();
-      return;
-    }
-
     onPlayCard?.(cards[index]!);
   };
 

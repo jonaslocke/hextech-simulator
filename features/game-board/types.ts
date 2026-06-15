@@ -26,6 +26,11 @@ export type GameBoardProps = {
   chainCardInstanceIds?: string[];
   cardsByInstanceId: Record<string, CatalogCard>;
   logEntries?: GameLogEntry[];
+  onPlayCard?: (input: {
+    canPlay: boolean;
+    cardInstanceId: string;
+    selectedModeId?: string;
+  }) => void;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;

@@ -287,6 +287,29 @@ export default function Home() {
 
   const viewer = match.players[viewerSeat];
   const projection = match.projections[viewer.playerId];
+  const playCardFromHand = ({
+    canPlay,
+    cardInstanceId,
+    selectedModeId
+  }: {
+    canPlay: boolean;
+    cardInstanceId: string;
+    selectedModeId?: string;
+  }) => {
+    if (!canPlay) {
+      setError("This card is not currently playable.");
+      return;
+    }
+
+    void submitIntent({
+      type: "game.playCard",
+      payload: {
+        cardInstanceId,
+        selectedModeId,
+        destination: "base"
+      }
+    });
+  };
 
   return (
     <main className="relative min-h-screen bg-slate-950">
@@ -323,6 +346,7 @@ export default function Home() {
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
+        onPlayCard={playCardFromHand}
         projection={projection}
       />
     </main>
