@@ -134,6 +134,7 @@ implemented, tested, and documented where relevant.
 ## 11. Basic Board UI
 
 - [x] Build app shell with game board route.
+- [ ] Replace static fixture-only home page with fixed Annie/Lux deck selection.
 - [x] Add opponent area.
 - [x] Add shared battlefield area.
 - [x] Add player base/board area.
@@ -231,6 +232,8 @@ implemented, tested, and documented where relevant.
 
 ## 14. Showdown Shell
 
+- [x] Keep showdown engine shell available for tests and later integration.
+- [ ] Defer player-facing showdown UI and full showdown play flow until after the non-showdown playable MVP.
 - [x] Detect supported movement into empty battlefield.
 - [x] Enter showdown state.
 - [x] Establish relevant players.
@@ -243,6 +246,7 @@ implemented, tested, and documented where relevant.
 
 ## 15. First End-To-End Acceptance
 
+- [ ] Replace the first playable acceptance path with a no-upload Annie/Lux deck-selection path that does not require player-facing mulligan or showdown.
 - [x] Validate Annie and Lux decks.
 - [x] Create best-of-3 match.
 - [x] Select and reveal battlefields.
@@ -260,6 +264,19 @@ implemented, tested, and documented where relevant.
 - [x] Close showdown.
 - [x] Confirm game-log audit trail for the scenario.
 - [x] Confirm both player projections preserve hidden information.
+
+## 15A. No-Upload Playable MVP Path
+
+- [ ] Expose only fixed deck choices: Annie and Lux.
+- [ ] Create a persisted match from selected fixed decks.
+- [ ] Auto-complete non-player-facing setup steps required to start the game, including zero-card keep for mulligan until mulligan UI is implemented.
+- [ ] Return both player tokens for local/manual testing.
+- [ ] Return viewer-safe projections and game-log entries from match creation.
+- [ ] Connect the UI to the match creation API.
+- [ ] Let the UI submit gameplay intents through the HTTP intent API.
+- [ ] Support visible controls for channel, draw, add Rune resources, play supported cards, pass, and end turn.
+- [ ] Keep movement-to-showdown unavailable from the default UI until showdown is brought back into scope.
+- [ ] Add an end-to-end Annie/Lux service test for setup through non-showdown gameplay.
 
 ## 16. Deferred Socket Multiplayer
 
