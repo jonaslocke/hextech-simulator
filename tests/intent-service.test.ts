@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type {
   DocumentRepository,
+  DeckSnapshotDocument,
   GameDocument,
   GameEventDocument,
   GameEventRepository,
@@ -185,6 +186,180 @@ test("intent service reveals battlefields after both players lock", async () => 
       type: "setup.revealBattlefieldChoices"
     }
   });
+});
+
+test("intent service auto-completes setup after battlefield reveal when starting player is chosen", async () => {
+  const playerALegend = "a-legend";
+  const playerAChampion = "a-champion";
+  const playerBLegend = "b-legend";
+  const playerBChampion = "b-champion";
+  const lockedByPlayerA = lockBattlefieldChoice(
+    gameSchema.parse({
+      ...createGame({
+        id: "game-1",
+        matchId: "match-1",
+        gameNumber: 1,
+        playerIds: ["player-a", "player-b"],
+        rngSeed: "auto-start-seed",
+        battlefieldCardInstanceIdsByPlayer: {
+          "player-a": ["battlefield-a"],
+          "player-b": ["battlefield-b"]
+        },
+        mainDeckCardInstanceIdsByPlayer: {
+          "player-a": ["a-main-1", "a-main-2", "a-main-3", "a-main-4", "a-main-5"],
+          "player-b": ["b-main-1", "b-main-2", "b-main-3", "b-main-4", "b-main-5"]
+        },
+        runeDeckCardInstanceIdsByPlayer: {
+          "player-a": ["a-rune-1", "a-rune-2"],
+          "player-b": ["b-rune-1", "b-rune-2"]
+        }
+      }),
+      canonicalState: {
+        ...createGame({
+          id: "game-1",
+          matchId: "match-1",
+          gameNumber: 1,
+          playerIds: ["player-a", "player-b"]
+        }).canonicalState,
+        rng: createGame({
+          id: "game-1",
+          matchId: "match-1",
+          gameNumber: 1,
+          playerIds: ["player-a", "player-b"],
+          rngSeed: "auto-start-seed"
+        }).canonicalState.rng,
+        setup: {
+          ...createGame({
+            id: "game-1",
+            matchId: "match-1",
+            gameNumber: 1,
+            playerIds: ["player-a", "player-b"]
+          }).canonicalState.setup,
+          startingPlayerChooserId: "player-a",
+          startingPlayerId: "player-a",
+          battlefieldPools: {
+            "player-a": {
+              playerId: "player-a",
+              registeredCardInstanceIds: ["battlefield-a"],
+              usedCardInstanceIds: []
+            },
+            "player-b": {
+              playerId: "player-b",
+              registeredCardInstanceIds: ["battlefield-b"],
+              usedCardInstanceIds: []
+            }
+          }
+        },
+        players: {
+          "player-a": {
+            playerId: "player-a",
+            runePool: {
+              energy: 0,
+              power: {}
+            },
+            zones: {
+              legend: null,
+              champion: null,
+              mainDeck: ["a-main-1", "a-main-2", "a-main-3", "a-main-4", "a-main-5"],
+              runeDeck: ["a-rune-1", "a-rune-2"],
+              hand: [],
+              trash: [],
+              banishment: [],
+              base: []
+            }
+          },
+          "player-b": {
+            playerId: "player-b",
+            runePool: {
+              energy: 0,
+              power: {}
+            },
+            zones: {
+              legend: null,
+              champion: null,
+              mainDeck: ["b-main-1", "b-main-2", "b-main-3", "b-main-4", "b-main-5"],
+              runeDeck: ["b-rune-1", "b-rune-2"],
+              hand: [],
+              trash: [],
+              banishment: [],
+              base: []
+            }
+          }
+        }
+      }
+    }),
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "battlefield-a",
+      now: "2026-06-14T04:00:00.000Z"
+    }
+  );
+  const { repositories } = createIntentFixture({
+    game: lockedByPlayerA,
+    deckSnapshots: [
+      createDeckSnapshotDocument("deck-a", "player-a", playerALegend, playerAChampion),
+      createDeckSnapshotDocument("deck-b", "player-b", playerBLegend, playerBChampion)
+    ]
+  });
+
+  const result = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-b",
+      stateVersion: lockedByPlayerA.stateVersion,
+      intent: {
+        type: "setup.lockBattlefieldChoice",
+        payload: {
+          cardInstanceId: "battlefield-b"
+        }
+      }
+    },
+    {
+      now: () => "2026-06-14T05:00:00.000Z"
+    }
+  );
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.equal(result.game.status, "in_progress");
+  assert.equal(result.game.canonicalState.turn?.activePlayerId, "player-a");
+  assert.equal(
+    result.game.canonicalState.players["player-a"]?.zones.legend,
+    playerALegend
+  );
+  assert.equal(
+    result.game.canonicalState.players["player-b"]?.zones.champion,
+    playerBChampion
+  );
+  assert.equal(result.game.canonicalState.players["player-a"]?.zones.hand.length, 4);
+  assert.equal(result.game.canonicalState.players["player-b"]?.zones.hand.length, 4);
+  assert.equal(
+    result.game.canonicalState.setup.mulliganChoices["player-a"]?.status,
+    "locked"
+  );
+  assert.deepEqual(
+    result.events
+      .filter((event) => event.type === gameEventTypes.serverDecision)
+      .map((event) => (event.payload as { decision: { type: string } }).decision.type),
+    [
+      "setup.revealBattlefieldChoices",
+      "setup.placeStartingObjects",
+      "setup.drawOpeningHands",
+      "setup.autoKeepOpeningHands",
+      "game.start"
+    ]
+  );
+  assert.equal(
+    result.events.filter((event) => event.type === gameEventTypes.rngOperation)
+      .length,
+    4
+  );
 });
 
 test("intent service rejects unsupported intents without mutation", async () => {
@@ -561,7 +736,13 @@ test("intent service rejects action or reaction play during showdown as unsuppor
   assert.deepEqual(await repositories.gameEvents.findByGameId("game-1"), []);
 });
 
-function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
+function createIntentFixture(
+  input: {
+    deckSnapshots?: DeckSnapshotDocument[];
+    game?: Game;
+    match?: Match;
+  } = {}
+) {
   const game =
     input.game ??
     createGame({
@@ -576,18 +757,24 @@ function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
       ...createBestOfThreeMatch({
         id: "match-1",
         playerSeats: [
-          {
-            playerId: "player-a",
-            seat: "player-1",
-            tokenHash: hashPlayerToken("token-a")
-          },
-          {
-            playerId: "player-b",
-            seat: "player-2",
-            tokenHash: hashPlayerToken("token-b")
-          }
-        ]
-      }),
+        {
+          playerId: "player-a",
+          seat: "player-1",
+          tokenHash: hashPlayerToken("token-a"),
+          deckSnapshotId: input.deckSnapshots?.find(
+            (document) => document.playerId === "player-a"
+          )?.id
+        },
+        {
+          playerId: "player-b",
+          seat: "player-2",
+          tokenHash: hashPlayerToken("token-b"),
+          deckSnapshotId: input.deckSnapshots?.find(
+            (document) => document.playerId === "player-b"
+          )?.id
+        }
+      ]
+    }),
       currentGameId: game.id,
       gameIds: [game.id]
     });
@@ -595,6 +782,22 @@ function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
   const games = new Map<string, GameDocument>([[game.id, game]]);
   const matches = new Map<string, MatchDocument>([[match.id, match]]);
   const events: GameEventDocument[] = [];
+  const deckSnapshots = new Map<string, DeckSnapshotDocument>(
+    input.deckSnapshots?.map((document) => [document.id, document]) ?? []
+  );
+  const deckSnapshotRepository: DocumentRepository<DeckSnapshotDocument> = {
+    async findById(id) {
+      return deckSnapshots.get(id) ?? null;
+    },
+
+    async insert(document) {
+      deckSnapshots.set(document.id, document);
+    },
+
+    async upsert(document) {
+      deckSnapshots.set(document.id, document);
+    }
+  };
 
   const gameRepository: DocumentRepository<GameDocument> = {
     async findById(id) {
@@ -663,10 +866,75 @@ function createIntentFixture(input: { game?: Game; match?: Match } = {}) {
     game,
     match,
     repositories: {
+      deckSnapshots: deckSnapshotRepository,
       games: gameRepository,
       matches: matchRepository,
       gameEvents: eventRepository
     }
+  };
+}
+
+function createDeckSnapshotDocument(
+  id: string,
+  playerId: string,
+  legendInstanceId: string,
+  championInstanceId: string
+): DeckSnapshotDocument {
+  const legend = createResolvedDeckEntry(legendInstanceId, "Legend");
+  const champion = createResolvedDeckEntry(championInstanceId, "Unit", 1);
+
+  return {
+    id,
+    createdAt: "2026-06-14T04:00:00.000Z",
+    updatedAt: "2026-06-14T04:00:00.000Z",
+    matchId: "match-1",
+    playerId,
+    catalogVersionHash: "test-catalog",
+    sourceText: "",
+    snapshot: {
+      catalogVersionHash: "test-catalog",
+      sourceText: "",
+      legend,
+      champion,
+      mainDeck: [],
+      runes: [],
+      battlefields: [],
+      sideboard: [],
+      instances: [
+        {
+          instanceId: legendInstanceId,
+          ownerId: playerId,
+          source: "legend",
+          card: legend.card
+        },
+        {
+          instanceId: championInstanceId,
+          ownerId: playerId,
+          source: "champion",
+          card: champion.card
+        }
+      ]
+    }
+  };
+}
+
+function createResolvedDeckEntry(
+  name: string,
+  type: Card["classification"]["type"],
+  energy: number | null = null
+) {
+  return {
+    section: type === "Legend" ? "Legend" as const : "Champion" as const,
+    quantity: 1,
+    name,
+    line: 1,
+    card: createCard({
+      domain: ["Chaos"],
+      energy,
+      name,
+      power: null,
+      type
+    })
   };
 }
 

@@ -1,4 +1,9 @@
-import type { GameEventDocument, MatchDocument, Repositories } from "../db";
+import type {
+  DeckSnapshotDocument,
+  GameEventDocument,
+  MatchDocument,
+  Repositories
+} from "../db";
 import type { RandomOperation } from "../engine";
 import type { Card } from "../catalog";
 import {
@@ -29,14 +34,18 @@ import {
   chooseStartingPlayer,
   commitMulligan,
   drawCards,
+  drawOpeningHands,
   endTurn,
   lockBattlefieldChoice,
   moveUnitToBattlefield,
   passPriority,
   passShowdown,
+  placeStartingObjects,
   playCard,
   recycleCards,
   revealBattlefieldChoices,
+  shuffleMainDecks,
+  shuffleRuneDecks,
   startGame,
   type CardLookup,
   type Game
@@ -125,7 +134,7 @@ export async function handleMatchIntent(
   const cardsByInstanceId =
     options.cardsByInstanceId ??
     (await loadCardsByInstanceIdForMatch(repositories, match));
-  const transition = applyIntent(
+  let transition = applyIntent(
     game,
     seat.playerId,
     payload,
@@ -135,6 +144,21 @@ export async function handleMatchIntent(
 
   if (!transition.accepted) {
     return transition;
+  }
+
+  try {
+    transition = await completeSetupIfReady(
+      repositories,
+      match,
+      transition,
+      now
+    );
+  } catch (error) {
+    return reject(
+      "illegal_intent",
+      error instanceof Error ? error.message : "Setup could not be completed.",
+      payload.intent.type
+    );
   }
 
   const existingEvents = await repositories.gameEvents.findByGameId(game.id);
@@ -212,6 +236,8 @@ type AppliedIntentResult =
       randomOperations: RandomOperation[];
     }
   | IntentServiceRejectedResult;
+
+type AcceptedAppliedIntentResult = Extract<AppliedIntentResult, { accepted: true }>;
 
 function applyIntent(
   game: Game,
@@ -526,6 +552,90 @@ function applyIntent(
   }
 }
 
+async function completeSetupIfReady(
+  repositories: Pick<Repositories, "matches" | "games" | "gameEvents"> &
+    Partial<Pick<Repositories, "deckSnapshots">>,
+  match: MatchDocument,
+  transition: AcceptedAppliedIntentResult,
+  now: string
+): Promise<AcceptedAppliedIntentResult> {
+  const game = transition.game;
+
+  if (!repositories.deckSnapshots || game.status !== "setup_pending") {
+    return transition;
+  }
+
+  if (game.canonicalState.setup.startingPlayerId === null) {
+    return transition;
+  }
+
+  if (game.canonicalState.battlefields.length > 0) {
+    return transition;
+  }
+
+  const choices = game.canonicalState.setup.battlefieldChoices;
+  const allBattlefieldsRevealed = game.canonicalState.setup.playerIds.every(
+    (playerId) => choices[playerId]?.status === "revealed"
+  );
+
+  if (!allBattlefieldsRevealed) {
+    return transition;
+  }
+
+  const deckSnapshotsByPlayer = await loadDeckSnapshotsByPlayer(
+    repositories,
+    match
+  );
+  const mainDeckShuffle = shuffleMainDecks(game, now);
+  const runeDeckShuffle = shuffleRuneDecks(mainDeckShuffle.game, now);
+  const placedGame = placeStartingObjects(runeDeckShuffle.game, {
+    now,
+    legendCardInstanceIdsByPlayer: findStartingInstanceIdsByPlayer(
+      deckSnapshotsByPlayer,
+      "legend"
+    ),
+    championCardInstanceIdsByPlayer: findStartingInstanceIdsByPlayer(
+      deckSnapshotsByPlayer,
+      "champion"
+    )
+  });
+  const openedGame = drawOpeningHands(placedGame, now);
+  const autoKeptGame = game.canonicalState.setup.playerIds.reduce(
+    (currentGame, playerId) =>
+      commitMulligan(currentGame, {
+        actorPlayerId: playerId,
+        selectedCardInstanceIds: [],
+        now
+      }),
+    openedGame
+  );
+
+  return {
+    accepted: true,
+    game: startGame(autoKeptGame, { now }),
+    serverDecisions: [
+      ...transition.serverDecisions,
+      {
+        type: "setup.placeStartingObjects"
+      },
+      {
+        type: "setup.drawOpeningHands"
+      },
+      {
+        type: "setup.autoKeepOpeningHands"
+      },
+      {
+        type: "game.start"
+      }
+    ],
+    randomOperations: [
+      ...transition.randomOperations,
+      ...mainDeckShuffle.randomOperations,
+      ...runeDeckShuffle.randomOperations
+    ]
+  };
+}
+
 function reject(
   code: string,
   message: string,
@@ -565,6 +675,54 @@ async function loadCardsByInstanceIdForMatch(
       ]) ?? []
     )
   ) satisfies Record<string, Card>;
+}
+
+async function loadDeckSnapshotsByPlayer(
+  repositories: Partial<Pick<Repositories, "deckSnapshots">>,
+  match: MatchDocument
+): Promise<Record<string, DeckSnapshotDocument>> {
+  if (!repositories.deckSnapshots) {
+    throw new Error("Deck snapshot repository is required.");
+  }
+
+  const pairs = await Promise.all(
+    match.playerSeats.map(async (seat) => {
+      if (!seat.deckSnapshotId) {
+        throw new Error(`Player ${seat.playerId} does not have a deck snapshot.`);
+      }
+
+      const document = await repositories.deckSnapshots!.findById(
+        seat.deckSnapshotId
+      );
+
+      if (!document) {
+        throw new Error(`Deck snapshot not found for player ${seat.playerId}.`);
+      }
+
+      return [seat.playerId, document] as const;
+    })
+  );
+
+  return Object.fromEntries(pairs);
+}
+
+function findStartingInstanceIdsByPlayer(
+  deckSnapshotsByPlayer: Record<string, DeckSnapshotDocument>,
+  source: "legend" | "champion"
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(deckSnapshotsByPlayer).map(([playerId, document]) => {
+      const instanceId = document.snapshot.instances.find(
+        (instance) => instance.source === source
+      )?.instanceId;
+
+      if (!instanceId) {
+        throw new Error(`Deck snapshot for ${playerId} is missing ${source}.`);
+      }
+
+      return [playerId, instanceId];
+    })
+  );
 }
 
 function createEventId(

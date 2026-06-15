@@ -12,15 +12,9 @@ import {
   matchSchema,
   type Match
 } from ".";
-import {
-  assignGameOneStartingPlayerChooserWithEvents,
-  shuffleMainDecksWithEvents,
-  shuffleRuneDecksWithEvents
-} from "./setup-service";
+import { assignGameOneStartingPlayerChooserWithEvents } from "./setup-service";
 import {
   createGame,
-  drawOpeningHands,
-  placeStartingObjects,
   type CardLookup,
   type Game
 } from "./game";
@@ -147,39 +141,6 @@ export async function runAnnieLuxFirstShowdownAcceptance(
     type: "setup.lockBattlefieldChoice",
     payload: {
       cardInstanceId: findFirstInstanceId(luxSnapshot, "battlefield")
-    }
-  });
-
-  await shuffleMainDecksWithEvents(repositories, gameId, now);
-  await shuffleRuneDecksWithEvents(repositories, gameId, now);
-  await persistDirectSetupGame(
-    repositories,
-    drawOpeningHands(
-      placeStartingObjects(await requirePersistedGame(repositories, gameId), {
-        now,
-        legendCardInstanceIdsByPlayer: {
-          [anniePlayerId]: findFirstInstanceId(annieSnapshot, "legend"),
-          [luxPlayerId]: findFirstInstanceId(luxSnapshot, "legend")
-        },
-        championCardInstanceIdsByPlayer: {
-          [anniePlayerId]: findFirstInstanceId(annieSnapshot, "champion"),
-          [luxPlayerId]: findFirstInstanceId(luxSnapshot, "champion")
-        }
-      }),
-      now
-    )
-  );
-
-  await submitIntent(repositories, matchId, gameId, annieToken, {
-    type: "setup.commitMulligan",
-    payload: {
-      selectedCardInstanceIds: []
-    }
-  });
-  await submitIntent(repositories, matchId, gameId, luxToken, {
-    type: "setup.commitMulligan",
-    payload: {
-      selectedCardInstanceIds: []
     }
   });
 
@@ -373,10 +334,6 @@ function createCardsByInstanceId(
       snapshot.instances.map((instance) => [instance.instanceId, instance.card])
     )
   );
-}
-
-async function persistDirectSetupGame(repositories: Repositories, game: Game) {
-  await repositories.games.upsert(game);
 }
 
 async function requirePersistedGame(

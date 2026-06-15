@@ -205,6 +205,12 @@ function renderServerDecisionMessage(event: GameEventDocument): string {
   switch (payload.decision?.type) {
     case "setup.revealBattlefieldChoices":
       return "Server revealed battlefield choices.";
+    case "setup.placeStartingObjects":
+      return "Server placed starting objects.";
+    case "setup.drawOpeningHands":
+      return "Server drew opening hands.";
+    case "setup.autoKeepOpeningHands":
+      return "Server kept opening hands.";
     case "game.start":
       return "Server started the game.";
     case "game.payCosts":

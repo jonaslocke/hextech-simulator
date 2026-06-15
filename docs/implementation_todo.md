@@ -269,7 +269,7 @@ implemented, tested, and documented where relevant.
 
 - [x] Expose only fixed deck choices: Annie and Lux.
 - [x] Create a persisted match from selected fixed decks.
-- [ ] Auto-complete non-player-facing setup steps required to start the game, including zero-card keep for mulligan until mulligan UI is implemented.
+- [x] Auto-complete non-player-facing setup steps required to start the game, including zero-card keep for mulligan until mulligan UI is implemented.
 - [x] Return both player tokens for local/manual testing.
 - [x] Return viewer-safe projections and game-log entries from match creation.
 - [x] Connect the UI to the match creation API.
