@@ -71,23 +71,23 @@ export const BattlefieldBoard: FC<Props> = ({
       />
       <div className="relative grid grid-rows-2 p-2">
         <div className="top-1 left-2 z-99 absolute flex items-center bg-black/50 text-[10px] uppercase">
-          <span className="px-1 py-0.5">{name}</span>
+          <span className="px-1 py-0.5 font-mono">{name}</span>
           <button
             type="button"
             aria-expanded={isBattlefieldCardOpen}
             aria-label={`Show ${name} battlefield card`}
-            className="flex justify-center items-center border-white/15 border-l w-5 h-5 text-white/80 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-yellow-300"
+            className="flex justify-center items-center border-white/15 border-l focus-visible:outline focus-visible:outline-yellow-300 w-5 h-5 text-white/80 hover:text-white"
             onClick={() => setIsBattlefieldCardOpen((isOpen) => !isOpen)}
           >
             <Info aria-hidden="true" className="size-3" />
           </button>
         </div>
         {isBattlefieldCardOpen && (
-          <div className="top-8 left-2 z-[120] absolute rounded-md bg-slate-950/95 p-1 shadow-2xl ring-1 ring-white/15">
+          <div className="top-8 left-2 z-120 absolute bg-slate-950/95 shadow-2xl p-1 rounded-md ring-1 ring-white/15">
             {/* eslint-disable-next-line @next/next/no-img-element -- Battlefield art comes from the catalog. */}
             <img
               alt={name}
-              className="block rounded-md w-72 max-w-[min(18rem,calc(50vw-2rem))] aspect-[1038/744] object-contain"
+              className="block rounded-md w-72 max-w-[min(18rem,calc(50vw-2rem))] object-contain aspect-1038/744"
               src={img}
             />
           </div>

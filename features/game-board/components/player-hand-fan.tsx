@@ -3,7 +3,6 @@
 import {
   CSSProperties,
   KeyboardEvent,
-  PointerEvent,
   useRef,
   useState,
 } from "react";
@@ -41,17 +40,6 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
     clearTuckTimeout();
     setExpanded(true);
   };
-  const getIndexFromPointer = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left;
-    const layout = handLayout({ expanded, total: cards.length });
-    const middle = (cards.length - 1) / 2;
-    const fanCenterX = rect.width / 2;
-    const firstCardCenterX = fanCenterX - middle * layout.spacing;
-    const rawIndex = Math.round((pointerX - firstCardCenterX) / layout.spacing);
-
-    return clamp(rawIndex, 0, cards.length - 1);
-  };
   const selectCardAtIndex = (index: number) => {
     if (!expanded) {
       expandHand();
@@ -80,30 +68,29 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
           event.preventDefault();
           selectCardAtIndex(hoveredIndex ?? 0);
         }}
-        onPointerDown={(event) => {
-          clearTuckTimeout();
-          const index = getIndexFromPointer(event);
-
-          setHoveredIndex(index);
-          selectCardAtIndex(index);
-        }}
         onPointerLeave={scheduleTuck}
-        onPointerMove={(event) => {
-          clearTuckTimeout();
-          setHoveredIndex(getIndexFromPointer(event));
-        }}
         role="button"
         tabIndex={0}
       >
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0">
           {cards.map((card, index) => {
             const hovered = hoveredIndex === index;
 
             return (
               <div
-                aria-hidden="true"
                 className="bottom-0 left-1/2 absolute transition-transform duration-200 ease-out"
                 key={card.instanceId ?? `${card.name}-${index}`}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  clearTuckTimeout();
+                  setHoveredIndex(index);
+                  selectCardAtIndex(index);
+                }}
+                onPointerEnter={() => {
+                  clearTuckTimeout();
+                  setHoveredIndex(index);
+                  expandHand();
+                }}
                 style={handCardStyle({
                   expanded,
                   hovered,
@@ -111,7 +98,12 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
                   total: cards.length,
                 })}
               >
-                <CardTile {...card} />
+                <CardTile
+                  enableHoverPreview
+                  focusablePreview={false}
+                  showMight={false}
+                  {...card}
+                />
               </div>
             );
           })}
@@ -119,10 +111,6 @@ export function PlayerHandFan({ cards, onPlayCard }: PlayerHandFanProps) {
       </div>
     </div>
   );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function handCardStyle({

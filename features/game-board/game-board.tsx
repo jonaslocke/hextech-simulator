@@ -72,6 +72,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             onOpenTrash={() => setOpenZone("playerTrash")}
             player={board.player}
           />
+          {/* this gives enough space to card hand fan do not get in the way of hover and clicking on runes */}
+          <div className="h-16" />
         </div>
         <ActionRail openZone={openZone} setOpenZone={setOpenZone} />
       </section>
@@ -85,6 +87,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerBanishment={board.player.zones.banishment}
         playerTrash={board.player.zones.trash}
       />
+
       <PlayerHandFan cards={board.player.zones.hand.cards} />
     </main>
   );
@@ -111,19 +114,19 @@ function createBoardModel({
   }
 
   const player = buildPlayerData({
-      cardsByInstanceId,
-      player: projection.players[viewerPlayerId],
-      playerNames,
-      projection,
-      scores,
-    });
+    cardsByInstanceId,
+    player: projection.players[viewerPlayerId],
+    playerNames,
+    projection,
+    scores,
+  });
   const opponent = buildPlayerData({
-      cardsByInstanceId,
-      player: projection.players[opponentPlayerId],
-      playerNames,
-      projection,
-      scores,
-    });
+    cardsByInstanceId,
+    player: projection.players[opponentPlayerId],
+    playerNames,
+    projection,
+    scores,
+  });
 
   const playerBattlefieldProjection = projection.battlefields.find(
     (battlefield) => battlefield.selectedByPlayerId === viewerPlayerId,
@@ -197,14 +200,44 @@ function buildPlayerData({
     name: playerNames[player.playerId] ?? player.playerId,
     score: scores[player.playerId] ?? 0,
     zones: {
-      banishment: buildZone("banishment", player.zones.banishment, cardsByInstanceId, projection),
+      banishment: buildZone(
+        "banishment",
+        player.zones.banishment,
+        cardsByInstanceId,
+        projection,
+      ),
       base: buildZone("base", player.zones.base, cardsByInstanceId, projection),
-      champion: buildZone("champion", player.zones.champion, cardsByInstanceId, projection),
+      champion: buildZone(
+        "champion",
+        player.zones.champion,
+        cardsByInstanceId,
+        projection,
+      ),
       hand: buildZone("hand", player.zones.hand, cardsByInstanceId, projection),
-      legend: buildZone("legend", player.zones.legend, cardsByInstanceId, projection),
-      mainDeck: buildZone("mainDeck", player.zones.mainDeck, cardsByInstanceId, projection),
-      runeDeck: buildZone("runeDeck", player.zones.runeDeck, cardsByInstanceId, projection),
-      trash: buildZone("trash", player.zones.trash, cardsByInstanceId, projection),
+      legend: buildZone(
+        "legend",
+        player.zones.legend,
+        cardsByInstanceId,
+        projection,
+      ),
+      mainDeck: buildZone(
+        "mainDeck",
+        player.zones.mainDeck,
+        cardsByInstanceId,
+        projection,
+      ),
+      runeDeck: buildZone(
+        "runeDeck",
+        player.zones.runeDeck,
+        cardsByInstanceId,
+        projection,
+      ),
+      trash: buildZone(
+        "trash",
+        player.zones.trash,
+        cardsByInstanceId,
+        projection,
+      ),
     },
   };
 }
@@ -216,7 +249,9 @@ function buildZone(
   projection: GameBoardProps["projection"],
 ): ZoneData {
   const cards = zone.cardInstanceIds
-    .flatMap((cardInstanceId) => buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates))
+    .flatMap((cardInstanceId) =>
+      buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
+    )
     .filter((card) => isCardAllowedInZone(kind, card));
 
   return {
@@ -264,7 +299,8 @@ function buildBattlefieldData({
 
   return {
     id: battlefield?.battlefieldId ?? `missing:${fallbackSelectedByPlayerId}`,
-    selectedByPlayerId: battlefield?.selectedByPlayerId ?? fallbackSelectedByPlayerId,
+    selectedByPlayerId:
+      battlefield?.selectedByPlayerId ?? fallbackSelectedByPlayerId,
     name: battlefieldCard?.name ?? "Battlefield",
     description: battlefieldCard?.text.plain ?? "No battlefield selected.",
     img: battlefieldCard?.media.image_url ?? "",
@@ -290,11 +326,17 @@ function buildCard(
 
   return [
     {
+      domains: card.classification.domain,
+      energy: card.attributes.energy ?? undefined,
       img: card.media.image_url ?? "",
       instanceId: cardInstanceId,
       isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
       might: card.attributes.might ?? undefined,
       name: card.name,
+      power: card.attributes.power ?? undefined,
+      publicCode: card.public_code,
+      rulesText: card.text.plain,
+      setLabel: card.set.label,
       supertype: card.classification.supertype ?? undefined,
       type: card.classification.type,
     },
@@ -313,9 +355,13 @@ function isCardAllowedInZone(kind: ZoneKind, card: Card) {
       return card.type === "Unit";
     case "hand":
     case "mainDeck":
-      return card.type === "Gear" || card.type === "Spell" || card.type === "Unit";
+      return (
+        card.type === "Gear" || card.type === "Spell" || card.type === "Unit"
+      );
     case "base":
-      return card.type === "Rune" || card.type === "Gear" || card.type === "Unit";
+      return (
+        card.type === "Rune" || card.type === "Gear" || card.type === "Unit"
+      );
     case "banishment":
     case "trash":
       return true;

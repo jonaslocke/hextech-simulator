@@ -53,10 +53,16 @@ export interface GameScore {
 }
 
 export type Card = {
+  domains?: string[];
+  energy?: number;
   instanceId?: string;
   name: string;
   img: HTMLImageElement["src"];
   might?: number;
+  power?: number;
+  publicCode?: string;
+  rulesText?: string;
+  setLabel?: string;
   supertype?: CatalogCard["classification"]["supertype"];
   type?: CardType;
   isExhausted?: boolean;
