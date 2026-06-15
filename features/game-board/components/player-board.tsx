@@ -1,8 +1,9 @@
 import { FC } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
+import { cn } from "@/lib/utils";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
-import { ArchiveX } from "lucide-react";
+import { ArchiveX, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
@@ -44,9 +45,16 @@ const RunesLine = ({
   player: PlayerData;
 }) => {
   const baseRunes = player.zones.base.cards.filter((card) => card.type === "Rune");
+  const hasBanishment = player.zones.banishment.count > 0;
 
   return (
-    <div className="gap-2 grid grid-cols-[130px_minmax(0,1fr)_130px_64px]">
+    <div
+      className={cn(
+        "gap-2 grid",
+        hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px_64px]",
+        !hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px]",
+      )}
+    >
       <ZoneArea isCentered>
         <HiddenZone count={player.zones.runeDeck.count} label="Rune deck" />
       </ZoneArea>
@@ -54,25 +62,25 @@ const RunesLine = ({
         <CardList cards={baseRunes} />
       </ZoneArea>
       <ZoneArea isCentered>
-        <ZoneCards onClick={onOpenTrash} showCount zone={player.zones.trash} />
+        <TrashZone onClick={onOpenTrash} zone={player.zones.trash} />
       </ZoneArea>
-      <ZoneArea isCentered>
-        <Button
-          aria-label={`${player.name} banished cards`}
-          className="relative p-2"
-          onClick={onOpenBanish}
-          title={`${player.zones.banishment.count} banished`}
-          type="button"
-          variant="ghost"
-        >
-          <ArchiveX className="size-5" />
-          {player.zones.banishment.count > 0 && (
+      {hasBanishment && (
+        <ZoneArea isCentered>
+          <Button
+            aria-label={`${player.name} banished cards`}
+            className="relative p-2"
+            onClick={onOpenBanish}
+            title={`${player.zones.banishment.count} banished`}
+            type="button"
+            variant="ghost"
+          >
+            <ArchiveX className="size-5" />
             <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
               {player.zones.banishment.count}
             </span>
-          )}
-        </Button>
-      </ZoneArea>
+          </Button>
+        </ZoneArea>
+      )}
     </div>
   );
 };
@@ -131,6 +139,32 @@ function ZoneCards({
   }
 
   return null;
+}
+
+function TrashZone({
+  onClick,
+  zone,
+}: {
+  onClick?: () => void;
+  zone: ZoneData;
+}) {
+  if (zone.cards.length > 0) {
+    return <ZoneCards onClick={onClick} showCount zone={zone} />;
+  }
+
+  return (
+    <button
+      aria-label="Open trash"
+      className="relative flex justify-center items-center p-2 text-slate-100"
+      onClick={onClick}
+      type="button"
+    >
+      <Trash2 className="size-5" />
+      <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
+        {zone.count}
+      </span>
+    </button>
+  );
 }
 
 function CardList({

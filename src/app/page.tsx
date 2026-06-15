@@ -284,32 +284,6 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
 
   unavailableMainDeckIds.add(baseUnit);
 
-  const trashCard = firstLegalCard(
-    snapshot,
-    allMainDeck,
-    unavailableMainDeckIds,
-    isMainDeckCard,
-  );
-
-  if (!trashCard) {
-    throw new Error("Fixture deck must include a main-deck card for trash state.");
-  }
-
-  unavailableMainDeckIds.add(trashCard);
-
-  const banishmentCard = firstLegalCard(
-    snapshot,
-    allMainDeck,
-    unavailableMainDeckIds,
-    isMainDeckCard,
-  );
-
-  if (!banishmentCard) {
-    throw new Error("Fixture deck must include a main-deck card for banishment state.");
-  }
-
-  unavailableMainDeckIds.add(banishmentCard);
-
   const chain = allMainDeck
     .filter((instanceId) => !unavailableMainDeckIds.has(instanceId))
     .filter((instanceId) => cardFor(snapshot, instanceId).classification.type === "Spell")
@@ -324,7 +298,7 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
   return {
     allMainDeck,
     allRunes,
-    banishment: [banishmentCard],
+    banishment: [],
     base: [...runesInPlay, baseUnit],
     battlefieldPool,
     battlefieldUnit,
@@ -337,7 +311,7 @@ function createPlayerFixture(snapshot: DeckSnapshot, battlefieldName: string) {
     runesInPlay,
     selectedBattlefield,
     snapshot,
-    trash: [trashCard],
+    trash: [],
   };
 }
 
@@ -354,14 +328,6 @@ function firstLegalCard(
 
     return isLegal(cardFor(snapshot, instanceId));
   });
-}
-
-function isMainDeckCard(card: Card) {
-  return (
-    card.classification.type === "Gear" ||
-    card.classification.type === "Spell" ||
-    card.classification.type === "Unit"
-  );
 }
 
 function sourceIds(
