@@ -29,6 +29,7 @@ export const gameTurnPhases = [
   "action",
   "end"
 ] as const;
+export const startOfTurnSteps = ["awaken", "beginning", "channel", "draw"] as const;
 
 export const battlefieldChoiceSchema = z.object({
   playerId: z.string().min(1),
@@ -64,7 +65,8 @@ export const gameTurnStateSchema = z.object({
   turnNumber: z.number().int().min(1),
   activePlayerId: z.string().min(1),
   phase: z.enum(gameTurnPhases),
-  passedPlayerIds: z.array(z.string().min(1))
+  passedPlayerIds: z.array(z.string().min(1)),
+  completedStartOfTurnSteps: z.array(z.enum(startOfTurnSteps)).default([])
 });
 
 export const showdownStateSchema = z.object({
@@ -145,6 +147,7 @@ export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
 export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
 export type GameTurnPhase = (typeof gameTurnPhases)[number];
+export type StartOfTurnStep = (typeof startOfTurnSteps)[number];
 export type GameTurnState = z.infer<typeof gameTurnStateSchema>;
 export type ShowdownState = z.infer<typeof showdownStateSchema>;
 export type RunePool = z.infer<typeof runePoolSchema>;
@@ -273,6 +276,11 @@ export type MoveUnitToBattlefieldInput = {
   unitCardInstanceId: string;
   battlefieldId: string;
   now?: string;
+};
+
+type ApplyStartOfTurnInput = {
+  activePlayerId: string;
+  turnNumber: number;
 };
 
 export type PassShowdownInput = {
@@ -765,7 +773,7 @@ export function startGame(game: Game, input: StartGameInput = {}): Game {
     }
   }
 
-  return gameSchema.parse({
+  const inProgressGame = gameSchema.parse({
     ...game,
     updatedAt: input.now ?? new Date().toISOString(),
     status: "in_progress",
@@ -775,10 +783,16 @@ export function startGame(game: Game, input: StartGameInput = {}): Game {
       turn: {
         turnNumber: 1,
         activePlayerId: startingPlayerId,
-        phase: "awaken",
-        passedPlayerIds: []
+        phase: "action",
+        passedPlayerIds: [],
+        completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
       }
     }
+  });
+
+  return applyStartOfTurn(inProgressGame, {
+    activePlayerId: startingPlayerId,
+    turnNumber: 1
   });
 }
 
@@ -1227,14 +1241,43 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
     throw new Error("Next player could not be determined.");
   }
 
-  const players = Object.fromEntries(
+  const advancedGame = gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      turn: {
+        turnNumber: turn.turnNumber + 1,
+        activePlayerId: nextPlayerId,
+        phase: "action",
+        passedPlayerIds: [],
+        completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
+      }
+    }
+  });
+
+  return applyStartOfTurn(advancedGame, {
+    activePlayerId: nextPlayerId,
+    turnNumber: turn.turnNumber + 1
+  });
+}
+
+function applyStartOfTurn(game: Game, input: ApplyStartOfTurnInput): Game {
+  const player = game.canonicalState.players[input.activePlayerId];
+
+  if (!player) {
+    throw new Error("Active player could not be found for Start of Turn.");
+  }
+
+  const playersWithClearedPools = Object.fromEntries(
     game.canonicalState.setup.playerIds.map((playerId) => {
-      const player = game.canonicalState.players[playerId]!;
+      const currentPlayer = game.canonicalState.players[playerId]!;
 
       return [
         playerId,
         {
-          ...player,
+          ...currentPlayer,
           runePool: {
             energy: 0,
             power: {}
@@ -1243,26 +1286,71 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
       ];
     })
   );
+  const activePlayer = playersWithClearedPools[input.activePlayerId]!;
+  const channelTargetCount = getStartOfTurnChannelCount(game, input);
+  const channeledCount = Math.min(channelTargetCount, activePlayer.zones.runeDeck.length);
+  const drawnCount = 1;
+
+  if (activePlayer.zones.mainDeck.length < drawnCount) {
+    throw new Error("Burn Out is not implemented for automatic Start of Turn draws.");
+  }
+
+  const channeledRuneCardInstanceIds = activePlayer.zones.runeDeck.slice(
+    0,
+    channeledCount
+  );
+  const players = {
+    ...playersWithClearedPools,
+    [input.activePlayerId]: {
+      ...activePlayer,
+      runePool: {
+        energy: 0,
+        power: {}
+      },
+      zones: {
+        ...activePlayer.zones,
+        runeDeck: activePlayer.zones.runeDeck.slice(channeledCount),
+        mainDeck: activePlayer.zones.mainDeck.slice(drawnCount),
+        hand: [
+          ...activePlayer.zones.hand,
+          ...activePlayer.zones.mainDeck.slice(0, drawnCount)
+        ],
+        base: [...activePlayer.zones.base, ...channeledRuneCardInstanceIds]
+      }
+    }
+  };
 
   return gameSchema.parse({
     ...game,
-    updatedAt: input.now ?? new Date().toISOString(),
-    stateVersion: game.stateVersion + 1,
     canonicalState: {
       ...game.canonicalState,
       cardStates: readyPlayerBoardCards(
         game.canonicalState.cardStates,
-        game.canonicalState.players[nextPlayerId]!.zones
+        player.zones
       ),
       players,
       turn: {
-        turnNumber: turn.turnNumber + 1,
-        activePlayerId: nextPlayerId,
-        phase: "awaken",
-        passedPlayerIds: []
+        turnNumber: input.turnNumber,
+        activePlayerId: input.activePlayerId,
+        phase: "action",
+        passedPlayerIds: [],
+        completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
       }
     }
   });
+}
+
+function getStartOfTurnChannelCount(
+  game: Game,
+  input: ApplyStartOfTurnInput
+): number {
+  const startingPlayerId = game.canonicalState.setup.startingPlayerId;
+
+  if (input.turnNumber === 2 && input.activePlayerId !== startingPlayerId) {
+    return 3;
+  }
+
+  return 2;
 }
 
 export function moveUnitToBattlefield(

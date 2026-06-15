@@ -215,6 +215,16 @@ function renderServerDecisionMessage(event: GameEventDocument): string {
       return "Server started the game.";
     case "game.payCosts":
       return "Server paid card costs.";
+    case "turn.start.awaken":
+      return "Server completed Awaken.";
+    case "turn.start.beginning":
+      return "Server completed Beginning.";
+    case "turn.start.channel":
+      return "Server completed Channel.";
+    case "turn.start.draw":
+      return "Server completed Draw.";
+    case "turn.action.begin":
+      return "Server began the Action phase.";
     case "showdown.enter":
       return "Server opened a showdown.";
     case "showdown.close":

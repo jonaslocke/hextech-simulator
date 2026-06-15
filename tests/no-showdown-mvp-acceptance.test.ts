@@ -61,22 +61,7 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
   assert.equal(startedGame.status, "in_progress");
   assert.equal(startedGame.canonicalState.turn?.activePlayerId, "player-2");
   assert.equal(startedGame.canonicalState.players["player-1"]?.zones.hand.length, 4);
-  assert.equal(startedGame.canonicalState.players["player-2"]?.zones.hand.length, 4);
-
-  await submitIntent(repositories, created, created.players.player2.playerToken, {
-    type: "game.channel",
-    payload: {
-      count: 2
-    }
-  });
-  const afterDraw = await submitIntent(
-    repositories,
-    created,
-    created.players.player2.playerToken,
-    {
-      type: "game.draw"
-    }
-  );
+  assert.equal(startedGame.canonicalState.players["player-2"]?.zones.hand.length, 5);
   const player2Projection = (
     await submitIntent(
       repositories,
@@ -88,7 +73,6 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
     )
   ).canonicalState.players["player-2"];
 
-  assert.equal(afterDraw.canonicalState.players["player-2"]?.zones.hand.length, 5);
   assert.equal(player2Projection?.zones.base.length, 2);
 
   const availableCardInstanceId = await firstAvailablePlayableCard(

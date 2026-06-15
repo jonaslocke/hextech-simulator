@@ -229,15 +229,16 @@ type AppliedIntentResult =
   | {
       accepted: true;
       game: Game;
-      serverDecisions: Array<{
-        type: string;
-        payload?: unknown;
-      }>;
+      serverDecisions: ServerDecision[];
       randomOperations: RandomOperation[];
     }
   | IntentServiceRejectedResult;
 
 type AcceptedAppliedIntentResult = Extract<AppliedIntentResult, { accepted: true }>;
+type ServerDecision = {
+  type: string;
+  payload?: unknown;
+};
 
 function applyIntent(
   game: Game,
@@ -318,13 +319,16 @@ function applyIntent(
           };
         }
 
+        const startedGame = startGame(committedGame, { now });
+
         return {
           accepted: true,
-          game: startGame(committedGame, { now }),
+          game: startedGame,
           serverDecisions: [
             {
               type: "game.start"
-            }
+            },
+            ...createStartOfTurnServerDecisions(committedGame, startedGame)
           ],
           randomOperations: []
         };
@@ -481,14 +485,15 @@ function applyIntent(
 
       case "game.endTurn": {
         endTurnIntentSchema.parse(input.intent);
+        const endedGame = endTurn(game, {
+          actorPlayerId,
+          now
+        });
 
         return {
           accepted: true,
-          game: endTurn(game, {
-            actorPlayerId,
-            now
-          }),
-          serverDecisions: [],
+          game: endedGame,
+          serverDecisions: createStartOfTurnServerDecisions(game, endedGame),
           randomOperations: []
         };
       }
@@ -606,13 +611,14 @@ async function completeSetupIfReady(
         actorPlayerId: playerId,
         selectedCardInstanceIds: [],
         now
-      }),
+    }),
     openedGame
   );
+  const startedGame = startGame(autoKeptGame, { now });
 
   return {
     accepted: true,
-    game: startGame(autoKeptGame, { now }),
+    game: startedGame,
     serverDecisions: [
       ...transition.serverDecisions,
       {
@@ -626,7 +632,8 @@ async function completeSetupIfReady(
       },
       {
         type: "game.start"
-      }
+      },
+      ...createStartOfTurnServerDecisions(autoKeptGame, startedGame)
     ],
     randomOperations: [
       ...transition.randomOperations,
@@ -634,6 +641,42 @@ async function completeSetupIfReady(
       ...runeDeckShuffle.randomOperations
     ]
   };
+}
+
+function createStartOfTurnServerDecisions(
+  beforeGame: Game,
+  afterGame: Game
+): ServerDecision[] {
+  const activePlayerId = afterGame.canonicalState.turn!.activePlayerId;
+  const beforePlayer = beforeGame.canonicalState.players[activePlayerId]!;
+  const afterPlayer = afterGame.canonicalState.players[activePlayerId]!;
+  const channeledCount =
+    afterPlayer.zones.base.length - beforePlayer.zones.base.length;
+  const drawnCount = afterPlayer.zones.hand.length - beforePlayer.zones.hand.length;
+
+  return [
+    {
+      type: "turn.start.awaken"
+    },
+    {
+      type: "turn.start.beginning"
+    },
+    {
+      type: "turn.start.channel",
+      payload: {
+        count: channeledCount
+      }
+    },
+    {
+      type: "turn.start.draw",
+      payload: {
+        count: drawnCount
+      }
+    },
+    {
+      type: "turn.action.begin"
+    }
+  ];
 }
 
 function reject(

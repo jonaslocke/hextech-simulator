@@ -337,7 +337,7 @@ test("intent service auto-completes setup after battlefield reveal when starting
     result.game.canonicalState.players["player-b"]?.zones.champion,
     playerBChampion
   );
-  assert.equal(result.game.canonicalState.players["player-a"]?.zones.hand.length, 4);
+  assert.equal(result.game.canonicalState.players["player-a"]?.zones.hand.length, 5);
   assert.equal(result.game.canonicalState.players["player-b"]?.zones.hand.length, 4);
   assert.equal(
     result.game.canonicalState.setup.mulliganChoices["player-a"]?.status,
@@ -352,7 +352,12 @@ test("intent service auto-completes setup after battlefield reveal when starting
       "setup.placeStartingObjects",
       "setup.drawOpeningHands",
       "setup.autoKeepOpeningHands",
-      "game.start"
+      "game.start",
+      "turn.start.awaken",
+      "turn.start.beginning",
+      "turn.start.channel",
+      "turn.start.draw",
+      "turn.action.begin"
     ]
   );
   assert.equal(
@@ -418,15 +423,32 @@ test("intent service starts the game after both mulligans are committed", async 
 
   assert.equal(result.game.status, "in_progress");
   assert.equal(result.game.canonicalState.turn?.activePlayerId, "player-a");
+  assert.equal(result.game.canonicalState.turn?.phase, "action");
   assert.deepEqual(
     result.events.map((event) => event.type),
-    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+    [
+      gameEventTypes.playerIntentAccepted,
+      gameEventTypes.serverDecision,
+      gameEventTypes.serverDecision,
+      gameEventTypes.serverDecision,
+      gameEventTypes.serverDecision,
+      gameEventTypes.serverDecision,
+      gameEventTypes.serverDecision
+    ]
   );
-  assert.deepEqual(result.events[1]?.payload, {
-    decision: {
-      type: "game.start"
-    }
-  });
+  assert.deepEqual(
+    result.events
+      .filter((event) => event.type === gameEventTypes.serverDecision)
+      .map((event) => (event.payload as { decision: { type: string } }).decision.type),
+    [
+      "game.start",
+      "turn.start.awaken",
+      "turn.start.beginning",
+      "turn.start.channel",
+      "turn.start.draw",
+      "turn.action.begin"
+    ]
+  );
 });
 
 test("intent service accepts draw intents and returns updated projection", async () => {
@@ -458,6 +480,70 @@ test("intent service accepts draw intents and returns updated projection", async
   ]);
   assert.equal(result.projection.players["player-a"]?.zones.hand.count, 2);
   assert.equal(result.events[0]?.type, gameEventTypes.playerIntentAccepted);
+});
+
+test("intent service ends turn and logs automatic Start of Turn ABCD steps", async () => {
+  const game = createInProgressIntentGame();
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-a",
+      stateVersion: game.stateVersion,
+      intent: {
+        type: "game.endTurn"
+      }
+    },
+    {
+      now: () => "2026-06-14T07:30:00.000Z"
+    }
+  );
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.deepEqual(result.game.canonicalState.turn, {
+    turnNumber: 2,
+    activePlayerId: "player-b",
+    phase: "action",
+    passedPlayerIds: [],
+    completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
+  });
+  assert.deepEqual(result.game.canonicalState.players["player-b"]?.zones.base, [
+    "b-rune-1"
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-b"]?.zones.hand, [
+    "b-main-1"
+  ]);
+  assert.deepEqual(
+    result.events
+      .filter((event) => event.type === gameEventTypes.serverDecision)
+      .map((event) => (event.payload as { decision: { type: string } }).decision.type),
+    [
+      "turn.start.awaken",
+      "turn.start.beginning",
+      "turn.start.channel",
+      "turn.start.draw",
+      "turn.action.begin"
+    ]
+  );
+  assert.deepEqual(
+    result.logEntries.map((entry) => entry.message),
+    [
+      "You ended the turn.",
+      "Server completed Awaken.",
+      "Server completed Beginning.",
+      "Server completed Channel.",
+      "Server completed Draw.",
+      "Server began the Action phase."
+    ]
+  );
 });
 
 test("intent service appends RNG event for simultaneous main deck recycle", async () => {
@@ -991,8 +1077,8 @@ function createOneMulliganCommittedGame(): Game {
           zones: {
             legend: "a-legend",
             champion: "a-champion",
-            mainDeck: [],
-            runeDeck: [],
+            mainDeck: ["a-main-1"],
+            runeDeck: ["a-rune-1", "a-rune-2"],
             hand: ["a-hand-1"],
             trash: [],
             banishment: [],

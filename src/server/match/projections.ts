@@ -98,7 +98,10 @@ export const projectedTurnStateSchema = z
     turnNumber: z.number().int().min(1),
     activePlayerId: z.string().min(1),
     phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
-    passedPlayerIds: z.array(z.string().min(1))
+    passedPlayerIds: z.array(z.string().min(1)),
+    completedStartOfTurnSteps: z
+      .array(z.enum(["awaken", "beginning", "channel", "draw"]))
+      .default([])
   })
   .nullable();
 

@@ -30,9 +30,24 @@ test("starts the game after starting player and mulligans are locked", () => {
   assert.deepEqual(result.canonicalState.turn, {
     turnNumber: 1,
     activePlayerId: "player-a",
-    phase: "awaken",
-    passedPlayerIds: []
+    phase: "action",
+    passedPlayerIds: [],
+    completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
   });
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-1",
+    "a-rune-2"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.runeDeck, [
+    "a-rune-3"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.hand, [
+    "a-main-1"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.mainDeck, [
+    "a-main-2",
+    "a-main-3"
+  ]);
 });
 
 test("draw moves top main deck cards to hand", () => {
@@ -132,6 +147,70 @@ test("adding Power recycles a rune and updates the rune pool", () => {
   assert.equal(result.canonicalState.cardStates["a-rune-base-1"], undefined);
 });
 
+test("adding Power can recycle an exhausted rune", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      cardStates: {
+        ...baseGame.canonicalState.cardStates,
+        "a-rune-base-1": {
+          exhausted: true
+        }
+      }
+    }
+  });
+
+  const result = addRuneResource(
+    game,
+    {
+      actorPlayerId: "player-a",
+      runeCardInstanceId: "a-rune-base-1",
+      resourceType: "power"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.canonicalState.players["player-a"]?.runePool.power, {
+    Chaos: 1
+  });
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-2"
+  ]);
+  assert.equal(result.canonicalState.cardStates["a-rune-base-1"], undefined);
+});
+
+test("adding Energy rejects exhausted runes", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      cardStates: {
+        ...baseGame.canonicalState.cardStates,
+        "a-rune-base-1": {
+          exhausted: true
+        }
+      }
+    }
+  });
+
+  assert.throws(
+    () =>
+      addRuneResource(
+        game,
+        {
+          actorPlayerId: "player-a",
+          runeCardInstanceId: "a-rune-base-1",
+          resourceType: "energy"
+        },
+        cardLookup
+      ),
+    /Exhausted runes cannot add Energy/
+  );
+});
+
 test("playCard automatically uses pool and ready runes to pay Energy", () => {
   const game = gameSchema.parse({
     ...createInProgressGameWithRunes(),
@@ -194,6 +273,53 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   assert.deepEqual(result.game.canonicalState.cardStates["a-unit-hand-1"], {
     exhausted: true
   });
+});
+
+test("playCard can recycle exhausted runes for Power", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      cardStates: {
+        ...baseGame.canonicalState.cardStates,
+        "a-rune-base-1": {
+          exhausted: true
+        }
+      },
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-a": {
+          ...baseGame.canonicalState.players["player-a"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-a"]!.zones,
+            hand: ["a-power-two-unit-hand"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-power-two-unit-hand"
+    },
+    cardLookup
+  );
+
+  assert.equal(
+    result.payment.resourcePayments.some(
+      (payment) =>
+        payment.type === "recycleRuneForPower" &&
+        payment.cardInstanceId === "a-rune-base-1"
+    ),
+    true
+  );
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+    "a-power-two-unit-hand"
+  ]);
 });
 
 test("playCard spends multi-domain Power in card metadata domain order", () => {
@@ -581,8 +707,56 @@ test("end turn advances active player and clears passes", () => {
   assert.deepEqual(result.canonicalState.turn, {
     turnNumber: 2,
     activePlayerId: "player-b",
-    phase: "awaken",
-    passedPlayerIds: []
+    phase: "action",
+    passedPlayerIds: [],
+    completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
+  });
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.base, [
+    "b-rune-1"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.runeDeck, []);
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.hand, [
+    "b-main-1"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.mainDeck, []);
+});
+
+test("non-starting player channels three runes on their first turn", () => {
+  const baseGame = createInProgressGame();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-b": {
+          ...baseGame.canonicalState.players["player-b"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-b"]!.zones,
+            runeDeck: ["b-rune-1", "b-rune-2", "b-rune-3"],
+            mainDeck: ["b-main-1"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = endTurn(game, {
+    actorPlayerId: "player-a"
+  });
+
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.base, [
+    "b-rune-1",
+    "b-rune-2",
+    "b-rune-3"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.runeDeck, []);
+  assert.deepEqual(result.canonicalState.turn, {
+    turnNumber: 2,
+    activePlayerId: "player-b",
+    phase: "action",
+    passedPlayerIds: [],
+    completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
   });
 });
 
@@ -630,6 +804,19 @@ test("end turn clears rune pools and readies next player's board cards", () => {
   assert.deepEqual(result.canonicalState.cardStates["b-rune-base-1"], {
     exhausted: false
   });
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.base, [
+    "b-rune-base-1",
+    "b-rune-1"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-b"]?.zones.hand, [
+    "b-main-1"
+  ]);
+  assert.deepEqual(result.canonicalState.turn?.completedStartOfTurnSteps, [
+    "awaken",
+    "beginning",
+    "channel",
+    "draw"
+  ]);
 });
 
 test("moving a unit to an empty battlefield opens a showdown", () => {
@@ -756,6 +943,34 @@ function createSetupCompleteGame(): Game {
             status: "locked",
             selectedCardInstanceIds: [],
             lockedAt: "2026-06-14T05:00:00.000Z"
+          }
+        }
+      },
+      players: {
+        "player-a": {
+          playerId: "player-a",
+          zones: {
+            legend: "a-legend",
+            champion: "a-champion",
+            mainDeck: ["a-main-1", "a-main-2", "a-main-3"],
+            runeDeck: ["a-rune-1", "a-rune-2", "a-rune-3"],
+            hand: [],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        },
+        "player-b": {
+          playerId: "player-b",
+          zones: {
+            legend: "b-legend",
+            champion: "b-champion",
+            mainDeck: ["b-main-1"],
+            runeDeck: ["b-rune-1"],
+            hand: [],
+            trash: [],
+            banishment: [],
+            base: []
           }
         }
       }

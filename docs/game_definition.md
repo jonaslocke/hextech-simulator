@@ -924,8 +924,10 @@ path:
 6. Shuffle decks with seeded RNG.
 7. Draw opening hands.
 8. Both players commit mulligan with zero selected cards.
-9. Start the first turn.
-10. Resolve first turn channel and draw behavior.
+9. Start the first turn and automatically resolve Start of Turn ABCD:
+   Awaken, Beginning, Channel, Draw.
+10. Channel 3 instead of 2 on the non-starting player's first turn; all other
+    automatic Start of Turn Channel steps channel 2 or as many as possible.
 11. Play one simple supported unit. Units enter the board exhausted.
 12. Advance turns until that unit is readied by normal turn progression.
 13. Move the ready unit to an empty battlefield, exhausting it as the Standard

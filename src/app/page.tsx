@@ -356,6 +356,19 @@ function GameActionPanel({
         <span className="font-semibold">Actions</span>
         <span className="text-slate-400">{projection.status}</span>
       </div>
+      {projection.turn && (
+        <div className="mb-3 rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-slate-300">
+          <div>
+            Turn {projection.turn.turnNumber} - {projection.turn.phase} - active{" "}
+            {projection.turn.activePlayerId}
+          </div>
+          {projection.turn.completedStartOfTurnSteps.length > 0 && (
+            <div className="mt-1 text-slate-500">
+              Start: {projection.turn.completedStartOfTurnSteps.join(" -> ")}
+            </div>
+          )}
+        </div>
+      )}
       {projection.status === "setup_pending" ? (
         <SetupControls
           cardsByInstanceId={cardsByInstanceId}
@@ -482,13 +495,10 @@ function GameplayControls({
   viewerId: string;
   viewerState: GameProjection["players"][string];
 }) {
-  const readyRunes = viewerState.zones.base.cardInstanceIds.filter((cardInstanceId) => {
+  const baseRunes = viewerState.zones.base.cardInstanceIds.filter((cardInstanceId) => {
     const card = cardsByInstanceId[cardInstanceId];
 
-    return (
-      card?.classification.type === "Rune" &&
-      projection.cardStates[cardInstanceId]?.exhausted !== true
-    );
+    return card?.classification.type === "Rune";
   });
   const playableCards = Object.entries(viewerState.availablePaymentModes);
 
@@ -535,13 +545,17 @@ function GameplayControls({
           Rune pool: {viewerState.runePool.energy} energy
         </span>
         <div className="grid max-h-28 gap-1 overflow-auto">
-          {readyRunes.map((cardInstanceId) => (
+          {baseRunes.map((cardInstanceId) => {
+            const isExhausted =
+              projection.cardStates[cardInstanceId]?.exhausted === true;
+
+            return (
             <div key={cardInstanceId} className="flex items-center gap-2">
               <span className="min-w-0 flex-1 truncate text-slate-400">
                 {cardsByInstanceId[cardInstanceId]?.name ?? "Rune"}
               </span>
               <Button
-                disabled={disabled}
+                disabled={disabled || isExhausted}
                 onClick={() =>
                   onIntent({
                     type: "game.addRuneResource",
@@ -575,9 +589,10 @@ function GameplayControls({
                 Power
               </Button>
             </div>
-          ))}
-          {readyRunes.length === 0 && (
-            <span className="text-slate-500">No ready runes in base.</span>
+          );
+          })}
+          {baseRunes.length === 0 && (
+            <span className="text-slate-500">No runes in base.</span>
           )}
         </div>
       </div>

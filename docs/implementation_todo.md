@@ -174,6 +174,8 @@ implemented, tested, and documented where relevant.
 - [x] Implement channel intent/action.
 - [x] Implement pass priority/focus intent.
 - [x] Implement end turn intent.
+- [x] Implement automatic Start of Turn ABCD steps after game start and end turn: Awaken, Beginning, Channel, Draw.
+- [x] Channel 3 instead of 2 on the non-starting player's first turn.
 - [x] Add canonical per-player rune pool state.
 - [x] Add canonical visible card exhaustion state.
 - [x] Implement manual Rune-to-Energy resource generation.
@@ -254,7 +256,7 @@ implemented, tested, and documented where relevant.
 - [x] Shuffle decks.
 - [x] Draw opening hands.
 - [x] Mulligan zero cards for both players.
-- [x] Resolve first turn channel and draw.
+- [x] Resolve first turn Start of Turn ABCD automatically.
 - [x] Play one simple supported unit.
 - [x] Advance turns until the played unit is ready.
 - [x] Reject movement by exhausted units.
