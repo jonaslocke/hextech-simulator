@@ -275,6 +275,86 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   });
 });
 
+test("playCard supports known Unit enter-ready behavior", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-a": {
+          ...baseGame.canonicalState.players["player-a"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-a"]!.zones,
+            hand: ["a-vanguard-attendant"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-vanguard-attendant"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.game.canonicalState.cardStates["a-vanguard-attendant"], {
+    exhausted: false
+  });
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-1",
+    "a-rune-base-2",
+    "a-vanguard-attendant"
+  ]);
+});
+
+test("playCard resolves known deterministic draw-on-play Unit behavior", () => {
+  const baseGame = createInProgressGameWithRunes();
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      players: {
+        ...baseGame.canonicalState.players,
+        "player-a": {
+          ...baseGame.canonicalState.players["player-a"]!,
+          zones: {
+            ...baseGame.canonicalState.players["player-a"]!.zones,
+            hand: ["a-lecturing-yordle"],
+            mainDeck: ["a-main-1", "a-main-2"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-lecturing-yordle"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, [
+    "a-main-1"
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.mainDeck, [
+    "a-main-2"
+  ]);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-1",
+    "a-rune-base-2",
+    "a-lecturing-yordle"
+  ]);
+});
+
 test("playCard can recycle exhausted runes for Power", () => {
   const baseGame = createInProgressGameWithRunes();
   const game = gameSchema.parse({
@@ -551,8 +631,65 @@ test("playCard rejects unsupported immediate play behavior", () => {
         },
         cardLookup
       ),
-    /immediate play behavior/
+    /runtime behavior/
   );
+});
+
+test("playCard rejects postponed Vision Choose and damage-on-play Unit behavior", () => {
+  const cases = [
+    {
+      cardInstanceId: "a-mystic-poro",
+      message: /Vision choices/
+    },
+    {
+      cardInstanceId: "a-annie-stubborn",
+      message: /Choose-based/
+    },
+    {
+      cardInstanceId: "a-tibbers",
+      message: /Damage-on-play/
+    }
+  ];
+
+  for (const { cardInstanceId, message } of cases) {
+    const baseGame = createInProgressGameWithRunes();
+    const game = gameSchema.parse({
+      ...baseGame,
+      canonicalState: {
+        ...baseGame.canonicalState,
+        players: {
+          ...baseGame.canonicalState.players,
+          "player-a": {
+            ...baseGame.canonicalState.players["player-a"]!,
+            zones: {
+              ...baseGame.canonicalState.players["player-a"]!.zones,
+              hand: [cardInstanceId]
+            }
+          }
+        }
+      }
+    });
+
+    assert.throws(
+      () =>
+        playCard(
+          game,
+          {
+            actorPlayerId: "player-a",
+            cardInstanceId
+          },
+          cardLookup
+        ),
+      message
+    );
+    assert.deepEqual(game.canonicalState.players["player-a"]?.zones.hand, [
+      cardInstanceId
+    ]);
+    assert.deepEqual(game.canonicalState.players["player-a"]?.zones.base, [
+      "a-rune-base-1",
+      "a-rune-base-2"
+    ]);
+  }
 });
 
 test("playCard rejects unsupported payment modes", () => {
@@ -1144,6 +1281,46 @@ const cardLookup: Record<string, Card> = {
     name: "On Play Unit",
     power: null,
     text: "When you play me, draw 1.",
+    type: "Unit"
+  }),
+  "a-vanguard-attendant": createCard({
+    domain: ["Order"],
+    energy: 0,
+    name: "Vanguard Attendant",
+    power: null,
+    text: "I enter ready.",
+    type: "Unit"
+  }),
+  "a-lecturing-yordle": createCard({
+    domain: ["Mind"],
+    energy: 0,
+    name: "Lecturing Yordle",
+    power: null,
+    text: "[Tank] (I must be assigned combat damage first.)When you play me, draw 1.",
+    type: "Unit"
+  }),
+  "a-mystic-poro": createCard({
+    domain: ["Chaos"],
+    energy: 0,
+    name: "Mystic Poro",
+    power: null,
+    text: "[Vision] (When you play me, look at the top card of your Main Deck. You may recycle it.)",
+    type: "Unit"
+  }),
+  "a-annie-stubborn": createCard({
+    domain: ["Chaos"],
+    energy: 0,
+    name: "Annie, Stubborn",
+    power: null,
+    text: "When you play me, return a spell from your trash to your hand.",
+    type: "Unit"
+  }),
+  "a-tibbers": createCard({
+    domain: ["Fury", "Chaos"],
+    energy: 0,
+    name: "Tibbers",
+    power: null,
+    text: "When you play me, deal 3 to all units at battlefields.",
     type: "Unit"
   })
 };

@@ -9,6 +9,7 @@ import {
   type RandomOperation
 } from "../engine";
 import type { Card } from "../catalog";
+import { getUnitPlayProfile } from "./card-runtime";
 import {
   cardDomainsInMetadataOrder,
   domains,
@@ -1090,7 +1091,11 @@ export function playCard(
     throw new Error("Only Unit card play to base is supported.");
   }
 
-  assertSupportedMvpCardPlay(card);
+  const profile = getUnitPlayProfile(card);
+
+  if (!profile.supported) {
+    throw new Error(profile.reason);
+  }
 
   const payment = buildAutomaticPaymentPlan(
     game,
@@ -1108,7 +1113,7 @@ export function playCard(
   );
   const paidGame = paidResult.game;
   const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
-  const zones =
+  let zones =
     sourceZone === "hand"
       ? {
           ...paidPlayer.zones,
@@ -1123,6 +1128,21 @@ export function playCard(
           base: [...paidPlayer.zones.base, input.cardInstanceId]
         };
 
+  if (profile.onPlay?.type === "draw") {
+    if (zones.mainDeck.length < profile.onPlay.count) {
+      throw new Error("Burn Out is not implemented for empty Main Deck draws.");
+    }
+
+    zones = {
+      ...zones,
+      mainDeck: zones.mainDeck.slice(profile.onPlay.count),
+      hand: [
+        ...zones.hand,
+        ...zones.mainDeck.slice(0, profile.onPlay.count)
+      ]
+    };
+  }
+
   return {
     game: gameSchema.parse({
       ...paidGame,
@@ -1133,7 +1153,7 @@ export function playCard(
         cardStates: {
           ...paidGame.canonicalState.cardStates,
           [input.cardInstanceId]: {
-            exhausted: true
+            exhausted: !profile.entersReady
           }
         },
         turn: {
@@ -1180,7 +1200,12 @@ export function getAvailablePaymentModesForPlayer(
     }
 
     try {
-      assertSupportedMvpCardPlay(card);
+      const profile = getUnitPlayProfile(card);
+
+      if (!profile.supported) {
+        continue;
+      }
+
       const resourceCosts = readCardCost(card);
       buildAutomaticPaymentPlan(game, playerId, resourceCosts, cardsByInstanceId);
       modesByCard[cardInstanceId] = [
@@ -1700,27 +1725,6 @@ function readCardCost(card: Card): {
             }
           ]
   };
-}
-
-function assertSupportedMvpCardPlay(card: Card) {
-  const text = card.text.plain.toLowerCase();
-
-  if (text.includes("additional cost")) {
-    throw new Error("Additional costs are not implemented.");
-  }
-
-  if (
-    text.includes("when you play me") ||
-    text.includes("when i'm played") ||
-    text.includes("when i am played") ||
-    text.includes("when you play this") ||
-    text.includes("when this is played") ||
-    text.includes("i enter ready") ||
-    text.includes("enters ready") ||
-    text.includes("you may play me to")
-  ) {
-    throw new Error("This card's immediate play behavior is not implemented.");
-  }
 }
 
 function buildAutomaticPaymentPlan(

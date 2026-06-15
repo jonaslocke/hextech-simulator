@@ -223,6 +223,21 @@ implemented, tested, and documented where relevant.
 - [x] Add tests for multi-domain Power payment and Rainbow fallback.
 - [x] Add tests for simultaneous multi-Rune recycle randomization.
 
+## 12B. Annie/Lux Unit Card Runtime
+
+- [x] Add explicit server-side Unit play profiles for the Annie and Lux fixture deck Units.
+- [x] Keep unknown non-empty Unit text unsupported instead of guessing future card behavior.
+- [x] Keep Units entering exhausted by default.
+- [x] Implement `Vanguard Attendant` entering ready.
+- [x] Implement deterministic on-play draw for `Lecturing Yordle`.
+- [x] Reject Vision cards at intent time until the Vision choice experience is implemented.
+- [x] Reject Choose-based Unit play effects at intent time until the Choose primitive is implemented.
+- [x] Reject damage-on-play Unit effects at intent time until damage and showdown resolution are implemented.
+- [ ] Implement the Choose primitive and use it for target/option selection.
+- [ ] Implement the Vision player-choice flow.
+- [ ] Implement damage and kill resolution for damage-on-play effects.
+- [ ] Implement `Lux, Crownguard` activated ability after spell play/resource restrictions are modeled.
+
 ## 13. Event Log Panel
 
 - [x] Derive human-readable log entries from canonical events.
