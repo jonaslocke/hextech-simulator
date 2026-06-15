@@ -22,7 +22,7 @@ type CardTileProps = Card & {
   enableHoverPreview?: boolean;
   focusablePreview?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
-  onPrimaryAction?: () => void;
+  onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
   showMight?: boolean;
 };
 
@@ -116,8 +116,8 @@ export const CardTile: FC<CardTileProps> = ({
         previewPosition ? "z-[2147483647]" : "z-10",
       )}
       onBlur={clearPreview}
-      onClick={() => {
-        onPrimaryAction?.();
+      onClick={(event) => {
+        onPrimaryAction?.(event);
       }}
       onContextMenu={(event) => {
         if (!onContextAction) {

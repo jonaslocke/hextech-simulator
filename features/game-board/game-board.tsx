@@ -103,7 +103,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       selectedModeId: modes[0]?.id,
     });
   };
-  const handleCardContextFromHand = (
+  const openPlayableCardMenu = (
     card: Card,
     event: MouseEvent<HTMLElement>,
   ) => {
@@ -130,8 +130,24 @@ export const GameBoard: FC<GameBoardProps> = ({
               disabled: true,
               label: "Not playable",
             },
-          ],
+      ],
     );
+  };
+  const handleCardContextFromHand = (
+    card: Card,
+    event: MouseEvent<HTMLElement>,
+  ) => {
+    openPlayableCardMenu(card, event);
+  };
+  const handleChampionCardAction = (
+    card: Card,
+    event?: MouseEvent<HTMLElement>,
+  ) => {
+    if (!event) {
+      return;
+    }
+
+    openPlayableCardMenu(card, event);
   };
   const handleRunePrimaryAction = (card: Card) => {
     closeCardActionMenu();
@@ -222,6 +238,8 @@ export const GameBoard: FC<GameBoardProps> = ({
           <PlayerBoard
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("playerTrash")}
+            onChampionContextAction={handleChampionCardAction}
+            onChampionPrimaryAction={handleChampionCardAction}
             onRuneContextAction={handleRuneContextAction}
             onRunePrimaryAction={handleRunePrimaryAction}
             player={board.player}

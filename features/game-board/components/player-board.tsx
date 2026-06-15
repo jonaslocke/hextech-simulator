@@ -10,10 +10,26 @@ import { Card, PlayerData, ZoneData } from "../types";
 type BaseLineProps = {
   player: PlayerData;
   isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
+  onChampionContextAction?: (
+    card: Card,
+    event: MouseEvent<HTMLDivElement>,
+  ) => void;
+  onChampionPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
 };
 
 type Props = {
   isMirrored?: boolean;
+  onChampionContextAction?: (
+    card: Card,
+    event: MouseEvent<HTMLDivElement>,
+  ) => void;
+  onChampionPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
   onRuneContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onRunePrimaryAction?: (card: Card) => void;
   onOpenBanish?: () => void;
@@ -22,7 +38,12 @@ type Props = {
   isActivePlayer: boolean;
 };
 
-const BaseLine = ({ player, isHightlighted }: BaseLineProps) => {
+const BaseLine = ({
+  player,
+  isHightlighted,
+  onChampionContextAction,
+  onChampionPrimaryAction,
+}: BaseLineProps) => {
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
   );
@@ -30,7 +51,11 @@ const BaseLine = ({ player, isHightlighted }: BaseLineProps) => {
   return (
     <div className="gap-2 grid grid-cols-[130px_130px_minmax(0,1fr)_130px]">
       <ZoneArea isCentered isHightlighted={isHightlighted}>
-        <ZoneCards zone={player.zones.champion} />
+        <ZoneCards
+          onCardContextAction={onChampionContextAction}
+          onCardPrimaryAction={onChampionPrimaryAction}
+          zone={player.zones.champion}
+        />
       </ZoneArea>
       <ZoneArea isCentered isHightlighted={isHightlighted}>
         <ZoneCards zone={player.zones.legend} />
@@ -115,6 +140,8 @@ const RunesLine = ({
 
 export const PlayerBoard: FC<Props> = ({
   isMirrored,
+  onChampionContextAction,
+  onChampionPrimaryAction,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -138,7 +165,12 @@ export const PlayerBoard: FC<Props> = ({
   }
   return (
     <>
-      <BaseLine player={player} isHightlighted={isActivePlayer} />
+      <BaseLine
+        onChampionContextAction={onChampionContextAction}
+        onChampionPrimaryAction={onChampionPrimaryAction}
+        player={player}
+        isHightlighted={isActivePlayer}
+      />
       <RunesLine
         onRuneContextAction={onRuneContextAction}
         onRunePrimaryAction={onRunePrimaryAction}
@@ -152,10 +184,17 @@ export const PlayerBoard: FC<Props> = ({
 };
 
 function ZoneCards({
+  onCardContextAction,
+  onCardPrimaryAction,
   onClick,
   showCount = false,
   zone,
 }: {
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onCardPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
   onClick?: () => void;
   showCount?: boolean;
   zone: ZoneData;
@@ -165,6 +204,8 @@ function ZoneCards({
       <CardList
         cards={zone.cards}
         count={showCount ? zone.count : undefined}
+        onCardContextAction={onCardContextAction}
+        onCardPrimaryAction={onCardPrimaryAction}
         onClick={onClick}
       />
     );
@@ -239,7 +280,10 @@ function CardList({
   cards: Card[];
   count?: number;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
-  onCardPrimaryAction?: (card: Card) => void;
+  onCardPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
   onClick?: () => void;
 }) {
   if (cards.length === 0) {
@@ -258,7 +302,9 @@ function CardList({
               : undefined
           }
           onPrimaryAction={
-            onCardPrimaryAction ? () => onCardPrimaryAction(card) : undefined
+            onCardPrimaryAction
+              ? (event) => onCardPrimaryAction(card, event)
+              : undefined
           }
           {...card}
         />
