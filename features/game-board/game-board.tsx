@@ -35,7 +35,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 }) => {
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
   const chainCards = chainCardInstanceIds.flatMap((cardInstanceId) =>
-    buildCard(cardInstanceId, cardsByInstanceId),
+    buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
   );
   const board = createBoardModel({
     cardsByInstanceId,
@@ -111,17 +111,19 @@ function createBoardModel({
   }
 
   const player = buildPlayerData({
-    cardsByInstanceId,
-    player: projection.players[viewerPlayerId],
-    playerNames,
-    scores,
-  });
+      cardsByInstanceId,
+      player: projection.players[viewerPlayerId],
+      playerNames,
+      projection,
+      scores,
+    });
   const opponent = buildPlayerData({
-    cardsByInstanceId,
-    player: projection.players[opponentPlayerId],
-    playerNames,
-    scores,
-  });
+      cardsByInstanceId,
+      player: projection.players[opponentPlayerId],
+      playerNames,
+      projection,
+      scores,
+    });
 
   const playerBattlefieldProjection = projection.battlefields.find(
     (battlefield) => battlefield.selectedByPlayerId === viewerPlayerId,
@@ -139,6 +141,7 @@ function createBoardModel({
     cardsByInstanceId,
     fallbackSelectedByPlayerId: viewerPlayerId,
     opponentPlayerId,
+    projection,
     viewerPlayerId,
     cardOwnerByInstanceId,
   });
@@ -147,6 +150,7 @@ function createBoardModel({
     cardsByInstanceId,
     fallbackSelectedByPlayerId: opponentPlayerId,
     opponentPlayerId,
+    projection,
     viewerPlayerId,
     cardOwnerByInstanceId,
   });
@@ -175,11 +179,13 @@ function buildPlayerData({
   cardsByInstanceId,
   player,
   playerNames,
+  projection,
   scores,
 }: {
   cardsByInstanceId: Record<string, CatalogCard>;
   player: ProjectedPlayerState | undefined;
   playerNames: Partial<Record<string, string>>;
+  projection: GameBoardProps["projection"];
   scores: Partial<Record<string, number>>;
 }): PlayerData {
   if (!player) {
@@ -191,14 +197,14 @@ function buildPlayerData({
     name: playerNames[player.playerId] ?? player.playerId,
     score: scores[player.playerId] ?? 0,
     zones: {
-      banishment: buildZone("banishment", player.zones.banishment, cardsByInstanceId),
-      base: buildZone("base", player.zones.base, cardsByInstanceId),
-      champion: buildZone("champion", player.zones.champion, cardsByInstanceId),
-      hand: buildZone("hand", player.zones.hand, cardsByInstanceId),
-      legend: buildZone("legend", player.zones.legend, cardsByInstanceId),
-      mainDeck: buildZone("mainDeck", player.zones.mainDeck, cardsByInstanceId),
-      runeDeck: buildZone("runeDeck", player.zones.runeDeck, cardsByInstanceId),
-      trash: buildZone("trash", player.zones.trash, cardsByInstanceId),
+      banishment: buildZone("banishment", player.zones.banishment, cardsByInstanceId, projection),
+      base: buildZone("base", player.zones.base, cardsByInstanceId, projection),
+      champion: buildZone("champion", player.zones.champion, cardsByInstanceId, projection),
+      hand: buildZone("hand", player.zones.hand, cardsByInstanceId, projection),
+      legend: buildZone("legend", player.zones.legend, cardsByInstanceId, projection),
+      mainDeck: buildZone("mainDeck", player.zones.mainDeck, cardsByInstanceId, projection),
+      runeDeck: buildZone("runeDeck", player.zones.runeDeck, cardsByInstanceId, projection),
+      trash: buildZone("trash", player.zones.trash, cardsByInstanceId, projection),
     },
   };
 }
@@ -207,9 +213,10 @@ function buildZone(
   kind: ZoneKind,
   zone: ProjectedZone,
   cardsByInstanceId: Record<string, CatalogCard>,
+  projection: GameBoardProps["projection"],
 ): ZoneData {
   const cards = zone.cardInstanceIds
-    .flatMap((cardInstanceId) => buildCard(cardInstanceId, cardsByInstanceId))
+    .flatMap((cardInstanceId) => buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates))
     .filter((card) => isCardAllowedInZone(kind, card));
 
   return {
@@ -226,6 +233,7 @@ function buildBattlefieldData({
   cardOwnerByInstanceId,
   fallbackSelectedByPlayerId,
   opponentPlayerId,
+  projection,
   viewerPlayerId,
 }: {
   battlefield: ProjectedBattlefield | undefined;
@@ -233,6 +241,7 @@ function buildBattlefieldData({
   cardOwnerByInstanceId: Record<string, string>;
   fallbackSelectedByPlayerId: string;
   opponentPlayerId: string;
+  projection: GameBoardProps["projection"];
   viewerPlayerId: string;
 }): BattlefieldData {
   const battlefieldCard = battlefield
@@ -241,9 +250,11 @@ function buildBattlefieldData({
   const unitCards = (battlefield?.units ?? []).flatMap((cardInstanceId) => {
     const ownerPlayerId =
       cardOwnerByInstanceId[cardInstanceId] ?? battlefield?.selectedByPlayerId;
-    const card = buildCard(cardInstanceId, cardsByInstanceId).filter((item) =>
-      isCardAllowedInZone("battlefield", item),
-    );
+    const card = buildCard(
+      cardInstanceId,
+      cardsByInstanceId,
+      projection.cardStates,
+    ).filter((item) => isCardAllowedInZone("battlefield", item));
 
     return card.map((item) => ({
       card: item,
@@ -269,6 +280,7 @@ function buildBattlefieldData({
 function buildCard(
   cardInstanceId: string,
   cardsByInstanceId: Record<string, CatalogCard>,
+  cardStates: GameBoardProps["projection"]["cardStates"],
 ): Card[] {
   const card = cardsByInstanceId[cardInstanceId];
 
@@ -280,7 +292,7 @@ function buildCard(
     {
       img: card.media.image_url ?? "",
       instanceId: cardInstanceId,
-      isExhausted: isCardExhausted(cardInstanceId),
+      isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
       might: card.attributes.might ?? undefined,
       name: card.name,
       supertype: card.classification.supertype ?? undefined,
@@ -325,10 +337,6 @@ function inferCardOwners(
       return ownerPlayerId ? [[cardInstanceId, ownerPlayerId]] : [];
     }),
   );
-}
-
-function isCardExhausted(cardInstanceId: string) {
-  return cardInstanceId.includes(":exhausted:") || cardInstanceId.includes("-exhausted-");
 }
 
 function showdownStateForBattlefield(

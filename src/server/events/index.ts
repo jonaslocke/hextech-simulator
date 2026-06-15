@@ -173,6 +173,17 @@ function renderIntentMessage(
 
       return `${actor} recycled ${formatCount(count, "card")} to ${destination}.`;
     }
+    case "game.addRuneResource": {
+      const resourceType =
+        (intent.payload as { resourceType?: unknown } | undefined)?.resourceType ===
+        "power"
+          ? "Power"
+          : "Energy";
+
+      return `${actor} added ${resourceType} to their rune pool.`;
+    }
+    case "game.playCard":
+      return `${actor} played a card.`;
     case "game.pass":
       return `${actor} passed.`;
     case "game.endTurn":
@@ -196,6 +207,8 @@ function renderServerDecisionMessage(event: GameEventDocument): string {
       return "Server revealed battlefield choices.";
     case "game.start":
       return "Server started the game.";
+    case "game.payCosts":
+      return "Server paid card costs.";
     case "showdown.enter":
       return "Server opened a showdown.";
     case "showdown.close":

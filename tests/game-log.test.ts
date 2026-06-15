@@ -93,6 +93,67 @@ test("renders draw channel pass and end-turn events safely", () => {
   );
 });
 
+test("renders rune resource, play card, and payment events safely", () => {
+  const entries = projectGameEventsForPlayer(
+    [
+      createEvent({
+        sequence: 1,
+        type: gameEventTypes.playerIntentAccepted,
+        actorPlayerId: "player-a",
+        payload: {
+          intent: {
+            type: "game.addRuneResource",
+            payload: {
+              runeCardInstanceId: "secret-rune",
+              resourceType: "power"
+            }
+          }
+        }
+      }),
+      createEvent({
+        sequence: 2,
+        type: gameEventTypes.playerIntentAccepted,
+        actorPlayerId: "player-a",
+        payload: {
+          intent: {
+            type: "game.playCard",
+            payload: {
+              cardInstanceId: "secret-card"
+            }
+          }
+        }
+      }),
+      createEvent({
+        sequence: 3,
+        type: gameEventTypes.serverDecision,
+        actorPlayerId: null,
+        payload: {
+          decision: {
+            type: "game.payCosts",
+            payload: {
+              energyCost: 2,
+              powerCost: 0,
+              exhaustedRuneCount: 2,
+              recycledRuneCount: 0
+            }
+          }
+        }
+      })
+    ],
+    "player-b"
+  );
+
+  assert.deepEqual(
+    entries.map((entry) => entry.message),
+    [
+      "Opponent added Power to their rune pool.",
+      "Opponent played a card.",
+      "Server paid card costs."
+    ]
+  );
+  assert.equal(entries.some((entry) => entry.message.includes("secret")), false);
+});
+
 test("renders recycle and rng events without card identities", () => {
   const entries = projectGameEventsForPlayer(
     [

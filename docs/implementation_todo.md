@@ -173,6 +173,14 @@ implemented, tested, and documented where relevant.
 - [x] Implement channel intent/action.
 - [x] Implement pass priority/focus intent.
 - [x] Implement end turn intent.
+- [x] Add canonical per-player rune pool state.
+- [x] Add canonical visible card exhaustion state.
+- [x] Implement manual Rune-to-Energy resource generation.
+- [x] Implement manual Rune-to-Power resource generation.
+- [x] Implement MVP cost model for metadata energy and domain power costs.
+- [x] Implement automatic `playCard` payment from rune pool and ready Runes.
+- [x] Implement supported Unit play from hand/champion zone to base.
+- [x] Reject unsupported immediate play text, additional costs, and unsupported card types before mutation.
 - [x] Enforce state version checks.
 - [x] Reject unsupported card behavior at intent time.
 - [x] Keep state unchanged on rejected intents.
@@ -180,6 +188,8 @@ implemented, tested, and documented where relevant.
 - [x] Add tests for channel.
 - [x] Add tests for Recycle ordering rules.
 - [x] Add tests for end turn.
+- [x] Add tests for rune-pool resource generation.
+- [x] Add tests for automatic cost payment and supported card play.
 
 ## 13. Event Log Panel
 

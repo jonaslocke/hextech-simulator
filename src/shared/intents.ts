@@ -56,6 +56,22 @@ export const recycleCardsIntentSchema = z.object({
   })
 });
 
+export const addRuneResourceIntentSchema = z.object({
+  type: z.literal("game.addRuneResource"),
+  payload: z.object({
+    runeCardInstanceId: z.string().min(1),
+    resourceType: z.enum(["energy", "power"])
+  })
+});
+
+export const playCardIntentSchema = z.object({
+  type: z.literal("game.playCard"),
+  payload: z.object({
+    cardInstanceId: z.string().min(1),
+    destination: z.literal("base").optional()
+  })
+});
+
 export const passPriorityIntentSchema = z.object({
   type: z.literal("game.pass"),
   payload: z.object({}).optional()
@@ -100,6 +116,8 @@ export type CommitMulliganIntent = z.infer<typeof commitMulliganIntentSchema>;
 export type DrawCardsIntent = z.infer<typeof drawCardsIntentSchema>;
 export type ChannelRunesIntent = z.infer<typeof channelRunesIntentSchema>;
 export type RecycleCardsIntent = z.infer<typeof recycleCardsIntentSchema>;
+export type AddRuneResourceIntent = z.infer<typeof addRuneResourceIntentSchema>;
+export type PlayCardIntent = z.infer<typeof playCardIntentSchema>;
 export type PassPriorityIntent = z.infer<typeof passPriorityIntentSchema>;
 export type EndTurnIntent = z.infer<typeof endTurnIntentSchema>;
 export type MoveUnitToBattlefieldIntent = z.infer<

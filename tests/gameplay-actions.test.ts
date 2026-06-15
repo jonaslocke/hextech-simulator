@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  addRuneResource,
   channelRunes,
   createGame,
   drawCards,
@@ -9,11 +10,13 @@ import {
   moveUnitToBattlefield,
   passPriority,
   passShowdown,
+  playCard,
   projectGameForPlayer,
   recycleCards,
   startGame,
   type Game
 } from "../src/server/match";
+import type { Card } from "../src/server/catalog";
 
 test("starts the game after starting player and mulligans are locked", () => {
   const game = createSetupCompleteGame();
@@ -82,6 +85,137 @@ test("channel moves top rune cards to base", () => {
     "a-rune-1",
     "a-rune-2"
   ]);
+});
+
+test("adding Energy exhausts a ready rune and updates the rune pool", () => {
+  const game = createInProgressGameWithRunes();
+
+  const result = addRuneResource(
+    game,
+    {
+      actorPlayerId: "player-a",
+      runeCardInstanceId: "a-rune-base-1",
+      resourceType: "energy"
+    },
+    cardLookup
+  );
+
+  assert.equal(result.canonicalState.players["player-a"]?.runePool.energy, 1);
+  assert.deepEqual(result.canonicalState.cardStates["a-rune-base-1"], {
+    exhausted: true
+  });
+});
+
+test("adding Power recycles a rune and updates the rune pool", () => {
+  const game = createInProgressGameWithRunes();
+
+  const result = addRuneResource(
+    game,
+    {
+      actorPlayerId: "player-a",
+      runeCardInstanceId: "a-rune-base-1",
+      resourceType: "power"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.canonicalState.players["player-a"]?.runePool.power, {
+    Chaos: 1
+  });
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-2"
+  ]);
+  assert.deepEqual(result.canonicalState.players["player-a"]?.zones.runeDeck, [
+    "a-rune-deck-1",
+    "a-rune-base-1"
+  ]);
+  assert.equal(result.canonicalState.cardStates["a-rune-base-1"], undefined);
+});
+
+test("playCard automatically uses pool and ready runes to pay Energy", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          runePool: {
+            energy: 1,
+            power: {}
+          },
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-unit-hand-1"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "a-unit-hand-1"
+    },
+    cardLookup
+  );
+
+  assert.deepEqual(result.payment, {
+    energyCost: 2,
+    powerCost: 0,
+    powerDomains: ["Chaos"],
+    spentEnergyFromPool: 1,
+    spentPowerFromPool: {},
+    exhaustedRuneCardInstanceIds: ["a-rune-base-1"],
+    recycledRuneCardInstanceIds: []
+  });
+  assert.equal(result.game.canonicalState.players["player-a"]?.runePool.energy, 0);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-1",
+    "a-rune-base-2",
+    "a-unit-hand-1"
+  ]);
+  assert.deepEqual(result.game.canonicalState.cardStates["a-unit-hand-1"], {
+    exhausted: true
+  });
+});
+
+test("playCard rejects unsupported immediate play behavior", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-a"]!
+              .zones,
+            hand: ["a-unit-on-play"]
+          }
+        }
+      }
+    }
+  });
+
+  assert.throws(
+    () =>
+      playCard(
+        game,
+        {
+          actorPlayerId: "player-a",
+          cardInstanceId: "a-unit-on-play"
+        },
+        cardLookup
+      ),
+    /immediate play behavior/
+  );
 });
 
 test("recycle puts one main deck card on bottom without RNG", () => {
@@ -193,6 +327,52 @@ test("end turn advances active player and clears passes", () => {
     activePlayerId: "player-b",
     phase: "awaken",
     passedPlayerIds: []
+  });
+});
+
+test("end turn clears rune pools and readies next player's board cards", () => {
+  const game = gameSchema.parse({
+    ...createInProgressGameWithRunes(),
+    canonicalState: {
+      ...createInProgressGameWithRunes().canonicalState,
+      cardStates: {
+        "b-rune-base-1": {
+          exhausted: true
+        }
+      },
+      players: {
+        ...createInProgressGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-a"]!,
+          runePool: {
+            energy: 2,
+            power: {
+              Chaos: 1
+            }
+          }
+        },
+        "player-b": {
+          ...createInProgressGameWithRunes().canonicalState.players["player-b"]!,
+          zones: {
+            ...createInProgressGameWithRunes().canonicalState.players["player-b"]!
+              .zones,
+            base: ["b-rune-base-1"]
+          }
+        }
+      }
+    }
+  });
+
+  const result = endTurn(game, {
+    actorPlayerId: "player-a"
+  });
+
+  assert.deepEqual(result.canonicalState.players["player-a"]?.runePool, {
+    energy: 0,
+    power: {}
+  });
+  assert.deepEqual(result.canonicalState.cardStates["b-rune-base-1"], {
+    exhausted: false
   });
 });
 
@@ -357,4 +537,116 @@ function createInProgressGameWithBattlefield(): Game {
       ]
     }
   });
+}
+
+function createInProgressGameWithRunes(): Game {
+  const game = createInProgressGame();
+
+  return gameSchema.parse({
+    ...game,
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates: {
+        "a-rune-base-1": {
+          exhausted: false
+        },
+        "a-rune-base-2": {
+          exhausted: false
+        }
+      },
+      players: {
+        ...game.canonicalState.players,
+        "player-a": {
+          ...game.canonicalState.players["player-a"]!,
+          zones: {
+            ...game.canonicalState.players["player-a"]!.zones,
+            runeDeck: ["a-rune-deck-1"],
+            base: ["a-rune-base-1", "a-rune-base-2"]
+          }
+        }
+      }
+    }
+  });
+}
+
+const cardLookup: Record<string, Card> = {
+  "a-rune-base-1": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-rune-base-2": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-rune-deck-1": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "b-rune-base-1": createCard({
+    domain: ["Order"],
+    energy: null,
+    name: "Order Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-unit-hand-1": createCard({
+    domain: ["Chaos"],
+    energy: 2,
+    name: "Simple Unit",
+    power: null,
+    type: "Unit"
+  }),
+  "a-unit-on-play": createCard({
+    domain: ["Chaos"],
+    energy: 1,
+    name: "On Play Unit",
+    power: null,
+    text: "When you play me, draw 1.",
+    type: "Unit"
+  })
+};
+
+function createCard(input: {
+  domain: string[];
+  energy: number | null;
+  name: string;
+  power: number | null;
+  text?: string;
+  type: Card["classification"]["type"];
+}): Card {
+  return {
+    id: input.name,
+    name: input.name,
+    public_code: input.name,
+    attributes: {
+      energy: input.energy,
+      might: input.type === "Unit" ? 2 : null,
+      power: input.power
+    },
+    classification: {
+      type: input.type,
+      supertype: null,
+      rarity: null,
+      domain: input.domain
+    },
+    text: {
+      plain: input.text ?? ""
+    },
+    set: {
+      set_id: "test",
+      label: "Test"
+    },
+    media: {},
+    tags: [],
+    metadata: {}
+  };
 }

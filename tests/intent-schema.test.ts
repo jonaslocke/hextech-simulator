@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  addRuneResourceIntentSchema,
   channelRunesIntentSchema,
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
@@ -10,6 +11,7 @@ import {
   matchIntentRequestBodySchema,
   moveUnitToBattlefieldIntentSchema,
   passPriorityIntentSchema,
+  playCardIntentSchema,
   recycleCardsIntentSchema
 } from "../src/shared/intents";
 
@@ -142,6 +144,26 @@ test("validates core gameplay intent payloads", () => {
       }
     }).payload.cardInstanceIds,
     ["a1"]
+  );
+  assert.equal(
+    addRuneResourceIntentSchema.parse({
+      type: "game.addRuneResource",
+      payload: {
+        runeCardInstanceId: "rune-1",
+        resourceType: "energy"
+      }
+    }).payload.resourceType,
+    "energy"
+  );
+  assert.equal(
+    playCardIntentSchema.parse({
+      type: "game.playCard",
+      payload: {
+        cardInstanceId: "card-1",
+        destination: "base"
+      }
+    }).payload.destination,
+    "base"
   );
   assert.equal(
     passPriorityIntentSchema.parse({

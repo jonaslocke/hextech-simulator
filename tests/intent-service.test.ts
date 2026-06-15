@@ -7,6 +7,7 @@ import type {
   GameEventRepository,
   MatchDocument
 } from "../src/server/db";
+import type { Card } from "../src/server/catalog";
 import { gameEventTypes } from "../src/server/events";
 import {
   createBestOfThreeMatch,
@@ -375,6 +376,106 @@ test("intent service opens showdown when moving to an empty battlefield", async 
   });
 });
 
+test("intent service accepts addRuneResource with server-side card metadata", async () => {
+  const game = createInProgressIntentGameWithRunes();
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-a",
+      stateVersion: game.stateVersion,
+      intent: {
+        type: "game.addRuneResource",
+        payload: {
+          runeCardInstanceId: "a-rune-base-1",
+          resourceType: "energy"
+        }
+      }
+    },
+    {
+      cardsByInstanceId: intentCardLookup
+    }
+  );
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.equal(result.game.canonicalState.players["player-a"]?.runePool.energy, 1);
+  assert.deepEqual(result.events.map((event) => event.type), [
+    gameEventTypes.playerIntentAccepted
+  ]);
+});
+
+test("intent service accepts playCard and appends payment decision", async () => {
+  const game = gameSchema.parse({
+    ...createInProgressIntentGameWithRunes(),
+    canonicalState: {
+      ...createInProgressIntentGameWithRunes().canonicalState,
+      players: {
+        ...createInProgressIntentGameWithRunes().canonicalState.players,
+        "player-a": {
+          ...createInProgressIntentGameWithRunes().canonicalState.players["player-a"]!,
+          zones: {
+            ...createInProgressIntentGameWithRunes().canonicalState.players[
+              "player-a"
+            ]!.zones,
+            hand: ["a-unit-hand-1"]
+          }
+        }
+      }
+    }
+  });
+  const { repositories } = createIntentFixture({ game });
+
+  const result = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-a",
+      stateVersion: game.stateVersion,
+      intent: {
+        type: "game.playCard",
+        payload: {
+          cardInstanceId: "a-unit-hand-1"
+        }
+      }
+    },
+    {
+      cardsByInstanceId: intentCardLookup
+    }
+  );
+
+  assert.equal(result.accepted, true);
+
+  if (!result.accepted) {
+    return;
+  }
+
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
+  assert.deepEqual(
+    result.events.map((event) => event.type),
+    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+  );
+  assert.deepEqual(result.events[1]?.payload, {
+    decision: {
+      type: "game.payCosts",
+      payload: {
+        energyCost: 2,
+        powerCost: 0,
+        exhaustedRuneCount: 2,
+        recycledRuneCount: 0
+      }
+    }
+  });
+});
+
 test("intent service closes showdown after both relevant players pass", async () => {
   const game = gameSchema.parse({
     ...createInProgressIntentGameWithBattlefield(),
@@ -729,4 +830,92 @@ function createInProgressIntentGameWithBattlefield(): Game {
       ]
     }
   });
+}
+
+function createInProgressIntentGameWithRunes(): Game {
+  const game = createInProgressIntentGame();
+
+  return gameSchema.parse({
+    ...game,
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates: {
+        "a-rune-base-1": {
+          exhausted: false
+        },
+        "a-rune-base-2": {
+          exhausted: false
+        }
+      },
+      players: {
+        ...game.canonicalState.players,
+        "player-a": {
+          ...game.canonicalState.players["player-a"]!,
+          zones: {
+            ...game.canonicalState.players["player-a"]!.zones,
+            base: ["a-rune-base-1", "a-rune-base-2"]
+          }
+        }
+      }
+    }
+  });
+}
+
+const intentCardLookup: Record<string, Card> = {
+  "a-rune-base-1": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-rune-base-2": createCard({
+    domain: ["Chaos"],
+    energy: null,
+    name: "Chaos Rune",
+    power: null,
+    type: "Rune"
+  }),
+  "a-unit-hand-1": createCard({
+    domain: ["Chaos"],
+    energy: 2,
+    name: "Simple Unit",
+    power: null,
+    type: "Unit"
+  })
+};
+
+function createCard(input: {
+  domain: string[];
+  energy: number | null;
+  name: string;
+  power: number | null;
+  type: Card["classification"]["type"];
+}): Card {
+  return {
+    id: input.name,
+    name: input.name,
+    public_code: input.name,
+    attributes: {
+      energy: input.energy,
+      might: input.type === "Unit" ? 2 : null,
+      power: input.power
+    },
+    classification: {
+      type: input.type,
+      supertype: null,
+      rarity: null,
+      domain: input.domain
+    },
+    text: {
+      plain: ""
+    },
+    set: {
+      set_id: "test",
+      label: "Test"
+    },
+    media: {},
+    tags: [],
+    metadata: {}
+  };
 }

@@ -38,9 +38,14 @@ test("creates a setup-pending game with initial setup state", () => {
     rngAlgorithm: "seedrandom",
     rngStep: 0
   });
+  assert.deepEqual(game.canonicalState.cardStates, {});
   assert.deepEqual(game.canonicalState.players, {
     "player-a": {
       playerId: "player-a",
+      runePool: {
+        energy: 0,
+        power: {}
+      },
       zones: {
         legend: null,
         champion: null,
@@ -54,6 +59,10 @@ test("creates a setup-pending game with initial setup state", () => {
     },
     "player-b": {
       playerId: "player-b",
+      runePool: {
+        energy: 0,
+        power: {}
+      },
       zones: {
         legend: null,
         champion: null,

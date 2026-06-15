@@ -8,6 +8,7 @@ import {
   shuffleItems,
   type RandomOperation
 } from "../engine";
+import type { Card } from "../catalog";
 
 export const gameStatuses = ["setup_pending", "ready", "in_progress", "complete"] as const;
 export const gameTurnPhases = [
@@ -64,6 +65,15 @@ export const showdownStateSchema = z.object({
   passedPlayerIds: z.array(z.string().min(1))
 });
 
+export const runePoolSchema = z.object({
+  energy: z.number().int().min(0),
+  power: z.record(z.string().min(1), z.number().int().min(0))
+});
+
+export const cardObjectStateSchema = z.object({
+  exhausted: z.boolean()
+});
+
 export const playerZonesSchema = z.object({
   legend: z.string().min(1).nullable(),
   champion: z.string().min(1).nullable(),
@@ -77,6 +87,7 @@ export const playerZonesSchema = z.object({
 
 export const gamePlayerStateSchema = z.object({
   playerId: z.string().min(1),
+  runePool: runePoolSchema.default({ energy: 0, power: {} }),
   zones: playerZonesSchema
 });
 
@@ -95,6 +106,7 @@ export const battlefieldStateSchema = z.object({
 
 export const canonicalGameStateSchema = z.object({
   battlefields: z.array(battlefieldStateSchema),
+  cardStates: z.record(z.string().min(1), cardObjectStateSchema).default({}),
   rng: rngStateSchema,
   players: z.record(z.string().min(1), gamePlayerStateSchema),
   setup: gameSetupStateSchema,
@@ -125,8 +137,11 @@ export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
 export type GameTurnPhase = (typeof gameTurnPhases)[number];
 export type GameTurnState = z.infer<typeof gameTurnStateSchema>;
 export type ShowdownState = z.infer<typeof showdownStateSchema>;
+export type RunePool = z.infer<typeof runePoolSchema>;
+export type CardObjectState = z.infer<typeof cardObjectStateSchema>;
 export type CanonicalGameState = z.infer<typeof canonicalGameStateSchema>;
 export type Game = z.infer<typeof gameSchema>;
+export type CardLookup = Readonly<Record<string, Card>>;
 
 export type CreateGameInput = {
   id?: string;
@@ -210,6 +225,35 @@ export type RecycleCardsResult = {
   randomOperations: RandomOperation[];
 };
 
+export type AddRuneResourceInput = {
+  actorPlayerId: string;
+  runeCardInstanceId: string;
+  resourceType: "energy" | "power";
+  now?: string;
+};
+
+export type PaymentPlan = {
+  energyCost: number;
+  powerCost: number;
+  powerDomains: string[];
+  spentEnergyFromPool: number;
+  spentPowerFromPool: Record<string, number>;
+  exhaustedRuneCardInstanceIds: string[];
+  recycledRuneCardInstanceIds: string[];
+};
+
+export type PlayCardInput = {
+  actorPlayerId: string;
+  cardInstanceId: string;
+  destination?: "base";
+  now?: string;
+};
+
+export type PlayCardResult = {
+  game: Game;
+  payment: PaymentPlan;
+};
+
 export type PassPriorityInput = {
   actorPlayerId: string;
   now?: string;
@@ -239,6 +283,7 @@ export function createGame(input: CreateGameInput): Game {
   const now = input.now ?? new Date().toISOString();
   const canonicalState: CanonicalGameState = {
     battlefields: [],
+    cardStates: {},
     rng: createRngState(input.rngSeed ?? id),
     players: createInitialPlayerStates(input),
     setup: {
@@ -779,6 +824,7 @@ export function channelRunes(game: Game, input: ChannelRunesInput): Game {
   assertGamePlayer(game, input.actorPlayerId);
 
   const player = game.canonicalState.players[input.actorPlayerId]!;
+  const channeledRuneCardInstanceIds = player.zones.runeDeck.slice(0, count);
 
   if (player.zones.runeDeck.length < count) {
     throw new Error("Rune Deck does not contain enough runes to channel.");
@@ -790,6 +836,15 @@ export function channelRunes(game: Game, input: ChannelRunesInput): Game {
     stateVersion: game.stateVersion + 1,
     canonicalState: {
       ...game.canonicalState,
+      cardStates: {
+        ...game.canonicalState.cardStates,
+        ...Object.fromEntries(
+          channeledRuneCardInstanceIds.map((cardInstanceId) => [
+            cardInstanceId,
+            game.canonicalState.cardStates[cardInstanceId] ?? { exhausted: false }
+          ])
+        )
+      },
       turn: {
         ...game.canonicalState.turn!,
         passedPlayerIds: []
@@ -801,7 +856,7 @@ export function channelRunes(game: Game, input: ChannelRunesInput): Game {
           zones: {
             ...player.zones,
             runeDeck: player.zones.runeDeck.slice(count),
-            base: [...player.zones.base, ...player.zones.runeDeck.slice(0, count)]
+            base: [...player.zones.base, ...channeledRuneCardInstanceIds]
           }
         }
       }
@@ -850,6 +905,11 @@ export function recycleCards(
   const nextSourceCards = sourceCards.filter(
     (cardInstanceId) => !selectedSet.has(cardInstanceId)
   );
+  const cardStates = { ...game.canonicalState.cardStates };
+
+  for (const cardInstanceId of input.cardInstanceIds) {
+    delete cardStates[cardInstanceId];
+  }
 
   return {
     game: gameSchema.parse({
@@ -858,6 +918,7 @@ export function recycleCards(
       stateVersion: game.stateVersion + 1,
       canonicalState: {
         ...game.canonicalState,
+        cardStates,
         rng: rngState,
         players: {
           ...game.canonicalState.players,
@@ -876,6 +937,195 @@ export function recycleCards(
       }
     }),
     randomOperations
+  };
+}
+
+export function addRuneResource(
+  game: Game,
+  input: AddRuneResourceInput,
+  cardsByInstanceId: CardLookup
+): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+
+  if (!player.zones.base.includes(input.runeCardInstanceId)) {
+    throw new Error("Rune must be in the acting player's base.");
+  }
+
+  const runeCard = requireCard(cardsByInstanceId, input.runeCardInstanceId);
+
+  if (runeCard.classification.type !== "Rune") {
+    throw new Error("Only Rune cards can add rune-pool resources.");
+  }
+
+  if (input.resourceType === "energy") {
+    const currentState = game.canonicalState.cardStates[input.runeCardInstanceId] ?? {
+      exhausted: false
+    };
+
+    if (currentState.exhausted) {
+      throw new Error("Exhausted runes cannot add Energy.");
+    }
+
+    return gameSchema.parse({
+      ...game,
+      updatedAt: input.now ?? new Date().toISOString(),
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...game.canonicalState,
+        cardStates: {
+          ...game.canonicalState.cardStates,
+          [input.runeCardInstanceId]: {
+            exhausted: true
+          }
+        },
+        turn: {
+          ...game.canonicalState.turn!,
+          passedPlayerIds: []
+        },
+        players: {
+          ...game.canonicalState.players,
+          [input.actorPlayerId]: {
+            ...player,
+            runePool: {
+              ...player.runePool,
+              energy: player.runePool.energy + 1
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const domain = requireSingleRuneDomain(runeCard);
+  const cardStates = { ...game.canonicalState.cardStates };
+  delete cardStates[input.runeCardInstanceId];
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates,
+      turn: {
+        ...game.canonicalState.turn!,
+        passedPlayerIds: []
+      },
+      players: {
+        ...game.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...player,
+          runePool: {
+            ...player.runePool,
+            power: addPower(player.runePool.power, domain, 1)
+          },
+          zones: {
+            ...player.zones,
+            base: player.zones.base.filter(
+              (cardInstanceId) => cardInstanceId !== input.runeCardInstanceId
+            ),
+            runeDeck: [...player.zones.runeDeck, input.runeCardInstanceId]
+          }
+        }
+      }
+    }
+  });
+}
+
+export function playCard(
+  game: Game,
+  input: PlayCardInput,
+  cardsByInstanceId: CardLookup
+): PlayCardResult {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  if (game.canonicalState.showdown !== null) {
+    throw new Error("Playing cards during showdown is not implemented.");
+  }
+
+  if (input.destination && input.destination !== "base") {
+    throw new Error("Only playing units to base is supported.");
+  }
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+  const sourceZone = player.zones.hand.includes(input.cardInstanceId)
+    ? "hand"
+    : player.zones.champion === input.cardInstanceId
+      ? "champion"
+      : null;
+
+  if (sourceZone === null) {
+    throw new Error("Card must be in hand or champion zone to be played.");
+  }
+
+  const card = requireCard(cardsByInstanceId, input.cardInstanceId);
+
+  if (card.classification.type !== "Unit") {
+    throw new Error("Only Unit card play to base is supported.");
+  }
+
+  assertSupportedMvpCardPlay(card);
+
+  const payment = buildAutomaticPaymentPlan(
+    game,
+    input.actorPlayerId,
+    readCardCost(card),
+    cardsByInstanceId
+  );
+  const paidGame = applyPaymentPlan(
+    game,
+    input.actorPlayerId,
+    payment,
+    cardsByInstanceId,
+    input.now
+  );
+  const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
+  const zones =
+    sourceZone === "hand"
+      ? {
+          ...paidPlayer.zones,
+          hand: paidPlayer.zones.hand.filter(
+            (cardInstanceId) => cardInstanceId !== input.cardInstanceId
+          ),
+          base: [...paidPlayer.zones.base, input.cardInstanceId]
+        }
+      : {
+          ...paidPlayer.zones,
+          champion: null,
+          base: [...paidPlayer.zones.base, input.cardInstanceId]
+        };
+
+  return {
+    game: gameSchema.parse({
+      ...paidGame,
+      updatedAt: input.now ?? new Date().toISOString(),
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...paidGame.canonicalState,
+        cardStates: {
+          ...paidGame.canonicalState.cardStates,
+          [input.cardInstanceId]: {
+            exhausted: true
+          }
+        },
+        turn: {
+          ...paidGame.canonicalState.turn!,
+          passedPlayerIds: []
+        },
+        players: {
+          ...paidGame.canonicalState.players,
+          [input.actorPlayerId]: {
+            ...paidPlayer,
+            zones
+          }
+        }
+      }
+    }),
+    payment
   };
 }
 
@@ -920,12 +1170,34 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
     throw new Error("Next player could not be determined.");
   }
 
+  const players = Object.fromEntries(
+    game.canonicalState.setup.playerIds.map((playerId) => {
+      const player = game.canonicalState.players[playerId]!;
+
+      return [
+        playerId,
+        {
+          ...player,
+          runePool: {
+            energy: 0,
+            power: {}
+          }
+        }
+      ];
+    })
+  );
+
   return gameSchema.parse({
     ...game,
     updatedAt: input.now ?? new Date().toISOString(),
     stateVersion: game.stateVersion + 1,
     canonicalState: {
       ...game.canonicalState,
+      cardStates: readyPlayerBoardCards(
+        game.canonicalState.cardStates,
+        game.canonicalState.players[nextPlayerId]!.zones
+      ),
+      players,
       turn: {
         turnNumber: turn.turnNumber + 1,
         activePlayerId: nextPlayerId,
@@ -1085,6 +1357,10 @@ function createInitialPlayerStates(
       playerId,
       {
         playerId,
+        runePool: {
+          energy: 0,
+          power: {}
+        },
         zones: {
           legend: null,
           champion: null,
@@ -1204,6 +1480,261 @@ function assertPositiveCount(count: number) {
   if (!Number.isInteger(count) || count < 1) {
     throw new Error("Count must be a positive integer.");
   }
+}
+
+function requireCard(cardsByInstanceId: CardLookup, cardInstanceId: string): Card {
+  const card = cardsByInstanceId[cardInstanceId];
+
+  if (!card) {
+    throw new Error(`Card metadata was not found for instance: ${cardInstanceId}`);
+  }
+
+  return card;
+}
+
+function requireSingleRuneDomain(card: Card): string {
+  const domains = card.classification.domain.filter((domain) => domain !== "Colorless");
+
+  if (domains.length !== 1) {
+    throw new Error("Rune Power generation requires exactly one non-colorless domain.");
+  }
+
+  return domains[0]!;
+}
+
+function addPower(
+  power: Record<string, number>,
+  domain: string,
+  amount: number
+): Record<string, number> {
+  return {
+    ...power,
+    [domain]: (power[domain] ?? 0) + amount
+  };
+}
+
+function readCardCost(card: Card): {
+  energy: number;
+  power: number;
+  powerDomains: string[];
+} {
+  const energy = card.attributes.energy ?? 0;
+  const power = card.attributes.power ?? 0;
+  const powerDomains = card.classification.domain.filter(
+    (domain) => domain !== "Colorless"
+  );
+
+  if (energy < 0 || power < 0) {
+    throw new Error("Negative costs are not supported.");
+  }
+
+  if (power > 0 && powerDomains.length === 0) {
+    throw new Error("Power costs require at least one card domain.");
+  }
+
+  return {
+    energy,
+    power,
+    powerDomains
+  };
+}
+
+function assertSupportedMvpCardPlay(card: Card) {
+  const text = card.text.plain.toLowerCase();
+
+  if (text.includes("additional cost")) {
+    throw new Error("Additional costs are not implemented.");
+  }
+
+  if (
+    text.includes("when you play me") ||
+    text.includes("when i'm played") ||
+    text.includes("when i am played") ||
+    text.includes("when you play this") ||
+    text.includes("when this is played") ||
+    text.includes("i enter ready") ||
+    text.includes("enters ready") ||
+    text.includes("you may play me to")
+  ) {
+    throw new Error("This card's immediate play behavior is not implemented.");
+  }
+}
+
+function buildAutomaticPaymentPlan(
+  game: Game,
+  playerId: string,
+  cost: {
+    energy: number;
+    power: number;
+    powerDomains: string[];
+  },
+  cardsByInstanceId: CardLookup
+): PaymentPlan {
+  const player = game.canonicalState.players[playerId]!;
+  let remainingEnergy = cost.energy;
+  let remainingPower = cost.power;
+  const spentPowerFromPool: Record<string, number> = {};
+  const exhaustedRuneCardInstanceIds: string[] = [];
+  const recycledRuneCardInstanceIds: string[] = [];
+
+  const spentEnergyFromPool = Math.min(player.runePool.energy, remainingEnergy);
+  remainingEnergy -= spentEnergyFromPool;
+
+  for (const domain of cost.powerDomains) {
+    if (remainingPower === 0) {
+      break;
+    }
+
+    const spent = Math.min(player.runePool.power[domain] ?? 0, remainingPower);
+
+    if (spent > 0) {
+      spentPowerFromPool[domain] = spent;
+      remainingPower -= spent;
+    }
+  }
+
+  for (const runeCardInstanceId of player.zones.base) {
+    if (remainingEnergy === 0) {
+      break;
+    }
+
+    const card = cardsByInstanceId[runeCardInstanceId];
+    const state = game.canonicalState.cardStates[runeCardInstanceId] ?? {
+      exhausted: false
+    };
+
+    if (card?.classification.type === "Rune" && !state.exhausted) {
+      exhaustedRuneCardInstanceIds.push(runeCardInstanceId);
+      remainingEnergy -= 1;
+    }
+  }
+
+  if (remainingEnergy > 0) {
+    throw new Error("Not enough Energy to pay this card's cost.");
+  }
+
+  for (const runeCardInstanceId of player.zones.base) {
+    if (remainingPower === 0) {
+      break;
+    }
+
+    const card = cardsByInstanceId[runeCardInstanceId];
+
+    if (!card || card.classification.type !== "Rune") {
+      continue;
+    }
+
+    const domain = requireSingleRuneDomain(card);
+
+    if (cost.powerDomains.includes(domain)) {
+      recycledRuneCardInstanceIds.push(runeCardInstanceId);
+      remainingPower -= 1;
+    }
+  }
+
+  if (remainingPower > 0) {
+    throw new Error("Not enough Power to pay this card's cost.");
+  }
+
+  if (recycledRuneCardInstanceIds.length > 1) {
+    throw new Error("Automatic payment for multiple recycled runes is not implemented.");
+  }
+
+  return {
+    energyCost: cost.energy,
+    powerCost: cost.power,
+    powerDomains: cost.powerDomains,
+    spentEnergyFromPool,
+    spentPowerFromPool,
+    exhaustedRuneCardInstanceIds,
+    recycledRuneCardInstanceIds
+  };
+}
+
+function applyPaymentPlan(
+  game: Game,
+  playerId: string,
+  payment: PaymentPlan,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  const player = game.canonicalState.players[playerId]!;
+  const recycledSet = new Set(payment.recycledRuneCardInstanceIds);
+  const cardStates = { ...game.canonicalState.cardStates };
+  const power = { ...player.runePool.power };
+
+  for (const [domain, spent] of Object.entries(payment.spentPowerFromPool)) {
+    power[domain] = Math.max(0, (power[domain] ?? 0) - spent);
+  }
+
+  for (const runeCardInstanceId of payment.recycledRuneCardInstanceIds) {
+    const runeCard = requireCard(cardsByInstanceId, runeCardInstanceId);
+    const domain = requireSingleRuneDomain(runeCard);
+    const current = power[domain] ?? 0;
+
+    if (current > 0) {
+      power[domain] = current - 1;
+    }
+
+    delete cardStates[runeCardInstanceId];
+  }
+
+  for (const runeCardInstanceId of payment.exhaustedRuneCardInstanceIds) {
+    if (!recycledSet.has(runeCardInstanceId)) {
+      cardStates[runeCardInstanceId] = {
+        exhausted: true
+      };
+    }
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates,
+      players: {
+        ...game.canonicalState.players,
+        [playerId]: {
+          ...player,
+          runePool: {
+            energy: player.runePool.energy - payment.spentEnergyFromPool,
+            power: Object.fromEntries(
+              Object.entries(power).filter(([, amount]) => amount > 0)
+            )
+          },
+          zones: {
+            ...player.zones,
+            base: player.zones.base.filter(
+              (cardInstanceId) => !recycledSet.has(cardInstanceId)
+            ),
+            runeDeck: [
+              ...player.zones.runeDeck,
+              ...payment.recycledRuneCardInstanceIds
+            ]
+          }
+        }
+      }
+    }
+  });
+}
+
+function readyPlayerBoardCards(
+  cardStates: Record<string, CardObjectState>,
+  zones: PlayerZones
+): Record<string, CardObjectState> {
+  const readyIds = new Set([
+    ...(zones.legend === null ? [] : [zones.legend]),
+    ...(zones.champion === null ? [] : [zones.champion]),
+    ...zones.base
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(cardStates).map(([cardInstanceId, state]) => [
+      cardInstanceId,
+      readyIds.has(cardInstanceId) ? { ...state, exhausted: false } : state
+    ])
+  );
 }
 
 function nextRelevantPlayer(relevantPlayerIds: string[], currentPlayerId: string): string {

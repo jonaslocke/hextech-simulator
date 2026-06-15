@@ -1,5 +1,6 @@
-import type { GameEventDocument, Repositories } from "../db";
+import type { GameEventDocument, MatchDocument, Repositories } from "../db";
 import type { RandomOperation } from "../engine";
+import type { Card } from "../catalog";
 import {
   createPlayerIntentAcceptedEvent,
   createRandomOperationEvent,
@@ -8,6 +9,7 @@ import {
   type GameLogEntry
 } from "../events";
 import {
+  addRuneResourceIntentSchema,
   channelRunesIntentSchema,
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
@@ -17,10 +19,12 @@ import {
   matchIntentPayloadSchema,
   moveUnitToBattlefieldIntentSchema,
   passPriorityIntentSchema,
+  playCardIntentSchema,
   recycleCardsIntentSchema,
   type MatchIntentPayload
 } from "../../shared/intents";
 import {
+  addRuneResource,
   channelRunes,
   chooseStartingPlayer,
   commitMulligan,
@@ -30,15 +34,18 @@ import {
   moveUnitToBattlefield,
   passPriority,
   passShowdown,
+  playCard,
   recycleCards,
   revealBattlefieldChoices,
   startGame,
+  type CardLookup,
   type Game
 } from "./game";
 import { projectGameForPlayer, type GameProjection } from "./projections";
 import { verifyPlayerToken } from "./tokens";
 
 export type IntentServiceOptions = {
+  cardsByInstanceId?: CardLookup;
   createEventId?: (input: { gameId: string; sequence: number }) => string;
   now?: () => string;
 };
@@ -65,7 +72,8 @@ export type IntentServiceResult =
   | IntentServiceRejectedResult;
 
 export async function handleMatchIntent(
-  repositories: Pick<Repositories, "matches" | "games" | "gameEvents">,
+  repositories: Pick<Repositories, "matches" | "games" | "gameEvents"> &
+    Partial<Pick<Repositories, "deckSnapshots">>,
   input: MatchIntentPayload,
   options: IntentServiceOptions = {}
 ): Promise<IntentServiceResult> {
@@ -114,7 +122,16 @@ export async function handleMatchIntent(
   }
 
   const now = options.now?.() ?? new Date().toISOString();
-  const transition = applyIntent(game, seat.playerId, payload, now);
+  const cardsByInstanceId =
+    options.cardsByInstanceId ??
+    (await loadCardsByInstanceIdForMatch(repositories, match));
+  const transition = applyIntent(
+    game,
+    seat.playerId,
+    payload,
+    now,
+    cardsByInstanceId
+  );
 
   if (!transition.accepted) {
     return transition;
@@ -196,7 +213,8 @@ function applyIntent(
   game: Game,
   actorPlayerId: string,
   input: MatchIntentPayload,
-  now: string
+  now: string,
+  cardsByInstanceId: CardLookup
 ): AppliedIntentResult {
   try {
     switch (input.intent.type) {
@@ -331,6 +349,68 @@ function applyIntent(
         };
       }
 
+      case "game.addRuneResource": {
+        const intent = addRuneResourceIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: addRuneResource(
+            game,
+            {
+              actorPlayerId,
+              runeCardInstanceId: intent.payload.runeCardInstanceId,
+              resourceType: intent.payload.resourceType,
+              now
+            },
+            cardsByInstanceId
+          ),
+          serverDecisions: [],
+          randomOperations: []
+        };
+      }
+
+      case "game.playCard": {
+        const intent = playCardIntentSchema.parse(input.intent);
+
+        if (game.canonicalState.showdown !== null) {
+          return reject(
+            "unsupported_intent",
+            "Action/Reaction play during showdown is not implemented.",
+            input.intent.type
+          );
+        }
+
+        const result = playCard(
+          game,
+          {
+            actorPlayerId,
+            cardInstanceId: intent.payload.cardInstanceId,
+            destination: intent.payload.destination,
+            now
+          },
+          cardsByInstanceId
+        );
+
+        return {
+          accepted: true,
+          game: result.game,
+          serverDecisions: [
+            {
+              type: "game.payCosts",
+              payload: {
+                energyCost: result.payment.energyCost,
+                powerCost: result.payment.powerCost,
+                exhaustedRuneCount:
+                  result.payment.exhaustedRuneCardInstanceIds.length,
+                recycledRuneCount:
+                  result.payment.recycledRuneCardInstanceIds.length
+              }
+            }
+          ],
+          randomOperations: []
+        };
+      }
+
       case "game.pass": {
         passPriorityIntentSchema.parse(input.intent);
         const passedGame =
@@ -403,7 +483,6 @@ function applyIntent(
         };
       }
 
-      case "game.playCard":
       case "game.activateAbility":
         if (game.canonicalState.showdown !== null) {
           return reject(
@@ -448,6 +527,32 @@ function reject(
       ...(source ? { source } : {})
     }
   };
+}
+
+async function loadCardsByInstanceIdForMatch(
+  repositories: Partial<Pick<Repositories, "deckSnapshots">>,
+  match: MatchDocument
+): Promise<CardLookup> {
+  if (!repositories.deckSnapshots) {
+    return {};
+  }
+
+  const deckSnapshots = await Promise.all(
+    match.playerSeats.map((seat) =>
+      seat.deckSnapshotId
+        ? repositories.deckSnapshots!.findById(seat.deckSnapshotId)
+        : Promise.resolve(null)
+    )
+  );
+
+  return Object.fromEntries(
+    deckSnapshots.flatMap((document) =>
+      document?.snapshot.instances.map((instance) => [
+        instance.instanceId,
+        instance.card
+      ]) ?? []
+    )
+  ) satisfies Record<string, Card>;
 }
 
 function createEventId(

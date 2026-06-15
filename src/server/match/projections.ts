@@ -1,6 +1,15 @@
 import { z } from "zod";
 import type { BattlefieldState, Game, PlayerZones } from "./game";
 
+export const projectedRunePoolSchema = z.object({
+  energy: z.number().int().nonnegative(),
+  power: z.record(z.string().min(1), z.number().int().nonnegative())
+});
+
+export const projectedCardStateSchema = z.object({
+  exhausted: z.boolean()
+});
+
 export const projectedZoneSchema = z.object({
   cardInstanceIds: z.array(z.string().min(1)),
   count: z.number().int().nonnegative(),
@@ -21,6 +30,7 @@ export const projectedPlayerZonesSchema = z.object({
 export const projectedPlayerStateSchema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
+  runePool: projectedRunePoolSchema,
   zones: projectedPlayerZonesSchema
 });
 
@@ -93,9 +103,12 @@ export const gameProjectionSchema = z.object({
   turn: projectedTurnStateSchema,
   showdown: projectedShowdownStateSchema,
   players: z.record(z.string().min(1), projectedPlayerStateSchema),
-  battlefields: z.array(projectedBattlefieldSchema)
+  battlefields: z.array(projectedBattlefieldSchema),
+  cardStates: z.record(z.string().min(1), projectedCardStateSchema)
 });
 
+export type ProjectedRunePool = z.infer<typeof projectedRunePoolSchema>;
+export type ProjectedCardState = z.infer<typeof projectedCardStateSchema>;
 export type ProjectedZone = z.infer<typeof projectedZoneSchema>;
 export type ProjectedPlayerZones = z.infer<typeof projectedPlayerZonesSchema>;
 export type ProjectedPlayerState = z.infer<typeof projectedPlayerStateSchema>;
@@ -110,6 +123,29 @@ export function projectGameForPlayer(game: Game, viewerPlayerId: string): GamePr
     throw new Error("Viewer must be one of the game players.");
   }
 
+  const players = Object.fromEntries(
+    game.canonicalState.setup.playerIds.map((playerId) => {
+      const player = game.canonicalState.players[playerId];
+
+      if (!player) {
+        throw new Error("Game player state is missing.");
+      }
+
+      return [
+        playerId,
+        {
+          playerId,
+          isViewer: playerId === viewerPlayerId,
+          runePool: player.runePool,
+          zones: projectZones(player.zones, playerId === viewerPlayerId)
+        }
+      ];
+    })
+  );
+  const battlefields = game.canonicalState.battlefields.map((battlefield) =>
+    projectBattlefield(battlefield, viewerPlayerId)
+  );
+
   return gameProjectionSchema.parse({
     id: game.id,
     matchId: game.matchId,
@@ -121,27 +157,9 @@ export function projectGameForPlayer(game: Game, viewerPlayerId: string): GamePr
     setup: projectSetup(game, viewerPlayerId),
     turn: game.canonicalState.turn,
     showdown: game.canonicalState.showdown,
-    players: Object.fromEntries(
-      game.canonicalState.setup.playerIds.map((playerId) => {
-        const player = game.canonicalState.players[playerId];
-
-        if (!player) {
-          throw new Error("Game player state is missing.");
-        }
-
-        return [
-          playerId,
-          {
-            playerId,
-            isViewer: playerId === viewerPlayerId,
-            zones: projectZones(player.zones, playerId === viewerPlayerId)
-          }
-        ];
-      })
-    ),
-    battlefields: game.canonicalState.battlefields.map((battlefield) =>
-      projectBattlefield(battlefield, viewerPlayerId)
-    )
+    players,
+    battlefields,
+    cardStates: projectCardStates(game, players, battlefields)
   });
 }
 
@@ -260,4 +278,38 @@ function secretZone(count: number): ProjectedZone {
     count,
     visibility: "secret"
   };
+}
+
+function projectCardStates(
+  game: Game,
+  players: Record<string, ProjectedPlayerState>,
+  battlefields: ProjectedBattlefield[]
+): Record<string, ProjectedCardState> {
+  const visibleCardInstanceIds = new Set<string>();
+
+  for (const player of Object.values(players)) {
+    for (const zone of Object.values(player.zones)) {
+      for (const cardInstanceId of zone.cardInstanceIds) {
+        visibleCardInstanceIds.add(cardInstanceId);
+      }
+    }
+  }
+
+  for (const battlefield of battlefields) {
+    visibleCardInstanceIds.add(battlefield.cardInstanceId);
+
+    for (const unitCardInstanceId of battlefield.units) {
+      visibleCardInstanceIds.add(unitCardInstanceId);
+    }
+
+    if (battlefield.facedownSlot?.cardInstanceId) {
+      visibleCardInstanceIds.add(battlefield.facedownSlot.cardInstanceId);
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(game.canonicalState.cardStates).filter(([cardInstanceId]) =>
+      visibleCardInstanceIds.has(cardInstanceId)
+    )
+  );
 }

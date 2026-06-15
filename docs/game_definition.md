@@ -343,8 +343,8 @@ Required MVP capabilities:
 - Opening draw and mulligan.
 - Draw during Draw Phase and by supported effects.
 - Channel during Channel Phase and by supported effects.
-- Add resources for supported effects.
-- Play supported cards.
+- Add energy or power to a player's rune pool from supported Rune abilities.
+- Play supported cards after validating and paying their energy and power costs.
 - Activate supported abilities.
 - Move units through legal Standard Move or supported effects.
 - Pass priority/focus where applicable.
@@ -364,6 +364,60 @@ Unsupported behavior:
   rule when available.
 - A valid deck may contain unsupported cards. Unsupported behavior only blocks
   the attempted intent that needs it.
+
+### Rune Pool MVP
+
+The rune pool is a per-player canonical state object, not a UI-only counter.
+
+It stores:
+
+- Energy as a numeric amount.
+- Power as domain-keyed amounts.
+
+Supported MVP resource generation:
+
+- A ready Rune in a player's base can be exhausted to add 1 Energy to that
+  player's rune pool.
+- A Rune in a player's base can be recycled to its owner's Rune Deck to add 1
+  Power matching that Rune's non-colorless domain.
+- Rune-pool resources are spent by cost payment and clear at end of turn.
+- End-turn advancement readies the next active player's board objects for the
+  next turn's Awaken state.
+
+The MVP does not yet implement non-Rune Add abilities, resource reactions while
+paying a cost, universal/rainbow Power, player-selected multi-rune payment
+ordering, or generated resources from card text other than the supported basic
+Rune abilities.
+
+### Card Cost Payment MVP
+
+Cost payment is a distinct rules subsystem from zone movement.
+
+Supported MVP payment behavior:
+
+- Card costs are read from authoritative card metadata.
+- Energy and Power costs are separate.
+- Power costs are payable with Power matching one of the played card's
+  non-colorless domains.
+- A player may manually add resources to their rune pool before playing a card.
+- `PlayCard` automatically spends available rune-pool resources first.
+- If more Energy is needed, `PlayCard` automatically exhausts ready Runes in
+  the player's base in deterministic board order.
+- If more Power is needed, `PlayCard` automatically recycles a matching Rune
+  from the player's base when exactly one recycled Rune is required.
+- Supported MVP Unit cards can be played from hand or champion zone to that
+  player's base and enter exhausted.
+
+Unsupported MVP payment behavior rejects before state mutation:
+
+- Additional costs.
+- Alternative costs.
+- Cost increases and discounts.
+- Multi-rune automatic Power payment that would require owner-selected Rune Deck
+  ordering.
+- Spell and Gear play.
+- Card text with immediate "when you play" or "enter ready" behavior.
+- Playing cards during showdown.
 
 ## Showdown MVP
 
