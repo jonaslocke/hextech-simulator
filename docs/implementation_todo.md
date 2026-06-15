@@ -168,7 +168,7 @@ implemented, tested, and documented where relevant.
 - [x] Recycle Main Deck cards to the bottom of their owner's Main Deck.
 - [x] Randomize simultaneous 2+ card Main Deck recycle order with seeded RNG.
 - [x] Recycle Runes to the bottom of their owner's Rune Deck.
-- [x] Preserve owner-chosen order for simultaneous 2+ Rune Deck recycle.
+- [x] Intentionally randomize simultaneous 2+ Rune Deck recycle order with seeded RNG.
 - [x] Implement draw intent/action.
 - [x] Implement channel intent/action.
 - [x] Implement pass priority/focus intent.
@@ -193,17 +193,19 @@ implemented, tested, and documented where relevant.
 
 ## 12A. Complete Rune Pool And Payment System
 
-- [ ] Replace flat `PaymentPlan` with resource costs, resource payments, non-resource costs, selected modes, optional costs, and applied modifiers.
-- [ ] Represent Power costs as requirements payable by one or more domains or by any domain.
-- [ ] Add Rainbow Power to rune-pool state and payment validation.
+- [x] Replace flat `PaymentPlan` with resource costs, resource payments, non-resource costs, selected modes, optional costs, and applied modifiers.
+- [x] Represent Power costs as requirements payable by one or more domains or by any domain.
+- [x] Add Rainbow Power to rune-pool state and payment validation.
 - [ ] Support multi-domain Power payment, using `Defiant Dance` as a fixture.
-- [ ] Prefer domain-specific Power before Rainbow Power during auto-payment.
-- [ ] Use card metadata domain order for multi-domain Power auto-payment.
-- [ ] Spend rune-pool resources before auto-exhausting or auto-recycling Runes.
-- [ ] Auto-exhaust ready Runes for missing Energy in deterministic board order.
-- [ ] Auto-recycle matching Runes for missing Power in deterministic board order.
-- [ ] Intentionally randomize the bottom-deck order when any simultaneous Rune recycle recycles 2 or more Runes.
-- [ ] Log seeded RNG operations for multi-Rune auto-payment recycle order.
+- [x] Prefer domain-specific Power before Rainbow Power during auto-payment.
+- [x] Use card metadata domain order for multi-domain Power auto-payment.
+- [x] Spend rune-pool resources before auto-exhausting or auto-recycling Runes.
+- [x] Auto-exhaust ready Runes for missing Energy in deterministic board order.
+- [x] Auto-recycle matching Runes for missing Power in deterministic board order.
+- [x] Intentionally randomize the bottom-deck order when any simultaneous Rune recycle recycles 2 or more Runes.
+- [x] Log seeded RNG operations for multi-Rune auto-payment recycle order.
+- [x] Expose regular legal play/payment mode in viewer-safe projection.
+- [x] Wire selected payment mode through `game.playCard` intent.
 - [ ] Expose legal play/payment modes in viewer-safe projection, including regular play and optional additional-cost modes.
 - [ ] Support selected optional additional-cost modes such as Accelerate and Repeat.
 - [ ] Enforce Repeat as a once-only optional additional cost.
@@ -215,8 +217,8 @@ implemented, tested, and documented where relevant.
 - [ ] Reject payment plans that would make already-chosen play placement, targets, or later required legality checks fail.
 - [ ] Keep Add-Reaction opportunities during payment intentionally unsupported.
 - [ ] Add tests for Bellows Breath regular vs Repeat payment modes.
-- [ ] Add tests for multi-domain Power payment and Rainbow fallback.
-- [ ] Add tests for simultaneous multi-Rune recycle randomization.
+- [x] Add tests for multi-domain Power payment and Rainbow fallback.
+- [x] Add tests for simultaneous multi-Rune recycle randomization.
 
 ## 13. Event Log Panel
 
