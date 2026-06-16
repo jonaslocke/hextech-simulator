@@ -6,12 +6,14 @@ import { CardTile } from "./card-tile";
 
 type Props = {
   battlefield: BattlefieldData;
+  hiddenCardInstanceIds?: Set<string>;
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred"; //tied to the game state open or neutral - 'deferred' due to be smaller when other BF is on showdown state open -- betternaming is needed
 };
 
 export const BattlefieldBoard: FC<Props> = ({
-  battlefield: { description, name, opponentUnits, playerUnits, img },
+  battlefield: { description, id, name, opponentUnits, playerUnits, img },
+  hiddenCardInstanceIds,
   owner,
   showdownState = "neutral",
 }) => {
@@ -101,20 +103,36 @@ export const BattlefieldBoard: FC<Props> = ({
           </div>
         )}
         {/* opponent's units */}
-        <div className="flex flex-wrap items-end gap-2 pb-2 border-white/10 border-b border-dashed overflow-auto">
+        <div
+          className="flex flex-wrap items-end gap-2 pb-2 border-white/10 border-b border-dashed overflow-auto"
+          data-zone-animation-id={`battlefield:${id}:opponent`}
+        >
           {opponentUnits.map((unit, index) => (
             <CardTile
               enableHoverPreview
+              isTransferHidden={
+                unit.instanceId
+                  ? hiddenCardInstanceIds?.has(unit.instanceId)
+                  : false
+              }
               key={unit.instanceId ?? `${unit.name}-${index}`}
               {...unit}
             />
           ))}
         </div>
         {/* player's units */}
-        <div className="flex flex-wrap gap-2 pt-2 overflow-auto">
+        <div
+          className="flex flex-wrap gap-2 pt-2 overflow-auto"
+          data-zone-animation-id={`battlefield:${id}:player`}
+        >
           {playerUnits.map((unit, index) => (
             <CardTile
               enableHoverPreview
+              isTransferHidden={
+                unit.instanceId
+                  ? hiddenCardInstanceIds?.has(unit.instanceId)
+                  : false
+              }
               key={unit.instanceId ?? `${unit.name}-${index}`}
               {...unit}
             />

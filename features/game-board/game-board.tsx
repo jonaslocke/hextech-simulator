@@ -1,6 +1,13 @@
 "use client";
 
-import { FC, MouseEvent, useEffect, useState } from "react";
+import {
+  FC,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { Card as CatalogCard } from "@/server/catalog";
 import type {
   ProjectedBattlefield,
@@ -11,6 +18,13 @@ import { ActionRail } from "./components/ActionRail";
 import { ScoreHeader } from "./components/ScoreHeader";
 import { TemporaryZoneOverlay } from "./components/TemporaryZoneOverlay";
 import { BattlefieldBoard } from "./components/battlefield-board";
+import {
+  CardZoneAnimationSnapshot,
+  CardZonePlacement,
+  CardZoneTransferOverlay,
+  ZoneAnimationCount,
+  captureCardZoneAnimationSnapshot,
+} from "./components/card-zone-transfer-overlay";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
 import {
@@ -53,6 +67,11 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
   const [cardActionMenu, setCardActionMenu] =
     useState<CardActionMenuState>(null);
+  const [activeTransferCardIds, setActiveTransferCardIds] = useState<
+    Set<string>
+  >(new Set());
+  const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
+    useState<CardZoneAnimationSnapshot | null>(null);
   const chainCards = chainCardInstanceIds.flatMap((cardInstanceId) =>
     buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
   );
@@ -66,6 +85,45 @@ export const GameBoard: FC<GameBoardProps> = ({
   const activePlayerId = projection.turn?.activePlayerId;
   const isOpponentActive = activePlayerId === board.opponent.playerId;
   const isPlayerActive = activePlayerId === board.player.playerId;
+  const animationData = useMemo(() => createAnimationData(board), [board]);
+  const handleActiveTransferCardIdsChange = useCallback(
+    (cardInstanceIds: Set<string>) => {
+      setActiveTransferCardIds((current) =>
+        areSetsEqual(current, cardInstanceIds) ? current : cardInstanceIds,
+      );
+    },
+    [],
+  );
+  const capturePendingAnimationSnapshot = useCallback(() => {
+    setPendingAnimationSnapshot(
+      captureCardZoneAnimationSnapshot({
+        placements: animationData.placements,
+        stateVersion: projection.stateVersion,
+        zoneCounts: animationData.zoneCounts,
+      }),
+    );
+  }, [animationData, projection.stateVersion]);
+  const submitPlayCard = useCallback(
+    (input: {
+      canPlay: boolean;
+      cardInstanceId: string;
+      selectedModeId?: string;
+    }) => {
+      if (input.canPlay) {
+        capturePendingAnimationSnapshot();
+      }
+
+      onPlayCard?.(input);
+    },
+    [capturePendingAnimationSnapshot, onPlayCard],
+  );
+  const submitRuneResource = useCallback(
+    (input: { cardInstanceId: string; resourceType: "energy" | "power" }) => {
+      capturePendingAnimationSnapshot();
+      onAddRuneResource?.(input);
+    },
+    [capturePendingAnimationSnapshot, onAddRuneResource],
+  );
   const closeCardActionMenu = () => setCardActionMenu(null);
   const openCardActionMenu = (
     event: MouseEvent<HTMLElement>,
@@ -97,16 +155,13 @@ export const GameBoard: FC<GameBoardProps> = ({
 
     const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
 
-    onPlayCard({
+    submitPlayCard({
       canPlay: modes.length > 0,
       cardInstanceId: card.instanceId,
       selectedModeId: modes[0]?.id,
     });
   };
-  const openPlayableCardMenu = (
-    card: Card,
-    event: MouseEvent<HTMLElement>,
-  ) => {
+  const openPlayableCardMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
     if (!card.instanceId || !viewerState) {
       return;
     }
@@ -119,7 +174,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         ? modes.map((mode) => ({
             label: `Play ${mode.label}`,
             onSelect: () =>
-              onPlayCard?.({
+              submitPlayCard({
                 canPlay: true,
                 cardInstanceId: card.instanceId!,
                 selectedModeId: mode.id,
@@ -130,7 +185,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               disabled: true,
               label: "Not playable",
             },
-      ],
+          ],
     );
   };
   const handleCardContextFromHand = (
@@ -156,7 +211,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    onAddRuneResource?.({
+    submitRuneResource({
       cardInstanceId: card.instanceId,
       resourceType: "energy",
     });
@@ -174,7 +229,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         disabled: card.isExhausted,
         label: card.isExhausted ? "Add Energy (exhausted)" : "Add Energy",
         onSelect: () =>
-          onAddRuneResource?.({
+          submitRuneResource({
             cardInstanceId: card.instanceId!,
             resourceType: "energy",
           }),
@@ -182,7 +237,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       {
         label: "Add Power",
         onSelect: () =>
-          onAddRuneResource?.({
+          submitRuneResource({
             cardInstanceId: card.instanceId!,
             resourceType: "power",
           }),
@@ -217,6 +272,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       <section className="flex flex-1">
         <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px_64px] p-2">
           <PlayerBoard
+            hiddenCardInstanceIds={activeTransferCardIds}
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("opponentTrash")}
             player={board.opponent}
@@ -226,16 +282,19 @@ export const GameBoard: FC<GameBoardProps> = ({
           <div className="flex gap-2">
             <BattlefieldBoard
               battlefield={board.playerBattlefield}
+              hiddenCardInstanceIds={activeTransferCardIds}
               owner="player"
               showdownState={board.playerBattlefieldShowdownState}
             />
             <BattlefieldBoard
               battlefield={board.opponentBattlefield}
+              hiddenCardInstanceIds={activeTransferCardIds}
               owner="opponent"
               showdownState={board.opponentBattlefieldShowdownState}
             />
           </div>
           <PlayerBoard
+            hiddenCardInstanceIds={activeTransferCardIds}
             onOpenBanish={() => setOpenZone("banish")}
             onOpenTrash={() => setOpenZone("playerTrash")}
             onChampionContextAction={handleChampionCardAction}
@@ -262,15 +321,25 @@ export const GameBoard: FC<GameBoardProps> = ({
 
       <PlayerHandFan
         cards={board.player.zones.hand.cards}
+        hiddenCardInstanceIds={activeTransferCardIds}
         onCardContextAction={handleCardContextFromHand}
         onPlayCard={handlePlayCardFromHand}
         onTuck={closeCardActionMenu}
+        playerId={board.player.playerId}
+      />
+      <CardZoneTransferOverlay
+        onActiveCardIdsChange={handleActiveTransferCardIdsChange}
+        onPendingSnapshotConsumed={() => setPendingAnimationSnapshot(null)}
+        pendingSnapshot={pendingAnimationSnapshot}
+        placements={animationData.placements}
+        stateVersion={projection.stateVersion}
+        zoneCounts={animationData.zoneCounts}
       />
       {cardActionMenu && (
         <>
           <button
             aria-label="Close card action menu"
-            className="fixed inset-0 z-[2147483646] cursor-default bg-transparent"
+            className="z-[2147483646] fixed inset-0 bg-transparent cursor-default"
             onPointerDown={closeCardActionMenu}
             type="button"
           />
@@ -285,6 +354,125 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
+
+function createAnimationData(board: ReturnType<typeof createBoardModel>): {
+  placements: CardZonePlacement[];
+  zoneCounts: ZoneAnimationCount[];
+} {
+  const placements: CardZonePlacement[] = [];
+  const zoneCounts: ZoneAnimationCount[] = [];
+
+  addPlayerAnimationData(board.player, placements, zoneCounts);
+  addPlayerAnimationData(board.opponent, placements, zoneCounts);
+  addBattlefieldAnimationData({
+    battlefield: board.playerBattlefield,
+    opponentPlayerId: board.opponent.playerId,
+    placements,
+    playerPlayerId: board.player.playerId,
+    zoneCounts,
+  });
+  addBattlefieldAnimationData({
+    battlefield: board.opponentBattlefield,
+    opponentPlayerId: board.opponent.playerId,
+    placements,
+    playerPlayerId: board.player.playerId,
+    zoneCounts,
+  });
+
+  return { placements, zoneCounts };
+}
+
+function addPlayerAnimationData(
+  player: PlayerData,
+  placements: CardZonePlacement[],
+  zoneCounts: ZoneAnimationCount[],
+) {
+  const zones = Object.values(player.zones);
+
+  for (const zone of zones) {
+    const zoneId = `${player.playerId}:${zone.kind}`;
+
+    zoneCounts.push({
+      count: zone.count,
+      ownerPlayerId: player.playerId,
+      zoneId,
+      zoneKind: zone.kind,
+    });
+
+    for (const card of zone.cards) {
+      placements.push({
+        card,
+        ownerPlayerId: player.playerId,
+        zoneId,
+        zoneKind: zone.kind,
+      });
+    }
+  }
+}
+
+function addBattlefieldAnimationData({
+  battlefield,
+  opponentPlayerId,
+  placements,
+  playerPlayerId,
+  zoneCounts,
+}: {
+  battlefield: BattlefieldData;
+  opponentPlayerId: string;
+  placements: CardZonePlacement[];
+  playerPlayerId: string;
+  zoneCounts: ZoneAnimationCount[];
+}) {
+  const playerZoneId = `battlefield:${battlefield.id}:player`;
+  const opponentZoneId = `battlefield:${battlefield.id}:opponent`;
+
+  zoneCounts.push(
+    {
+      count: battlefield.playerUnits.length,
+      ownerPlayerId: playerPlayerId,
+      zoneId: playerZoneId,
+      zoneKind: "battlefield",
+    },
+    {
+      count: battlefield.opponentUnits.length,
+      ownerPlayerId: opponentPlayerId,
+      zoneId: opponentZoneId,
+      zoneKind: "battlefield",
+    },
+  );
+
+  for (const card of battlefield.playerUnits) {
+    placements.push({
+      card,
+      ownerPlayerId: playerPlayerId,
+      zoneId: playerZoneId,
+      zoneKind: "battlefield",
+    });
+  }
+
+  for (const card of battlefield.opponentUnits) {
+    placements.push({
+      card,
+      ownerPlayerId: opponentPlayerId,
+      zoneId: opponentZoneId,
+      zoneKind: "battlefield",
+    });
+  }
+}
+
+function areSetsEqual<T>(left: Set<T>, right: Set<T>) {
+  if (left.size !== right.size) {
+    return false;
+  }
+
+  for (const item of left) {
+    if (!right.has(item)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 function RunePoolBar({
   runePool,
@@ -305,7 +493,7 @@ function RunePoolBar({
 
   return (
     <div className="flex items-center gap-3 px-2 border border-white/15 rounded-md overflow-auto text-slate-100 text-xs">
-      <span className="font-semibold text-slate-400 uppercase tracking-wide">
+      <span className="font-mono font-semibold text-slate-400 uppercase tracking-wide">
         Rune pool
       </span>
       {energy > 0 && (
@@ -327,7 +515,6 @@ function RunePoolBar({
               // eslint-disable-next-line @next/next/no-img-element -- Domain icons are local imported UI assets.
               <img alt="" className="w-auto h-4 object-contain" src={icon} />
             )}
-            <span>{formatDomain(domain)}</span>
             <span className="font-bold text-white">{amount}</span>
           </span>
         );

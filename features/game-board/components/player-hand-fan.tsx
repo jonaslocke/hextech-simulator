@@ -1,27 +1,31 @@
 "use client";
 
 import {
-  CSSProperties,
   KeyboardEvent,
   MouseEvent,
   useRef,
   useState,
 } from "react";
+import { motion } from "motion/react";
 import { Card } from "../types";
 import { CardTile } from "./card-tile";
 
 type PlayerHandFanProps = {
   cards: Card[];
+  hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onPlayCard?: (card: Card) => void;
   onTuck?: () => void;
+  playerId: string;
 };
 
 export function PlayerHandFan({
   cards,
+  hiddenCardInstanceIds,
   onCardContextAction,
   onPlayCard,
   onTuck,
+  playerId,
 }: PlayerHandFanProps) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -69,6 +73,7 @@ export function PlayerHandFan({
       <div
         aria-label="Player hand"
         className="relative w-full max-w-5xl h-full touch-none pointer-events-auto"
+        data-zone-animation-id={`${playerId}:hand`}
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) {
             scheduleTuck();
@@ -90,35 +95,57 @@ export function PlayerHandFan({
         <div className="absolute inset-0">
           {cards.map((card, index) => {
             const hovered = hoveredIndex === index;
+            const motionStyle = handCardMotion({
+              expanded,
+              hovered,
+              index,
+              total: cards.length,
+            });
 
             return (
               <div
-                className="bottom-0 left-1/2 absolute transition-transform duration-200 ease-out"
+                className="bottom-0 left-1/2 absolute -translate-x-1/2"
                 key={card.instanceId ?? `${card.name}-${index}`}
-                onClick={(event) => {
-                  openCardMenu(card, event, index);
-                }}
-                onContextMenu={(event) => {
-                  openCardMenu(card, event, index);
-                }}
-                onPointerEnter={() => {
-                  clearTuckTimeout();
-                  setHoveredIndex(index);
-                  expandHand();
-                }}
-                style={handCardStyle({
-                  expanded,
-                  hovered,
-                  index,
-                  total: cards.length,
-                })}
+                style={{ zIndex: motionStyle.zIndex }}
               >
-                <CardTile
-                  enableHoverPreview
-                  focusablePreview={false}
-                  showMight={false}
-                  {...card}
-                />
+                <motion.div
+                  animate={{
+                    rotate: motionStyle.rotate,
+                    scale: motionStyle.scale,
+                    x: motionStyle.x,
+                    y: motionStyle.y,
+                  }}
+                  initial={false}
+                  onClick={(event) => {
+                    openCardMenu(card, event, index);
+                  }}
+                  onContextMenu={(event) => {
+                    openCardMenu(card, event, index);
+                  }}
+                  onPointerEnter={() => {
+                    clearTuckTimeout();
+                    setHoveredIndex(index);
+                    expandHand();
+                  }}
+                  style={{ transformOrigin: "bottom center" }}
+                  transition={{
+                    duration: 0.2,
+                    ease: "easeOut",
+                    type: "tween",
+                  }}
+                >
+                  <CardTile
+                    enableHoverPreview
+                    focusablePreview={false}
+                    isTransferHidden={
+                      card.instanceId
+                        ? hiddenCardInstanceIds?.has(card.instanceId)
+                        : false
+                    }
+                    showMight={false}
+                    {...card}
+                  />
+                </motion.div>
               </div>
             );
           })}
@@ -128,7 +155,7 @@ export function PlayerHandFan({
   );
 }
 
-function handCardStyle({
+function handCardMotion({
   expanded,
   hovered,
   index,
@@ -138,7 +165,7 @@ function handCardStyle({
   hovered: boolean;
   index: number;
   total: number;
-}): CSSProperties {
+}) {
   const middle = (total - 1) / 2;
   const offset = index - middle;
   const layout = handLayout({ expanded, total });
@@ -156,8 +183,10 @@ function handCardStyle({
   const distanceFromCenter = Math.abs(offset);
 
   return {
-    transform: `translateX(calc(-50% + ${x}px)) translateY(${y}px) rotate(${rotation}deg) scale(${scale})`,
-    transformOrigin: "bottom center",
+    rotate: rotation,
+    scale,
+    x,
+    y,
     zIndex: hovered ? 100 : Math.round(80 - distanceFromCenter * 10),
   };
 }

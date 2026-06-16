@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
 type BaseLineProps = {
+  hiddenCardInstanceIds?: Set<string>;
   player: PlayerData;
   isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
   onChampionContextAction?: (
@@ -21,6 +22,7 @@ type BaseLineProps = {
 };
 
 type Props = {
+  hiddenCardInstanceIds?: Set<string>;
   isMirrored?: boolean;
   onChampionContextAction?: (
     card: Card,
@@ -39,6 +41,7 @@ type Props = {
 };
 
 const BaseLine = ({
+  hiddenCardInstanceIds,
   player,
   isHightlighted,
   onChampionContextAction,
@@ -50,20 +53,42 @@ const BaseLine = ({
 
   return (
     <div className="gap-2 grid grid-cols-[130px_130px_minmax(0,1fr)_130px]">
-      <ZoneArea isCentered isHightlighted={isHightlighted}>
+      <ZoneArea
+        animationZoneId={`${player.playerId}:champion`}
+        isCentered
+        isHightlighted={isHightlighted}
+      >
         <ZoneCards
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardContextAction={onChampionContextAction}
           onCardPrimaryAction={onChampionPrimaryAction}
           zone={player.zones.champion}
         />
       </ZoneArea>
-      <ZoneArea isCentered isHightlighted={isHightlighted}>
-        <ZoneCards zone={player.zones.legend} />
+      <ZoneArea
+        animationZoneId={`${player.playerId}:legend`}
+        isCentered
+        isHightlighted={isHightlighted}
+      >
+        <ZoneCards
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          zone={player.zones.legend}
+        />
       </ZoneArea>
-      <ZoneArea isHightlighted={isHightlighted}>
-        <CardList cards={baseUnits} />
+      <ZoneArea
+        animationZoneId={`${player.playerId}:base`}
+        isHightlighted={isHightlighted}
+      >
+        <CardList
+          cards={baseUnits}
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+        />
       </ZoneArea>
-      <ZoneArea isCentered isHightlighted={isHightlighted}>
+      <ZoneArea
+        animationZoneId={`${player.playerId}:mainDeck`}
+        isCentered
+        isHightlighted={isHightlighted}
+      >
         <HiddenZone count={player.zones.mainDeck.count} label="Main deck" />
       </ZoneArea>
     </div>
@@ -79,6 +104,7 @@ interface RunesProps extends BaseLineProps {
 }
 
 const RunesLine = ({
+  hiddenCardInstanceIds,
   isMirrored = false,
   onRuneContextAction,
   onRunePrimaryAction,
@@ -100,25 +126,42 @@ const RunesLine = ({
         !hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px]",
       )}
     >
-      <ZoneArea isCentered isHightlighted={isHightlighted}>
+      <ZoneArea
+        animationZoneId={`${player.playerId}:runeDeck`}
+        isCentered
+        isHightlighted={isHightlighted}
+      >
         <HiddenZone count={player.zones.runeDeck.count} label="Rune deck" />
       </ZoneArea>
-      <ZoneArea isHightlighted={isHightlighted}>
+      <ZoneArea
+        animationZoneId={`${player.playerId}:base`}
+        isHightlighted={isHightlighted}
+      >
         <CardList
           cards={baseRunes}
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardContextAction={onRuneContextAction}
           onCardPrimaryAction={onRunePrimaryAction}
         />
       </ZoneArea>
-      <ZoneArea isCentered isHightlighted={isHightlighted}>
+      <ZoneArea
+        animationZoneId={`${player.playerId}:trash`}
+        isCentered
+        isHightlighted={isHightlighted}
+      >
         <TrashZone
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
           handCount={isMirrored ? player.zones.hand.count : undefined}
           onClick={onOpenTrash}
           zone={player.zones.trash}
         />
       </ZoneArea>
       {hasBanishment && (
-        <ZoneArea isCentered isHightlighted={isHightlighted}>
+        <ZoneArea
+          animationZoneId={`${player.playerId}:banishment`}
+          isCentered
+          isHightlighted={isHightlighted}
+        >
           <Button
             aria-label={`${player.name} banished cards`}
             className="relative p-2"
@@ -139,6 +182,7 @@ const RunesLine = ({
 };
 
 export const PlayerBoard: FC<Props> = ({
+  hiddenCardInstanceIds,
   isMirrored,
   onChampionContextAction,
   onChampionPrimaryAction,
@@ -153,25 +197,32 @@ export const PlayerBoard: FC<Props> = ({
     return (
       <>
         <RunesLine
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
           isMirrored
           onOpenBanish={onOpenBanish}
           onOpenTrash={onOpenTrash}
           player={player}
           isHightlighted={isActivePlayer}
         />
-        <BaseLine player={player} isHightlighted={isActivePlayer} />
+        <BaseLine
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          player={player}
+          isHightlighted={isActivePlayer}
+        />
       </>
     );
   }
   return (
     <>
       <BaseLine
+        hiddenCardInstanceIds={hiddenCardInstanceIds}
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
         player={player}
         isHightlighted={isActivePlayer}
       />
       <RunesLine
+        hiddenCardInstanceIds={hiddenCardInstanceIds}
         onRuneContextAction={onRuneContextAction}
         onRunePrimaryAction={onRunePrimaryAction}
         onOpenBanish={onOpenBanish}
@@ -184,12 +235,14 @@ export const PlayerBoard: FC<Props> = ({
 };
 
 function ZoneCards({
+  hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
   onClick,
   showCount = false,
   zone,
 }: {
+  hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onCardPrimaryAction?: (
     card: Card,
@@ -204,6 +257,7 @@ function ZoneCards({
       <CardList
         cards={zone.cards}
         count={showCount ? zone.count : undefined}
+        hiddenCardInstanceIds={hiddenCardInstanceIds}
         onCardContextAction={onCardContextAction}
         onCardPrimaryAction={onCardPrimaryAction}
         onClick={onClick}
@@ -219,10 +273,12 @@ function ZoneCards({
 }
 
 function TrashZone({
+  hiddenCardInstanceIds,
   handCount,
   onClick,
   zone,
 }: {
+  hiddenCardInstanceIds?: Set<string>;
   handCount?: number;
   onClick?: () => void;
   zone: ZoneData;
@@ -230,7 +286,12 @@ function TrashZone({
   if (zone.cards.length > 0) {
     return (
       <div className="flex items-center gap-2">
-        <ZoneCards onClick={onClick} showCount zone={zone} />
+        <ZoneCards
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onClick={onClick}
+          showCount
+          zone={zone}
+        />
         {handCount !== undefined && <HandCount value={handCount} />}
       </div>
     );
@@ -273,12 +334,14 @@ function HandCount({ value }: { value: number }) {
 function CardList({
   cards,
   count,
+  hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
   onClick,
 }: {
   cards: Card[];
   count?: number;
+  hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onCardPrimaryAction?: (
     card: Card,
@@ -295,6 +358,11 @@ function CardList({
       {cards.map((card, index) => (
         <CardTile
           enableHoverPreview={!onClick}
+          isTransferHidden={
+            card.instanceId
+              ? hiddenCardInstanceIds?.has(card.instanceId)
+              : false
+          }
           key={card.instanceId ?? `${card.name}-${index}`}
           onContextAction={
             onCardContextAction

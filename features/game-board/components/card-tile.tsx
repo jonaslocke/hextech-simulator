@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Card } from "../types";
 import {
@@ -20,7 +21,9 @@ import {
 
 type CardTileProps = Card & {
   enableHoverPreview?: boolean;
+  enableZoneAnimation?: boolean;
   focusablePreview?: boolean;
+  isTransferHidden?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
   onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
   showMight?: boolean;
@@ -29,8 +32,11 @@ type CardTileProps = Card & {
 export const CardTile: FC<CardTileProps> = ({
   domains = [],
   enableHoverPreview = false,
+  enableZoneAnimation = true,
   energy,
   focusablePreview = true,
+  instanceId,
+  isTransferHidden = false,
   isExhausted,
   img,
   might,
@@ -110,9 +116,13 @@ export const CardTile: FC<CardTileProps> = ({
 
   return (
     <div
+      data-card-instance-id={
+        enableZoneAnimation && instanceId ? instanceId : undefined
+      }
       className={cn(
         "relative shrink-0",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
+        isTransferHidden && "invisible pointer-events-none",
         previewPosition ? "z-[2147483647]" : "z-10",
       )}
       onBlur={clearPreview}
@@ -143,12 +153,21 @@ export const CardTile: FC<CardTileProps> = ({
       style={{ zIndex: previewPosition ? 2147483647 : undefined }}
       tabIndex={enableHoverPreview && focusablePreview ? 0 : undefined}
     >
-      <div
-        className={cn(
-          "relative transition",
-          isExhausted && "rotate-90",
-        )}
+      <motion.div
+        animate={{
+          rotate: isExhausted ? 90 : 0,
+          scale: isExhausted ? 0.98 : 1,
+          y: isExhausted ? -2 : 0,
+        }}
+        className="relative"
+        initial={false}
         ref={bodyRef}
+        transition={{
+          type: "spring",
+          stiffness: 360,
+          damping: 28,
+          mass: 0.75,
+        }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
         <img
@@ -164,7 +183,7 @@ export const CardTile: FC<CardTileProps> = ({
             {might}
           </span>
         )}
-      </div>
+      </motion.div>
       {previewPosition && (
         <div
           className="pointer-events-none fixed z-[2147483647] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-[0_28px_80px_rgba(0,0,0,0.88)] ring-1 ring-yellow-300/40 drop-shadow-[0_18px_30px_rgba(0,0,0,0.75)]"

@@ -99,6 +99,7 @@ function ZoneCards({
     <div className="flex gap-2 overflow-auto">
       {cards.map((card, index) => (
         <CardTile
+          enableZoneAnimation={false}
           enableHoverPreview
           key={card.instanceId ?? `${card.name}-${index}`}
           {...card}
