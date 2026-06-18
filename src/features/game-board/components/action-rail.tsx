@@ -8,11 +8,15 @@ export function ActionRail({
   isChainLockedOpen = false,
   onPassTurn,
   openZone,
+  passTurnDisabled = false,
+  passTurnLabel = "Pass Turn",
   setOpenZone,
 }: {
   isChainLockedOpen?: boolean;
   onPassTurn?: () => void;
   openZone: TemporaryZone;
+  passTurnDisabled?: boolean;
+  passTurnLabel?: string;
   setOpenZone: (zone: TemporaryZone) => void;
 }) {
   return (
@@ -35,7 +39,8 @@ export function ActionRail({
       </ActionButton>
       <ActionButton
         active={false}
-        label="Pass Turn"
+        disabled={passTurnDisabled || !onPassTurn}
+        label={passTurnLabel}
         onClick={onPassTurn ?? (() => undefined)}
       >
         <SkipForward className="size-5" />

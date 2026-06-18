@@ -12,7 +12,6 @@ import { DECK_OPTIONS } from "../constants";
 import type {
   AcceptedMatch,
   CatalogCard,
-  CreatedPlayer,
   FixedDeckId,
   GameProjection,
   MatchIntent,
@@ -286,6 +285,16 @@ export function MatchSimulator() {
       type: "game.pass"
     });
   };
+  const endTurn = () => {
+    if (projection.chain) {
+      setError("Resolve the chain before passing the turn.");
+      return;
+    }
+
+    void submitIntent({
+      type: "game.endTurn"
+    });
+  };
 
   return (
     <main className="relative bg-slate-950 min-h-screen">
@@ -311,19 +320,22 @@ export function MatchSimulator() {
           Match {match.matchId} - State {projection.stateVersion}
         </span>
       </div>
-      <GameActionPanel
-        cardsByInstanceId={match.cardsByInstanceId}
-        disabled={isSubmitting}
-        error={error}
-        onIntent={submitIntent}
-        projection={projection}
-        viewer={viewer}
-      />
+      {projection.status === "setup_pending" && (
+        <SetupActionPanel
+          cardsByInstanceId={match.cardsByInstanceId}
+          disabled={isSubmitting}
+          onIntent={submitIntent}
+          projection={projection}
+          viewerId={viewer.playerId}
+        />
+      )}
+      {error && <ErrorToast message={error} onClose={() => setError(null)} />}
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
         onActivateAbility={activateAbility}
         onAddRuneResource={addRuneResourceFromBoard}
+        onEndTurn={endTurn}
         onPass={passPriority}
         onPlayCard={playCardFromHand}
         onSubmitChoice={submitChoice}
@@ -333,69 +345,32 @@ export function MatchSimulator() {
   );
 }
 
-function GameActionPanel({
+function SetupActionPanel({
   cardsByInstanceId,
   disabled,
-  error,
   onIntent,
   projection,
-  viewer
+  viewerId
 }: {
   cardsByInstanceId: Record<string, CatalogCard>;
   disabled: boolean;
-  error: string | null;
   onIntent: (intent: MatchIntent) => void;
   projection: GameProjection;
-  viewer: CreatedPlayer;
+  viewerId: string;
 }) {
-  const viewerState = projection.players[viewer.playerId];
-
-  if (!viewerState) {
-    return null;
-  }
-
   return (
     <aside className="top-10 z-50 absolute bg-slate-950/90 shadow-xl p-3 border border-white/10 rounded w-80 text-slate-100 text-xs">
       <div className="flex justify-between items-center gap-2 mb-2">
-        <span className="font-semibold">Actions</span>
+        <span className="font-semibold">Setup</span>
         <span className="text-slate-400">{projection.status}</span>
       </div>
-      {projection.turn && (
-        <div className="bg-slate-900/80 mb-3 px-2 py-1 border border-white/10 rounded text-slate-300">
-          <div>
-            Turn {projection.turn.turnNumber} - {projection.turn.phase} - active{" "}
-            {projection.turn.activePlayerId}
-          </div>
-          {projection.turn.completedStartOfTurnSteps.length > 0 && (
-            <div className="mt-1 text-slate-500">
-              Start: {projection.turn.completedStartOfTurnSteps.join(" -> ")}
-            </div>
-          )}
-        </div>
-      )}
-      {projection.status === "setup_pending" ? (
-        <SetupControls
-          cardsByInstanceId={cardsByInstanceId}
-          disabled={disabled}
-          onIntent={onIntent}
-          projection={projection}
-          viewerId={viewer.playerId}
-        />
-      ) : (
-        <GameplayControls
-          cardsByInstanceId={cardsByInstanceId}
-          disabled={disabled}
-          onIntent={onIntent}
-          projection={projection}
-          viewerId={viewer.playerId}
-          viewerState={viewerState}
-        />
-      )}
-      {error && (
-        <p className="bg-red-950/70 mt-3 px-2 py-1 border border-red-400/40 rounded text-red-100">
-          {error}
-        </p>
-      )}
+      <SetupControls
+        cardsByInstanceId={cardsByInstanceId}
+        disabled={disabled}
+        onIntent={onIntent}
+        projection={projection}
+        viewerId={viewerId}
+      />
     </aside>
   );
 }
@@ -484,197 +459,25 @@ function SetupControls({
   );
 }
 
-function GameplayControls({
-  cardsByInstanceId,
-  disabled,
-  onIntent,
-  projection,
-  viewerId,
-  viewerState
+function ErrorToast({
+  message,
+  onClose
 }: {
-  cardsByInstanceId: Record<string, CatalogCard>;
-  disabled: boolean;
-  onIntent: (intent: MatchIntent) => void;
-  projection: GameProjection;
-  viewerId: string;
-  viewerState: GameProjection["players"][string];
+  message: string;
+  onClose: () => void;
 }) {
-  const baseRunes = viewerState.zones.base.cardInstanceIds.filter((cardInstanceId) => {
-    const card = cardsByInstanceId[cardInstanceId];
-
-    return card?.classification.type === "Rune";
-  });
-  const playableCards = Object.entries(viewerState.availablePaymentModes);
-
   return (
-    <div className="gap-3 grid">
-      <div className="gap-2 grid grid-cols-2">
-        <Button
-          disabled={disabled}
-          onClick={() => onIntent({ type: "game.channel" })}
-          size="sm"
-          type="button"
-        >
-          Channel 1
-        </Button>
-        <Button
-          disabled={disabled}
-          onClick={() => onIntent({ type: "game.draw" })}
-          size="sm"
-          type="button"
-        >
-          Draw 1
-        </Button>
-        <Button
-          disabled={disabled}
-          onClick={() => onIntent({ type: "game.pass" })}
-          size="sm"
-          type="button"
-          variant="secondary"
-        >
-          Pass
-        </Button>
-        <Button
-          disabled={disabled || projection.turn?.activePlayerId !== viewerId}
-          onClick={() => onIntent({ type: "game.endTurn" })}
-          size="sm"
-          type="button"
-          variant="secondary"
-        >
-          End turn
-        </Button>
-      </div>
-      <div className="gap-2 grid">
-        <span className="font-medium text-slate-300">
-          Rune pool: {viewerState.runePool.energy} energy
-        </span>
-        <div className="gap-1 grid max-h-28 overflow-auto">
-          {baseRunes.map((cardInstanceId) => {
-            const isExhausted =
-              projection.cardStates[cardInstanceId]?.exhausted === true;
-
-            return (
-            <div key={cardInstanceId} className="flex items-center gap-2">
-              <span className="flex-1 min-w-0 text-slate-400 truncate">
-                {cardsByInstanceId[cardInstanceId]?.name ?? "Rune"}
-              </span>
-              <Button
-                disabled={disabled || isExhausted}
-                onClick={() =>
-                  onIntent({
-                    type: "game.addRuneResource",
-                    payload: {
-                      runeCardInstanceId: cardInstanceId,
-                      resourceType: "energy"
-                    }
-                  })
-                }
-                size="sm"
-                type="button"
-                variant="secondary"
-              >
-                Energy
-              </Button>
-              <Button
-                disabled={disabled}
-                onClick={() =>
-                  onIntent({
-                    type: "game.addRuneResource",
-                    payload: {
-                      runeCardInstanceId: cardInstanceId,
-                      resourceType: "power"
-                    }
-                  })
-                }
-                size="sm"
-                type="button"
-                variant="secondary"
-              >
-                Power
-              </Button>
-            </div>
-          );
-          })}
-          {baseRunes.length === 0 && (
-            <span className="text-slate-500">No runes in base.</span>
-          )}
-        </div>
-      </div>
-      <div className="gap-2 grid">
-        <span className="font-medium text-slate-300">Playable cards</span>
-        <div className="gap-1 grid max-h-32 overflow-auto">
-          {playableCards.map(([cardInstanceId, modes]) => (
-            <PlayableCardButton
-              card={cardsByInstanceId[cardInstanceId]}
-              cardInstanceId={cardInstanceId}
-              disabled={disabled || modes.length === 0}
-              key={cardInstanceId}
-              onIntent={onIntent}
-              selectedModeId={modes[0]?.id}
-            />
-          ))}
-          {playableCards.length === 0 && (
-            <span className="text-slate-500">No supported card can be paid now.</span>
-          )}
-        </div>
-      </div>
+    <div className="right-16 bottom-5 z-50 fixed flex items-center gap-3 bg-red-950/90 shadow-xl px-3 py-2 border border-red-400/50 rounded-md text-red-100 text-sm">
+      <span>{message}</span>
+      <button
+        className="text-red-200 hover:text-white"
+        onClick={onClose}
+        type="button"
+      >
+        Close
+      </button>
     </div>
   );
-}
-
-function PlayableCardButton({
-  card,
-  cardInstanceId,
-  disabled,
-  onIntent,
-  selectedModeId
-}: {
-  card: CatalogCard | undefined;
-  cardInstanceId: string;
-  disabled: boolean;
-  onIntent: (intent: MatchIntent) => void;
-  selectedModeId: string | undefined;
-}) {
-  const requiresBoardTargets =
-    card !== undefined && cardRequiresBoardTargets(card.name);
-
-  return (
-    <Button
-      disabled={disabled || requiresBoardTargets}
-      onClick={() =>
-        onIntent({
-          type: "game.playCard",
-          payload: {
-            cardInstanceId,
-            selectedModeId,
-            destination: "base"
-          }
-        })
-      }
-      size="sm"
-      title={
-        requiresBoardTargets
-          ? "Use the card in hand and choose targets on the board."
-          : undefined
-      }
-      type="button"
-      variant="secondary"
-    >
-      {card?.name ?? "Card"}
-      {requiresBoardTargets ? " (choose on board)" : ""}
-    </Button>
-  );
-}
-
-function cardRequiresBoardTargets(name: string) {
-  return [
-    "Back to Back",
-    "Blast of Power",
-    "Falling Comet",
-    "Final Spark",
-    "Singularity",
-    "Stupefy"
-  ].includes(name);
 }
 
 function DeckSelect({

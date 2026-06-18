@@ -60,6 +60,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   logEntries = [],
   onActivateAbility,
   onAddRuneResource,
+  onEndTurn,
   onPass,
   onPlayCard,
   onSubmitChoice,
@@ -109,6 +110,14 @@ export const GameBoard: FC<GameBoardProps> = ({
   const canViewerPassChain =
     isChainLockedOpen &&
     projection.chain?.priorityPlayerId === projection.viewerPlayerId;
+  const canViewerEndTurn =
+    !isChainLockedOpen &&
+    projection.turn?.activePlayerId === projection.viewerPlayerId;
+  const passTurnLabel = isChainLockedOpen
+    ? "Resolve chain first"
+    : canViewerEndTurn
+      ? "Pass Turn"
+      : "Waiting for turn";
   const board = createBoardModel({
     cardsByInstanceId,
     playerNames,
@@ -475,8 +484,10 @@ export const GameBoard: FC<GameBoardProps> = ({
         </div>
         <ActionRail
           isChainLockedOpen={isChainLockedOpen}
-          onPassTurn={onPass}
+          onPassTurn={onEndTurn}
           openZone={openZone}
+          passTurnDisabled={!canViewerEndTurn}
+          passTurnLabel={passTurnLabel}
           setOpenZone={setOpenZoneRespectingChain}
         />
       </section>

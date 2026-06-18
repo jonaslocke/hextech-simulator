@@ -41,6 +41,7 @@ export type GameBoardProps = {
     };
     selectedModeId?: string;
   }) => void;
+  onEndTurn?: () => void;
   onPass?: () => void;
   onSubmitChoice?: (input: { choiceId: string; orderedIds: string[] }) => void;
   playerNames?: Partial<Record<string, string>>;
