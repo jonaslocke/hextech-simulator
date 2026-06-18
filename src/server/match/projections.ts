@@ -34,7 +34,8 @@ export const projectedChainItemSchema = z.object({
   sourceCardInstanceId: z.string().min(1).nullable(),
   cardInstanceId: z.string().min(1).nullable(),
   label: z.string().min(1),
-  kind: z.enum(["spell", "ability", "trigger", "unit"])
+  kind: z.enum(["spell", "ability", "trigger", "unit"]),
+  targetCardInstanceIds: z.array(z.string().min(1)).default([])
 });
 
 export const projectedChainSchema = z
@@ -457,7 +458,8 @@ function projectChain(game: Game): GameProjection["chain"] {
       sourceCardInstanceId: item.sourceCardInstanceId,
       cardInstanceId: item.cardInstanceId,
       label: item.label,
-      kind: item.kind
+      kind: item.kind,
+      targetCardInstanceIds: item.choices.targetCardInstanceIds
     })),
     relevantPlayerIds: chain.relevantPlayerIds,
     priorityPlayerId: chain.priorityPlayerId,

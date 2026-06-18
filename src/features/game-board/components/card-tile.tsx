@@ -23,6 +23,7 @@ type CardTileProps = Card & {
   enableHoverPreview?: boolean;
   enableZoneAnimation?: boolean;
   focusablePreview?: boolean;
+  isHighlighted?: boolean;
   isTransferHidden?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
   onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
@@ -37,6 +38,7 @@ export const CardTile: FC<CardTileProps> = ({
   energy,
   focusablePreview = true,
   instanceId,
+  isHighlighted = false,
   isTransferHidden = false,
   isExhausted,
   img,
@@ -124,7 +126,7 @@ export const CardTile: FC<CardTileProps> = ({
         "relative shrink-0",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
         isTransferHidden && "invisible pointer-events-none",
-        previewPosition ? "z-[2147483647]" : "z-10",
+        previewPosition ? "z-[2147483647]" : isHighlighted ? "z-20" : "z-10",
       )}
       onBlur={clearPreview}
       onClick={(event) => {
@@ -176,6 +178,8 @@ export const CardTile: FC<CardTileProps> = ({
           className={cn(
             "block h-30 aspect-130/181 rounded-md border border-white/15 bg-slate-900 object-cover shadow-md transition",
             "hover:border-yellow-300/70 hover:shadow-lg hover:shadow-black/40",
+            isHighlighted &&
+              "border-cyan-300 ring-2 ring-cyan-300 shadow-cyan-300/40 shadow-lg",
           )}
           src={img}
         />

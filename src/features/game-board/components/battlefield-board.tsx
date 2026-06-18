@@ -7,6 +7,7 @@ import { CardTile } from "./card-tile";
 
 type Props = {
   battlefield: BattlefieldData;
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   onCardPrimaryAction?: (
     card: Card,
@@ -18,6 +19,7 @@ type Props = {
 
 export const BattlefieldBoard: FC<Props> = ({
   battlefield: { description, id, name, opponentUnits, playerUnits, img },
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardPrimaryAction,
   owner,
@@ -116,6 +118,11 @@ export const BattlefieldBoard: FC<Props> = ({
           {opponentUnits.map((unit, index) => (
             <CardTile
               enableHoverPreview
+              isHighlighted={
+                unit.instanceId
+                  ? highlightedCardInstanceIds?.has(unit.instanceId)
+                  : false
+              }
               isTransferHidden={
                 unit.instanceId
                   ? hiddenCardInstanceIds?.has(unit.instanceId)
@@ -139,6 +146,11 @@ export const BattlefieldBoard: FC<Props> = ({
           {playerUnits.map((unit, index) => (
             <CardTile
               enableHoverPreview
+              isHighlighted={
+                unit.instanceId
+                  ? highlightedCardInstanceIds?.has(unit.instanceId)
+                  : false
+              }
               isTransferHidden={
                 unit.instanceId
                   ? hiddenCardInstanceIds?.has(unit.instanceId)

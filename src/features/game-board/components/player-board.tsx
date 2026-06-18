@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
 type BaseLineProps = {
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   player: PlayerData;
   isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
@@ -26,6 +27,7 @@ type BaseLineProps = {
 };
 
 type Props = {
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   isMirrored?: boolean;
   onChampionContextAction?: (
@@ -49,6 +51,7 @@ type Props = {
 };
 
 const BaseLine = ({
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   player,
   isHightlighted,
@@ -77,6 +80,7 @@ const BaseLine = ({
           isHightlighted={isHightlighted}
         >
           <ZoneCards
+            highlightedCardInstanceIds={highlightedCardInstanceIds}
             hiddenCardInstanceIds={hiddenCardInstanceIds}
             onCardContextAction={onChampionContextAction}
             onCardPrimaryAction={onChampionPrimaryAction}
@@ -90,6 +94,7 @@ const BaseLine = ({
         isHightlighted={isHightlighted}
       >
         <ZoneCards
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           zone={player.zones.legend}
         />
@@ -100,6 +105,7 @@ const BaseLine = ({
       >
         <CardList
           cards={baseUnits}
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardPrimaryAction={onBoardCardPrimaryAction}
           showMight
@@ -125,6 +131,7 @@ interface RunesProps extends BaseLineProps {
 }
 
 const RunesLine = ({
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isMirrored = false,
   onRuneContextAction,
@@ -162,6 +169,7 @@ const RunesLine = ({
       >
         <CardList
           cards={baseRunes}
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardContextAction={onRuneContextAction}
           onCardPrimaryAction={onRunePrimaryAction}
@@ -174,6 +182,7 @@ const RunesLine = ({
         isHightlighted={isHightlighted}
       >
         <TrashZone
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           handCount={isMirrored ? player.zones.hand.count : undefined}
           onClick={onOpenTrash}
@@ -226,6 +235,7 @@ function countRuneReadiness(cards: Card[]) {
 }
 
 export const PlayerBoard: FC<Props> = ({
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isMirrored,
   onChampionContextAction,
@@ -242,6 +252,7 @@ export const PlayerBoard: FC<Props> = ({
     return (
       <>
         <RunesLine
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           isMirrored
           onOpenBanish={onOpenBanish}
@@ -250,6 +261,7 @@ export const PlayerBoard: FC<Props> = ({
           isHightlighted={isActivePlayer}
         />
         <BaseLine
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onBoardCardPrimaryAction={onBoardCardPrimaryAction}
           player={player}
@@ -261,6 +273,7 @@ export const PlayerBoard: FC<Props> = ({
   return (
     <>
       <BaseLine
+        highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
@@ -269,6 +282,7 @@ export const PlayerBoard: FC<Props> = ({
         isHightlighted={isActivePlayer}
       />
       <RunesLine
+        highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onRuneContextAction={onRuneContextAction}
         onRunePrimaryAction={onRunePrimaryAction}
@@ -282,6 +296,7 @@ export const PlayerBoard: FC<Props> = ({
 };
 
 function ZoneCards({
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
@@ -290,6 +305,7 @@ function ZoneCards({
   showMight = false,
   zone,
 }: {
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onCardPrimaryAction?: (
@@ -306,6 +322,7 @@ function ZoneCards({
       <CardList
         cards={zone.cards}
         count={showCount ? zone.count : undefined}
+        highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onCardContextAction={onCardContextAction}
         onCardPrimaryAction={onCardPrimaryAction}
@@ -323,11 +340,13 @@ function ZoneCards({
 }
 
 function TrashZone({
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   handCount,
   onClick,
   zone,
 }: {
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   handCount?: number;
   onClick?: () => void;
@@ -339,6 +358,7 @@ function TrashZone({
     return (
       <div className="flex items-center gap-2">
         <ZoneCards
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onClick={onClick}
           showCount
@@ -389,6 +409,7 @@ function HandCount({ value }: { value: number }) {
 function CardList({
   cards,
   count,
+  highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
@@ -397,6 +418,7 @@ function CardList({
 }: {
   cards: Card[];
   count?: number;
+  highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onCardPrimaryAction?: (
@@ -415,6 +437,11 @@ function CardList({
       {cards.map((card, index) => (
         <CardTile
           enableHoverPreview={!onClick}
+          isHighlighted={
+            card.instanceId
+              ? highlightedCardInstanceIds?.has(card.instanceId)
+              : false
+          }
           isTransferHidden={
             card.instanceId
               ? hiddenCardInstanceIds?.has(card.instanceId)

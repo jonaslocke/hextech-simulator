@@ -88,6 +88,12 @@ export type Card = {
   comesToPlayReady?: boolean;
 };
 
+export type ChainCardEntry = {
+  card: Card;
+  chainItemId: string;
+  targetCardInstanceIds: string[];
+};
+
 export type ZoneData = {
   cards: Card[];
   count: number;

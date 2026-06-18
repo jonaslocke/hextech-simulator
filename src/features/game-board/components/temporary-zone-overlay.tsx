@@ -2,7 +2,7 @@
 
 import type { GameLogEntry } from "@/server/events";
 import { X } from "lucide-react";
-import { Card, TemporaryZone, ZoneData } from "../types";
+import { Card, ChainCardEntry, TemporaryZone, ZoneData } from "../types";
 import { BoardSlot } from "./board-slot";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
@@ -13,6 +13,8 @@ export function TemporaryZoneOverlay({
   chainPassLabel = "Pass priority",
   isCloseDisabled = false,
   logEntries,
+  onChainItemPointerEnter,
+  onChainItemPointerLeave,
   openZone,
   onClose,
   onPassChain,
@@ -22,10 +24,12 @@ export function TemporaryZoneOverlay({
   playerTrash,
 }: {
   canPassChain?: boolean;
-  chainCards: Card[];
+  chainCards: ChainCardEntry[];
   chainPassLabel?: string;
   isCloseDisabled?: boolean;
   logEntries: GameLogEntry[];
+  onChainItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
+  onChainItemPointerLeave?: () => void;
   openZone: TemporaryZone;
   onClose: () => void;
   onPassChain?: () => void;
@@ -86,7 +90,12 @@ export function TemporaryZoneOverlay({
         <ZoneCards emptyLabel="No cards in trash" cards={opponentTrash.cards} />
       ) : openZone === "chain" ? (
         <div className="grid gap-3">
-          <ZoneCards emptyLabel={message} cards={chainCards} />
+          <ChainCards
+            emptyLabel={message}
+            entries={chainCards}
+            onItemPointerEnter={onChainItemPointerEnter}
+            onItemPointerLeave={onChainItemPointerLeave}
+          />
           {chainCards.length > 0 && (
             <button
               className="disabled:opacity-50 bg-cyan-300 hover:bg-cyan-200 disabled:hover:bg-cyan-300 px-3 py-2 rounded font-semibold text-slate-950 text-sm disabled:cursor-not-allowed"
@@ -101,6 +110,44 @@ export function TemporaryZoneOverlay({
       ) : (
         <EmptyState label={message} />
       )}
+    </div>
+  );
+}
+
+function ChainCards({
+  emptyLabel,
+  entries,
+  onItemPointerEnter,
+  onItemPointerLeave,
+}: {
+  emptyLabel: string;
+  entries: ChainCardEntry[];
+  onItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
+  onItemPointerLeave?: () => void;
+}) {
+  if (entries.length === 0) {
+    return <EmptyState label={emptyLabel} />;
+  }
+
+  return (
+    <div className="flex gap-2 overflow-auto">
+      {entries.map((entry, index) => (
+        <div
+          key={entry.chainItemId}
+          onPointerEnter={() =>
+            onItemPointerEnter?.(entry.targetCardInstanceIds)
+          }
+          onPointerLeave={onItemPointerLeave}
+        >
+          <CardTile
+            enableZoneAnimation={false}
+            enableHoverPreview
+            key={entry.card.instanceId ?? `${entry.card.name}-${index}`}
+            showMight={false}
+            {...entry.card}
+          />
+        </div>
+      ))}
     </div>
   );
 }

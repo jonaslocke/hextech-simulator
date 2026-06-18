@@ -37,6 +37,7 @@ import {
 import {
   BattlefieldData,
   Card,
+  ChainCardEntry,
   GameBoardProps,
   PlayerData,
   TemporaryZone,
@@ -84,7 +85,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     selectedTargetIds: string[];
     selectedModeId?: string;
   } | null>(null);
-  const chainCards = (projection.chain?.items ?? []).flatMap((item) => {
+  const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
+    Set<string>
+  >(new Set());
+  const chainCards: ChainCardEntry[] = (projection.chain?.items ?? []).flatMap((item) => {
     const displayCardInstanceId = item.cardInstanceId ?? item.sourceCardInstanceId;
 
     if (displayCardInstanceId) {
@@ -95,16 +99,24 @@ export const GameBoard: FC<GameBoardProps> = ({
       );
 
       if (cards.length > 0) {
-        return cards;
+        return cards.map((card) => ({
+          card,
+          chainItemId: item.id,
+          targetCardInstanceIds: item.targetCardInstanceIds,
+        }));
       }
     }
 
     return [
       {
-        name: item.label,
-        img: cardBackImage.src,
-        type: undefined,
-      } satisfies Card,
+        card: {
+          name: item.label,
+          img: cardBackImage.src,
+          type: undefined,
+        } satisfies Card,
+        chainItemId: item.id,
+        targetCardInstanceIds: item.targetCardInstanceIds,
+      },
     ];
   });
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
@@ -446,6 +458,12 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [isChainLockedOpen]);
 
   useEffect(() => {
+    if (!isChainLockedOpen || openZone !== "chain") {
+      setHighlightedCardInstanceIds(new Set());
+    }
+  }, [isChainLockedOpen, openZone]);
+
+  useEffect(() => {
     if (!cardActionMenu) {
       return;
     }
@@ -472,6 +490,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       <section className="flex flex-1">
         <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px_64px] p-2">
           <PlayerBoard
+            highlightedCardInstanceIds={highlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
             onOpenBanish={() => setOpenZoneRespectingChain("banish")}
@@ -483,6 +502,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           <div className="flex gap-2">
             <BattlefieldBoard
               battlefield={board.playerBattlefield}
+              highlightedCardInstanceIds={highlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
               onCardPrimaryAction={handleBoardCardPrimaryAction}
               owner="player"
@@ -490,6 +510,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             />
             <BattlefieldBoard
               battlefield={board.opponentBattlefield}
+              highlightedCardInstanceIds={highlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
               onCardPrimaryAction={handleBoardCardPrimaryAction}
               owner="opponent"
@@ -497,6 +518,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             />
           </div>
           <PlayerBoard
+            highlightedCardInstanceIds={highlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
             onOpenBanish={() => setOpenZoneRespectingChain("banish")}
             onOpenTrash={() => setOpenZoneRespectingChain("playerTrash")}
@@ -526,6 +548,10 @@ export const GameBoard: FC<GameBoardProps> = ({
         isCloseDisabled={isChainLockedOpen}
         logEntries={logEntries}
         onClose={() => setOpenZoneRespectingChain(null)}
+        onChainItemPointerEnter={(targetCardInstanceIds) =>
+          setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
+        }
+        onChainItemPointerLeave={() => setHighlightedCardInstanceIds(new Set())}
         onPassChain={onPass}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
