@@ -14,9 +14,9 @@ import type {
   ProjectedPlayerState,
   ProjectedZone,
 } from "@/server/match";
-import { ActionRail } from "./components/ActionRail";
-import { ScoreHeader } from "./components/ScoreHeader";
-import { TemporaryZoneOverlay } from "./components/TemporaryZoneOverlay";
+import { ActionRail } from "./components/action-rail";
+import { ScoreHeader } from "./components/score-header";
+import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import {
   CardZoneAnimationSnapshot,

@@ -1,7 +1,7 @@
 "use client";
 
 import { FC } from "react";
-import { ScoreTrack } from "./ScoreTrack";
+import { ScoreTrack } from "./score-track";
 import { GameScore } from "../types";
 
 export const ScoreHeader: FC<GameScore> = ({ opponent, player }) => {

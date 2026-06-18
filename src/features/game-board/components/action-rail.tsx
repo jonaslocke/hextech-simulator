@@ -2,7 +2,7 @@
 
 import { History, Layers3, SkipForward } from "lucide-react";
 import { TemporaryZone } from "../types";
-import { ActionButton } from "./ActionButton";
+import { ActionButton } from "./action-button";
 
 export function ActionRail({
   onPassTurn,

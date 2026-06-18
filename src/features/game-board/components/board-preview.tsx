@@ -2,7 +2,7 @@
 
 import { History, Layers3, PanelRightOpen, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
-import cardBackImage from "../../../assets/cardback.jpg";
+import cardBackImage from "../../../../assets/cardback.jpg";
 import type { Card } from "@/server/catalog";
 import type { GameLogEntry } from "@/server/events";
 import type { GameProjection, ProjectedZone } from "@/server/match";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizeCardText } from "../features/game-board/lib/normalize-card-description";
+import { normalizeCardText } from "../src/features/game-board/lib/normalize-card-description";
 
 test("card description transpiler preserves and renders Riftbound resource tokens", () => {
   const text = normalizeCardText(

@@ -3,9 +3,9 @@
 import type { GameLogEntry } from "@/server/events";
 import { X } from "lucide-react";
 import { Card, TemporaryZone, ZoneData } from "../types";
-import { BoardSlot } from "./BoardSlot";
+import { BoardSlot } from "./board-slot";
 import { CardTile } from "./card-tile";
-import { EmptyState } from "./EmptyState";
+import { EmptyState } from "./empty-state";
 
 export function TemporaryZoneOverlay({
   chainCards,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import cardBackImage from "../../../assets/cardback.jpg";
+import cardBackImage from "../../../../assets/cardback.jpg";
 import { motion } from "motion/react";
 import type { Card, ZoneKind } from "../types";
 

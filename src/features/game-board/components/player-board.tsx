@@ -1,5 +1,5 @@
 import { ComponentProps, FC, MouseEvent } from "react";
-import cardBackImage from "../../../assets/cardback.jpg";
+import cardBackImage from "../../../../assets/cardback.jpg";
 import { cn } from "@/shared/utils/cn";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
