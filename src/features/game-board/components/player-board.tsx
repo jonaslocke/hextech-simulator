@@ -92,6 +92,7 @@ const BaseLine = ({
           cards={baseUnits}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardPrimaryAction={onBoardCardPrimaryAction}
+          showMight
         />
       </ZoneArea>
       <ZoneArea
@@ -157,6 +158,7 @@ const RunesLine = ({
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardContextAction={onRuneContextAction}
           onCardPrimaryAction={onRunePrimaryAction}
+          showMight={false}
         />
       </ZoneArea>
       <ZoneArea
@@ -258,6 +260,7 @@ function ZoneCards({
   onCardPrimaryAction,
   onClick,
   showCount = false,
+  showMight = false,
   zone,
 }: {
   hiddenCardInstanceIds?: Set<string>;
@@ -268,6 +271,7 @@ function ZoneCards({
   ) => void;
   onClick?: () => void;
   showCount?: boolean;
+  showMight?: boolean;
   zone: ZoneData;
 }) {
   if (zone.cards.length > 0) {
@@ -279,6 +283,7 @@ function ZoneCards({
         onCardContextAction={onCardContextAction}
         onCardPrimaryAction={onCardPrimaryAction}
         onClick={onClick}
+        showMight={showMight}
       />
     );
   }
@@ -301,6 +306,8 @@ function TrashZone({
   onClick?: () => void;
   zone: ZoneData;
 }) {
+  const latestCard = zone.cards.at(-1);
+
   if (zone.cards.length > 0) {
     return (
       <div className="flex items-center gap-2">
@@ -308,7 +315,10 @@ function TrashZone({
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onClick={onClick}
           showCount
-          zone={zone}
+          zone={{
+            ...zone,
+            cards: latestCard ? [latestCard] : [],
+          }}
         />
         {handCount !== undefined && <HandCount value={handCount} />}
       </div>
@@ -356,6 +366,7 @@ function CardList({
   onCardContextAction,
   onCardPrimaryAction,
   onClick,
+  showMight = false,
 }: {
   cards: Card[];
   count?: number;
@@ -366,6 +377,7 @@ function CardList({
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
   onClick?: () => void;
+  showMight?: boolean;
 }) {
   if (cards.length === 0) {
     return null;
@@ -392,6 +404,7 @@ function CardList({
               ? (event) => onCardPrimaryAction(card, event)
               : undefined
           }
+          showMight={showMight}
           {...card}
         />
       ))}

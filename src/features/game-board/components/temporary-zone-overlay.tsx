@@ -123,6 +123,7 @@ function ZoneCards({
           enableZoneAnimation={false}
           enableHoverPreview
           key={card.instanceId ?? `${card.name}-${index}`}
+          showMight={false}
           {...card}
         />
       ))}
