@@ -12,7 +12,6 @@ import {
 import { DECK_OPTIONS } from "../constants";
 import type {
   AcceptedMatch,
-  CatalogCard,
   FixedDeckId,
   GameProjection,
   MatchIntent,
@@ -220,6 +219,26 @@ export function MatchSimulator() {
     id: playerId,
     label: playerLabel(match, playerId)
   }));
+  const viewerBattlefieldChoice =
+    projection.setup.battlefieldChoices[viewer.playerId];
+  const viewerBattlefieldPool =
+    projection.setup.battlefieldPools[viewer.playerId];
+  const battlefieldChoiceOpen =
+    !startingPlayerChoiceOpen &&
+    projection.status === "setup_pending" &&
+    viewerBattlefieldChoice?.status === "unlocked" &&
+    (viewerBattlefieldPool?.registeredCardInstanceIds.length ?? 0) > 0;
+  const battlefieldOptions =
+    viewerBattlefieldPool?.registeredCardInstanceIds.map((cardInstanceId) => {
+      const card = match.cardsByInstanceId[cardInstanceId];
+
+      return {
+        description: card?.text.plain || card?.set.label,
+        id: cardInstanceId,
+        imageUrl: card?.media.image_url,
+        label: card?.name ?? "Battlefield"
+      };
+    }) ?? [];
   const playCardFromHand = ({
     canPlay,
     cardInstanceId,
@@ -335,9 +354,6 @@ export function MatchSimulator() {
       </div>
       {projection.status === "setup_pending" && (
         <SetupActionPanel
-          cardsByInstanceId={match.cardsByInstanceId}
-          disabled={isSubmitting}
-          onIntent={submitIntent}
           projection={projection}
           viewerId={viewer.playerId}
         />
@@ -363,6 +379,26 @@ export function MatchSimulator() {
         selectionMode="single"
         title="Choose Starting Player"
       />
+      <ChoiceDialog
+        confirmLabel="Lock battlefield"
+        description="This battlefield will be revealed after both players lock their choices."
+        isOpen={battlefieldChoiceOpen}
+        onConfirm={([cardInstanceId]) => {
+          if (!cardInstanceId) {
+            return;
+          }
+
+          void submitIntent({
+            type: "setup.lockBattlefieldChoice",
+            payload: {
+              cardInstanceId
+            }
+          });
+        }}
+        options={battlefieldOptions}
+        selectionMode="single"
+        title="Choose Battlefield"
+      />
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
@@ -379,15 +415,9 @@ export function MatchSimulator() {
 }
 
 function SetupActionPanel({
-  cardsByInstanceId,
-  disabled,
-  onIntent,
   projection,
   viewerId
 }: {
-  cardsByInstanceId: Record<string, CatalogCard>;
-  disabled: boolean;
-  onIntent: (intent: MatchIntent) => void;
   projection: GameProjection;
   viewerId: string;
 }) {
@@ -398,9 +428,6 @@ function SetupActionPanel({
         <span className="text-slate-400">{projection.status}</span>
       </div>
       <SetupControls
-        cardsByInstanceId={cardsByInstanceId}
-        disabled={disabled}
-        onIntent={onIntent}
         projection={projection}
         viewerId={viewerId}
       />
@@ -409,20 +436,13 @@ function SetupActionPanel({
 }
 
 function SetupControls({
-  cardsByInstanceId,
-  disabled,
-  onIntent,
   projection,
   viewerId
 }: {
-  cardsByInstanceId: Record<string, CatalogCard>;
-  disabled: boolean;
-  onIntent: (intent: MatchIntent) => void;
   projection: GameProjection;
   viewerId: string;
 }) {
   const viewerChoice = projection.setup.battlefieldChoices[viewerId];
-  const viewerBattlefieldPool = projection.setup.battlefieldPools[viewerId];
 
   return (
     <div className="gap-3 grid">
@@ -445,27 +465,7 @@ function SetupControls({
         {viewerChoice?.status === "revealed" || viewerChoice?.status === "locked" ? (
           <span className="text-slate-400">Choice {viewerChoice.status}.</span>
         ) : (
-          <div className="gap-2 grid">
-            {viewerBattlefieldPool?.registeredCardInstanceIds.map((cardInstanceId) => (
-              <Button
-                key={cardInstanceId}
-                disabled={disabled}
-                onClick={() =>
-                  onIntent({
-                    type: "setup.lockBattlefieldChoice",
-                    payload: {
-                      cardInstanceId
-                    }
-                  })
-                }
-                size="sm"
-                type="button"
-                variant="secondary"
-              >
-                {cardsByInstanceId[cardInstanceId]?.name ?? "Battlefield"}
-              </Button>
-            ))}
-          </div>
+          <span className="text-slate-400">Choose in the dialog.</span>
         )}
       </div>
     </div>
