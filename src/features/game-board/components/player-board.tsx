@@ -19,6 +19,10 @@ type BaseLineProps = {
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onBoardCardPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
 };
 
 type Props = {
@@ -29,6 +33,10 @@ type Props = {
     event: MouseEvent<HTMLDivElement>,
   ) => void;
   onChampionPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
+  onBoardCardPrimaryAction?: (
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
@@ -46,6 +54,7 @@ const BaseLine = ({
   isHightlighted,
   onChampionContextAction,
   onChampionPrimaryAction,
+  onBoardCardPrimaryAction,
 }: BaseLineProps) => {
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
@@ -82,6 +91,7 @@ const BaseLine = ({
         <CardList
           cards={baseUnits}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onCardPrimaryAction={onBoardCardPrimaryAction}
         />
       </ZoneArea>
       <ZoneArea
@@ -191,6 +201,7 @@ export const PlayerBoard: FC<Props> = ({
   isMirrored,
   onChampionContextAction,
   onChampionPrimaryAction,
+  onBoardCardPrimaryAction,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -211,6 +222,7 @@ export const PlayerBoard: FC<Props> = ({
         />
         <BaseLine
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onBoardCardPrimaryAction={onBoardCardPrimaryAction}
           player={player}
           isHightlighted={isActivePlayer}
         />
@@ -223,6 +235,7 @@ export const PlayerBoard: FC<Props> = ({
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
+        onBoardCardPrimaryAction={onBoardCardPrimaryAction}
         player={player}
         isHightlighted={isActivePlayer}
       />

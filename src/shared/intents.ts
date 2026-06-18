@@ -69,7 +69,37 @@ export const playCardIntentSchema = z.object({
   payload: z.object({
     cardInstanceId: z.string().min(1),
     selectedModeId: z.string().min(1).optional(),
-    destination: z.literal("base").optional()
+    destination: z.literal("base").optional(),
+    choices: z
+      .object({
+        targetCardInstanceIds: z.array(z.string().min(1)).optional(),
+        targetBattlefieldIds: z.array(z.string().min(1)).optional(),
+        targetPlayerIds: z.array(z.string().min(1)).optional()
+      })
+      .optional()
+  })
+});
+
+export const activateAbilityIntentSchema = z.object({
+  type: z.literal("game.activateAbility"),
+  payload: z.object({
+    sourceCardInstanceId: z.string().min(1),
+    abilityId: z.string().min(1),
+    choices: z
+      .object({
+        targetCardInstanceIds: z.array(z.string().min(1)).optional(),
+        targetBattlefieldIds: z.array(z.string().min(1)).optional(),
+        targetPlayerIds: z.array(z.string().min(1)).optional()
+      })
+      .optional()
+  })
+});
+
+export const submitChoiceIntentSchema = z.object({
+  type: z.literal("game.submitChoice"),
+  payload: z.object({
+    choiceId: z.string().min(1),
+    orderedIds: z.array(z.string().min(1))
   })
 });
 
@@ -119,6 +149,8 @@ export type ChannelRunesIntent = z.infer<typeof channelRunesIntentSchema>;
 export type RecycleCardsIntent = z.infer<typeof recycleCardsIntentSchema>;
 export type AddRuneResourceIntent = z.infer<typeof addRuneResourceIntentSchema>;
 export type PlayCardIntent = z.infer<typeof playCardIntentSchema>;
+export type ActivateAbilityIntent = z.infer<typeof activateAbilityIntentSchema>;
+export type SubmitChoiceIntent = z.infer<typeof submitChoiceIntentSchema>;
 export type PassPriorityIntent = z.infer<typeof passPriorityIntentSchema>;
 export type EndTurnIntent = z.infer<typeof endTurnIntentSchema>;
 export type MoveUnitToBattlefieldIntent = z.infer<

@@ -78,12 +78,71 @@ export const showdownStateSchema = z.object({
   passedPlayerIds: z.array(z.string().min(1))
 });
 
+export const chosenTargetsSchema = z.object({
+  targetCardInstanceIds: z.array(z.string().min(1)).default([]),
+  targetBattlefieldIds: z.array(z.string().min(1)).default([]),
+  targetPlayerIds: z.array(z.string().min(1)).default([])
+});
+
+export const chainItemSchema = z.object({
+  id: z.string().min(1),
+  controllerPlayerId: z.string().min(1),
+  sourceCardInstanceId: z.string().min(1).nullable(),
+  cardInstanceId: z.string().min(1).nullable(),
+  label: z.string().min(1),
+  kind: z.enum(["spell", "ability", "trigger", "unit"]),
+  effectId: z.string().min(1),
+  choices: chosenTargetsSchema.default({
+    targetCardInstanceIds: [],
+    targetBattlefieldIds: [],
+    targetPlayerIds: []
+  }),
+  payment: z.unknown().optional()
+});
+
+export const chainStateSchema = z.object({
+  items: z.array(chainItemSchema),
+  relevantPlayerIds: z.array(z.string().min(1)).min(1),
+  priorityPlayerId: z.string().min(1),
+  passedPlayerIds: z.array(z.string().min(1))
+});
+
+export const pendingChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("orderTriggers"),
+  prompt: z.string().min(1),
+  optionIds: z.array(z.string().min(1)).min(1)
+});
+
+export const modifierSchema = z.object({
+  id: z.string().min(1),
+  controllerPlayerId: z.string().min(1),
+  sourceCardInstanceId: z.string().min(1).nullable(),
+  targetCardInstanceId: z.string().min(1).nullable(),
+  kind: z.enum(["mightDelta", "spellEnergyDiscount"]),
+  amount: z.number().int(),
+  minimum: z.number().int().min(0).nullable().default(null),
+  duration: z.enum(["thisTurn", "whileSourceAtBattlefield"]),
+  createdAtTurn: z.number().int().min(1)
+});
+
 export const runePoolSchema = z.object({
   energy: z.number().int().min(0),
+  conditionalEnergy: z
+    .record(
+      z.string().min(1),
+      z.object({
+        amount: z.number().int().min(0),
+        restriction: z.enum(["spell"])
+      })
+    )
+    .optional(),
   power: z.record(z.string().min(1), z.number().int().min(0))
 });
 
 export const cardObjectStateSchema = z.object({
+  damage: z.number().int().min(0).optional(),
   exhausted: z.boolean()
 });
 
@@ -100,7 +159,10 @@ export const playerZonesSchema = z.object({
 
 export const gamePlayerStateSchema = z.object({
   playerId: z.string().min(1),
-  runePool: runePoolSchema.default({ energy: 0, power: {} }),
+  runePool: runePoolSchema.default({
+    energy: 0,
+    power: {}
+  }),
   zones: playerZonesSchema
 });
 
@@ -120,6 +182,9 @@ export const battlefieldStateSchema = z.object({
 export const canonicalGameStateSchema = z.object({
   battlefields: z.array(battlefieldStateSchema),
   cardStates: z.record(z.string().min(1), cardObjectStateSchema).default({}),
+  chain: chainStateSchema.nullable().default(null),
+  modifiers: z.array(modifierSchema).default([]),
+  pendingChoice: pendingChoiceSchema.nullable().default(null),
   rng: rngStateSchema,
   players: z.record(z.string().min(1), gamePlayerStateSchema),
   setup: gameSetupStateSchema,
@@ -153,6 +218,11 @@ export type GameTurnState = z.infer<typeof gameTurnStateSchema>;
 export type ShowdownState = z.infer<typeof showdownStateSchema>;
 export type RunePool = z.infer<typeof runePoolSchema>;
 export type CardObjectState = z.infer<typeof cardObjectStateSchema>;
+export type ChainItem = z.infer<typeof chainItemSchema>;
+export type ChainState = z.infer<typeof chainStateSchema>;
+export type ChosenTargets = z.infer<typeof chosenTargetsSchema>;
+export type Modifier = z.infer<typeof modifierSchema>;
+export type PendingChoice = z.infer<typeof pendingChoiceSchema>;
 export type CanonicalGameState = z.infer<typeof canonicalGameStateSchema>;
 export type Game = z.infer<typeof gameSchema>;
 export type CardLookup = Readonly<Record<string, Card>>;
@@ -249,6 +319,7 @@ export type AddRuneResourceInput = {
 export type PlayCardInput = {
   actorPlayerId: string;
   cardInstanceId: string;
+  choices?: Partial<ChosenTargets>;
   selectedModeId?: string;
   destination?: "base";
   now?: string;
@@ -265,6 +336,8 @@ export type AvailablePaymentModesByCard = Record<string, PaymentMode[]>;
 export type PassPriorityInput = {
   actorPlayerId: string;
   now?: string;
+  autoPassOpponent?: boolean;
+  cardsByInstanceId?: CardLookup;
 };
 
 export type EndTurnInput = {
@@ -277,6 +350,22 @@ export type MoveUnitToBattlefieldInput = {
   unitCardInstanceId: string;
   battlefieldId: string;
   now?: string;
+};
+
+export type ActivateAbilityInput = {
+  actorPlayerId: string;
+  sourceCardInstanceId: string;
+  abilityId: string;
+  choices?: Partial<ChosenTargets>;
+  now?: string;
+};
+
+export type SubmitChoiceInput = {
+  actorPlayerId: string;
+  choiceId: string;
+  orderedIds: string[];
+  now?: string;
+  autoPassOpponent?: boolean;
 };
 
 type ApplyStartOfTurnInput = {
@@ -297,6 +386,9 @@ export function createGame(input: CreateGameInput): Game {
   const canonicalState: CanonicalGameState = {
     battlefields: [],
     cardStates: {},
+    chain: null,
+    modifiers: [],
+    pendingChoice: null,
     rng: createRngState(input.rngSeed ?? id),
     players: createInitialPlayerStates(input),
     setup: {
@@ -1064,10 +1156,6 @@ export function playCard(
     throw new Error("Playing cards during showdown is not implemented.");
   }
 
-  if (input.destination && input.destination !== "base") {
-    throw new Error("Only playing units to base is supported.");
-  }
-
   const selectedModeId = input.selectedModeId ?? "regular";
 
   if (selectedModeId !== "regular") {
@@ -1087,8 +1175,16 @@ export function playCard(
 
   const card = requireCard(cardsByInstanceId, input.cardInstanceId);
 
+  if (card.classification.type === "Spell") {
+    return playSpellCard(game, input, card, sourceZone, cardsByInstanceId);
+  }
+
   if (card.classification.type !== "Unit") {
-    throw new Error("Only Unit card play to base is supported.");
+    throw new Error("Only Unit and supported Spell card play is supported.");
+  }
+
+  if (input.destination && input.destination !== "base") {
+    throw new Error("Only playing units to base is supported.");
   }
 
   const profile = getUnitPlayProfile(card);
@@ -1100,9 +1196,10 @@ export function playCard(
   const payment = buildAutomaticPaymentPlan(
     game,
     input.actorPlayerId,
-    readCardCost(card),
+    readCardCostWithModifiers(game, input.actorPlayerId, card, cardsByInstanceId),
     cardsByInstanceId,
-    selectedModeId
+    selectedModeId,
+    "unit"
   );
   const paidResult = applyPaymentPlan(
     game,
@@ -1174,6 +1271,94 @@ export function playCard(
   };
 }
 
+function playSpellCard(
+  game: Game,
+  input: PlayCardInput,
+  card: Card,
+  sourceZone: "hand" | "champion",
+  cardsByInstanceId: CardLookup
+): PlayCardResult {
+  assertCanPlaySpell(game, input.actorPlayerId, card);
+
+  const selectedModeId = input.selectedModeId ?? "regular";
+  const profile = getLuxSpellProfile(card);
+  const choices = normalizeChoices(input.choices);
+
+  validateSpellChoices(game, input.actorPlayerId, profile, choices, cardsByInstanceId);
+
+  const resourceCosts = addDeflectCosts(
+    game,
+    input.actorPlayerId,
+    readCardCostWithModifiers(game, input.actorPlayerId, card, cardsByInstanceId),
+    choices,
+    cardsByInstanceId
+  );
+  const payment = buildAutomaticPaymentPlan(
+    game,
+    input.actorPlayerId,
+    resourceCosts,
+    cardsByInstanceId,
+    selectedModeId,
+    "spell"
+  );
+  const paidResult = applyPaymentPlan(
+    game,
+    input.actorPlayerId,
+    payment,
+    cardsByInstanceId,
+    input.now
+  );
+  const paidGame = paidResult.game;
+  const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
+  const chainItem: ChainItem = {
+    id: `${input.cardInstanceId}:chain:${paidGame.stateVersion + 1}`,
+    controllerPlayerId: input.actorPlayerId,
+    sourceCardInstanceId: input.cardInstanceId,
+    cardInstanceId: input.cardInstanceId,
+    label: card.name,
+    kind: "spell",
+    effectId: profile.effectId,
+    choices,
+    payment
+  };
+
+  return {
+    game: gameSchema.parse({
+      ...paidGame,
+      updatedAt: input.now ?? new Date().toISOString(),
+      stateVersion: game.stateVersion + 1,
+      canonicalState: {
+        ...paidGame.canonicalState,
+        chain: addChainItem(paidGame, chainItem),
+        turn: {
+          ...paidGame.canonicalState.turn!,
+          passedPlayerIds: []
+        },
+        players: {
+          ...paidGame.canonicalState.players,
+          [input.actorPlayerId]: {
+            ...paidPlayer,
+            zones:
+              sourceZone === "hand"
+                ? {
+                    ...paidPlayer.zones,
+                    hand: paidPlayer.zones.hand.filter(
+                      (cardInstanceId) => cardInstanceId !== input.cardInstanceId
+                    )
+                  }
+                : {
+                    ...paidPlayer.zones,
+                    champion: null
+                  }
+          }
+        }
+      }
+    }),
+    payment,
+    randomOperations: paidResult.randomOperations
+  };
+}
+
 export function getAvailablePaymentModesForPlayer(
   game: Game,
   playerId: string,
@@ -1195,19 +1380,47 @@ export function getAvailablePaymentModesForPlayer(
   for (const cardInstanceId of candidateCardInstanceIds) {
     const card = cardsByInstanceId[cardInstanceId];
 
-    if (!card || card.classification.type !== "Unit") {
+    if (
+      !card ||
+      (card.classification.type !== "Unit" && card.classification.type !== "Spell")
+    ) {
       continue;
     }
 
     try {
-      const profile = getUnitPlayProfile(card);
+      if (card.classification.type === "Unit") {
+        const profile = getUnitPlayProfile(card);
 
-      if (!profile.supported) {
-        continue;
+        if (!profile.supported) {
+          continue;
+        }
+      } else {
+        const profile = getLuxSpellProfile(card);
+
+        if (!canPlaySpellAtCurrentTiming(game, playerId, card)) {
+          continue;
+        }
+
+        if (!hasAnyLegalChoiceForSpell(game, playerId, profile, cardsByInstanceId)) {
+          continue;
+        }
       }
 
-      const resourceCosts = readCardCost(card);
-      buildAutomaticPaymentPlan(game, playerId, resourceCosts, cardsByInstanceId);
+      const playKind = card.classification.type === "Spell" ? "spell" : "unit";
+      const resourceCosts = readCardCostWithModifiers(
+        game,
+        playerId,
+        card,
+        cardsByInstanceId
+      );
+      buildAutomaticPaymentPlan(
+        game,
+        playerId,
+        resourceCosts,
+        cardsByInstanceId,
+        "regular",
+        playKind
+      );
       modesByCard[cardInstanceId] = [
         {
           id: "regular",
@@ -1229,6 +1442,14 @@ export function passPriority(game: Game, input: PassPriorityInput): Game {
   assertInProgressTurn(game);
   assertGamePlayer(game, input.actorPlayerId);
 
+  if (game.canonicalState.pendingChoice !== null) {
+    throw new Error("A pending choice must be completed before passing.");
+  }
+
+  if (game.canonicalState.chain !== null) {
+    return passChainPriority(game, input);
+  }
+
   const turn = game.canonicalState.turn!;
   const passedPlayerIds = turn.passedPlayerIds.includes(input.actorPlayerId)
     ? turn.passedPlayerIds
@@ -1248,6 +1469,144 @@ export function passPriority(game: Game, input: PassPriorityInput): Game {
   });
 }
 
+export function activateAbility(
+  game: Game,
+  input: ActivateAbilityInput,
+  cardsByInstanceId: CardLookup
+): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  if (game.canonicalState.showdown !== null) {
+    throw new Error("Action/Reaction play during showdown is not implemented.");
+  }
+
+  if (game.canonicalState.chain !== null) {
+    throw new Error("Only Reaction spells are currently supported during chains.");
+  }
+
+  if (game.canonicalState.pendingChoice !== null) {
+    throw new Error("A pending choice must be completed before activating abilities.");
+  }
+
+  if (input.abilityId !== "lux-crownguard-add-spell-energy") {
+    throw new Error("Activated ability is not implemented.");
+  }
+
+  const player = game.canonicalState.players[input.actorPlayerId]!;
+
+  if (!player.zones.base.includes(input.sourceCardInstanceId)) {
+    throw new Error("Lux Crownguard must be in the acting player's base.");
+  }
+
+  const card = requireCard(cardsByInstanceId, input.sourceCardInstanceId);
+
+  if (card.name !== "Lux, Crownguard") {
+    throw new Error("Only Lux Crownguard's activated ability is supported.");
+  }
+
+  const currentState = game.canonicalState.cardStates[input.sourceCardInstanceId] ?? {
+    exhausted: false
+  };
+
+  if (currentState.exhausted) {
+    throw new Error("Exhausted cards cannot pay exhaust ability costs.");
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates: {
+        ...game.canonicalState.cardStates,
+        [input.sourceCardInstanceId]: {
+          ...currentState,
+          exhausted: true
+        }
+      },
+      players: {
+        ...game.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...player,
+          runePool: addConditionalEnergy(
+            player.runePool,
+            "lux-crownguard-spell-energy",
+            2,
+            "spell"
+          )
+        }
+      }
+    }
+  });
+}
+
+export function submitChoice(
+  game: Game,
+  input: SubmitChoiceInput,
+  cardsByInstanceId: CardLookup
+): Game {
+  assertInProgressTurn(game);
+  assertGamePlayer(game, input.actorPlayerId);
+
+  const pendingChoice = game.canonicalState.pendingChoice;
+
+  if (pendingChoice === null) {
+    throw new Error("No pending choice is available.");
+  }
+
+  if (pendingChoice.id !== input.choiceId) {
+    throw new Error("Submitted choice does not match the pending choice.");
+  }
+
+  if (pendingChoice.playerId !== input.actorPlayerId) {
+    throw new Error("Only the prompted player can submit this choice.");
+  }
+
+  if (!sameMembers(pendingChoice.optionIds, input.orderedIds)) {
+    throw new Error("Trigger ordering must include every pending trigger exactly once.");
+  }
+
+  const chain = game.canonicalState.chain;
+
+  if (chain === null) {
+    throw new Error("Trigger ordering requires an active chain.");
+  }
+
+  const triggerItems = input.orderedIds.map((id) => {
+    const item = chain.items.find((candidate) => candidate.id === id);
+
+    if (!item) {
+      throw new Error("Pending trigger was not found on the chain.");
+    }
+
+    return item;
+  });
+  const nonTriggerItems = chain.items.filter(
+    (item) => !pendingChoice.optionIds.includes(item.id)
+  );
+  const orderedGame = gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      chain: {
+        ...chain,
+        items: [...nonTriggerItems, ...triggerItems],
+        priorityPlayerId: input.actorPlayerId,
+        passedPlayerIds: []
+      },
+      pendingChoice: null
+    }
+  });
+
+  return input.autoPassOpponent
+    ? autoPassChainOpponents(orderedGame, input.actorPlayerId, cardsByInstanceId)
+    : orderedGame;
+}
+
 export function endTurn(game: Game, input: EndTurnInput): Game {
   assertInProgressTurn(game);
   assertGamePlayer(game, input.actorPlayerId);
@@ -1256,6 +1615,14 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
 
   if (turn.activePlayerId !== input.actorPlayerId) {
     throw new Error("Only the active player can end the turn.");
+  }
+
+  if (game.canonicalState.chain !== null) {
+    throw new Error("Cannot end the turn while a chain is active.");
+  }
+
+  if (game.canonicalState.pendingChoice !== null) {
+    throw new Error("Cannot end the turn while a choice is pending.");
   }
 
   const nextPlayerId = game.canonicalState.setup.playerIds.find(
@@ -1272,6 +1639,10 @@ export function endTurn(game: Game, input: EndTurnInput): Game {
     stateVersion: game.stateVersion + 1,
     canonicalState: {
       ...game.canonicalState,
+      cardStates: clearMarkedDamage(game.canonicalState.cardStates),
+      modifiers: game.canonicalState.modifiers.filter(
+        (modifier) => modifier.duration !== "thisTurn"
+      ),
       turn: {
         turnNumber: turn.turnNumber + 1,
         activePlayerId: nextPlayerId,
@@ -1498,6 +1869,990 @@ export function passShowdown(game: Game, input: PassShowdownInput): Game {
           }
     }
   });
+}
+
+function passChainPriority(game: Game, input: PassPriorityInput): Game {
+  const chain = game.canonicalState.chain!;
+
+  if (chain.priorityPlayerId !== input.actorPlayerId) {
+    throw new Error("Only the player with chain priority can pass.");
+  }
+
+  const passedPlayerIds = chain.passedPlayerIds.includes(input.actorPlayerId)
+    ? chain.passedPlayerIds
+    : [...chain.passedPlayerIds, input.actorPlayerId];
+  const shouldResolve = chain.relevantPlayerIds.every((playerId) =>
+    passedPlayerIds.includes(playerId)
+  );
+  const nextPriorityPlayerId = shouldResolve
+    ? input.actorPlayerId
+    : nextRelevantPlayer(chain.relevantPlayerIds, input.actorPlayerId);
+  const passedGame = gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...game.canonicalState,
+      chain: {
+        ...chain,
+        priorityPlayerId: nextPriorityPlayerId,
+        passedPlayerIds
+      }
+    }
+  });
+
+  const nextGame = shouldResolve
+    ? resolveTopChainItem(passedGame, input.cardsByInstanceId ?? {}, input.now)
+    : passedGame;
+
+  return input.autoPassOpponent
+    ? autoPassChainOpponents(
+        nextGame,
+        input.actorPlayerId,
+        input.cardsByInstanceId ?? {}
+      )
+    : nextGame;
+}
+
+function resolveTopChainItem(
+  game: Game,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  const chain = game.canonicalState.chain;
+
+  if (chain === null || chain.items.length === 0) {
+    throw new Error("No chain item is available to resolve.");
+  }
+
+  const item = chain.items[chain.items.length - 1]!;
+  let resolvedGame = resolveChainItem(game, item, now);
+  const remainingItems = chain.items.slice(0, -1);
+
+  resolvedGame = gameSchema.parse({
+    ...resolvedGame,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...resolvedGame.canonicalState,
+      chain:
+        remainingItems.length === 0
+          ? null
+          : {
+              ...chain,
+              items: remainingItems,
+              priorityPlayerId:
+                remainingItems[remainingItems.length - 1]!.controllerPlayerId,
+              passedPlayerIds: []
+            }
+    }
+  });
+
+  resolvedGame = cleanupLethalDamage(resolvedGame, cardsByInstanceId, now);
+
+  if (item.kind === "spell") {
+    resolvedGame = enqueueSpellPlayedTriggers(
+      resolvedGame,
+      item,
+      cardsByInstanceId,
+      now
+    );
+  }
+
+  return resolvedGame;
+}
+
+function resolveChainItem(game: Game, item: ChainItem, now?: string): Game {
+  switch (item.effectId) {
+    case "spell:stupefy":
+      return resolveStupefy(game, item, now);
+    case "spell:back-to-back":
+      return resolveBackToBack(game, item, now);
+    case "spell:falling-comet":
+      return resolveDamageSpell(game, item, 6, now);
+    case "spell:blast-of-power":
+      return resolveKillSpell(game, item, now);
+    case "spell:singularity":
+      return resolveDamageSpell(game, item, 6, now);
+    case "spell:final-spark":
+      return resolveDamageSpell(game, item, 8, now);
+    case "trigger:lady-of-luminosity-draw":
+      return drawCards(game, {
+        actorPlayerId: item.controllerPlayerId,
+        count: 1,
+        now
+      });
+    case "trigger:ravenbloom-student":
+      return addMightModifier(game, {
+        amount: 1,
+        controllerPlayerId: item.controllerPlayerId,
+        sourceCardInstanceId: item.sourceCardInstanceId,
+        targetCardInstanceId: item.sourceCardInstanceId,
+        minimum: null,
+        now
+      });
+    case "trigger:lux-illuminated":
+      return addMightModifier(game, {
+        amount: 3,
+        controllerPlayerId: item.controllerPlayerId,
+        sourceCardInstanceId: item.sourceCardInstanceId,
+        targetCardInstanceId: item.sourceCardInstanceId,
+        minimum: null,
+        now
+      });
+    default:
+      throw new Error(`Chain effect is not implemented: ${item.effectId}`);
+  }
+}
+
+function resolveStupefy(game: Game, item: ChainItem, now?: string): Game {
+  const targetId = item.choices.targetCardInstanceIds[0];
+
+  if (!targetId || !isBoardUnit(game, targetId)) {
+    return moveResolvedSpellToTrash(game, item, now);
+  }
+
+  const modifiedGame = addMightModifier(game, {
+    amount: -1,
+    controllerPlayerId: item.controllerPlayerId,
+    sourceCardInstanceId: item.cardInstanceId,
+    targetCardInstanceId: targetId,
+    minimum: 1,
+    now
+  });
+  const drawnGame = drawCards(modifiedGame, {
+    actorPlayerId: item.controllerPlayerId,
+    count: 1,
+    now
+  });
+
+  return moveResolvedSpellToTrash(drawnGame, item, now);
+}
+
+function resolveBackToBack(game: Game, item: ChainItem, now?: string): Game {
+  let nextGame = game;
+
+  for (const targetId of item.choices.targetCardInstanceIds) {
+    if (isFriendlyBoardUnit(nextGame, item.controllerPlayerId, targetId)) {
+      nextGame = addMightModifier(nextGame, {
+        amount: 2,
+        controllerPlayerId: item.controllerPlayerId,
+        sourceCardInstanceId: item.cardInstanceId,
+        targetCardInstanceId: targetId,
+        minimum: null,
+        now
+      });
+    }
+  }
+
+  return moveResolvedSpellToTrash(nextGame, item, now);
+}
+
+function resolveDamageSpell(
+  game: Game,
+  item: ChainItem,
+  damage: number,
+  now?: string
+): Game {
+  let nextGame = game;
+
+  for (const targetId of item.choices.targetCardInstanceIds) {
+    if (isValidDamageTarget(nextGame, item.effectId, targetId)) {
+      nextGame = markDamage(nextGame, targetId, damage, now);
+    }
+  }
+
+  return moveResolvedSpellToTrash(nextGame, item, now);
+}
+
+function resolveKillSpell(game: Game, item: ChainItem, now?: string): Game {
+  const targetId = item.choices.targetCardInstanceIds[0];
+  const killedGame =
+    targetId && isUnitAtBattlefield(game, targetId)
+      ? killPermanent(game, targetId, now)
+      : game;
+
+  return moveResolvedSpellToTrash(killedGame, item, now);
+}
+
+function moveResolvedSpellToTrash(game: Game, item: ChainItem, now?: string): Game {
+  if (!item.cardInstanceId) {
+    return game;
+  }
+
+  const ownerId = item.controllerPlayerId;
+
+  const owner = game.canonicalState.players[ownerId]!;
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      players: {
+        ...game.canonicalState.players,
+        [ownerId]: {
+          ...owner,
+          zones: {
+            ...owner.zones,
+            trash: [...owner.zones.trash, item.cardInstanceId]
+          }
+        }
+      }
+    }
+  });
+}
+
+function enqueueSpellPlayedTriggers(
+  game: Game,
+  item: ChainItem,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  const energyCost = readChainItemEnergyCost(item);
+  const triggers: ChainItem[] = [];
+  const controllerId = item.controllerPlayerId;
+  const controller = game.canonicalState.players[controllerId]!;
+
+  if (
+    energyCost >= 5 &&
+    controller.zones.legend &&
+    cardsByInstanceId[controller.zones.legend]?.name === "Lady of Luminosity - Starter"
+  ) {
+    triggers.push(createTriggerChainItem(game, {
+      controllerPlayerId: controllerId,
+      effectId: "trigger:lady-of-luminosity-draw",
+      label: "Lady of Luminosity",
+      sourceCardInstanceId: controller.zones.legend
+    }));
+  }
+
+  for (const unitId of controlledBoardUnitIds(game, controllerId)) {
+    const name = cardsByInstanceId[unitId]?.name;
+
+    if (name === "Ravenbloom Student") {
+      triggers.push(createTriggerChainItem(game, {
+        controllerPlayerId: controllerId,
+        effectId: "trigger:ravenbloom-student",
+        label: "Ravenbloom Student",
+        sourceCardInstanceId: unitId
+      }));
+    }
+
+    if (energyCost >= 5 && name === "Lux, Illuminated") {
+      triggers.push(createTriggerChainItem(game, {
+        controllerPlayerId: controllerId,
+        effectId: "trigger:lux-illuminated",
+        label: "Lux, Illuminated",
+        sourceCardInstanceId: unitId
+      }));
+    }
+  }
+
+  if (triggers.length === 0) {
+    return game;
+  }
+
+  const chain = game.canonicalState.chain;
+  const nextChain: ChainState = chain ?? {
+    items: [],
+    relevantPlayerIds: [...game.canonicalState.setup.playerIds],
+    priorityPlayerId: controllerId,
+    passedPlayerIds: []
+  };
+  const withTriggers = gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      chain: {
+        ...nextChain,
+        items: [...nextChain.items, ...triggers],
+        priorityPlayerId: controllerId,
+        passedPlayerIds: []
+      },
+      pendingChoice:
+        triggers.length > 1
+          ? {
+              id: `choice:${game.stateVersion + 1}:${controllerId}:triggers`,
+              playerId: controllerId,
+              type: "orderTriggers",
+              prompt: "Choose the order for triggered abilities.",
+              optionIds: triggers.map((trigger) => trigger.id)
+            }
+          : game.canonicalState.pendingChoice
+    }
+  });
+
+  return withTriggers;
+}
+
+function createTriggerChainItem(
+  game: Game,
+  input: {
+    controllerPlayerId: string;
+    effectId: string;
+    label: string;
+    sourceCardInstanceId: string;
+  }
+): ChainItem {
+  return {
+    id: `${input.sourceCardInstanceId}:${input.effectId}:${game.stateVersion + 1}`,
+    controllerPlayerId: input.controllerPlayerId,
+    sourceCardInstanceId: input.sourceCardInstanceId,
+    cardInstanceId: null,
+    label: input.label,
+    kind: "trigger",
+    effectId: input.effectId,
+    choices: {
+      targetCardInstanceIds: [],
+      targetBattlefieldIds: [],
+      targetPlayerIds: []
+    }
+  };
+}
+
+function addChainItem(game: Game, item: ChainItem): ChainState {
+  const chain = game.canonicalState.chain;
+
+  if (chain === null) {
+    return {
+      items: [item],
+      relevantPlayerIds: [...game.canonicalState.setup.playerIds],
+      priorityPlayerId: item.controllerPlayerId,
+      passedPlayerIds: []
+    };
+  }
+
+  return {
+    ...chain,
+    items: [...chain.items, item],
+    priorityPlayerId: item.controllerPlayerId,
+    passedPlayerIds: []
+  };
+}
+
+function assertCanPlaySpell(game: Game, actorPlayerId: string, card: Card) {
+  if (!canPlaySpellAtCurrentTiming(game, actorPlayerId, card)) {
+    throw new Error("Spell is not legal at the current timing.");
+  }
+}
+
+function canPlaySpellAtCurrentTiming(
+  game: Game,
+  actorPlayerId: string,
+  card: Card
+): boolean {
+  if (game.canonicalState.showdown !== null || game.canonicalState.pendingChoice) {
+    return false;
+  }
+
+  const turn = game.canonicalState.turn;
+
+  if (!turn || turn.phase !== "action") {
+    return false;
+  }
+
+  if (game.canonicalState.chain === null) {
+    return turn.activePlayerId === actorPlayerId;
+  }
+
+  return (
+    game.canonicalState.chain.priorityPlayerId === actorPlayerId &&
+    spellTiming(card) === "reaction"
+  );
+}
+
+function spellTiming(card: Card): "action" | "reaction" | "normal" {
+  if (card.text.plain.includes("[Reaction]")) {
+    return "reaction";
+  }
+
+  if (card.text.plain.includes("[Action]")) {
+    return "action";
+  }
+
+  return "normal";
+}
+
+type LuxSpellProfile = {
+  effectId: string;
+  targetRule:
+    | { type: "anyUnit"; count: number }
+    | { type: "friendlyUnit"; count: number }
+    | { type: "unitAtBattlefield"; count: number }
+    | { type: "upToAnyUnit"; max: number };
+};
+
+function getLuxSpellProfile(card: Card): LuxSpellProfile {
+  switch (card.name) {
+    case "Stupefy":
+      return { effectId: "spell:stupefy", targetRule: { type: "anyUnit", count: 1 } };
+    case "Back to Back":
+      return {
+        effectId: "spell:back-to-back",
+        targetRule: { type: "friendlyUnit", count: 2 }
+      };
+    case "Falling Comet":
+      return {
+        effectId: "spell:falling-comet",
+        targetRule: { type: "unitAtBattlefield", count: 1 }
+      };
+    case "Blast of Power":
+      return {
+        effectId: "spell:blast-of-power",
+        targetRule: { type: "unitAtBattlefield", count: 1 }
+      };
+    case "Singularity":
+      return {
+        effectId: "spell:singularity",
+        targetRule: { type: "upToAnyUnit", max: 2 }
+      };
+    case "Final Spark":
+      return {
+        effectId: "spell:final-spark",
+        targetRule: { type: "anyUnit", count: 1 }
+      };
+    default:
+      throw new Error("This Spell's runtime behavior is not implemented.");
+  }
+}
+
+function validateSpellChoices(
+  game: Game,
+  playerId: string,
+  profile: LuxSpellProfile,
+  choices: ChosenTargets,
+  cardsByInstanceId: CardLookup
+) {
+  const targetIds = choices.targetCardInstanceIds;
+  const uniqueTargetCount = new Set(targetIds).size;
+
+  if (uniqueTargetCount !== targetIds.length) {
+    throw new Error("A target can only be chosen once.");
+  }
+
+  switch (profile.targetRule.type) {
+    case "anyUnit":
+      if (targetIds.length !== profile.targetRule.count) {
+        throw new Error("This spell requires the exact number of unit targets.");
+      }
+      break;
+    case "friendlyUnit":
+      if (targetIds.length !== profile.targetRule.count) {
+        throw new Error("This spell requires the exact number of friendly targets.");
+      }
+      break;
+    case "unitAtBattlefield":
+      if (targetIds.length !== profile.targetRule.count) {
+        throw new Error("This spell requires a unit at a battlefield.");
+      }
+      break;
+    case "upToAnyUnit":
+      if (targetIds.length > profile.targetRule.max) {
+        throw new Error("This spell has too many targets.");
+      }
+      break;
+  }
+
+  for (const targetId of targetIds) {
+    const targetCard = cardsByInstanceId[targetId];
+
+    if (targetCard?.classification.type !== "Unit") {
+      throw new Error("Spell target must be a unit.");
+    }
+
+    if (!isLegalTargetForRule(game, playerId, targetId, profile.targetRule)) {
+      throw new Error("Spell target is not legal.");
+    }
+
+  }
+}
+
+function hasAnyLegalChoiceForSpell(
+  game: Game,
+  playerId: string,
+  profile: LuxSpellProfile,
+  cardsByInstanceId: CardLookup
+): boolean {
+  const legalTargets = getLegalTargetCardInstanceIds(
+    game,
+    playerId,
+    profile.targetRule
+  ).filter(
+    (targetId) => cardsByInstanceId[targetId]?.classification.type === "Unit"
+  );
+
+  if (profile.targetRule.type === "upToAnyUnit") {
+    return true;
+  }
+
+  return legalTargets.length >= profile.targetRule.count;
+}
+
+function normalizeChoices(input?: Partial<ChosenTargets>): ChosenTargets {
+  return {
+    targetCardInstanceIds: input?.targetCardInstanceIds ?? [],
+    targetBattlefieldIds: input?.targetBattlefieldIds ?? [],
+    targetPlayerIds: input?.targetPlayerIds ?? []
+  };
+}
+
+function getLegalTargetCardInstanceIds(
+  game: Game,
+  playerId: string,
+  rule: LuxSpellProfile["targetRule"]
+): string[] {
+  return allBoardUnitIds(game).filter((targetId) =>
+    isLegalTargetForRule(game, playerId, targetId, rule)
+  );
+}
+
+function isLegalTargetForRule(
+  game: Game,
+  playerId: string,
+  targetId: string,
+  rule: LuxSpellProfile["targetRule"]
+): boolean {
+  if (rule.type === "friendlyUnit") {
+    return isFriendlyBoardUnit(game, playerId, targetId);
+  }
+
+  if (rule.type === "unitAtBattlefield") {
+    return isUnitAtBattlefield(game, targetId);
+  }
+
+  return isBoardUnit(game, targetId);
+}
+
+function addMightModifier(
+  game: Game,
+  input: {
+    amount: number;
+    controllerPlayerId: string;
+    sourceCardInstanceId: string | null;
+    targetCardInstanceId: string | null;
+    minimum: number | null;
+    now?: string;
+  }
+): Game {
+  if (!input.targetCardInstanceId || !isBoardUnit(game, input.targetCardInstanceId)) {
+    return game;
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: input.now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      modifiers: [
+        ...game.canonicalState.modifiers,
+        {
+          id: `modifier:${game.canonicalState.modifiers.length + 1}:${input.targetCardInstanceId}`,
+          controllerPlayerId: input.controllerPlayerId,
+          sourceCardInstanceId: input.sourceCardInstanceId,
+          targetCardInstanceId: input.targetCardInstanceId,
+          kind: "mightDelta",
+          amount: input.amount,
+          minimum: input.minimum,
+          duration: "thisTurn",
+          createdAtTurn: game.canonicalState.turn?.turnNumber ?? 1
+        }
+      ]
+    }
+  });
+}
+
+function markDamage(
+  game: Game,
+  cardInstanceId: string,
+  damage: number,
+  now?: string
+): Game {
+  const state = game.canonicalState.cardStates[cardInstanceId] ?? {
+    exhausted: false
+  };
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates: {
+        ...game.canonicalState.cardStates,
+        [cardInstanceId]: {
+          ...state,
+          damage: (state.damage ?? 0) + damage
+        }
+      }
+    }
+  });
+}
+
+function cleanupLethalDamage(
+  game: Game,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  let nextGame = game;
+
+  for (const cardInstanceId of allBoardUnitIds(game)) {
+    const damage = nextGame.canonicalState.cardStates[cardInstanceId]?.damage ?? 0;
+
+    if (
+      damage > 0 &&
+      damage >= getComputedMight(nextGame, cardInstanceId, cardsByInstanceId)
+    ) {
+      nextGame = killPermanent(nextGame, cardInstanceId, now);
+    }
+  }
+
+  return nextGame;
+}
+
+function killPermanent(game: Game, cardInstanceId: string, now?: string): Game {
+  const ownerId = findCardOwnerPlayerId(game, cardInstanceId);
+
+  if (!ownerId) {
+    return game;
+  }
+
+  const owner = game.canonicalState.players[ownerId]!;
+  const cardStates = { ...game.canonicalState.cardStates };
+  delete cardStates[cardInstanceId];
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates,
+      modifiers: game.canonicalState.modifiers.filter(
+        (modifier) =>
+          modifier.targetCardInstanceId !== cardInstanceId &&
+          modifier.sourceCardInstanceId !== cardInstanceId
+      ),
+      players: {
+        ...game.canonicalState.players,
+        [ownerId]: {
+          ...owner,
+          zones: {
+            ...owner.zones,
+            base: owner.zones.base.filter((id) => id !== cardInstanceId),
+            trash: [...owner.zones.trash, cardInstanceId]
+          }
+        }
+      },
+      battlefields: game.canonicalState.battlefields.map((battlefield) => ({
+        ...battlefield,
+        units: battlefield.units.filter((id) => id !== cardInstanceId)
+      }))
+    }
+  });
+}
+
+function clearMarkedDamage(
+  cardStates: Record<string, CardObjectState>
+): Record<string, CardObjectState> {
+  return Object.fromEntries(
+    Object.entries(cardStates).map(([cardInstanceId, state]) => {
+      const { damage: _damage, ...rest } = state;
+      return [cardInstanceId, rest];
+    })
+  );
+}
+
+function getComputedMight(
+  game: Game,
+  cardInstanceId: string,
+  cardsByInstanceId: CardLookup
+): number {
+  const card = cardsByInstanceId[cardInstanceId];
+  let might = card?.attributes.might ?? 0;
+  let minimum: number | null = null;
+
+  for (const modifier of game.canonicalState.modifiers) {
+    if (modifier.kind !== "mightDelta") {
+      continue;
+    }
+
+    if (modifier.targetCardInstanceId !== cardInstanceId) {
+      continue;
+    }
+
+    might += modifier.amount;
+    minimum =
+      modifier.minimum === null
+        ? minimum
+        : minimum === null
+          ? modifier.minimum
+          : Math.max(minimum, modifier.minimum);
+  }
+
+  return Math.max(minimum ?? 0, might);
+}
+
+function readCardCostWithModifiers(
+  game: Game,
+  playerId: string,
+  card: Card,
+  cardsByInstanceId: CardLookup
+): {
+  energy: number;
+  power: PowerRequirement[];
+} {
+  const cost = readCardCost(card);
+
+  if (card.classification.type !== "Spell") {
+    return cost;
+  }
+
+  const discounts = getSpellEnergyDiscounts(game, playerId, cardsByInstanceId);
+  let energy = cost.energy;
+  const appliedDiscounts: string[] = [];
+
+  for (const discount of discounts) {
+    const nextEnergy = Math.max(discount.minimum, energy - discount.amount);
+
+    if (nextEnergy !== energy) {
+      appliedDiscounts.push(discount.id);
+    }
+
+    energy = nextEnergy;
+  }
+
+  return {
+    ...cost,
+    energy
+  };
+}
+
+function addDeflectCosts(
+  game: Game,
+  playerId: string,
+  cost: {
+    energy: number;
+    power: PowerRequirement[];
+  },
+  choices: ChosenTargets,
+  cardsByInstanceId: CardLookup
+): {
+  energy: number;
+  power: PowerRequirement[];
+} {
+  const deflectPower = choices.targetCardInstanceIds.reduce((total, targetId) => {
+    const card = cardsByInstanceId[targetId];
+    const ownerId = findCardOwnerPlayerId(game, targetId);
+
+    if (!card || ownerId === null || ownerId === playerId) {
+      return total;
+    }
+
+    return total + readDeflectPowerCost(card);
+  }, 0);
+
+  if (deflectPower === 0) {
+    return cost;
+  }
+
+  return {
+    ...cost,
+    power: [
+      ...cost.power,
+      {
+        amount: deflectPower,
+        payableBy: "any"
+      }
+    ]
+  };
+}
+
+function readDeflectPowerCost(card: Card): number {
+  const match = card.text.plain.match(/\[Deflect(?:\s+(\d+))?\]/);
+
+  if (!match) {
+    return 0;
+  }
+
+  return match[1] ? Number.parseInt(match[1], 10) : 1;
+}
+
+function getSpellEnergyDiscounts(
+  game: Game,
+  playerId: string,
+  cardsByInstanceId: CardLookup
+): Array<{ id: string; amount: number; minimum: number }> {
+  const discounts: Array<{ id: string; amount: number; minimum: number }> = [];
+
+  for (const unitId of controlledBattlefieldUnitIds(game, playerId)) {
+    if (cardsByInstanceId[unitId]?.name === "Eager Apprentice") {
+      discounts.push({
+        id: `eager-apprentice:${unitId}`,
+        amount: 1,
+        minimum: 1
+      });
+    }
+  }
+
+  for (const modifier of game.canonicalState.modifiers) {
+    if (
+      modifier.kind === "spellEnergyDiscount" &&
+      modifier.controllerPlayerId === playerId
+    ) {
+      discounts.push({
+        id: modifier.id,
+        amount: Math.abs(modifier.amount),
+        minimum: modifier.minimum ?? 0
+      });
+    }
+  }
+
+  return discounts;
+}
+
+function addConditionalEnergy(
+  runePool: RunePool,
+  id: string,
+  amount: number,
+  restriction: "spell"
+): RunePool {
+  const current = runePool.conditionalEnergy?.[id];
+
+  return {
+    ...runePool,
+    conditionalEnergy: {
+      ...(runePool.conditionalEnergy ?? {}),
+      [id]: {
+        amount: (current?.amount ?? 0) + amount,
+        restriction
+      }
+    }
+  };
+}
+
+function autoPassChainOpponents(
+  game: Game,
+  originalActorPlayerId: string,
+  cardsByInstanceId: CardLookup
+): Game {
+  let nextGame = game;
+
+  while (
+    nextGame.canonicalState.chain !== null &&
+    nextGame.canonicalState.pendingChoice === null &&
+    nextGame.canonicalState.chain.priorityPlayerId !== originalActorPlayerId
+  ) {
+    nextGame = passChainPriority(nextGame, {
+      actorPlayerId: nextGame.canonicalState.chain.priorityPlayerId,
+      autoPassOpponent: false
+    });
+  }
+
+  return nextGame;
+}
+
+function readChainItemEnergyCost(item: ChainItem): number {
+  const payment = item.payment as PaymentPlan | undefined;
+
+  return payment?.resourceCosts.energy ?? 0;
+}
+
+function isValidDamageTarget(
+  game: Game,
+  effectId: string,
+  cardInstanceId: string
+): boolean {
+  return effectId === "spell:falling-comet" || effectId === "spell:blast-of-power"
+    ? isUnitAtBattlefield(game, cardInstanceId)
+    : isBoardUnit(game, cardInstanceId);
+}
+
+function isBoardUnit(game: Game, cardInstanceId: string): boolean {
+  return allBoardUnitIds(game).includes(cardInstanceId);
+}
+
+function isUnitAtBattlefield(game: Game, cardInstanceId: string): boolean {
+  return game.canonicalState.battlefields.some((battlefield) =>
+    battlefield.units.includes(cardInstanceId)
+  );
+}
+
+function isFriendlyBoardUnit(
+  game: Game,
+  playerId: string,
+  cardInstanceId: string
+): boolean {
+  return controlledBoardUnitIds(game, playerId).includes(cardInstanceId);
+}
+
+function allBoardUnitIds(game: Game): string[] {
+  return [
+    ...Object.values(game.canonicalState.players).flatMap((player) =>
+      player.zones.base.filter((cardInstanceId) =>
+        Boolean(game.canonicalState.cardStates[cardInstanceId])
+      )
+    ),
+    ...game.canonicalState.battlefields.flatMap((battlefield) => battlefield.units)
+  ];
+}
+
+function controlledBoardUnitIds(game: Game, playerId: string): string[] {
+  const player = game.canonicalState.players[playerId]!;
+
+  return [
+    ...player.zones.base.filter((cardInstanceId) =>
+      Boolean(game.canonicalState.cardStates[cardInstanceId])
+    ),
+    ...game.canonicalState.battlefields.flatMap((battlefield) =>
+      battlefield.units.filter(
+        (cardInstanceId) => findCardOwnerPlayerId(game, cardInstanceId) === playerId
+      )
+    )
+  ];
+}
+
+function controlledBattlefieldUnitIds(game: Game, playerId: string): string[] {
+  return game.canonicalState.battlefields.flatMap((battlefield) =>
+    battlefield.units.filter(
+      (cardInstanceId) => findCardOwnerPlayerId(game, cardInstanceId) === playerId
+    )
+  );
+}
+
+function findCardOwnerPlayerId(game: Game, cardInstanceId: string): string | null {
+  for (const [playerId, player] of Object.entries(game.canonicalState.players)) {
+    const zones = player.zones;
+
+    if (
+      zones.legend === cardInstanceId ||
+      zones.champion === cardInstanceId ||
+      zones.mainDeck.includes(cardInstanceId) ||
+      zones.runeDeck.includes(cardInstanceId) ||
+      zones.hand.includes(cardInstanceId) ||
+      zones.trash.includes(cardInstanceId) ||
+      zones.banishment.includes(cardInstanceId) ||
+      zones.base.includes(cardInstanceId)
+    ) {
+      return playerId;
+    }
+  }
+
+  const ownerPrefix = cardInstanceId.split(":")[0];
+
+  if (ownerPrefix && game.canonicalState.setup.playerIds.includes(ownerPrefix)) {
+    return ownerPrefix;
+  }
+
+  return null;
+}
+
+function sameMembers(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const leftSet = new Set(left);
+
+  return right.every((value) => leftSet.has(value));
 }
 
 function createInitialBattlefieldChoices(
@@ -1735,13 +3090,43 @@ function buildAutomaticPaymentPlan(
     power: PowerRequirement[];
   },
   cardsByInstanceId: CardLookup,
-  selectedModeId = "regular"
+  selectedModeId = "regular",
+  playKind: "spell" | "unit" = "unit"
 ): PaymentPlan {
   const player = game.canonicalState.players[playerId]!;
   let remainingEnergy = cost.energy;
   const resourcePayments: ResourcePayment[] = [];
   const recycledRuneCardInstanceIds = new Set<string>();
   const availablePoolPower = { ...player.runePool.power };
+  const availableConditionalEnergy = { ...(player.runePool.conditionalEnergy ?? {}) };
+
+  if (playKind === "spell") {
+    for (const [restrictionId, entry] of Object.entries(availableConditionalEnergy)) {
+      if (remainingEnergy === 0) {
+        break;
+      }
+
+      if (entry.restriction !== "spell" || entry.amount <= 0) {
+        continue;
+      }
+
+      const spent = Math.min(entry.amount, remainingEnergy);
+
+      if (spent > 0) {
+        resourcePayments.push({
+          type: "spendConditionalEnergy",
+          amount: spent,
+          sourceId: restrictionId,
+          restriction: "spell"
+        });
+        availableConditionalEnergy[restrictionId] = {
+          ...entry,
+          amount: entry.amount - spent
+        };
+        remainingEnergy -= spent;
+      }
+    }
+  }
 
   const spentEnergyFromPool = Math.min(player.runePool.energy, remainingEnergy);
 
@@ -1844,11 +3229,25 @@ function applyPaymentPlan(
   );
   const cardStates = { ...game.canonicalState.cardStates };
   const power = { ...player.runePool.power };
+  const conditionalEnergy = { ...(player.runePool.conditionalEnergy ?? {}) };
   let energy = player.runePool.energy;
 
   for (const resourcePayment of payment.resourcePayments) {
     if (resourcePayment.type === "spendEnergy") {
       energy -= resourcePayment.amount;
+      continue;
+    }
+
+    if (resourcePayment.type === "spendConditionalEnergy") {
+      const entry = conditionalEnergy[resourcePayment.sourceId];
+
+      if (entry) {
+        conditionalEnergy[resourcePayment.sourceId] = {
+          ...entry,
+          amount: Math.max(0, entry.amount - resourcePayment.amount)
+        };
+      }
+
       continue;
     }
 
@@ -1874,6 +3273,19 @@ function applyPaymentPlan(
     }
   }
 
+  const remainingConditionalEnergy = Object.fromEntries(
+    Object.entries(conditionalEnergy).filter(([, entry]) => entry.amount > 0)
+  );
+  const nextRunePool: RunePool = {
+    energy,
+    ...(Object.keys(remainingConditionalEnergy).length > 0
+      ? { conditionalEnergy: remainingConditionalEnergy }
+      : {}),
+    power: Object.fromEntries(
+      Object.entries(power).filter(([, amount]) => amount > 0)
+    )
+  };
+
   return {
     game: gameSchema.parse({
       ...game,
@@ -1886,12 +3298,7 @@ function applyPaymentPlan(
           ...game.canonicalState.players,
           [playerId]: {
             ...player,
-            runePool: {
-              energy,
-              power: Object.fromEntries(
-                Object.entries(power).filter(([, amount]) => amount > 0)
-              )
-            },
+            runePool: nextRunePool,
             zones: {
               ...player.zones,
               base: player.zones.base.filter(

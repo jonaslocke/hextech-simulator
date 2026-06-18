@@ -9,13 +9,50 @@ import {
 import { paymentModeSchema } from "./payment";
 
 export const projectedRunePoolSchema = z.object({
+  conditionalEnergy: z
+    .record(
+      z.string().min(1),
+      z.object({
+        amount: z.number().int().nonnegative(),
+        restriction: z.enum(["spell"])
+      })
+    )
+    .default({}),
   energy: z.number().int().nonnegative(),
   power: z.record(z.string().min(1), z.number().int().nonnegative())
 });
 
 export const projectedCardStateSchema = z.object({
+  computedMight: z.number().int().min(0).optional(),
+  damage: z.number().int().min(0).optional(),
   exhausted: z.boolean()
 });
+
+export const projectedChainItemSchema = z.object({
+  id: z.string().min(1),
+  controllerPlayerId: z.string().min(1),
+  cardInstanceId: z.string().min(1).nullable(),
+  label: z.string().min(1),
+  kind: z.enum(["spell", "ability", "trigger", "unit"])
+});
+
+export const projectedChainSchema = z
+  .object({
+    items: z.array(projectedChainItemSchema),
+    priorityPlayerId: z.string().min(1),
+    passedPlayerIds: z.array(z.string().min(1))
+  })
+  .nullable();
+
+export const projectedPendingChoiceSchema = z
+  .object({
+    id: z.string().min(1),
+    playerId: z.string().min(1),
+    type: z.literal("orderTriggers"),
+    prompt: z.string().min(1),
+    optionIds: z.array(z.string().min(1))
+  })
+  .nullable();
 
 export const projectedZoneSchema = z.object({
   cardInstanceIds: z.array(z.string().min(1)),
@@ -41,6 +78,14 @@ export const projectedPlayerStateSchema = z.object({
   availablePaymentModes: z.record(
     z.string().min(1),
     z.array(paymentModeSchema)
+  ),
+  legalTargetsByCard: z.record(
+    z.string().min(1),
+    z.object({
+      cardInstanceIds: z.array(z.string().min(1)),
+      battlefieldIds: z.array(z.string().min(1)),
+      playerIds: z.array(z.string().min(1))
+    })
   ),
   zones: projectedPlayerZonesSchema
 });
@@ -126,6 +171,8 @@ export const gameProjectionSchema = z.object({
   setup: projectedSetupStateSchema,
   turn: projectedTurnStateSchema,
   showdown: projectedShowdownStateSchema,
+  chain: projectedChainSchema,
+  pendingChoice: projectedPendingChoiceSchema,
   players: z.record(z.string().min(1), projectedPlayerStateSchema),
   battlefields: z.array(projectedBattlefieldSchema),
   cardStates: z.record(z.string().min(1), projectedCardStateSchema)
@@ -133,6 +180,8 @@ export const gameProjectionSchema = z.object({
 
 export type ProjectedRunePool = z.infer<typeof projectedRunePoolSchema>;
 export type ProjectedCardState = z.infer<typeof projectedCardStateSchema>;
+export type ProjectedChain = z.infer<typeof projectedChainSchema>;
+export type ProjectedPendingChoice = z.infer<typeof projectedPendingChoiceSchema>;
 export type ProjectedZone = z.infer<typeof projectedZoneSchema>;
 export type ProjectedPlayerZones = z.infer<typeof projectedPlayerZonesSchema>;
 export type ProjectedPlayerState = z.infer<typeof projectedPlayerStateSchema>;
@@ -164,10 +213,17 @@ export function projectGameForPlayer(
         {
           playerId,
           isViewer: playerId === viewerPlayerId,
-          runePool: player.runePool,
+          runePool: {
+            ...player.runePool,
+            conditionalEnergy: player.runePool.conditionalEnergy ?? {}
+          },
           availablePaymentModes:
             playerId === viewerPlayerId && cardsByInstanceId
               ? getAvailablePaymentModesForPlayer(game, playerId, cardsByInstanceId)
+              : {},
+          legalTargetsByCard:
+            playerId === viewerPlayerId && cardsByInstanceId
+              ? projectLegalTargets(game, playerId, cardsByInstanceId)
               : {},
           zones: projectZones(player.zones, playerId === viewerPlayerId)
         }
@@ -189,9 +245,11 @@ export function projectGameForPlayer(
     setup: projectSetup(game, viewerPlayerId),
     turn: game.canonicalState.turn,
     showdown: game.canonicalState.showdown,
+    chain: projectChain(game),
+    pendingChoice: projectPendingChoice(game, viewerPlayerId),
     players,
     battlefields,
-    cardStates: projectCardStates(game, players, battlefields)
+    cardStates: projectCardStates(game, players, battlefields, cardsByInstanceId)
   });
 }
 
@@ -337,7 +395,8 @@ function secretZone(count: number): ProjectedZone {
 function projectCardStates(
   game: Game,
   players: Record<string, ProjectedPlayerState>,
-  battlefields: ProjectedBattlefield[]
+  battlefields: ProjectedBattlefield[],
+  cardsByInstanceId?: CardLookup
 ): Record<string, ProjectedCardState> {
   const visibleCardInstanceIds = new Set<string>();
 
@@ -362,8 +421,180 @@ function projectCardStates(
   }
 
   return Object.fromEntries(
-    Object.entries(game.canonicalState.cardStates).filter(([cardInstanceId]) =>
-      visibleCardInstanceIds.has(cardInstanceId)
-    )
+    Object.entries(game.canonicalState.cardStates)
+      .filter(([cardInstanceId]) => visibleCardInstanceIds.has(cardInstanceId))
+      .map(([cardInstanceId, state]) => [
+        cardInstanceId,
+        {
+          ...state,
+          ...(cardsByInstanceId?.[cardInstanceId]?.classification.type === "Unit"
+            ? {
+                computedMight: computeMight(
+                  game,
+                  cardInstanceId,
+                  cardsByInstanceId
+                )
+              }
+            : {})
+        }
+      ])
   );
+}
+
+function projectChain(game: Game): GameProjection["chain"] {
+  const chain = game.canonicalState.chain;
+
+  if (chain === null) {
+    return null;
+  }
+
+  return {
+    items: chain.items.map((item) => ({
+      id: item.id,
+      controllerPlayerId: item.controllerPlayerId,
+      cardInstanceId: item.cardInstanceId,
+      label: item.label,
+      kind: item.kind
+    })),
+    priorityPlayerId: chain.priorityPlayerId,
+    passedPlayerIds: chain.passedPlayerIds
+  };
+}
+
+function projectPendingChoice(
+  game: Game,
+  viewerPlayerId: string
+): GameProjection["pendingChoice"] {
+  const choice = game.canonicalState.pendingChoice;
+
+  if (choice === null || choice.playerId !== viewerPlayerId) {
+    return null;
+  }
+
+  return choice;
+}
+
+function projectLegalTargets(
+  game: Game,
+  playerId: string,
+  cardsByInstanceId: CardLookup
+): ProjectedPlayerState["legalTargetsByCard"] {
+  const player = game.canonicalState.players[playerId];
+
+  if (!player || game.status !== "in_progress" || game.canonicalState.showdown) {
+    return {};
+  }
+
+  const cards = [...player.zones.hand, ...(player.zones.champion ? [player.zones.champion] : [])];
+
+  return Object.fromEntries(
+    cards.flatMap((cardInstanceId) => {
+      const card = cardsByInstanceId[cardInstanceId];
+
+      if (card?.classification.type !== "Spell") {
+        return [];
+      }
+
+      const targetIds = legalTargetIdsForLuxSpell(
+        game,
+        playerId,
+        card.name,
+        cardsByInstanceId
+      );
+
+      return [
+        [
+          cardInstanceId,
+          {
+            cardInstanceIds: targetIds,
+            battlefieldIds: game.canonicalState.battlefields.map(
+              (battlefield) => battlefield.battlefieldId
+            ),
+            playerIds: game.canonicalState.setup.playerIds.filter(
+              (candidate) => candidate !== playerId
+            )
+          }
+        ]
+      ];
+    })
+  );
+}
+
+function legalTargetIdsForLuxSpell(
+  game: Game,
+  playerId: string,
+  cardName: string,
+  cardsByInstanceId: CardLookup
+): string[] {
+  return allBoardUnitIds(game, cardsByInstanceId).filter((cardInstanceId) => {
+    if (cardName === "Back to Back") {
+      return findOwnerByInstanceId(game, cardInstanceId) === playerId;
+    }
+
+    if (cardName === "Falling Comet" || cardName === "Blast of Power") {
+      return game.canonicalState.battlefields.some((battlefield) =>
+        battlefield.units.includes(cardInstanceId)
+      );
+    }
+
+    if (
+      cardName === "Stupefy" ||
+      cardName === "Singularity" ||
+      cardName === "Final Spark"
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
+function allBoardUnitIds(game: Game, cardsByInstanceId: CardLookup): string[] {
+  return [
+    ...Object.values(game.canonicalState.players).flatMap((player) =>
+      player.zones.base.filter(
+        (cardInstanceId) =>
+          cardsByInstanceId[cardInstanceId]?.classification.type === "Unit"
+      )
+    ),
+    ...game.canonicalState.battlefields.flatMap((battlefield) =>
+      battlefield.units.filter(
+        (cardInstanceId) =>
+          cardsByInstanceId[cardInstanceId]?.classification.type === "Unit"
+      )
+    )
+  ];
+}
+
+function computeMight(
+  game: Game,
+  cardInstanceId: string,
+  cardsByInstanceId: CardLookup
+): number {
+  const baseMight = cardsByInstanceId[cardInstanceId]?.attributes.might ?? 0;
+  let might = baseMight;
+  let minimum = 0;
+
+  for (const modifier of game.canonicalState.modifiers) {
+    if (
+      modifier.kind === "mightDelta" &&
+      modifier.targetCardInstanceId === cardInstanceId
+    ) {
+      might += modifier.amount;
+      minimum =
+        modifier.minimum === null ? minimum : Math.max(minimum, modifier.minimum);
+    }
+  }
+
+  return Math.max(minimum, might);
+}
+
+function findOwnerByInstanceId(game: Game, cardInstanceId: string): string | null {
+  const ownerPrefix = cardInstanceId.split(":")[0];
+
+  if (game.canonicalState.setup.playerIds.includes(ownerPrefix)) {
+    return ownerPrefix;
+  }
+
+  return null;
 }

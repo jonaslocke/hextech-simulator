@@ -199,7 +199,7 @@ implemented, tested, and documented where relevant.
 - [x] Replace flat `PaymentPlan` with resource costs, resource payments, non-resource costs, selected modes, optional costs, and applied modifiers.
 - [x] Represent Power costs as requirements payable by one or more domains or by any domain.
 - [x] Add Rainbow Power to rune-pool state and payment validation.
-- [ ] Support multi-domain Power payment, using `Defiant Dance` as a fixture.
+- [x] Support multi-domain Power payment, using metadata domain order as the accepted rule.
 - [x] Prefer domain-specific Power before Rainbow Power during auto-payment.
 - [x] Use card metadata domain order for multi-domain Power auto-payment.
 - [x] Spend rune-pool resources before auto-exhausting or auto-recycling Runes.
@@ -212,7 +212,7 @@ implemented, tested, and documented where relevant.
 - [ ] Expose legal play/payment modes in viewer-safe projection, including regular play and optional additional-cost modes.
 - [ ] Support selected optional additional-cost modes such as Accelerate and Repeat.
 - [ ] Enforce Repeat as a once-only optional additional cost.
-- [ ] Treat Deflect on spells as mandatory additional Power cost.
+- [x] Treat Deflect on spells as mandatory additional Power cost.
 - [ ] Allow ability flows that target Deflect objects to opt out before payment when the rules permit cancellation.
 - [ ] Add canonical computed temporary cost modifiers for ignore-cost effects, increases, discounts, and modified object costs.
 - [ ] Let player intent supply non-resource cost order only when order can affect legality or outcome.
@@ -233,10 +233,35 @@ implemented, tested, and documented where relevant.
 - [x] Reject Vision cards at intent time until the Vision choice experience is implemented.
 - [x] Reject Choose-based Unit play effects at intent time until the Choose primitive is implemented.
 - [x] Reject damage-on-play Unit effects at intent time until damage and showdown resolution are implemented.
-- [ ] Implement the Choose primitive and use it for target/option selection.
+- [x] Implement the first Choose primitive path for spell targets and trigger ordering.
 - [ ] Implement the Vision player-choice flow.
 - [ ] Implement damage and kill resolution for damage-on-play effects.
-- [ ] Implement `Lux, Crownguard` activated ability after spell play/resource restrictions are modeled.
+- [x] Implement `Lux, Crownguard` activated ability after spell play/resource restrictions are modeled.
+
+## 15B. Full Lux Non-Showdown Runtime
+
+- [x] Add canonical non-showdown chain state for spells, triggers, and pass-to-resolve sequencing.
+- [x] Keep Action/Reaction play during showdown rejected as unsupported.
+- [x] Add `game.playCard` target-choice payload support.
+- [x] Add `game.activateAbility` support for `Lux, Crownguard`.
+- [x] Add `game.submitChoice` support for trigger ordering.
+- [x] Project chain items, pending choices, legal spell targets, conditional rune-pool resources, computed Might, and marked damage.
+- [x] Add modifier records for this-turn Might changes and computed spell Energy discounts.
+- [x] Apply `Eager Apprentice` spell Energy discount only while it is at a battlefield.
+- [x] Add conditional spell-only Energy and spend it before generic Energy for spells.
+- [x] Add damage marking, lethal cleanup, kill-to-trash, and end-turn damage clearing.
+- [x] Implement `Stupefy`.
+- [x] Implement `Back to Back`.
+- [x] Implement `Falling Comet`.
+- [x] Implement `Blast of Power`.
+- [x] Implement `Singularity`.
+- [x] Implement `Final Spark`.
+- [x] Implement `Lady of Luminosity - Starter` spell-cost trigger.
+- [x] Implement `Ravenbloom Student` spell-play trigger.
+- [x] Implement `Lux, Illuminated` spell-cost trigger.
+- [x] Add focused Lux runtime tests for conditional spell Energy, chain resolution, target choices, Deflect cost, discounts, damage cleanup, and trigger ordering.
+- [ ] Add richer player-facing trigger-order controls beyond submitting the projected order.
+- [ ] Add manual UI acceptance coverage for selecting board targets by clicking and seeing chain/pending-choice state.
 
 ## 13. Event Log Panel
 

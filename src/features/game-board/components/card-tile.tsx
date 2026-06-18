@@ -33,6 +33,7 @@ export const CardTile: FC<CardTileProps> = ({
   domains = [],
   enableHoverPreview = false,
   enableZoneAnimation = true,
+  damage,
   energy,
   focusablePreview = true,
   instanceId,
@@ -181,6 +182,11 @@ export const CardTile: FC<CardTileProps> = ({
         {showMight && might !== undefined && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-900/70 bg-white px-1 text-xs font-bold text-slate-950 shadow">
             {might}
+          </span>
+        )}
+        {damage !== undefined && damage > 0 && (
+          <span className="absolute top-1/2 -left-2 flex h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-full border border-red-100 bg-red-500 px-1 text-xs font-black text-white shadow">
+            {damage}
           </span>
         )}
       </motion.div>

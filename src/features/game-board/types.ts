@@ -23,9 +23,12 @@ export type ZoneKind =
   | "trash";
 
 export type GameBoardProps = {
-  chainCardInstanceIds?: string[];
   cardsByInstanceId: Record<string, CatalogCard>;
   logEntries?: GameLogEntry[];
+  onActivateAbility?: (input: {
+    abilityId: string;
+    sourceCardInstanceId: string;
+  }) => void;
   onAddRuneResource?: (input: {
     cardInstanceId: string;
     resourceType: "energy" | "power";
@@ -33,8 +36,12 @@ export type GameBoardProps = {
   onPlayCard?: (input: {
     canPlay: boolean;
     cardInstanceId: string;
+    choices?: {
+      targetCardInstanceIds?: string[];
+    };
     selectedModeId?: string;
   }) => void;
+  onSubmitChoice?: (input: { choiceId: string; orderedIds: string[] }) => void;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
@@ -75,6 +82,7 @@ export type Card = {
   supertype?: CatalogCard["classification"]["supertype"];
   type?: CardType;
   isExhausted?: boolean;
+  damage?: number;
   comesToPlayReady?: boolean;
 };
 

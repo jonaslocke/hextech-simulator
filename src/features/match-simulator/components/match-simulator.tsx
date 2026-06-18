@@ -211,10 +211,14 @@ export function MatchSimulator() {
   const playCardFromHand = ({
     canPlay,
     cardInstanceId,
+    choices,
     selectedModeId
   }: {
     canPlay: boolean;
     cardInstanceId: string;
+    choices?: {
+      targetCardInstanceIds?: string[];
+    };
     selectedModeId?: string;
   }) => {
     if (!canPlay) {
@@ -226,8 +230,39 @@ export function MatchSimulator() {
       type: "game.playCard",
       payload: {
         cardInstanceId,
+        choices,
         selectedModeId,
         destination: "base"
+      }
+    });
+  };
+  const activateAbility = ({
+    abilityId,
+    sourceCardInstanceId
+  }: {
+    abilityId: string;
+    sourceCardInstanceId: string;
+  }) => {
+    void submitIntent({
+      type: "game.activateAbility",
+      payload: {
+        abilityId,
+        sourceCardInstanceId
+      }
+    });
+  };
+  const submitChoice = ({
+    choiceId,
+    orderedIds
+  }: {
+    choiceId: string;
+    orderedIds: string[];
+  }) => {
+    void submitIntent({
+      type: "game.submitChoice",
+      payload: {
+        choiceId,
+        orderedIds
       }
     });
   };
@@ -282,8 +317,10 @@ export function MatchSimulator() {
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
+        onActivateAbility={activateAbility}
         onAddRuneResource={addRuneResourceFromBoard}
         onPlayCard={playCardFromHand}
+        onSubmitChoice={submitChoice}
         projection={projection}
       />
     </main>

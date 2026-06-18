@@ -15,6 +15,7 @@ import {
 } from "../events";
 import {
   addRuneResourceIntentSchema,
+  activateAbilityIntentSchema,
   channelRunesIntentSchema,
   chooseStartingPlayerIntentSchema,
   commitMulliganIntentSchema,
@@ -26,10 +27,12 @@ import {
   passPriorityIntentSchema,
   playCardIntentSchema,
   recycleCardsIntentSchema,
+  submitChoiceIntentSchema,
   type MatchIntentPayload
 } from "../../shared/intents";
 import {
   addRuneResource,
+  activateAbility,
   channelRunes,
   chooseStartingPlayer,
   commitMulligan,
@@ -47,6 +50,7 @@ import {
   shuffleMainDecks,
   shuffleRuneDecks,
   startGame,
+  submitChoice,
   type CardLookup,
   type Game
 } from "./game";
@@ -54,6 +58,7 @@ import { projectGameForPlayer, type GameProjection } from "./projections";
 import { verifyPlayerToken } from "./tokens";
 
 export type IntentServiceOptions = {
+  autoPassChainOpponent?: boolean;
   cardsByInstanceId?: CardLookup;
   createEventId?: (input: { gameId: string; sequence: number }) => string;
   now?: () => string;
@@ -247,6 +252,9 @@ function applyIntent(
   now: string,
   cardsByInstanceId: CardLookup
 ): AppliedIntentResult {
+  const autoPassChainOpponent =
+    process.env.HEXTECH_CHAIN_AUTO_PASS_OPPONENT === "true";
+
   try {
     switch (input.intent.type) {
       case "setup.chooseStartingPlayer": {
@@ -419,6 +427,7 @@ function applyIntent(
           {
             actorPlayerId,
             cardInstanceId: intent.payload.cardInstanceId,
+            choices: intent.payload.choices,
             selectedModeId: intent.payload.selectedModeId,
             destination: intent.payload.destination,
             now
@@ -459,6 +468,8 @@ function applyIntent(
           game.canonicalState.showdown === null
             ? passPriority(game, {
                 actorPlayerId,
+                autoPassOpponent: autoPassChainOpponent,
+                cardsByInstanceId,
                 now
               })
             : passShowdown(game, {
@@ -535,11 +546,58 @@ function applyIntent(
           );
         }
 
-        return reject(
-          "unsupported_intent",
-          `Intent type is not supported: ${input.intent.type}`,
-          input.intent.type
-        );
+        {
+          const intent = activateAbilityIntentSchema.parse(input.intent);
+
+          return {
+            accepted: true,
+            game: activateAbility(
+              game,
+              {
+                actorPlayerId,
+                sourceCardInstanceId: intent.payload.sourceCardInstanceId,
+                abilityId: intent.payload.abilityId,
+                choices: intent.payload.choices,
+                now
+              },
+              cardsByInstanceId
+            ),
+            serverDecisions: [
+              {
+                type: "game.activateAbility",
+                payload: {
+                  abilityId: intent.payload.abilityId
+                }
+              }
+            ],
+            randomOperations: []
+          };
+        }
+
+      case "game.submitChoice": {
+        const intent = submitChoiceIntentSchema.parse(input.intent);
+
+        return {
+          accepted: true,
+          game: submitChoice(
+            game,
+            {
+              actorPlayerId,
+              choiceId: intent.payload.choiceId,
+              orderedIds: intent.payload.orderedIds,
+              autoPassOpponent: autoPassChainOpponent,
+              now
+            },
+            cardsByInstanceId
+          ),
+          serverDecisions: [
+            {
+              type: "game.submitChoice"
+            }
+          ],
+          randomOperations: []
+        };
+      }
 
       default:
         return reject(

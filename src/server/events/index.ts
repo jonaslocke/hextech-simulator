@@ -184,6 +184,10 @@ function renderIntentMessage(
     }
     case "game.playCard":
       return `${actor} played a card.`;
+    case "game.activateAbility":
+      return `${actor} activated an ability.`;
+    case "game.submitChoice":
+      return `${actor} submitted a choice.`;
     case "game.pass":
       return `${actor} passed.`;
     case "game.endTurn":
@@ -215,6 +219,10 @@ function renderServerDecisionMessage(event: GameEventDocument): string {
       return "Server started the game.";
     case "game.payCosts":
       return "Server paid card costs.";
+    case "game.activateAbility":
+      return "Server resolved an activated ability.";
+    case "game.submitChoice":
+      return "Server accepted a player choice.";
     case "turn.start.awaken":
       return "Server completed Awaken.";
     case "turn.start.beginning":

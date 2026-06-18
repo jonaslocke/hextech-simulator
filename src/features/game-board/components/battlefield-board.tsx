@@ -1,12 +1,17 @@
 import { cn } from "@/shared/utils/cn";
 import { Info } from "lucide-react";
-import { FC, useEffect, useRef, useState } from "react";
+import { FC, MouseEvent, useEffect, useRef, useState } from "react";
 import { BattlefieldData } from "../types";
+import type { Card } from "../types";
 import { CardTile } from "./card-tile";
 
 type Props = {
   battlefield: BattlefieldData;
   hiddenCardInstanceIds?: Set<string>;
+  onCardPrimaryAction?: (
+    card: Card,
+    event?: MouseEvent<HTMLDivElement>,
+  ) => void;
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred"; //tied to the game state open or neutral - 'deferred' due to be smaller when other BF is on showdown state open -- betternaming is needed
 };
@@ -14,6 +19,7 @@ type Props = {
 export const BattlefieldBoard: FC<Props> = ({
   battlefield: { description, id, name, opponentUnits, playerUnits, img },
   hiddenCardInstanceIds,
+  onCardPrimaryAction,
   owner,
   showdownState = "neutral",
 }) => {
@@ -116,6 +122,11 @@ export const BattlefieldBoard: FC<Props> = ({
                   : false
               }
               key={unit.instanceId ?? `${unit.name}-${index}`}
+              onPrimaryAction={
+                onCardPrimaryAction
+                  ? (event) => onCardPrimaryAction(unit, event)
+                  : undefined
+              }
               {...unit}
             />
           ))}
@@ -134,6 +145,11 @@ export const BattlefieldBoard: FC<Props> = ({
                   : false
               }
               key={unit.instanceId ?? `${unit.name}-${index}`}
+              onPrimaryAction={
+                onCardPrimaryAction
+                  ? (event) => onCardPrimaryAction(unit, event)
+                  : undefined
+              }
               {...unit}
             />
           ))}

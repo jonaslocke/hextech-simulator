@@ -25,6 +25,12 @@ export const resourcePaymentSchema = z.discriminatedUnion("type", [
     amount: z.number().int().positive()
   }),
   z.object({
+    type: z.literal("spendConditionalEnergy"),
+    amount: z.number().int().positive(),
+    sourceId: z.string().min(1),
+    restriction: z.enum(["spell"])
+  }),
+  z.object({
     type: z.literal("spendPower"),
     domain: powerPaymentDomainSchema,
     amount: z.number().int().positive()
