@@ -110,6 +110,17 @@ export const GameBoard: FC<GameBoardProps> = ({
   const canViewerPassChain =
     isChainLockedOpen &&
     projection.chain?.priorityPlayerId === projection.viewerPlayerId;
+  const chainPassWillResolve =
+    canViewerPassChain &&
+    projection.chain !== null &&
+    projection.chain.relevantPlayerIds.every(
+      (playerId) =>
+        playerId === projection.viewerPlayerId ||
+        projection.chain?.passedPlayerIds.includes(playerId),
+    );
+  const chainPassLabel = chainPassWillResolve
+    ? "Pass and Resolve"
+    : "Pass Priority";
   const canViewerEndTurn =
     !isChainLockedOpen &&
     projection.turn?.activePlayerId === projection.viewerPlayerId;
@@ -494,6 +505,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       <TemporaryZoneOverlay
         canPassChain={canViewerPassChain}
         chainCards={chainCards}
+        chainPassLabel={chainPassLabel}
         isCloseDisabled={isChainLockedOpen}
         logEntries={logEntries}
         onClose={() => setOpenZoneRespectingChain(null)}

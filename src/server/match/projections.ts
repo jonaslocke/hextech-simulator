@@ -40,6 +40,7 @@ export const projectedChainItemSchema = z.object({
 export const projectedChainSchema = z
   .object({
     items: z.array(projectedChainItemSchema),
+    relevantPlayerIds: z.array(z.string().min(1)).min(1),
     priorityPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
   })
@@ -458,6 +459,7 @@ function projectChain(game: Game): GameProjection["chain"] {
       label: item.label,
       kind: item.kind
     })),
+    relevantPlayerIds: chain.relevantPlayerIds,
     priorityPlayerId: chain.priorityPlayerId,
     passedPlayerIds: chain.passedPlayerIds
   };

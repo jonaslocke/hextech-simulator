@@ -10,6 +10,7 @@ import { EmptyState } from "./empty-state";
 export function TemporaryZoneOverlay({
   canPassChain = false,
   chainCards,
+  chainPassLabel = "Pass priority",
   isCloseDisabled = false,
   logEntries,
   openZone,
@@ -22,6 +23,7 @@ export function TemporaryZoneOverlay({
 }: {
   canPassChain?: boolean;
   chainCards: Card[];
+  chainPassLabel?: string;
   isCloseDisabled?: boolean;
   logEntries: GameLogEntry[];
   openZone: TemporaryZone;
@@ -92,7 +94,7 @@ export function TemporaryZoneOverlay({
               onClick={onPassChain}
               type="button"
             >
-              {canPassChain ? "Pass priority" : "Waiting for priority"}
+              {canPassChain ? chainPassLabel : "Waiting for priority"}
             </button>
           )}
         </div>
