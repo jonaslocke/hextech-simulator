@@ -59,21 +59,31 @@ const BaseLine = ({
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
   );
+  const hasChampionZone =
+    player.zones.champion.cards.length > 0 || player.zones.champion.count > 0;
 
   return (
-    <div className="gap-2 grid grid-cols-[130px_130px_minmax(0,1fr)_130px]">
-      <ZoneArea
-        animationZoneId={`${player.playerId}:champion`}
-        isCentered
-        isHightlighted={isHightlighted}
-      >
-        <ZoneCards
-          hiddenCardInstanceIds={hiddenCardInstanceIds}
-          onCardContextAction={onChampionContextAction}
-          onCardPrimaryAction={onChampionPrimaryAction}
-          zone={player.zones.champion}
-        />
-      </ZoneArea>
+    <div
+      className={cn(
+        "gap-2 grid",
+        hasChampionZone && "grid-cols-[130px_130px_minmax(0,1fr)_130px]",
+        !hasChampionZone && "grid-cols-[130px_minmax(0,1fr)_130px]",
+      )}
+    >
+      {hasChampionZone && (
+        <ZoneArea
+          animationZoneId={`${player.playerId}:champion`}
+          isCentered
+          isHightlighted={isHightlighted}
+        >
+          <ZoneCards
+            hiddenCardInstanceIds={hiddenCardInstanceIds}
+            onCardContextAction={onChampionContextAction}
+            onCardPrimaryAction={onChampionPrimaryAction}
+            zone={player.zones.champion}
+          />
+        </ZoneArea>
+      )}
       <ZoneArea
         animationZoneId={`${player.playerId}:legend`}
         isCentered
