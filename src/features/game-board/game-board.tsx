@@ -14,6 +14,7 @@ import type {
   ProjectedPlayerState,
   ProjectedZone,
 } from "@/server/match";
+import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
 import { ScoreHeader } from "./components/score-header";
@@ -129,6 +130,22 @@ export const GameBoard: FC<GameBoardProps> = ({
     : canViewerEndTurn
       ? "Pass Turn"
       : "Waiting for turn";
+  const pendingChoiceOptions =
+    projection.pendingChoice?.optionIds.map((id) => {
+      const item = projection.chain?.items.find(
+        (candidate) => candidate.id === id,
+      );
+      const cardInstanceId = item?.cardInstanceId ?? item?.sourceCardInstanceId;
+
+      return {
+        description: item ? formatChainItemKind(item.kind) : undefined,
+        id,
+        imageUrl: cardInstanceId
+          ? cardsByInstanceId[cardInstanceId]?.media.image_url ?? cardBackImage.src
+          : undefined,
+        label: item?.label ?? id,
+      };
+    }) ?? [];
   const board = createBoardModel({
     cardsByInstanceId,
     playerNames,
@@ -538,16 +555,19 @@ export const GameBoard: FC<GameBoardProps> = ({
         />
       )}
       {projection.pendingChoice && (
-        <PendingChoicePrompt
-          onSubmit={(orderedIds) =>
+        <ChoiceDialog
+          confirmLabel="Submit order"
+          description="Move triggered effects into the order they should resolve."
+          isOpen
+          onConfirm={(orderedIds) =>
             onSubmitChoice?.({
               choiceId: projection.pendingChoice!.id,
               orderedIds,
             })
           }
-          optionIds={projection.pendingChoice.optionIds}
-          prompt={projection.pendingChoice.prompt}
-          chainItems={projection.chain?.items ?? []}
+          options={pendingChoiceOptions}
+          selectionMode="ordered"
+          title={projection.pendingChoice.prompt}
         />
       )}
       <CardZoneTransferOverlay
@@ -767,46 +787,6 @@ function TargetSelectionPrompt({
   );
 }
 
-function PendingChoicePrompt({
-  chainItems,
-  onSubmit,
-  optionIds,
-  prompt,
-}: {
-  chainItems: NonNullable<GameBoardProps["projection"]["chain"]>["items"];
-  onSubmit: (orderedIds: string[]) => void;
-  optionIds: string[];
-  prompt: string;
-}) {
-  return (
-    <div className="top-20 left-1/2 z-[2147483646] fixed w-80 bg-slate-950/95 shadow-2xl p-3 border border-yellow-300/30 rounded-md text-sm text-slate-100 -translate-x-1/2">
-      <div className="font-semibold">{prompt}</div>
-      <div className="mt-2 grid gap-1">
-        {optionIds.map((id, index) => {
-          const item = chainItems.find((candidate) => candidate.id === id);
-
-          return (
-            <div
-              className="flex items-center justify-between rounded bg-white/5 px-2 py-1 text-xs"
-              key={id}
-            >
-              <span>{item?.label ?? id}</span>
-              <span className="text-slate-500">{index + 1}</span>
-            </div>
-          );
-        })}
-      </div>
-      <button
-        className="mt-3 w-full rounded bg-yellow-300 px-3 py-1 font-semibold text-slate-950"
-        onClick={() => onSubmit(optionIds)}
-        type="button"
-      >
-        Submit order
-      </button>
-    </div>
-  );
-}
-
 function RunePoolBar({
   runePool,
 }: {
@@ -876,6 +856,21 @@ function powerDomainOrder(domain: string) {
   return order.indexOf(formatDomain(domain)) === -1
     ? order.length
     : order.indexOf(formatDomain(domain));
+}
+
+function formatChainItemKind(kind: string) {
+  switch (kind) {
+    case "ability":
+      return "Ability";
+    case "spell":
+      return "Spell";
+    case "trigger":
+      return "Triggered ability";
+    case "unit":
+      return "Unit";
+    default:
+      return undefined;
+  }
 }
 
 function CardActionMenu({
