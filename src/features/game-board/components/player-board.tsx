@@ -138,6 +138,7 @@ const RunesLine = ({
     (card) => card.type === "Rune",
   );
   const hasBanishment = player.zones.banishment.count > 0;
+  const runeCounts = countRuneReadiness(baseRunes);
 
   return (
     <div
@@ -157,11 +158,7 @@ const RunesLine = ({
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
         isHightlighted={isHightlighted}
-        // TODO: wire this to current exhausted / ready rune from the real game projection
-        totalCardsCount={{
-          exhausted: 1,
-          ready: 10,
-        }}
+        totalCardsCount={runeCounts}
       >
         <CardList
           cards={baseRunes}
@@ -207,6 +204,26 @@ const RunesLine = ({
     </div>
   );
 };
+
+function countRuneReadiness(cards: Card[]) {
+  return cards.reduce(
+    (counts, card) => {
+      if (card.isExhausted) {
+        return {
+          ...counts,
+          total: counts.total + 1,
+        };
+      }
+
+      return {
+        ...counts,
+        ready: counts.ready + 1,
+        total: counts.total + 1,
+      };
+    },
+    { ready: 0, total: 0 },
+  );
+}
 
 export const PlayerBoard: FC<Props> = ({
   hiddenCardInstanceIds,

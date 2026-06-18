@@ -7,7 +7,7 @@ interface Props extends PropsWithChildren {
   isHightlighted?: boolean;
   totalCardsCount?: {
     ready: number;
-    exhausted: number;
+    total: number;
   };
 }
 
@@ -31,7 +31,7 @@ export const ZoneArea: FC<Props> = ({
       )}
     >
       {hasTotalCardsCount && (
-        <div className="top-1 right-1 absolute font-mono text-[10px] text-white/65">{`${totalCardsCount?.exhausted}/${totalCardsCount?.ready}`}</div>
+        <div className="top-1 right-1 absolute font-mono text-[10px] text-white/65">{`${totalCardsCount?.ready}/${totalCardsCount?.total}`}</div>
       )}
       {children}
     </div>
