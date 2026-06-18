@@ -135,7 +135,14 @@ function ChainCards({
         <div
           key={entry.chainItemId}
           onPointerEnter={() =>
-            onItemPointerEnter?.(entry.targetCardInstanceIds)
+            onItemPointerEnter?.(
+              [
+                entry.sourceCardInstanceId,
+                ...entry.targetCardInstanceIds,
+              ].filter((cardInstanceId): cardInstanceId is string =>
+                Boolean(cardInstanceId),
+              ),
+            )
           }
           onPointerLeave={onItemPointerLeave}
         >

@@ -91,6 +91,7 @@ export type Card = {
 export type ChainCardEntry = {
   card: Card;
   chainItemId: string;
+  sourceCardInstanceId: string | null;
   targetCardInstanceIds: string[];
 };
 

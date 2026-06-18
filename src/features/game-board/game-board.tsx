@@ -102,6 +102,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         return cards.map((card) => ({
           card,
           chainItemId: item.id,
+          sourceCardInstanceId: item.sourceCardInstanceId,
           targetCardInstanceIds: item.targetCardInstanceIds,
         }));
       }
@@ -115,6 +116,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           type: undefined,
         } satisfies Card,
         chainItemId: item.id,
+        sourceCardInstanceId: item.sourceCardInstanceId,
         targetCardInstanceIds: item.targetCardInstanceIds,
       },
     ];

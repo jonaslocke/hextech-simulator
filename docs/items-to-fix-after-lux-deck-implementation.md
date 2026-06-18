@@ -6,7 +6,7 @@
 [x] choosen champion zone is only shown when there's a card there, same coded behavior as in banished cards
 [x] on the zone area of runes, there's a counter for exhausted and ready runes, wire this to the real game state projection
 [x] we need a card highlight feature, that way when hovering on items on the stack we can highloght cards that are the target of the effects/spells
-[ ] when a ability its to be resolved on the chain we need to highlight its source as well, this will help players when there are more than one of the same card and they keep track of witch trigger is resolving
+[x] when a ability its to be resolved on the chain we need to highlight its source as well, this will help players when there are more than one of the same card and they keep track of witch trigger is resolving
 [ ] we need to validate the order of start of the game setup, from my pov the first battlefield choice is done before any player knowing who starts the game, currently the chooser player knows that he is the one choosing, with that, on the BF choice we need to make players aware of who starts
 [ ] bug: Lux ability is able to be used even when the player has no priority
 [ ] Lux ability is a reaction and should be possible to add energy when owner has priority, right now its no possible to use it when there is a spell on chain
