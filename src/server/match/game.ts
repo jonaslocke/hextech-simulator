@@ -1175,6 +1175,10 @@ export function playCard(
 
   const card = requireCard(cardsByInstanceId, input.cardInstanceId);
 
+  if (game.canonicalState.chain !== null && card.classification.type !== "Spell") {
+    throw new Error("Only Reaction spells can be played while the chain is open.");
+  }
+
   if (card.classification.type === "Spell") {
     return playSpellCard(game, input, card, sourceZone, cardsByInstanceId);
   }
@@ -1389,6 +1393,10 @@ export function getAvailablePaymentModesForPlayer(
 
     try {
       if (card.classification.type === "Unit") {
+        if (game.canonicalState.chain !== null) {
+          continue;
+        }
+
         const profile = getUnitPlayProfile(card);
 
         if (!profile.supported) {

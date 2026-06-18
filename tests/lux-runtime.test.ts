@@ -7,6 +7,7 @@ import {
   gameSchema,
   passPriority,
   playCard,
+  projectGameForPlayer,
   submitChoice,
   type Game
 } from "../src/server/match";
@@ -139,6 +140,55 @@ test("Stupefy resolves through the chain, modifies Might this turn, draws, and g
       (modifier) => modifier.targetCardInstanceId === "player-b:target-unit"
     )?.amount,
     -1
+  );
+});
+
+test("open chain timing rejects Units and does not project them as playable", () => {
+  const game = createLuxGame({
+    playerARunePool: {
+      energy: 3,
+      power: {}
+    },
+    playerAHand: ["player-a:stupefy", "player-a:unit-during-chain"],
+    playerAMainDeck: ["player-a:draw-card"],
+    playerBBase: ["player-b:target-unit"]
+  });
+  const withChain = playCard(
+    game,
+    {
+      actorPlayerId: "player-a",
+      cardInstanceId: "player-a:stupefy",
+      choices: {
+        targetCardInstanceIds: ["player-b:target-unit"]
+      }
+    },
+    cardsByInstanceId
+  ).game;
+
+  assert.throws(
+    () =>
+      playCard(
+        withChain,
+        {
+          actorPlayerId: "player-a",
+          cardInstanceId: "player-a:unit-during-chain"
+        },
+        cardsByInstanceId
+      ),
+    /Only Reaction spells/
+  );
+
+  const projection = projectGameForPlayer(
+    withChain,
+    "player-a",
+    cardsByInstanceId
+  );
+
+  assert.equal(
+    projection.players["player-a"]?.availablePaymentModes[
+      "player-a:unit-during-chain"
+    ],
+    undefined
   );
 });
 
@@ -436,6 +486,16 @@ test("spell-cost triggers create a pending trigger-order choice after chain reso
 
   assert.equal(withTriggers.canonicalState.pendingChoice?.type, "orderTriggers");
   assert.equal(withTriggers.canonicalState.chain?.items.length, 3);
+  assert.deepEqual(
+    projectGameForPlayer(withTriggers, "player-a", cardsByInstanceId).chain?.items.map(
+      (item) => item.sourceCardInstanceId
+    ),
+    [
+      "player-a:legend",
+      "player-a:ravenbloom-student",
+      "player-a:lux-illuminated"
+    ]
+  );
 
   const optionIds = withTriggers.canonicalState.pendingChoice?.optionIds ?? [];
   const reordered = submitChoice(
@@ -523,9 +583,48 @@ function createLuxGame(input: {
         playerIds: ["player-a", "player-b"],
         startingPlayerChooserId: "player-a",
         startingPlayerId: "player-a",
-        battlefieldChoices: {},
-        battlefieldPools: {},
-        mulliganChoices: {}
+        battlefieldChoices: {
+          "player-a": {
+            playerId: "player-a",
+            status: "revealed",
+            cardInstanceId: "player-a:battlefield",
+            lockedAt: "2026-06-18T00:00:00.000Z",
+            revealedAt: "2026-06-18T00:00:00.000Z"
+          },
+          "player-b": {
+            playerId: "player-b",
+            status: "revealed",
+            cardInstanceId: "player-b:battlefield",
+            lockedAt: "2026-06-18T00:00:00.000Z",
+            revealedAt: "2026-06-18T00:00:00.000Z"
+          }
+        },
+        battlefieldPools: {
+          "player-a": {
+            playerId: "player-a",
+            registeredCardInstanceIds: ["player-a:battlefield"],
+            usedCardInstanceIds: []
+          },
+          "player-b": {
+            playerId: "player-b",
+            registeredCardInstanceIds: ["player-b:battlefield"],
+            usedCardInstanceIds: []
+          }
+        },
+        mulliganChoices: {
+          "player-a": {
+            playerId: "player-a",
+            status: "locked",
+            selectedCardInstanceIds: [],
+            lockedAt: "2026-06-18T00:00:00.000Z"
+          },
+          "player-b": {
+            playerId: "player-b",
+            status: "locked",
+            selectedCardInstanceIds: [],
+            lockedAt: "2026-06-18T00:00:00.000Z"
+          }
+        }
       },
       showdown: null,
       turn: {
@@ -681,6 +780,12 @@ const cardsByInstanceId: Record<string, Card> = {
     name: "Stupefy",
     text: "[Reaction] Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:. Draw 1.",
     type: "Spell"
+  }),
+  "player-a:unit-during-chain": createCard({
+    domain: ["Mind"],
+    energy: 1,
+    name: "Unit During Chain",
+    type: "Unit"
   }),
   "player-b:battlefield-unit": createCard({
     domain: ["Fury"],

@@ -5,10 +5,12 @@ import { TemporaryZone } from "../types";
 import { ActionButton } from "./action-button";
 
 export function ActionRail({
+  isChainLockedOpen = false,
   onPassTurn,
   openZone,
   setOpenZone,
 }: {
+  isChainLockedOpen?: boolean;
   onPassTurn?: () => void;
   openZone: TemporaryZone;
   setOpenZone: (zone: TemporaryZone) => void;
@@ -17,8 +19,10 @@ export function ActionRail({
     <aside className="relative flex flex-col justify-center items-center gap-3 bg-[#111827] px-3">
       <ActionButton
         active={openZone === "chain"}
-        label="Chain"
-        onClick={() => setOpenZone(openZone === "chain" ? null : "chain")}
+        label={isChainLockedOpen ? "Chain is resolving" : "Chain"}
+        onClick={() =>
+          setOpenZone(openZone === "chain" && !isChainLockedOpen ? null : "chain")
+        }
       >
         <Layers3 className="size-5" />
       </ActionButton>

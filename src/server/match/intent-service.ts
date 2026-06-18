@@ -144,7 +144,8 @@ export async function handleMatchIntent(
     seat.playerId,
     payload,
     now,
-    cardsByInstanceId
+    cardsByInstanceId,
+    options.autoPassChainOpponent
   );
 
   if (!transition.accepted) {
@@ -250,9 +251,11 @@ function applyIntent(
   actorPlayerId: string,
   input: MatchIntentPayload,
   now: string,
-  cardsByInstanceId: CardLookup
+  cardsByInstanceId: CardLookup,
+  autoPassChainOpponentOption = false
 ): AppliedIntentResult {
   const autoPassChainOpponent =
+    autoPassChainOpponentOption ||
     process.env.HEXTECH_CHAIN_AUTO_PASS_OPPONENT === "true";
 
   try {

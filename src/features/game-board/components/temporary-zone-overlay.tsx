@@ -8,19 +8,25 @@ import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
 
 export function TemporaryZoneOverlay({
+  canPassChain = false,
   chainCards,
+  isCloseDisabled = false,
   logEntries,
   openZone,
   onClose,
+  onPassChain,
   opponentBanishment,
   opponentTrash,
   playerBanishment,
   playerTrash,
 }: {
+  canPassChain?: boolean;
   chainCards: Card[];
+  isCloseDisabled?: boolean;
   logEntries: GameLogEntry[];
   openZone: TemporaryZone;
   onClose: () => void;
+  onPassChain?: () => void;
   opponentBanishment: ZoneData;
   opponentTrash: ZoneData;
   playerBanishment: ZoneData;
@@ -53,7 +59,8 @@ export function TemporaryZoneOverlay({
         <div className="font-semibold text-sm">{title}</div>
         <button
           aria-label="Close temporary zone"
-          className="bg-slate-700 hover:bg-slate-600 p-1 rounded text-slate-100"
+          className="disabled:opacity-40 bg-slate-700 hover:bg-slate-600 p-1 rounded text-slate-100 disabled:cursor-not-allowed"
+          disabled={isCloseDisabled}
           onClick={onClose}
           type="button"
         >
@@ -76,7 +83,19 @@ export function TemporaryZoneOverlay({
       ) : openZone === "opponentTrash" ? (
         <ZoneCards emptyLabel="No cards in trash" cards={opponentTrash.cards} />
       ) : openZone === "chain" ? (
-        <ZoneCards emptyLabel={message} cards={chainCards} />
+        <div className="grid gap-3">
+          <ZoneCards emptyLabel={message} cards={chainCards} />
+          {chainCards.length > 0 && (
+            <button
+              className="disabled:opacity-50 bg-cyan-300 hover:bg-cyan-200 disabled:hover:bg-cyan-300 px-3 py-2 rounded font-semibold text-slate-950 text-sm disabled:cursor-not-allowed"
+              disabled={!canPassChain}
+              onClick={onPassChain}
+              type="button"
+            >
+              {canPassChain ? "Pass priority" : "Waiting for priority"}
+            </button>
+          )}
+        </div>
       ) : (
         <EmptyState label={message} />
       )}

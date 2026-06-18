@@ -14,6 +14,7 @@ import type {
   ProjectedPlayerState,
   ProjectedZone,
 } from "@/server/match";
+import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
 import { ScoreHeader } from "./components/score-header";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
@@ -59,6 +60,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   logEntries = [],
   onActivateAbility,
   onAddRuneResource,
+  onPass,
   onPlayCard,
   onSubmitChoice,
   playerNames = {},
@@ -80,17 +82,33 @@ export const GameBoard: FC<GameBoardProps> = ({
     selectedTargetIds: string[];
     selectedModeId?: string;
   } | null>(null);
-  const chainCards = (projection.chain?.items ?? []).flatMap((item) =>
-    item.cardInstanceId
-      ? buildCard(item.cardInstanceId, cardsByInstanceId, projection.cardStates)
-      : [
-          {
-            name: item.label,
-            img: "",
-            type: undefined,
-          } satisfies Card,
-        ],
-  );
+  const chainCards = (projection.chain?.items ?? []).flatMap((item) => {
+    const displayCardInstanceId = item.cardInstanceId ?? item.sourceCardInstanceId;
+
+    if (displayCardInstanceId) {
+      const cards = buildCard(
+        displayCardInstanceId,
+        cardsByInstanceId,
+        projection.cardStates,
+      );
+
+      if (cards.length > 0) {
+        return cards;
+      }
+    }
+
+    return [
+      {
+        name: item.label,
+        img: cardBackImage.src,
+        type: undefined,
+      } satisfies Card,
+    ];
+  });
+  const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
+  const canViewerPassChain =
+    isChainLockedOpen &&
+    projection.chain?.priorityPlayerId === projection.viewerPlayerId;
   const board = createBoardModel({
     cardsByInstanceId,
     playerNames,
@@ -144,6 +162,14 @@ export const GameBoard: FC<GameBoardProps> = ({
     [capturePendingAnimationSnapshot, onAddRuneResource],
   );
   const closeCardActionMenu = () => setCardActionMenu(null);
+  const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
+    if (isChainLockedOpen) {
+      setOpenZone("chain");
+      return;
+    }
+
+    setOpenZone(zone);
+  };
   const openCardActionMenu = (
     event: MouseEvent<HTMLElement>,
     items: CardActionMenuItem[],
@@ -377,6 +403,12 @@ export const GameBoard: FC<GameBoardProps> = ({
   };
 
   useEffect(() => {
+    if (isChainLockedOpen) {
+      setOpenZone("chain");
+    }
+  }, [isChainLockedOpen]);
+
+  useEffect(() => {
     if (!cardActionMenu) {
       return;
     }
@@ -405,8 +437,8 @@ export const GameBoard: FC<GameBoardProps> = ({
           <PlayerBoard
             hiddenCardInstanceIds={activeTransferCardIds}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
-            onOpenBanish={() => setOpenZone("banish")}
-            onOpenTrash={() => setOpenZone("opponentTrash")}
+            onOpenBanish={() => setOpenZoneRespectingChain("banish")}
+            onOpenTrash={() => setOpenZoneRespectingChain("opponentTrash")}
             player={board.opponent}
             isActivePlayer={isOpponentActive}
             isMirrored
@@ -429,8 +461,8 @@ export const GameBoard: FC<GameBoardProps> = ({
           </div>
           <PlayerBoard
             hiddenCardInstanceIds={activeTransferCardIds}
-            onOpenBanish={() => setOpenZone("banish")}
-            onOpenTrash={() => setOpenZone("playerTrash")}
+            onOpenBanish={() => setOpenZoneRespectingChain("banish")}
+            onOpenTrash={() => setOpenZoneRespectingChain("playerTrash")}
             onChampionContextAction={handleChampionCardAction}
             onChampionPrimaryAction={handleChampionCardAction}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
@@ -441,12 +473,20 @@ export const GameBoard: FC<GameBoardProps> = ({
           />
           <RunePoolBar runePool={viewerState?.runePool} />
         </div>
-        <ActionRail openZone={openZone} setOpenZone={setOpenZone} />
+        <ActionRail
+          isChainLockedOpen={isChainLockedOpen}
+          onPassTurn={onPass}
+          openZone={openZone}
+          setOpenZone={setOpenZoneRespectingChain}
+        />
       </section>
       <TemporaryZoneOverlay
+        canPassChain={canViewerPassChain}
         chainCards={chainCards}
+        isCloseDisabled={isChainLockedOpen}
         logEntries={logEntries}
-        onClose={() => setOpenZone(null)}
+        onClose={() => setOpenZoneRespectingChain(null)}
+        onPassChain={onPass}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
         opponentTrash={board.opponent.zones.trash}
@@ -1086,7 +1126,7 @@ function buildCard(
       domains: card.classification.domain,
       damage: cardStates[cardInstanceId]?.damage,
       energy: card.attributes.energy ?? undefined,
-      img: card.media.image_url ?? "",
+      img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,
       isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
       might: cardStates[cardInstanceId]?.computedMight ?? card.attributes.might ?? undefined,

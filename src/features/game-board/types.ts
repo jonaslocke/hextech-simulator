@@ -41,6 +41,7 @@ export type GameBoardProps = {
     };
     selectedModeId?: string;
   }) => void;
+  onPass?: () => void;
   onSubmitChoice?: (input: { choiceId: string; orderedIds: string[] }) => void;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;

@@ -158,15 +158,15 @@ export function MatchSimulator() {
 
   if (!match) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-slate-100">
-        <section className="w-full max-w-xl rounded-lg border border-white/10 bg-slate-900 p-5 shadow-xl">
+      <main className="flex justify-center items-center bg-slate-950 p-6 min-h-screen text-slate-100">
+        <section className="bg-slate-900 shadow-xl p-5 border border-white/10 rounded-lg w-full max-w-xl">
           <div className="mb-5">
-            <h1 className="text-xl font-semibold">Riftbound Simulator</h1>
-            <p className="mt-1 text-sm text-slate-400">
+            <h1 className="font-semibold text-xl">Riftbound Simulator</h1>
+            <p className="mt-1 text-slate-400 text-sm">
               Select fixed MVP decks for both seats. Uploads are out of scope for now.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="gap-4 grid sm:grid-cols-2">
             <DeckSelect
               label="Player 1 deck"
               value={playerDecks.player1}
@@ -189,7 +189,7 @@ export function MatchSimulator() {
             />
           </div>
           {error && (
-            <p className="mt-4 rounded border border-red-400/40 bg-red-950/60 px-3 py-2 text-sm text-red-100">
+            <p className="bg-red-950/60 mt-4 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
               {error}
             </p>
           )}
@@ -281,10 +281,15 @@ export function MatchSimulator() {
       }
     });
   };
+  const passPriority = () => {
+    void submitIntent({
+      type: "game.pass"
+    });
+  };
 
   return (
-    <main className="relative min-h-screen bg-slate-950">
-      <div className="absolute left-14 top-2 z-50 flex items-center gap-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-slate-100 shadow">
+    <main className="relative bg-slate-950 min-h-screen">
+      <div className="top-2 left-14 z-50 absolute flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
         <span className="text-slate-400">Viewer</span>
         <Button
           size="sm"
@@ -319,6 +324,7 @@ export function MatchSimulator() {
         logEntries={match.logEntries[viewer.playerId] ?? []}
         onActivateAbility={activateAbility}
         onAddRuneResource={addRuneResourceFromBoard}
+        onPass={passPriority}
         onPlayCard={playCardFromHand}
         onSubmitChoice={submitChoice}
         projection={projection}
@@ -349,13 +355,13 @@ function GameActionPanel({
   }
 
   return (
-    <aside className="absolute right-14 top-2 z-50 w-80 rounded border border-white/10 bg-slate-950/90 p-3 text-xs text-slate-100 shadow-xl">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <aside className="top-10 z-50 absolute bg-slate-950/90 shadow-xl p-3 border border-white/10 rounded w-80 text-slate-100 text-xs">
+      <div className="flex justify-between items-center gap-2 mb-2">
         <span className="font-semibold">Actions</span>
         <span className="text-slate-400">{projection.status}</span>
       </div>
       {projection.turn && (
-        <div className="mb-3 rounded border border-white/10 bg-slate-900/80 px-2 py-1 text-slate-300">
+        <div className="bg-slate-900/80 mb-3 px-2 py-1 border border-white/10 rounded text-slate-300">
           <div>
             Turn {projection.turn.turnNumber} - {projection.turn.phase} - active{" "}
             {projection.turn.activePlayerId}
@@ -386,7 +392,7 @@ function GameActionPanel({
         />
       )}
       {error && (
-        <p className="mt-3 rounded border border-red-400/40 bg-red-950/70 px-2 py-1 text-red-100">
+        <p className="bg-red-950/70 mt-3 px-2 py-1 border border-red-400/40 rounded text-red-100">
           {error}
         </p>
       )}
@@ -412,8 +418,8 @@ function SetupControls({
   const viewerBattlefieldPool = projection.setup.battlefieldPools[viewerId];
 
   return (
-    <div className="grid gap-3">
-      <div className="grid gap-2">
+    <div className="gap-3 grid">
+      <div className="gap-2 grid">
         <span className="font-medium text-slate-300">Starting player</span>
         {projection.setup.startingPlayerId ? (
           <span className="text-slate-400">
@@ -446,12 +452,12 @@ function SetupControls({
           </span>
         )}
       </div>
-      <div className="grid gap-2">
+      <div className="gap-2 grid">
         <span className="font-medium text-slate-300">Battlefield</span>
         {viewerChoice?.status === "revealed" || viewerChoice?.status === "locked" ? (
           <span className="text-slate-400">Choice {viewerChoice.status}.</span>
         ) : (
-          <div className="grid gap-2">
+          <div className="gap-2 grid">
             {viewerBattlefieldPool?.registeredCardInstanceIds.map((cardInstanceId) => (
               <Button
                 key={cardInstanceId}
@@ -501,8 +507,8 @@ function GameplayControls({
   const playableCards = Object.entries(viewerState.availablePaymentModes);
 
   return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-2 gap-2">
+    <div className="gap-3 grid">
+      <div className="gap-2 grid grid-cols-2">
         <Button
           disabled={disabled}
           onClick={() => onIntent({ type: "game.channel" })}
@@ -538,18 +544,18 @@ function GameplayControls({
           End turn
         </Button>
       </div>
-      <div className="grid gap-2">
+      <div className="gap-2 grid">
         <span className="font-medium text-slate-300">
           Rune pool: {viewerState.runePool.energy} energy
         </span>
-        <div className="grid max-h-28 gap-1 overflow-auto">
+        <div className="gap-1 grid max-h-28 overflow-auto">
           {baseRunes.map((cardInstanceId) => {
             const isExhausted =
               projection.cardStates[cardInstanceId]?.exhausted === true;
 
             return (
             <div key={cardInstanceId} className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-slate-400">
+              <span className="flex-1 min-w-0 text-slate-400 truncate">
                 {cardsByInstanceId[cardInstanceId]?.name ?? "Rune"}
               </span>
               <Button
@@ -594,29 +600,18 @@ function GameplayControls({
           )}
         </div>
       </div>
-      <div className="grid gap-2">
+      <div className="gap-2 grid">
         <span className="font-medium text-slate-300">Playable cards</span>
-        <div className="grid max-h-32 gap-1 overflow-auto">
+        <div className="gap-1 grid max-h-32 overflow-auto">
           {playableCards.map(([cardInstanceId, modes]) => (
-            <Button
-              key={cardInstanceId}
+            <PlayableCardButton
+              card={cardsByInstanceId[cardInstanceId]}
+              cardInstanceId={cardInstanceId}
               disabled={disabled || modes.length === 0}
-              onClick={() =>
-                onIntent({
-                  type: "game.playCard",
-                  payload: {
-                    cardInstanceId,
-                    selectedModeId: modes[0]?.id,
-                    destination: "base"
-                  }
-                })
-              }
-              size="sm"
-              type="button"
-              variant="secondary"
-            >
-              {cardsByInstanceId[cardInstanceId]?.name ?? "Card"}
-            </Button>
+              key={cardInstanceId}
+              onIntent={onIntent}
+              selectedModeId={modes[0]?.id}
+            />
           ))}
           {playableCards.length === 0 && (
             <span className="text-slate-500">No supported card can be paid now.</span>
@@ -625,6 +620,61 @@ function GameplayControls({
       </div>
     </div>
   );
+}
+
+function PlayableCardButton({
+  card,
+  cardInstanceId,
+  disabled,
+  onIntent,
+  selectedModeId
+}: {
+  card: CatalogCard | undefined;
+  cardInstanceId: string;
+  disabled: boolean;
+  onIntent: (intent: MatchIntent) => void;
+  selectedModeId: string | undefined;
+}) {
+  const requiresBoardTargets =
+    card !== undefined && cardRequiresBoardTargets(card.name);
+
+  return (
+    <Button
+      disabled={disabled || requiresBoardTargets}
+      onClick={() =>
+        onIntent({
+          type: "game.playCard",
+          payload: {
+            cardInstanceId,
+            selectedModeId,
+            destination: "base"
+          }
+        })
+      }
+      size="sm"
+      title={
+        requiresBoardTargets
+          ? "Use the card in hand and choose targets on the board."
+          : undefined
+      }
+      type="button"
+      variant="secondary"
+    >
+      {card?.name ?? "Card"}
+      {requiresBoardTargets ? " (choose on board)" : ""}
+    </Button>
+  );
+}
+
+function cardRequiresBoardTargets(name: string) {
+  return [
+    "Back to Back",
+    "Blast of Power",
+    "Falling Comet",
+    "Final Spark",
+    "Singularity",
+    "Stupefy"
+  ].includes(name);
 }
 
 function DeckSelect({
@@ -637,10 +687,10 @@ function DeckSelect({
   value: FixedDeckId;
 }) {
   return (
-    <label className="grid gap-2 text-sm">
+    <label className="gap-2 grid text-sm">
       <span className="font-medium text-slate-300">{label}</span>
       <select
-        className="rounded border border-white/10 bg-slate-950 px-3 py-2 text-slate-100"
+        className="bg-slate-950 px-3 py-2 border border-white/10 rounded text-slate-100"
         value={value}
         onChange={(event) => onChange(event.target.value as FixedDeckId)}
       >

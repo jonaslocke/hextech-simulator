@@ -31,6 +31,7 @@ export const projectedCardStateSchema = z.object({
 export const projectedChainItemSchema = z.object({
   id: z.string().min(1),
   controllerPlayerId: z.string().min(1),
+  sourceCardInstanceId: z.string().min(1).nullable(),
   cardInstanceId: z.string().min(1).nullable(),
   label: z.string().min(1),
   kind: z.enum(["spell", "ability", "trigger", "unit"])
@@ -452,6 +453,7 @@ function projectChain(game: Game): GameProjection["chain"] {
     items: chain.items.map((item) => ({
       id: item.id,
       controllerPlayerId: item.controllerPlayerId,
+      sourceCardInstanceId: item.sourceCardInstanceId,
       cardInstanceId: item.cardInstanceId,
       label: item.label,
       kind: item.kind

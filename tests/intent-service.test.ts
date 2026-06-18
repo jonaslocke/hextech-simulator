@@ -737,6 +737,75 @@ test("intent service accepts playCard and appends payment decision", async () =>
   });
 });
 
+test("intent service resolves Stupefy through chain into draw and Might modifier", async () => {
+  const game = createStupefyIntentGame();
+  const { repositories } = createIntentFixture({ game });
+  const played = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-a",
+      stateVersion: game.stateVersion,
+      intent: {
+        type: "game.playCard",
+        payload: {
+          cardInstanceId: "player-a:stupefy",
+          choices: {
+            targetCardInstanceIds: ["player-b:target-unit"]
+          }
+        }
+      }
+    },
+    {
+      cardsByInstanceId: stupefyIntentCardLookup
+    }
+  );
+
+  assert.equal(played.accepted, true);
+
+  if (!played.accepted) {
+    return;
+  }
+
+  assert.equal(played.game.canonicalState.chain?.items[0]?.label, "Stupefy");
+
+  const resolved = await handleMatchIntent(
+    repositories,
+    {
+      matchId: "match-1",
+      gameId: "game-1",
+      playerToken: "token-a",
+      stateVersion: played.game.stateVersion,
+      intent: {
+        type: "game.pass"
+      }
+    },
+    {
+      autoPassChainOpponent: true,
+      cardsByInstanceId: stupefyIntentCardLookup
+    }
+  );
+
+  assert.equal(resolved.accepted, true);
+
+  if (!resolved.accepted) {
+    return;
+  }
+
+  assert.equal(resolved.game.canonicalState.chain, null);
+  assert.deepEqual(resolved.game.canonicalState.players["player-a"]?.zones.hand, [
+    "player-a:draw-card"
+  ]);
+  assert.deepEqual(resolved.game.canonicalState.players["player-a"]?.zones.trash, [
+    "player-a:stupefy"
+  ]);
+  assert.equal(
+    resolved.projection.cardStates["player-b:target-unit"]?.computedMight,
+    1
+  );
+});
+
 test("intent service closes showdown after both relevant players pass", async () => {
   const game = gameSchema.parse({
     ...createInProgressIntentGameWithBattlefield(),
@@ -1215,6 +1284,73 @@ function createInProgressIntentGameWithRunes(): Game {
   });
 }
 
+function createStupefyIntentGame(): Game {
+  const base = createGame({
+    id: "game-1",
+    matchId: "match-1",
+    gameNumber: 1,
+    playerIds: ["player-a", "player-b"],
+    rngSeed: "stupefy-service-seed"
+  });
+
+  return gameSchema.parse({
+    ...base,
+    status: "in_progress",
+    stateVersion: 12,
+    canonicalState: {
+      ...base.canonicalState,
+      cardStates: {
+        "player-b:target-unit": {
+          exhausted: false
+        }
+      },
+      turn: {
+        turnNumber: 1,
+        activePlayerId: "player-a",
+        phase: "action",
+        passedPlayerIds: [],
+        completedStartOfTurnSteps: ["awaken", "beginning", "channel", "draw"]
+      },
+      players: {
+        "player-a": {
+          playerId: "player-a",
+          runePool: {
+            energy: 1,
+            power: {}
+          },
+          zones: {
+            legend: "player-a:legend",
+            champion: null,
+            mainDeck: ["player-a:draw-card"],
+            runeDeck: [],
+            hand: ["player-a:stupefy"],
+            trash: [],
+            banishment: [],
+            base: []
+          }
+        },
+        "player-b": {
+          playerId: "player-b",
+          runePool: {
+            energy: 0,
+            power: {}
+          },
+          zones: {
+            legend: "player-b:legend",
+            champion: null,
+            mainDeck: [],
+            runeDeck: [],
+            hand: [],
+            trash: [],
+            banishment: [],
+            base: ["player-b:target-unit"]
+          }
+        }
+      }
+    }
+  });
+}
+
 const intentCardLookup: Record<string, Card> = {
   "a-rune-base-1": createCard({
     domain: ["Chaos"],
@@ -1239,11 +1375,51 @@ const intentCardLookup: Record<string, Card> = {
   })
 };
 
+const stupefyIntentCardLookup: Record<string, Card> = {
+  "player-a:draw-card": createCard({
+    domain: ["Mind"],
+    energy: 1,
+    name: "Draw Card",
+    power: null,
+    type: "Unit"
+  }),
+  "player-a:legend": createCard({
+    domain: ["Mind"],
+    energy: null,
+    name: "Lady of Luminosity - Starter",
+    power: null,
+    type: "Legend"
+  }),
+  "player-a:stupefy": createCard({
+    domain: ["Mind"],
+    energy: 1,
+    name: "Stupefy",
+    power: null,
+    text: "[Reaction] Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:. Draw 1.",
+    type: "Spell"
+  }),
+  "player-b:legend": createCard({
+    domain: ["Fury"],
+    energy: null,
+    name: "Opponent Legend",
+    power: null,
+    type: "Legend"
+  }),
+  "player-b:target-unit": createCard({
+    domain: ["Fury"],
+    energy: 2,
+    name: "Target Unit",
+    power: null,
+    type: "Unit"
+  })
+};
+
 function createCard(input: {
   domain: string[];
   energy: number | null;
   name: string;
   power: number | null;
+  text?: string;
   type: Card["classification"]["type"];
 }): Card {
   return {
@@ -1262,7 +1438,7 @@ function createCard(input: {
       domain: input.domain
     },
     text: {
-      plain: ""
+      plain: input.text ?? ""
     },
     set: {
       set_id: "test",
