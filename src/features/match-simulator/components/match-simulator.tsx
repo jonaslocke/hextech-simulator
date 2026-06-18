@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/shared/components/button";
+import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import { GameBoard } from "@/features/game-board";
 import {
   createFixedDeckMatch,
@@ -207,6 +208,18 @@ export function MatchSimulator() {
 
   const viewer = match.players[viewerSeat];
   const projection = match.projections[viewer.playerId];
+  const startingPlayerChoiceOpen =
+    projection.status === "setup_pending" &&
+    projection.setup.startingPlayerId === null &&
+    projection.setup.startingPlayerChooserId === viewer.playerId;
+  const startingPlayerOptions = projection.setup.playerIds.map((playerId) => ({
+    description:
+      playerId === viewer.playerId
+        ? "You take the first turn."
+        : "Your opponent takes the first turn.",
+    id: playerId,
+    label: playerLabel(match, playerId)
+  }));
   const playCardFromHand = ({
     canPlay,
     cardInstanceId,
@@ -330,6 +343,26 @@ export function MatchSimulator() {
         />
       )}
       {error && <ErrorToast message={error} onClose={() => setError(null)} />}
+      <ChoiceDialog
+        confirmLabel="Choose starting player"
+        description="The selected player will take the first turn of this game."
+        isOpen={startingPlayerChoiceOpen}
+        onConfirm={([startingPlayerId]) => {
+          if (!startingPlayerId) {
+            return;
+          }
+
+          void submitIntent({
+            type: "setup.chooseStartingPlayer",
+            payload: {
+              startingPlayerId
+            }
+          });
+        }}
+        options={startingPlayerOptions}
+        selectionMode="single"
+        title="Choose Starting Player"
+      />
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
@@ -388,7 +421,6 @@ function SetupControls({
   projection: GameProjection;
   viewerId: string;
 }) {
-  const playerIds = projection.setup.playerIds;
   const viewerChoice = projection.setup.battlefieldChoices[viewerId];
   const viewerBattlefieldPool = projection.setup.battlefieldPools[viewerId];
 
@@ -401,26 +433,7 @@ function SetupControls({
             Selected: {projection.setup.startingPlayerId}
           </span>
         ) : projection.setup.startingPlayerChooserId === viewerId ? (
-          <div className="flex gap-2">
-            {playerIds.map((playerId) => (
-              <Button
-                key={playerId}
-                disabled={disabled}
-                onClick={() =>
-                  onIntent({
-                    type: "setup.chooseStartingPlayer",
-                    payload: {
-                      startingPlayerId: playerId
-                    }
-                  })
-                }
-                size="sm"
-                type="button"
-              >
-                {playerId}
-              </Button>
-            ))}
-          </div>
+          <span className="text-slate-400">Choose in the dialog.</span>
         ) : (
           <span className="text-slate-400">
             Waiting for {projection.setup.startingPlayerChooserId ?? "chooser"}.
@@ -457,6 +470,18 @@ function SetupControls({
       </div>
     </div>
   );
+}
+
+function playerLabel(match: AcceptedMatch, playerId: string) {
+  if (match.players.player1.playerId === playerId) {
+    return "Player 1";
+  }
+
+  if (match.players.player2.playerId === playerId) {
+    return "Player 2";
+  }
+
+  return playerId;
 }
 
 function ErrorToast({
