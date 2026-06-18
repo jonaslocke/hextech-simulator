@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils/cn";
 import { Info } from "lucide-react";
 import { FC, useEffect, useRef, useState } from "react";
 import { BattlefieldData } from "../types";

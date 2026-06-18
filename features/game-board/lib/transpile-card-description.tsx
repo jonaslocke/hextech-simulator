@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils/cn";
 import bodyRune from "../assets/domains/body-16.webp";
 import calmRune from "../assets/domains/calm-16.webp";
 import chaosRune from "../assets/domains/chaos-16.webp";

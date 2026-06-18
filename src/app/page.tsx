@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Card as CatalogCard } from "@/server/catalog";
 import type { GameLogEntry } from "@/server/events";
 import type { GameProjection } from "@/server/match";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/components/button";
 import { GameBoard } from "../../features/game-board";
 
 type FixedDeckId = "annie" | "lux";

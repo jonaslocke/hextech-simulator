@@ -1,10 +1,10 @@
 import { ComponentProps, FC, MouseEvent } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/utils/cn";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
 import { ArchiveX, Hand, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/components/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
 type BaseLineProps = {
