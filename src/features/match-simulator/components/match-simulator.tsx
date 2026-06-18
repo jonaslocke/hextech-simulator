@@ -352,12 +352,6 @@ export function MatchSimulator() {
           Match {match.matchId} - State {projection.stateVersion}
         </span>
       </div>
-      {projection.status === "setup_pending" && (
-        <SetupActionPanel
-          projection={projection}
-          viewerId={viewer.playerId}
-        />
-      )}
       {error && <ErrorToast message={error} onClose={() => setError(null)} />}
       <ChoiceDialog
         confirmLabel="Choose starting player"
@@ -411,64 +405,6 @@ export function MatchSimulator() {
         projection={projection}
       />
     </main>
-  );
-}
-
-function SetupActionPanel({
-  projection,
-  viewerId
-}: {
-  projection: GameProjection;
-  viewerId: string;
-}) {
-  return (
-    <aside className="top-10 z-50 absolute bg-slate-950/90 shadow-xl p-3 border border-white/10 rounded w-80 text-slate-100 text-xs">
-      <div className="flex justify-between items-center gap-2 mb-2">
-        <span className="font-semibold">Setup</span>
-        <span className="text-slate-400">{projection.status}</span>
-      </div>
-      <SetupControls
-        projection={projection}
-        viewerId={viewerId}
-      />
-    </aside>
-  );
-}
-
-function SetupControls({
-  projection,
-  viewerId
-}: {
-  projection: GameProjection;
-  viewerId: string;
-}) {
-  const viewerChoice = projection.setup.battlefieldChoices[viewerId];
-
-  return (
-    <div className="gap-3 grid">
-      <div className="gap-2 grid">
-        <span className="font-medium text-slate-300">Starting player</span>
-        {projection.setup.startingPlayerId ? (
-          <span className="text-slate-400">
-            Selected: {projection.setup.startingPlayerId}
-          </span>
-        ) : projection.setup.startingPlayerChooserId === viewerId ? (
-          <span className="text-slate-400">Choose in the dialog.</span>
-        ) : (
-          <span className="text-slate-400">
-            Waiting for {projection.setup.startingPlayerChooserId ?? "chooser"}.
-          </span>
-        )}
-      </div>
-      <div className="gap-2 grid">
-        <span className="font-medium text-slate-300">Battlefield</span>
-        {viewerChoice?.status === "revealed" || viewerChoice?.status === "locked" ? (
-          <span className="text-slate-400">Choice {viewerChoice.status}.</span>
-        ) : (
-          <span className="text-slate-400">Choose in the dialog.</span>
-        )}
-      </div>
-    </div>
   );
 }
 
