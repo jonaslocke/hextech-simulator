@@ -13,6 +13,7 @@ export async function PATCH(
     const { cardCode } = await context.params;
     const repositories = await getCardCatalogAdminRepositories();
     const body = (await request.json()) as {
+      behaviorTemplateIds?: string[];
       behaviorTemplateId?: string | null;
       supportStatus:
         | "fully_supported"
@@ -36,4 +37,3 @@ export async function PATCH(
     return adminErrorResponse(error);
   }
 }
-

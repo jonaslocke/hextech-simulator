@@ -117,6 +117,7 @@ export async function assignBehaviorToCard(
   >,
   input: {
     cardCode: string;
+    behaviorTemplateIds?: string[];
     behaviorTemplateId?: string | null;
     supportStatus: RuntimeSupportStatus;
     reviewerNotes?: string | null;
@@ -130,12 +131,20 @@ export async function assignBehaviorToCard(
     throw new Error(`Canonical card not found: ${input.cardCode}`);
   }
 
-  if (input.behaviorTemplateId) {
-    const template =
-      await repositories.behaviorTemplates.findById(input.behaviorTemplateId);
+  const behaviorTemplateIds = [
+    ...new Set(
+      [
+        ...(input.behaviorTemplateIds ?? []),
+        ...(input.behaviorTemplateId ? [input.behaviorTemplateId] : [])
+      ].filter((templateId) => templateId.length > 0)
+    )
+  ].sort();
+
+  for (const behaviorTemplateId of behaviorTemplateIds) {
+    const template = await repositories.behaviorTemplates.findById(behaviorTemplateId);
 
     if (!template) {
-      throw new Error(`Behavior template not found: ${input.behaviorTemplateId}`);
+      throw new Error(`Behavior template not found: ${behaviorTemplateId}`);
     }
   }
 
@@ -147,7 +156,7 @@ export async function assignBehaviorToCard(
         ?.createdAt ?? timestamp,
     updatedAt: timestamp,
     cardCode: input.cardCode,
-    behaviorTemplateId: input.behaviorTemplateId ?? null,
+    behaviorTemplateIds,
     supportStatus: input.supportStatus,
     status:
       input.supportStatus === "needs_behavior_review" ? "needs_review" : "assigned",

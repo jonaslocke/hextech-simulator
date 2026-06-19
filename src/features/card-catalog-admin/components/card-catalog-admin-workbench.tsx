@@ -31,6 +31,23 @@ type BehaviorEffect = {
   target?: string;
 };
 
+type BehaviorSourceExample = {
+  cardCode: string;
+  cardName: string;
+  publicCode: string;
+  sourceText: string;
+};
+
+type BehaviorTemplate = {
+  id: string;
+  name: string;
+  behavior: {
+    timing: string;
+    effects: BehaviorEffect[];
+  };
+  sourceExamples: BehaviorSourceExample[];
+};
+
 type BehaviorDraft = {
   id: string;
   name: string;
@@ -51,6 +68,13 @@ type BehaviorDraftReviewStatus =
   | "manual_review"
   | "blocked_by_engine_capability"
   | "rejected";
+
+type RuntimeSupportStatus =
+  | "fully_supported"
+  | "vanilla_supported"
+  | "not_playable"
+  | "blocked_by_missing_engine_capability"
+  | "needs_behavior_review";
 
 type GroupingDraft = {
   id: string;
@@ -74,6 +98,29 @@ type GroupingDraft = {
   };
 };
 
+type CanonicalCard = {
+  cardCode: string;
+  name: string;
+  catalogStatus: string;
+  text: {
+    plain: string;
+  };
+};
+
+type CardBehaviorAssignment = {
+  cardCode: string;
+  behaviorTemplateIds: string[];
+  supportStatus: RuntimeSupportStatus;
+  status: string;
+  reviewerNotes: string | null;
+};
+
+type AssignmentDraft = {
+  behaviorTemplateIds: string[];
+  supportStatus: RuntimeSupportStatus;
+  reviewerNotes: string;
+};
+
 type ApiResult<T> =
   | ({
       accepted: true;
@@ -85,7 +132,18 @@ type ApiResult<T> =
       };
     };
 
-type WorkbenchTab = "behaviors" | "catalog";
+type WorkbenchTab = "behaviors" | "catalog" | "assignments";
+
+const runtimeSupportOptions: Array<{
+  value: RuntimeSupportStatus;
+  label: string;
+}> = [
+  { value: "fully_supported", label: "Supported" },
+  { value: "vanilla_supported", label: "Vanilla" },
+  { value: "needs_behavior_review", label: "Needs Review" },
+  { value: "blocked_by_missing_engine_capability", label: "Blocked" },
+  { value: "not_playable", label: "Not Playable" }
+];
 
 export function CardCatalogAdminWorkbench() {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>("behaviors");
@@ -93,7 +151,11 @@ export function CardCatalogAdminWorkbench() {
   const [behaviorImportRun, setBehaviorImportRun] = useState<ImportRun | null>(null);
   const [catalogImportRun, setCatalogImportRun] = useState<ImportRun | null>(null);
   const [behaviorDrafts, setBehaviorDrafts] = useState<BehaviorDraft[]>([]);
+  const [behaviorTemplates, setBehaviorTemplates] = useState<BehaviorTemplate[]>([]);
   const [groupingDrafts, setGroupingDrafts] = useState<GroupingDraft[]>([]);
+  const [canonicalCards, setCanonicalCards] = useState<CanonicalCard[]>([]);
+  const [assignments, setAssignments] = useState<CardBehaviorAssignment[]>([]);
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -121,6 +183,9 @@ export function CardCatalogAdminWorkbench() {
   ).length;
   const validatedGroupCount = groupingDrafts.filter(
     (draft) => draft.status === "validated"
+  ).length;
+  const assignedCardCount = assignments.filter(
+    (assignment) => assignment.status === "assigned"
   ).length;
 
   async function runBehaviorAnalysis() {
@@ -279,6 +344,109 @@ export function CardCatalogAdminWorkbench() {
     });
   }
 
+  async function loadAssignmentData() {
+    await runAction("refresh-assignments", async () => {
+      const [cardsPayload, templatesPayload] = await Promise.all([
+        fetchJson<ApiResult<{
+          cards: CanonicalCard[];
+          assignments: CardBehaviorAssignment[];
+        }>>("/api/admin/card-catalog/canonical-cards"),
+        fetchJson<ApiResult<{ templates: BehaviorTemplate[] }>>(
+          "/api/admin/card-catalog/behavior-templates"
+        )
+      ]);
+
+      if (!cardsPayload.accepted) {
+        throw new Error(cardsPayload.error.message);
+      }
+
+      if (!templatesPayload.accepted) {
+        throw new Error(templatesPayload.error.message);
+      }
+
+      setCanonicalCards(cardsPayload.cards);
+      setAssignments(cardsPayload.assignments);
+      setBehaviorTemplates(templatesPayload.templates);
+      setAssignmentDrafts(
+        createAssignmentDrafts({
+          assignments: cardsPayload.assignments,
+          behaviorDrafts,
+          cards: cardsPayload.cards,
+          templates: templatesPayload.templates
+        })
+      );
+      setActiveTab("assignments");
+      setNotice(`Loaded ${cardsPayload.cards.length} canonical cards.`);
+    });
+  }
+
+  async function saveAssignment(cardCode: string) {
+    const draft = assignmentDrafts[cardCode];
+
+    if (!draft) {
+      return;
+    }
+
+    await runAction(`assign:${cardCode}`, async () => {
+      const payload = await fetchJson<ApiResult<{ assignment: CardBehaviorAssignment }>>(
+        `/api/admin/card-catalog/canonical-cards/${encodeURIComponent(
+          cardCode
+        )}/behavior`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...draft,
+            assignedBy: "manual-test"
+          })
+        }
+      );
+
+      if (!payload.accepted) {
+        throw new Error(payload.error.message);
+      }
+
+      setAssignments((current) => [
+        ...current.filter((assignment) => assignment.cardCode !== cardCode),
+        payload.assignment
+      ]);
+      setNotice(`Assigned behavior for ${cardCode}.`);
+    });
+  }
+
+  function updateAssignmentDraft(
+    cardCode: string,
+    patch: Partial<AssignmentDraft>
+  ) {
+    setAssignmentDrafts((current) => ({
+      ...current,
+      [cardCode]: {
+        ...current[cardCode],
+        behaviorTemplateIds: current[cardCode]?.behaviorTemplateIds ?? [],
+        supportStatus: current[cardCode]?.supportStatus ?? "needs_behavior_review",
+        reviewerNotes: current[cardCode]?.reviewerNotes ?? "",
+        ...patch
+      }
+    }));
+  }
+
+  function toggleAssignmentTemplate(cardCode: string, templateId: string) {
+    const currentDraft = assignmentDrafts[cardCode] ?? {
+      behaviorTemplateIds: [],
+      supportStatus: "needs_behavior_review" as RuntimeSupportStatus,
+      reviewerNotes: ""
+    };
+    const behaviorTemplateIds = currentDraft.behaviorTemplateIds.includes(templateId)
+      ? currentDraft.behaviorTemplateIds.filter((candidate) => candidate !== templateId)
+      : [...currentDraft.behaviorTemplateIds, templateId].sort();
+
+    updateAssignmentDraft(cardCode, {
+      behaviorTemplateIds
+    });
+  }
+
   async function postCardSet<T>(url: string): Promise<T> {
     if (!file) {
       throw new Error("Choose a set JSON file first.");
@@ -363,8 +531,8 @@ export function CardCatalogAdminWorkbench() {
           />
           <MetricCard
             icon={<ListChecks className="size-4" />}
-            label="Validated Groups"
-            value={`${validatedGroupCount}/${groupingDrafts.length}`}
+            label="Validated / Assigned"
+            value={`${validatedGroupCount}/${groupingDrafts.length} / ${assignedCardCount}`}
           />
         </div>
 
@@ -404,6 +572,20 @@ export function CardCatalogAdminWorkbench() {
               <RefreshCw className={cn("size-4", busyAction === "refresh-drafts" && "animate-spin")} />
               Refresh Drafts
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={loadAssignmentData}
+              disabled={isBusy}
+            >
+              <ListChecks
+                className={cn(
+                  "size-4",
+                  busyAction === "refresh-assignments" && "animate-pulse"
+                )}
+              />
+              Refresh Assignments
+            </Button>
           </div>
           <div className="flex rounded-md border border-white/10 bg-slate-950 p-1">
             <TabButton
@@ -417,6 +599,17 @@ export function CardCatalogAdminWorkbench() {
               onClick={() => setActiveTab("catalog")}
             >
               Catalog
+            </TabButton>
+            <TabButton
+              active={activeTab === "assignments"}
+              onClick={() => {
+                setActiveTab("assignments");
+                if (canonicalCards.length === 0 && !isBusy) {
+                  void loadAssignmentData();
+                }
+              }}
+            >
+              Assign
             </TabButton>
           </div>
         </div>
@@ -433,11 +626,23 @@ export function CardCatalogAdminWorkbench() {
             onApprove={approveBehaviorDraft}
             onReviewStatusChange={updateBehaviorDraftReviewStatus}
           />
-        ) : (
+        ) : activeTab === "catalog" ? (
           <GroupingDraftList
             groups={visibleGroups}
             busyAction={busyAction}
             onValidate={validateGroup}
+          />
+        ) : (
+          <AssignmentList
+            assignments={assignments}
+            behaviorDrafts={behaviorDrafts}
+            busyAction={busyAction}
+            cards={canonicalCards}
+            drafts={assignmentDrafts}
+            templates={behaviorTemplates}
+            onSave={saveAssignment}
+            onToggleTemplate={toggleAssignmentTemplate}
+            onUpdateDraft={updateAssignmentDraft}
           />
         )}
       </section>
@@ -709,7 +914,7 @@ function GroupingDraftList({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-semibold">
-                  {group.cardCode} · {group.canonicalCard.name}
+                  {group.cardCode} - {group.canonicalCard.name}
                 </h3>
                 <StatusBadge value={group.status} />
               </div>
@@ -750,6 +955,180 @@ function GroupingDraftList({
   );
 }
 
+function AssignmentList({
+  assignments,
+  behaviorDrafts,
+  busyAction,
+  cards,
+  drafts,
+  templates,
+  onSave,
+  onToggleTemplate,
+  onUpdateDraft
+}: {
+  assignments: CardBehaviorAssignment[];
+  behaviorDrafts: BehaviorDraft[];
+  busyAction: string | null;
+  cards: CanonicalCard[];
+  drafts: Record<string, AssignmentDraft>;
+  templates: BehaviorTemplate[];
+  onSave: (cardCode: string) => void;
+  onToggleTemplate: (cardCode: string, templateId: string) => void;
+  onUpdateDraft: (cardCode: string, patch: Partial<AssignmentDraft>) => void;
+}) {
+  if (cards.length === 0) {
+    return <EmptyPanel label="No canonical cards loaded." />;
+  }
+
+  const assignmentsByCardCode = new Map(
+    assignments.map((assignment) => [assignment.cardCode, assignment])
+  );
+
+  return (
+    <section className="grid gap-3">
+      {cards.map((card) => {
+        const assignment = assignmentsByCardCode.get(card.cardCode);
+        const draft = drafts[card.cardCode] ?? {
+          behaviorTemplateIds: [],
+          supportStatus: "needs_behavior_review" as RuntimeSupportStatus,
+          reviewerNotes: ""
+        };
+        const suggestedTemplateIds = getSuggestedTemplateIdsForCard({
+          behaviorDrafts,
+          cardCode: card.cardCode,
+          templates
+        });
+        const sortedTemplates = sortTemplatesForCard(templates, suggestedTemplateIds);
+
+        return (
+          <article
+            key={card.cardCode}
+            className="rounded-lg border border-white/10 bg-slate-900 p-4"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">
+                    {card.cardCode} - {card.name}
+                  </h3>
+                  <StatusBadge value={assignment?.status ?? "unassigned"} />
+                  <StatusBadge value={draft.supportStatus} />
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-slate-400">
+                  {card.text.plain || "No card text."}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={busyAction === `assign:${card.cardCode}`}
+                onClick={() => onSave(card.cardCode)}
+              >
+                {busyAction === `assign:${card.cardCode}` ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Save
+              </Button>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr]">
+              <div className="grid gap-2">
+                <label className="text-xs font-semibold uppercase text-slate-500">
+                  Runtime support
+                </label>
+                <select
+                  className="h-10 rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
+                  value={draft.supportStatus}
+                  onChange={(event) =>
+                    onUpdateDraft(card.cardCode, {
+                      supportStatus: event.target.value as RuntimeSupportStatus
+                    })
+                  }
+                >
+                  {runtimeSupportOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className="min-h-20 rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                  placeholder="Reviewer notes"
+                  value={draft.reviewerNotes}
+                  onChange={(event) =>
+                    onUpdateDraft(card.cardCode, {
+                      reviewerNotes: event.target.value
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-500">
+                  Approved templates
+                </div>
+                {sortedTemplates.length > 0 ? (
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {sortedTemplates.map((template) => {
+                      const isSuggested = suggestedTemplateIds.has(template.id);
+                      const isChecked = draft.behaviorTemplateIds.includes(template.id);
+
+                      return (
+                        <label
+                          key={template.id}
+                          className={cn(
+                            "flex min-h-16 cursor-pointer items-start gap-3 rounded-md border p-3 text-sm",
+                            isChecked
+                              ? "border-cyan-300/50 bg-cyan-950/30"
+                              : "border-white/10 bg-slate-950 hover:bg-slate-800"
+                          )}
+                        >
+                          <input
+                            className="mt-1"
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() =>
+                              onToggleTemplate(card.cardCode, template.id)
+                            }
+                          />
+                          <span className="min-w-0">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-slate-100">
+                                {template.name}
+                              </span>
+                              {isSuggested && (
+                                <span className="rounded bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-100">
+                                  suggested
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-1 block font-mono text-xs text-slate-400">
+                              {template.behavior.timing} -{" "}
+                              {template.behavior.effects
+                                .map((effect) => effect.type)
+                                .join(", ")}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">
+                    No approved templates available.
+                  </p>
+                )}
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
 function StatusBadge({ value }: { value: string }) {
   return (
     <span className="rounded bg-white/10 px-2 py-1 text-xs capitalize text-slate-200">
@@ -786,4 +1165,80 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const payload = (await response.json()) as T;
 
   return payload;
+}
+
+function createAssignmentDrafts({
+  assignments,
+  behaviorDrafts,
+  cards,
+  templates
+}: {
+  assignments: CardBehaviorAssignment[];
+  behaviorDrafts: BehaviorDraft[];
+  cards: CanonicalCard[];
+  templates: BehaviorTemplate[];
+}): Record<string, AssignmentDraft> {
+  const assignmentsByCardCode = new Map(
+    assignments.map((assignment) => [assignment.cardCode, assignment])
+  );
+
+  return Object.fromEntries(
+    cards.map((card) => {
+      const assignment = assignmentsByCardCode.get(card.cardCode);
+      const suggestedTemplateIds = getSuggestedTemplateIdsForCard({
+        behaviorDrafts,
+        cardCode: card.cardCode,
+        templates
+      });
+
+      return [
+        card.cardCode,
+        {
+          behaviorTemplateIds:
+            assignment?.behaviorTemplateIds ?? [...suggestedTemplateIds].sort(),
+          supportStatus: assignment?.supportStatus ?? "needs_behavior_review",
+          reviewerNotes: assignment?.reviewerNotes ?? ""
+        }
+      ];
+    })
+  );
+}
+
+function getSuggestedTemplateIdsForCard({
+  behaviorDrafts,
+  cardCode,
+  templates
+}: {
+  behaviorDrafts: BehaviorDraft[];
+  cardCode: string;
+  templates: BehaviorTemplate[];
+}): Set<string> {
+  return new Set([
+    ...templates
+      .filter((template) =>
+        template.sourceExamples.some((example) => example.cardCode === cardCode)
+      )
+      .map((template) => template.id),
+    ...behaviorDrafts.flatMap((draft) =>
+      draft.matchedCardCodes.includes(cardCode)
+        ? draft.similarApprovedTemplateIds
+        : []
+    )
+  ]);
+}
+
+function sortTemplatesForCard(
+  templates: BehaviorTemplate[],
+  suggestedTemplateIds: Set<string>
+): BehaviorTemplate[] {
+  return [...templates].sort((left, right) => {
+    const leftSuggested = suggestedTemplateIds.has(left.id);
+    const rightSuggested = suggestedTemplateIds.has(right.id);
+
+    if (leftSuggested !== rightSuggested) {
+      return leftSuggested ? -1 : 1;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 }

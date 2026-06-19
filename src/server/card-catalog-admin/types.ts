@@ -159,11 +159,10 @@ export type CardGroupingDraftDocument = BaseDocument & {
 
 export type CardBehaviorAssignmentDocument = BaseDocument & {
   cardCode: string;
-  behaviorTemplateId: string | null;
+  behaviorTemplateIds: string[];
   supportStatus: RuntimeSupportStatus;
   status: CardBehaviorAssignmentStatus;
   reviewerNotes: string | null;
   assignedBy: string;
   assignedAt: string;
 };
-

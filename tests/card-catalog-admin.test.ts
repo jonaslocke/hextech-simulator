@@ -246,6 +246,7 @@ test("card import validates groups separately from later behavior assignment", a
   );
 
   await createAndApproveDrawTemplate(repositories);
+  await createAndApproveMightTemplate(repositories);
 
   const validatedGroup = await import("../src/server/card-catalog-admin").then(
     ({ updateCardGroupingDraft }) =>
@@ -257,10 +258,13 @@ test("card import validates groups separately from later behavior assignment", a
       })
   );
   const persistedCard = await repositories.canonicalCards.findByCardCode("OGN-027");
-  const drawTemplate = (await repositories.behaviorTemplates.findAll())[0]!;
+  const behaviorTemplates = await repositories.behaviorTemplates.findAll();
+  const expectedTemplateIds = behaviorTemplates
+    .map((template) => template.id)
+    .sort();
   const assignment = await assignBehaviorToCard(repositories, {
     cardCode: "OGN-027",
-    behaviorTemplateId: drawTemplate.id,
+    behaviorTemplateIds: expectedTemplateIds,
     supportStatus: "fully_supported",
     assignedBy: "tester",
     now: new Date("2026-06-19T00:02:00.000Z")
@@ -270,7 +274,7 @@ test("card import validates groups separately from later behavior assignment", a
   assert.ok(persistedCard);
   assert.equal(persistedCard.variants.length, 0);
   assert.equal(assignment.cardCode, "OGN-027");
-  assert.equal(assignment.behaviorTemplateId, drawTemplate.id);
+  assert.deepEqual(assignment.behaviorTemplateIds, expectedTemplateIds);
 });
 
 async function createAndApproveDrawTemplate(
@@ -296,6 +300,32 @@ async function createAndApproveDrawTemplate(
     draftId: draft.id,
     approvedBy: "tester",
     now: new Date("2026-06-19T00:00:30.000Z")
+  });
+}
+
+async function createAndApproveMightTemplate(
+  repositories: ReturnType<typeof createInMemoryCardCatalogAdminRepositories>
+) {
+  const result = await analyzeBehaviorTemplates(repositories, {
+    cards: [
+      createTestCard({
+        name: "Might Spell",
+        publicCode: "TST-003/001",
+        text: "Give me +1 :rb_might: this turn."
+      })
+    ],
+    uploadedFileName: "might.json",
+    importRunId: "import:might",
+    now: new Date("2026-06-19T00:00:00.000Z")
+  });
+  const draft = result.drafts.find((candidate) => candidate.name === "Modify Might");
+
+  assert.ok(draft);
+
+  return approveBehaviorTemplateDraft(repositories, {
+    draftId: draft.id,
+    approvedBy: "tester",
+    now: new Date("2026-06-19T00:00:45.000Z")
   });
 }
 
