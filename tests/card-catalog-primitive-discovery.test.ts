@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  analyzeCardBehaviorSuggestions,
+  analyzeLocalCardSetBehaviorSuggestions,
   analyzeLocalCardSetCorpus,
   deriveCardCode,
   discoverCardPrimitives
@@ -53,6 +55,68 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
   });
 });
 
+test("discovers selector constraints for target legality from card text", () => {
+  const backToBack = discoverCardPrimitives(
+    createTestCard({
+      name: "Back to Back",
+      publicCode: "OGN-206/298",
+      text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give two friendly units each +2 :rb_might: this turn."
+    })
+  );
+  const fallingComet = discoverCardPrimitives(
+    createTestCard({
+      name: "Falling Comet",
+      publicCode: "OGN-087/298",
+      text: "[Action] (Play on your turn or in showdowns.)Deal 6 to a unit at a battlefield."
+    })
+  );
+  const singularity = discoverCardPrimitives(
+    createTestCard({
+      name: "Singularity",
+      publicCode: "OGN-105/298",
+      text: "Deal 6 to each of up to two units."
+    })
+  );
+
+  assert.deepEqual(findAssignment(backToBack, "selector.friendly_unit")?.parameters, {
+    count: 2,
+    controller: "self",
+    excludesSource: false
+  });
+  assert.deepEqual(findAssignment(fallingComet, "selector.unit")?.parameters, {
+    count: 1,
+    excludesSource: false,
+    scope: "any",
+    zone: "battlefield"
+  });
+  assert.deepEqual(findAssignment(singularity, "selector.up_to")?.parameters, {
+    count: 2
+  });
+});
+
+test("builds typed card behavior suggestions with parameter validation", () => {
+  const report = analyzeCardBehaviorSuggestions([
+    createTestCard({
+      name: "Stupefy",
+      publicCode: "OGN-095/298",
+      text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:. Draw 1."
+    })
+  ]);
+  const suggestion = report.cards[0]!;
+  const modifier = suggestion.clauses
+    .flatMap((clause) => clause.assignments)
+    .find((assignment) => assignment.assignment.primitiveId === "modifier.modify_might");
+
+  assert.equal(suggestion.supportStatus, "supported");
+  assert.equal(suggestion.missingRequiredParameterCount, 0);
+  assert.equal(suggestion.unsupportedClauseCount, 0);
+  assert.equal(modifier?.parameterValidation.complete, true);
+  assert.equal(
+    modifier?.catalogEntry.parameters.some((parameter) => parameter.name === "target"),
+    true
+  );
+});
+
 test("discovers reusable primitives from the full local card corpus", async () => {
   const report = await analyzeLocalCardSetCorpus();
   const primitiveIds = new Set(
@@ -78,6 +142,28 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(report.summary.discoveredPrimitiveCount > 20, true);
 });
 
+test("builds a corpus behavior suggestion report without behavior templates", async () => {
+  const report = await analyzeLocalCardSetBehaviorSuggestions();
+  const primitiveIds = new Set(report.primitiveCatalog.map((entry) => entry.id));
+  const chooseTarget = report.primitiveCatalog.find(
+    (entry) => entry.id === "choice.choose_target"
+  );
+
+  assert.deepEqual(report.summary.sourceFiles, [
+    "ogn.json",
+    "ogs.json",
+    "sfd.json"
+  ]);
+  assert.equal(report.summary.totalCards, 656);
+  assert.equal(report.summary.cardsWithRulesText, 636);
+  assert.equal(report.summary.suggestedCardCount, 636);
+  assert.equal(report.summary.completeSuggestionCount > 0, true);
+  assert.equal(primitiveIds.has("choice.choose_target"), true);
+  assert.equal(primitiveIds.has("selector.friendly_unit"), true);
+  assert.equal(primitiveIds.has("selector.enemy_unit"), true);
+  assert.equal((chooseTarget?.examples.length ?? 0) > 0, true);
+});
+
 test("reports unsupported clauses without inventing behavior", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
@@ -91,6 +177,28 @@ test("reports unsupported clauses without inventing behavior", () => {
   assert.equal(discovery.clauses[0]?.assignments.length, 0);
   assert.match(discovery.clauses[0]?.unsupportedReason ?? "", /No action/);
 });
+
+test("rolls unsupported text into behavior suggestion status", () => {
+  const report = analyzeCardBehaviorSuggestions([
+    createTestCard({
+      name: "Mystery Spell",
+      publicCode: "TST-001/001",
+      text: "Transform fate into a hidden lesson."
+    })
+  ]);
+
+  assert.equal(report.cards[0]?.supportStatus, "unsupported");
+  assert.equal(report.cards[0]?.unsupportedClauseCount, 1);
+});
+
+function findAssignment(
+  discovery: ReturnType<typeof discoverCardPrimitives>,
+  primitiveId: string
+) {
+  return discovery.clauses
+    .flatMap((clause) => clause.assignments)
+    .find((assignment) => assignment.primitiveId === primitiveId);
+}
 
 function createTestCard(input: {
   name: string;

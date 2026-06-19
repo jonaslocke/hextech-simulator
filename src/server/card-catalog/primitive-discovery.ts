@@ -10,6 +10,7 @@ export type PrimitiveFamily =
   | "modifier"
   | "trigger"
   | "condition"
+  | "choice"
   | "cost"
   | "replacement"
   | "prevention"
@@ -136,22 +137,22 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope"], (context) =>
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText) }, "medium")
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["count"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { count: readFirstNumber(context.rulesText) }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "self", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["count"], (context) =>
     /\benemy units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.enemy_unit", "selector", { count: readFirstNumber(context.rulesText) }, "high")
+      ? assignment(context, "selector.enemy_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.up_to", "selector", "Select up to count", "Behavior allows selecting up to a maximum count.", ["count"], (context) =>
     /\bup to\b/.test(context.rulesText)
-      ? assignment(context, "selector.up_to", "selector", { count: readFirstNumber(context.rulesText) }, "high")
+      ? assignment(context, "selector.up_to", "selector", { count: readUpToCount(context.rulesText) }, "high")
       : null
   ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
@@ -278,6 +279,21 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("condition.fallback_cannot", "condition", "Fallback if cannot", "Use fallback behavior if primary behavior cannot happen.", [], (context) =>
     /\bif you can't\b|\bif you cannot\b/.test(context.rulesText)
       ? assignment(context, "condition.fallback_cannot", "condition", {}, "high")
+      : null
+  ),
+  primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player", "count", "target"], (context) =>
+    /\bchoose\b/.test(context.rulesText)
+      ? assignment(context, "choice.choose_target", "choice", { player: "controller", count: readChoiceCount(context.rulesText), target: readGenericTarget(context.rulesText) }, "high")
+      : null
+  ),
+  primitive("choice.choose_mode", "choice", "Choose mode", "Player chooses one mode from a modal effect.", ["player"], (context) =>
+    /\bchoose one\b|\bdo one of the following\b/.test(context.rulesText)
+      ? assignment(context, "choice.choose_mode", "choice", { player: "controller" }, "high")
+      : null
+  ),
+  primitive("choice.optional", "choice", "Optional choice", "Player may choose whether to apply a behavior.", ["player"], (context) =>
+    /\byou may\b|\bi may\b|\beach player may\b/.test(context.rulesText)
+      ? assignment(context, "choice.optional", "choice", { player: readPlayer(context.rulesText) }, "medium")
       : null
   ),
   primitive("cost.pay", "cost", "Pay cost", "Pay an additional or alternate cost.", ["amount", "resource"], (context) =>
@@ -550,7 +566,9 @@ function normalizeParameters(
   parameters: PrimitiveAssignment["parameters"]
 ): PrimitiveAssignment["parameters"] {
   return Object.fromEntries(
-    Object.entries(parameters).filter(([, value]) => value !== undefined)
+    Object.entries(parameters).filter(
+      ([, value]) => value !== undefined && value !== null
+    )
   ) as PrimitiveAssignment["parameters"];
 }
 
@@ -659,15 +677,97 @@ function readGenericTarget(rulesText: string): string {
 }
 
 function readNumberAfter(rulesText: string, word: string): number | null {
-  const match = rulesText.match(new RegExp(`\\b${word}\\s+(\\d+)\\b`));
+  const match = rulesText.match(
+    new RegExp(`\\b${word}\\s+(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\b`)
+  );
 
-  return match ? Number(match[1]) : null;
+  return match ? readNumberToken(match[1]!) : null;
 }
 
 function readFirstNumber(rulesText: string): number | null {
-  const match = rulesText.match(/\b(\d+)\b/);
+  const match = rulesText.match(
+    /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/
+  );
 
-  return match ? Number(match[1]) : null;
+  return match ? readNumberToken(match[1]!) : null;
+}
+
+function readUnitCount(rulesText: string): number | null {
+  const unitMatch = rulesText.match(
+    /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:friendly |enemy |other |buffed )?units?\b/
+  );
+
+  if (unitMatch) {
+    return readNumberToken(unitMatch[1]!);
+  }
+
+  if (/\beach\b|\ball\b|\bALL\b/.test(rulesText)) {
+    return null;
+  }
+
+  return /\b(a|an)\s+(?:friendly |enemy |other |buffed )?unit\b/.test(rulesText)
+    ? 1
+    : null;
+}
+
+function readChoiceCount(rulesText: string): number | null {
+  const chooseMatch = rulesText.match(
+    /\bchoose\s+(?:up to\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\b/
+  );
+
+  if (!chooseMatch) {
+    return readUnitCount(rulesText);
+  }
+
+  return chooseMatch[1] === "a" || chooseMatch[1] === "an"
+    ? 1
+    : readNumberToken(chooseMatch[1]!);
+}
+
+function readUpToCount(rulesText: string): number | null {
+  const match = rulesText.match(
+    /\bup to\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/
+  );
+
+  return match ? readNumberToken(match[1]!) : null;
+}
+
+function readTargetZone(rulesText: string): string | null {
+  if (rulesText.includes("at a battlefield") || rulesText.includes("at the same location")) {
+    return "battlefield";
+  }
+
+  if (rulesText.includes("in your base") || rulesText.includes("to base")) {
+    return "base";
+  }
+
+  if (rulesText.includes("from your trash") || rulesText.includes("from trashes")) {
+    return "trash";
+  }
+
+  if (rulesText.includes("in their hands") || rulesText.includes("to your hand")) {
+    return "hand";
+  }
+
+  return null;
+}
+
+function readNumberToken(token: string): number | null {
+  const lowerToken = token.toLowerCase();
+  const wordNumbers: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10
+  };
+
+  return wordNumbers[lowerToken] ?? Number(lowerToken);
 }
 
 function readMightAmount(rulesText: string): number | null {
