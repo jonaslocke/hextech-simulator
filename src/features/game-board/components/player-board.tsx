@@ -12,7 +12,7 @@ import cardBackImage from "../../../../assets/cardback.jpg";
 import { cn } from "@/shared/utils/cn";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
-import { ArchiveX, Hand, Trash2 } from "lucide-react";
+import { ArchiveX, Trash2 } from "lucide-react";
 import { Button } from "@/shared/components/button";
 import { Card, PlayerData, ZoneData } from "../types";
 
@@ -202,7 +202,6 @@ const RunesLine = ({
         <TrashZone
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
-          handCount={isMirrored ? player.zones.hand.count : undefined}
           onClick={onOpenTrash}
           zone={player.zones.trash}
         />
@@ -372,13 +371,11 @@ function ZoneCards({
 function TrashZone({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
-  handCount,
   onClick,
   zone,
 }: {
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
-  handCount?: number;
   onClick?: () => void;
   zone: ZoneData;
 }) {
@@ -415,7 +412,6 @@ function TrashZone({
             </span>
           </button>
         )}
-        {handCount !== undefined && <HandCount value={handCount} />}
       </div>
     );
   }
@@ -434,22 +430,6 @@ function TrashZone({
           {zone.count}
         </span>
       </button>
-      {handCount !== undefined && <HandCount value={handCount} />}
-    </div>
-  );
-}
-
-function HandCount({ value }: { value: number }) {
-  return (
-    <div
-      aria-label={`${value} cards in hand`}
-      className="relative flex justify-center items-center p-2 text-slate-100"
-      title={`${value} cards in hand`}
-    >
-      <Hand className="size-5" />
-      <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
-        {value}
-      </span>
     </div>
   );
 }
