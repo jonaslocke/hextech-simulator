@@ -90,7 +90,7 @@ export const chainItemSchema = z.object({
   sourceCardInstanceId: z.string().min(1).nullable(),
   cardInstanceId: z.string().min(1).nullable(),
   label: z.string().min(1),
-  kind: z.enum(["spell", "ability", "trigger", "unit"]),
+  kind: z.enum(["spell", "ability", "trigger"]),
   effectId: z.string().min(1),
   choices: chosenTargetsSchema.default({
     targetCardInstanceIds: [],
@@ -1215,54 +1215,55 @@ export function playCard(
   );
   const paidGame = paidResult.game;
   const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
-  const chainItem: ChainItem = {
-    id: `${input.cardInstanceId}:chain:${paidGame.stateVersion + 1}`,
-    controllerPlayerId: input.actorPlayerId,
-    sourceCardInstanceId: input.cardInstanceId,
-    cardInstanceId: input.cardInstanceId,
-    label: card.name,
-    kind: "unit",
-    effectId: "unit:play-to-base",
-    choices: {
-      targetCardInstanceIds: [],
-      targetBattlefieldIds: [],
-      targetPlayerIds: []
-    },
-    payment
-  };
-
-  return {
-    game: gameSchema.parse({
-      ...paidGame,
-      updatedAt: input.now ?? new Date().toISOString(),
-      stateVersion: game.stateVersion + 1,
-      canonicalState: {
-        ...paidGame.canonicalState,
-        chain: addChainItem(paidGame, chainItem),
-        turn: {
-          ...paidGame.canonicalState.turn!,
-          passedPlayerIds: []
-        },
-        players: {
-          ...paidGame.canonicalState.players,
-          [input.actorPlayerId]: {
-            ...paidPlayer,
-            zones:
-              sourceZone === "hand"
-                ? {
-                    ...paidPlayer.zones,
-                    hand: paidPlayer.zones.hand.filter(
-                      (cardInstanceId) => cardInstanceId !== input.cardInstanceId
-                    )
-                  }
-                : {
-                    ...paidPlayer.zones,
-                    champion: null
-                  }
-          }
+  const playedGame = gameSchema.parse({
+    ...paidGame,
+    updatedAt: input.now ?? new Date().toISOString(),
+    stateVersion: game.stateVersion + 1,
+    canonicalState: {
+      ...paidGame.canonicalState,
+      cardStates: {
+        ...paidGame.canonicalState.cardStates,
+        [input.cardInstanceId]: {
+          exhausted: !profile.entersReady
+        }
+      },
+      turn: {
+        ...paidGame.canonicalState.turn!,
+        passedPlayerIds: []
+      },
+      players: {
+        ...paidGame.canonicalState.players,
+        [input.actorPlayerId]: {
+          ...paidPlayer,
+          zones:
+            sourceZone === "hand"
+              ? {
+                  ...paidPlayer.zones,
+                  hand: paidPlayer.zones.hand.filter(
+                    (cardInstanceId) => cardInstanceId !== input.cardInstanceId
+                  ),
+                  base: [...paidPlayer.zones.base, input.cardInstanceId]
+                }
+              : {
+                  ...paidPlayer.zones,
+                  champion: null,
+                  base: [...paidPlayer.zones.base, input.cardInstanceId]
+                }
         }
       }
-    }),
+    }
+  });
+
+  return {
+    game: enqueueUnitPlayedTriggers(
+      playedGame,
+      {
+        controllerPlayerId: input.actorPlayerId,
+        cardInstanceId: input.cardInstanceId
+      },
+      cardsByInstanceId,
+      input.now
+    ),
     payment,
     randomOperations: paidResult.randomOperations
   };
@@ -1984,15 +1985,6 @@ function resolveTopChainItem(
     );
   }
 
-  if (item.kind === "unit") {
-    resolvedGame = enqueueUnitPlayedTriggers(
-      resolvedGame,
-      item,
-      cardsByInstanceId,
-      now
-    );
-  }
-
   return resolvedGame;
 }
 
@@ -2003,8 +1995,6 @@ function resolveChainItem(
   now?: string
 ): Game {
   switch (item.effectId) {
-    case "unit:play-to-base":
-      return resolveUnitPlayToBase(game, item, cardsByInstanceId, now);
     case "spell:stupefy":
       return resolveStupefy(game, item, now);
     case "spell:back-to-back":
@@ -2052,48 +2042,6 @@ function resolveChainItem(
   }
 }
 
-function resolveUnitPlayToBase(
-  game: Game,
-  item: ChainItem,
-  cardsByInstanceId: CardLookup,
-  now?: string
-): Game {
-  if (!item.cardInstanceId) {
-    return game;
-  }
-
-  const controller = game.canonicalState.players[item.controllerPlayerId]!;
-  const card = requireCard(cardsByInstanceId, item.cardInstanceId);
-  const profile = getUnitPlayProfile(card);
-
-  if (!profile.supported) {
-    throw new Error(profile.reason);
-  }
-
-  return gameSchema.parse({
-    ...game,
-    updatedAt: now ?? new Date().toISOString(),
-    canonicalState: {
-      ...game.canonicalState,
-      cardStates: {
-        ...game.canonicalState.cardStates,
-        [item.cardInstanceId]: {
-          exhausted: !profile.entersReady
-        }
-      },
-      players: {
-        ...game.canonicalState.players,
-        [item.controllerPlayerId]: {
-          ...controller,
-          zones: {
-            ...controller.zones,
-            base: [...controller.zones.base, item.cardInstanceId]
-          }
-        }
-      }
-    }
-  });
-}
 
 function resolveStupefy(game: Game, item: ChainItem, now?: string): Game {
   const targetId = item.choices.targetCardInstanceIds[0];
@@ -2280,15 +2228,14 @@ function enqueueSpellPlayedTriggers(
 
 function enqueueUnitPlayedTriggers(
   game: Game,
-  item: ChainItem,
+  input: {
+    controllerPlayerId: string;
+    cardInstanceId: string;
+  },
   cardsByInstanceId: CardLookup,
   now?: string
 ): Game {
-  if (!item.cardInstanceId) {
-    return game;
-  }
-
-  const card = cardsByInstanceId[item.cardInstanceId];
+  const card = cardsByInstanceId[input.cardInstanceId];
 
   if (!card) {
     return game;
@@ -2301,16 +2248,16 @@ function enqueueUnitPlayedTriggers(
   }
 
   const trigger = createTriggerChainItem(game, {
-    controllerPlayerId: item.controllerPlayerId,
+    controllerPlayerId: input.controllerPlayerId,
     effectId: "trigger:lecturing-yordle-draw",
     label: card.name,
-    sourceCardInstanceId: item.cardInstanceId
+    sourceCardInstanceId: input.cardInstanceId
   });
   const chain = game.canonicalState.chain;
   const nextChain: ChainState = chain ?? {
     items: [],
     relevantPlayerIds: [...game.canonicalState.setup.playerIds],
-    priorityPlayerId: item.controllerPlayerId,
+    priorityPlayerId: input.controllerPlayerId,
     passedPlayerIds: []
   };
 
@@ -2322,7 +2269,7 @@ function enqueueUnitPlayedTriggers(
       chain: {
         ...nextChain,
         items: [...nextChain.items, trigger],
-        priorityPlayerId: item.controllerPlayerId,
+        priorityPlayerId: input.controllerPlayerId,
         passedPlayerIds: []
       }
     }
