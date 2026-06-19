@@ -112,7 +112,8 @@ export const pendingChoiceSchema = z.object({
   playerId: z.string().min(1),
   type: z.literal("orderTriggers"),
   prompt: z.string().min(1),
-  optionIds: z.array(z.string().min(1)).min(1)
+  optionIds: z.array(z.string().min(1)).min(1),
+  pendingChainItems: z.array(chainItemSchema).default([])
 });
 
 export const modifierSchema = z.object({
@@ -1611,17 +1612,14 @@ export function submitChoice(
   }
 
   const triggerItems = input.orderedIds.map((id) => {
-    const item = chain.items.find((candidate) => candidate.id === id);
+    const item = pendingChoice.pendingChainItems.find((candidate) => candidate.id === id);
 
     if (!item) {
-      throw new Error("Pending trigger was not found on the chain.");
+      throw new Error("Pending trigger was not found.");
     }
 
     return item;
   });
-  const nonTriggerItems = chain.items.filter(
-    (item) => !pendingChoice.optionIds.includes(item.id)
-  );
   const orderedGame = gameSchema.parse({
     ...game,
     updatedAt: input.now ?? new Date().toISOString(),
@@ -1630,7 +1628,7 @@ export function submitChoice(
       ...game.canonicalState,
       chain: {
         ...chain,
-        items: [...nonTriggerItems, ...triggerItems],
+        items: [...chain.items, ...triggerItems],
         priorityPlayerId: input.actorPlayerId,
         passedPlayerIds: []
       },
@@ -2202,7 +2200,7 @@ function enqueueSpellPlayedTriggers(
       ...game.canonicalState,
       chain: {
         ...nextChain,
-        items: [...nextChain.items, ...triggers],
+        items: triggers.length > 1 ? nextChain.items : [...nextChain.items, ...triggers],
         priorityPlayerId: controllerId,
         passedPlayerIds: []
       },
@@ -2213,7 +2211,8 @@ function enqueueSpellPlayedTriggers(
               playerId: controllerId,
               type: "orderTriggers",
               prompt: "Choose the order for triggered abilities.",
-              optionIds: triggers.map((trigger) => trigger.id)
+              optionIds: triggers.map((trigger) => trigger.id),
+              pendingChainItems: triggers
             }
           : game.canonicalState.pendingChoice
     }

@@ -25,6 +25,7 @@ type CardTileProps = Card & {
   focusablePreview?: boolean;
   isHighlighted?: boolean;
   isTransferHidden?: boolean;
+  preserveOrientation?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
   onHighlightPointerEnter?: () => void;
   onHighlightPointerLeave?: () => void;
@@ -51,6 +52,7 @@ export const CardTile: FC<CardTileProps> = ({
   onHighlightPointerLeave,
   onPrimaryAction,
   power,
+  preserveOrientation = false,
   publicCode,
   rulesText,
   setLabel,
@@ -168,9 +170,9 @@ export const CardTile: FC<CardTileProps> = ({
     >
       <motion.div
         animate={{
-          rotate: isExhausted ? 90 : 0,
-          scale: isExhausted ? 0.98 : 1,
-          y: isExhausted ? -2 : 0,
+          rotate: isExhausted && !preserveOrientation ? 90 : 0,
+          scale: isExhausted && !preserveOrientation ? 0.98 : 1,
+          y: isExhausted && !preserveOrientation ? -2 : 0,
         }}
         className="relative"
         initial={false}

@@ -151,7 +151,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       : "Waiting for turn";
   const pendingChoiceOptions =
     projection.pendingChoice?.optionIds.map((id) => {
-      const item = projection.chain?.items.find(
+      const item = projection.pendingChoice?.pendingChainItems.find(
         (candidate) => candidate.id === id,
       );
       const cardInstanceId = item?.cardInstanceId ?? item?.sourceCardInstanceId;
@@ -557,8 +557,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   return (
     <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
       <ScoreHeader opponent={board.opponent} player={board.player} />
-      <section className="flex flex-1">
-        <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px_64px] p-2">
+      <section className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] min-h-0 p-2 overflow-hidden">
           <PlayerBoard
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}

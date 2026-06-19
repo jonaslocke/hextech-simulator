@@ -12,9 +12,11 @@
 [x] when choosing targets at hover a target we should highlight the card as well, the cards selected keep selected until the spell goes into stack
 [x] Lux ability is able to be used even when the player has no priority, we need to acknowledge that ability have timming rules as spells do
 [x] Lux ability is a reaction and should be possible to add energy when owner has priority, right now its no possible to use it when there is a spell on chain
-[ ] chain items should wait for triggering order are choosen to only after that appears on the chain ![alt text](image-2.png)
-[ ] opponent trash looks strange when there is cards in trash![alt text](image.png)
-[ ] base units should wrap down when comes to a limit of width ![alt text](image-1.png)
+[x] chain items should wait for triggering order are choosen to only after that appears on the chain ![alt text](image-2.png)
+[x] opponent trash looks strange when there is cards in trash![alt text](image.png)
+[x] base units should wrap down when comes to a limit of width ![alt text](image-1.png)
 [ ] Chain events are reacting to the state of the card in battlefield, the units appears rotated on the chain ![alt text](image-3.png)
+[ ] Chain items need to be displayed on a vertical manner, the order of resolution of chain makes sense to be displayed in vertical sing is last in first out, this would give a cleaner indictator of in witch order spells/abilities resolve. ![alt text](image-4.png)
+[ ] chain items should have a visual indicator of ownership, I added seat colors indicators on the css file we could use those to add a border only to the left of the card in chain, the combination of player name background + that border could be a good indicator for that, I would like to add to the card preview/hover window the indicator of owner, that would help other places and experiences as well
 [ ] validate if on-play unit abilities should go into chain and exchange priorities
 [ ] validate if the rules applied to specific Lux deck cards will carry over to other cards

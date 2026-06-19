@@ -1,4 +1,13 @@
-import { ComponentProps, FC, MouseEvent } from "react";
+"use client";
+
+import {
+  ComponentProps,
+  FC,
+  MouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import cardBackImage from "../../../../assets/cardback.jpg";
 import { cn } from "@/shared/utils/cn";
 import { CardTile } from "./card-tile";
@@ -74,7 +83,7 @@ const BaseLine = ({
   return (
     <div
       className={cn(
-        "gap-2 grid",
+        "gap-2 grid min-h-0",
         hasChampionZone && "grid-cols-[130px_130px_minmax(0,1fr)_130px]",
         !hasChampionZone && "grid-cols-[130px_minmax(0,1fr)_130px]",
       )}
@@ -113,6 +122,7 @@ const BaseLine = ({
           cards={baseUnits}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          layout="wrap"
           onCardPrimaryAction={onBoardCardPrimaryAction}
           onCardPointerEnter={onBoardCardPointerEnter}
           onCardPointerLeave={onBoardCardPointerLeave}
@@ -158,7 +168,7 @@ const RunesLine = ({
   return (
     <div
       className={cn(
-        "gap-2 grid",
+        "gap-2 grid min-h-0",
         hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px_64px]",
         !hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px]",
       )}
@@ -376,17 +386,35 @@ function TrashZone({
 
   if (zone.cards.length > 0) {
     return (
-      <div className="flex items-center gap-2">
-        <ZoneCards
-          highlightedCardInstanceIds={highlightedCardInstanceIds}
-          hiddenCardInstanceIds={hiddenCardInstanceIds}
-          onClick={onClick}
-          showCount
-          zone={{
-            ...zone,
-            cards: latestCard ? [latestCard] : [],
-          }}
-        />
+      <div className="flex items-center justify-center gap-2 max-w-full">
+        {latestCard && (
+          <button
+            aria-label={`Open trash, ${zone.count} cards`}
+            className="relative shrink-0"
+            onClick={onClick}
+            title={`${zone.count} cards in trash`}
+            type="button"
+          >
+            <CardTile
+              enableHoverPreview
+              isHighlighted={
+                latestCard.instanceId
+                  ? highlightedCardInstanceIds?.has(latestCard.instanceId)
+                  : false
+              }
+              isTransferHidden={
+                latestCard.instanceId
+                  ? hiddenCardInstanceIds?.has(latestCard.instanceId)
+                  : false
+              }
+              showMight={false}
+              {...latestCard}
+            />
+            <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
+              {zone.count}
+            </span>
+          </button>
+        )}
         {handCount !== undefined && <HandCount value={handCount} />}
       </div>
     );
@@ -436,6 +464,7 @@ function CardList({
   onCardPointerEnter,
   onCardPointerLeave,
   onClick,
+  layout = "row",
   showMight = false,
 }: {
   cards: Card[];
@@ -450,8 +479,60 @@ function CardList({
   onCardPointerEnter?: (card: Card) => void;
   onCardPointerLeave?: (card: Card) => void;
   onClick?: () => void;
+  layout?: "row" | "wrap";
   showMight?: boolean;
 }) {
+  const wrapContainerRef = useRef<HTMLDivElement>(null);
+  const [hasWrappedRows, setHasWrappedRows] = useState(false);
+
+  useEffect(() => {
+    if (layout !== "wrap" || !wrapContainerRef.current) {
+      setHasWrappedRows(false);
+      return;
+    }
+
+    const container = wrapContainerRef.current;
+    let frameId = 0;
+
+    const updateWrapState = () => {
+      const cardElements = Array.from(container.children).filter(
+        (child) => child.tagName === "DIV",
+      );
+
+      if (cardElements.length < 2) {
+        setHasWrappedRows(false);
+        return;
+      }
+
+      const firstTop = cardElements[0].getBoundingClientRect().top;
+      const wrapped = cardElements.some(
+        (element) =>
+          Math.abs(element.getBoundingClientRect().top - firstTop) > 4,
+      );
+
+      setHasWrappedRows(wrapped);
+    };
+
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(updateWrapState);
+    };
+
+    scheduleUpdate();
+
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(container);
+
+    for (const child of Array.from(container.children)) {
+      resizeObserver.observe(child);
+    }
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
+  }, [cards.length, layout]);
+
   if (cards.length === 0) {
     return null;
   }
@@ -500,8 +581,22 @@ function CardList({
     </>
   );
 
-  if (!onClick && count === undefined) {
+  if (!onClick && count === undefined && layout === "row") {
     return content;
+  }
+
+  if (!onClick && layout === "wrap") {
+    return (
+      <div
+        className={cn(
+          "flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
+          hasWrappedRows ? "content-start" : "content-center",
+        )}
+        ref={wrapContainerRef}
+      >
+        {content}
+      </div>
+    );
   }
 
   if (!onClick) {

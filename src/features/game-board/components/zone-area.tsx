@@ -25,7 +25,7 @@ export const ZoneArea: FC<Props> = ({
     <div
       data-zone-animation-id={animationZoneId}
       className={cn(
-        "relative flex items-center gap-2 px-2 border rounded-md overflow-auto",
+        "relative flex items-center gap-2 min-h-0 px-2 border rounded-md overflow-auto",
         isCentered && "justify-center",
         isHightlighted ? "border-[#88F6F6]" : "border-white/15",
       )}

@@ -604,11 +604,23 @@ test("spell-cost triggers create a pending trigger-order choice after chain reso
   );
 
   assert.equal(withTriggers.canonicalState.pendingChoice?.type, "orderTriggers");
-  assert.equal(withTriggers.canonicalState.chain?.items.length, 3);
+  assert.equal(withTriggers.canonicalState.chain?.items.length, 0);
   assert.deepEqual(
-    projectGameForPlayer(withTriggers, "player-a", cardsByInstanceId).chain?.items.map(
+    withTriggers.canonicalState.pendingChoice?.pendingChainItems.map(
       (item) => item.sourceCardInstanceId
     ),
+    [
+      "player-a:legend",
+      "player-a:ravenbloom-student",
+      "player-a:lux-illuminated"
+    ]
+  );
+  assert.deepEqual(
+    projectGameForPlayer(
+      withTriggers,
+      "player-a",
+      cardsByInstanceId
+    ).pendingChoice?.pendingChainItems.map((item) => item.sourceCardInstanceId),
     [
       "player-a:legend",
       "player-a:ravenbloom-student",

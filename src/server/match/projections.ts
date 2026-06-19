@@ -54,7 +54,8 @@ export const projectedPendingChoiceSchema = z
     playerId: z.string().min(1),
     type: z.literal("orderTriggers"),
     prompt: z.string().min(1),
-    optionIds: z.array(z.string().min(1))
+    optionIds: z.array(z.string().min(1)),
+    pendingChainItems: z.array(projectedChainItemSchema).default([])
   })
   .nullable();
 
@@ -490,7 +491,22 @@ function projectPendingChoice(
     return null;
   }
 
-  return choice;
+  return {
+    id: choice.id,
+    playerId: choice.playerId,
+    type: choice.type,
+    prompt: choice.prompt,
+    optionIds: choice.optionIds,
+    pendingChainItems: choice.pendingChainItems.map((item) => ({
+      id: item.id,
+      controllerPlayerId: item.controllerPlayerId,
+      sourceCardInstanceId: item.sourceCardInstanceId,
+      cardInstanceId: item.cardInstanceId,
+      label: item.label,
+      kind: item.kind,
+      targetCardInstanceIds: item.choices.targetCardInstanceIds
+    }))
+  };
 }
 
 function projectLegalTargets(

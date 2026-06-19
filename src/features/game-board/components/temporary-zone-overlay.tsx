@@ -150,6 +150,7 @@ function ChainCards({
             enableZoneAnimation={false}
             enableHoverPreview
             key={entry.card.instanceId ?? `${entry.card.name}-${index}`}
+            preserveOrientation
             showMight={false}
             {...entry.card}
           />
