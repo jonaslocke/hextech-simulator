@@ -1489,10 +1489,6 @@ export function activateAbility(
     throw new Error("Action/Reaction play during showdown is not implemented.");
   }
 
-  if (game.canonicalState.chain !== null) {
-    throw new Error("Only Reaction spells are currently supported during chains.");
-  }
-
   if (game.canonicalState.pendingChoice !== null) {
     throw new Error("A pending choice must be completed before activating abilities.");
   }
@@ -1513,13 +1509,20 @@ export function activateAbility(
     throw new Error("Only Lux Crownguard's activated ability is supported.");
   }
 
+  if (
+    !canActivateLuxCrownguardSpellEnergyAbility(
+      game,
+      input.actorPlayerId,
+      input.sourceCardInstanceId,
+      cardsByInstanceId
+    )
+  ) {
+    throw new Error("Ability is not legal at the current timing.");
+  }
+
   const currentState = game.canonicalState.cardStates[input.sourceCardInstanceId] ?? {
     exhausted: false
   };
-
-  if (currentState.exhausted) {
-    throw new Error("Exhausted cards cannot pay exhaust ability costs.");
-  }
 
   return gameSchema.parse({
     ...game,
@@ -1548,6 +1551,31 @@ export function activateAbility(
       }
     }
   });
+}
+
+export function getAvailableActivatedAbilityIdsForPlayer(
+  game: Game,
+  playerId: string,
+  cardsByInstanceId: CardLookup
+): Record<string, string[]> {
+  const player = game.canonicalState.players[playerId];
+
+  if (!player || game.status !== "in_progress") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    player.zones.base.flatMap((cardInstanceId) =>
+      canActivateLuxCrownguardSpellEnergyAbility(
+        game,
+        playerId,
+        cardInstanceId,
+        cardsByInstanceId
+      )
+        ? [[cardInstanceId, ["lux-crownguard-add-spell-energy"]]]
+        : []
+    )
+  );
 }
 
 export function submitChoice(
@@ -2245,6 +2273,60 @@ function assertCanPlaySpell(game: Game, actorPlayerId: string, card: Card) {
   }
 }
 
+function canActivateLuxCrownguardSpellEnergyAbility(
+  game: Game,
+  actorPlayerId: string,
+  sourceCardInstanceId: string,
+  cardsByInstanceId: CardLookup
+): boolean {
+  const player = game.canonicalState.players[actorPlayerId];
+
+  if (!player?.zones.base.includes(sourceCardInstanceId)) {
+    return false;
+  }
+
+  const card = cardsByInstanceId[sourceCardInstanceId];
+
+  if (!card || card.name !== "Lux, Crownguard") {
+    return false;
+  }
+
+  if (!canActivateAbilityAtCurrentTiming(game, actorPlayerId, card)) {
+    return false;
+  }
+
+  const currentState = game.canonicalState.cardStates[sourceCardInstanceId] ?? {
+    exhausted: false
+  };
+
+  return !currentState.exhausted;
+}
+
+function canActivateAbilityAtCurrentTiming(
+  game: Game,
+  actorPlayerId: string,
+  sourceCard: Card
+): boolean {
+  if (game.canonicalState.showdown !== null || game.canonicalState.pendingChoice) {
+    return false;
+  }
+
+  const turn = game.canonicalState.turn;
+
+  if (!turn || turn.phase !== "action") {
+    return false;
+  }
+
+  if (game.canonicalState.chain === null) {
+    return turn.activePlayerId === actorPlayerId;
+  }
+
+  return (
+    game.canonicalState.chain.priorityPlayerId === actorPlayerId &&
+    abilityTiming(sourceCard) === "reaction"
+  );
+}
+
 function canPlaySpellAtCurrentTiming(
   game: Game,
   actorPlayerId: string,
@@ -2271,11 +2353,19 @@ function canPlaySpellAtCurrentTiming(
 }
 
 function spellTiming(card: Card): "action" | "reaction" | "normal" {
-  if (card.text.plain.includes("[Reaction]")) {
+  return timingFromText(card.text.plain);
+}
+
+function abilityTiming(card: Card): "action" | "reaction" | "normal" {
+  return timingFromText(card.text.plain);
+}
+
+function timingFromText(text: string): "action" | "reaction" | "normal" {
+  if (text.includes("[Reaction]")) {
     return "reaction";
   }
 
-  if (card.text.plain.includes("[Action]")) {
+  if (text.includes("[Action]")) {
     return "action";
   }
 

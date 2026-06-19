@@ -22,6 +22,16 @@ test("Lux Crownguard ability adds spell-only Energy that pays spells before gene
     playerAHand: ["player-a:final-spark"],
     playerBBase: ["player-b:target-unit"]
   });
+  assert.deepEqual(
+    projectGameForPlayer(
+      game,
+      "player-a",
+      cardsByInstanceId
+    ).players["player-a"]?.availableAbilityIdsByCard,
+    {
+      "player-a:lux-crownguard": ["lux-crownguard-add-spell-energy"]
+    }
+  );
 
   const withSpellEnergy = activateAbility(
     game,
@@ -74,6 +84,115 @@ test("Lux Crownguard ability adds spell-only Energy that pays spells before gene
   assert.equal(
     result.game.canonicalState.players["player-a"]?.runePool.conditionalEnergy,
     undefined
+  );
+});
+
+test("Lux Crownguard ability rejects when the owner does not have priority", () => {
+  const baseGame = createLuxGame({
+    playerABase: ["player-a:lux-crownguard"]
+  });
+  const game = gameSchema.parse({
+    ...baseGame,
+    canonicalState: {
+      ...baseGame.canonicalState,
+      turn: {
+        ...baseGame.canonicalState.turn!,
+        activePlayerId: "player-b"
+      }
+    }
+  });
+  assert.deepEqual(
+    projectGameForPlayer(
+      game,
+      "player-a",
+      cardsByInstanceId
+    ).players["player-a"]?.availableAbilityIdsByCard,
+    {}
+  );
+
+  assert.throws(
+    () =>
+      activateAbility(
+        game,
+        {
+          actorPlayerId: "player-a",
+          abilityId: "lux-crownguard-add-spell-energy",
+          sourceCardInstanceId: "player-a:lux-crownguard"
+        },
+        cardsByInstanceId
+      ),
+    /Ability is not legal at the current timing/
+  );
+});
+
+test("Lux Crownguard reaction ability can be activated with chain priority", () => {
+  const game = withChain(
+    createLuxGame({
+      playerABase: ["player-a:lux-crownguard"]
+    }),
+    "player-a"
+  );
+  assert.deepEqual(
+    projectGameForPlayer(
+      game,
+      "player-a",
+      cardsByInstanceId
+    ).players["player-a"]?.availableAbilityIdsByCard,
+    {
+      "player-a:lux-crownguard": ["lux-crownguard-add-spell-energy"]
+    }
+  );
+
+  const withSpellEnergy = activateAbility(
+    game,
+    {
+      actorPlayerId: "player-a",
+      abilityId: "lux-crownguard-add-spell-energy",
+      sourceCardInstanceId: "player-a:lux-crownguard"
+    },
+    cardsByInstanceId
+  );
+
+  assert.deepEqual(
+    withSpellEnergy.canonicalState.players["player-a"]?.runePool.conditionalEnergy,
+    {
+      "lux-crownguard-spell-energy": {
+        amount: 2,
+        restriction: "spell"
+      }
+    }
+  );
+  assert.equal(withSpellEnergy.canonicalState.chain?.priorityPlayerId, "player-a");
+});
+
+test("Lux Crownguard reaction ability rejects without chain priority", () => {
+  const game = withChain(
+    createLuxGame({
+      playerABase: ["player-a:lux-crownguard"]
+    }),
+    "player-b"
+  );
+  assert.deepEqual(
+    projectGameForPlayer(
+      game,
+      "player-a",
+      cardsByInstanceId
+    ).players["player-a"]?.availableAbilityIdsByCard,
+    {}
+  );
+
+  assert.throws(
+    () =>
+      activateAbility(
+        game,
+        {
+          actorPlayerId: "player-a",
+          abilityId: "lux-crownguard-add-spell-energy",
+          sourceCardInstanceId: "player-a:lux-crownguard"
+        },
+        cardsByInstanceId
+      ),
+    /Ability is not legal at the current timing/
   );
 });
 
@@ -524,6 +643,36 @@ function resolveChain(game: Game): Game {
   return passPriority(firstPass, {
     actorPlayerId: "player-b",
     cardsByInstanceId
+  });
+}
+
+function withChain(game: Game, priorityPlayerId: string): Game {
+  return gameSchema.parse({
+    ...game,
+    canonicalState: {
+      ...game.canonicalState,
+      chain: {
+        items: [
+          {
+            id: "chain:item:1",
+            controllerPlayerId: "player-a",
+            sourceCardInstanceId: null,
+            cardInstanceId: "player-a:stupefy",
+            label: "Stupefy",
+            kind: "spell",
+            effectId: "spell:stupefy",
+            choices: {
+              targetCardInstanceIds: ["player-b:target-unit"],
+              targetBattlefieldIds: [],
+              targetPlayerIds: []
+            }
+          }
+        ],
+        relevantPlayerIds: ["player-a", "player-b"],
+        priorityPlayerId,
+        passedPlayerIds: []
+      }
+    }
   });
 }
 

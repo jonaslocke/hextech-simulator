@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  getAvailableActivatedAbilityIdsForPlayer,
   getAvailablePaymentModesForPlayer,
   type BattlefieldState,
   type CardLookup,
@@ -78,6 +79,10 @@ export const projectedPlayerStateSchema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
   runePool: projectedRunePoolSchema,
+  availableAbilityIdsByCard: z.record(
+    z.string().min(1),
+    z.array(z.string().min(1))
+  ),
   availablePaymentModes: z.record(
     z.string().min(1),
     z.array(paymentModeSchema)
@@ -220,6 +225,14 @@ export function projectGameForPlayer(
             ...player.runePool,
             conditionalEnergy: player.runePool.conditionalEnergy ?? {}
           },
+          availableAbilityIdsByCard:
+            playerId === viewerPlayerId && cardsByInstanceId
+              ? getAvailableActivatedAbilityIdsForPlayer(
+                  game,
+                  playerId,
+                  cardsByInstanceId
+                )
+              : {},
           availablePaymentModes:
             playerId === viewerPlayerId && cardsByInstanceId
               ? getAvailablePaymentModesForPlayer(game, playerId, cardsByInstanceId)

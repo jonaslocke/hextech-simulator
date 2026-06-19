@@ -382,13 +382,20 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
+    const abilityId = "lux-crownguard-add-spell-energy";
+    const availableAbilityIds =
+      viewerState?.availableAbilityIdsByCard[card.instanceId] ?? [];
+    const canActivate = availableAbilityIds.includes(abilityId);
     openCardActionMenu(event, [
       {
-        disabled: card.isExhausted,
-        label: card.isExhausted ? "Add spell Energy (exhausted)" : "Add spell Energy",
+        disabled: !canActivate,
+        label: luxAbilityMenuLabel({
+          canActivate,
+          isExhausted: card.isExhausted ?? false,
+        }),
         onSelect: () =>
           onActivateAbility?.({
-            abilityId: "lux-crownguard-add-spell-energy",
+            abilityId,
             sourceCardInstanceId: card.instanceId!,
           }),
       },
@@ -882,6 +889,24 @@ function TargetSelectionPrompt({
       </button>
     </div>
   );
+}
+
+function luxAbilityMenuLabel({
+  canActivate,
+  isExhausted,
+}: {
+  canActivate: boolean;
+  isExhausted: boolean;
+}) {
+  if (canActivate) {
+    return "Add spell Energy";
+  }
+
+  if (isExhausted) {
+    return "Add spell Energy (exhausted)";
+  }
+
+  return "Add spell Energy (no priority)";
 }
 
 function RunePoolBar({

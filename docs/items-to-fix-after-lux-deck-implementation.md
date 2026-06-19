@@ -10,9 +10,11 @@
 [x] we need to validate the order of start of the game setup, from my pov the first battlefield choice is done before any player knowing who starts the game, currently the chooser player knows that he is the one choosing, with that, on the BF choice we need to make players aware of who starts
 [x] after a player locks a battlefield or waits for the starting-player chooser, show a setup waiting reason instead of an empty board
 [x] when choosing targets at hover a target we should highlight the card as well, the cards selected keep selected until the spell goes into stack
-[ ] Lux ability is able to be used even when the player has no priority, we need to acknowledge that ability have timming rules as spells do
-[ ] Lux ability is a reaction and should be possible to add energy when owner has priority, right now its no possible to use it when there is a spell on chain
+[x] Lux ability is able to be used even when the player has no priority, we need to acknowledge that ability have timming rules as spells do
+[x] Lux ability is a reaction and should be possible to add energy when owner has priority, right now its no possible to use it when there is a spell on chain
 [ ] chain items should wait for triggering order are choosen to only after that appears on the chain ![alt text](image-2.png)
 [ ] opponent trash looks strange when there is cards in trash![alt text](image.png)
 [ ] base units should wrap down when comes to a limit of width ![alt text](image-1.png)
 [ ] Chain events are reacting to the state of the card in battlefield, the units appears rotated on the chain ![alt text](image-3.png)
+[ ] validate if on-play unit abilities should go into chain and exchange priorities
+[ ] validate if the rules applied to specific Lux deck cards will carry over to other cards

@@ -7,12 +7,40 @@
   --font-title: "Sora", sans-serif;
   --font-body: "Open Sans", sans-serif;
   --font-mono: "Space Mono", monospace;
+
+  --background: #020617;
+
+  --player-accent: #2563eb;
+  --opponent-accent: #e11d48;
+
+  --player-accent-soft: rgba(37, 99, 235, 0.16);
+  --opponent-accent-soft: rgba(225, 29, 72, 0.16);
+
+  --player-accent-border: #60a5fa;
+  --opponent-accent-border: #fb7185;
+
+  --player-label-foreground: #ffffff;
+  --opponent-label-foreground: #ffffff;
 }
 
 @theme inline {
   --font-title: var(--font-title);
   --font-body: var(--font-body);
   --font-mono: var(--font-mono);
+
+  --color-background: var(--background);
+
+  --color-player-accent: var(--player-accent);
+  --color-opponent-accent: var(--opponent-accent);
+
+  --color-player-accent-soft: var(--player-accent-soft);
+  --color-opponent-accent-soft: var(--opponent-accent-soft);
+
+  --color-player-accent-border: var(--player-accent-border);
+  --color-opponent-accent-border: var(--opponent-accent-border);
+
+  --color-player-label-foreground: var(--player-label-foreground);
+  --color-opponent-label-foreground: var(--opponent-label-foreground);
 }
 
 * {
@@ -21,7 +49,7 @@
 
 body {
   margin: 0;
-  background: #020617;
+  background: var(--background);
   font-family: var(--font-body);
 }
 
