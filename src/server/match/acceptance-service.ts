@@ -169,6 +169,12 @@ export async function runAnnieLuxFirstShowdownAcceptance(
       destination: "base"
     }
   }, cardsByInstanceId);
+  await submitIntent(repositories, matchId, gameId, luxToken, {
+    type: "game.pass"
+  }, cardsByInstanceId);
+  await submitIntent(repositories, matchId, gameId, annieToken, {
+    type: "game.pass"
+  }, cardsByInstanceId);
 
   await submitIntent(repositories, matchId, gameId, luxToken, {
     type: "game.endTurn"

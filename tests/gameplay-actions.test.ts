@@ -267,10 +267,20 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
     "a-rune-base-1",
+    "a-rune-base-2"
+  ]);
+  assert.equal(result.game.canonicalState.chain?.items[0]?.kind, "unit");
+  assert.equal(result.game.canonicalState.chain?.items[0]?.cardInstanceId, "a-unit-hand-1");
+
+  const resolved = resolveChain(result.game);
+
+  assert.equal(resolved.canonicalState.chain, null);
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-1",
     "a-rune-base-2",
     "a-unit-hand-1"
   ]);
-  assert.deepEqual(result.game.canonicalState.cardStates["a-unit-hand-1"], {
+  assert.deepEqual(resolved.canonicalState.cardStates["a-unit-hand-1"], {
     exhausted: true
   });
 });
@@ -302,11 +312,12 @@ test("playCard supports known Unit enter-ready behavior", () => {
     },
     cardLookup
   );
+  const resolved = resolveChain(result.game);
 
-  assert.deepEqual(result.game.canonicalState.cardStates["a-vanguard-attendant"], {
+  assert.deepEqual(resolved.canonicalState.cardStates["a-vanguard-attendant"], {
     exhausted: false
   });
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.base, [
     "a-rune-base-1",
     "a-rune-base-2",
     "a-vanguard-attendant"
@@ -342,13 +353,40 @@ test("playCard resolves known deterministic draw-on-play Unit behavior", () => {
     cardLookup
   );
 
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, [
-    "a-main-1"
-  ]);
+  assert.equal(result.game.canonicalState.chain?.items[0]?.kind, "unit");
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.mainDeck, [
+    "a-main-1",
     "a-main-2"
   ]);
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+
+  const withTrigger = resolveChain(result.game);
+
+  assert.equal(
+    withTrigger.canonicalState.chain?.items[0]?.effectId,
+    "trigger:lecturing-yordle-draw"
+  );
+  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.hand, []);
+  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.mainDeck, [
+    "a-main-1",
+    "a-main-2"
+  ]);
+  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.base, [
+    "a-rune-base-1",
+    "a-rune-base-2",
+    "a-lecturing-yordle"
+  ]);
+
+  const resolved = resolveChain(withTrigger);
+
+  assert.equal(resolved.canonicalState.chain, null);
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.hand, [
+    "a-main-1"
+  ]);
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.mainDeck, [
+    "a-main-2"
+  ]);
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.base, [
     "a-rune-base-1",
     "a-rune-base-2",
     "a-lecturing-yordle"
@@ -397,7 +435,9 @@ test("playCard can recycle exhausted runes for Power", () => {
     ),
     true
   );
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+  const resolved = resolveChain(result.game);
+
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.base, [
     "a-power-two-unit-hand"
   ]);
 });
@@ -540,7 +580,9 @@ test("playCard recycles runes for Power using card metadata domain order", () =>
       producedDomain: "Calm"
     }
   ]);
-  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
+  const resolved = resolveChain(result.game);
+
+  assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.base, [
     "a-chaos-rune-base",
     "a-multi-domain-unit-hand"
   ]);
@@ -1208,6 +1250,18 @@ function createInProgressGameWithRunes(): Game {
         }
       }
     }
+  });
+}
+
+function resolveChain(game: Game): Game {
+  const firstPass = passPriority(game, {
+    actorPlayerId: "player-a",
+    cardsByInstanceId: cardLookup
+  });
+
+  return passPriority(firstPass, {
+    actorPlayerId: "player-b",
+    cardsByInstanceId: cardLookup
   });
 }
 

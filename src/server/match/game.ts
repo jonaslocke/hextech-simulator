@@ -1215,35 +1215,21 @@ export function playCard(
   );
   const paidGame = paidResult.game;
   const paidPlayer = paidGame.canonicalState.players[input.actorPlayerId]!;
-  let zones =
-    sourceZone === "hand"
-      ? {
-          ...paidPlayer.zones,
-          hand: paidPlayer.zones.hand.filter(
-            (cardInstanceId) => cardInstanceId !== input.cardInstanceId
-          ),
-          base: [...paidPlayer.zones.base, input.cardInstanceId]
-        }
-      : {
-          ...paidPlayer.zones,
-          champion: null,
-          base: [...paidPlayer.zones.base, input.cardInstanceId]
-        };
-
-  if (profile.onPlay?.type === "draw") {
-    if (zones.mainDeck.length < profile.onPlay.count) {
-      throw new Error("Burn Out is not implemented for empty Main Deck draws.");
-    }
-
-    zones = {
-      ...zones,
-      mainDeck: zones.mainDeck.slice(profile.onPlay.count),
-      hand: [
-        ...zones.hand,
-        ...zones.mainDeck.slice(0, profile.onPlay.count)
-      ]
-    };
-  }
+  const chainItem: ChainItem = {
+    id: `${input.cardInstanceId}:chain:${paidGame.stateVersion + 1}`,
+    controllerPlayerId: input.actorPlayerId,
+    sourceCardInstanceId: input.cardInstanceId,
+    cardInstanceId: input.cardInstanceId,
+    label: card.name,
+    kind: "unit",
+    effectId: "unit:play-to-base",
+    choices: {
+      targetCardInstanceIds: [],
+      targetBattlefieldIds: [],
+      targetPlayerIds: []
+    },
+    payment
+  };
 
   return {
     game: gameSchema.parse({
@@ -1252,12 +1238,7 @@ export function playCard(
       stateVersion: game.stateVersion + 1,
       canonicalState: {
         ...paidGame.canonicalState,
-        cardStates: {
-          ...paidGame.canonicalState.cardStates,
-          [input.cardInstanceId]: {
-            exhausted: !profile.entersReady
-          }
-        },
+        chain: addChainItem(paidGame, chainItem),
         turn: {
           ...paidGame.canonicalState.turn!,
           passedPlayerIds: []
@@ -1266,7 +1247,18 @@ export function playCard(
           ...paidGame.canonicalState.players,
           [input.actorPlayerId]: {
             ...paidPlayer,
-            zones
+            zones:
+              sourceZone === "hand"
+                ? {
+                    ...paidPlayer.zones,
+                    hand: paidPlayer.zones.hand.filter(
+                      (cardInstanceId) => cardInstanceId !== input.cardInstanceId
+                    )
+                  }
+                : {
+                    ...paidPlayer.zones,
+                    champion: null
+                  }
           }
         }
       }
@@ -1960,7 +1952,7 @@ function resolveTopChainItem(
   }
 
   const item = chain.items[chain.items.length - 1]!;
-  let resolvedGame = resolveChainItem(game, item, now);
+  let resolvedGame = resolveChainItem(game, item, cardsByInstanceId, now);
   const remainingItems = chain.items.slice(0, -1);
 
   resolvedGame = gameSchema.parse({
@@ -1992,11 +1984,27 @@ function resolveTopChainItem(
     );
   }
 
+  if (item.kind === "unit") {
+    resolvedGame = enqueueUnitPlayedTriggers(
+      resolvedGame,
+      item,
+      cardsByInstanceId,
+      now
+    );
+  }
+
   return resolvedGame;
 }
 
-function resolveChainItem(game: Game, item: ChainItem, now?: string): Game {
+function resolveChainItem(
+  game: Game,
+  item: ChainItem,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
   switch (item.effectId) {
+    case "unit:play-to-base":
+      return resolveUnitPlayToBase(game, item, cardsByInstanceId, now);
     case "spell:stupefy":
       return resolveStupefy(game, item, now);
     case "spell:back-to-back":
@@ -2033,9 +2041,58 @@ function resolveChainItem(game: Game, item: ChainItem, now?: string): Game {
         minimum: null,
         now
       });
+    case "trigger:lecturing-yordle-draw":
+      return drawCards(game, {
+        actorPlayerId: item.controllerPlayerId,
+        count: 1,
+        now
+      });
     default:
       throw new Error(`Chain effect is not implemented: ${item.effectId}`);
   }
+}
+
+function resolveUnitPlayToBase(
+  game: Game,
+  item: ChainItem,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  if (!item.cardInstanceId) {
+    return game;
+  }
+
+  const controller = game.canonicalState.players[item.controllerPlayerId]!;
+  const card = requireCard(cardsByInstanceId, item.cardInstanceId);
+  const profile = getUnitPlayProfile(card);
+
+  if (!profile.supported) {
+    throw new Error(profile.reason);
+  }
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      cardStates: {
+        ...game.canonicalState.cardStates,
+        [item.cardInstanceId]: {
+          exhausted: !profile.entersReady
+        }
+      },
+      players: {
+        ...game.canonicalState.players,
+        [item.controllerPlayerId]: {
+          ...controller,
+          zones: {
+            ...controller.zones,
+            base: [...controller.zones.base, item.cardInstanceId]
+          }
+        }
+      }
+    }
+  });
 }
 
 function resolveStupefy(game: Game, item: ChainItem, now?: string): Game {
@@ -2219,6 +2276,57 @@ function enqueueSpellPlayedTriggers(
   });
 
   return withTriggers;
+}
+
+function enqueueUnitPlayedTriggers(
+  game: Game,
+  item: ChainItem,
+  cardsByInstanceId: CardLookup,
+  now?: string
+): Game {
+  if (!item.cardInstanceId) {
+    return game;
+  }
+
+  const card = cardsByInstanceId[item.cardInstanceId];
+
+  if (!card) {
+    return game;
+  }
+
+  const profile = getUnitPlayProfile(card);
+
+  if (!profile.supported || profile.onPlay?.type !== "draw") {
+    return game;
+  }
+
+  const trigger = createTriggerChainItem(game, {
+    controllerPlayerId: item.controllerPlayerId,
+    effectId: "trigger:lecturing-yordle-draw",
+    label: card.name,
+    sourceCardInstanceId: item.cardInstanceId
+  });
+  const chain = game.canonicalState.chain;
+  const nextChain: ChainState = chain ?? {
+    items: [],
+    relevantPlayerIds: [...game.canonicalState.setup.playerIds],
+    priorityPlayerId: item.controllerPlayerId,
+    passedPlayerIds: []
+  };
+
+  return gameSchema.parse({
+    ...game,
+    updatedAt: now ?? new Date().toISOString(),
+    canonicalState: {
+      ...game.canonicalState,
+      chain: {
+        ...nextChain,
+        items: [...nextChain.items, trigger],
+        priorityPlayerId: item.controllerPlayerId,
+        passedPlayerIds: []
+      }
+    }
+  });
 }
 
 function createTriggerChainItem(

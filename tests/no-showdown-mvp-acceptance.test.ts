@@ -79,7 +79,7 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
     created,
     created.players.player2.playerToken
   );
-  const afterPlay = await submitIntent(
+  await submitIntent(
     repositories,
     created,
     created.players.player2.playerToken,
@@ -90,6 +90,17 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
         selectedModeId: "regular",
         destination: "base"
       }
+    }
+  );
+  await submitIntent(repositories, created, created.players.player2.playerToken, {
+    type: "game.pass"
+  });
+  const afterPlay = await submitIntent(
+    repositories,
+    created,
+    created.players.player1.playerToken,
+    {
+      type: "game.pass"
     }
   );
   const events = await repositories.gameEvents.findByGameId(created.game.id);
