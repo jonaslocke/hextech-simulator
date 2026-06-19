@@ -267,10 +267,10 @@ test("playCard automatically uses pool and ready runes to pay Energy", () => {
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
     "a-rune-base-1",
-    "a-rune-base-2"
+    "a-rune-base-2",
+    "a-unit-hand-1"
   ]);
-  assert.equal(result.game.canonicalState.chain?.items[0]?.kind, "unit");
-  assert.equal(result.game.canonicalState.chain?.items[0]?.cardInstanceId, "a-unit-hand-1");
+  assert.equal(result.game.canonicalState.chain, null);
 
   const resolved = resolveChain(result.game);
 
@@ -353,31 +353,23 @@ test("playCard resolves known deterministic draw-on-play Unit behavior", () => {
     cardLookup
   );
 
-  assert.equal(result.game.canonicalState.chain?.items[0]?.kind, "unit");
+  assert.equal(result.game.canonicalState.chain?.items[0]?.kind, "trigger");
+  assert.equal(
+    result.game.canonicalState.chain?.items[0]?.effectId,
+    "trigger:lecturing-yordle-draw"
+  );
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.hand, []);
   assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.mainDeck, [
     "a-main-1",
     "a-main-2"
   ]);
-
-  const withTrigger = resolveChain(result.game);
-
-  assert.equal(
-    withTrigger.canonicalState.chain?.items[0]?.effectId,
-    "trigger:lecturing-yordle-draw"
-  );
-  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.hand, []);
-  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.mainDeck, [
-    "a-main-1",
-    "a-main-2"
-  ]);
-  assert.deepEqual(withTrigger.canonicalState.players["player-a"]?.zones.base, [
+  assert.deepEqual(result.game.canonicalState.players["player-a"]?.zones.base, [
     "a-rune-base-1",
     "a-rune-base-2",
     "a-lecturing-yordle"
   ]);
 
-  const resolved = resolveChain(withTrigger);
+  const resolved = resolveChain(result.game);
 
   assert.equal(resolved.canonicalState.chain, null);
   assert.deepEqual(resolved.canonicalState.players["player-a"]?.zones.hand, [
