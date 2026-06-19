@@ -2,6 +2,7 @@
 
 import type { GameLogEntry } from "@/server/events";
 import { X } from "lucide-react";
+import { cn } from "@/shared/utils/cn";
 import { Card, ChainCardEntry, TemporaryZone, ZoneData } from "../types";
 import { BoardSlot } from "./board-slot";
 import { CardTile } from "./card-tile";
@@ -129,10 +130,18 @@ function ChainCards({
     return <EmptyState label={emptyLabel} />;
   }
 
+  const resolutionOrder = [...entries].reverse();
+
   return (
-    <div className="flex gap-2 overflow-auto">
-      {entries.map((entry, index) => (
+    <div className="grid gap-2 max-h-[50vh] overflow-auto pr-1">
+      {resolutionOrder.map((entry, index) => (
         <div
+          className={cn(
+            "grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded border border-white/10 bg-black/20 p-2 border-l-4",
+            entry.controllerSeat === "player"
+              ? "border-l-player-accent-border"
+              : "border-l-opponent-accent-border",
+          )}
           key={entry.chainItemId}
           onPointerEnter={() =>
             onItemPointerEnter?.(
@@ -150,10 +159,30 @@ function ChainCards({
             enableZoneAnimation={false}
             enableHoverPreview
             key={entry.card.instanceId ?? `${entry.card.name}-${index}`}
+            ownerLabel={entry.controllerName}
+            ownerSeat={entry.controllerSeat}
             preserveOrientation
             showMight={false}
             {...entry.card}
           />
+          <div className="min-w-0 text-xs text-slate-300">
+            <div
+              className={cn(
+                "mb-1 inline-flex rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white",
+                entry.controllerSeat === "player"
+                  ? "bg-player-accent"
+                  : "bg-opponent-accent",
+              )}
+            >
+              {entry.controllerName}
+            </div>
+            <div className="font-semibold text-slate-100">
+              {entry.card.name}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {index === 0 ? "Resolves next" : `Resolves ${index + 1}`}
+            </div>
+          </div>
         </div>
       ))}
     </div>

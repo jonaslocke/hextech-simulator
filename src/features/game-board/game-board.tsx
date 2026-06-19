@@ -93,39 +93,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
-  const chainCards: ChainCardEntry[] = (projection.chain?.items ?? []).flatMap((item) => {
-    const displayCardInstanceId = item.cardInstanceId ?? item.sourceCardInstanceId;
-
-    if (displayCardInstanceId) {
-      const cards = buildCard(
-        displayCardInstanceId,
-        cardsByInstanceId,
-        projection.cardStates,
-      );
-
-      if (cards.length > 0) {
-        return cards.map((card) => ({
-          card,
-          chainItemId: item.id,
-          sourceCardInstanceId: item.sourceCardInstanceId,
-          targetCardInstanceIds: item.targetCardInstanceIds,
-        }));
-      }
-    }
-
-    return [
-      {
-        card: {
-          name: item.label,
-          img: cardBackImage.src,
-          type: undefined,
-        } satisfies Card,
-        chainItemId: item.id,
-        sourceCardInstanceId: item.sourceCardInstanceId,
-        targetCardInstanceIds: item.targetCardInstanceIds,
-      },
-    ];
-  });
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
   const canViewerPassChain =
     isChainLockedOpen &&
@@ -171,6 +138,60 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const chainControllerDetails = (controllerPlayerId: string) => {
+    if (controllerPlayerId === board.player.playerId) {
+      return {
+        controllerName: board.player.name,
+        controllerSeat: "player" as const,
+      };
+    }
+
+    return {
+      controllerName: board.opponent.name,
+      controllerSeat: "opponent" as const,
+    };
+  };
+  const chainCards: ChainCardEntry[] = (projection.chain?.items ?? []).flatMap(
+    (item) => {
+      const displayCardInstanceId =
+        item.cardInstanceId ?? item.sourceCardInstanceId;
+      const controllerDetails = chainControllerDetails(item.controllerPlayerId);
+
+      if (displayCardInstanceId) {
+        const cards = buildCard(
+          displayCardInstanceId,
+          cardsByInstanceId,
+          projection.cardStates,
+        );
+
+        if (cards.length > 0) {
+          return cards.map((card) => ({
+            card,
+            chainItemId: item.id,
+            controllerPlayerId: item.controllerPlayerId,
+            ...controllerDetails,
+            sourceCardInstanceId: item.sourceCardInstanceId,
+            targetCardInstanceIds: item.targetCardInstanceIds,
+          }));
+        }
+      }
+
+      return [
+        {
+          card: {
+            name: item.label,
+            img: cardBackImage.src,
+            type: undefined,
+          } satisfies Card,
+          chainItemId: item.id,
+          controllerPlayerId: item.controllerPlayerId,
+          ...controllerDetails,
+          sourceCardInstanceId: item.sourceCardInstanceId,
+          targetCardInstanceIds: item.targetCardInstanceIds,
+        },
+      ];
+    },
+  );
   const viewerState = projection.players[projection.viewerPlayerId];
   const legalTargetIds =
     targetSelection && viewerState

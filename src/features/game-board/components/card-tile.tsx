@@ -30,6 +30,8 @@ type CardTileProps = Card & {
   onHighlightPointerEnter?: () => void;
   onHighlightPointerLeave?: () => void;
   onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
+  ownerLabel?: string;
+  ownerSeat?: "player" | "opponent";
   showMight?: boolean;
 };
 
@@ -51,6 +53,8 @@ export const CardTile: FC<CardTileProps> = ({
   onHighlightPointerEnter,
   onHighlightPointerLeave,
   onPrimaryAction,
+  ownerLabel,
+  ownerSeat,
   power,
   preserveOrientation = false,
   publicCode,
@@ -226,6 +230,8 @@ export const CardTile: FC<CardTileProps> = ({
             energy={energy}
             might={might}
             name={name}
+            ownerLabel={ownerLabel}
+            ownerSeat={ownerSeat}
             power={power}
             publicCode={publicCode}
             rulesText={rulesText}
@@ -244,6 +250,8 @@ function CardSummary({
   energy,
   might,
   name,
+  ownerLabel,
+  ownerSeat,
   power,
   publicCode,
   rulesText,
@@ -255,6 +263,8 @@ function CardSummary({
   energy?: number;
   might?: number;
   name: string;
+  ownerLabel?: string;
+  ownerSeat?: "player" | "opponent";
   power?: number;
   publicCode?: string;
   rulesText?: string;
@@ -269,7 +279,21 @@ function CardSummary({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-auto pr-1">
       <div>
-        <div className="text-base font-semibold leading-tight">{name}</div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-base font-semibold leading-tight">{name}</div>
+          {ownerLabel && ownerSeat && (
+            <span
+              className={cn(
+                "shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white",
+                ownerSeat === "player"
+                  ? "bg-player-accent"
+                  : "bg-opponent-accent",
+              )}
+            >
+              {ownerLabel}
+            </span>
+          )}
+        </div>
         {typeLine && (
           <div className="mt-1 text-xs uppercase tracking-wide text-slate-400">
             {typeLine}

@@ -16,8 +16,8 @@
 [x] opponent trash looks strange when there is cards in trash![alt text](image.png)
 [x] base units should wrap down when comes to a limit of width ![alt text](image-1.png)
 [x] Chain events are reacting to the state of the card in battlefield, the units appears rotated on the chain ![alt text](image-3.png)
-[ ] Chain items need to be displayed on a vertical manner, the order of resolution of chain makes sense to be displayed in vertical sing is last in first out, this would give a cleaner indictator of in witch order spells/abilities resolve. ![alt text](image-4.png)
-[ ] chain items should have a visual indicator of ownership, I added seat colors indicators on the css file we could use those to add a border only to the left of the card in chain, the combination of player name background + that border could be a good indicator for that, I would like to add to the card preview/hover window the indicator of owner, that would help other places and experiences as well
+[x] Chain items need to be displayed on a vertical manner, the order of resolution of chain makes sense to be displayed in vertical sing is last in first out, this would give a cleaner indictator of in witch order spells/abilities resolve. ![alt text](image-4.png)
+[x] chain items should have a visual indicator of ownership, I added seat colors indicators on the css file we could use those to add a border only to the left of the card in chain, the combination of player name background + that border could be a good indicator for that, I would like to add to the card preview/hover window the indicator of owner, that would help other places and experiences as well
 [ ] the temporary zone should be an element that player can move its position around, sometimes the chain could be placed in top of something crucial and players would want to move it away from that position, every time the temp zone is closed and open again, it reset its position
 [ ] validate if on-play unit abilities should go into chain and exchange priorities
 [ ] validate if the rules applied to specific Lux deck cards will carry over to other cards

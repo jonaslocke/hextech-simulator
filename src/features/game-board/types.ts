@@ -91,6 +91,9 @@ export type Card = {
 export type ChainCardEntry = {
   card: Card;
   chainItemId: string;
+  controllerPlayerId: string;
+  controllerSeat: "player" | "opponent";
+  controllerName: string;
   sourceCardInstanceId: string | null;
   targetCardInstanceIds: string[];
 };
