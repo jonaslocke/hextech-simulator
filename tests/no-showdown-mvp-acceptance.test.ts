@@ -31,22 +31,13 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
     },
     rngSeed: "annie-lux-4"
   });
-  const chooserId = created.game.canonicalState.setup.startingPlayerChooserId;
-  const chooserToken = tokenForPlayer(created, chooserId);
-
-  await submitIntent(repositories, created, chooserToken, {
-    type: "setup.chooseStartingPlayer",
-    payload: {
-      startingPlayerId: "player-2"
-    }
-  });
   await submitIntent(repositories, created, created.players.player1.playerToken, {
     type: "setup.lockBattlefieldChoice",
     payload: {
       cardInstanceId: ownFirstBattlefield(created, "player-1")
     }
   });
-  const startedGame = await submitIntent(
+  const revealedGame = await submitIntent(
     repositories,
     created,
     created.players.player2.playerToken,
@@ -57,6 +48,14 @@ test("runs no-showdown Annie vs Lux path through setup and basic gameplay", asyn
       }
     }
   );
+  const chooserId = revealedGame.canonicalState.setup.startingPlayerChooserId;
+  const chooserToken = tokenForPlayer(created, chooserId);
+  const startedGame = await submitIntent(repositories, created, chooserToken, {
+    type: "setup.chooseStartingPlayer",
+    payload: {
+      startingPlayerId: "player-2"
+    }
+  });
 
   assert.equal(startedGame.status, "in_progress");
   assert.equal(startedGame.canonicalState.turn?.activePlayerId, "player-2");

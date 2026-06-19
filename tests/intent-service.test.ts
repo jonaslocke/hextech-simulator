@@ -177,15 +177,28 @@ test("intent service reveals battlefields after both players lock", async () => 
     result.game.canonicalState.setup.battlefieldChoices["player-b"]?.status,
     "revealed"
   );
+  assert.equal(
+    result.game.canonicalState.setup.startingPlayerChooserId !== null,
+    true
+  );
   assert.deepEqual(
     result.events.map((event) => event.type),
-    [gameEventTypes.playerIntentAccepted, gameEventTypes.serverDecision]
+    [
+      gameEventTypes.playerIntentAccepted,
+      gameEventTypes.serverDecision,
+      gameEventTypes.rngOperation
+    ]
   );
   assert.deepEqual(result.events[1]?.payload, {
     decision: {
       type: "setup.revealBattlefieldChoices"
     }
   });
+  assert.equal(
+    (result.events[2]?.payload as { operation: { purpose: string } }).operation
+      .purpose,
+    "game-1-starting-player-chooser"
+  );
 });
 
 test("intent service auto-completes setup after battlefield reveal when starting player is chosen", async () => {

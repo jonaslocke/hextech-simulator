@@ -22,7 +22,6 @@ import {
   type Game
 } from "./game";
 import { projectGameForPlayer, type GameProjection } from "./projections";
-import { assignGameOneStartingPlayerChooserWithEvents } from "./setup-service";
 
 export const fixedDeckIds = ["annie", "lux"] as const;
 
@@ -164,12 +163,7 @@ export async function createFixedDeckMatch(
   await repositories.matches.upsert(match);
   await repositories.games.upsert(initialGame);
 
-  const chooserResult = await assignGameOneStartingPlayerChooserWithEvents(
-    repositories,
-    gameId,
-    now
-  );
-  const game = chooserResult.game;
+  const game = initialGame;
   const events = await repositories.gameEvents.findByGameId(gameId);
   match = (await repositories.matches.findById(matchId)) ?? match;
 

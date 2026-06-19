@@ -33,6 +33,7 @@ import {
 import {
   addRuneResource,
   activateAbility,
+  assignGameOneStartingPlayerChooser,
   channelRunes,
   chooseStartingPlayer,
   commitMulligan,
@@ -296,9 +297,32 @@ function applyIntent(
           };
         }
 
+        const revealedGame = revealBattlefieldChoices(lockedGame, now);
+
+        if (
+          revealedGame.gameNumber === 1 &&
+          revealedGame.canonicalState.setup.startingPlayerChooserId === null
+        ) {
+          const chooserResult = assignGameOneStartingPlayerChooser(
+            revealedGame,
+            now
+          );
+
+          return {
+            accepted: true,
+            game: chooserResult.game,
+            serverDecisions: [
+              {
+                type: "setup.revealBattlefieldChoices"
+              }
+            ],
+            randomOperations: [chooserResult.randomOperation]
+          };
+        }
+
         return {
           accepted: true,
-          game: revealBattlefieldChoices(lockedGame, now),
+          game: revealedGame,
           serverDecisions: [
             {
               type: "setup.revealBattlefieldChoices"

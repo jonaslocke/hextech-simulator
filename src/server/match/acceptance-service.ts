@@ -12,7 +12,6 @@ import {
   matchSchema,
   type Match
 } from ".";
-import { assignGameOneStartingPlayerChooserWithEvents } from "./setup-service";
 import {
   createGame,
   type CardLookup,
@@ -124,13 +123,6 @@ export async function runAnnieLuxFirstShowdownAcceptance(
   await repositories.matches.upsert(match);
   await repositories.games.upsert(game);
 
-  await assignGameOneStartingPlayerChooserWithEvents(repositories, gameId, now);
-  await submitIntent(repositories, matchId, gameId, annieLuxTokenByChooser, {
-    type: "setup.chooseStartingPlayer",
-    payload: {
-      startingPlayerId: luxPlayerId
-    }
-  });
   await submitIntent(repositories, matchId, gameId, annieToken, {
     type: "setup.lockBattlefieldChoice",
     payload: {
@@ -141,6 +133,12 @@ export async function runAnnieLuxFirstShowdownAcceptance(
     type: "setup.lockBattlefieldChoice",
     payload: {
       cardInstanceId: findFirstInstanceId(luxSnapshot, "battlefield")
+    }
+  });
+  await submitIntent(repositories, matchId, gameId, annieLuxTokenByChooser, {
+    type: "setup.chooseStartingPlayer",
+    payload: {
+      startingPlayerId: luxPlayerId
     }
   });
 

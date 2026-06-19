@@ -207,8 +207,16 @@ export function MatchSimulator() {
 
   const viewer = match.players[viewerSeat];
   const projection = match.projections[viewer.playerId];
+  const opponentPlayerId = projection.setup.playerIds.find(
+    (playerId) => playerId !== viewer.playerId
+  );
+  const battlefieldChoicesRevealed = projection.setup.playerIds.every(
+    (playerId) =>
+      projection.setup.battlefieldChoices[playerId]?.status === "revealed"
+  );
   const startingPlayerChoiceOpen =
     projection.status === "setup_pending" &&
+    battlefieldChoicesRevealed &&
     projection.setup.startingPlayerId === null &&
     projection.setup.startingPlayerChooserId === viewer.playerId;
   const startingPlayerOptions = projection.setup.playerIds.map((playerId) => ({
@@ -221,13 +229,30 @@ export function MatchSimulator() {
   }));
   const viewerBattlefieldChoice =
     projection.setup.battlefieldChoices[viewer.playerId];
+  const opponentBattlefieldChoice = opponentPlayerId
+    ? projection.setup.battlefieldChoices[opponentPlayerId]
+    : undefined;
   const viewerBattlefieldPool =
     projection.setup.battlefieldPools[viewer.playerId];
+  const startingPlayerId = projection.setup.startingPlayerId;
+  const startingPlayerLabel = startingPlayerId
+    ? playerLabel(match, startingPlayerId)
+    : null;
   const battlefieldChoiceOpen =
     !startingPlayerChoiceOpen &&
     projection.status === "setup_pending" &&
     viewerBattlefieldChoice?.status === "unlocked" &&
     (viewerBattlefieldPool?.registeredCardInstanceIds.length ?? 0) > 0;
+  const setupWaitingState = getSetupWaitingState({
+    battlefieldChoiceOpen,
+    battlefieldChoicesRevealed,
+    match,
+    opponentBattlefieldChoiceStatus: opponentBattlefieldChoice?.status,
+    projection,
+    startingPlayerChoiceOpen,
+    viewerBattlefieldChoiceStatus: viewerBattlefieldChoice?.status,
+    viewerPlayerId: viewer.playerId
+  });
   const battlefieldOptions =
     viewerBattlefieldPool?.registeredCardInstanceIds.map((cardInstanceId) => {
       const card = match.cardsByInstanceId[cardInstanceId];
@@ -375,7 +400,11 @@ export function MatchSimulator() {
       />
       <ChoiceDialog
         confirmLabel="Lock battlefield"
-        description="This battlefield will be revealed after both players lock their choices."
+        description={
+          startingPlayerLabel
+            ? `${startingPlayerLabel} starts this game. This battlefield will be revealed after both players lock their choices.`
+            : "Turn order will be determined after both players lock their battlefield choices."
+        }
         isOpen={battlefieldChoiceOpen}
         onConfirm={([cardInstanceId]) => {
           if (!cardInstanceId) {
@@ -393,6 +422,7 @@ export function MatchSimulator() {
         selectionMode="single"
         title="Choose Battlefield"
       />
+      {setupWaitingState && <SetupWaitingOverlay {...setupWaitingState} />}
       <GameBoard
         cardsByInstanceId={match.cardsByInstanceId}
         logEntries={match.logEntries[viewer.playerId] ?? []}
@@ -405,6 +435,93 @@ export function MatchSimulator() {
         projection={projection}
       />
     </main>
+  );
+}
+
+function getSetupWaitingState({
+  battlefieldChoiceOpen,
+  battlefieldChoicesRevealed,
+  match,
+  opponentBattlefieldChoiceStatus,
+  projection,
+  startingPlayerChoiceOpen,
+  viewerBattlefieldChoiceStatus,
+  viewerPlayerId
+}: {
+  battlefieldChoiceOpen: boolean;
+  battlefieldChoicesRevealed: boolean;
+  match: AcceptedMatch;
+  opponentBattlefieldChoiceStatus: string | undefined;
+  projection: GameProjection;
+  startingPlayerChoiceOpen: boolean;
+  viewerBattlefieldChoiceStatus: string | undefined;
+  viewerPlayerId: string;
+}): { detail: string; title: string } | null {
+  if (
+    projection.status !== "setup_pending" ||
+    battlefieldChoiceOpen ||
+    startingPlayerChoiceOpen
+  ) {
+    return null;
+  }
+
+  if (
+    viewerBattlefieldChoiceStatus === "locked" &&
+    opponentBattlefieldChoiceStatus === "unlocked"
+  ) {
+    return {
+      detail:
+        "Your battlefield is locked. It will be revealed after both players have locked their choices.",
+      title: "Waiting for opponent to choose a battlefield"
+    };
+  }
+
+  if (
+    battlefieldChoicesRevealed &&
+    projection.setup.startingPlayerId === null &&
+    projection.setup.startingPlayerChooserId !== null &&
+    projection.setup.startingPlayerChooserId !== viewerPlayerId
+  ) {
+    return {
+      detail: `${playerLabel(
+        match,
+        projection.setup.startingPlayerChooserId
+      )} is choosing who takes the first turn.`,
+      title: "Waiting for starting player choice"
+    };
+  }
+
+  if (
+    viewerBattlefieldChoiceStatus === "locked" &&
+    opponentBattlefieldChoiceStatus === "locked" &&
+    !battlefieldChoicesRevealed
+  ) {
+    return {
+      detail: "Both battlefield choices are locked. Waiting for the server to reveal them.",
+      title: "Revealing battlefield choices"
+    };
+  }
+
+  return null;
+}
+
+function SetupWaitingOverlay({
+  detail,
+  title
+}: {
+  detail: string;
+  title: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-6 text-slate-100">
+      <section className="w-full max-w-md rounded-lg border border-cyan-300/25 bg-slate-950/95 p-5 text-center shadow-2xl shadow-black/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+          Setup
+        </p>
+        <h2 className="mt-2 text-lg font-semibold">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
+      </section>
+    </div>
   );
 }
 

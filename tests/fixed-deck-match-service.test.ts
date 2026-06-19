@@ -12,7 +12,6 @@ import type {
   MatchDocument,
   Repositories
 } from "../src/server/db";
-import { gameEventTypes } from "../src/server/events";
 import {
   createFixedDeckMatch,
   listFixedDeckOptions
@@ -58,16 +57,8 @@ test("creates a persisted setup match from selected fixed decks", async () => {
   assert.deepEqual(persistedGame, result.game);
   assert.equal(result.match.currentGameId, "match-fixed-decks:game:1");
   assert.equal(result.game.status, "setup_pending");
-  assert.equal(
-    result.game.canonicalState.setup.startingPlayerChooserId !== null,
-    true
-  );
-  assert.equal(events.length, 1);
-  assert.equal(events[0]?.type, gameEventTypes.rngOperation);
-  assert.equal(
-    (events[0]?.payload as { operation: { purpose: string } }).operation.purpose,
-    "game-1-starting-player-chooser"
-  );
+  assert.equal(result.game.canonicalState.setup.startingPlayerChooserId, null);
+  assert.equal(events.length, 0);
   assert.equal(
     verifyPlayerToken(
       result.players.player1.playerToken,
@@ -85,10 +76,7 @@ test("creates a persisted setup match from selected fixed decks", async () => {
   assert.equal(result.projections["player-1"]?.viewerPlayerId, "player-1");
   assert.equal(result.projections["player-2"]?.viewerPlayerId, "player-2");
   assert.equal(result.projections["player-1"]?.players["player-2"]?.zones.hand.count, 0);
-  assert.equal(
-    result.logEntries["player-1"]?.[0]?.message,
-    "Server randomly selected the starting-player chooser."
-  );
+  assert.deepEqual(result.logEntries["player-1"], []);
   assert.equal(result.players.player1.deckId, "annie");
   assert.equal(result.players.player2.deckId, "lux");
   assert.equal(Object.keys(result.cardsByInstanceId).length > 100, true);
