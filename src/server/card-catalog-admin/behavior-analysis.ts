@@ -36,6 +36,8 @@ type BehaviorCandidate = {
   unresolvedClause: string | null;
 };
 
+const TIMING_KEYWORDS = new Set(["Action", "Reaction"]);
+
 export async function analyzeBehaviorTemplates(
   repositories: Pick<
     CardCatalogAdminRepositories,
@@ -524,7 +526,7 @@ function extractKeywords(text: string): string[] {
         match[1]!.replace(/\s+\d+$/, "").trim()
       )
     )
-  ];
+  ].filter((keyword) => !TIMING_KEYWORDS.has(keyword));
 }
 
 function normalizeClause(clause: string): string {

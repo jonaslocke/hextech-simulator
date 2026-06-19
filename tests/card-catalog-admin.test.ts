@@ -87,9 +87,25 @@ test("behavior analysis scans the full bundled corpus and suggests reusable temp
   );
 
   assert.equal(result.importRun.totalCardsRead, 656);
-  assert.equal(result.drafts.some((draft) => draft.name === "Action keyword"), true);
-  assert.equal(result.drafts.some((draft) => draft.name === "Reaction keyword"), true);
+  assert.equal(result.drafts.some((draft) => draft.name === "Action keyword"), false);
+  assert.equal(result.drafts.some((draft) => draft.name === "Reaction keyword"), false);
   assert.equal(result.drafts.some((draft) => draft.name === "Draw"), true);
+  assert.equal(
+    result.drafts.some(
+      (draft) =>
+        draft.name === "Modify Might" &&
+        draft.suggestedBehavior?.timing === "action"
+    ),
+    true
+  );
+  assert.equal(
+    result.drafts.some(
+      (draft) =>
+        draft.name === "Move Unit" &&
+        draft.suggestedBehavior?.timing === "reaction"
+    ),
+    true
+  );
   assert.equal(matchedCardCodes.has("OGN-095"), true);
   assert.equal(matchedCardCodes.size > 50, true);
 });
@@ -104,12 +120,12 @@ test("approved behavior templates dedupe by structural hash across future analys
     importRunId: "import:ogs",
     now: new Date("2026-06-19T00:00:00.000Z")
   });
-  const actionDraft = first.drafts.find((draft) => draft.name === "Action keyword");
+  const shieldDraft = first.drafts.find((draft) => draft.name === "Shield keyword");
 
-  assert.ok(actionDraft);
+  assert.ok(shieldDraft);
 
   const approved = await approveBehaviorTemplateDraft(repositories, {
-    draftId: actionDraft.id,
+    draftId: shieldDraft.id,
     approvedBy: "tester",
     now: new Date("2026-06-19T00:01:00.000Z")
   });
@@ -119,17 +135,17 @@ test("approved behavior templates dedupe by structural hash across future analys
     importRunId: "import:ogn",
     now: new Date("2026-06-19T00:02:00.000Z")
   });
-  const repeatedActionDraft = second.drafts.find(
-    (draft) => draft.name === "Action keyword"
+  const repeatedShieldDraft = second.drafts.find(
+    (draft) => draft.name === "Shield keyword"
   );
 
-  assert.ok(repeatedActionDraft);
-  assert.deepEqual(repeatedActionDraft.similarApprovedTemplateIds, [
+  assert.ok(repeatedShieldDraft);
+  assert.deepEqual(repeatedShieldDraft.similarApprovedTemplateIds, [
     approved.template.id
   ]);
 
   const duplicateApproval = await approveBehaviorTemplateDraft(repositories, {
-    draftId: repeatedActionDraft.id,
+    draftId: repeatedShieldDraft.id,
     approvedBy: "tester",
     now: new Date("2026-06-19T00:03:00.000Z")
   });
@@ -302,4 +318,3 @@ function createTestCard(input: {
     }
   };
 }
-
