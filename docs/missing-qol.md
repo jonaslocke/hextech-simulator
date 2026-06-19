@@ -1,0 +1,1 @@
+[ ] the temporary zone should be an element that player can move its position around, sometimes the chain could be placed in top of something crucial and players would want to move it away from that position, every time the temp zone is closed and open again, it reset its position
