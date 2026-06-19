@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
+  CircleAlert,
   Database,
   FileJson,
   ListChecks,
   Loader2,
   RefreshCw,
-  Upload
+  Upload,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/shared/components/button";
 import { cn } from "@/shared/utils/cn";
@@ -39,12 +41,18 @@ type BehaviorDraft = {
   unresolvedClauses: string[];
   confidence: "high" | "medium" | "low";
   status: string;
+  reviewerNotes: string | null;
   similarApprovedTemplateIds: string[];
   suggestedBehavior: {
     timing: string;
     effects: BehaviorEffect[];
   } | null;
 };
+
+type BehaviorDraftReviewStatus =
+  | "manual_review"
+  | "blocked_by_engine_capability"
+  | "rejected";
 
 type GroupingDraft = {
   id: string;
@@ -202,6 +210,52 @@ export function CardCatalogAdminWorkbench() {
 
       await refreshBehaviorDrafts();
       setNotice(payload.deduplicated ? "Reused existing template." : "Approved template.");
+    });
+  }
+
+  async function updateBehaviorDraftReviewStatus(
+    draft: BehaviorDraft,
+    status: BehaviorDraftReviewStatus
+  ) {
+    const defaultNote =
+      status === "blocked_by_engine_capability"
+        ? "Behavior is understood but blocked by missing engine capability."
+        : status === "rejected"
+          ? "Rejected during manual review."
+          : (draft.reviewerNotes ?? "");
+    const reviewerNotes = window.prompt("Reviewer notes", defaultNote);
+
+    if (reviewerNotes === null) {
+      return;
+    }
+
+    await runAction(`review:${status}:${draft.id}`, async () => {
+      const payload = await fetchJson<ApiResult<{ draft: BehaviorDraft }>>(
+        `/api/admin/card-catalog/behavior-template-drafts/${encodeURIComponent(
+          draft.id
+        )}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            status,
+            reviewerNotes
+          })
+        }
+      );
+
+      if (!payload.accepted) {
+        throw new Error(payload.error.message);
+      }
+
+      setBehaviorDrafts((current) =>
+        current.map((candidate) =>
+          candidate.id === draft.id ? payload.draft : candidate
+        )
+      );
+      setNotice(`Marked ${draft.name} as ${status.replace(/_/g, " ")}.`);
     });
   }
 
@@ -416,6 +470,7 @@ export function CardCatalogAdminWorkbench() {
             drafts={visibleDrafts}
             busyAction={busyAction}
             onApprove={approveBehaviorDraft}
+            onReviewStatusChange={updateBehaviorDraftReviewStatus}
           />
         ) : (
           <GroupingDraftList
@@ -517,11 +572,16 @@ function Field({ label, value }: { label: string; value: number | string }) {
 function BehaviorDraftList({
   busyAction,
   drafts,
-  onApprove
+  onApprove,
+  onReviewStatusChange
 }: {
   busyAction: string | null;
   drafts: BehaviorDraft[];
   onApprove: (draft: BehaviorDraft) => void;
+  onReviewStatusChange: (
+    draft: BehaviorDraft,
+    status: BehaviorDraftReviewStatus
+  ) => void;
 }) {
   if (drafts.length === 0) {
     return <EmptyPanel label="No behavior drafts loaded." />;
@@ -532,6 +592,11 @@ function BehaviorDraftList({
       {drafts.map((draft) => {
         const canApprove =
           draft.status !== "approved" && draft.unresolvedClauses.length === 0;
+        const needsManualReview =
+          draft.unresolvedClauses.length > 0 ||
+          draft.suggestedBehavior?.effects.some(
+            (effect) => effect.type === "manualReview"
+          );
 
         return (
           <article
@@ -554,19 +619,81 @@ function BehaviorDraftList({
                   {draft.sourceClauses.join(" | ")}
                 </p>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                disabled={!canApprove || busyAction === `approve:${draft.id}`}
-                onClick={() => onApprove(draft)}
-              >
-                {busyAction === `approve:${draft.id}` ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="size-4" />
+              <div className="flex flex-wrap gap-2">
+                {canApprove && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busyAction === `approve:${draft.id}`}
+                    onClick={() => onApprove(draft)}
+                  >
+                    {busyAction === `approve:${draft.id}` ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="size-4" />
+                    )}
+                    Approve
+                  </Button>
                 )}
-                Approve
-              </Button>
+                {needsManualReview && draft.status !== "approved" && (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={
+                        draft.status === "blocked_by_engine_capability" ||
+                        busyAction === `review:blocked_by_engine_capability:${draft.id}`
+                      }
+                      onClick={() =>
+                        onReviewStatusChange(
+                          draft,
+                          "blocked_by_engine_capability"
+                        )
+                      }
+                    >
+                      {busyAction ===
+                      `review:blocked_by_engine_capability:${draft.id}` ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CircleAlert className="size-4" />
+                      )}
+                      Block
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={
+                        draft.status === "rejected" ||
+                        busyAction === `review:rejected:${draft.id}`
+                      }
+                      onClick={() => onReviewStatusChange(draft, "rejected")}
+                    >
+                      {busyAction === `review:rejected:${draft.id}` ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <XCircle className="size-4" />
+                      )}
+                      Reject
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={
+                        draft.status === "manual_review" ||
+                        busyAction === `review:manual_review:${draft.id}`
+                      }
+                      onClick={() =>
+                        onReviewStatusChange(draft, "manual_review")
+                      }
+                    >
+                      Review Note
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
               <Field label="Cards" value={draft.matchedCardCodes.length} />
@@ -583,6 +710,11 @@ function BehaviorDraftList({
             {draft.unresolvedClauses.length > 0 && (
               <div className="mt-3 rounded border border-amber-300/20 bg-amber-950/30 p-3 text-sm text-amber-100">
                 {draft.unresolvedClauses.slice(0, 3).join(" | ")}
+              </div>
+            )}
+            {draft.reviewerNotes && (
+              <div className="mt-3 rounded border border-cyan-300/20 bg-cyan-950/20 p-3 text-sm text-cyan-100">
+                {draft.reviewerNotes}
               </div>
             )}
           </article>
@@ -694,4 +826,3 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
   return payload;
 }
-
