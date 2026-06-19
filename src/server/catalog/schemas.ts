@@ -19,6 +19,7 @@ export const cardSchema = z
     name: z.string().min(1),
     riftbound_id: z.string().optional(),
     public_code: z.string().min(1),
+    collector_number: z.union([z.string(), z.number()]).optional(),
     attributes: z.object({
       energy: z.number().nullable(),
       might: z.number().nullable(),
