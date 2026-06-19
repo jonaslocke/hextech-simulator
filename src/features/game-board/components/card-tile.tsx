@@ -26,6 +26,8 @@ type CardTileProps = Card & {
   isHighlighted?: boolean;
   isTransferHidden?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
+  onHighlightPointerEnter?: () => void;
+  onHighlightPointerLeave?: () => void;
   onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
   showMight?: boolean;
 };
@@ -45,6 +47,8 @@ export const CardTile: FC<CardTileProps> = ({
   might,
   name,
   onContextAction,
+  onHighlightPointerEnter,
+  onHighlightPointerLeave,
   onPrimaryAction,
   power,
   publicCode,
@@ -150,8 +154,14 @@ export const CardTile: FC<CardTileProps> = ({
         event.preventDefault();
         onPrimaryAction();
       }}
-      onPointerEnter={schedulePreview}
-      onPointerLeave={clearPreview}
+      onPointerEnter={() => {
+        onHighlightPointerEnter?.();
+        schedulePreview();
+      }}
+      onPointerLeave={() => {
+        onHighlightPointerLeave?.();
+        clearPreview();
+      }}
       ref={tileRef}
       style={{ zIndex: previewPosition ? 2147483647 : undefined }}
       tabIndex={enableHoverPreview && focusablePreview ? 0 : undefined}

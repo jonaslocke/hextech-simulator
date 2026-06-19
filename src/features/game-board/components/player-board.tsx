@@ -24,6 +24,8 @@ type BaseLineProps = {
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onBoardCardPointerEnter?: (card: Card) => void;
+  onBoardCardPointerLeave?: (card: Card) => void;
 };
 
 type Props = {
@@ -42,6 +44,8 @@ type Props = {
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onBoardCardPointerEnter?: (card: Card) => void;
+  onBoardCardPointerLeave?: (card: Card) => void;
   onRuneContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onRunePrimaryAction?: (card: Card) => void;
   onOpenBanish?: () => void;
@@ -58,6 +62,8 @@ const BaseLine = ({
   onChampionContextAction,
   onChampionPrimaryAction,
   onBoardCardPrimaryAction,
+  onBoardCardPointerEnter,
+  onBoardCardPointerLeave,
 }: BaseLineProps) => {
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
@@ -108,6 +114,8 @@ const BaseLine = ({
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardPrimaryAction={onBoardCardPrimaryAction}
+          onCardPointerEnter={onBoardCardPointerEnter}
+          onCardPointerLeave={onBoardCardPointerLeave}
           showMight
         />
       </ZoneArea>
@@ -241,6 +249,8 @@ export const PlayerBoard: FC<Props> = ({
   onChampionContextAction,
   onChampionPrimaryAction,
   onBoardCardPrimaryAction,
+  onBoardCardPointerEnter,
+  onBoardCardPointerLeave,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -264,6 +274,8 @@ export const PlayerBoard: FC<Props> = ({
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onBoardCardPrimaryAction={onBoardCardPrimaryAction}
+          onBoardCardPointerEnter={onBoardCardPointerEnter}
+          onBoardCardPointerLeave={onBoardCardPointerLeave}
           player={player}
           isHightlighted={isActivePlayer}
         />
@@ -278,6 +290,8 @@ export const PlayerBoard: FC<Props> = ({
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
         onBoardCardPrimaryAction={onBoardCardPrimaryAction}
+        onBoardCardPointerEnter={onBoardCardPointerEnter}
+        onBoardCardPointerLeave={onBoardCardPointerLeave}
         player={player}
         isHightlighted={isActivePlayer}
       />
@@ -300,6 +314,8 @@ function ZoneCards({
   hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
+  onCardPointerEnter,
+  onCardPointerLeave,
   onClick,
   showCount = false,
   showMight = false,
@@ -312,6 +328,8 @@ function ZoneCards({
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onCardPointerEnter?: (card: Card) => void;
+  onCardPointerLeave?: (card: Card) => void;
   onClick?: () => void;
   showCount?: boolean;
   showMight?: boolean;
@@ -326,6 +344,8 @@ function ZoneCards({
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onCardContextAction={onCardContextAction}
         onCardPrimaryAction={onCardPrimaryAction}
+        onCardPointerEnter={onCardPointerEnter}
+        onCardPointerLeave={onCardPointerLeave}
         onClick={onClick}
         showMight={showMight}
       />
@@ -413,6 +433,8 @@ function CardList({
   hiddenCardInstanceIds,
   onCardContextAction,
   onCardPrimaryAction,
+  onCardPointerEnter,
+  onCardPointerLeave,
   onClick,
   showMight = false,
 }: {
@@ -425,6 +447,8 @@ function CardList({
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onCardPointerEnter?: (card: Card) => void;
+  onCardPointerLeave?: (card: Card) => void;
   onClick?: () => void;
   showMight?: boolean;
 }) {
@@ -457,6 +481,12 @@ function CardList({
             onCardPrimaryAction
               ? (event) => onCardPrimaryAction(card, event)
               : undefined
+          }
+          onHighlightPointerEnter={
+            onCardPointerEnter ? () => onCardPointerEnter(card) : undefined
+          }
+          onHighlightPointerLeave={
+            onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
           }
           showMight={showMight}
           {...card}

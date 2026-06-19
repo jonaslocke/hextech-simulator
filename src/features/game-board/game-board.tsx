@@ -88,6 +88,11 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
   >(new Set());
+  const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
+    useState<string | null>(null);
+  const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
+    string[]
+  >([]);
   const chainCards: ChainCardEntry[] = (projection.chain?.items ?? []).flatMap((item) => {
     const displayCardInstanceId = item.cardInstanceId ?? item.sourceCardInstanceId;
 
@@ -167,6 +172,37 @@ export const GameBoard: FC<GameBoardProps> = ({
     scores,
   });
   const viewerState = projection.players[projection.viewerPlayerId];
+  const legalTargetIds =
+    targetSelection && viewerState
+      ? (viewerState.legalTargetsByCard[targetSelection.cardInstanceId]
+          ?.cardInstanceIds ?? [])
+      : [];
+  const displayedHighlightedCardInstanceIds = useMemo(() => {
+    const next = new Set(highlightedCardInstanceIds);
+
+    for (const targetId of targetSelection?.selectedTargetIds ?? []) {
+      next.add(targetId);
+    }
+
+    for (const targetId of pendingSubmittedTargetIds) {
+      next.add(targetId);
+    }
+
+    if (
+      hoveredTargetCardInstanceId &&
+      legalTargetIds.includes(hoveredTargetCardInstanceId)
+    ) {
+      next.add(hoveredTargetCardInstanceId);
+    }
+
+    return next;
+  }, [
+    highlightedCardInstanceIds,
+    hoveredTargetCardInstanceId,
+    legalTargetIds,
+    pendingSubmittedTargetIds,
+    targetSelection?.selectedTargetIds,
+  ]);
   const activePlayerId = projection.turn?.activePlayerId;
   const isOpponentActive = activePlayerId === board.opponent.playerId;
   const isPlayerActive = activePlayerId === board.player.playerId;
@@ -393,6 +429,24 @@ export const GameBoard: FC<GameBoardProps> = ({
       submitTargetedPlay(nextSelection);
     }
   };
+  const handleTargetPointerEnter = (card: Card) => {
+    if (!targetSelection || !card.instanceId) {
+      return;
+    }
+
+    if (!legalTargetIds.includes(card.instanceId)) {
+      return;
+    }
+
+    setHoveredTargetCardInstanceId(card.instanceId);
+  };
+  const handleTargetPointerLeave = (card: Card) => {
+    if (hoveredTargetCardInstanceId !== card.instanceId) {
+      return;
+    }
+
+    setHoveredTargetCardInstanceId(null);
+  };
   const submitTargetedPlay = (selection = targetSelection) => {
     if (!selection) {
       return;
@@ -410,6 +464,8 @@ export const GameBoard: FC<GameBoardProps> = ({
       },
       selectedModeId: selection.selectedModeId,
     });
+    setPendingSubmittedTargetIds(selection.selectedTargetIds);
+    setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
   };
   const handleRunePrimaryAction = (card: Card) => {
@@ -466,6 +522,11 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [isChainLockedOpen, openZone]);
 
   useEffect(() => {
+    setHoveredTargetCardInstanceId(null);
+    setPendingSubmittedTargetIds([]);
+  }, [projection.stateVersion]);
+
+  useEffect(() => {
     if (!cardActionMenu) {
       return;
     }
@@ -492,9 +553,11 @@ export const GameBoard: FC<GameBoardProps> = ({
       <section className="flex flex-1">
         <div className="flex-1 gap-2 grid grid-rows-[146px_minmax(0,1fr)_calc(100vh/3)_minmax(0,1fr)_146px_64px] p-2">
           <PlayerBoard
-            highlightedCardInstanceIds={highlightedCardInstanceIds}
+            highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
+            onBoardCardPointerEnter={handleTargetPointerEnter}
+            onBoardCardPointerLeave={handleTargetPointerLeave}
             onOpenBanish={() => setOpenZoneRespectingChain("banish")}
             onOpenTrash={() => setOpenZoneRespectingChain("opponentTrash")}
             player={board.opponent}
@@ -504,29 +567,35 @@ export const GameBoard: FC<GameBoardProps> = ({
           <div className="flex gap-2">
             <BattlefieldBoard
               battlefield={board.playerBattlefield}
-              highlightedCardInstanceIds={highlightedCardInstanceIds}
+              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
               onCardPrimaryAction={handleBoardCardPrimaryAction}
+              onCardPointerEnter={handleTargetPointerEnter}
+              onCardPointerLeave={handleTargetPointerLeave}
               owner="player"
               showdownState={board.playerBattlefieldShowdownState}
             />
             <BattlefieldBoard
               battlefield={board.opponentBattlefield}
-              highlightedCardInstanceIds={highlightedCardInstanceIds}
+              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
               onCardPrimaryAction={handleBoardCardPrimaryAction}
+              onCardPointerEnter={handleTargetPointerEnter}
+              onCardPointerLeave={handleTargetPointerLeave}
               owner="opponent"
               showdownState={board.opponentBattlefieldShowdownState}
             />
           </div>
           <PlayerBoard
-            highlightedCardInstanceIds={highlightedCardInstanceIds}
+            highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
             onOpenBanish={() => setOpenZoneRespectingChain("banish")}
             onOpenTrash={() => setOpenZoneRespectingChain("playerTrash")}
             onChampionContextAction={handleChampionCardAction}
             onChampionPrimaryAction={handleChampionCardAction}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
+            onBoardCardPointerEnter={handleTargetPointerEnter}
+            onBoardCardPointerLeave={handleTargetPointerLeave}
             onRuneContextAction={handleRuneContextAction}
             onRunePrimaryAction={handleRunePrimaryAction}
             player={board.player}

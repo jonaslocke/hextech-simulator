@@ -13,6 +13,8 @@ type Props = {
     card: Card,
     event?: MouseEvent<HTMLDivElement>,
   ) => void;
+  onCardPointerEnter?: (card: Card) => void;
+  onCardPointerLeave?: (card: Card) => void;
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred"; //tied to the game state open or neutral - 'deferred' due to be smaller when other BF is on showdown state open -- betternaming is needed
 };
@@ -21,6 +23,8 @@ export const BattlefieldBoard: FC<Props> = ({
   battlefield: { description, id, name, opponentUnits, playerUnits, img },
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
+  onCardPointerEnter,
+  onCardPointerLeave,
   onCardPrimaryAction,
   owner,
   showdownState = "neutral",
@@ -134,6 +138,12 @@ export const BattlefieldBoard: FC<Props> = ({
                   ? (event) => onCardPrimaryAction(unit, event)
                   : undefined
               }
+              onHighlightPointerEnter={
+                onCardPointerEnter ? () => onCardPointerEnter(unit) : undefined
+              }
+              onHighlightPointerLeave={
+                onCardPointerLeave ? () => onCardPointerLeave(unit) : undefined
+              }
               {...unit}
             />
           ))}
@@ -161,6 +171,12 @@ export const BattlefieldBoard: FC<Props> = ({
                 onCardPrimaryAction
                   ? (event) => onCardPrimaryAction(unit, event)
                   : undefined
+              }
+              onHighlightPointerEnter={
+                onCardPointerEnter ? () => onCardPointerEnter(unit) : undefined
+              }
+              onHighlightPointerLeave={
+                onCardPointerLeave ? () => onCardPointerLeave(unit) : undefined
               }
               {...unit}
             />
