@@ -88,6 +88,7 @@ type ApiResult<T> =
     };
 
 type WorkbenchTab = "behaviors" | "catalog";
+type SourceMode = "upload" | "seed";
 
 const bundledSetOptions: Array<{ id: BundledSet; label: string }> = [
   { id: "ogs", label: "OGS" },
@@ -98,7 +99,8 @@ const bundledSetOptions: Array<{ id: BundledSet; label: string }> = [
 
 export function CardCatalogAdminWorkbench() {
   const [activeTab, setActiveTab] = useState<WorkbenchTab>("behaviors");
-  const [bundledSet, setBundledSet] = useState<BundledSet>("ogs");
+  const [sourceMode, setSourceMode] = useState<SourceMode>("upload");
+  const [seedSet, setSeedSet] = useState<BundledSet>("ogs");
   const [file, setFile] = useState<File | null>(null);
   const [behaviorImportRun, setBehaviorImportRun] = useState<ImportRun | null>(null);
   const [catalogImportRun, setCatalogImportRun] = useState<ImportRun | null>(null);
@@ -290,7 +292,11 @@ export function CardCatalogAdminWorkbench() {
   }
 
   async function postCardSet<T>(url: string): Promise<T> {
-    if (file) {
+    if (sourceMode === "upload") {
+      if (!file) {
+        throw new Error("Choose a set JSON file first.");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       return fetchJson<T>(url, {
@@ -305,7 +311,7 @@ export function CardCatalogAdminWorkbench() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        bundledSet
+        bundledSet: seedSet
       })
     });
   }
@@ -337,36 +343,47 @@ export function CardCatalogAdminWorkbench() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="h-10 rounded-md border border-white/10 bg-slate-900 px-3 text-sm text-slate-100"
-              value={bundledSet}
-              onChange={(event) => setBundledSet(event.target.value as BundledSet)}
-            >
-              {bundledSetOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 hover:bg-slate-800">
-              <Upload className="size-4" />
-              <span>{file ? file.name : "JSON file"}</span>
-              <input
-                className="sr-only"
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            {file && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setFile(null)}
-                disabled={isBusy}
+            <div className="flex rounded-md border border-white/10 bg-slate-950 p-1">
+              <TabButton
+                active={sourceMode === "upload"}
+                onClick={() => setSourceMode("upload")}
               >
-                Use bundled
-              </Button>
+                Upload
+              </TabButton>
+              <TabButton
+                active={sourceMode === "seed"}
+                onClick={() => setSourceMode("seed")}
+              >
+                Seed
+              </TabButton>
+            </div>
+            {sourceMode === "upload" ? (
+              <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-slate-900 px-3 text-sm text-slate-100 hover:bg-slate-800">
+                <Upload className="size-4" />
+                <span>{file ? file.name : "Set JSON"}</span>
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] ?? null);
+                    setSourceMode("upload");
+                  }}
+                />
+              </label>
+            ) : (
+              <select
+                aria-label="Seed corpus"
+                className="h-10 rounded-md border border-white/10 bg-slate-900 px-3 text-sm text-slate-100"
+                value={seedSet}
+                onChange={(event) => setSeedSet(event.target.value as BundledSet)}
+              >
+                {bundledSetOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
         </header>
