@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
-import path from "node:path";
-import { cardSetFileSchema, type Card } from "./schemas";
+import { fixedMvpCards } from "./fixed-mvp-cards.generated";
+import type { Card } from "./schemas";
+
+const FIXED_MVP_CATALOG_SOURCE = "fixed-mvp-cards.generated.ts";
 
 export type CardCatalog = {
   cards: Card[];
@@ -11,25 +12,11 @@ export type CardCatalog = {
   versionHash: string;
 };
 
-export async function loadCardCatalog(
-  setsDir = path.join(process.cwd(), "data", "sets")
-): Promise<CardCatalog> {
-  const filenames = (await readdir(setsDir))
-    .filter((filename) => filename.endsWith(".json"))
-    .sort();
-
-  const cards: Card[] = [];
+export async function loadCardCatalog(): Promise<CardCatalog> {
+  const cards = [...fixedMvpCards];
   const hash = createHash("sha256");
-
-  for (const filename of filenames) {
-    const fullPath = path.join(setsDir, filename);
-    const raw = await readFile(fullPath, "utf8");
-    hash.update(filename);
-    hash.update(raw);
-
-    const parsed = cardSetFileSchema.parse(JSON.parse(raw));
-    cards.push(...parsed);
-  }
+  hash.update(FIXED_MVP_CATALOG_SOURCE);
+  hash.update(JSON.stringify(cards));
 
   const byName = new Map<string, Card>();
   const byPublicCode = new Map<string, Card>();
@@ -46,7 +33,7 @@ export async function loadCardCatalog(
     cards,
     byName,
     byPublicCode,
-    setFiles: filenames,
+    setFiles: [FIXED_MVP_CATALOG_SOURCE],
     versionHash: hash.digest("hex")
   };
 }

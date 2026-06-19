@@ -10,12 +10,12 @@ import {
 test("loads local Riftbound card catalog", async () => {
   const catalog = await loadCardCatalog();
 
-  assert.equal(catalog.cards.length, 656);
+  assert.equal(catalog.cards.length, 39);
   assert.equal(requireCardByName(catalog, "Dark Child - Starter").classification.type, "Legend");
   assert.equal(requireCardByName(catalog, "Lady of Luminosity - Starter").classification.type, "Legend");
   assert.equal(requireCardByName(catalog, "Annie, Stubborn").classification.supertype, "Champion");
   assert.equal(requireCardByName(catalog, "Lux, Crownguard").classification.supertype, "Champion");
-  assert.deepEqual(catalog.setFiles, ["ogn.json", "ogs.json", "sfd.json"]);
+  assert.deepEqual(catalog.setFiles, ["fixed-mvp-cards.generated.ts"]);
   assert.match(catalog.versionHash, /^[a-f0-9]{64}$/);
 });
 
@@ -27,8 +27,8 @@ test("creates and persists catalog version metadata", async () => {
 
   assert.equal(document.id, catalog.versionHash);
   assert.equal(document.versionHash, catalog.versionHash);
-  assert.equal(document.cardCount, 656);
-  assert.deepEqual(document.setFiles, ["ogn.json", "ogs.json", "sfd.json"]);
+  assert.equal(document.cardCount, 39);
+  assert.deepEqual(document.setFiles, ["fixed-mvp-cards.generated.ts"]);
   assert.equal(document.createdAt, now.toISOString());
 
   const result = await persistCardCatalogVersion(

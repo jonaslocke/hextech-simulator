@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { cardSetFileSchema, type Card } from "../catalog";
 
 export async function parseCardSetRequest(request: Request): Promise<{
@@ -23,19 +21,9 @@ export async function parseCardSetRequest(request: Request): Promise<{
   }
 
   const body = (await request.json()) as {
-    bundledSet?: string;
     cards?: unknown;
     uploadedFileName?: string;
   };
-
-  if (body.bundledSet) {
-    const cards = await readBundledSet(body.bundledSet);
-
-    return {
-      cards,
-      uploadedFileName: `${body.bundledSet}.json`
-    };
-  }
 
   if (body.cards) {
     return {
@@ -44,25 +32,9 @@ export async function parseCardSetRequest(request: Request): Promise<{
     };
   }
 
-  throw new Error("Expected multipart file, bundledSet, or cards payload.");
-}
-
-export async function readBundledSet(setCode: string): Promise<Card[]> {
-  const filename =
-    setCode === "all" ? null : `${setCode.toLowerCase().replace(/\.json$/, "")}.json`;
-
-  if (filename === null) {
-    const sets = await Promise.all(["ogn", "ogs", "sfd"].map((set) => readBundledSet(set)));
-    return sets.flat();
-  }
-
-  const filePath = path.join(process.cwd(), "data", "sets", filename);
-  const raw = await readFile(filePath, "utf8");
-
-  return parseCardsJson(raw);
+  throw new Error("Expected multipart file or cards payload.");
 }
 
 function parseCardsJson(raw: string): Card[] {
   return cardSetFileSchema.parse(JSON.parse(raw));
 }
-

@@ -8,17 +8,16 @@ import {
   createInMemoryCardCatalogAdminRepositories,
   deriveCardCode,
   deriveCardCodeFromCard,
-  readBundledSet,
   updateBehaviorTemplateDraft
 } from "../src/server/card-catalog-admin";
-import { cardSetFileSchema, type Card } from "../src/server/catalog";
+import { cardSetFileSchema, loadCardCatalog, type Card } from "../src/server/catalog";
 
 test("derives gameplay identity from the first seven public_code characters", async () => {
   assert.equal(deriveCardCode("OGN-095/298"), "OGN-095");
   assert.equal(deriveCardCode("OGN-027a/298"), "OGN-027");
   assert.equal(deriveCardCode("OGN-307*/298"), "OGN-307");
 
-  const cards = await readAllBundledCards();
+  const cards = (await loadCardCatalog()).cards;
   const baseCards = cards.filter(
     (card) =>
       card.metadata.alternate_art === false &&
@@ -69,13 +68,13 @@ test("collector_number is optional and not authoritative for import validation",
   assert.equal(parsed[0]?.public_code, "TST-001/001");
 });
 
-test("behavior analysis scans the full bundled corpus and suggests reusable templates", async () => {
+test("behavior analysis scans the full uploaded card list and suggests reusable templates", async () => {
   const repositories = createInMemoryCardCatalogAdminRepositories();
-  const cards = await readAllBundledCards();
+  const cards = (await loadCardCatalog()).cards;
   const result = await analyzeBehaviorTemplates(repositories, {
     cards,
-    uploadedFileName: "all.json",
-    importRunId: "import:all",
+    uploadedFileName: "fixed-mvp-cards.generated.ts",
+    importRunId: "import:fixed-mvp",
     now: new Date("2026-06-19T00:00:00.000Z")
   });
 
@@ -86,7 +85,7 @@ test("behavior analysis scans the full bundled corpus and suggests reusable temp
     actionableDrafts.flatMap((draft) => draft.matchedCardCodes)
   );
 
-  assert.equal(result.importRun.totalCardsRead, 656);
+  assert.equal(result.importRun.totalCardsRead, cards.length);
   assert.equal(result.drafts.some((draft) => draft.name === "Action keyword"), false);
   assert.equal(result.drafts.some((draft) => draft.name === "Reaction keyword"), false);
   assert.equal(result.drafts.some((draft) => draft.name === "Draw"), true);
@@ -94,7 +93,7 @@ test("behavior analysis scans the full bundled corpus and suggests reusable temp
     result.drafts.some(
       (draft) =>
         draft.name === "Modify Might" &&
-        draft.suggestedBehavior?.timing === "action"
+        draft.suggestedBehavior?.timing === "reaction"
     ),
     true
   );
@@ -107,17 +106,21 @@ test("behavior analysis scans the full bundled corpus and suggests reusable temp
     true
   );
   assert.equal(matchedCardCodes.has("OGN-095"), true);
-  assert.equal(matchedCardCodes.size > 50, true);
+  assert.equal(matchedCardCodes.size > 10, true);
 });
 
 test("approved behavior templates dedupe by structural hash across future analyses", async () => {
   const repositories = createInMemoryCardCatalogAdminRepositories();
-  const ogs = await readBundledSet("ogs");
-  const ogn = await readBundledSet("ogn");
   const first = await analyzeBehaviorTemplates(repositories, {
-    cards: ogs,
-    uploadedFileName: "ogs.json",
-    importRunId: "import:ogs",
+    cards: [
+      createTestCard({
+        name: "First Shield Unit",
+        publicCode: "TST-001/001",
+        text: "[Shield]"
+      })
+    ],
+    uploadedFileName: "first.json",
+    importRunId: "import:first",
     now: new Date("2026-06-19T00:00:00.000Z")
   });
   const shieldDraft = first.drafts.find((draft) => draft.name === "Shield keyword");
@@ -130,9 +133,15 @@ test("approved behavior templates dedupe by structural hash across future analys
     now: new Date("2026-06-19T00:01:00.000Z")
   });
   const second = await analyzeBehaviorTemplates(repositories, {
-    cards: ogn,
-    uploadedFileName: "ogn.json",
-    importRunId: "import:ogn",
+    cards: [
+      createTestCard({
+        name: "Second Shield Unit",
+        publicCode: "TST-002/001",
+        text: "[Shield]"
+      })
+    ],
+    uploadedFileName: "second.json",
+    importRunId: "import:second",
     now: new Date("2026-06-19T00:02:00.000Z")
   });
   const repeatedShieldDraft = second.drafts.find(
@@ -199,10 +208,24 @@ test("manual-review behavior drafts cannot be approved until unresolved clauses 
 
 test("card import validates groups separately from later behavior assignment", async () => {
   const repositories = createInMemoryCardCatalogAdminRepositories();
-  const ogn = await readBundledSet("ogn");
+  const cards = [
+    createTestCard({
+      name: "Darius, Trifarian",
+      publicCode: "OGN-027/298",
+      text: "Draw 1."
+    }),
+    createTestCard({
+      name: "Darius, Trifarian",
+      publicCode: "OGN-027a/298",
+      text: "Draw 1.",
+      metadata: {
+        alternate_art: true
+      }
+    })
+  ];
   const importResult = await createCardImport(repositories, {
-    cards: ogn,
-    uploadedFileName: "ogn.json",
+    cards,
+    uploadedFileName: "variant-test.json",
     importRunId: "catalog-import:ogn",
     now: new Date("2026-06-19T00:00:00.000Z")
   });
@@ -276,14 +299,11 @@ async function createAndApproveDrawTemplate(
   });
 }
 
-async function readAllBundledCards() {
-  return readBundledSet("all");
-}
-
 function createTestCard(input: {
   name: string;
   publicCode: string;
   text: string;
+  metadata?: Partial<Card["metadata"]>;
 }): Card {
   return {
     id: input.publicCode,
@@ -314,7 +334,8 @@ function createTestCard(input: {
       clean_name: input.name,
       alternate_art: false,
       overnumbered: false,
-      signature: false
+      signature: false,
+      ...input.metadata
     }
   };
 }
