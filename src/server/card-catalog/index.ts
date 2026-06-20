@@ -1,3 +1,4 @@
+export * from "./approved-card-behavior";
 export * from "./behavior-suggestions";
 export * from "./identity";
 export * from "./import-preview";

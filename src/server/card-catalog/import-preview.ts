@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { cardSetFileSchema, type Card } from "../catalog";
 import { analyzeCardBehaviorSuggestions, type CardBehaviorSuggestion } from "./behavior-suggestions";
 import { deriveCardCodeFromCard } from "./identity";
+import type { PrimitiveCatalogEntry } from "./primitive-catalog";
 import type {
   ExistingCardValidationLookup,
   PersistedCardValidationSummary
@@ -43,6 +44,7 @@ export type CardCatalogImportPreviewResult = {
     requiresEngineSupportCardCount: number;
     missingRequiredParameterCount: number;
   };
+  primitiveCatalog: PrimitiveCatalogEntry[];
   cards: CardCatalogImportPreviewCard[];
 };
 
@@ -125,6 +127,7 @@ export async function previewCardCatalogImport(input: {
       missingRequiredParameterCount:
         suggestionReport.summary.missingRequiredParameterCount
     },
+    primitiveCatalog: suggestionReport.primitiveCatalog,
     cards: previewCards
   };
 }

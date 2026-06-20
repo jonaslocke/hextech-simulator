@@ -7,14 +7,27 @@ import {
   Database,
   FileJson,
   ListChecks,
+  Plus,
+  Save,
+  Trash2,
   Upload
 } from "lucide-react";
 import { Button } from "@/shared/components/button";
-import { previewCardCatalogUpload } from "../api";
-import type { CardCatalogPreviewResponse } from "../types";
+import {
+  approveCardCatalogBehavior,
+  previewCardCatalogUpload
+} from "../api";
+import type {
+  CardCatalogApprovalRequest,
+  CardCatalogPreviewResponse
+} from "../types";
 
 type Preview = Extract<CardCatalogPreviewResponse, { accepted: true }>["preview"];
 type PreviewCard = Preview["cards"][number];
+type PrimitiveCatalogEntry = Preview["primitiveCatalog"][number];
+type EditableClause = CardCatalogApprovalRequest["clauses"][number];
+type EditableAssignment = EditableClause["assignments"][number];
+type ApprovalStatus = CardCatalogApprovalRequest["status"];
 
 const SUPPORT_STYLES: Record<string, string> = {
   supported: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
@@ -34,8 +47,16 @@ const EXISTING_STATE_STYLES: Record<string, string> = {
 export function CardCatalogImportPreview() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [reviewCardCode, setReviewCardCode] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [savingCardCode, setSavingCardCode] = useState<string | null>(null);
+  const primitiveCatalogById = useMemo(
+    () =>
+      new Map((preview?.primitiveCatalog ?? []).map((entry) => [entry.id, entry])),
+    [preview]
+  );
   const sortedCards = useMemo(
     () =>
       [...(preview?.cards ?? [])].sort((left, right) =>
@@ -43,6 +64,7 @@ export function CardCatalogImportPreview() {
       ),
     [preview]
   );
+  const reviewCard = sortedCards.find((card) => card.cardCode === reviewCardCode);
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     setSelectedFile(event.target.files?.[0] ?? null);
@@ -69,6 +91,8 @@ export function CardCatalogImportPreview() {
       }
 
       setPreview(response.preview);
+      setDrafts({});
+      setReviewCardCode(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Upload failed.");
     } finally {
@@ -76,14 +100,74 @@ export function CardCatalogImportPreview() {
     }
   }
 
+  function reviewCardForApproval(card: PreviewCard) {
+    setDrafts((current) => ({
+      ...current,
+      [card.cardCode]: current[card.cardCode] ?? createReviewDraft(card)
+    }));
+    setReviewCardCode(card.cardCode);
+    setError(null);
+  }
+
+  async function saveReview(card: PreviewCard) {
+    const draft = drafts[card.cardCode] ?? createReviewDraft(card);
+
+    setSavingCardCode(card.cardCode);
+    setError(null);
+
+    try {
+      const response = await approveCardCatalogBehavior({
+        cardCode: card.cardCode,
+        publicCode: card.publicCode,
+        name: card.name,
+        setCode: card.setCode,
+        type: card.type,
+        sourceText: card.rulesText,
+        sourceTextHash: card.sourceTextHash,
+        status: draft.status,
+        clauses: draft.clauses,
+        adminNotes: draft.adminNotes
+      });
+
+      if (!response.accepted) {
+        setError(
+          [response.error.message, ...(response.error.details ?? [])].join(" ")
+        );
+        return;
+      }
+
+      setPreview((current) =>
+        current ? markCardPersisted(current, card, response.behavior) : current
+      );
+      setReviewCardCode(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Approval failed.");
+    } finally {
+      setSavingCardCode(null);
+    }
+  }
+
+  function updateDraft(cardCode: string, updater: (draft: ReviewDraft) => ReviewDraft) {
+    const card = sortedCards.find((candidate) => candidate.cardCode === cardCode);
+
+    if (!card) {
+      return;
+    }
+
+    setDrafts((current) => ({
+      ...current,
+      [cardCode]: updater(current[cardCode] ?? createReviewDraft(card))
+    }));
+  }
+
   return (
     <main className="bg-slate-950 min-h-screen text-slate-100">
-      <div className="mx-auto px-5 py-8 max-w-[1400px]">
+      <div className="mx-auto px-5 py-8 max-w-[1480px]">
         <header className="flex md:flex-row flex-col md:justify-between md:items-end gap-5 pb-5 border-white/10 border-b">
           <div>
             <h1 className="font-semibold text-2xl">Card Catalog Import</h1>
             <p className="mt-1 text-slate-400 text-sm">
-              Upload a set JSON to generate an ephemeral validation preview.
+              Upload a set JSON, review suggested behaviors, and persist approved cards.
             </p>
           </div>
           <div className="flex sm:flex-row flex-col gap-3">
@@ -120,7 +204,61 @@ export function CardCatalogImportPreview() {
         {preview ? (
           <>
             <SummaryBand preview={preview} />
-            <CardTable cards={sortedCards} />
+            <CardTable
+              cards={sortedCards}
+              onReview={reviewCardForApproval}
+              reviewCardCode={reviewCardCode}
+            />
+            {reviewCard && (
+              <ReviewPanel
+                card={reviewCard}
+                draft={drafts[reviewCard.cardCode] ?? createReviewDraft(reviewCard)}
+                isSaving={savingCardCode === reviewCard.cardCode}
+                onAddPrimitive={(clauseId, primitiveId) =>
+                  updateDraft(reviewCard.cardCode, (draft) =>
+                    addPrimitiveToClause(
+                      draft,
+                      clauseId,
+                      primitiveId,
+                      primitiveCatalogById
+                    )
+                  )
+                }
+                onChangeAdminNotes={(adminNotes) =>
+                  updateDraft(reviewCard.cardCode, (draft) => ({
+                    ...draft,
+                    adminNotes
+                  }))
+                }
+                onChangeParameter={(clauseId, assignmentIndex, parameterName, value) =>
+                  updateDraft(reviewCard.cardCode, (draft) =>
+                    updateAssignmentParameter({
+                      assignmentIndex,
+                      clauseId,
+                      draft,
+                      parameterName,
+                      primitiveCatalogById,
+                      value
+                    })
+                  )
+                }
+                onChangeStatus={(status) =>
+                  updateDraft(reviewCard.cardCode, (draft) => ({
+                    ...draft,
+                    status
+                  }))
+                }
+                onClose={() => setReviewCardCode(null)}
+                onRemovePrimitive={(clauseId, assignmentIndex) =>
+                  updateDraft(reviewCard.cardCode, (draft) =>
+                    removePrimitiveFromClause(draft, clauseId, assignmentIndex)
+                  )
+                }
+                onSave={() => saveReview(reviewCard)}
+                primitiveCatalog={preview.primitiveCatalog}
+                primitiveCatalogById={primitiveCatalogById}
+              />
+            )}
           </>
         ) : (
           <section className="mt-6 py-16 border border-dashed border-white/15 rounded-lg text-center">
@@ -131,6 +269,84 @@ export function CardCatalogImportPreview() {
       </div>
     </main>
   );
+}
+
+type ReviewDraft = {
+  status: ApprovalStatus;
+  adminNotes: string;
+  clauses: EditableClause[];
+};
+
+function createReviewDraft(card: PreviewCard): ReviewDraft {
+  return {
+    status: card.suggestion?.supportStatus === "requires_engine_support"
+      ? "requires_engine_support"
+      : "approved",
+    adminNotes: "",
+    clauses:
+      card.suggestion?.clauses.map((clause) => ({
+        id: clause.id,
+        sourceText: clause.sourceText,
+        normalizedText: clause.normalizedText,
+        unsupportedReason: clause.unsupportedReason,
+        assignments: clause.assignments.map((assignment) => ({
+          primitiveId: assignment.assignment.primitiveId,
+          family: assignment.assignment.family,
+          sourceText: assignment.assignment.sourceText,
+          parameters: assignment.assignment.parameters,
+          confidence: assignment.assignment.confidence
+        }))
+      })) ?? []
+  };
+}
+
+function markCardPersisted(
+  preview: Preview,
+  card: PreviewCard,
+  persisted: {
+    cardCode: string;
+    status: ApprovalStatus;
+    sourceTextHash: string;
+    updatedAt: string;
+  }
+): Preview {
+  const previousState = card.existingCatalog.state;
+  const nextCards = preview.cards.map((candidate) =>
+    candidate.cardCode === card.cardCode
+      ? {
+          ...candidate,
+          existingCatalog: {
+            state: "already_persisted" as const,
+            persisted: {
+              cardCode: persisted.cardCode,
+              status: persisted.status,
+              sourceTextHash: persisted.sourceTextHash,
+              updatedAt: persisted.updatedAt
+            }
+          }
+        }
+      : candidate
+  );
+
+  return {
+    ...preview,
+    summary: {
+      ...preview.summary,
+      newCardCount:
+        previousState === "new"
+          ? Math.max(0, preview.summary.newCardCount - 1)
+          : preview.summary.newCardCount,
+      alreadyPersistedCardCount:
+        previousState === "already_persisted"
+          ? preview.summary.alreadyPersistedCardCount
+          : preview.summary.alreadyPersistedCardCount + 1,
+      changedSincePersistedCardCount:
+        previousState === "changed_since_persisted"
+          ? Math.max(0, preview.summary.changedSincePersistedCardCount - 1)
+          : preview.summary.changedSincePersistedCardCount
+    },
+    cards: nextCards
+  };
 }
 
 function SummaryBand({ preview }: { preview: Preview }) {
@@ -185,18 +401,27 @@ function Metric({
   );
 }
 
-function CardTable({ cards }: { cards: PreviewCard[] }) {
+function CardTable({
+  cards,
+  onReview,
+  reviewCardCode
+}: {
+  cards: PreviewCard[];
+  onReview(card: PreviewCard): void;
+  reviewCardCode: string | null;
+}) {
   return (
     <section className="mt-5 border border-white/10 rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse text-sm">
+        <table className="w-full min-w-[1080px] border-collapse text-sm">
           <thead className="bg-slate-900 text-slate-400 text-xs uppercase">
             <tr>
               <th className="px-4 py-3 w-40 text-left font-medium">Card</th>
               <th className="px-4 py-3 text-left font-medium">Rules Text</th>
-              <th className="px-4 py-3 w-48 text-left font-medium">Catalog</th>
-              <th className="px-4 py-3 w-52 text-left font-medium">Status</th>
-              <th className="px-4 py-3 w-80 text-left font-medium">Primitives</th>
+              <th className="px-4 py-3 w-44 text-left font-medium">Catalog</th>
+              <th className="px-4 py-3 w-44 text-left font-medium">Status</th>
+              <th className="px-4 py-3 w-72 text-left font-medium">Primitives</th>
+              <th className="px-4 py-3 w-32 text-left font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -235,16 +460,17 @@ function CardTable({ cards }: { cards: PreviewCard[] }) {
                   ) : null}
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex flex-wrap gap-1.5">
-                    {(card.suggestion?.primitiveIds ?? ["vanilla"]).map((primitiveId) => (
-                      <span
-                        className="bg-white/5 px-2 py-1 border border-white/10 rounded font-mono text-[11px] text-slate-300"
-                        key={primitiveId}
-                      >
-                        {primitiveId}
-                      </span>
-                    ))}
-                  </div>
+                  <PrimitiveChips primitiveIds={card.suggestion?.primitiveIds ?? ["vanilla"]} />
+                </td>
+                <td className="px-4 py-4">
+                  <Button
+                    onClick={() => onReview(card)}
+                    size="sm"
+                    type="button"
+                    variant={reviewCardCode === card.cardCode ? "default" : "secondary"}
+                  >
+                    Review
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -252,6 +478,402 @@ function CardTable({ cards }: { cards: PreviewCard[] }) {
         </table>
       </div>
     </section>
+  );
+}
+
+function ReviewPanel({
+  card,
+  draft,
+  isSaving,
+  onAddPrimitive,
+  onChangeAdminNotes,
+  onChangeParameter,
+  onChangeStatus,
+  onClose,
+  onRemovePrimitive,
+  onSave,
+  primitiveCatalog,
+  primitiveCatalogById
+}: {
+  card: PreviewCard;
+  draft: ReviewDraft;
+  isSaving: boolean;
+  onAddPrimitive(clauseId: string, primitiveId: string): void;
+  onChangeAdminNotes(value: string): void;
+  onChangeParameter(
+    clauseId: string,
+    assignmentIndex: number,
+    parameterName: string,
+    value: string
+  ): void;
+  onChangeStatus(status: ApprovalStatus): void;
+  onClose(): void;
+  onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
+  onSave(): void;
+  primitiveCatalog: PrimitiveCatalogEntry[];
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+}) {
+  return (
+    <section className="mt-5 bg-slate-900/70 p-5 border border-cyan-400/20 rounded-lg">
+      <div className="flex md:flex-row flex-col md:justify-between gap-4">
+        <div>
+          <p className="font-mono text-cyan-200 text-xs">{card.cardCode}</p>
+          <h2 className="mt-1 font-semibold text-xl">{card.name}</h2>
+          <p className="mt-2 max-w-3xl text-slate-300 text-sm leading-relaxed">
+            {card.rulesText || "No rules text."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 h-fit">
+          <select
+            className="bg-slate-950 px-3 py-2 border border-white/15 rounded-md text-sm"
+            onChange={(event) => onChangeStatus(event.target.value as ApprovalStatus)}
+            value={draft.status}
+          >
+            <option value="approved">approved</option>
+            <option value="requires_engine_support">requires engine support</option>
+            <option value="rejected">rejected</option>
+          </select>
+          <Button disabled={isSaving} onClick={onSave} type="button">
+            <Save className="size-4" aria-hidden="true" />
+            {isSaving ? "Saving..." : "Persist"}
+          </Button>
+          <Button onClick={onClose} type="button" variant="secondary">
+            Close
+          </Button>
+        </div>
+      </div>
+
+      <div className="gap-4 grid lg:grid-cols-[1fr_320px] mt-5">
+        <div className="space-y-4">
+          {draft.clauses.length === 0 ? (
+            <div className="bg-slate-950/70 p-4 border border-white/10 rounded-lg">
+              <p className="text-slate-300 text-sm">Vanilla card approval.</p>
+            </div>
+          ) : (
+            draft.clauses.map((clause) => (
+              <ClauseEditor
+                clause={clause}
+                key={clause.id}
+                onAddPrimitive={onAddPrimitive}
+                onChangeParameter={onChangeParameter}
+                onRemovePrimitive={onRemovePrimitive}
+                primitiveCatalog={primitiveCatalog}
+                primitiveCatalogById={primitiveCatalogById}
+              />
+            ))
+          )}
+        </div>
+
+        <aside className="bg-slate-950/70 p-4 border border-white/10 rounded-lg h-fit">
+          <label className="block text-slate-400 text-xs uppercase tracking-wide">
+            Admin Notes
+          </label>
+          <textarea
+            className="bg-slate-950 mt-2 p-3 border border-white/15 rounded-md w-full min-h-36 text-sm"
+            onChange={(event) => onChangeAdminNotes(event.target.value)}
+            value={draft.adminNotes}
+          />
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function ClauseEditor({
+  clause,
+  onAddPrimitive,
+  onChangeParameter,
+  onRemovePrimitive,
+  primitiveCatalog,
+  primitiveCatalogById
+}: {
+  clause: EditableClause;
+  onAddPrimitive(clauseId: string, primitiveId: string): void;
+  onChangeParameter(
+    clauseId: string,
+    assignmentIndex: number,
+    parameterName: string,
+    value: string
+  ): void;
+  onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
+  primitiveCatalog: PrimitiveCatalogEntry[];
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+}) {
+  const [selectedPrimitiveId, setSelectedPrimitiveId] = useState(
+    primitiveCatalog[0]?.id ?? ""
+  );
+
+  return (
+    <div className="bg-slate-950/70 p-4 border border-white/10 rounded-lg">
+      <div className="flex md:flex-row flex-col md:justify-between gap-3">
+        <div>
+          <p className="font-mono text-slate-500 text-xs">{clause.id}</p>
+          <p className="mt-1 text-slate-200 text-sm">{clause.sourceText}</p>
+          {clause.unsupportedReason && (
+            <p className="mt-2 text-amber-200 text-xs">{clause.unsupportedReason}</p>
+          )}
+        </div>
+        <div className="flex gap-2 h-fit">
+          <select
+            className="bg-slate-900 px-2 py-2 border border-white/15 rounded-md text-xs"
+            onChange={(event) => setSelectedPrimitiveId(event.target.value)}
+            value={selectedPrimitiveId}
+          >
+            {primitiveCatalog.map((primitive) => (
+              <option key={primitive.id} value={primitive.id}>
+                {primitive.id}
+              </option>
+            ))}
+          </select>
+          <Button
+            disabled={!selectedPrimitiveId}
+            onClick={() => onAddPrimitive(clause.id, selectedPrimitiveId)}
+            size="sm"
+            type="button"
+            variant="secondary"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Add
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3 mt-4">
+        {clause.assignments.map((assignment, assignmentIndex) => (
+          <PrimitiveEditor
+            assignment={assignment}
+            assignmentIndex={assignmentIndex}
+            clauseId={clause.id}
+            key={`${assignment.primitiveId}:${assignmentIndex}`}
+            onChangeParameter={onChangeParameter}
+            onRemovePrimitive={onRemovePrimitive}
+            primitiveCatalogById={primitiveCatalogById}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PrimitiveEditor({
+  assignment,
+  assignmentIndex,
+  clauseId,
+  onChangeParameter,
+  onRemovePrimitive,
+  primitiveCatalogById
+}: {
+  assignment: EditableAssignment;
+  assignmentIndex: number;
+  clauseId: string;
+  onChangeParameter(
+    clauseId: string,
+    assignmentIndex: number,
+    parameterName: string,
+    value: string
+  ): void;
+  onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+}) {
+  const catalogEntry = primitiveCatalogById.get(assignment.primitiveId);
+  const parameterNames = [
+    ...new Set([
+      ...(catalogEntry?.parameters.map((parameter) => parameter.name) ?? []),
+      ...Object.keys(assignment.parameters)
+    ])
+  ];
+
+  return (
+    <div className="bg-white/[0.03] p-3 border border-white/10 rounded-md">
+      <div className="flex justify-between gap-3">
+        <div>
+          <p className="font-mono text-cyan-100 text-xs">{assignment.primitiveId}</p>
+          <p className="mt-1 text-slate-500 text-xs">{catalogEntry?.description}</p>
+        </div>
+        <Button
+          onClick={() => onRemovePrimitive(clauseId, assignmentIndex)}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+
+      {parameterNames.length > 0 && (
+        <div className="gap-3 grid sm:grid-cols-2 xl:grid-cols-3 mt-3">
+          {parameterNames.map((parameterName) => {
+            const parameterDefinition = catalogEntry?.parameters.find(
+              (parameter) => parameter.name === parameterName
+            );
+
+            return (
+              <label className="block" key={parameterName}>
+                <span className="text-slate-400 text-xs">
+                  {parameterName}
+                  {parameterDefinition?.required ? " *" : ""}
+                </span>
+                <input
+                  className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
+                  onChange={(event) =>
+                    onChangeParameter(
+                      clauseId,
+                      assignmentIndex,
+                      parameterName,
+                      event.target.value
+                    )
+                  }
+                  type={parameterDefinition?.type === "number" ? "number" : "text"}
+                  value={String(assignment.parameters[parameterName] ?? "")}
+                />
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function addPrimitiveToClause(
+  draft: ReviewDraft,
+  clauseId: string,
+  primitiveId: string,
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>
+): ReviewDraft {
+  const primitive = primitiveCatalogById.get(primitiveId);
+
+  if (!primitive) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    clauses: draft.clauses.map((clause) =>
+      clause.id === clauseId
+        ? {
+            ...clause,
+            assignments: [
+              ...clause.assignments,
+              {
+                primitiveId,
+                family: primitive.family,
+                sourceText: clause.sourceText,
+                parameters: {},
+                confidence: "medium"
+              }
+            ]
+          }
+        : clause
+    )
+  };
+}
+
+function removePrimitiveFromClause(
+  draft: ReviewDraft,
+  clauseId: string,
+  assignmentIndex: number
+): ReviewDraft {
+  return {
+    ...draft,
+    clauses: draft.clauses.map((clause) =>
+      clause.id === clauseId
+        ? {
+            ...clause,
+            assignments: clause.assignments.filter(
+              (_, index) => index !== assignmentIndex
+            )
+          }
+        : clause
+    )
+  };
+}
+
+function updateAssignmentParameter({
+  assignmentIndex,
+  clauseId,
+  draft,
+  parameterName,
+  primitiveCatalogById,
+  value
+}: {
+  assignmentIndex: number;
+  clauseId: string;
+  draft: ReviewDraft;
+  parameterName: string;
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+  value: string;
+}): ReviewDraft {
+  return {
+    ...draft,
+    clauses: draft.clauses.map((clause) =>
+      clause.id === clauseId
+        ? {
+            ...clause,
+            assignments: clause.assignments.map((assignment, index) =>
+              index === assignmentIndex
+                ? {
+                    ...assignment,
+                    parameters: {
+                      ...assignment.parameters,
+                      [parameterName]: parseParameterValue({
+                        primitiveCatalogById,
+                        assignment,
+                        parameterName,
+                        value
+                      })
+                    }
+                  }
+                : assignment
+            )
+          }
+        : clause
+    )
+  };
+}
+
+function parseParameterValue({
+  assignment,
+  parameterName,
+  primitiveCatalogById,
+  value
+}: {
+  assignment: EditableAssignment;
+  parameterName: string;
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+  value: string;
+}): string | number | boolean | null {
+  if (value.trim() === "") {
+    return null;
+  }
+
+  const parameterDefinition = primitiveCatalogById
+    .get(assignment.primitiveId)
+    ?.parameters.find((parameter) => parameter.name === parameterName);
+
+  if (parameterDefinition?.type === "number") {
+    return Number(value);
+  }
+
+  if (parameterDefinition?.type === "boolean") {
+    return value === "true";
+  }
+
+  return value;
+}
+
+function PrimitiveChips({ primitiveIds }: { primitiveIds: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {primitiveIds.map((primitiveId) => (
+        <span
+          className="bg-white/5 px-2 py-1 border border-white/10 rounded font-mono text-[11px] text-slate-300"
+          key={primitiveId}
+        >
+          {primitiveId}
+        </span>
+      ))}
+    </div>
   );
 }
 
