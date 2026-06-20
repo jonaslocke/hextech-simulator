@@ -1,18 +1,30 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode
+} from "react";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
+  ChevronsUpDown,
   Database,
   FileJson,
   ListChecks,
   Plus,
   Save,
+  Search,
   Trash2,
   Upload
 } from "lucide-react";
 import { Button } from "@/shared/components/button";
+import { cn } from "@/shared/utils/cn";
 import {
   approveCardCatalogBehavior,
   previewCardCatalogUpload
@@ -679,17 +691,11 @@ function ClauseEditor({
           )}
         </div>
         <div className="flex gap-2 h-fit">
-          <select
-            className="bg-slate-900 px-2 py-2 border border-white/15 rounded-md text-xs"
-            onChange={(event) => setSelectedPrimitiveId(event.target.value)}
+          <PrimitiveCombobox
+            onChange={setSelectedPrimitiveId}
+            primitives={primitiveCatalog}
             value={selectedPrimitiveId}
-          >
-            {primitiveCatalog.map((primitive) => (
-              <option key={primitive.id} value={primitive.id}>
-                {primitive.id}
-              </option>
-            ))}
-          </select>
+          />
           <Button
             disabled={!selectedPrimitiveId}
             onClick={() => onAddPrimitive(clause.id, selectedPrimitiveId)}
@@ -716,6 +722,147 @@ function ClauseEditor({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function PrimitiveCombobox({
+  onChange,
+  primitives,
+  value
+}: {
+  onChange(value: string): void;
+  primitives: PrimitiveCatalogEntry[];
+  value: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const listboxId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selectedPrimitive = primitives.find((primitive) => primitive.id === value);
+  const filteredPrimitives = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return primitives;
+    }
+
+    return primitives.filter((primitive) =>
+      [
+        primitive.id,
+        primitive.name,
+        primitive.family,
+        primitive.description
+      ].some((field) => field.toLowerCase().includes(query))
+    );
+  }, [primitives, search]);
+
+  useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  function selectPrimitive(primitiveId: string) {
+    onChange(primitiveId);
+    setIsOpen(false);
+    setSearch("");
+  }
+
+  function selectFirstFilteredPrimitive() {
+    const firstPrimitive = filteredPrimitives[0];
+
+    if (firstPrimitive) {
+      selectPrimitive(firstPrimitive.id);
+    }
+  }
+
+  return (
+    <div className="relative w-80">
+      <button
+        aria-controls={listboxId}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="flex justify-between items-center gap-2 bg-slate-900 px-3 py-2 border border-white/15 rounded-md w-full h-8 text-left text-xs"
+        onClick={() => setIsOpen((current) => !current)}
+        role="combobox"
+        type="button"
+      >
+        <span className="min-w-0">
+          <span className="block font-mono text-slate-100 truncate">
+            {selectedPrimitive?.id ?? "Select primitive"}
+          </span>
+          {selectedPrimitive && (
+            <span className="block text-slate-500 truncate">
+              {selectedPrimitive.name}
+            </span>
+          )}
+        </span>
+        <ChevronsUpDown className="flex-none size-4 text-slate-400" aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div className="right-0 z-20 absolute bg-slate-950 shadow-xl mt-2 border border-white/15 rounded-md w-[420px] max-w-[calc(100vw-3rem)] overflow-hidden">
+          <div className="flex items-center gap-2 px-3 border-white/10 border-b">
+            <Search className="size-4 text-slate-500" aria-hidden="true" />
+            <input
+              className="bg-transparent py-3 outline-none w-full text-sm placeholder:text-slate-600"
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  selectFirstFilteredPrimitive();
+                }
+
+                if (event.key === "Escape") {
+                  setIsOpen(false);
+                }
+              }}
+              placeholder="Search primitives..."
+              ref={inputRef}
+              value={search}
+            />
+          </div>
+
+          <div className="max-h-72 overflow-y-auto p-1" id={listboxId} role="listbox">
+            {filteredPrimitives.length === 0 ? (
+              <p className="px-3 py-6 text-center text-slate-500 text-sm">
+                No primitive found.
+              </p>
+            ) : (
+              filteredPrimitives.map((primitive) => (
+                <button
+                  aria-selected={primitive.id === value}
+                  className="flex items-start gap-3 hover:bg-white/10 px-2 py-2 rounded w-full text-left"
+                  key={primitive.id}
+                  onClick={() => selectPrimitive(primitive.id)}
+                  role="option"
+                  type="button"
+                >
+                  <Check
+                    className={cn(
+                      "mt-0.5 size-4 flex-none text-cyan-200",
+                      primitive.id === value ? "opacity-100" : "opacity-0"
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-mono text-slate-100 text-xs">
+                      {primitive.id}
+                    </span>
+                    <span className="block mt-0.5 text-slate-400 text-xs">
+                      {primitive.name} · {primitive.family}
+                    </span>
+                    <span className="block mt-1 text-slate-500 text-xs line-clamp-2">
+                      {primitive.description}
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
