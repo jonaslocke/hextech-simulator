@@ -10,7 +10,7 @@ import {
   getPrimitiveCatalogEntry,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
-import { gameZoneKinds } from "../src/server/match/game";
+import { gameZoneKinds, modifierDurations } from "../src/server/match/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
@@ -49,7 +49,7 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
 
   assert.deepEqual(modifyMight?.parameters, {
     amount: -1,
-    duration: "this_turn",
+    duration: "thisTurn",
     minimum: 1,
     target: "unit"
   });
@@ -145,6 +145,36 @@ test("catalogs selector unit zone as a known game zone enum", () => {
   assert.equal(invalidZoneValidation.complete, false);
   assert.match(
     invalidZoneValidation.issues[0]?.message ?? "",
+    /must be one of/
+  );
+});
+
+test("catalogs modify might duration as a known modifier duration enum", () => {
+  const modifyMight = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "modifier.modify_might"
+  );
+  const durationParameter = modifyMight?.parameters.find(
+    (parameter) => parameter.name === "duration"
+  );
+  const invalidDurationValidation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "modifier.modify_might",
+      family: "modifier",
+      sourceText: "give a unit +1 :rb_might: for a weird duration",
+      parameters: {
+        amount: 1,
+        target: "unit",
+        duration: "weird_duration"
+      },
+      confidence: "medium"
+    },
+    getPrimitiveCatalogEntry("modifier.modify_might", "modifier")
+  );
+
+  assert.deepEqual(durationParameter?.options, [...modifierDurations]);
+  assert.equal(invalidDurationValidation.complete, false);
+  assert.match(
+    invalidDurationValidation.issues[0]?.message ?? "",
     /must be one of/
   );
 });

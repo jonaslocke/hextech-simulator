@@ -798,11 +798,11 @@ function readMinimum(rulesText: string): number | null {
 
 function readDuration(rulesText: string): string | null {
   if (rulesText.includes("this turn")) {
-    return "this_turn";
+    return "thisTurn";
   }
 
-  if (rulesText.includes("while")) {
-    return "conditional";
+  if (rulesText.includes("while") && rulesText.includes("battlefield")) {
+    return "whileSourceAtBattlefield";
   }
 
   return null;

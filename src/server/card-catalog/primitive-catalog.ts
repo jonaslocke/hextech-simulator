@@ -3,7 +3,7 @@ import type {
   PrimitiveAssignment,
   PrimitiveFamily
 } from "./primitive-discovery";
-import { gameZoneKinds } from "../match/game";
+import { gameZoneKinds, modifierDurations } from "../match/game";
 
 export type PrimitiveParameterType =
   | "string"
@@ -337,7 +337,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("amount", "number", "The Might delta."),
       required("target", "target", "The modified unit."),
-      optional("duration", "duration", "How long the modifier lasts."),
+      optional("duration", "duration", "How long the modifier lasts.", modifierDurations),
       optional("minimum", "number", "The minimum resulting Might.")
     ],
     engineSupport: supported("Selected as an initial executable modifier primitive for the new catalog pipeline.")

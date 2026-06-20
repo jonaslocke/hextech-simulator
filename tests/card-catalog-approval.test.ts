@@ -80,7 +80,7 @@ function createApprovedStupefyInput(): ApprovedCardBehaviorInput {
             sourceText: "Give a unit -1 :rb_might:",
             parameters: {
               amount: -1,
-              duration: "this_turn",
+              duration: "thisTurn",
               target: "unit",
               minimum: 1
             },

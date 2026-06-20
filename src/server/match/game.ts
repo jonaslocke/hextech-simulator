@@ -42,6 +42,7 @@ export const playerZoneKinds = [
   "base"
 ] as const;
 export const gameZoneKinds = [...playerZoneKinds, "battlefield"] as const;
+export const modifierDurations = ["thisTurn", "whileSourceAtBattlefield"] as const;
 
 export const battlefieldChoiceSchema = z.object({
   playerId: z.string().min(1),
@@ -135,7 +136,7 @@ export const modifierSchema = z.object({
   kind: z.enum(["mightDelta", "spellEnergyDiscount"]),
   amount: z.number().int(),
   minimum: z.number().int().min(0).nullable().default(null),
-  duration: z.enum(["thisTurn", "whileSourceAtBattlefield"]),
+  duration: z.enum(modifierDurations),
   createdAtTurn: z.number().int().min(1)
 });
 
@@ -222,6 +223,7 @@ export type PlayerBattlefieldPool = z.infer<typeof playerBattlefieldPoolSchema>;
 export type MulliganChoice = z.infer<typeof mulliganChoiceSchema>;
 export type PlayerZones = z.infer<typeof playerZonesSchema>;
 export type GameZoneKind = (typeof gameZoneKinds)[number];
+export type ModifierDuration = (typeof modifierDurations)[number];
 export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
 export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
