@@ -8,6 +8,7 @@ import {
   deriveCardCode,
   discoverCardPrimitives,
   getPrimitiveCatalogEntry,
+  playerReferenceKinds,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
 import {
@@ -58,7 +59,7 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
     target: "unit"
   });
   assert.deepEqual(draw?.parameters, {
-    player: "controller",
+    player: "player",
     count: 1
   });
 });
@@ -88,7 +89,7 @@ test("discovers selector constraints for target legality from card text", () => 
 
   assert.deepEqual(findAssignment(backToBack, "selector.friendly_unit")?.parameters, {
     count: 2,
-    controller: "self",
+    controller: "player",
     excludesSource: false
   });
   assert.deepEqual(findAssignment(fallingComet, "selector.unit")?.parameters, {
@@ -196,7 +197,7 @@ test("catalogs rune resource behavior with known resource type enum", () => {
       family: "action",
       sourceText: "add a rune resource",
       parameters: {
-        player: "controller",
+        player: "player",
         resourceType: "mana",
         amount: 1
       },
@@ -209,6 +210,35 @@ test("catalogs rune resource behavior with known resource type enum", () => {
   assert.equal(invalidResourceValidation.complete, false);
   assert.match(
     invalidResourceValidation.issues[0]?.message ?? "",
+    /must be one of/
+  );
+});
+
+test("catalogs player parameters as known player reference enum", () => {
+  const drawCards = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "action.draw_cards"
+  );
+  const playerParameter = drawCards?.parameters.find(
+    (parameter) => parameter.name === "player"
+  );
+  const invalidPlayerValidation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "action.draw_cards",
+      family: "action",
+      sourceText: "draw 1",
+      parameters: {
+        player: "teammate",
+        count: 1
+      },
+      confidence: "medium"
+    },
+    getPrimitiveCatalogEntry("action.draw_cards", "action")
+  );
+
+  assert.deepEqual(playerParameter?.options, [...playerReferenceKinds]);
+  assert.equal(invalidPlayerValidation.complete, false);
+  assert.match(
+    invalidPlayerValidation.issues[0]?.message ?? "",
     /must be one of/
   );
 });

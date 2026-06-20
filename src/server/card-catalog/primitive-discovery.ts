@@ -142,7 +142,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["count"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "self", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["count"], (context) =>
@@ -157,12 +157,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
     /\bdraw\b/.test(context.rulesText)
-      ? assignment(context, "action.draw_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
+      ? assignment(context, "action.draw_cards", "action", { player: "player", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
       : null
   ),
   primitive("action.discard_cards", "action", "Discard cards", "Move cards from hand to trash.", ["player", "count"], (context) =>
     /\bdiscard\b/.test(context.rulesText)
-      ? assignment(context, "action.discard_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "discard") ?? 1 }, "high")
+      ? assignment(context, "action.discard_cards", "action", { player: "player", count: readNumberAfter(context.rulesText, "discard") ?? 1 }, "high")
       : null
   ),
   primitive("action.move_unit", "action", "Move unit", "Move a unit between zones or battlefields.", ["destination", "count"], (context) =>
@@ -283,12 +283,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player", "count", "target"], (context) =>
     /\bchoose\b/.test(context.rulesText)
-      ? assignment(context, "choice.choose_target", "choice", { player: "controller", count: readChoiceCount(context.rulesText), target: readGenericTarget(context.rulesText) }, "high")
+      ? assignment(context, "choice.choose_target", "choice", { player: "player", count: readChoiceCount(context.rulesText), target: readGenericTarget(context.rulesText) }, "high")
       : null
   ),
   primitive("choice.choose_mode", "choice", "Choose mode", "Player chooses one mode from a modal effect.", ["player"], (context) =>
     /\bchoose one\b|\bdo one of the following\b/.test(context.rulesText)
-      ? assignment(context, "choice.choose_mode", "choice", { player: "controller" }, "high")
+      ? assignment(context, "choice.choose_mode", "choice", { player: "player" }, "high")
       : null
   ),
   primitive("choice.optional", "choice", "Optional choice", "Player may choose whether to apply a behavior.", ["player"], (context) =>
@@ -586,7 +586,7 @@ function readTriggerSubject(rulesText: string): string {
 
 function readTurnPlayer(rulesText: string): string {
   if (rulesText.includes("your turn")) {
-    return "controller";
+    return "player";
   }
 
   if (rulesText.includes("opponent")) {
@@ -594,10 +594,10 @@ function readTurnPlayer(rulesText: string): string {
   }
 
   if (rulesText.includes("each")) {
-    return "each_player";
+    return "eachPlayer";
   }
 
-  return "current_turn_player";
+  return "currentTurnPlayer";
 }
 
 function readUnitScope(rulesText: string): string {
@@ -618,14 +618,14 @@ function readUnitScope(rulesText: string): string {
 
 function readPlayer(rulesText: string): string {
   if (rulesText.includes("each player")) {
-    return "each_player";
+    return "eachPlayer";
   }
 
   if (rulesText.includes("opponent")) {
     return "opponent";
   }
 
-  return "controller";
+  return "player";
 }
 
 function readMoveDestination(rulesText: string): string | null {

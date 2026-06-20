@@ -63,6 +63,13 @@ export type PrimitiveParameterValidation = {
   issues: ParameterValidationIssue[];
 };
 
+export const playerReferenceKinds = [
+  "player",
+  "opponent",
+  "eachPlayer",
+  "currentTurnPlayer"
+] as const;
+
 type PrimitiveCatalogSeed = Omit<PrimitiveCatalogEntry, "examples">;
 
 const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
@@ -624,7 +631,7 @@ function required(
     type,
     required: true,
     description,
-    ...(options ? { options } : {})
+    ...parameterOptions(type, options)
   };
 }
 
@@ -639,8 +646,23 @@ function optional(
     type,
     required: false,
     description,
-    ...(options ? { options } : {})
+    ...parameterOptions(type, options)
   };
+}
+
+function parameterOptions(
+  type: PrimitiveParameterType,
+  options: readonly string[] | undefined
+): Pick<PrimitiveParameterDefinition, "options"> {
+  if (options) {
+    return { options };
+  }
+
+  if (type === "player") {
+    return { options: playerReferenceKinds };
+  }
+
+  return {};
 }
 
 function supported(note: string): PrimitiveEngineSupport {

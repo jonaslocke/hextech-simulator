@@ -99,7 +99,7 @@ function createApprovedStupefyInput(): ApprovedCardBehaviorInput {
             family: "action",
             sourceText: "Draw 1",
             parameters: {
-              player: "controller",
+              player: "player",
               count: 1
             },
             confidence: "high"
