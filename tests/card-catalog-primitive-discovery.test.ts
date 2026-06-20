@@ -5,10 +5,16 @@ import {
   analyzeLocalCardSetBehaviorSuggestions,
   analyzeLocalCardSetCorpus,
   buildPrimitiveCatalog,
+  costResourceTypes,
   deriveCardCode,
   discoverCardPrimitives,
   getPrimitiveCatalogEntry,
   playerReferenceKinds,
+  runeEntryStates,
+  targetReferenceKinds,
+  tokenKinds,
+  triggerSubjectKinds,
+  unitScopeKinds,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
 import {
@@ -243,10 +249,100 @@ test("catalogs player parameters as known player reference enum", () => {
   );
 });
 
+test("catalogs corpus-backed primitive text parameters as enums", () => {
+  const catalog = buildPrimitiveCatalog();
+  const onPlay = catalog.find((entry) => entry.id === "trigger.on_play");
+  const selectorUnit = catalog.find((entry) => entry.id === "selector.unit");
+  const channelRunes = catalog.find((entry) => entry.id === "action.channel_runes");
+  const playToken = catalog.find((entry) => entry.id === "action.play_token");
+  const payCost = catalog.find((entry) => entry.id === "cost.pay");
+
+  assert.deepEqual(
+    onPlay?.parameters.find((parameter) => parameter.name === "subject")?.options,
+    [...triggerSubjectKinds]
+  );
+  assert.deepEqual(
+    selectorUnit?.parameters.find((parameter) => parameter.name === "scope")?.options,
+    [...unitScopeKinds]
+  );
+  assert.deepEqual(
+    channelRunes?.parameters.find((parameter) => parameter.name === "entryState")?.options,
+    [...runeEntryStates]
+  );
+  assert.deepEqual(
+    playToken?.parameters.find((parameter) => parameter.name === "tokenName")?.options,
+    [...tokenKinds]
+  );
+  assert.deepEqual(
+    payCost?.parameters.find((parameter) => parameter.name === "resource")?.options,
+    [...costResourceTypes]
+  );
+});
+
+test("catalogs target parameters as known target references", () => {
+  const modifyMight = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "modifier.modify_might"
+  );
+  const targetParameter = modifyMight?.parameters.find(
+    (parameter) => parameter.name === "target"
+  );
+  const invalidTargetValidation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "modifier.modify_might",
+      family: "modifier",
+      sourceText: "give something +1 :rb_might:",
+      parameters: {
+        amount: 1,
+        target: "unspecified"
+      },
+      confidence: "low"
+    },
+    getPrimitiveCatalogEntry("modifier.modify_might", "modifier")
+  );
+
+  assert.deepEqual(targetParameter?.options, [...targetReferenceKinds]);
+  assert.equal(invalidTargetValidation.complete, false);
+  assert.match(
+    invalidTargetValidation.issues[0]?.message ?? "",
+    /must be one of/
+  );
+});
+
+test("discovers exact token names from token creation text", () => {
+  const recruit = discoverCardPrimitives(
+    createTestCard({
+      name: "Recruit Maker",
+      publicCode: "TST-002/001",
+      text: "When you play me, play a 1 :rb_might: Recruit unit token in your base."
+    })
+  );
+  const gold = discoverCardPrimitives(
+    createTestCard({
+      name: "Gold Maker",
+      publicCode: "TST-003/001",
+      text: "When I move, play four Gold gear tokens exhausted."
+    })
+  );
+
+  assert.equal(
+    findAssignment(recruit, "action.play_token")?.parameters.tokenName,
+    "1 :rb_might: Recruit unit"
+  );
+  assert.equal(
+    findAssignment(gold, "action.play_token")?.parameters.tokenName,
+    "Gold gear"
+  );
+});
+
 test("discovers reusable primitives from the full local card corpus", async () => {
   const report = await analyzeLocalCardSetCorpus();
+  const catalog = buildPrimitiveCatalog(report.primitives);
   const primitiveIds = new Set(
     report.primitives.map((entry) => entry.primitive.id)
+  );
+  const tankKeyword = catalog.find((entry) => entry.id === "keyword.tank");
+  const tankParameter = tankKeyword?.parameters.find(
+    (parameter) => parameter.name === "keyword"
   );
 
   assert.deepEqual(report.summary.sourceFiles, [
@@ -266,6 +362,7 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
   assert.equal(primitiveIds.has("selector.unit"), true);
   assert.equal(report.summary.discoveredPrimitiveCount > 20, true);
+  assert.deepEqual(tankParameter?.options, ["Tank"]);
 });
 
 test("builds a corpus behavior suggestion report without behavior templates", async () => {

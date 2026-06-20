@@ -231,7 +231,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.play_token", "action", "Play token", "Create or play a token.", ["tokenName", "count"], (context) =>
-    /\btoken\b/.test(context.rulesText)
+    /\btokens?\b/.test(context.rulesText)
       ? assignment(context, "action.play_token", "action", { tokenName: readTokenName(context.normalizedText), count: readFirstNumber(context.rulesText) ?? 1 }, "medium")
       : null
   ),
@@ -825,7 +825,12 @@ function readCostType(rulesText: string): string | null {
 }
 
 function readTokenName(normalizedText: string): string | null {
-  const match = normalizedText.match(/play (?:a |an |one |two |three |four )?([^.]*) token/i);
+  const matches = [
+    ...normalizedText.matchAll(
+      /\bplay\s+(?:(?:a|an|one|two|three|four)\s+)?([^,.;]*?)\s+tokens?\b/gi
+    )
+  ];
+  const match = matches.at(-1);
 
   return match?.[1]?.trim() || null;
 }

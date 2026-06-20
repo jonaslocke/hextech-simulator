@@ -70,6 +70,36 @@ export const playerReferenceKinds = [
   "currentTurnPlayer"
 ] as const;
 
+export const triggerSubjectKinds = [
+  "source",
+  "controller",
+  "event_subject"
+] as const;
+
+export const unitScopeKinds = ["any", "each", "friendly", "enemy"] as const;
+
+export const targetReferenceKinds = [
+  "enemy_unit",
+  "equipment",
+  "friendly_unit",
+  "rune",
+  "runes",
+  "source",
+  "unit"
+] as const;
+
+export const runeEntryStates = ["default", "exhausted"] as const;
+
+export const costResourceTypes = ["energy", "rune"] as const;
+
+export const tokenKinds = [
+  "1 :rb_might: Recruit unit",
+  "2 :rb_might: Sand Soldier unit",
+  "3 :rb_might: Mech unit",
+  "Gold gear",
+  "ready 3 :rb_might: Sprite unit"
+] as const;
+
 type PrimitiveCatalogSeed = Omit<PrimitiveCatalogEntry, "examples">;
 
 const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
@@ -94,7 +124,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "trigger",
     name: "On play trigger",
     description: "Creates an effect when a card is played.",
-    parameters: [required("subject", "string", "The played card or player event that fires the trigger.")],
+    parameters: [required("subject", "string", "The played card or player event that fires the trigger.", triggerSubjectKinds)],
     engineSupport: partiallySupported("Recurring corpus primitive; executable support must be validated per event source.")
   }),
   "trigger.on_move": primitiveSeed({
@@ -102,14 +132,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "trigger",
     name: "On move trigger",
     description: "Creates an effect when a unit moves.",
-    parameters: [required("subject", "string", "The unit movement event that fires the trigger.")]
+    parameters: [required("subject", "string", "The unit movement event that fires the trigger.", triggerSubjectKinds)]
   }),
   "trigger.on_death": primitiveSeed({
     id: "trigger.on_death",
     family: "trigger",
     name: "On death trigger",
     description: "Creates an effect when a unit dies.",
-    parameters: [required("subject", "string", "The death event that fires the trigger.")]
+    parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)]
   }),
   "trigger.end_of_turn": primitiveSeed({
     id: "trigger.end_of_turn",
@@ -136,7 +166,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Select unit",
     description: "Constrains a choice or effect to units.",
     parameters: [
-      optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy."),
+      optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy.", unitScopeKinds),
       optional("count", "number", "How many units are selected when the text says a fixed count."),
       optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
@@ -243,7 +273,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The player who channels runes."),
       required("count", "number", "The number of runes channeled."),
-      optional("entryState", "string", "Whether channeled runes enter ready or exhausted.")
+      optional("entryState", "string", "Whether channeled runes use the default entry state or enter exhausted.", runeEntryStates)
     ],
     engineSupport: requiresEngineSupport("Channel effects are recurring in the corpus and need generalized card-driven execution.")
   }),
@@ -338,7 +368,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Play token",
     description: "Creates or plays a token.",
     parameters: [
-      required("tokenName", "string", "The token to create or play."),
+      required("tokenName", "string", "The token to create or play.", tokenKinds),
       required("count", "number", "The number of tokens.")
     ]
   }),
@@ -369,7 +399,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Changes a card or ability cost.",
     parameters: [
       required("amount", "number", "The cost delta."),
-      required("costType", "resource", "The resource being modified."),
+      required("costType", "resource", "The resource being modified.", costResourceTypes),
       optional("minimum", "number", "The minimum resulting cost.")
     ],
     engineSupport: partiallySupported("Cost modification is recurring in the corpus; resource and scope variants require additional validation.")
@@ -460,7 +490,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Requires an additional or alternate cost.",
     parameters: [
       required("amount", "number", "The cost amount."),
-      required("resource", "resource", "The resource paid.")
+      required("resource", "resource", "The resource paid.", costResourceTypes)
     ],
     engineSupport: partiallySupported("Cost payment is foundational, but arbitrary additional and alternate costs need per-primitive validation.")
   }),
@@ -610,14 +640,41 @@ function buildFallbackSeed(
     description:
       discovered?.primitive.description ??
       "Primitive discovered from card text and awaiting catalog definition.",
-    parameters:
-      discovered?.primitive.parameterNames.map((name) =>
-        optional(name, "string", "Parameter discovered from the raw primitive detector.")
-      ) ?? [],
+    parameters: buildFallbackParameters(discovered),
     engineSupport: id.startsWith("keyword.")
       ? requiresEngineSupport("Keyword behavior must be reviewed and mapped to engine behavior.")
       : requiresEngineSupport("This primitive needs catalog definition and engine support review.")
   });
+}
+
+function buildFallbackParameters(
+  discovered: DiscoveredPrimitive | undefined
+): PrimitiveParameterDefinition[] {
+  return (
+    discovered?.primitive.parameterNames.map((name) =>
+      optional(
+        name,
+        "string",
+        "Parameter discovered from the raw primitive detector.",
+        exactDiscoveredStringOptions(discovered, name)
+      )
+    ) ?? []
+  );
+}
+
+function exactDiscoveredStringOptions(
+  discovered: DiscoveredPrimitive,
+  parameterName: string
+): readonly string[] | undefined {
+  const values = [
+    ...new Set(
+      discovered.examples
+        .map((example) => example.parameters[parameterName])
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+    )
+  ].sort();
+
+  return values.length > 0 ? values : undefined;
 }
 
 function required(
@@ -660,6 +717,18 @@ function parameterOptions(
 
   if (type === "player") {
     return { options: playerReferenceKinds };
+  }
+
+  if (type === "target") {
+    return { options: targetReferenceKinds };
+  }
+
+  if (type === "zone") {
+    return { options: gameZoneKinds };
+  }
+
+  if (type === "duration") {
+    return { options: modifierDurations };
   }
 
   return {};
