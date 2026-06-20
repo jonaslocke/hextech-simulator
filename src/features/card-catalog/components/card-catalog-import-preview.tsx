@@ -210,54 +210,56 @@ export function CardCatalogImportPreview() {
               reviewCardCode={reviewCardCode}
             />
             {reviewCard && (
-              <ReviewPanel
-                card={reviewCard}
-                draft={drafts[reviewCard.cardCode] ?? createReviewDraft(reviewCard)}
-                isSaving={savingCardCode === reviewCard.cardCode}
-                onAddPrimitive={(clauseId, primitiveId) =>
-                  updateDraft(reviewCard.cardCode, (draft) =>
-                    addPrimitiveToClause(
-                      draft,
-                      clauseId,
-                      primitiveId,
-                      primitiveCatalogById
+              <ReviewModal card={reviewCard} onClose={() => setReviewCardCode(null)}>
+                <ReviewPanel
+                  card={reviewCard}
+                  draft={drafts[reviewCard.cardCode] ?? createReviewDraft(reviewCard)}
+                  isSaving={savingCardCode === reviewCard.cardCode}
+                  onAddPrimitive={(clauseId, primitiveId) =>
+                    updateDraft(reviewCard.cardCode, (draft) =>
+                      addPrimitiveToClause(
+                        draft,
+                        clauseId,
+                        primitiveId,
+                        primitiveCatalogById
+                      )
                     )
-                  )
-                }
-                onChangeAdminNotes={(adminNotes) =>
-                  updateDraft(reviewCard.cardCode, (draft) => ({
-                    ...draft,
-                    adminNotes
-                  }))
-                }
-                onChangeParameter={(clauseId, assignmentIndex, parameterName, value) =>
-                  updateDraft(reviewCard.cardCode, (draft) =>
-                    updateAssignmentParameter({
-                      assignmentIndex,
-                      clauseId,
-                      draft,
-                      parameterName,
-                      primitiveCatalogById,
-                      value
-                    })
-                  )
-                }
-                onChangeStatus={(status) =>
-                  updateDraft(reviewCard.cardCode, (draft) => ({
-                    ...draft,
-                    status
-                  }))
-                }
-                onClose={() => setReviewCardCode(null)}
-                onRemovePrimitive={(clauseId, assignmentIndex) =>
-                  updateDraft(reviewCard.cardCode, (draft) =>
-                    removePrimitiveFromClause(draft, clauseId, assignmentIndex)
-                  )
-                }
-                onSave={() => saveReview(reviewCard)}
-                primitiveCatalog={preview.primitiveCatalog}
-                primitiveCatalogById={primitiveCatalogById}
-              />
+                  }
+                  onChangeAdminNotes={(adminNotes) =>
+                    updateDraft(reviewCard.cardCode, (draft) => ({
+                      ...draft,
+                      adminNotes
+                    }))
+                  }
+                  onChangeParameter={(clauseId, assignmentIndex, parameterName, value) =>
+                    updateDraft(reviewCard.cardCode, (draft) =>
+                      updateAssignmentParameter({
+                        assignmentIndex,
+                        clauseId,
+                        draft,
+                        parameterName,
+                        primitiveCatalogById,
+                        value
+                      })
+                    )
+                  }
+                  onChangeStatus={(status) =>
+                    updateDraft(reviewCard.cardCode, (draft) => ({
+                      ...draft,
+                      status
+                    }))
+                  }
+                  onClose={() => setReviewCardCode(null)}
+                  onRemovePrimitive={(clauseId, assignmentIndex) =>
+                    updateDraft(reviewCard.cardCode, (draft) =>
+                      removePrimitiveFromClause(draft, clauseId, assignmentIndex)
+                    )
+                  }
+                  onSave={() => saveReview(reviewCard)}
+                  primitiveCatalog={preview.primitiveCatalog}
+                  primitiveCatalogById={primitiveCatalogById}
+                />
+              </ReviewModal>
             )}
           </>
         ) : (
@@ -481,6 +483,35 @@ function CardTable({
   );
 }
 
+function ReviewModal({
+  card,
+  children,
+  onClose
+}: {
+  card: PreviewCard;
+  children: ReactNode;
+  onClose(): void;
+}) {
+  return (
+    <div
+      aria-labelledby="card-catalog-review-title"
+      aria-modal="true"
+      className="z-50 fixed inset-0 flex justify-center items-start p-4 sm:p-6 overflow-y-auto"
+      role="dialog"
+    >
+      <button
+        aria-label={`Close review for ${card.name}`}
+        className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="relative w-full max-w-[1280px] shadow-2xl shadow-cyan-950/40">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ReviewPanel({
   card,
   draft,
@@ -514,11 +545,13 @@ function ReviewPanel({
   primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
 }) {
   return (
-    <section className="mt-5 bg-slate-900/70 p-5 border border-cyan-400/20 rounded-lg">
+    <section className="bg-slate-900 p-5 border border-cyan-400/20 rounded-lg">
       <div className="flex md:flex-row flex-col md:justify-between gap-4">
         <div>
           <p className="font-mono text-cyan-200 text-xs">{card.cardCode}</p>
-          <h2 className="mt-1 font-semibold text-xl">{card.name}</h2>
+          <h2 className="mt-1 font-semibold text-xl" id="card-catalog-review-title">
+            {card.name}
+          </h2>
           <p className="mt-2 max-w-3xl text-slate-300 text-sm leading-relaxed">
             {card.rulesText || "No rules text."}
           </p>
