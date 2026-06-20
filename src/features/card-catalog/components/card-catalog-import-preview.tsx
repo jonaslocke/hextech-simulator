@@ -1,10 +1,7 @@
 "use client";
 
 import {
-  useEffect,
-  useId,
   useMemo,
-  useRef,
   useState,
   type ChangeEvent,
   type ReactNode
@@ -19,11 +16,23 @@ import {
   ListChecks,
   Plus,
   Save,
-  Search,
   Trash2,
   Upload
 } from "lucide-react";
 import { Button } from "@/shared/components/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/shared/components/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/shared/components/popover";
 import { cn } from "@/shared/utils/cn";
 import {
   approveCardCatalogBehavior,
@@ -736,108 +745,42 @@ function PrimitiveCombobox({
   value: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const listboxId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
   const selectedPrimitive = primitives.find((primitive) => primitive.id === value);
-  const filteredPrimitives = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return primitives;
-    }
-
-    return primitives.filter((primitive) =>
-      [
-        primitive.id,
-        primitive.name,
-        primitive.family,
-        primitive.description
-      ].some((field) => field.toLowerCase().includes(query))
-    );
-  }, [primitives, search]);
-
-  useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus();
-    }
-  }, [isOpen]);
 
   function selectPrimitive(primitiveId: string) {
     onChange(primitiveId);
     setIsOpen(false);
-    setSearch("");
-  }
-
-  function selectFirstFilteredPrimitive() {
-    const firstPrimitive = filteredPrimitives[0];
-
-    if (firstPrimitive) {
-      selectPrimitive(firstPrimitive.id);
-    }
   }
 
   return (
-    <div className="relative w-80">
-      <button
-        aria-controls={listboxId}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        className="flex justify-between items-center gap-2 bg-slate-900 px-3 py-2 border border-white/15 rounded-md w-full h-8 text-left text-xs"
-        onClick={() => setIsOpen((current) => !current)}
-        role="combobox"
-        type="button"
-      >
-        <span className="min-w-0">
-          <span className="block font-mono text-slate-100 truncate">
-            {selectedPrimitive?.id ?? "Select primitive"}
+    <Popover onOpenChange={setIsOpen} open={isOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          aria-expanded={isOpen}
+          className="w-80 justify-between overflow-hidden bg-slate-900 text-left font-normal"
+          role="combobox"
+          type="button"
+          variant="secondary"
+        >
+          <span className="min-w-0 truncate font-mono text-xs">
+            {selectedPrimitive
+              ? `${selectedPrimitive.id} - ${selectedPrimitive.name}`
+              : "Select primitive"}
           </span>
-          {selectedPrimitive && (
-            <span className="block text-slate-500 truncate">
-              {selectedPrimitive.name}
-            </span>
-          )}
-        </span>
-        <ChevronsUpDown className="flex-none size-4 text-slate-400" aria-hidden="true" />
-      </button>
-
-      {isOpen && (
-        <div className="right-0 z-20 absolute bg-slate-950 shadow-xl mt-2 border border-white/15 rounded-md w-[420px] max-w-[calc(100vw-3rem)] overflow-hidden">
-          <div className="flex items-center gap-2 px-3 border-white/10 border-b">
-            <Search className="size-4 text-slate-500" aria-hidden="true" />
-            <input
-              className="bg-transparent py-3 outline-none w-full text-sm placeholder:text-slate-600"
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  selectFirstFilteredPrimitive();
-                }
-
-                if (event.key === "Escape") {
-                  setIsOpen(false);
-                }
-              }}
-              placeholder="Search primitives..."
-              ref={inputRef}
-              value={search}
-            />
-          </div>
-
-          <div className="max-h-72 overflow-y-auto p-1" id={listboxId} role="listbox">
-            {filteredPrimitives.length === 0 ? (
-              <p className="px-3 py-6 text-center text-slate-500 text-sm">
-                No primitive found.
-              </p>
-            ) : (
-              filteredPrimitives.map((primitive) => (
-                <button
-                  aria-selected={primitive.id === value}
-                  className="flex items-start gap-3 hover:bg-white/10 px-2 py-2 rounded w-full text-left"
+          <ChevronsUpDown className="ml-2 size-4 shrink-0 text-slate-400" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[420px] p-0">
+        <Command>
+          <CommandInput placeholder="Search primitives..." />
+          <CommandList>
+            <CommandEmpty>No primitive found.</CommandEmpty>
+            <CommandGroup>
+              {primitives.map((primitive) => (
+                <CommandItem
                   key={primitive.id}
-                  onClick={() => selectPrimitive(primitive.id)}
-                  role="option"
-                  type="button"
+                  onSelect={() => selectPrimitive(primitive.id)}
+                  value={`${primitive.id} ${primitive.name} ${primitive.family} ${primitive.description}`}
                 >
                   <Check
                     className={cn(
@@ -851,19 +794,19 @@ function PrimitiveCombobox({
                       {primitive.id}
                     </span>
                     <span className="block mt-0.5 text-slate-400 text-xs">
-                      {primitive.name} · {primitive.family}
+                      {primitive.name} / {primitive.family}
                     </span>
                     <span className="block mt-1 text-slate-500 text-xs line-clamp-2">
                       {primitive.description}
                     </span>
                   </span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
