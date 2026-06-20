@@ -4,9 +4,13 @@ import {
   analyzeCardBehaviorSuggestions,
   analyzeLocalCardSetBehaviorSuggestions,
   analyzeLocalCardSetCorpus,
+  buildPrimitiveCatalog,
   deriveCardCode,
-  discoverCardPrimitives
+  discoverCardPrimitives,
+  getPrimitiveCatalogEntry,
+  validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
+import { gameZoneKinds } from "../src/server/match/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
@@ -114,6 +118,34 @@ test("builds typed card behavior suggestions with parameter validation", () => {
   assert.equal(
     modifier?.catalogEntry.parameters.some((parameter) => parameter.name === "target"),
     true
+  );
+});
+
+test("catalogs selector unit zone as a known game zone enum", () => {
+  const selectorUnit = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "selector.unit"
+  );
+  const zoneParameter = selectorUnit?.parameters.find(
+    (parameter) => parameter.name === "zone"
+  );
+  const invalidZoneValidation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "selector.unit",
+      family: "selector",
+      sourceText: "unit in a fake zone",
+      parameters: {
+        zone: "fake_zone"
+      },
+      confidence: "medium"
+    },
+    getPrimitiveCatalogEntry("selector.unit", "selector")
+  );
+
+  assert.deepEqual(zoneParameter?.options, [...gameZoneKinds]);
+  assert.equal(invalidZoneValidation.complete, false);
+  assert.match(
+    invalidZoneValidation.issues[0]?.message ?? "",
+    /must be one of/
   );
 });
 

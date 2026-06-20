@@ -31,6 +31,17 @@ export const gameTurnPhases = [
   "end"
 ] as const;
 export const startOfTurnSteps = ["awaken", "beginning", "channel", "draw"] as const;
+export const playerZoneKinds = [
+  "legend",
+  "champion",
+  "mainDeck",
+  "runeDeck",
+  "hand",
+  "trash",
+  "banishment",
+  "base"
+] as const;
+export const gameZoneKinds = [...playerZoneKinds, "battlefield"] as const;
 
 export const battlefieldChoiceSchema = z.object({
   playerId: z.string().min(1),
@@ -210,6 +221,7 @@ export type BattlefieldChoice = z.infer<typeof battlefieldChoiceSchema>;
 export type PlayerBattlefieldPool = z.infer<typeof playerBattlefieldPoolSchema>;
 export type MulliganChoice = z.infer<typeof mulliganChoiceSchema>;
 export type PlayerZones = z.infer<typeof playerZonesSchema>;
+export type GameZoneKind = (typeof gameZoneKinds)[number];
 export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
 export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;

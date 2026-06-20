@@ -739,6 +739,8 @@ function PrimitiveEditor({
             const parameterDefinition = catalogEntry?.parameters.find(
               (parameter) => parameter.name === parameterName
             );
+            const parameterOptions = parameterDefinition?.options ?? [];
+            const fieldValue = String(assignment.parameters[parameterName] ?? "");
 
             return (
               <label className="block" key={parameterName}>
@@ -746,19 +748,41 @@ function PrimitiveEditor({
                   {parameterName}
                   {parameterDefinition?.required ? " *" : ""}
                 </span>
-                <input
-                  className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
-                  onChange={(event) =>
-                    onChangeParameter(
-                      clauseId,
-                      assignmentIndex,
-                      parameterName,
-                      event.target.value
-                    )
-                  }
-                  type={parameterDefinition?.type === "number" ? "number" : "text"}
-                  value={String(assignment.parameters[parameterName] ?? "")}
-                />
+                {parameterOptions.length > 0 ? (
+                  <select
+                    className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
+                    onChange={(event) =>
+                      onChangeParameter(
+                        clauseId,
+                        assignmentIndex,
+                        parameterName,
+                        event.target.value
+                      )
+                    }
+                    value={fieldValue}
+                  >
+                    <option value="">Select {parameterName}</option>
+                    {parameterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
+                    onChange={(event) =>
+                      onChangeParameter(
+                        clauseId,
+                        assignmentIndex,
+                        parameterName,
+                        event.target.value
+                      )
+                    }
+                    type={parameterDefinition?.type === "number" ? "number" : "text"}
+                    value={fieldValue}
+                  />
+                )}
               </label>
             );
           })}

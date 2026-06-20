@@ -3,6 +3,7 @@ import type {
   PrimitiveAssignment,
   PrimitiveFamily
 } from "./primitive-discovery";
+import { gameZoneKinds } from "../match/game";
 
 export type PrimitiveParameterType =
   | "string"
@@ -26,6 +27,7 @@ export type PrimitiveParameterDefinition = {
   type: PrimitiveParameterType;
   required: boolean;
   description: string;
+  options?: readonly string[];
 };
 
 export type PrimitiveEngineSupport = {
@@ -129,7 +131,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy."),
       optional("count", "number", "How many units are selected when the text says a fixed count."),
-      optional("zone", "zone", "Where the unit must be, when stated."),
+      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
@@ -142,7 +144,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Constrains a choice or effect to units controlled by the acting player.",
     parameters: [
       optional("count", "number", "How many friendly units are selected."),
-      optional("zone", "zone", "Where the unit must be, when stated."),
+      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
@@ -156,7 +158,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Constrains a choice or effect to units controlled by an opponent.",
     parameters: [
       optional("count", "number", "How many enemy units are selected."),
-      optional("zone", "zone", "Where the unit must be, when stated."),
+      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
@@ -522,6 +524,18 @@ export function validatePrimitiveAssignmentParameters(
         parameterName: parameter.name,
         message: `Parameter "${parameter.name}" must be ${parameter.type}.`
       });
+      continue;
+    }
+
+    if (
+      !isMissingParameterValue(value) &&
+      parameter.options &&
+      !parameter.options.includes(String(value))
+    ) {
+      issues.push({
+        parameterName: parameter.name,
+        message: `Parameter "${parameter.name}" must be one of: ${parameter.options.join(", ")}.`
+      });
     }
   }
 
@@ -602,13 +616,15 @@ function required(
 function optional(
   name: string,
   type: PrimitiveParameterType,
-  description: string
+  description: string,
+  options?: readonly string[]
 ): PrimitiveParameterDefinition {
   return {
     name,
     type,
     required: false,
-    description
+    description,
+    ...(options ? { options } : {})
   };
 }
 
