@@ -215,6 +215,9 @@ export function CardCatalogImportPreview() {
                   card={reviewCard}
                   draft={drafts[reviewCard.cardCode] ?? createReviewDraft(reviewCard)}
                   isSaving={savingCardCode === reviewCard.cardCode}
+                  onAddClause={() =>
+                    updateDraft(reviewCard.cardCode, (draft) => addManualClause(draft))
+                  }
                   onAddPrimitive={(clauseId, primitiveId) =>
                     updateDraft(reviewCard.cardCode, (draft) =>
                       addPrimitiveToClause(
@@ -241,6 +244,11 @@ export function CardCatalogImportPreview() {
                         primitiveCatalogById,
                         value
                       })
+                    )
+                  }
+                  onChangeClauseSourceText={(clauseId, sourceText) =>
+                    updateDraft(reviewCard.cardCode, (draft) =>
+                      updateClauseSourceText(draft, clauseId, sourceText)
                     )
                   }
                   onChangeStatus={(status) =>
@@ -516,8 +524,10 @@ function ReviewPanel({
   card,
   draft,
   isSaving,
+  onAddClause,
   onAddPrimitive,
   onChangeAdminNotes,
+  onChangeClauseSourceText,
   onChangeParameter,
   onChangeStatus,
   onClose,
@@ -529,8 +539,10 @@ function ReviewPanel({
   card: PreviewCard;
   draft: ReviewDraft;
   isSaving: boolean;
+  onAddClause(): void;
   onAddPrimitive(clauseId: string, primitiveId: string): void;
   onChangeAdminNotes(value: string): void;
+  onChangeClauseSourceText(clauseId: string, value: string): void;
   onChangeParameter(
     clauseId: string,
     assignmentIndex: number,
@@ -578,9 +590,17 @@ function ReviewPanel({
 
       <div className="gap-4 grid lg:grid-cols-[1fr_320px] mt-5">
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={onAddClause} size="sm" type="button" variant="secondary">
+              <Plus className="size-4" aria-hidden="true" />
+              Add behavior clause
+            </Button>
+          </div>
           {draft.clauses.length === 0 ? (
             <div className="bg-slate-950/70 p-4 border border-white/10 rounded-lg">
-              <p className="text-slate-300 text-sm">Vanilla card approval.</p>
+              <p className="text-slate-300 text-sm">
+                No behavior clauses assigned yet.
+              </p>
             </div>
           ) : (
             draft.clauses.map((clause) => (
@@ -588,6 +608,7 @@ function ReviewPanel({
                 clause={clause}
                 key={clause.id}
                 onAddPrimitive={onAddPrimitive}
+                onChangeSourceText={onChangeClauseSourceText}
                 onChangeParameter={onChangeParameter}
                 onRemovePrimitive={onRemovePrimitive}
                 primitiveCatalog={primitiveCatalog}
@@ -615,6 +636,7 @@ function ReviewPanel({
 function ClauseEditor({
   clause,
   onAddPrimitive,
+  onChangeSourceText,
   onChangeParameter,
   onRemovePrimitive,
   primitiveCatalog,
@@ -622,6 +644,7 @@ function ClauseEditor({
 }: {
   clause: EditableClause;
   onAddPrimitive(clauseId: string, primitiveId: string): void;
+  onChangeSourceText(clauseId: string, value: string): void;
   onChangeParameter(
     clauseId: string,
     assignmentIndex: number,
@@ -641,7 +664,16 @@ function ClauseEditor({
       <div className="flex md:flex-row flex-col md:justify-between gap-3">
         <div>
           <p className="font-mono text-slate-500 text-xs">{clause.id}</p>
-          <p className="mt-1 text-slate-200 text-sm">{clause.sourceText}</p>
+          <label className="block mt-2">
+            <span className="text-slate-400 text-xs uppercase tracking-wide">
+              Clause Source
+            </span>
+            <input
+              className="bg-slate-900 mt-1 px-2 py-2 border border-white/15 rounded-md w-full min-w-80 text-sm"
+              onChange={(event) => onChangeSourceText(clause.id, event.target.value)}
+              value={clause.sourceText}
+            />
+          </label>
           {clause.unsupportedReason && (
             <p className="mt-2 text-amber-200 text-xs">{clause.unsupportedReason}</p>
           )}
@@ -792,6 +824,24 @@ function PrimitiveEditor({
   );
 }
 
+function addManualClause(draft: ReviewDraft): ReviewDraft {
+  const sourceText = "Manual behavior";
+
+  return {
+    ...draft,
+    clauses: [
+      ...draft.clauses,
+      {
+        id: nextManualClauseId(draft),
+        sourceText,
+        normalizedText: sourceText,
+        unsupportedReason: null,
+        assignments: []
+      }
+    ]
+  };
+}
+
 function addPrimitiveToClause(
   draft: ReviewDraft,
   clauseId: string,
@@ -840,6 +890,29 @@ function removePrimitiveFromClause(
             assignments: clause.assignments.filter(
               (_, index) => index !== assignmentIndex
             )
+          }
+        : clause
+    )
+  };
+}
+
+function updateClauseSourceText(
+  draft: ReviewDraft,
+  clauseId: string,
+  sourceText: string
+): ReviewDraft {
+  return {
+    ...draft,
+    clauses: draft.clauses.map((clause) =>
+      clause.id === clauseId
+        ? {
+            ...clause,
+            sourceText,
+            normalizedText: sourceText.replace(/\s+/g, " ").trim(),
+            assignments: clause.assignments.map((assignment) => ({
+              ...assignment,
+              sourceText
+            }))
           }
         : clause
     )
@@ -917,6 +990,19 @@ function parseParameterValue({
   }
 
   return value;
+}
+
+function nextManualClauseId(draft: ReviewDraft): string {
+  const existingIds = new Set(draft.clauses.map((clause) => clause.id));
+  let index = draft.clauses.length + 1;
+  let clauseId = `manual-clause-${index}`;
+
+  while (existingIds.has(clauseId)) {
+    index += 1;
+    clauseId = `manual-clause-${index}`;
+  }
+
+  return clauseId;
 }
 
 function PrimitiveChips({ primitiveIds }: { primitiveIds: string[] }) {

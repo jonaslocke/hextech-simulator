@@ -10,7 +10,11 @@ import {
   getPrimitiveCatalogEntry,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
-import { gameZoneKinds, modifierDurations } from "../src/server/match/game";
+import {
+  gameZoneKinds,
+  modifierDurations,
+  runeResourceTypes
+} from "../src/server/match/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
@@ -175,6 +179,36 @@ test("catalogs modify might duration as a known modifier duration enum", () => {
   assert.equal(invalidDurationValidation.complete, false);
   assert.match(
     invalidDurationValidation.issues[0]?.message ?? "",
+    /must be one of/
+  );
+});
+
+test("catalogs rune resource behavior with known resource type enum", () => {
+  const addRuneResource = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "action.add_rune_resource"
+  );
+  const resourceTypeParameter = addRuneResource?.parameters.find(
+    (parameter) => parameter.name === "resourceType"
+  );
+  const invalidResourceValidation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "action.add_rune_resource",
+      family: "action",
+      sourceText: "add a rune resource",
+      parameters: {
+        player: "controller",
+        resourceType: "mana",
+        amount: 1
+      },
+      confidence: "medium"
+    },
+    getPrimitiveCatalogEntry("action.add_rune_resource", "action")
+  );
+
+  assert.deepEqual(resourceTypeParameter?.options, [...runeResourceTypes]);
+  assert.equal(invalidResourceValidation.complete, false);
+  assert.match(
+    invalidResourceValidation.issues[0]?.message ?? "",
     /must be one of/
   );
 });

@@ -43,6 +43,7 @@ export const playerZoneKinds = [
 ] as const;
 export const gameZoneKinds = [...playerZoneKinds, "battlefield"] as const;
 export const modifierDurations = ["thisTurn", "whileSourceAtBattlefield"] as const;
+export const runeResourceTypes = ["energy", "power"] as const;
 
 export const battlefieldChoiceSchema = z.object({
   playerId: z.string().min(1),
@@ -224,6 +225,7 @@ export type MulliganChoice = z.infer<typeof mulliganChoiceSchema>;
 export type PlayerZones = z.infer<typeof playerZonesSchema>;
 export type GameZoneKind = (typeof gameZoneKinds)[number];
 export type ModifierDuration = (typeof modifierDurations)[number];
+export type RuneResourceType = (typeof runeResourceTypes)[number];
 export type GamePlayerState = z.infer<typeof gamePlayerStateSchema>;
 export type BattlefieldState = z.infer<typeof battlefieldStateSchema>;
 export type GameSetupState = z.infer<typeof gameSetupStateSchema>;
@@ -327,7 +329,7 @@ export type RecycleCardsResult = {
 export type AddRuneResourceInput = {
   actorPlayerId: string;
   runeCardInstanceId: string;
-  resourceType: "energy" | "power";
+  resourceType: RuneResourceType;
   now?: string;
 };
 

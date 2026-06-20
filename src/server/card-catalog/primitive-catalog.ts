@@ -3,7 +3,7 @@ import type {
   PrimitiveAssignment,
   PrimitiveFamily
 } from "./primitive-discovery";
-import { gameZoneKinds, modifierDurations } from "../match/game";
+import { gameZoneKinds, modifierDurations, runeResourceTypes } from "../match/game";
 
 export type PrimitiveParameterType =
   | "string"
@@ -239,6 +239,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("entryState", "string", "Whether channeled runes enter ready or exhausted.")
     ],
     engineSupport: requiresEngineSupport("Channel effects are recurring in the corpus and need generalized card-driven execution.")
+  }),
+  "action.add_rune_resource": primitiveSeed({
+    id: "action.add_rune_resource",
+    family: "action",
+    name: "Add rune resource",
+    description: "Adds Energy or Power from a rune to the player's rune pool.",
+    parameters: [
+      required("player", "player", "The player who receives the rune-pool resource."),
+      required("resourceType", "resource", "The rune-pool resource produced.", runeResourceTypes),
+      required("amount", "number", "The amount of resource produced."),
+      optional("source", "target", "The rune card producing the resource.")
+    ],
+    engineSupport: supported("The current engine exposes rune resource actions for Energy and Power.")
   }),
   "action.deal_damage": primitiveSeed({
     id: "action.deal_damage",
@@ -603,13 +616,15 @@ function buildFallbackSeed(
 function required(
   name: string,
   type: PrimitiveParameterType,
-  description: string
+  description: string,
+  options?: readonly string[]
 ): PrimitiveParameterDefinition {
   return {
     name,
     type,
     required: true,
-    description
+    description,
+    ...(options ? { options } : {})
   };
 }
 
