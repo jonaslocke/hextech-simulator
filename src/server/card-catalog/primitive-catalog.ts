@@ -44,6 +44,8 @@ export type PrimitiveCatalogEntry = {
   description: string;
   parameters: PrimitiveParameterDefinition[];
   fixedRules: string[];
+  listensToEvents: GameEventKind[];
+  emitsEvents: GameEventKind[];
   timingRequirements: string[];
   targetingRequirements: string[];
   engineSupport: PrimitiveEngineSupport;
@@ -70,14 +72,55 @@ export const playerReferenceKinds = [
   "player",
   "opponent",
   "eachPlayer",
+  "anyPlayer",
   "currentTurnPlayer"
 ] as const;
 
-export const triggerSubjectKinds = [
+export const playEventSubjectKinds = [
   "source",
-  "controller",
-  "event_subject"
+  "card",
+  "unit",
+  "spell",
+  "gear"
 ] as const;
+
+export const triggerSubjectKinds = ["source", "event_subject"] as const;
+
+export const delayedTimingKinds = [
+  "endOfThisTurn",
+  "endOfPlayerTurn",
+  "endOfOpponentTurn"
+] as const;
+
+export const gameEventKinds = [
+  "turn.awaken",
+  "turn.beginning",
+  "turn.channel",
+  "turn.draw",
+  "turn.ended",
+  "card.played",
+  "card.chosen",
+  "card.readied",
+  "card.exhausted",
+  "card.drawn",
+  "card.discarded",
+  "card.recycled",
+  "card.revealed",
+  "card.banished",
+  "card.returnedToHand",
+  "unit.moved",
+  "unit.died",
+  "unit.damaged",
+  "unit.stunned",
+  "rune.channeled",
+  "resource.added",
+  "equipment.attached",
+  "equipment.detached",
+  "battlefield.conquered",
+  "battlefield.held"
+] as const;
+
+export type GameEventKind = (typeof gameEventKinds)[number];
 
 export const unitScopeKinds = ["any", "each", "friendly", "enemy"] as const;
 
@@ -165,12 +208,38 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: supported("Declared as a foundational timing primitive for the new catalog pipeline; not inherited from legacy runtime code."),
     timingRequirements: ["open chain priority"]
   }),
+  "timing.delayed": primitiveSeed({
+    id: "timing.delayed",
+    family: "timing",
+    name: "Delayed timing",
+    description: "Schedules the clause effect for a later turn boundary.",
+    parameters: [
+      required(
+        "point",
+        "string",
+        "The turn boundary when the scheduled effect resolves.",
+        delayedTimingKinds
+      )
+    ],
+    engineSupport: requiresEngineSupport(
+      "Delayed effects require future engine scheduling and source tracking."
+    )
+  }),
   "trigger.on_play": primitiveSeed({
     id: "trigger.on_play",
     family: "trigger",
     name: "On play trigger",
     description: "Creates an effect when a card is played.",
-    parameters: [required("subject", "string", "The played card or player event that fires the trigger.", triggerSubjectKinds)],
+    parameters: [
+      required("actor", "player", "Who played the card."),
+      required(
+        "subject",
+        "string",
+        "The kind of played card that fires the trigger.",
+        playEventSubjectKinds
+      )
+    ],
+    listensToEvents: ["card.played"],
     engineSupport: partiallySupported("Recurring corpus primitive; executable support must be validated per event source.")
   }),
   "trigger.on_move": primitiveSeed({
@@ -178,33 +247,70 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "trigger",
     name: "On move trigger",
     description: "Creates an effect when a unit moves.",
-    parameters: [required("subject", "string", "The unit movement event that fires the trigger.", triggerSubjectKinds)]
+    parameters: [required("subject", "string", "The unit movement event that fires the trigger.", triggerSubjectKinds)],
+    listensToEvents: ["unit.moved"]
   }),
   "trigger.on_death": primitiveSeed({
     id: "trigger.on_death",
     family: "trigger",
     name: "On death trigger",
     description: "Creates an effect when a unit dies.",
-    parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)]
+    parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)],
+    listensToEvents: ["unit.died"]
   }),
   "trigger.end_of_turn": primitiveSeed({
     id: "trigger.end_of_turn",
     family: "trigger",
     name: "End of turn trigger",
     description: "Creates an effect at the end of a turn.",
-    parameters: [required("player", "player", "Which player's end of turn fires the trigger.")]
+    parameters: [required("player", "player", "Which player's end of turn fires the trigger.")],
+    listensToEvents: ["turn.ended"]
   }),
   "trigger.conquer_battlefield": primitiveSeed({
     id: "trigger.conquer_battlefield",
     family: "trigger",
     name: "Conquer battlefield trigger",
-    description: "Creates an effect when a battlefield is conquered."
+    description: "Creates an effect when a battlefield is conquered.",
+    listensToEvents: ["battlefield.conquered"]
   }),
   "trigger.hold_battlefield": primitiveSeed({
     id: "trigger.hold_battlefield",
     family: "trigger",
     name: "Hold battlefield trigger",
-    description: "Creates an effect when a player holds a battlefield."
+    description: "Creates an effect when a player holds a battlefield.",
+    listensToEvents: ["battlefield.held"]
+  }),
+  "trigger.on_choose": primitiveSeed({
+    id: "trigger.on_choose",
+    family: "trigger",
+    name: "Choose trigger",
+    description: "Creates an effect when a card or game object is chosen.",
+    parameters: [
+      required("actor", "player", "Who made the choice."),
+      required(
+        "subject",
+        "string",
+        "What relationship the chosen object has to this source.",
+        triggerSubjectKinds
+      )
+    ],
+    listensToEvents: ["card.chosen"]
+  }),
+  "trigger.on_ready": primitiveSeed({
+    id: "trigger.on_ready",
+    family: "trigger",
+    name: "Ready trigger",
+    description: "Creates an effect when a card or game object becomes ready.",
+    parameters: [
+      required("actor", "player", "Who readied the object."),
+      required(
+        "subject",
+        "string",
+        "What relationship the readied object has to this source.",
+        triggerSubjectKinds
+      )
+    ],
+    listensToEvents: ["card.readied"]
   }),
   "selector.unit": primitiveSeed({
     id: "selector.unit",
@@ -263,6 +369,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("player", "player", "The player who draws cards."),
       required("count", "number", "The number of cards drawn.")
     ],
+    emitsEvents: ["card.drawn"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
   "action.discard_cards": primitiveSeed({
@@ -273,7 +380,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The player who discards cards."),
       required("count", "number", "The number of cards discarded.")
-    ]
+    ],
+    emitsEvents: ["card.discarded"]
   }),
   "action.move_unit": primitiveSeed({
     id: "action.move_unit",
@@ -284,6 +392,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("destination", "zone", "The destination zone or battlefield."),
       optional("count", "number", "The number of units moved.")
     ],
+    emitsEvents: ["unit.moved"],
     engineSupport: partiallySupported("Movement is recurring in the corpus; destination and timing variants require additional validation.")
   }),
   "action.ready_cards": primitiveSeed({
@@ -295,6 +404,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("target", "target", "The cards to ready."),
       optional("count", "number", "The number of cards to ready.")
     ],
+    emitsEvents: ["card.readied"],
     engineSupport: requiresEngineSupport("Ready effects are recurring in the corpus and need generalized card-driven execution.")
   }),
   "action.exhaust_cards": primitiveSeed({
@@ -306,6 +416,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("target", "target", "The cards to exhaust."),
       optional("count", "number", "The number of cards to exhaust.")
     ],
+    emitsEvents: ["card.exhausted"],
     engineSupport: partiallySupported("Exhaustion appears both as a cost and effect; arbitrary target exhaustion still needs validation.")
   }),
   "action.channel_runes": primitiveSeed({
@@ -318,6 +429,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("count", "number", "The number of runes channeled."),
       optional("entryState", "string", "Whether channeled runes use the default entry state or enter exhausted.", runeEntryStates)
     ],
+    emitsEvents: ["rune.channeled"],
     engineSupport: requiresEngineSupport("Channel effects are recurring in the corpus and need generalized card-driven execution.")
   }),
   "action.add_rune_resource": primitiveSeed({
@@ -331,6 +443,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("amount", "number", "The amount of resource produced."),
       optional("source", "target", "The rune card producing the resource.")
     ],
+    emitsEvents: ["resource.added"],
     engineSupport: supported("The current engine exposes rune resource actions for Energy and Power.")
   }),
   "action.deal_damage": primitiveSeed({
@@ -342,6 +455,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("amount", "number", "The amount of damage."),
       required("target", "target", "The damaged target.")
     ],
+    emitsEvents: ["unit.damaged"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
   "action.kill_unit": primitiveSeed({
@@ -350,6 +464,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Kill unit",
     description: "Kills a unit and moves it through the appropriate game zones.",
     parameters: [required("target", "target", "The unit to kill.")],
+    emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
   "action.banish_card": primitiveSeed({
@@ -357,14 +472,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Banish card",
     description: "Moves a card to banishment.",
-    parameters: [required("target", "target", "The card to banish.")]
+    parameters: [required("target", "target", "The card to banish.")],
+    emitsEvents: ["card.banished"]
   }),
   "action.return_to_hand": primitiveSeed({
     id: "action.return_to_hand",
     family: "action",
     name: "Return to hand",
     description: "Moves a card to its owner's hand.",
-    parameters: [required("target", "target", "The card to return.")]
+    parameters: [required("target", "target", "The card to return.")],
+    emitsEvents: ["card.returnedToHand"]
   }),
   "action.recycle_cards": primitiveSeed({
     id: "action.recycle_cards",
@@ -375,6 +492,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("target", "target", "The cards to recycle."),
       optional("count", "number", "The number of cards recycled.")
     ],
+    emitsEvents: ["card.recycled"],
     engineSupport: requiresEngineSupport("Recycle effects are recurring in the corpus and need generalized card-driven execution.")
   }),
   "action.look": primitiveSeed({
@@ -389,21 +507,24 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Reveal cards",
     description: "Reveals hidden cards.",
-    parameters: [optional("count", "number", "The number of cards revealed.")]
+    parameters: [optional("count", "number", "The number of cards revealed.")],
+    emitsEvents: ["card.revealed"]
   }),
   "action.attach_equipment": primitiveSeed({
     id: "action.attach_equipment",
     family: "action",
     name: "Attach equipment",
     description: "Attaches equipment to a legal unit.",
-    parameters: [required("target", "target", "The unit receiving the equipment.")]
+    parameters: [required("target", "target", "The unit receiving the equipment.")],
+    emitsEvents: ["equipment.attached"]
   }),
   "action.detach_equipment": primitiveSeed({
     id: "action.detach_equipment",
     family: "action",
     name: "Detach equipment",
     description: "Detaches equipment from a unit.",
-    parameters: [required("target", "target", "The equipment to detach.")]
+    parameters: [required("target", "target", "The equipment to detach.")],
+    emitsEvents: ["equipment.detached"]
   }),
   "action.play_token": primitiveSeed({
     id: "action.play_token",
@@ -413,14 +534,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("tokenName", "string", "The token to create or play.", tokenKinds),
       required("count", "number", "The number of tokens.")
-    ]
+    ],
+    emitsEvents: ["card.played"]
   }),
   "action.stun_card": primitiveSeed({
     id: "action.stun_card",
     family: "action",
     name: "Stun card",
     description: "Applies stun to a card.",
-    parameters: [required("target", "target", "The card to stun.")]
+    parameters: [required("target", "target", "The card to stun.")],
+    emitsEvents: ["unit.stunned"]
   }),
   "modifier.modify_might": primitiveSeed({
     id: "modifier.modify_might",
@@ -694,6 +817,8 @@ function primitiveSeed(input: Partial<PrimitiveCatalogSeed> & Pick<PrimitiveCata
   return {
     parameters: [],
     fixedRules: [],
+    listensToEvents: [],
+    emitsEvents: [],
     timingRequirements: [],
     targetingRequirements: [],
     engineSupport: requiresEngineSupport("No generalized implementation support has been declared for this primitive in the new catalog pipeline."),

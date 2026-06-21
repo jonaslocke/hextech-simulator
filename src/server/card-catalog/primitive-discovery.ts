@@ -123,9 +123,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("timing.reaction", "timing", "Reaction timing", "Card can be played at reaction timing.", [], (context) =>
     context.lowerText.includes("[reaction]") ? assignment(context, "timing.reaction", "timing", {}, "high") : null
   ),
-  primitive("trigger.on_play", "trigger", "On play trigger", "Behavior triggers when a card is played.", ["subject"], (context) =>
-    /\bwhen (you play|i'm played|you play me|i enter|i'm played)\b/.test(context.rulesText)
-      ? assignment(context, "trigger.on_play", "trigger", { subject: readTriggerSubject(context.rulesText) }, "medium")
+  primitive("timing.delayed", "timing", "Delayed timing", "Behavior resolves at a later turn boundary.", ["point"], (context) =>
+    /\bat the end of (this|your|an opponent's) turn\b/.test(context.rulesText)
+      ? assignment(context, "timing.delayed", "timing", { point: readDelayedTiming(context.rulesText) }, "high")
+      : null
+  ),
+  primitive("trigger.on_play", "trigger", "On play trigger", "Behavior triggers when a card is played.", ["actor", "subject"], (context) =>
+    /\bwhen (you play|a player plays|an opponent plays|i'm played|you play me|i enter)\b/.test(context.rulesText)
+      ? assignment(context, "trigger.on_play", "trigger", { actor: readEventActor(context.rulesText), subject: readPlayEventSubject(context.rulesText) }, "high")
       : null
   ),
   primitive("trigger.on_move", "trigger", "On move trigger", "Behavior triggers when a unit moves.", ["subject"], (context) =>
@@ -139,7 +144,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("trigger.end_of_turn", "trigger", "End of turn trigger", "Behavior triggers at end of turn.", ["player"], (context) =>
-    /\bat the end of (your|this|each|an opponent's) turn\b/.test(context.rulesText)
+    /\bat the end of (your|each|an opponent's) turn\b/.test(context.rulesText) &&
+    !/^when\b/.test(context.rulesText)
       ? assignment(context, "trigger.end_of_turn", "trigger", { player: readTurnPlayer(context.rulesText) }, "high")
       : null
   ),
@@ -151,6 +157,16 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("trigger.hold_battlefield", "trigger", "Hold battlefield trigger", "Behavior triggers when a player holds a battlefield.", [], (context) =>
     /\bwhen you hold here\b/.test(context.rulesText)
       ? assignment(context, "trigger.hold_battlefield", "trigger", {}, "high")
+      : null
+  ),
+  primitive("trigger.on_choose", "trigger", "Choose trigger", "Behavior triggers when a card or object is chosen.", ["actor", "subject"], (context) =>
+    isChoiceEventTrigger(context.rulesText)
+      ? assignment(context, "trigger.on_choose", "trigger", { actor: readEventActor(context.rulesText), subject: readChooseEventSubject(context.rulesText) }, "high")
+      : null
+  ),
+  primitive("trigger.on_ready", "trigger", "Ready trigger", "Behavior triggers when a card or object becomes ready.", ["actor", "subject"], (context) =>
+    /\bwhen (you|i) (?:choose or )?ready\b|\bwhen .*\bbecomes ready\b/.test(context.rulesText)
+      ? assignment(context, "trigger.on_ready", "trigger", { actor: readEventActor(context.rulesText), subject: readTriggerSubject(context.rulesText) }, "high")
       : null
   ),
   primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope", "minimumCount", "maximumCount"], (context) =>
@@ -179,12 +195,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.move_unit", "action", "Move unit", "Move a unit between zones or battlefields.", ["destination", "count"], (context) =>
-    /\bmove\b|\bmoved\b/.test(context.rulesText)
+    /\bmove\b|\bmoved\b/.test(readInstructionText(context.rulesText))
       ? assignment(context, "action.move_unit", "action", { destination: readMoveDestination(context.rulesText), count: readFirstNumber(context.rulesText) }, "medium")
       : null
   ),
   primitive("action.ready_cards", "action", "Ready cards", "Ready exhausted cards.", ["target", "count"], (context) =>
-    /\bready\b/.test(context.rulesText)
+    /\bready\b/.test(readInstructionText(context.rulesText))
       ? assignment(context, "action.ready_cards", "action", { target: readReadyTarget(context.rulesText), count: readNumberAfter(context.rulesText, "ready") }, "high")
       : null
   ),
@@ -290,7 +306,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player"], (context) =>
-    /\bchoose\b/.test(context.rulesText)
+    /\bchoose\b/.test(context.rulesText) && !isChoiceEventTrigger(context.rulesText)
       ? assignment(context, "choice.choose_target", "choice", { player: "player" }, "high")
       : null
   ),
@@ -650,6 +666,64 @@ function readTriggerSubject(rulesText: string): string {
   }
 
   return "event_subject";
+}
+
+function readEventActor(rulesText: string): string {
+  if (rulesText.includes("opponent")) {
+    return "opponent";
+  }
+
+  if (rulesText.includes("a player")) {
+    return "anyPlayer";
+  }
+
+  return "player";
+}
+
+function readPlayEventSubject(rulesText: string): string {
+  if (/\bplay (?:me|this)\b|\bthis is played\b|\bi'm played\b/.test(rulesText)) {
+    return "source";
+  }
+
+  if (/\bplay (?:a |another )?spell\b/.test(rulesText)) {
+    return "spell";
+  }
+
+  if (/\bplay (?:a |another )?unit\b/.test(rulesText)) {
+    return "unit";
+  }
+
+  if (/\bplay (?:a |another )?gear\b/.test(rulesText)) {
+    return "gear";
+  }
+
+  return "card";
+}
+
+function isChoiceEventTrigger(rulesText: string): boolean {
+  return /\bwhen (you|i) choose\b/.test(rulesText);
+}
+
+function readChooseEventSubject(rulesText: string): string {
+  return /\bwhen (you|i) choose(?: or ready)? me\b/.test(rulesText)
+    ? "source"
+    : "event_subject";
+}
+
+function readDelayedTiming(rulesText: string): string {
+  if (rulesText.includes("an opponent's turn")) {
+    return "endOfOpponentTurn";
+  }
+
+  if (rulesText.includes("your turn")) {
+    return "endOfPlayerTurn";
+  }
+
+  return "endOfThisTurn";
+}
+
+function readInstructionText(rulesText: string): string {
+  return rulesText.replace(/^when\b[^,]*,\s*/, "");
 }
 
 function readTurnPlayer(rulesText: string): string {

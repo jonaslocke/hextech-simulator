@@ -9,11 +9,12 @@ import {
   deriveCardCode,
   discoverCardPrimitives,
   getPrimitiveCatalogEntry,
+  gameEventKinds,
+  playEventSubjectKinds,
   playerReferenceKinds,
   runeEntryStates,
   targetReferenceKinds,
   tokenKinds,
-  triggerSubjectKinds,
   unitLocationRelations,
   unitScopeKinds,
   unitTargetAreas,
@@ -237,6 +238,89 @@ test("uses selectors for explicit choice legality and count", () => {
     controller: "opponent",
     excludesSource: false
   });
+});
+
+test("models play, choose, and ready clauses as event listeners", () => {
+  const ravenbloom = discoverCardPrimitives(
+    createTestCard({
+      name: "Ravenbloom Student",
+      publicCode: "OGN-103/298",
+      text: "When you play a spell, give me +1 :rb_might: this turn."
+    })
+  );
+  const bladeDancer = discoverCardPrimitives(
+    createTestCard({
+      name: "Blade Dancer",
+      publicCode: "SFD-216/221",
+      text: "When you choose a friendly unit, you may exhaust me and pay :rb_rune_rainbow: to ready it."
+    })
+  );
+  const irelia = discoverCardPrimitives(
+    createTestCard({
+      name: "Irelia, Fervent",
+      publicCode: "SFD-153/221",
+      text: "When you choose or ready me, give me +1 :rb_might: this turn."
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(ravenbloom, "trigger.on_play")?.parameters,
+    { actor: "player", subject: "spell" }
+  );
+  assert.deepEqual(
+    findAssignment(bladeDancer, "trigger.on_choose")?.parameters,
+    { actor: "player", subject: "event_subject" }
+  );
+  assert.equal(findAssignment(bladeDancer, "choice.choose_target"), undefined);
+  assert.deepEqual(findAssignment(irelia, "trigger.on_choose")?.parameters, {
+    actor: "player",
+    subject: "source"
+  });
+  assert.deepEqual(findAssignment(irelia, "trigger.on_ready")?.parameters, {
+    actor: "player",
+    subject: "source"
+  });
+  assert.equal(findAssignment(irelia, "action.ready_cards"), undefined);
+});
+
+test("models Targon's Peak as a conquer listener with delayed resolution", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Targon's Peak",
+      publicCode: "OGN-289/298",
+      text: "When you conquer here, ready 2 runes at the end of this turn."
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(discovery, "timing.delayed")?.parameters,
+    { point: "endOfThisTurn" }
+  );
+  assert.notEqual(
+    findAssignment(discovery, "trigger.conquer_battlefield"),
+    undefined
+  );
+  assert.equal(findAssignment(discovery, "trigger.end_of_turn"), undefined);
+  assert.deepEqual(
+    getPrimitiveCatalogEntry("trigger.conquer_battlefield", "trigger")
+      .listensToEvents,
+    ["battlefield.conquered"]
+  );
+});
+
+test("declares emitted events for reusable action primitives", () => {
+  assert.equal(gameEventKinds.includes("turn.awaken"), true);
+  assert.equal(gameEventKinds.includes("turn.beginning"), true);
+  assert.equal(gameEventKinds.includes("turn.channel"), true);
+  assert.equal(gameEventKinds.includes("turn.draw"), true);
+  assert.deepEqual(
+    getPrimitiveCatalogEntry("action.move_unit", "action").emitsEvents,
+    ["unit.moved"]
+  );
+  assert.deepEqual(
+    getPrimitiveCatalogEntry("action.ready_cards", "action").emitsEvents,
+    ["card.readied"]
+  );
 });
 
 test("discovers Base, source-location, and shared-location Unit constraints", () => {
@@ -492,7 +576,7 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
 
   assert.deepEqual(
     onPlay?.parameters.find((parameter) => parameter.name === "subject")?.options,
-    [...triggerSubjectKinds]
+    [...playEventSubjectKinds]
   );
   assert.deepEqual(
     selectorUnit?.parameters.find((parameter) => parameter.name === "scope")?.options,

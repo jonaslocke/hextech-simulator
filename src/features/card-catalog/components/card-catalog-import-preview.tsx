@@ -880,6 +880,28 @@ function PrimitiveEditor({
         </div>
       )}
 
+      {((catalogEntry?.listensToEvents.length ?? 0) > 0 ||
+        (catalogEntry?.emitsEvents.length ?? 0) > 0) && (
+        <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+          {(catalogEntry?.listensToEvents.length ?? 0) > 0 && (
+            <div>
+              <p className="text-slate-500">Listens to</p>
+              <p className="mt-1 font-mono text-cyan-100">
+                {catalogEntry?.listensToEvents.join(", ")}
+              </p>
+            </div>
+          )}
+          {(catalogEntry?.emitsEvents.length ?? 0) > 0 && (
+            <div>
+              <p className="text-slate-500">Emits</p>
+              <p className="mt-1 font-mono text-emerald-200">
+                {catalogEntry?.emitsEvents.join(", ")}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {parameterNames.length > 0 && (
         <div className="gap-3 grid sm:grid-cols-2 xl:grid-cols-3 mt-3">
           {parameterNames.map((parameterName) => {
