@@ -153,24 +153,19 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "trigger.hold_battlefield", "trigger", {}, "high")
       : null
   ),
-  primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope"], (context) =>
+  primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope", "minimumCount", "maximumCount"], (context) =>
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
       : null
   ),
-  primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["count"], (context) =>
+  primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
-  primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["count"], (context) =>
+  primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["minimumCount", "maximumCount"], (context) =>
     /\benemy units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.enemy_unit", "selector", { count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
-      : null
-  ),
-  primitive("selector.up_to", "selector", "Select up to count", "Behavior allows selecting up to a maximum count.", ["count"], (context) =>
-    /\bup to\b/.test(context.rulesText)
-      ? assignment(context, "selector.up_to", "selector", { count: readUpToCount(context.rulesText) }, "high")
+      ? assignment(context, "selector.enemy_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
@@ -289,19 +284,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("condition.while", "condition", "While condition", "Behavior applies while a condition is true.", [], (context) =>
     /\bwhile\b/.test(context.rulesText) ? assignment(context, "condition.while", "condition", {}, "medium") : null
   ),
-  primitive("condition.minimum", "condition", "Minimum value condition", "A value cannot go below a minimum.", ["minimum"], (context) =>
-    /\bminimum of\b/.test(context.rulesText)
-      ? assignment(context, "condition.minimum", "condition", { minimum: readMinimum(context.rulesText) }, "high")
-      : null
-  ),
   primitive("condition.fallback_cannot", "condition", "Fallback if cannot", "Use fallback behavior if primary behavior cannot happen.", [], (context) =>
     /\bif you can't\b|\bif you cannot\b/.test(context.rulesText)
       ? assignment(context, "condition.fallback_cannot", "condition", {}, "high")
       : null
   ),
-  primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player", "count", "target"], (context) =>
+  primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player"], (context) =>
     /\bchoose\b/.test(context.rulesText)
-      ? assignment(context, "choice.choose_target", "choice", { player: "player", count: readChoiceCount(context.rulesText), target: readGenericTarget(context.rulesText) }, "high")
+      ? assignment(context, "choice.choose_target", "choice", { player: "player" }, "high")
       : null
   ),
   primitive("choice.choose_mode", "choice", "Choose mode", "Player chooses one mode from a modal effect.", ["player"], (context) =>
@@ -788,26 +778,34 @@ function readUnitCount(rulesText: string): number | null {
     : null;
 }
 
-function readChoiceCount(rulesText: string): number | null {
-  const chooseMatch = rulesText.match(
-    /\bchoose\s+(?:up to\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\b/
-  );
-
-  if (!chooseMatch) {
-    return readUnitCount(rulesText);
-  }
-
-  return chooseMatch[1] === "a" || chooseMatch[1] === "an"
-    ? 1
-    : readNumberToken(chooseMatch[1]!);
-}
-
-function readUpToCount(rulesText: string): number | null {
+function readUnitCountBounds(rulesText: string): {
+  minimumCount: number | null;
+  maximumCount: number | null;
+} {
   const match = rulesText.match(
     /\bup to\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/
   );
 
-  return match ? readNumberToken(match[1]!) : null;
+  if (match) {
+    return {
+      minimumCount: 0,
+      maximumCount: readNumberToken(match[1]!)
+    };
+  }
+
+  if (/\bany number of\b/.test(rulesText)) {
+    return {
+      minimumCount: 0,
+      maximumCount: null
+    };
+  }
+
+  const exactCount = readUnitCount(rulesText);
+
+  return {
+    minimumCount: exactCount,
+    maximumCount: exactCount
+  };
 }
 
 function readUnitTargetArea(rulesText: string): string {

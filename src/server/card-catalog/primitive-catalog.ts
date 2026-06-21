@@ -213,7 +213,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Constrains a choice or effect to units.",
     parameters: [
       optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy.", unitScopeKinds),
-      optional("count", "number", "How many units are selected when the text says a fixed count."),
+      optional("minimumCount", "number", "The minimum number of units in the selection."),
+      optional("maximumCount", "number", "The maximum number of units in the selection."),
       required("area", "area", "The board area containing legal unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
@@ -227,7 +228,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Select friendly unit",
     description: "Constrains a choice or effect to units controlled by the acting player.",
     parameters: [
-      optional("count", "number", "How many friendly units are selected."),
+      optional("minimumCount", "number", "The minimum number of friendly units in the selection."),
+      optional("maximumCount", "number", "The maximum number of friendly units in the selection."),
       required("area", "area", "The board area containing legal friendly unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
@@ -242,7 +244,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Select enemy unit",
     description: "Constrains a choice or effect to units controlled by an opponent.",
     parameters: [
-      optional("count", "number", "How many enemy units are selected."),
+      optional("minimumCount", "number", "The minimum number of enemy units in the selection."),
+      optional("maximumCount", "number", "The maximum number of enemy units in the selection."),
       required("area", "area", "The board area containing legal enemy unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
@@ -250,15 +253,6 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
-  }),
-  "selector.up_to": primitiveSeed({
-    id: "selector.up_to",
-    family: "selector",
-    name: "Select up to count",
-    description: "Constrains a choice to zero through a maximum number of targets.",
-    parameters: [required("count", "number", "The maximum number of targets.")],
-    engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
-    targetingRequirements: ["target count may be zero through the maximum"]
   }),
   "action.draw_cards": primitiveSeed({
     id: "action.draw_cards",
@@ -489,14 +483,6 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Applies behavior while a condition is true.",
     engineSupport: ambiguous("The condition expression must be reviewed before implementation support can be determined.")
   }),
-  "condition.minimum": primitiveSeed({
-    id: "condition.minimum",
-    family: "condition",
-    name: "Minimum value condition",
-    description: "Constrains a value so it cannot go below a minimum.",
-    parameters: [required("minimum", "number", "The minimum allowed value.")],
-    engineSupport: supported("Declared as a foundational condition primitive for the new catalog pipeline; not inherited from legacy runtime code.")
-  }),
   "condition.fallback_cannot": primitiveSeed({
     id: "condition.fallback_cannot",
     family: "condition",
@@ -509,12 +495,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Choose target",
     description: "Prompts a player to choose one or more targets.",
     parameters: [
-      required("player", "player", "The player who makes the choice."),
-      optional("count", "number", "The number of targets chosen."),
-      required("target", "target", "The kind of target chosen.")
+      required("player", "player", "The player who makes the choice.")
     ],
     engineSupport: supported("Declared as a foundational choice primitive for the new catalog pipeline; not inherited from legacy runtime code."),
-    targetingRequirements: ["chosen targets must satisfy the attached selector primitives"]
+    targetingRequirements: [
+      "candidate legality and count bounds come from selector primitives in the same behavior clause"
+    ]
   }),
   "choice.choose_mode": primitiveSeed({
     id: "choice.choose_mode",
@@ -638,11 +624,48 @@ export function validatePrimitiveAssignmentParameters(
     }
   }
 
+  if (entry.id.startsWith("selector.") && entry.id.endsWith("unit")) {
+    validateSelectorCountBounds(assignment, issues);
+  }
+
   return {
     complete: missingRequired.length === 0 && issues.length === 0,
     missingRequired,
     issues
   };
+}
+
+function validateSelectorCountBounds(
+  assignment: PrimitiveAssignment,
+  issues: ParameterValidationIssue[]
+): void {
+  const minimumCount = assignment.parameters.minimumCount;
+  const maximumCount = assignment.parameters.maximumCount;
+
+  if (typeof minimumCount === "number" && minimumCount < 0) {
+    issues.push({
+      parameterName: "minimumCount",
+      message: 'Parameter "minimumCount" cannot be negative.'
+    });
+  }
+
+  if (typeof maximumCount === "number" && maximumCount < 0) {
+    issues.push({
+      parameterName: "maximumCount",
+      message: 'Parameter "maximumCount" cannot be negative.'
+    });
+  }
+
+  if (
+    typeof minimumCount === "number" &&
+    typeof maximumCount === "number" &&
+    minimumCount > maximumCount
+  ) {
+    issues.push({
+      parameterName: "maximumCount",
+      message: 'Parameter "maximumCount" cannot be less than "minimumCount".'
+    });
+  }
 }
 
 export function combineSupportStatuses(

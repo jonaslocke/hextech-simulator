@@ -43,7 +43,6 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   assert.equal(stupefyPreview?.suggestion?.supportStatus, "supported");
   assert.deepEqual(stupefyPreview?.suggestion?.primitiveIds, [
     "action.draw_cards",
-    "condition.minimum",
     "modifier.modify_might",
     "selector.unit",
     "timing.reaction"

@@ -48,7 +48,6 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
     "timing.reaction",
     "selector.unit",
     "modifier.modify_might",
-    "condition.minimum",
     "action.draw_cards"
   ]);
 
@@ -62,7 +61,8 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
 
   assert.deepEqual(selector?.parameters, {
     scope: "any",
-    count: 1,
+    minimumCount: 1,
+    maximumCount: 1,
     area: "board",
     locationRelation: "any",
     excludesSource: false
@@ -104,22 +104,30 @@ test("discovers selector constraints for target legality from card text", () => 
   );
 
   assert.deepEqual(findAssignment(backToBack, "selector.friendly_unit")?.parameters, {
-    count: 2,
+    minimumCount: 2,
+    maximumCount: 2,
     area: "board",
     locationRelation: "any",
     controller: "player",
     excludesSource: false
   });
   assert.deepEqual(findAssignment(fallingComet, "selector.unit")?.parameters, {
-    count: 1,
+    minimumCount: 1,
+    maximumCount: 1,
     area: "battlefield",
     excludesSource: false,
     locationRelation: "any",
     scope: "any",
   });
-  assert.deepEqual(findAssignment(singularity, "selector.up_to")?.parameters, {
-    count: 2
+  assert.deepEqual(findAssignment(singularity, "selector.unit")?.parameters, {
+    scope: "each",
+    minimumCount: 0,
+    maximumCount: 2,
+    area: "board",
+    locationRelation: "any",
+    excludesSource: false
   });
+  assert.equal(findAssignment(singularity, "selector.up_to"), undefined);
 });
 
 test("builds typed card behavior suggestions with parameter validation", () => {
@@ -182,6 +190,53 @@ test("catalogs strict Unit target areas and location relations", () => {
     invalidAreaValidation.issues[0]?.message ?? "",
     /must be one of/
   );
+});
+
+test("rejects invalid Unit selector count bounds", () => {
+  const validation = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "selector.unit",
+      family: "selector",
+      sourceText: "choose units",
+      parameters: {
+        minimumCount: 3,
+        maximumCount: 2,
+        area: "board",
+        locationRelation: "any"
+      },
+      confidence: "high"
+    },
+    getPrimitiveCatalogEntry("selector.unit", "selector")
+  );
+
+  assert.equal(validation.complete, false);
+  assert.match(
+    validation.issues.find((issue) => issue.parameterName === "maximumCount")
+      ?.message ?? "",
+    /cannot be less/
+  );
+});
+
+test("uses selectors for explicit choice legality and count", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Solari Chief",
+      publicCode: "OGN-225/298",
+      text: "When you play me, choose an enemy unit."
+    })
+  );
+  const choice = findAssignment(discovery, "choice.choose_target");
+  const selector = findAssignment(discovery, "selector.enemy_unit");
+
+  assert.deepEqual(choice?.parameters, { player: "player" });
+  assert.deepEqual(selector?.parameters, {
+    minimumCount: 1,
+    maximumCount: 1,
+    area: "board",
+    locationRelation: "any",
+    controller: "opponent",
+    excludesSource: false
+  });
 });
 
 test("discovers Base, source-location, and shared-location Unit constraints", () => {

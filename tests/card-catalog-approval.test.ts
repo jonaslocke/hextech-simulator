@@ -102,7 +102,8 @@ function createApprovedStupefyInput(): ApprovedCardBehaviorInput {
             sourceText: "Give a unit -1 :rb_might:",
             parameters: {
               scope: "any",
-              count: 1,
+              minimumCount: 1,
+              maximumCount: 1,
               area: "board",
               locationRelation: "any",
               excludesSource: false
