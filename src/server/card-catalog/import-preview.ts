@@ -8,6 +8,7 @@ import type {
   ExistingCardValidationLookup,
   PersistedCardValidationSummary
 } from "./validated-card-lookup";
+import { CARD_BEHAVIOR_SCHEMA_VERSION } from "./validated-card-lookup";
 
 export type ExistingCardCatalogState =
   | "new"
@@ -175,6 +176,10 @@ function readExistingCatalogState(
 ): ExistingCardCatalogState {
   if (!persisted) {
     return "new";
+  }
+
+  if (persisted.schemaVersion !== CARD_BEHAVIOR_SCHEMA_VERSION) {
+    return "changed_since_persisted";
   }
 
   if (persisted.sourceTextHash && persisted.sourceTextHash !== sourceTextHash) {

@@ -33,6 +33,13 @@ import {
   PopoverContent,
   PopoverTrigger
 } from "@/shared/components/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/shared/components/select";
 import { cn } from "@/shared/utils/cn";
 import {
   approveCardCatalogBehavior,
@@ -336,6 +343,7 @@ function markCardPersisted(
   card: PreviewCard,
   persisted: {
     cardCode: string;
+    schemaVersion: number;
     status: ApprovalStatus;
     sourceTextHash: string;
     updatedAt: string;
@@ -350,6 +358,7 @@ function markCardPersisted(
             state: "already_persisted" as const,
             persisted: {
               cardCode: persisted.cardCode,
+              schemaVersion: persisted.schemaVersion,
               status: persisted.status,
               sourceTextHash: persisted.sourceTextHash,
               updatedAt: persisted.updatedAt
@@ -855,6 +864,24 @@ function PrimitiveEditor({
         </Button>
       </div>
 
+      {(catalogEntry?.fixedRules.length ?? 0) > 0 && (
+        <div className="mt-3 rounded-md border border-cyan-400/15 bg-cyan-400/5 p-3">
+          <p className="text-xs font-medium uppercase text-cyan-100">
+            Inherited rules
+          </p>
+          <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-300">
+            {catalogEntry?.fixedRules.map((rule) => (
+              <li className="flex gap-2" key={rule}>
+                <span className="text-cyan-300" aria-hidden="true">
+                  -
+                </span>
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {parameterNames.length > 0 && (
         <div className="gap-3 grid sm:grid-cols-2 xl:grid-cols-3 mt-3">
           {parameterNames.map((parameterName) => {
@@ -865,31 +892,37 @@ function PrimitiveEditor({
             const fieldValue = String(assignment.parameters[parameterName] ?? "");
 
             return (
-              <label className="block" key={parameterName}>
+              <div className="block" key={parameterName}>
                 <span className="text-slate-400 text-xs">
                   {parameterName}
                   {parameterDefinition?.required ? " *" : ""}
                 </span>
                 {parameterOptions.length > 0 ? (
-                  <select
-                    className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
-                    onChange={(event) =>
+                  <Select
+                    onValueChange={(value) =>
                       onChangeParameter(
                         clauseId,
                         assignmentIndex,
                         parameterName,
-                        event.target.value
+                        value
                       )
                     }
-                    value={fieldValue}
+                    value={fieldValue || undefined}
                   >
-                    <option value="">Select {parameterName}</option>
-                    {parameterOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label={parameterName}
+                      className="mt-1"
+                    >
+                      <SelectValue placeholder={`Select ${parameterName}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parameterOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <input
                     className="bg-slate-950 mt-1 px-2 py-2 border border-white/15 rounded-md w-full text-sm"
@@ -905,7 +938,7 @@ function PrimitiveEditor({
                     value={fieldValue}
                   />
                 )}
-              </label>
+              </div>
             );
           })}
         </div>

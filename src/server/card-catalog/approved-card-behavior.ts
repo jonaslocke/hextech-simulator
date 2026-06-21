@@ -1,6 +1,9 @@
 import type { Db } from "mongodb";
 import { z } from "zod";
-import { CARD_BEHAVIOR_VALIDATIONS_COLLECTION } from "./validated-card-lookup";
+import {
+  CARD_BEHAVIOR_SCHEMA_VERSION,
+  CARD_BEHAVIOR_VALIDATIONS_COLLECTION
+} from "./validated-card-lookup";
 
 const primitiveFamilySchema = z.enum([
   "ability",
@@ -64,7 +67,7 @@ export type ApprovedCardBehaviorInput = z.infer<
 
 export type ApprovedCardBehaviorDocument = ApprovedCardBehaviorInput & {
   id: string;
-  schemaVersion: 1;
+  schemaVersion: typeof CARD_BEHAVIOR_SCHEMA_VERSION;
   createdAt: string;
   updatedAt: string;
 };
@@ -120,7 +123,7 @@ export function buildApprovedCardBehaviorDocument({
   return {
     ...input,
     id: input.cardCode,
-    schemaVersion: 1,
+    schemaVersion: CARD_BEHAVIOR_SCHEMA_VERSION,
     createdAt,
     updatedAt
   };

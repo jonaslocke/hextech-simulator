@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       accepted: true,
       behavior: {
         cardCode: behavior.cardCode,
+        schemaVersion: behavior.schemaVersion,
         status: behavior.status,
         sourceTextHash: behavior.sourceTextHash,
         updatedAt: behavior.updatedAt

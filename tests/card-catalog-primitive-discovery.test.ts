@@ -14,11 +14,12 @@ import {
   targetReferenceKinds,
   tokenKinds,
   triggerSubjectKinds,
+  unitLocationRelations,
   unitScopeKinds,
+  unitTargetAreas,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
 import {
-  gameZoneKinds,
   modifierDurations,
   runeResourceTypes
 } from "../src/server/match/game";
@@ -57,6 +58,15 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
   const draw = discovery.clauses
     .flatMap((clause) => clause.assignments)
     .find((assignment) => assignment.primitiveId === "action.draw_cards");
+  const selector = findAssignment(discovery, "selector.unit");
+
+  assert.deepEqual(selector?.parameters, {
+    scope: "any",
+    count: 1,
+    area: "board",
+    locationRelation: "any",
+    excludesSource: false
+  });
 
   assert.deepEqual(modifyMight?.parameters, {
     amount: -1,
@@ -95,14 +105,17 @@ test("discovers selector constraints for target legality from card text", () => 
 
   assert.deepEqual(findAssignment(backToBack, "selector.friendly_unit")?.parameters, {
     count: 2,
+    area: "board",
+    locationRelation: "any",
     controller: "player",
     excludesSource: false
   });
   assert.deepEqual(findAssignment(fallingComet, "selector.unit")?.parameters, {
     count: 1,
+    area: "battlefield",
     excludesSource: false,
+    locationRelation: "any",
     scope: "any",
-    zone: "battlefield"
   });
   assert.deepEqual(findAssignment(singularity, "selector.up_to")?.parameters, {
     count: 2
@@ -132,32 +145,156 @@ test("builds typed card behavior suggestions with parameter validation", () => {
   );
 });
 
-test("catalogs selector unit zone as a known game zone enum", () => {
+test("catalogs strict Unit target areas and location relations", () => {
   const selectorUnit = buildPrimitiveCatalog().find(
     (entry) => entry.id === "selector.unit"
   );
-  const zoneParameter = selectorUnit?.parameters.find(
-    (parameter) => parameter.name === "zone"
+  const areaParameter = selectorUnit?.parameters.find(
+    (parameter) => parameter.name === "area"
   );
-  const invalidZoneValidation = validatePrimitiveAssignmentParameters(
+  const relationParameter = selectorUnit?.parameters.find(
+    (parameter) => parameter.name === "locationRelation"
+  );
+  const invalidAreaValidation = validatePrimitiveAssignmentParameters(
     {
       primitiveId: "selector.unit",
       family: "selector",
-      sourceText: "unit in a fake zone",
+      sourceText: "unit in trash",
       parameters: {
-        zone: "fake_zone"
+        area: "trash",
+        locationRelation: "any"
       },
       confidence: "medium"
     },
     getPrimitiveCatalogEntry("selector.unit", "selector")
   );
 
-  assert.deepEqual(zoneParameter?.options, [...gameZoneKinds]);
-  assert.equal(invalidZoneValidation.complete, false);
+  assert.equal(
+    selectorUnit?.parameters.some((parameter) => parameter.name === "zone"),
+    false
+  );
+  assert.deepEqual(areaParameter?.options, [...unitTargetAreas]);
+  assert.deepEqual(relationParameter?.options, [...unitLocationRelations]);
+  assert.equal(areaParameter?.required, true);
+  assert.equal(relationParameter?.required, true);
+  assert.equal(invalidAreaValidation.complete, false);
   assert.match(
-    invalidZoneValidation.issues[0]?.message ?? "",
+    invalidAreaValidation.issues[0]?.message ?? "",
     /must be one of/
   );
+});
+
+test("discovers Base, source-location, and shared-location Unit constraints", () => {
+  const baseTarget = discoverCardPrimitives(
+    createTestCard({
+      name: "Yone, Blademaster",
+      publicCode: "SFD-116/221",
+      text: "Deal damage equal to my Might to an enemy unit in a base."
+    })
+  );
+  const hereTarget = discoverCardPrimitives(
+    createTestCard({
+      name: "Taric, Protector",
+      publicCode: "OGN-074/298",
+      text: "Other friendly units here have [Shield]."
+    })
+  );
+  const sameBattlefield = discoverCardPrimitives(
+    createTestCard({
+      name: "Facebreaker",
+      publicCode: "OGN-220/298",
+      text: "Stun a friendly unit and an enemy unit at the same battlefield."
+    })
+  );
+  const sameLocation = discoverCardPrimitives(
+    createTestCard({
+      name: "Bellows Breath",
+      publicCode: "SFD-080/221",
+      text: "Deal 1 to up to three units at the same location."
+    })
+  );
+
+  assert.equal(
+    findAssignment(baseTarget, "selector.enemy_unit")?.parameters.area,
+    "base"
+  );
+  assert.deepEqual(
+    pickLocation(findAssignment(hereTarget, "selector.friendly_unit")?.parameters),
+    { area: "board", locationRelation: "sourceLocation" }
+  );
+  assert.deepEqual(
+    pickLocation(
+      findAssignment(sameBattlefield, "selector.friendly_unit")?.parameters
+    ),
+    { area: "battlefield", locationRelation: "sharedLocation" }
+  );
+  assert.deepEqual(
+    pickLocation(findAssignment(sameLocation, "selector.unit")?.parameters),
+    { area: "board", locationRelation: "sharedLocation" }
+  );
+});
+
+test("does not confuse a move destination with the selected Unit area", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Fight or Flight",
+      publicCode: "OGN-168/298",
+      text: "Move a unit from a battlefield to its base."
+    })
+  );
+
+  assert.deepEqual(
+    pickLocation(findAssignment(discovery, "selector.unit")?.parameters),
+    { area: "battlefield", locationRelation: "any" }
+  );
+});
+
+test("catalogs Hidden as one fixed parameterless behavior", () => {
+  const catalogEntry = getPrimitiveCatalogEntry("keyword.hidden", "keyword");
+  const standUnited = discoverCardPrimitives(
+    createTestCard({
+      name: "Stand United",
+      publicCode: "OGN-053/298",
+      text: "[Hidden] (Hide now for :rb_rune_rainbow: to react with later for :rb_energy_0:.)[Action] (Play on your turn or in showdowns.)Buff a friendly unit."
+    })
+  );
+  const windsinger = discoverCardPrimitives(
+    createTestCard({
+      name: "Windsinger",
+      publicCode: "SFD-138/221",
+      text: "Hidden (Hide now for :rb_rune_rainbow: to react with later for :rb_energy_0:.)When you play me, return another unit at a battlefield."
+    })
+  );
+
+  assert.equal(findAssignments(standUnited, "keyword.hidden").length, 1);
+  assert.deepEqual(
+    findAssignment(standUnited, "keyword.hidden")?.parameters,
+    {}
+  );
+  assert.equal(findAssignments(windsinger, "keyword.hidden").length, 1);
+  assert.deepEqual(catalogEntry.parameters, []);
+  assert.equal(catalogEntry.fixedRules.length, 6);
+  assert.equal(catalogEntry.engineSupport.status, "requires_engine_support");
+});
+
+test("does not grant Hidden behavior to cards that only reference Hidden", () => {
+  const references = [
+    "Put a Teemo unit you own into your hand from your Champion Zone or the board if it has [Hidden].",
+    "When you play a card from [Hidden], give me +2 :rb_might: this turn.",
+    "Return another friendly gear, unit, or [Hidden] card to its owner's hand."
+  ];
+
+  for (const [index, text] of references.entries()) {
+    const discovery = discoverCardPrimitives(
+      createTestCard({
+        name: `Hidden Reference ${index}`,
+        publicCode: `TST-10${index}/200`,
+        text
+      })
+    );
+
+    assert.equal(findAssignments(discovery, "keyword.hidden").length, 0);
+  }
 });
 
 test("catalogs modify might duration as a known modifier duration enum", () => {
@@ -385,6 +522,20 @@ test("discovers reusable primitives from the full local card corpus", async () =
   const tankParameter = tankKeyword?.parameters.find(
     (parameter) => parameter.name === "keyword"
   );
+  const hiddenCards = report.cards.filter((card) =>
+    card.primitiveIds.includes("keyword.hidden")
+  );
+  const hiddenReferenceNames = new Set([
+    "Swift Scout",
+    "Ember Monk",
+    "Ava Achiever",
+    "Pack of Wonders",
+    "Noxus Saboteur",
+    "Guerilla Warfare"
+  ]);
+  const hiddenReferences = report.cards.filter((card) =>
+    hiddenReferenceNames.has(card.cardName)
+  );
 
   assert.deepEqual(report.summary.sourceFiles, [
     "ogn.json",
@@ -403,6 +554,14 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(primitiveIds.has("modifier.modify_might"), true);
   assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
   assert.equal(primitiveIds.has("selector.unit"), true);
+  assert.equal(hiddenCards.length, 26);
+  assert.equal(hiddenReferences.length, 8);
+  assert.equal(
+    hiddenReferences.every(
+      (card) => !card.primitiveIds.includes("keyword.hidden")
+    ),
+    true
+  );
   assert.equal(report.summary.discoveredPrimitiveCount > 20, true);
   assert.deepEqual(tankParameter?.options, ["Tank"]);
 });
@@ -463,6 +622,24 @@ function findAssignment(
   return discovery.clauses
     .flatMap((clause) => clause.assignments)
     .find((assignment) => assignment.primitiveId === primitiveId);
+}
+
+function findAssignments(
+  discovery: ReturnType<typeof discoverCardPrimitives>,
+  primitiveId: string
+) {
+  return discovery.clauses
+    .flatMap((clause) => clause.assignments)
+    .filter((assignment) => assignment.primitiveId === primitiveId);
+}
+
+function pickLocation(
+  parameters: Record<string, string | number | boolean | null> | undefined
+) {
+  return {
+    area: parameters?.area,
+    locationRelation: parameters?.locationRelation
+  };
 }
 
 function createTestCard(input: {

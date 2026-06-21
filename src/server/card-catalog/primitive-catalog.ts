@@ -11,6 +11,8 @@ export type PrimitiveParameterType =
   | "boolean"
   | "player"
   | "target"
+  | "area"
+  | "locationRelation"
   | "zone"
   | "duration"
   | "resource";
@@ -41,6 +43,7 @@ export type PrimitiveCatalogEntry = {
   name: string;
   description: string;
   parameters: PrimitiveParameterDefinition[];
+  fixedRules: string[];
   timingRequirements: string[];
   targetingRequirements: string[];
   engineSupport: PrimitiveEngineSupport;
@@ -78,6 +81,14 @@ export const triggerSubjectKinds = [
 
 export const unitScopeKinds = ["any", "each", "friendly", "enemy"] as const;
 
+export const unitTargetAreas = ["board", "base", "battlefield"] as const;
+
+export const unitLocationRelations = [
+  "any",
+  "sourceLocation",
+  "sharedLocation"
+] as const;
+
 export const targetReferenceKinds = [
   "enemy_unit",
   "equipment",
@@ -111,6 +122,31 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "Provides both intrinsic Basic Rune abilities: exhaust to add 1 Energy, or recycle to add 1 Power of the Rune's domain.",
     engineSupport: supported(
       "Rules-defined behavior with a fixed execution contract and no card-specific parameters."
+    )
+  }),
+  "keyword.hidden": primitiveSeed({
+    id: "keyword.hidden",
+    family: "keyword",
+    name: "Hidden",
+    description:
+      "Allows a card to be hidden instead of played and later played from its Facedown Zone.",
+    fixedRules: [
+      "Rather than play this card, its controller may pay 1 deck-domain Power to hide it.",
+      "The destination must be an empty Facedown Zone at a Battlefield controlled by that player.",
+      "Hiding is not playing and does not open a chain.",
+      "Beginning on the next player's turn, the hidden card gains Reaction and may be played ignoring its base cost.",
+      "When played from Hidden, every choice is restricted to valid targets at the associated Battlefield.",
+      "The card may still be played normally with its normal timing, cost, and targeting restrictions."
+    ],
+    timingRequirements: [
+      "play from Hidden is available beginning on the next player's turn",
+      "play from Hidden gains Reaction timing"
+    ],
+    targetingRequirements: [
+      "when played from Hidden, choices must be at the associated Battlefield"
+    ],
+    engineSupport: requiresEngineSupport(
+      "Hidden requires facedown-zone state, play-origin context, conditional timing, cost replacement, and inherited targeting restrictions."
     )
   }),
   "timing.action": primitiveSeed({
@@ -178,7 +214,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy.", unitScopeKinds),
       optional("count", "number", "How many units are selected when the text says a fixed count."),
-      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
+      required("area", "area", "The board area containing legal unit targets."),
+      required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
@@ -191,7 +228,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Constrains a choice or effect to units controlled by the acting player.",
     parameters: [
       optional("count", "number", "How many friendly units are selected."),
-      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
+      required("area", "area", "The board area containing legal friendly unit targets."),
+      required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
@@ -205,7 +243,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Constrains a choice or effect to units controlled by an opponent.",
     parameters: [
       optional("count", "number", "How many enemy units are selected."),
-      optional("zone", "zone", "Where the unit must be, when stated.", gameZoneKinds),
+      required("area", "area", "The board area containing legal enemy unit targets."),
+      required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
@@ -631,6 +670,7 @@ export function combineSupportStatuses(
 function primitiveSeed(input: Partial<PrimitiveCatalogSeed> & Pick<PrimitiveCatalogSeed, "id" | "family" | "name" | "description">): PrimitiveCatalogSeed {
   return {
     parameters: [],
+    fixedRules: [],
     timingRequirements: [],
     targetingRequirements: [],
     engineSupport: requiresEngineSupport("No generalized implementation support has been declared for this primitive in the new catalog pipeline."),
@@ -733,6 +773,14 @@ function parameterOptions(
     return { options: targetReferenceKinds };
   }
 
+  if (type === "area") {
+    return { options: unitTargetAreas };
+  }
+
+  if (type === "locationRelation") {
+    return { options: unitLocationRelations };
+  }
+
   if (type === "zone") {
     return { options: gameZoneKinds };
   }
@@ -794,6 +842,8 @@ function isParameterTypeValid(
     case "string":
     case "player":
     case "target":
+    case "area":
+    case "locationRelation":
     case "zone":
     case "duration":
     case "resource":

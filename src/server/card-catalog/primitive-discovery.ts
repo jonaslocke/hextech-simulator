@@ -108,6 +108,14 @@ const BASIC_RUNE_RESOURCE_PRIMITIVE: PrimitiveDefinition = {
   parameterNames: []
 };
 
+const HIDDEN_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
+  id: "keyword.hidden",
+  family: "keyword",
+  name: "Hidden",
+  description: "Rules-defined Hidden keyword behavior.",
+  parameterNames: []
+};
+
 const primitiveDetectors: PrimitiveDetector[] = [
   primitive("timing.action", "timing", "Action timing", "Card can be played at action timing.", [], (context) =>
     context.lowerText.includes("[action]") ? assignment(context, "timing.action", "timing", {}, "high") : null
@@ -147,17 +155,17 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope"], (context) =>
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["count"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["count"], (context) =>
     /\benemy units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.enemy_unit", "selector", { count: readUnitCount(context.rulesText), zone: readTargetZone(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.enemy_unit", "selector", { count: readUnitCount(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.up_to", "selector", "Select up to count", "Behavior allows selecting up to a maximum count.", ["count"], (context) =>
@@ -502,6 +510,7 @@ function primitive(
 const primitiveDefinitionsById = new Map(
   [
     BASIC_RUNE_RESOURCE_PRIMITIVE,
+    HIDDEN_KEYWORD_PRIMITIVE,
     ...primitiveDetectors.map((detector) => detector.primitive)
   ].map((primitiveDefinition) => [
     primitiveDefinition.id,
@@ -563,9 +572,12 @@ function assignment(
 }
 
 function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[] {
-  return [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
+  const hiddenAssignments = isHiddenDeclaration(context.normalizedText)
+    ? [assignment(context, "keyword.hidden", "keyword", {}, "high")]
+    : [];
+  const genericAssignments = [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
     .map((match) => match[1]!.trim())
-    .filter((keyword) => !["Action", "Reaction"].includes(keyword))
+    .filter((keyword) => !["Action", "Reaction", "Hidden"].includes(keyword))
     .map((keyword) => {
       const primitiveId = `keyword.${toPrimitiveKey(keyword)}`;
       const definition: PrimitiveDefinition = {
@@ -588,6 +600,12 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
         "high"
       );
     });
+
+  return [...hiddenAssignments, ...genericAssignments];
+}
+
+function isHiddenDeclaration(normalizedText: string): boolean {
+  return /^\[Hidden\]|^Hidden\s*\(/i.test(normalizedText);
 }
 
 function createClauseContext(
@@ -792,24 +810,48 @@ function readUpToCount(rulesText: string): number | null {
   return match ? readNumberToken(match[1]!) : null;
 }
 
-function readTargetZone(rulesText: string): string | null {
-  if (rulesText.includes("at a battlefield") || rulesText.includes("at the same location")) {
+function readUnitTargetArea(rulesText: string): string {
+  if (
+    rulesText.includes("same battlefield") ||
+    unitNearArea(rulesText, "battlefields?")
+  ) {
     return "battlefield";
   }
 
-  if (rulesText.includes("in your base") || rulesText.includes("to base")) {
+  if (unitNearArea(rulesText, "bases?")) {
     return "base";
   }
 
-  if (rulesText.includes("from your trash") || rulesText.includes("from trashes")) {
-    return "trash";
+  return "board";
+}
+
+function readUnitLocationRelation(rulesText: string): string {
+  if (rulesText.includes("same location") || rulesText.includes("same battlefield")) {
+    return "sharedLocation";
   }
 
-  if (rulesText.includes("in their hands") || rulesText.includes("to your hand")) {
-    return "hand";
+  if (
+    /\bunits?\b[^.]{0,60}\bhere\b|\bhere\b[^.]{0,60}\bunits?\b/.test(rulesText) ||
+    rulesText.includes("my location") ||
+    rulesText.includes("my battlefield")
+  ) {
+    return "sourceLocation";
   }
 
-  return null;
+  return "any";
+}
+
+function unitNearArea(rulesText: string, areaPattern: string): boolean {
+  const unitPattern = "(?:friendly\\s+|enemy\\s+|other\\s+|buffed\\s+)?units?";
+  const qualifierPattern = "(?:a\\s+|an\\s+|the\\s+|my\\s+|your\\s+|their\\s+|same\\s+)?";
+  const forward = new RegExp(
+    `\\b${unitPattern}\\b[^.]{0,60}\\b(?:at|in|from)\\s+${qualifierPattern}${areaPattern}\\b`
+  );
+  const reverse = new RegExp(
+    `\\b(?:at|in|from)\\s+${qualifierPattern}${areaPattern}\\b[^.]{0,60}\\b${unitPattern}\\b`
+  );
+
+  return forward.test(rulesText) || reverse.test(rulesText);
 }
 
 function readNumberToken(token: string): number | null {

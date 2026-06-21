@@ -1,6 +1,7 @@
 import type { Collection, Db, Filter } from "mongodb";
 
 export const CARD_BEHAVIOR_VALIDATIONS_COLLECTION = "cardBehaviorValidations";
+export const CARD_BEHAVIOR_SCHEMA_VERSION = 2 as const;
 
 export type PersistedCardValidationStatus =
   | "approved"
@@ -9,6 +10,7 @@ export type PersistedCardValidationStatus =
 
 export type PersistedCardValidationSummary = {
   cardCode: string;
+  schemaVersion: number | null;
   status: PersistedCardValidationStatus;
   sourceTextHash: string | null;
   updatedAt: string | null;
@@ -17,6 +19,7 @@ export type PersistedCardValidationSummary = {
 type CardBehaviorValidationDocument = {
   _id?: string;
   cardCode?: string;
+  schemaVersion?: number;
   status?: PersistedCardValidationStatus;
   sourceTextHash?: string | null;
   updatedAt?: string | null;
@@ -68,6 +71,7 @@ async function findPersistedCardValidationsByCardCodes(
           cardCode,
           {
             cardCode,
+            schemaVersion: document.schemaVersion ?? null,
             status: document.status,
             sourceTextHash: document.sourceTextHash ?? null,
             updatedAt: document.updatedAt ?? null
