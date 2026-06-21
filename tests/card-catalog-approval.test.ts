@@ -35,6 +35,39 @@ test("validates approved behavior payloads before persistence", () => {
   assert.equal(parsed.adminNotes, "Validated from uploaded mvp.json.");
 });
 
+test("accepts approved intrinsic Basic Rune ability behavior", () => {
+  const parsed = approvedCardBehaviorInputSchema.parse({
+    cardCode: "OGN-089",
+    publicCode: "OGN-089/298",
+    name: "Mind Rune",
+    setCode: "OGN",
+    type: "Rune",
+    sourceText: "",
+    sourceTextHash: "mind-rune-hash",
+    status: "approved",
+    adminNotes: "Validated from Core Rules 157.2.",
+    clauses: [
+      {
+        id: "intrinsic-basic-rune-resources",
+        sourceText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
+        normalizedText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
+        unsupportedReason: null,
+        assignments: [
+          {
+            primitiveId: "ability.basic_rune_resources",
+            family: "ability",
+            sourceText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
+            parameters: {},
+            confidence: "high"
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(parsed.clauses[0]?.assignments[0]?.family, "ability");
+});
+
 function createApprovedStupefyInput(): ApprovedCardBehaviorInput {
   return {
     cardCode: "OGN-095",

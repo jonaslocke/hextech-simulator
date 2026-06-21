@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CARD_BEHAVIOR_VALIDATIONS_COLLECTION } from "./validated-card-lookup";
 
 const primitiveFamilySchema = z.enum([
+  "ability",
   "timing",
   "selector",
   "action",

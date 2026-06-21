@@ -4,6 +4,7 @@ import { cardSetFileSchema, type Card } from "../catalog";
 import { deriveCardCodeFromCard } from "./identity";
 
 export type PrimitiveFamily =
+  | "ability"
   | "timing"
   | "selector"
   | "action"
@@ -96,6 +97,15 @@ type ClauseContext = {
   lowerText: string;
   rulesText: string;
   inheritedTiming: "action" | "reaction" | null;
+};
+
+const BASIC_RUNE_RESOURCE_PRIMITIVE: PrimitiveDefinition = {
+  id: "ability.basic_rune_resources",
+  family: "ability",
+  name: "Basic rune resources",
+  description:
+    "A Basic Rune may exhaust to add 1 Energy or recycle itself to add 1 Power of its domain.",
+  parameterNames: []
 };
 
 const primitiveDetectors: PrimitiveDetector[] = [
@@ -339,8 +349,14 @@ export function analyzeCardCorpus(
   cards: Card[],
   sourceFiles: string[] = []
 ): CorpusPrimitiveDiscoveryReport {
+  const cardsWithRulesText = cards.filter(
+    (card) => card.text.plain.trim().length > 0
+  );
   const discoveredCards = cards
-    .filter((card) => card.text.plain.trim().length > 0)
+    .filter(
+      (card) =>
+        card.text.plain.trim().length > 0 || hasIntrinsicCardBehavior(card)
+    )
     .map(discoverCardPrimitives);
   const primitiveMap = new Map<string, DiscoveredPrimitive>();
   const unsupportedClauses: UnsupportedClause[] = [];
@@ -402,7 +418,7 @@ export function analyzeCardCorpus(
     summary: {
       sourceFiles,
       totalCards: cards.length,
-      cardsWithRulesText: discoveredCards.length,
+      cardsWithRulesText: cardsWithRulesText.length,
       discoveredPrimitiveCount: primitives.length,
       unsupportedClauseCount: unsupportedClauses.length
     },
@@ -414,8 +430,9 @@ export function analyzeCardCorpus(
 
 export function discoverCardPrimitives(card: Card): CardPrimitiveDiscovery {
   let inheritedTiming: "action" | "reaction" | null = null;
-  const clauses = splitRulesTextIntoClauses(card.text.plain).map(
-    (sourceText, index) => {
+  const clauses = [
+    ...discoverIntrinsicCardClauses(card),
+    ...splitRulesTextIntoClauses(card.text.plain).map((sourceText, index) => {
       const context = createClauseContext(sourceText, inheritedTiming);
       const assignments = [
         ...primitiveDetectors.flatMap((detector) => detector.detect(context) ?? []),
@@ -445,8 +462,8 @@ export function discoverCardPrimitives(card: Card): CardPrimitiveDiscovery {
           ? null
           : "No action, modifier, trigger, cost, replacement, prevention, or keyword primitive matched this clause."
       } satisfies ClauseDiscovery;
-    }
-  );
+    })
+  ];
   const primitiveIds = [
     ...new Set(clauses.flatMap((clause) => clause.assignments.map((assignment) => assignment.primitiveId)))
   ].sort();
@@ -483,8 +500,51 @@ function primitive(
 }
 
 const primitiveDefinitionsById = new Map(
-  primitiveDetectors.map((detector) => [detector.primitive.id, detector.primitive])
+  [
+    BASIC_RUNE_RESOURCE_PRIMITIVE,
+    ...primitiveDetectors.map((detector) => detector.primitive)
+  ].map((primitiveDefinition) => [
+    primitiveDefinition.id,
+    primitiveDefinition
+  ])
 );
+
+function discoverIntrinsicCardClauses(card: Card): ClauseDiscovery[] {
+  if (!isBasicRune(card)) {
+    return [];
+  }
+
+  const sourceText = "Basic Rune intrinsic abilities (Core Rules 157.2)";
+
+  return [
+    {
+      id: "intrinsic-basic-rune-resources",
+      sourceText,
+      normalizedText: sourceText,
+      assignments: [
+        {
+          primitiveId: BASIC_RUNE_RESOURCE_PRIMITIVE.id,
+          family: BASIC_RUNE_RESOURCE_PRIMITIVE.family,
+          sourceText,
+          parameters: {},
+          confidence: "high"
+        }
+      ],
+      unsupportedReason: null
+    }
+  ];
+}
+
+function hasIntrinsicCardBehavior(card: Card): boolean {
+  return isBasicRune(card);
+}
+
+function isBasicRune(card: Card): boolean {
+  return (
+    card.classification.type === "Rune" &&
+    card.classification.supertype === "Basic"
+  );
+}
 
 function assignment(
   context: ClauseContext,

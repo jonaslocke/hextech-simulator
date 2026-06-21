@@ -103,6 +103,16 @@ export const tokenKinds = [
 type PrimitiveCatalogSeed = Omit<PrimitiveCatalogEntry, "examples">;
 
 const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
+  "ability.basic_rune_resources": primitiveSeed({
+    id: "ability.basic_rune_resources",
+    family: "ability",
+    name: "Basic rune resources",
+    description:
+      "Provides both intrinsic Basic Rune abilities: exhaust to add 1 Energy, or recycle to add 1 Power of the Rune's domain.",
+    engineSupport: supported(
+      "Rules-defined behavior with a fixed execution contract and no card-specific parameters."
+    )
+  }),
   "timing.action": primitiveSeed({
     id: "timing.action",
     family: "timing",
@@ -795,6 +805,7 @@ function inferPrimitiveFamily(id: string): PrimitiveFamily {
   const family = id.split(".")[0];
 
   if (
+    family === "ability" ||
     family === "timing" ||
     family === "selector" ||
     family === "action" ||

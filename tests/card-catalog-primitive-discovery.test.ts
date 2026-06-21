@@ -249,6 +249,47 @@ test("catalogs player parameters as known player reference enum", () => {
   );
 });
 
+test("discovers intrinsic Basic Rune resource abilities without rules text", () => {
+  const mindRune = createTestCard({
+    name: "Mind Rune",
+    publicCode: "OGN-089/298",
+    text: "",
+    type: "Rune",
+    supertype: "Basic",
+    domain: ["Mind"]
+  });
+  const discovery = discoverCardPrimitives(mindRune);
+  const report = analyzeCardBehaviorSuggestions([mindRune]);
+  const assignment = discovery.clauses[0]?.assignments[0];
+  const catalogEntry = report.primitiveCatalog.find(
+    (entry) => entry.id === "ability.basic_rune_resources"
+  );
+
+  assert.equal(discovery.rulesText, "");
+  assert.deepEqual(discovery.primitiveIds, ["ability.basic_rune_resources"]);
+  assert.equal(discovery.clauses[0]?.id, "intrinsic-basic-rune-resources");
+  assert.equal(assignment?.family, "ability");
+  assert.deepEqual(assignment?.parameters, {});
+  assert.equal(report.summary.cardsWithRulesText, 0);
+  assert.equal(report.summary.suggestedCardCount, 1);
+  assert.equal(report.cards[0]?.supportStatus, "supported");
+  assert.deepEqual(catalogEntry?.parameters, []);
+});
+
+test("does not grant Basic Rune abilities to non-Basic Runes", () => {
+  const nonBasicRune = createTestCard({
+    name: "Special Rune",
+    publicCode: "TST-004/001",
+    text: "",
+    type: "Rune",
+    supertype: null,
+    domain: ["Mind"]
+  });
+
+  assert.deepEqual(discoverCardPrimitives(nonBasicRune).clauses, []);
+  assert.equal(analyzeCardBehaviorSuggestions([nonBasicRune]).cards.length, 0);
+});
+
 test("catalogs corpus-backed primitive text parameters as enums", () => {
   const catalog = buildPrimitiveCatalog();
   const onPlay = catalog.find((entry) => entry.id === "trigger.on_play");
@@ -358,6 +399,7 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(primitiveIds.has("action.exhaust_cards"), true);
   assert.equal(primitiveIds.has("action.deal_damage"), true);
   assert.equal(primitiveIds.has("action.channel_runes"), true);
+  assert.equal(primitiveIds.has("ability.basic_rune_resources"), true);
   assert.equal(primitiveIds.has("modifier.modify_might"), true);
   assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
   assert.equal(primitiveIds.has("selector.unit"), true);
@@ -379,7 +421,7 @@ test("builds a corpus behavior suggestion report without behavior templates", as
   ]);
   assert.equal(report.summary.totalCards, 656);
   assert.equal(report.summary.cardsWithRulesText, 636);
-  assert.equal(report.summary.suggestedCardCount, 636);
+  assert.equal(report.summary.suggestedCardCount, 648);
   assert.equal(report.summary.completeSuggestionCount > 0, true);
   assert.equal(primitiveIds.has("choice.choose_target"), true);
   assert.equal(primitiveIds.has("selector.friendly_unit"), true);

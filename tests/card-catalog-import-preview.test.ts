@@ -52,6 +52,30 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   assert.equal(megaMechPreview?.suggestion, null);
 });
 
+test("previews textless Basic Runes as intrinsic behavior cards", async () => {
+  const mindRune = createTestCard({
+    name: "Mind Rune",
+    publicCode: "OGN-089/298",
+    text: "",
+    type: "Rune",
+    supertype: "Basic",
+    domain: ["Mind"]
+  });
+
+  const preview = await previewCardCatalogImport({
+    sourceLabel: "runes.json",
+    rawJson: JSON.stringify([mindRune]),
+    existingCardLookup: async () => new Map()
+  });
+
+  assert.equal(preview.summary.suggestedCardCount, 1);
+  assert.equal(preview.summary.vanillaCardCount, 0);
+  assert.equal(preview.cards[0]?.isVanilla, false);
+  assert.deepEqual(preview.cards[0]?.suggestion?.primitiveIds, [
+    "ability.basic_rune_resources"
+  ]);
+});
+
 test("marks uploaded cards that already exist in the persisted catalog", async () => {
   const card = createTestCard({
     name: "Back to Back",
