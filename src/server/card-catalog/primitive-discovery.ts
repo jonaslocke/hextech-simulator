@@ -99,13 +99,20 @@ type ClauseContext = {
   inheritedTiming: "action" | "reaction" | null;
 };
 
-const BASIC_RUNE_RESOURCE_PRIMITIVE: PrimitiveDefinition = {
-  id: "ability.basic_rune_resources",
+const EXHAUST_FOR_RESOURCE_PRIMITIVE: PrimitiveDefinition = {
+  id: "ability.exhaust_for_resource",
   family: "ability",
-  name: "Basic rune resources",
-  description:
-    "A Basic Rune may exhaust to add 1 Energy or recycle itself to add 1 Power of its domain.",
-  parameterNames: []
+  name: "Exhaust for resource",
+  description: "Exhaust the source to add a rune-pool resource.",
+  parameterNames: ["resourceType", "amountSource", "amount", "domain", "usage"]
+};
+
+const RECYCLE_FOR_POWER_PRIMITIVE: PrimitiveDefinition = {
+  id: "ability.recycle_for_power",
+  family: "ability",
+  name: "Recycle for Power",
+  description: "Recycle the source to add Power of its domain.",
+  parameterNames: ["amount", "domain", "usage"]
 };
 
 const HIDDEN_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
@@ -117,6 +124,11 @@ const HIDDEN_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
 };
 
 const primitiveDetectors: PrimitiveDetector[] = [
+  primitive("ability.exhaust_for_resource", "ability", "Exhaust for resource", "Exhaust the source to add a rune-pool resource.", ["resourceType", "amountSource", "amount", "domain", "usage"], (context) =>
+    isExhaustForResourceAbility(context.rulesText)
+      ? assignment(context, "ability.exhaust_for_resource", "ability", readExhaustForResourceParameters(context.rulesText), "high")
+      : null
+  ),
   primitive("timing.action", "timing", "Action timing", "Card can be played at action timing.", [], (context) =>
     context.lowerText.includes("[action]") ? assignment(context, "timing.action", "timing", {}, "high") : null
   ),
@@ -184,6 +196,11 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "selector.enemy_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
+  primitive("selector.token", "selector", "Select token", "Behavior applies to a known token kind.", ["tokenName", "controller"], (context) =>
+    /\byour gold\b/.test(context.rulesText)
+      ? assignment(context, "selector.token", "selector", { tokenName: "Gold gear", controller: "player" }, "high")
+      : null
+  ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
     /\bdraw\b/.test(context.rulesText)
       ? assignment(context, "action.draw_cards", "action", { player: "player", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
@@ -205,13 +222,20 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.exhaust_cards", "action", "Exhaust cards", "Exhaust ready cards.", ["target", "count"], (context) =>
-    /\bexhaust\b|:rb_exhaust:/.test(context.rulesText)
+    /\bexhaust\b/.test(context.rulesText)
       ? assignment(context, "action.exhaust_cards", "action", { target: readGenericTarget(context.rulesText), count: readNumberAfter(context.rulesText, "exhaust") }, "medium")
       : null
   ),
   primitive("action.channel_runes", "action", "Channel runes", "Move runes from rune deck to base.", ["player", "count", "entryState"], (context) =>
     /\bchannel\b/.test(context.rulesText)
       ? assignment(context, "action.channel_runes", "action", { player: readPlayer(context.rulesText), count: readNumberAfter(context.rulesText, "channel") ?? 1, entryState: context.rulesText.includes("exhausted") ? "exhausted" : "default" }, "high")
+      : null
+  ),
+  primitive("action.add_rune_resource", "action", "Add rune resource", "Add Energy or Power to a player's rune pool.", ["player", "resourceType", "amount", "source"], (context) =>
+    isAddResourceInstruction(context.rulesText) &&
+    !context.rulesText.includes("an additional") &&
+    !isExhaustForResourceAbility(context.rulesText)
+      ? assignment(context, "action.add_rune_resource", "action", readAddResourceParameters(context.rulesText), "high")
       : null
   ),
   primitive("action.deal_damage", "action", "Deal damage", "Apply damage to one or more targets.", ["amount", "target"], (context) =>
@@ -326,7 +350,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("cost.exhaust_source", "cost", "Exhaust source cost", "Exhaust source as a cost.", [], (context) =>
-    /:rb_exhaust:/.test(context.lowerText)
+    /:rb_exhaust:/.test(context.lowerText) &&
+    !isExhaustForResourceAbility(context.rulesText)
       ? assignment(context, "cost.exhaust_source", "cost", {}, "high")
       : null
   ),
@@ -515,7 +540,8 @@ function primitive(
 
 const primitiveDefinitionsById = new Map(
   [
-    BASIC_RUNE_RESOURCE_PRIMITIVE,
+    EXHAUST_FOR_RESOURCE_PRIMITIVE,
+    RECYCLE_FOR_POWER_PRIMITIVE,
     HIDDEN_KEYWORD_PRIMITIVE,
     ...primitiveDetectors.map((detector) => detector.primitive)
   ].map((primitiveDefinition) => [
@@ -533,15 +559,31 @@ function discoverIntrinsicCardClauses(card: Card): ClauseDiscovery[] {
 
   return [
     {
-      id: "intrinsic-basic-rune-resources",
+      id: "intrinsic-basic-rune-abilities",
       sourceText,
       normalizedText: sourceText,
       assignments: [
         {
-          primitiveId: BASIC_RUNE_RESOURCE_PRIMITIVE.id,
-          family: BASIC_RUNE_RESOURCE_PRIMITIVE.family,
+          primitiveId: EXHAUST_FOR_RESOURCE_PRIMITIVE.id,
+          family: EXHAUST_FOR_RESOURCE_PRIMITIVE.family,
           sourceText,
-          parameters: {},
+          parameters: {
+            resourceType: "energy",
+            amountSource: "constant",
+            amount: 1,
+            usage: "unrestricted"
+          },
+          confidence: "high"
+        },
+        {
+          primitiveId: RECYCLE_FOR_POWER_PRIMITIVE.id,
+          family: RECYCLE_FOR_POWER_PRIMITIVE.family,
+          sourceText,
+          parameters: {
+            amount: 1,
+            domain: "sourceDomain",
+            usage: "unrestricted"
+          },
           confidence: "high"
         }
       ],
@@ -583,7 +625,9 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
     : [];
   const genericAssignments = [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
     .map((match) => match[1]!.trim())
-    .filter((keyword) => !["Action", "Reaction", "Hidden"].includes(keyword))
+    .filter(
+      (keyword) => !["Action", "Reaction", "Hidden", "Add"].includes(keyword)
+    )
     .map((keyword) => {
       const primitiveId = `keyword.${toPrimitiveKey(keyword)}`;
       const definition: PrimitiveDefinition = {
@@ -631,11 +675,25 @@ function createClauseContext(
 }
 
 function splitRulesTextIntoClauses(text: string): string[] {
-  return text
+  const clauses = text
     .replace(/\r/g, "")
     .split(/\n+|(?<=\.)\s+|(?<=\])\s*(?=\[)/)
     .map((clause) => normalizeText(clause).replace(/\.$/, ""))
     .filter((clause) => clause.length > 0);
+
+  return clauses.reduce<string[]>((merged, clause) => {
+    if (/^(Use only\b|\(Abilities that add resources)/i.test(clause)) {
+      const previousIndex = merged.length - 1;
+
+      if (previousIndex >= 0) {
+        merged[previousIndex] = `${merged[previousIndex]} ${clause}`;
+        return merged;
+      }
+    }
+
+    merged.push(clause);
+    return merged;
+  }, []);
 }
 
 function normalizeText(text: string): string {
@@ -942,6 +1000,82 @@ function readNumberToken(token: string): number | null {
   };
 
   return wordNumbers[lowerToken] ?? Number(lowerToken);
+}
+
+function isAddResourceInstruction(rulesText: string): boolean {
+  return /\[add\]|:rb_add:/.test(rulesText);
+}
+
+function isExhaustForResourceAbility(rulesText: string): boolean {
+  return /:rb_exhaust:/.test(rulesText) && isAddResourceInstruction(rulesText);
+}
+
+function readExhaustForResourceParameters(
+  rulesText: string
+): PrimitiveAssignment["parameters"] {
+  const resourceType = readProducedResourceType(rulesText);
+  const amountSource = rulesText.includes("that much")
+    ? "paidAmount"
+    : "constant";
+
+  return {
+    resourceType,
+    amountSource,
+    amount:
+      amountSource === "constant"
+        ? readProducedResourceAmount(rulesText, resourceType)
+        : null,
+    domain:
+      resourceType === "power" ? readProducedPowerDomain(rulesText) : null,
+    usage: readResourceUsage(rulesText)
+  };
+}
+
+function readAddResourceParameters(
+  rulesText: string
+): PrimitiveAssignment["parameters"] {
+  const resourceType = readProducedResourceType(rulesText);
+
+  return {
+    player: "player",
+    resourceType,
+    amount: readProducedResourceAmount(rulesText, resourceType),
+    source: "source"
+  };
+}
+
+function readProducedResourceType(rulesText: string): string {
+  const outputText = rulesText.split(/\[add\]|:rb_add:/).at(-1) ?? rulesText;
+  return /\benergy\b|:rb_energy_\d+:/.test(outputText) ? "energy" : "power";
+}
+
+function readProducedResourceAmount(
+  rulesText: string,
+  resourceType: string
+): number | null {
+  if (resourceType === "energy") {
+    const match = rulesText.match(/:rb_energy_(\d+):/);
+    return match ? Number(match[1]) : null;
+  }
+
+  return [...rulesText.matchAll(/:rb_rune_[a-z_]+:/g)].length || null;
+}
+
+function readProducedPowerDomain(rulesText: string): string | null {
+  const match = rulesText.match(/:rb_rune_([a-z_]+):/);
+  return match?.[1] ?? null;
+}
+
+function readResourceUsage(rulesText: string): string {
+  if (rulesText.includes("use only to play spells")) {
+    return "spellsOnly";
+  }
+
+  if (rulesText.includes("use only to play gear or use gear abilities")) {
+    return "gearAndGearAbilitiesOnly";
+  }
+
+  return "unrestricted";
 }
 
 function isNonCostNumericModifier(rulesText: string): boolean {

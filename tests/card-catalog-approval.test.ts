@@ -17,7 +17,6 @@ test("builds an approved card behavior document keyed by stable card code", () =
   assert.equal(document.id, "OGN-095");
   assert.equal(document.cardCode, "OGN-095");
   assert.equal(document.status, "approved");
-  assert.equal("schemaVersion" in document, false);
   assert.equal(document.clauses[0]?.assignments[0]?.primitiveId, "timing.reaction");
   assert.equal(
     document.clauses[0]?.assignments.find(
@@ -48,16 +47,32 @@ test("accepts approved intrinsic Basic Rune ability behavior", () => {
     adminNotes: "Validated from Core Rules 157.2.",
     clauses: [
       {
-        id: "intrinsic-basic-rune-resources",
+        id: "intrinsic-basic-rune-abilities",
         sourceText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
         normalizedText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
         unsupportedReason: null,
         assignments: [
           {
-            primitiveId: "ability.basic_rune_resources",
+            primitiveId: "ability.exhaust_for_resource",
             family: "ability",
             sourceText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
-            parameters: {},
+            parameters: {
+              resourceType: "energy",
+              amountSource: "constant",
+              amount: 1,
+              usage: "unrestricted"
+            },
+            confidence: "high"
+          },
+          {
+            primitiveId: "ability.recycle_for_power",
+            family: "ability",
+            sourceText: "Basic Rune intrinsic abilities (Core Rules 157.2)",
+            parameters: {
+              amount: 1,
+              domain: "sourceDomain",
+              usage: "unrestricted"
+            },
             confidence: "high"
           }
         ]

@@ -16,6 +16,9 @@ import {
   playEventSubjectKinds,
   playerReferenceKinds,
   runeEntryStates,
+  resourceAmountSources,
+  resourceDomainKinds,
+  resourceUsageKinds,
   targetReferenceKinds,
   tokenKinds,
   unitLocationRelations,
@@ -236,6 +239,10 @@ test("discovers corpus-backed numeric modifier operations", () => {
       target: "event_subject"
     }
   );
+  assert.deepEqual(findAssignment(baroness, "selector.token")?.parameters, {
+    tokenName: "Gold gear",
+    controller: "player"
+  });
 });
 
 test("does not treat numeric comparisons as modifiers", () => {
@@ -627,7 +634,7 @@ test("catalogs player parameters as known player reference enum", () => {
   );
 });
 
-test("discovers intrinsic Basic Rune resource abilities without rules text", () => {
+test("discovers separate intrinsic Basic Rune resource abilities", () => {
   const mindRune = createTestCard({
     name: "Mind Rune",
     publicCode: "OGN-089/298",
@@ -638,20 +645,93 @@ test("discovers intrinsic Basic Rune resource abilities without rules text", () 
   });
   const discovery = discoverCardPrimitives(mindRune);
   const report = analyzeCardBehaviorSuggestions([mindRune]);
-  const assignment = discovery.clauses[0]?.assignments[0];
-  const catalogEntry = report.primitiveCatalog.find(
-    (entry) => entry.id === "ability.basic_rune_resources"
+  const exhaustAbility = findAssignment(
+    discovery,
+    "ability.exhaust_for_resource"
+  );
+  const recycleAbility = findAssignment(
+    discovery,
+    "ability.recycle_for_power"
   );
 
   assert.equal(discovery.rulesText, "");
-  assert.deepEqual(discovery.primitiveIds, ["ability.basic_rune_resources"]);
-  assert.equal(discovery.clauses[0]?.id, "intrinsic-basic-rune-resources");
-  assert.equal(assignment?.family, "ability");
-  assert.deepEqual(assignment?.parameters, {});
+  assert.deepEqual(discovery.primitiveIds, [
+    "ability.exhaust_for_resource",
+    "ability.recycle_for_power"
+  ]);
+  assert.equal(discovery.clauses[0]?.id, "intrinsic-basic-rune-abilities");
+  assert.deepEqual(exhaustAbility?.parameters, {
+    resourceType: "energy",
+    amountSource: "constant",
+    amount: 1,
+    usage: "unrestricted"
+  });
+  assert.deepEqual(recycleAbility?.parameters, {
+    amount: 1,
+    domain: "sourceDomain",
+    usage: "unrestricted"
+  });
   assert.equal(report.summary.cardsWithRulesText, 0);
   assert.equal(report.summary.suggestedCardCount, 1);
-  assert.equal(report.cards[0]?.supportStatus, "supported");
-  assert.deepEqual(catalogEntry?.parameters, []);
+  assert.equal(report.cards[0]?.supportStatus, "requires_engine_support");
+});
+
+test("reuses exhaust-for-resource behavior for Lux and variable converters", () => {
+  const lux = discoverCardPrimitives(
+    createTestCard({
+      name: "Lux, Crownguard",
+      publicCode: "OGS-014/024",
+      text: ":rb_exhaust:: [Reaction] - [Add] :rb_energy_2:. Use only to play spells. (Abilities that add resources can't be reacted to.)",
+      type: "Unit"
+    })
+  );
+  const ancientHenge = discoverCardPrimitives(
+    createTestCard({
+      name: "Ancient Henge",
+      publicCode: "SFD-117/221",
+      text: ":rb_exhaust:: [Reaction] - Pay any amount of Energy to [Add] that much :rb_rune_rainbow:. (Abilities that add resources can't be reacted to.)",
+      type: "Gear"
+    })
+  );
+  const hextechAnomaly = discoverCardPrimitives(
+    createTestCard({
+      name: "Hextech Anomaly",
+      publicCode: "SFD-083/221",
+      text: ":rb_exhaust:: [Reaction] - Pay any amount of :rb_rune_rainbow: to [Add] that much Energy. (Abilities that add resources can't be reacted to.)",
+      type: "Gear"
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(lux, "ability.exhaust_for_resource")?.parameters,
+    {
+      resourceType: "energy",
+      amountSource: "constant",
+      amount: 2,
+      usage: "spellsOnly"
+    }
+  );
+  assert.deepEqual(
+    findAssignment(ancientHenge, "ability.exhaust_for_resource")?.parameters,
+    {
+      resourceType: "power",
+      amountSource: "paidAmount",
+      domain: "rainbow",
+      usage: "unrestricted"
+    }
+  );
+  assert.deepEqual(
+    findAssignment(hextechAnomaly, "ability.exhaust_for_resource")?.parameters,
+    {
+      resourceType: "energy",
+      amountSource: "paidAmount",
+      usage: "unrestricted"
+    }
+  );
+  assert.equal(findAssignment(lux, "action.exhaust_cards"), undefined);
+  assert.equal(findAssignment(lux, "cost.exhaust_source"), undefined);
+  assert.equal(findAssignment(lux, "keyword.add"), undefined);
+  assert.equal(lux.clauses.length, 1);
 });
 
 test("does not grant Basic Rune abilities to non-Basic Runes", () => {
@@ -675,6 +755,9 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
   const channelRunes = catalog.find((entry) => entry.id === "action.channel_runes");
   const playToken = catalog.find((entry) => entry.id === "action.play_token");
   const payCost = catalog.find((entry) => entry.id === "cost.pay");
+  const exhaustForResource = catalog.find(
+    (entry) => entry.id === "ability.exhaust_for_resource"
+  );
   const numericModifier = catalog.find(
     (entry) => entry.id === "modifier.modify_numeric_value"
   );
@@ -713,6 +796,22 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
     numericModifier?.parameters.find((parameter) => parameter.name === "operand")
       ?.options,
     [...numericOperandKinds]
+  );
+  assert.deepEqual(
+    exhaustForResource?.parameters.find(
+      (parameter) => parameter.name === "amountSource"
+    )?.options,
+    [...resourceAmountSources]
+  );
+  assert.deepEqual(
+    exhaustForResource?.parameters.find((parameter) => parameter.name === "domain")
+      ?.options,
+    [...resourceDomainKinds]
+  );
+  assert.deepEqual(
+    exhaustForResource?.parameters.find((parameter) => parameter.name === "usage")
+      ?.options,
+    [...resourceUsageKinds]
   );
 });
 
@@ -812,7 +911,8 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(primitiveIds.has("action.exhaust_cards"), true);
   assert.equal(primitiveIds.has("action.deal_damage"), true);
   assert.equal(primitiveIds.has("action.channel_runes"), true);
-  assert.equal(primitiveIds.has("ability.basic_rune_resources"), true);
+  assert.equal(primitiveIds.has("ability.exhaust_for_resource"), true);
+  assert.equal(primitiveIds.has("ability.recycle_for_power"), true);
   assert.equal(primitiveIds.has("modifier.modify_numeric_value"), true);
   assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
   assert.equal(primitiveIds.has("selector.unit"), true);

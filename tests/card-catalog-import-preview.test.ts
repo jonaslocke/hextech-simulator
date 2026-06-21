@@ -74,7 +74,8 @@ test("previews textless Basic Runes as intrinsic behavior cards", async () => {
   assert.equal(preview.summary.vanillaCardCount, 0);
   assert.equal(preview.cards[0]?.isVanilla, false);
   assert.deepEqual(preview.cards[0]?.suggestion?.primitiveIds, [
-    "ability.basic_rune_resources"
+    "ability.exhaust_for_resource",
+    "ability.recycle_for_power"
   ]);
 });
 

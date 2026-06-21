@@ -149,6 +149,25 @@ export const runeEntryStates = ["default", "exhausted"] as const;
 
 export const costResourceTypes = ["energy", "rune"] as const;
 
+export const resourceAmountSources = ["constant", "paidAmount"] as const;
+
+export const resourceUsageKinds = [
+  "unrestricted",
+  "spellsOnly",
+  "gearAndGearAbilitiesOnly"
+] as const;
+
+export const resourceDomainKinds = [
+  "sourceDomain",
+  "body",
+  "calm",
+  "chaos",
+  "fury",
+  "mind",
+  "order",
+  "rainbow"
+] as const;
+
 export const numericValueKinds = [
   "might",
   "mightBonus",
@@ -186,14 +205,48 @@ export const tokenKinds = [
 type PrimitiveCatalogSeed = Omit<PrimitiveCatalogEntry, "examples">;
 
 const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
-  "ability.basic_rune_resources": primitiveSeed({
-    id: "ability.basic_rune_resources",
+  "ability.exhaust_for_resource": primitiveSeed({
+    id: "ability.exhaust_for_resource",
     family: "ability",
-    name: "Basic rune resources",
+    name: "Exhaust for resource",
     description:
-      "Provides both intrinsic Basic Rune abilities: exhaust to add 1 Energy, or recycle to add 1 Power of the Rune's domain.",
-    engineSupport: supported(
-      "Rules-defined behavior with a fixed execution contract and no card-specific parameters."
+      "Exhausts the source to add Energy or domain Power to its controller's rune pool.",
+    parameters: [
+      required("resourceType", "resource", "The produced rune-pool resource.", runeResourceTypes),
+      required("amountSource", "string", "How the produced amount is determined.", resourceAmountSources),
+      optional("amount", "number", "The produced amount when amountSource is constant."),
+      optional("domain", "string", "The produced Power domain.", resourceDomainKinds),
+      required("usage", "string", "What the generated resource may pay for.", resourceUsageKinds)
+    ],
+    fixedRules: [
+      "Exhausting the source is the activation cost.",
+      "The ability has Reaction timing.",
+      "Abilities that add resources cannot be reacted to."
+    ],
+    emitsEvents: ["card.exhausted", "resource.added"],
+    engineSupport: requiresEngineSupport(
+      "The catalog contract is reusable; generalized activated resource abilities remain future engine work."
+    )
+  }),
+  "ability.recycle_for_power": primitiveSeed({
+    id: "ability.recycle_for_power",
+    family: "ability",
+    name: "Recycle for Power",
+    description:
+      "Recycles the source to add Power of its domain to its controller's rune pool.",
+    parameters: [
+      required("amount", "number", "The amount of Power produced."),
+      required("domain", "string", "The produced Power domain.", resourceDomainKinds),
+      required("usage", "string", "What the generated Power may pay for.", resourceUsageKinds)
+    ],
+    fixedRules: [
+      "Recycling the source is the activation cost.",
+      "The ability has Reaction timing.",
+      "Abilities that add resources cannot be reacted to."
+    ],
+    emitsEvents: ["card.recycled", "resource.added"],
+    engineSupport: requiresEngineSupport(
+      "The catalog contract is reusable; generalized activated resource abilities remain future engine work."
     )
   }),
   "keyword.hidden": primitiveSeed({
@@ -388,6 +441,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
+  }),
+  "selector.token": primitiveSeed({
+    id: "selector.token",
+    family: "selector",
+    name: "Select token",
+    description: "Constrains a behavior to a known token kind.",
+    parameters: [
+      required("tokenName", "string", "The token kind.", tokenKinds),
+      required("controller", "player", "The token controller relationship.")
+    ],
+    targetingRequirements: ["target must be the selected token kind"]
   }),
   "action.draw_cards": primitiveSeed({
     id: "action.draw_cards",
@@ -792,11 +856,39 @@ export function validatePrimitiveAssignmentParameters(
     validateNumericModifier(assignment, issues);
   }
 
+  if (entry.id === "ability.exhaust_for_resource") {
+    validateExhaustForResource(assignment, issues);
+  }
+
   return {
     complete: missingRequired.length === 0 && issues.length === 0,
     missingRequired,
     issues
   };
+}
+
+function validateExhaustForResource(
+  assignment: PrimitiveAssignment,
+  issues: ParameterValidationIssue[]
+): void {
+  const resourceType = assignment.parameters.resourceType;
+  const amountSource = assignment.parameters.amountSource;
+  const amount = assignment.parameters.amount;
+  const domain = assignment.parameters.domain;
+
+  if (amountSource === "constant" && typeof amount !== "number") {
+    issues.push({
+      parameterName: "amount",
+      message: 'Parameter "amount" is required for a constant amount source.'
+    });
+  }
+
+  if (resourceType === "power" && typeof domain !== "string") {
+    issues.push({
+      parameterName: "domain",
+      message: 'Parameter "domain" is required when producing Power.'
+    });
+  }
 }
 
 function validateNumericModifier(
