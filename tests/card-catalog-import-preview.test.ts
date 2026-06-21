@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  CARD_BEHAVIOR_SCHEMA_VERSION,
   CardCatalogImportPreviewError,
   previewCardCatalogImport,
   type PersistedCardValidationSummary
@@ -85,7 +84,6 @@ test("marks uploaded cards that already exist in the persisted catalog", async (
   });
   const persisted: PersistedCardValidationSummary = {
     cardCode: "OGN-206",
-    schemaVersion: CARD_BEHAVIOR_SCHEMA_VERSION,
     status: "approved",
     sourceTextHash: null,
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -119,7 +117,6 @@ test("marks persisted cards as changed when the source text hash differs", async
           "OGN-087",
           {
             cardCode: "OGN-087",
-            schemaVersion: CARD_BEHAVIOR_SCHEMA_VERSION,
             status: "approved",
             sourceTextHash: "different-hash",
             updatedAt: "2026-06-19T00:00:00.000Z"
@@ -130,39 +127,6 @@ test("marks persisted cards as changed when the source text hash differs", async
 
   assert.equal(preview.summary.changedSincePersistedCardCount, 1);
   assert.equal(preview.cards[0]?.existingCatalog.state, "changed_since_persisted");
-});
-
-test("requires revalidation for older persisted behavior schemas", async () => {
-  const card = createTestCard({
-    name: "Stupefy",
-    publicCode: "OGN-095/298",
-    text: "Give a unit -1 :rb_might: this turn."
-  });
-
-  for (const schemaVersion of [1, null]) {
-    const preview = await previewCardCatalogImport({
-      sourceLabel: "uploaded.json",
-      rawJson: JSON.stringify([card]),
-      existingCardLookup: async () =>
-        new Map([
-          [
-            "OGN-095",
-            {
-              cardCode: "OGN-095",
-              schemaVersion,
-              status: "approved" as const,
-              sourceTextHash: null,
-              updatedAt: "2026-06-20T00:00:00.000Z"
-            }
-          ]
-        ])
-    });
-
-    assert.equal(
-      preview.cards[0]?.existingCatalog.state,
-      "changed_since_persisted"
-    );
-  }
 });
 
 test("rejects invalid uploaded JSON before behavior discovery", async () => {

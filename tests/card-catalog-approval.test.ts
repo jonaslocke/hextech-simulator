@@ -17,7 +17,7 @@ test("builds an approved card behavior document keyed by stable card code", () =
   assert.equal(document.id, "OGN-095");
   assert.equal(document.cardCode, "OGN-095");
   assert.equal(document.status, "approved");
-  assert.equal(document.schemaVersion, 2);
+  assert.equal("schemaVersion" in document, false);
   assert.equal(document.clauses[0]?.assignments[0]?.primitiveId, "timing.reaction");
   assert.equal(
     document.clauses[0]?.assignments.find(

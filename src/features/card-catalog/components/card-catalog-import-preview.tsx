@@ -343,7 +343,6 @@ function markCardPersisted(
   card: PreviewCard,
   persisted: {
     cardCode: string;
-    schemaVersion: number;
     status: ApprovalStatus;
     sourceTextHash: string;
     updatedAt: string;
@@ -358,7 +357,6 @@ function markCardPersisted(
             state: "already_persisted" as const,
             persisted: {
               cardCode: persisted.cardCode,
-              schemaVersion: persisted.schemaVersion,
               status: persisted.status,
               sourceTextHash: persisted.sourceTextHash,
               updatedAt: persisted.updatedAt

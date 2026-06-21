@@ -25,7 +25,6 @@ export type CardCatalogApprovalResponse =
       accepted: true;
       behavior: {
         cardCode: string;
-        schemaVersion: number;
         status: PersistedCardValidationStatus;
         sourceTextHash: string;
         updatedAt: string;
