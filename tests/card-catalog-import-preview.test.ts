@@ -40,10 +40,13 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   const stupefyPreview = preview.cards.find((card) => card.cardCode === "OGN-095");
   const megaMechPreview = preview.cards.find((card) => card.cardCode === "OGN-088");
 
-  assert.equal(stupefyPreview?.suggestion?.supportStatus, "supported");
+  assert.equal(
+    stupefyPreview?.suggestion?.supportStatus,
+    "requires_engine_support"
+  );
   assert.deepEqual(stupefyPreview?.suggestion?.primitiveIds, [
     "action.draw_cards",
-    "modifier.modify_might",
+    "modifier.modify_numeric_value",
     "selector.unit",
     "timing.reaction"
   ]);

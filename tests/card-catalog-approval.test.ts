@@ -21,9 +21,9 @@ test("builds an approved card behavior document keyed by stable card code", () =
   assert.equal(document.clauses[0]?.assignments[0]?.primitiveId, "timing.reaction");
   assert.equal(
     document.clauses[0]?.assignments.find(
-      (assignment) => assignment.primitiveId === "modifier.modify_might"
+      (assignment) => assignment.primitiveId === "modifier.modify_numeric_value"
     )?.parameters.amount,
-    -1
+    1
   );
 });
 
@@ -111,11 +111,14 @@ function createApprovedStupefyInput(): ApprovedCardBehaviorInput {
             confidence: "medium"
           },
           {
-            primitiveId: "modifier.modify_might",
+            primitiveId: "modifier.modify_numeric_value",
             family: "modifier",
             sourceText: "Give a unit -1 :rb_might:",
             parameters: {
-              amount: -1,
+              attribute: "might",
+              operation: "reduce",
+              operand: "constant",
+              amount: 1,
               duration: "thisTurn",
               target: "unit",
               minimum: 1

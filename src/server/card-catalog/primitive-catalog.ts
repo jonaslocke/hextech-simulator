@@ -133,9 +133,12 @@ export const unitLocationRelations = [
 ] as const;
 
 export const targetReferenceKinds = [
+  "card",
   "enemy_unit",
   "equipment",
+  "event_subject",
   "friendly_unit",
+  "game",
   "rune",
   "runes",
   "source",
@@ -145,6 +148,32 @@ export const targetReferenceKinds = [
 export const runeEntryStates = ["default", "exhausted"] as const;
 
 export const costResourceTypes = ["energy", "rune"] as const;
+
+export const numericValueKinds = [
+  "might",
+  "mightBonus",
+  "energyCost",
+  "powerCost",
+  "victoryRequirement",
+  "resourceAmount"
+] as const;
+
+export const numericModifierOperations = [
+  "increase",
+  "reduce",
+  "multiply",
+  "set"
+] as const;
+
+export const numericOperandKinds = [
+  "constant",
+  "sourceMight",
+  "selectedUnitMight",
+  "highestControlledUnitMight",
+  "recycledUnitMight",
+  "cardEnergyCost",
+  "eventAmount"
+] as const;
 
 export const tokenKinds = [
   "1 :rb_might: Recruit unit",
@@ -545,30 +574,45 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [required("target", "target", "The card to stun.")],
     emitsEvents: ["unit.stunned"]
   }),
-  "modifier.modify_might": primitiveSeed({
-    id: "modifier.modify_might",
+  "modifier.modify_numeric_value": primitiveSeed({
+    id: "modifier.modify_numeric_value",
     family: "modifier",
-    name: "Modify Might",
-    description: "Changes a unit's Might.",
+    name: "Modify numeric value",
+    description:
+      "Adds a typed operation to the modifier chain for a numeric game or card value.",
     parameters: [
-      required("amount", "number", "The Might delta."),
-      required("target", "target", "The modified unit."),
+      required(
+        "attribute",
+        "string",
+        "The numeric value being modified.",
+        numericValueKinds
+      ),
+      required(
+        "operation",
+        "string",
+        "How the modifier changes the base or current value.",
+        numericModifierOperations
+      ),
+      required(
+        "operand",
+        "string",
+        "Where the operation value comes from.",
+        numericOperandKinds
+      ),
+      optional("amount", "number", "The constant operand when operand is constant."),
+      required("target", "target", "The object or game value being modified."),
       optional("duration", "duration", "How long the modifier lasts.", modifierDurations),
-      optional("minimum", "number", "The minimum resulting Might.")
+      optional("minimum", "number", "The minimum resulting value.")
     ],
-    engineSupport: supported("Selected as an initial executable modifier primitive for the new catalog pipeline.")
-  }),
-  "modifier.modify_cost": primitiveSeed({
-    id: "modifier.modify_cost",
-    family: "modifier",
-    name: "Modify cost",
-    description: "Changes a card or ability cost.",
-    parameters: [
-      required("amount", "number", "The cost delta."),
-      required("costType", "resource", "The resource being modified.", costResourceTypes),
-      optional("minimum", "number", "The minimum resulting cost.")
+    fixedRules: [
+      "Every numeric game or card value starts from its printed or rules-defined base value.",
+      "Active numeric modifiers are applied by the future engine as an ordered modifier chain.",
+      "A set operation replaces the value at its rules-defined chain position; multiply, increase, and reduce operations then use their own rules-defined ordering.",
+      "Minimum is a floor on the result of this modifier and is not a separate condition."
     ],
-    engineSupport: partiallySupported("Cost modification is recurring in the corpus; resource and scope variants require additional validation.")
+    engineSupport: requiresEngineSupport(
+      "The catalog defines the modifier contract; ordered runtime evaluation remains future engine work."
+    )
   }),
   "modifier.enter_ready": primitiveSeed({
     id: "modifier.enter_ready",
@@ -577,13 +621,6 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Makes a card enter ready instead of exhausted.",
     parameters: [required("target", "target", "The card that enters ready.")],
     engineSupport: partiallySupported("Entry-state changes are recurring in the corpus; target/source variants require additional validation.")
-  }),
-  "modifier.victory_requirement": primitiveSeed({
-    id: "modifier.victory_requirement",
-    family: "modifier",
-    name: "Modify victory requirement",
-    description: "Changes the points needed to win.",
-    parameters: [required("amount", "number", "The victory requirement delta.")]
   }),
   "modifier.targeting_restriction": primitiveSeed({
     id: "modifier.targeting_restriction",
@@ -751,11 +788,37 @@ export function validatePrimitiveAssignmentParameters(
     validateSelectorCountBounds(assignment, issues);
   }
 
+  if (entry.id === "modifier.modify_numeric_value") {
+    validateNumericModifier(assignment, issues);
+  }
+
   return {
     complete: missingRequired.length === 0 && issues.length === 0,
     missingRequired,
     issues
   };
+}
+
+function validateNumericModifier(
+  assignment: PrimitiveAssignment,
+  issues: ParameterValidationIssue[]
+): void {
+  const operand = assignment.parameters.operand;
+  const amount = assignment.parameters.amount;
+
+  if (operand === "constant" && typeof amount !== "number") {
+    issues.push({
+      parameterName: "amount",
+      message: 'Parameter "amount" is required for a constant operand.'
+    });
+  }
+
+  if (typeof amount === "number" && amount < 0) {
+    issues.push({
+      parameterName: "amount",
+      message: 'Parameter "amount" cannot be negative; use the reduce operation.'
+    });
+  }
 }
 
 function validateSelectorCountBounds(

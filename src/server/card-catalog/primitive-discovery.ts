@@ -269,24 +269,24 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "action.stun_card", "action", { target: readGenericTarget(context.rulesText) }, "high")
       : null
   ),
-  primitive("modifier.modify_might", "modifier", "Modify Might", "Modify a unit's Might.", ["amount", "duration", "minimum", "target"], (context) =>
-    /\bmight\b|:rb_might:/.test(context.rulesText)
-      ? assignment(context, "modifier.modify_might", "modifier", { amount: readMightAmount(context.rulesText), duration: readDuration(context.rulesText), minimum: readMinimum(context.rulesText), target: readGenericTarget(context.rulesText) }, "high")
+  primitive("modifier.modify_numeric_value", "modifier", "Modify numeric value", "Modify a numeric game or card value.", ["attribute", "operation", "operand", "amount", "target", "duration", "minimum"], (context) =>
+    isNonCostNumericModifier(context.rulesText)
+      ? assignment(context, "modifier.modify_numeric_value", "modifier", readNumericModifier(context.rulesText, readNonCostNumericAttribute(context.rulesText)), "high")
       : null
   ),
-  primitive("modifier.modify_cost", "modifier", "Modify cost", "Modify a card or ability cost.", ["amount", "costType", "minimum"], (context) =>
-    /\bcosts?\b|\breduced\b|\bincreased\b/.test(context.rulesText)
-      ? assignment(context, "modifier.modify_cost", "modifier", { amount: readSignedNumber(context.rulesText), costType: readCostType(context.rulesText), minimum: readMinimum(context.rulesText) }, "medium")
+  primitive("modifier.modify_numeric_value", "modifier", "Modify numeric value", "Modify a numeric game or card value.", ["attribute", "operation", "operand", "amount", "target", "duration", "minimum"], (context) =>
+    isEnergyCostModifier(context.rulesText)
+      ? assignment(context, "modifier.modify_numeric_value", "modifier", readNumericModifier(context.rulesText, "energyCost"), "high")
+      : null
+  ),
+  primitive("modifier.modify_numeric_value", "modifier", "Modify numeric value", "Modify a numeric game or card value.", ["attribute", "operation", "operand", "amount", "target", "duration", "minimum"], (context) =>
+    isPowerCostModifier(context.rulesText)
+      ? assignment(context, "modifier.modify_numeric_value", "modifier", readNumericModifier(context.rulesText, "powerCost"), "high")
       : null
   ),
   primitive("modifier.enter_ready", "modifier", "Enter ready", "Card or token enters ready.", ["target"], (context) =>
     /\benter ready\b|\benters ready\b/.test(context.rulesText)
       ? assignment(context, "modifier.enter_ready", "modifier", { target: readGenericTarget(context.rulesText) }, "high")
-      : null
-  ),
-  primitive("modifier.victory_requirement", "modifier", "Modify victory requirement", "Modify points needed to win.", ["amount"], (context) =>
-    /\bpoints needed to win\b/.test(context.rulesText)
-      ? assignment(context, "modifier.victory_requirement", "modifier", { amount: readSignedNumber(context.rulesText) ?? readFirstNumber(context.rulesText) }, "high")
       : null
   ),
   primitive("modifier.targeting_restriction", "modifier", "Targeting restriction", "Change what can be chosen or targeted.", [], (context) =>
@@ -942,6 +942,167 @@ function readNumberToken(token: string): number | null {
   };
 
   return wordNumbers[lowerToken] ?? Number(lowerToken);
+}
+
+function isNonCostNumericModifier(rulesText: string): boolean {
+  return (
+    /[+-]\s*\d+\s*:rb_might:/.test(rulesText) ||
+    /\bdouble\b[^.]*\bmight\b/.test(rulesText) ||
+    /\bmight becomes\b/.test(rulesText) ||
+    /\bbase might bonus\b/.test(rulesText) ||
+    /\bpoints needed to win\b/.test(rulesText) ||
+    /\[add\]\s+an additional\b|:rb_add:\s+an additional\b/.test(rulesText)
+  );
+}
+
+function isEnergyCostModifier(rulesText: string): boolean {
+  return (
+    /\benergy costs?\b[^.]*\b(reduced|increased)\b/.test(rulesText) ||
+    /\benergy costs?\b[^.]*:rb_energy_\d+:\s+(less|more)\b/.test(rulesText) ||
+    /\bcosts?\s+:rb_energy_\d+:\s+(less|more)\b/.test(rulesText) ||
+    /\breduce its energy cost\b/.test(rulesText)
+  );
+}
+
+function isPowerCostModifier(rulesText: string): boolean {
+  return (
+    /\bpower costs?\b[^.]*\b(reduced|less|more|increased)\b/.test(rulesText) ||
+    /\bcosts?\b[^.]*:rb_rune_[a-z_]+:\s+(less|more)\b/.test(rulesText)
+  );
+}
+
+function readNonCostNumericAttribute(rulesText: string): string {
+  if (rulesText.includes("points needed to win")) {
+    return "victoryRequirement";
+  }
+
+  if (/\[add\]\s+an additional\b|:rb_add:\s+an additional\b/.test(rulesText)) {
+    return "resourceAmount";
+  }
+
+  if (rulesText.includes("base might bonus")) {
+    return "mightBonus";
+  }
+
+  return "might";
+}
+
+function readNumericModifier(
+  rulesText: string,
+  attribute: string
+): PrimitiveAssignment["parameters"] {
+  const operation = readNumericOperation(rulesText);
+  const operand = readNumericOperand(rulesText);
+
+  return {
+    attribute,
+    operation,
+    operand,
+    amount: readNumericAmount(rulesText, attribute, operation, operand),
+    target: readNumericTarget(rulesText, attribute),
+    duration: readDuration(rulesText),
+    minimum: readMinimum(rulesText)
+  };
+}
+
+function readNumericOperation(rulesText: string): string {
+  if (/\bdouble\b/.test(rulesText)) {
+    return "multiply";
+  }
+
+  if (/\bbecomes?\b/.test(rulesText)) {
+    return "set";
+  }
+
+  if (/\breduced?\b|\bless\b|-\s*\d+/.test(rulesText)) {
+    return "reduce";
+  }
+
+  return "increase";
+}
+
+function readNumericOperand(rulesText: string): string {
+  if (rulesText.includes("highest might")) {
+    return "highestControlledUnitMight";
+  }
+
+  if (rulesText.includes("might of the unit you recycled")) {
+    return "recycledUnitMight";
+  }
+
+  if (rulesText.includes("becomes the might of")) {
+    return "selectedUnitMight";
+  }
+
+  if (rulesText.includes("equal to my might")) {
+    return "sourceMight";
+  }
+
+  if (rulesText.includes("energy cost") && rulesText.includes("equal to")) {
+    return "cardEnergyCost";
+  }
+
+  if (rulesText.includes("that much")) {
+    return "eventAmount";
+  }
+
+  return "constant";
+}
+
+function readNumericAmount(
+  rulesText: string,
+  attribute: string,
+  operation: string,
+  operand: string
+): number | null {
+  if (operand !== "constant") {
+    return null;
+  }
+
+  if (operation === "multiply" && rulesText.includes("double")) {
+    return 2;
+  }
+
+  if (attribute === "energyCost" || attribute === "resourceAmount") {
+    const energy = rulesText.match(/:rb_energy_(\d+):/);
+    return energy ? Number(energy[1]) : readFirstNumber(rulesText);
+  }
+
+  if (attribute === "powerCost") {
+    return [...rulesText.matchAll(/:rb_rune_[a-z_]+:/g)].length || null;
+  }
+
+  if (attribute === "victoryRequirement") {
+    return readFirstNumber(rulesText);
+  }
+
+  const mightAmount = readMightAmount(rulesText);
+  return mightAmount === null ? null : Math.abs(mightAmount);
+}
+
+function readNumericTarget(rulesText: string, attribute: string): string {
+  if (attribute === "victoryRequirement") {
+    return "game";
+  }
+
+  if (attribute === "resourceAmount") {
+    return "event_subject";
+  }
+
+  if (attribute === "mightBonus") {
+    return "equipment";
+  }
+
+  if (attribute === "energyCost" || attribute === "powerCost") {
+    return "card";
+  }
+
+  if (/\b(my|me|i)\b/.test(rulesText)) {
+    return "source";
+  }
+
+  const target = readGenericTarget(rulesText);
+  return target === "unspecified" ? "unit" : target;
 }
 
 function readMightAmount(rulesText: string): number | null {

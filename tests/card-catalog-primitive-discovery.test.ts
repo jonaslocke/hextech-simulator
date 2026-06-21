@@ -10,6 +10,9 @@ import {
   discoverCardPrimitives,
   getPrimitiveCatalogEntry,
   gameEventKinds,
+  numericModifierOperations,
+  numericOperandKinds,
+  numericValueKinds,
   playEventSubjectKinds,
   playerReferenceKinds,
   runeEntryStates,
@@ -48,13 +51,16 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
   assert.deepEqual(primitiveIds, [
     "timing.reaction",
     "selector.unit",
-    "modifier.modify_might",
+    "modifier.modify_numeric_value",
     "action.draw_cards"
   ]);
 
-  const modifyMight = discovery.clauses
+  const numericModifier = discovery.clauses
     .flatMap((clause) => clause.assignments)
-    .find((assignment) => assignment.primitiveId === "modifier.modify_might");
+    .find(
+      (assignment) =>
+        assignment.primitiveId === "modifier.modify_numeric_value"
+    );
   const draw = discovery.clauses
     .flatMap((clause) => clause.assignments)
     .find((assignment) => assignment.primitiveId === "action.draw_cards");
@@ -69,8 +75,11 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
     excludesSource: false
   });
 
-  assert.deepEqual(modifyMight?.parameters, {
-    amount: -1,
+  assert.deepEqual(numericModifier?.parameters, {
+    attribute: "might",
+    operation: "reduce",
+    operand: "constant",
+    amount: 1,
     duration: "thisTurn",
     minimum: 1,
     target: "unit"
@@ -142,15 +151,105 @@ test("builds typed card behavior suggestions with parameter validation", () => {
   const suggestion = report.cards[0]!;
   const modifier = suggestion.clauses
     .flatMap((clause) => clause.assignments)
-    .find((assignment) => assignment.assignment.primitiveId === "modifier.modify_might");
+    .find(
+      (assignment) =>
+        assignment.assignment.primitiveId === "modifier.modify_numeric_value"
+    );
 
-  assert.equal(suggestion.supportStatus, "supported");
+  assert.equal(suggestion.supportStatus, "requires_engine_support");
   assert.equal(suggestion.missingRequiredParameterCount, 0);
   assert.equal(suggestion.unsupportedClauseCount, 0);
   assert.equal(modifier?.parameterValidation.complete, true);
   assert.equal(
     modifier?.catalogEntry.parameters.some((parameter) => parameter.name === "target"),
     true
+  );
+});
+
+test("discovers corpus-backed numeric modifier operations", () => {
+  const aspirantsClimb = discoverCardPrimitives(
+    createTestCard({
+      name: "Aspirant's Climb",
+      publicCode: "OGN-276/298",
+      text: "Increase the points needed to win the game by 1."
+    })
+  );
+  const fiora = discoverCardPrimitives(
+    createTestCard({
+      name: "Fiora, Peerless",
+      publicCode: "SFD-110/221",
+      text: "When I attack or defend one on one, double my Might this combat."
+    })
+  );
+  const mutation = discoverCardPrimitives(
+    createTestCard({
+      name: "Convergent Mutation",
+      publicCode: "OGN-108/298",
+      text: "Choose a friendly unit. Its Might becomes the Might of another friendly unit this turn."
+    })
+  );
+  const baroness = discoverCardPrimitives(
+    createTestCard({
+      name: "Chem-Baroness",
+      publicCode: "SFD-201/221",
+      text: "While your score is within 3 points of the Victory Score, your Gold [Add] an additional :rb_energy_1:."
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(aspirantsClimb, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "victoryRequirement",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "game"
+    }
+  );
+  assert.deepEqual(
+    findAssignment(fiora, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "might",
+      operation: "multiply",
+      operand: "constant",
+      amount: 2,
+      target: "source"
+    }
+  );
+  assert.deepEqual(
+    findAssignment(mutation, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "might",
+      operation: "set",
+      operand: "selectedUnitMight",
+      target: "friendly_unit",
+      duration: "thisTurn"
+    }
+  );
+  assert.deepEqual(
+    findAssignment(baroness, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "resourceAmount",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "event_subject"
+    }
+  );
+});
+
+test("does not treat numeric comparisons as modifiers", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Yasuo, Remorseful",
+      publicCode: "OGN-076/298",
+      text: "Deal damage equal to my Might to an enemy unit here."
+    })
+  );
+
+  assert.equal(
+    findAssignment(discovery, "modifier.modify_numeric_value"),
+    undefined
   );
 });
 
@@ -436,26 +535,29 @@ test("does not grant Hidden behavior to cards that only reference Hidden", () =>
   }
 });
 
-test("catalogs modify might duration as a known modifier duration enum", () => {
-  const modifyMight = buildPrimitiveCatalog().find(
-    (entry) => entry.id === "modifier.modify_might"
+test("catalogs numeric modifier duration as a known duration enum", () => {
+  const numericModifier = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "modifier.modify_numeric_value"
   );
-  const durationParameter = modifyMight?.parameters.find(
+  const durationParameter = numericModifier?.parameters.find(
     (parameter) => parameter.name === "duration"
   );
   const invalidDurationValidation = validatePrimitiveAssignmentParameters(
     {
-      primitiveId: "modifier.modify_might",
+      primitiveId: "modifier.modify_numeric_value",
       family: "modifier",
       sourceText: "give a unit +1 :rb_might: for a weird duration",
       parameters: {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
         amount: 1,
         target: "unit",
         duration: "weird_duration"
       },
       confidence: "medium"
     },
-    getPrimitiveCatalogEntry("modifier.modify_might", "modifier")
+    getPrimitiveCatalogEntry("modifier.modify_numeric_value", "modifier")
   );
 
   assert.deepEqual(durationParameter?.options, [...modifierDurations]);
@@ -573,6 +675,9 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
   const channelRunes = catalog.find((entry) => entry.id === "action.channel_runes");
   const playToken = catalog.find((entry) => entry.id === "action.play_token");
   const payCost = catalog.find((entry) => entry.id === "cost.pay");
+  const numericModifier = catalog.find(
+    (entry) => entry.id === "modifier.modify_numeric_value"
+  );
 
   assert.deepEqual(
     onPlay?.parameters.find((parameter) => parameter.name === "subject")?.options,
@@ -594,27 +699,45 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
     payCost?.parameters.find((parameter) => parameter.name === "resource")?.options,
     [...costResourceTypes]
   );
+  assert.deepEqual(
+    numericModifier?.parameters.find((parameter) => parameter.name === "attribute")
+      ?.options,
+    [...numericValueKinds]
+  );
+  assert.deepEqual(
+    numericModifier?.parameters.find((parameter) => parameter.name === "operation")
+      ?.options,
+    [...numericModifierOperations]
+  );
+  assert.deepEqual(
+    numericModifier?.parameters.find((parameter) => parameter.name === "operand")
+      ?.options,
+    [...numericOperandKinds]
+  );
 });
 
 test("catalogs target parameters as known target references", () => {
-  const modifyMight = buildPrimitiveCatalog().find(
-    (entry) => entry.id === "modifier.modify_might"
+  const numericModifier = buildPrimitiveCatalog().find(
+    (entry) => entry.id === "modifier.modify_numeric_value"
   );
-  const targetParameter = modifyMight?.parameters.find(
+  const targetParameter = numericModifier?.parameters.find(
     (parameter) => parameter.name === "target"
   );
   const invalidTargetValidation = validatePrimitiveAssignmentParameters(
     {
-      primitiveId: "modifier.modify_might",
+      primitiveId: "modifier.modify_numeric_value",
       family: "modifier",
       sourceText: "give something +1 :rb_might:",
       parameters: {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
         amount: 1,
         target: "unspecified"
       },
       confidence: "low"
     },
-    getPrimitiveCatalogEntry("modifier.modify_might", "modifier")
+    getPrimitiveCatalogEntry("modifier.modify_numeric_value", "modifier")
   );
 
   assert.deepEqual(targetParameter?.options, [...targetReferenceKinds]);
@@ -690,7 +813,7 @@ test("discovers reusable primitives from the full local card corpus", async () =
   assert.equal(primitiveIds.has("action.deal_damage"), true);
   assert.equal(primitiveIds.has("action.channel_runes"), true);
   assert.equal(primitiveIds.has("ability.basic_rune_resources"), true);
-  assert.equal(primitiveIds.has("modifier.modify_might"), true);
+  assert.equal(primitiveIds.has("modifier.modify_numeric_value"), true);
   assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
   assert.equal(primitiveIds.has("selector.unit"), true);
   assert.equal(hiddenCards.length, 26);
