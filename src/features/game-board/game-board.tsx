@@ -8,6 +8,11 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  DomainIcon,
+  EnergyResource,
+  formatDomain,
+} from "@/features/card-presentation";
 import type { Card as CatalogCard } from "@/server/catalog";
 import type {
   ProjectedBattlefield,
@@ -29,11 +34,6 @@ import {
 } from "./components/card-zone-transfer-overlay";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
-import {
-  EnergyResource,
-  formatDomain,
-  getDomainIcon,
-} from "./lib/transpile-card-description";
 import {
   BattlefieldData,
   Card,
@@ -972,23 +972,16 @@ function RunePoolBar({
           <EnergyResource compact value={entry.amount} />
         </span>
       ))}
-      {powerEntries.map(([domain, amount]) => {
-        const icon = getDomainIcon(domain.toLowerCase());
-
-        return (
-          <span
-            className="inline-flex items-center gap-1 bg-violet-300/10 px-2 py-1 border border-violet-300/25 rounded text-violet-100"
-            key={domain}
-            title={`${formatDomain(domain)} Power`}
-          >
-            {icon && (
-              // eslint-disable-next-line @next/next/no-img-element -- Domain icons are local imported UI assets.
-              <img alt="" className="w-auto h-4 object-contain" src={icon} />
-            )}
-            <span className="font-bold text-white">{amount}</span>
-          </span>
-        );
-      })}
+      {powerEntries.map(([domain, amount]) => (
+        <span
+          className="inline-flex items-center gap-1 bg-violet-300/10 px-2 py-1 border border-violet-300/25 rounded text-violet-100"
+          key={domain}
+          title={`${formatDomain(domain)} Power`}
+        >
+          <DomainIcon decorative domain={domain} />
+          <span className="font-bold text-white">{amount}</span>
+        </span>
+      ))}
     </div>
   );
 }

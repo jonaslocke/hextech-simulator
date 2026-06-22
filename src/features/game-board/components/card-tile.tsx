@@ -9,15 +9,15 @@ import {
   useState,
 } from "react";
 import { motion } from "motion/react";
-import { cn } from "@/shared/utils/cn";
-import { Card } from "../types";
 import {
+  CardRulesText,
+  DomainIcon,
   EnergyResource,
   formatDomain,
-  getDomainIcon,
   MightResource,
-  transpileCardDescription,
-} from "../lib/transpile-card-description";
+} from "@/features/card-presentation";
+import { cn } from "@/shared/utils/cn";
+import { Card } from "../types";
 
 type CardTileProps = Card & {
   enableHoverPreview?: boolean;
@@ -307,14 +307,7 @@ function CardSummary({
               className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200"
               key={domain}
             >
-              {getDomainIcon(domain.toLowerCase()) && (
-                // eslint-disable-next-line @next/next/no-img-element -- Domain icons are local imported UI assets.
-                <img
-                  alt=""
-                  className="h-3.5 w-auto object-contain"
-                  src={getDomainIcon(domain.toLowerCase()) ?? undefined}
-                />
-              )}
+              <DomainIcon compact decorative domain={domain} />
               {formatDomain(domain)}
             </span>
           ))}
@@ -335,7 +328,7 @@ function CardSummary({
       )}
       <div className="grid gap-1.5 rounded border border-white/10 bg-black/25 p-2 text-sm text-slate-100">
         {rulesText?.trim() ? (
-          transpileCardDescription(rulesText)
+          <CardRulesText text={rulesText} />
         ) : (
           <p className="text-slate-400">No rules text.</p>
         )}
