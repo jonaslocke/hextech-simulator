@@ -87,7 +87,7 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
     target: "unit"
   });
   assert.deepEqual(draw?.parameters, {
-    player: "player",
+    player: "controller",
     count: 1
   });
 });
@@ -120,9 +120,10 @@ test("discovers selector constraints for target legality from card text", () => 
     maximumCount: 2,
     area: "board",
     locationRelation: "any",
-    controller: "player",
+    controller: "controller",
     excludesSource: false
   });
+  assert.equal(findAssignment(backToBack, "selector.unit"), undefined);
   assert.deepEqual(findAssignment(fallingComet, "selector.unit")?.parameters, {
     minimumCount: 1,
     maximumCount: 1,
@@ -242,7 +243,7 @@ test("discovers corpus-backed numeric modifier operations", () => {
   );
   assert.deepEqual(findAssignment(baroness, "selector.token")?.parameters, {
     tokenName: "Gold gear",
-    controller: "player"
+    controller: "controller"
   });
 });
 
@@ -360,7 +361,7 @@ test("uses selectors for explicit choice legality and count", () => {
   const choice = findAssignment(discovery, "choice.choose_target");
   const selector = findAssignment(discovery, "selector.enemy_unit");
 
-  assert.deepEqual(choice?.parameters, { player: "player" });
+  assert.deepEqual(choice?.parameters, { player: "controller" });
   assert.deepEqual(selector?.parameters, {
     minimumCount: 1,
     maximumCount: 1,
@@ -396,19 +397,19 @@ test("models play, choose, and ready clauses as event listeners", () => {
 
   assert.deepEqual(
     findAssignment(ravenbloom, "trigger.on_play")?.parameters,
-    { actor: "player", subject: "spell" }
+    { actor: "controller", subject: "spell" }
   );
   assert.deepEqual(
     findAssignment(bladeDancer, "trigger.on_choose")?.parameters,
-    { actor: "player", subject: "event_subject" }
+    { actor: "controller", subject: "event_subject" }
   );
   assert.equal(findAssignment(bladeDancer, "choice.choose_target"), undefined);
   assert.deepEqual(findAssignment(irelia, "trigger.on_choose")?.parameters, {
-    actor: "player",
+    actor: "controller",
     subject: "source"
   });
   assert.deepEqual(findAssignment(irelia, "trigger.on_ready")?.parameters, {
-    actor: "player",
+    actor: "controller",
     subject: "source"
   });
   assert.equal(findAssignment(irelia, "action.ready_cards"), undefined);
@@ -424,7 +425,7 @@ test("models a played spell Energy-cost threshold as a typed clause condition", 
   );
 
   assert.deepEqual(findAssignment(discovery, "trigger.on_play")?.parameters, {
-    actor: "player",
+    actor: "controller",
     subject: "spell"
   });
   assert.deepEqual(
@@ -497,11 +498,62 @@ test("models Targon's Peak as a conquer listener with delayed resolution", () =>
     undefined
   );
   assert.equal(findAssignment(discovery, "trigger.end_of_turn"), undefined);
+  assert.deepEqual(findAssignment(discovery, "action.ready_cards")?.parameters, {
+    player: "controller",
+    target: "runes",
+    count: 2
+  });
   assert.deepEqual(
     getPrimitiveCatalogEntry("trigger.conquer_battlefield", "trigger")
       .listensToEvents,
     ["battlefield.conquered"]
   );
+});
+
+test("models the remaining Lux MVP battlefield, keyword, and entry behaviors", () => {
+  const papertree = discoverCardPrimitives(
+    createTestCard({
+      name: "The Papertree",
+      publicCode: "SFD-219/221",
+      text: "When you hold here, each player channels 1 rune exhausted.",
+      type: "Battlefield"
+    })
+  );
+  const daringPoro = discoverCardPrimitives(
+    createTestCard({
+      name: "Daring Poro",
+      publicCode: "OGN-210/298",
+      text: "[Assault] (+1 :rb_might: while I'm an attacker.)"
+    })
+  );
+  const lecturingYordle = discoverCardPrimitives(
+    createTestCard({
+      name: "Lecturing Yordle",
+      publicCode: "OGN-087/298",
+      text: "[Tank] (I must be assigned combat damage first.)When you play me, draw 1."
+    })
+  );
+  const attendant = discoverCardPrimitives(
+    createTestCard({
+      name: "Vanguard Attendant",
+      publicCode: "OGS-016/024",
+      text: "I enter ready."
+    })
+  );
+
+  assert.deepEqual(findAssignment(papertree, "action.channel_runes")?.parameters, {
+    player: "eachPlayer",
+    count: 1,
+    entryState: "exhausted"
+  });
+  assert.deepEqual(findAssignment(daringPoro, "keyword.assault")?.parameters, {
+    amount: 1
+  });
+  assert.deepEqual(findAssignment(lecturingYordle, "keyword.tank")?.parameters, {});
+  assert.deepEqual(findAssignment(attendant, "modifier.enter_ready")?.parameters, {
+    target: "source"
+  });
+  assert.equal(findAssignment(attendant, "action.ready_cards"), undefined);
 });
 
 test("declares emitted events for reusable action primitives", () => {
@@ -771,7 +823,8 @@ test("discovers separate intrinsic Basic Rune resource abilities", () => {
     "ability.exhaust_for_resource",
     "ability.recycle_for_power"
   ]);
-  assert.equal(discovery.clauses[0]?.id, "intrinsic-basic-rune-abilities");
+  assert.equal(discovery.clauses[0]?.id, "intrinsic-exhaust-for-energy");
+  assert.equal(discovery.clauses[1]?.id, "intrinsic-recycle-for-power");
   assert.deepEqual(exhaustAbility?.parameters, {
     resourceType: "energy",
     amountSource: "constant",
@@ -842,6 +895,7 @@ test("reuses exhaust-for-resource behavior for Lux and variable converters", () 
   );
   assert.equal(findAssignment(lux, "action.exhaust_cards"), undefined);
   assert.equal(findAssignment(lux, "cost.exhaust_source"), undefined);
+  assert.equal(findAssignment(lux, "timing.reaction"), undefined);
   assert.equal(findAssignment(lux, "keyword.add"), undefined);
   assert.equal(lux.clauses.length, 1);
 });
@@ -857,7 +911,8 @@ test("does not grant Basic Rune abilities to non-Basic Runes", () => {
   });
 
   assert.deepEqual(discoverCardPrimitives(nonBasicRune).clauses, []);
-  assert.equal(analyzeCardBehaviorSuggestions([nonBasicRune]).cards.length, 0);
+  assert.equal(analyzeCardBehaviorSuggestions([nonBasicRune]).cards.length, 1);
+  assert.deepEqual(analyzeCardBehaviorSuggestions([nonBasicRune]).cards[0]?.clauses, []);
 });
 
 test("catalogs corpus-backed primitive text parameters as enums", () => {
@@ -1037,7 +1092,7 @@ test("discovers reusable primitives from the full local card corpus", async () =
     true
   );
   assert.equal(report.summary.discoveredPrimitiveCount > 20, true);
-  assert.deepEqual(tankParameter?.options, ["Tank"]);
+  assert.equal(tankParameter, undefined);
 });
 
 test("builds a corpus behavior suggestion report without behavior templates", async () => {
@@ -1054,7 +1109,7 @@ test("builds a corpus behavior suggestion report without behavior templates", as
   ]);
   assert.equal(report.summary.totalCards, 656);
   assert.equal(report.summary.cardsWithRulesText, 636);
-  assert.equal(report.summary.suggestedCardCount, 648);
+  assert.equal(report.summary.suggestedCardCount, 656);
   assert.equal(report.summary.completeSuggestionCount > 0, true);
   assert.equal(primitiveIds.has("choice.choose_target"), true);
   assert.equal(primitiveIds.has("selector.friendly_unit"), true);

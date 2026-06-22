@@ -70,6 +70,7 @@ export type PrimitiveParameterValidation = {
 };
 
 export const playerReferenceKinds = [
+  "controller",
   "player",
   "opponent",
   "eachPlayer",
@@ -301,6 +302,34 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "Hidden requires facedown-zone state, play-origin context, conditional timing, cost replacement, and inherited targeting restrictions."
     )
   }),
+  "keyword.assault": primitiveSeed({
+    id: "keyword.assault",
+    family: "keyword",
+    name: "Assault",
+    description: "Increases this unit's Might while it is an attacker.",
+    parameters: [
+      required("amount", "number", "The Might gained while the source is an attacker.")
+    ],
+    fixedRules: [
+      "Assault applies only while the source is an attacker.",
+      "An unnumbered Assault keyword has an amount of 1."
+    ],
+    engineSupport: requiresEngineSupport(
+      "Assault requires generalized attacker-state modifiers during showdowns."
+    )
+  }),
+  "keyword.tank": primitiveSeed({
+    id: "keyword.tank",
+    family: "keyword",
+    name: "Tank",
+    description: "Requires this unit to be assigned combat damage first.",
+    fixedRules: [
+      "When assigning combat damage, Tank units must be assigned damage before non-Tank units."
+    ],
+    engineSupport: requiresEngineSupport(
+      "Tank requires generalized combat-damage assignment priority."
+    )
+  }),
   "timing.action": primitiveSeed({
     id: "timing.action",
     family: "timing",
@@ -521,6 +550,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Ready cards",
     description: "Readies exhausted cards.",
     parameters: [
+      required("player", "player", "The controller of the cards to ready."),
       required("target", "target", "The cards to ready."),
       optional("count", "number", "The number of cards to ready.")
     ],

@@ -36,7 +36,7 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   assert.deepEqual(lookupCalls, [["OGN-095", "OGN-088"]]);
   assert.equal(preview.sourceLabel, "mvp.json");
   assert.equal(preview.summary.uploadedCardCount, 2);
-  assert.equal(preview.summary.suggestedCardCount, 1);
+  assert.equal(preview.summary.suggestedCardCount, 2);
   assert.equal(preview.summary.vanillaCardCount, 1);
   assert.equal(preview.summary.newCardCount, 2);
 
@@ -54,7 +54,7 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
     "timing.reaction"
   ]);
   assert.equal(megaMechPreview?.isVanilla, true);
-  assert.equal(megaMechPreview?.suggestion, null);
+  assert.deepEqual(megaMechPreview?.suggestion?.clauses, []);
 });
 
 test("previews textless Basic Runes as intrinsic behavior cards", async () => {

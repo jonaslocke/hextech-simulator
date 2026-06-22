@@ -107,7 +107,9 @@ export async function previewCardCatalogImport(input: {
           persisted
         },
         suggestion,
-        isVanilla: card.text.plain.trim().length === 0 && suggestion === null
+        isVanilla:
+          card.text.plain.trim().length === 0 &&
+          (suggestion === null || suggestion.clauses.length === 0)
       } satisfies CardCatalogImportPreviewCard;
     }
   );

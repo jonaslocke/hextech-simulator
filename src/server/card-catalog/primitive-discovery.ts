@@ -123,6 +123,22 @@ const HIDDEN_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
   parameterNames: []
 };
 
+const ASSAULT_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
+  id: "keyword.assault",
+  family: "keyword",
+  name: "Assault",
+  description: "Increases this unit's Might while it is an attacker.",
+  parameterNames: ["amount"]
+};
+
+const TANK_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
+  id: "keyword.tank",
+  family: "keyword",
+  name: "Tank",
+  description: "Requires this unit to be assigned combat damage first.",
+  parameterNames: []
+};
+
 const primitiveDetectors: PrimitiveDetector[] = [
   primitive("ability.exhaust_for_resource", "ability", "Exhaust for resource", "Exhaust the source to add a rune-pool resource.", ["resourceType", "amountSource", "amount", "domain", "usage"], (context) =>
     isExhaustForResourceAbility(context.rulesText)
@@ -133,7 +149,10 @@ const primitiveDetectors: PrimitiveDetector[] = [
     context.lowerText.includes("[action]") ? assignment(context, "timing.action", "timing", {}, "high") : null
   ),
   primitive("timing.reaction", "timing", "Reaction timing", "Card can be played at reaction timing.", [], (context) =>
-    context.lowerText.includes("[reaction]") ? assignment(context, "timing.reaction", "timing", {}, "high") : null
+    context.lowerText.includes("[reaction]") &&
+    !isExhaustForResourceAbility(context.rulesText)
+      ? assignment(context, "timing.reaction", "timing", {}, "high")
+      : null
   ),
   primitive("timing.delayed", "timing", "Delayed timing", "Behavior resolves at a later turn boundary.", ["point"], (context) =>
     /\bat the end of (this|your|an opponent's) turn\b/.test(context.rulesText)
@@ -182,13 +201,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope", "minimumCount", "maximumCount"], (context) =>
-    /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText)
+    /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText) &&
+    !/\b(?:friendly|enemy) units?\b/.test(context.rulesText)
       ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "player", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "controller", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["minimumCount", "maximumCount"], (context) =>
@@ -198,17 +218,17 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.token", "selector", "Select token", "Behavior applies to a known token kind.", ["tokenName", "controller"], (context) =>
     /\byour gold\b/.test(context.rulesText)
-      ? assignment(context, "selector.token", "selector", { tokenName: "Gold gear", controller: "player" }, "high")
+      ? assignment(context, "selector.token", "selector", { tokenName: "Gold gear", controller: "controller" }, "high")
       : null
   ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
     /\bdraw\b/.test(context.rulesText)
-      ? assignment(context, "action.draw_cards", "action", { player: "player", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
+      ? assignment(context, "action.draw_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
       : null
   ),
   primitive("action.discard_cards", "action", "Discard cards", "Move cards from hand to trash.", ["player", "count"], (context) =>
     /\bdiscard\b/.test(context.rulesText)
-      ? assignment(context, "action.discard_cards", "action", { player: "player", count: readNumberAfter(context.rulesText, "discard") ?? 1 }, "high")
+      ? assignment(context, "action.discard_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "discard") ?? 1 }, "high")
       : null
   ),
   primitive("action.move_unit", "action", "Move unit", "Move a unit between zones or battlefields.", ["destination", "count"], (context) =>
@@ -216,9 +236,10 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "action.move_unit", "action", { destination: readMoveDestination(context.rulesText), count: readFirstNumber(context.rulesText) }, "medium")
       : null
   ),
-  primitive("action.ready_cards", "action", "Ready cards", "Ready exhausted cards.", ["target", "count"], (context) =>
-    /\bready\b/.test(readInstructionText(context.rulesText))
-      ? assignment(context, "action.ready_cards", "action", { target: readReadyTarget(context.rulesText), count: readNumberAfter(context.rulesText, "ready") }, "high")
+  primitive("action.ready_cards", "action", "Ready cards", "Ready exhausted cards.", ["player", "target", "count"], (context) =>
+    /\bready\b/.test(readInstructionText(context.rulesText)) &&
+    !/\benters? ready\b/.test(context.rulesText)
+      ? assignment(context, "action.ready_cards", "action", { player: "controller", target: readReadyTarget(context.rulesText), count: readNumberAfter(context.rulesText, "ready") }, "high")
       : null
   ),
   primitive("action.exhaust_cards", "action", "Exhaust cards", "Exhaust ready cards.", ["target", "count"], (context) =>
@@ -227,8 +248,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.channel_runes", "action", "Channel runes", "Move runes from rune deck to base.", ["player", "count", "entryState"], (context) =>
-    /\bchannel\b/.test(context.rulesText)
-      ? assignment(context, "action.channel_runes", "action", { player: readPlayer(context.rulesText), count: readNumberAfter(context.rulesText, "channel") ?? 1, entryState: context.rulesText.includes("exhausted") ? "exhausted" : "default" }, "high")
+    /\bchannels?\b/.test(context.rulesText)
+      ? assignment(context, "action.channel_runes", "action", { player: readPlayer(context.rulesText), count: readNumberAfter(context.rulesText, "channels?") ?? 1, entryState: context.rulesText.includes("exhausted") ? "exhausted" : "default" }, "high")
       : null
   ),
   primitive("action.add_rune_resource", "action", "Add rune resource", "Add Energy or Power to a player's rune pool.", ["player", "resourceType", "amount", "source"], (context) =>
@@ -344,12 +365,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("choice.choose_target", "choice", "Choose target", "Player chooses one or more targets.", ["player"], (context) =>
     /\bchoose\b/.test(context.rulesText) && !isChoiceEventTrigger(context.rulesText)
-      ? assignment(context, "choice.choose_target", "choice", { player: "player" }, "high")
+      ? assignment(context, "choice.choose_target", "choice", { player: "controller" }, "high")
       : null
   ),
   primitive("choice.choose_mode", "choice", "Choose mode", "Player chooses one mode from a modal effect.", ["player"], (context) =>
     /\bchoose one\b|\bdo one of the following\b/.test(context.rulesText)
-      ? assignment(context, "choice.choose_mode", "choice", { player: "player" }, "high")
+      ? assignment(context, "choice.choose_mode", "choice", { player: "controller" }, "high")
       : null
   ),
   primitive("choice.optional", "choice", "Optional choice", "Player may choose whether to apply a behavior.", ["player"], (context) =>
@@ -404,12 +425,7 @@ export function analyzeCardCorpus(
   const cardsWithRulesText = cards.filter(
     (card) => card.text.plain.trim().length > 0
   );
-  const discoveredCards = cards
-    .filter(
-      (card) =>
-        card.text.plain.trim().length > 0 || hasIntrinsicCardBehavior(card)
-    )
-    .map(discoverCardPrimitives);
+  const discoveredCards = cards.map(discoverCardPrimitives);
   const primitiveMap = new Map<string, DiscoveredPrimitive>();
   const unsupportedClauses: UnsupportedClause[] = [];
 
@@ -556,6 +572,8 @@ const primitiveDefinitionsById = new Map(
     EXHAUST_FOR_RESOURCE_PRIMITIVE,
     RECYCLE_FOR_POWER_PRIMITIVE,
     HIDDEN_KEYWORD_PRIMITIVE,
+    ASSAULT_KEYWORD_PRIMITIVE,
+    TANK_KEYWORD_PRIMITIVE,
     ...primitiveDetectors.map((detector) => detector.primitive)
   ].map((primitiveDefinition) => [
     primitiveDefinition.id,
@@ -572,7 +590,7 @@ function discoverIntrinsicCardClauses(card: Card): ClauseDiscovery[] {
 
   return [
     {
-      id: "intrinsic-basic-rune-abilities",
+      id: "intrinsic-exhaust-for-energy",
       sourceText,
       normalizedText: sourceText,
       assignments: [
@@ -587,7 +605,15 @@ function discoverIntrinsicCardClauses(card: Card): ClauseDiscovery[] {
             usage: "unrestricted"
           },
           confidence: "high"
-        },
+        }
+      ],
+      unsupportedReason: null
+    },
+    {
+      id: "intrinsic-recycle-for-power",
+      sourceText,
+      normalizedText: sourceText,
+      assignments: [
         {
           primitiveId: RECYCLE_FOR_POWER_PRIMITIVE.id,
           family: RECYCLE_FOR_POWER_PRIMITIVE.family,
@@ -603,10 +629,6 @@ function discoverIntrinsicCardClauses(card: Card): ClauseDiscovery[] {
       unsupportedReason: null
     }
   ];
-}
-
-function hasIntrinsicCardBehavior(card: Card): boolean {
-  return isBasicRune(card);
 }
 
 function isBasicRune(card: Card): boolean {
@@ -636,10 +658,27 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
   const hiddenAssignments = isHiddenDeclaration(context.normalizedText)
     ? [assignment(context, "keyword.hidden", "keyword", {}, "high")]
     : [];
+  const assaultMatch = context.normalizedText.match(/\[Assault(?:\s+(\d+))?\]/i);
+  const assaultAssignments = assaultMatch
+    ? [
+        assignment(
+          context,
+          "keyword.assault",
+          "keyword",
+          { amount: assaultMatch[1] ? Number(assaultMatch[1]) : 1 },
+          "high"
+        )
+      ]
+    : [];
+  const tankAssignments = /\[Tank\]/i.test(context.normalizedText)
+    ? [assignment(context, "keyword.tank", "keyword", {}, "high")]
+    : [];
   const genericAssignments = [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
     .map((match) => match[1]!.trim())
     .filter(
-      (keyword) => !["Action", "Reaction", "Hidden", "Add"].includes(keyword)
+      (keyword) =>
+        !["Action", "Reaction", "Hidden", "Add", "Tank"].includes(keyword) &&
+        !/^Assault(?:\s+\d+)?$/i.test(keyword)
     )
     .map((keyword) => {
       const primitiveId = `keyword.${toPrimitiveKey(keyword)}`;
@@ -664,7 +703,12 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
       );
     });
 
-  return [...hiddenAssignments, ...genericAssignments];
+  return [
+    ...hiddenAssignments,
+    ...assaultAssignments,
+    ...tankAssignments,
+    ...genericAssignments
+  ];
 }
 
 function isHiddenDeclaration(normalizedText: string): boolean {
@@ -748,7 +792,7 @@ function readEventActor(rulesText: string): string {
     return "anyPlayer";
   }
 
-  return "player";
+  return "controller";
 }
 
 function readPlayEventSubject(rulesText: string): string {
@@ -799,7 +843,7 @@ function readInstructionText(rulesText: string): string {
 
 function readTurnPlayer(rulesText: string): string {
   if (rulesText.includes("your turn")) {
-    return "player";
+    return "controller";
   }
 
   if (rulesText.includes("opponent")) {
@@ -838,7 +882,7 @@ function readPlayer(rulesText: string): string {
     return "opponent";
   }
 
-  return "player";
+  return "controller";
 }
 
 function readMoveDestination(rulesText: string): string | null {
@@ -882,7 +926,7 @@ function readGenericTarget(rulesText: string): string {
     return "rune";
   }
 
-  if (rulesText.includes("me") || rulesText.includes(" i ")) {
+  if (/\b(?:me|i)\b/.test(rulesText)) {
     return "source";
   }
 
@@ -1050,7 +1094,7 @@ function readAddResourceParameters(
   const resourceType = readProducedResourceType(rulesText);
 
   return {
-    player: "player",
+    player: "controller",
     resourceType,
     amount: readProducedResourceAmount(rulesText, resourceType),
     source: "source"
