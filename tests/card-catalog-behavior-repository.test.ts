@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildBehaviorDefinitionDocument,
+  buildCurrentBehaviorCatalog,
   buildPrimitiveCatalog,
   findBehaviorCatalogSyncIssues
 } from "../src/server/card-catalog";
@@ -31,6 +32,13 @@ test("builds stable reusable behavior definitions without card examples", () => 
     first.parameters.find((parameter) => parameter.name === "target")?.options,
     ["unit", "friendly_unit", "enemy_unit"]
   );
+});
+
+test("includes corpus-derived keyword behaviors in the synchronized catalog", async () => {
+  const catalog = await buildCurrentBehaviorCatalog();
+
+  assert.equal(catalog.some((entry) => entry.id === "keyword.assault"), true);
+  assert.equal(catalog.some((entry) => entry.id === "keyword.hidden"), true);
 });
 
 test("reports missing and outdated behavior definitions", () => {

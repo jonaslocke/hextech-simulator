@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Db } from "mongodb";
 import { buildPrimitiveCatalog, type PrimitiveCatalogEntry } from "./primitive-catalog";
+import { analyzeLocalCardSetCorpus } from "./primitive-discovery";
 
 export const BEHAVIORS_COLLECTION = "behaviors";
 
@@ -42,14 +43,15 @@ export function buildBehaviorDefinitionDocument(
 
 export async function syncBehaviorDefinitions(
   db: Db,
-  entries = buildPrimitiveCatalog(),
+  entries?: PrimitiveCatalogEntry[],
   now = new Date().toISOString()
 ): Promise<{ synchronizedCount: number }> {
+  const definitions = entries ?? (await buildCurrentBehaviorCatalog());
   const collection = db.collection<BehaviorDefinitionMongoDocument>(
     BEHAVIORS_COLLECTION
   );
 
-  for (const entry of entries) {
+  for (const entry of definitions) {
     const document = buildBehaviorDefinitionDocument(entry, now);
     const { id, createdAt, ...mutableFields } = document;
 
@@ -63,26 +65,27 @@ export async function syncBehaviorDefinitions(
     );
   }
 
-  return { synchronizedCount: entries.length };
+  return { synchronizedCount: definitions.length };
 }
 
 export async function loadBehaviorDefinitions(
   db: Db,
-  expectedEntries = buildPrimitiveCatalog()
+  expectedEntries?: PrimitiveCatalogEntry[]
 ): Promise<PrimitiveCatalogEntry[]> {
+  const definitions = expectedEntries ?? (await buildCurrentBehaviorCatalog());
   const documents = await db
     .collection<BehaviorDefinitionMongoDocument>(BEHAVIORS_COLLECTION)
     .find({})
     .sort({ _id: 1 })
     .toArray();
   const documentsById = new Map(documents.map((document) => [document.id, document]));
-  const issues = findBehaviorCatalogSyncIssues(documents, expectedEntries);
+  const issues = findBehaviorCatalogSyncIssues(documents, definitions);
 
   if (issues.length > 0) {
     throw new BehaviorCatalogNotInitializedError(issues);
   }
 
-  return expectedEntries.map((entry) => {
+  return definitions.map((entry) => {
     const stored = documentsById.get(entry.id)!;
     const { _id, definitionHash, createdAt, updatedAt, ...definition } = stored;
     void _id;
@@ -94,9 +97,17 @@ export async function loadBehaviorDefinitions(
   });
 }
 
+export async function buildCurrentBehaviorCatalog(): Promise<
+  PrimitiveCatalogEntry[]
+> {
+  const corpus = await analyzeLocalCardSetCorpus();
+
+  return buildPrimitiveCatalog(corpus.primitives);
+}
+
 export function findBehaviorCatalogSyncIssues(
   storedDocuments: ReadonlyArray<Pick<BehaviorDefinitionDocument, "id" | "definitionHash">>,
-  expectedEntries = buildPrimitiveCatalog()
+  expectedEntries: PrimitiveCatalogEntry[]
 ): string[] {
   const documentsById = new Map(
     storedDocuments.map((document) => [document.id, document])
