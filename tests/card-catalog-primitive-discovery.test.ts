@@ -246,6 +246,30 @@ test("discovers corpus-backed numeric modifier operations", () => {
   });
 });
 
+test("models Eager Apprentice's controller, card type, location, and cost floor", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Eager Apprentice",
+      publicCode: "OGN-084/298",
+      text: "While I'm at a battlefield, the Energy costs for spells you play is reduced by :rb_energy_1:, to a minimum of :rb_energy_1:."
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(discovery, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "energyCost",
+      operation: "reduce",
+      operand: "constant",
+      amount: 1,
+      target: "controller_spell",
+      duration: "whileSourceAtBattlefield",
+      minimum: 1
+    }
+  );
+  assert.equal(findAssignment(discovery, "condition.while"), undefined);
+});
+
 test("does not treat numeric comparisons as modifiers", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({

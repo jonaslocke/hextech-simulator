@@ -148,6 +148,7 @@ export const unitLocationRelations = [
 
 export const targetReferenceKinds = [
   "card",
+  "controller_spell",
   "enemy_unit",
   "equipment",
   "event_subject",
@@ -206,6 +207,7 @@ export const numericModifierOperations = [
 
 export const behaviorDurationKinds = [
   "thisTurn",
+  "whileSourceAtBattlefield",
   "whileSourceOnBoard"
 ] as const;
 

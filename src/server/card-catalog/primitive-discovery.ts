@@ -333,7 +333,9 @@ const primitiveDetectors: PrimitiveDetector[] = [
     /\bif\b/.test(context.rulesText) ? assignment(context, "condition.if", "condition", {}, "medium") : null
   ),
   primitive("condition.while", "condition", "While condition", "Behavior applies while a condition is true.", [], (context) =>
-    /\bwhile\b/.test(context.rulesText) ? assignment(context, "condition.while", "condition", {}, "medium") : null
+    /\bwhile\b/.test(context.rulesText) && !isSourceAtBattlefieldDuration(context.rulesText)
+      ? assignment(context, "condition.while", "condition", {}, "medium")
+      : null
   ),
   primitive("condition.fallback_cannot", "condition", "Fallback if cannot", "Use fallback behavior if primary behavior cannot happen.", [], (context) =>
     /\bif you can't\b|\bif you cannot\b/.test(context.rulesText)
@@ -1247,6 +1249,10 @@ function readNumericTarget(rulesText: string, attribute: string): string {
   }
 
   if (attribute === "energyCost" || attribute === "powerCost") {
+    if (/\bspells you play\b/.test(rulesText)) {
+      return "controller_spell";
+    }
+
     return "card";
   }
 
@@ -1289,11 +1295,19 @@ function readDuration(rulesText: string, attribute: string): string | null {
     return "thisTurn";
   }
 
+  if (isSourceAtBattlefieldDuration(rulesText)) {
+    return "whileSourceAtBattlefield";
+  }
+
   if (attribute === "victoryRequirement" || rulesText.includes("while")) {
     return "whileSourceOnBoard";
   }
 
   return null;
+}
+
+function isSourceAtBattlefieldDuration(rulesText: string): boolean {
+  return /\bwhile (?:i'm|i am|this card is) at a battlefield\b/.test(rulesText);
 }
 
 function readCostType(rulesText: string): string | null {
