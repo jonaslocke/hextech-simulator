@@ -49,10 +49,30 @@ export type CanonicalCardPublicationInput = z.infer<typeof canonicalCardPublicat
 
 export type CanonicalBehaviorBinding = {
   behaviorId: string;
-  clauseId: string;
-  sourceText: string;
   parameters: ApprovedPrimitiveAssignment["parameters"];
   confidence: ApprovedPrimitiveAssignment["confidence"];
+  order: number;
+};
+
+export type CanonicalBehaviorClause = {
+  id: string;
+  sequence: number;
+  sourceText: string;
+  normalizedText: string;
+  abilities: CanonicalBehaviorBinding[];
+  triggers: CanonicalBehaviorBinding[];
+  conditions: CanonicalBehaviorBinding[];
+  selectors: CanonicalBehaviorBinding[];
+  choices: CanonicalBehaviorBinding[];
+  costs: CanonicalBehaviorBinding[];
+  timings: CanonicalBehaviorBinding[];
+  effects: CanonicalBehaviorBinding[];
+  keywords: CanonicalBehaviorBinding[];
+};
+
+export type CanonicalBehaviorModel = {
+  playTimings: CanonicalBehaviorBinding[];
+  clauses: CanonicalBehaviorClause[];
 };
 
 export type CanonicalCardDocument = {
@@ -61,7 +81,7 @@ export type CanonicalCardDocument = {
   card: Card;
   sourceTextHash: string;
   status: "approved";
-  behaviorBindings: CanonicalBehaviorBinding[];
+  behaviorModel: CanonicalBehaviorModel;
   approval: { adminNotes: string; approvedAt: string };
   createdAt: string;
   updatedAt: string;
@@ -113,8 +133,31 @@ export function buildCanonicalCardDocument(
   }
 
   const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
-  const behaviorBindings = parsed.clauses.flatMap((clause) =>
-    clause.assignments.map((assignment) => {
+  const playTimings: CanonicalBehaviorBinding[] = [];
+  const clauses = parsed.clauses.map((clause, sequence) => {
+    if (clause.unsupportedReason !== null) {
+      throw new Error(
+        `Unsupported behavior clause ${clause.id}: ${clause.unsupportedReason}`
+      );
+    }
+
+    const structuredClause: CanonicalBehaviorClause = {
+      id: clause.id,
+      sequence,
+      sourceText: clause.sourceText,
+      normalizedText: clause.normalizedText,
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [],
+      keywords: []
+    };
+
+    clause.assignments.forEach((assignment, order) => {
       const behavior = catalogById.get(assignment.primitiveId);
       if (!behavior) {
         throw new Error(`Unknown behavior definition: ${assignment.primitiveId}`);
@@ -129,15 +172,37 @@ export function buildCanonicalCardDocument(
             .map((issue) => issue.message).join(" ")}`
         );
       }
-      return {
+
+      if (
+        assignment.family === "condition" &&
+        behavior.engineSupport.status === "ambiguous"
+      ) {
+        throw new Error(
+          `Ambiguous behavior condition must be replaced before publication: ${assignment.primitiveId}`
+        );
+      }
+
+      const binding = {
         behaviorId: assignment.primitiveId,
-        clauseId: clause.id,
-        sourceText: assignment.sourceText,
         parameters: assignment.parameters,
-        confidence: assignment.confidence
+        confidence: assignment.confidence,
+        order
       } satisfies CanonicalBehaviorBinding;
-    })
-  );
+
+      if (
+        card.classification.type === "Spell" &&
+        (assignment.primitiveId === "timing.action" ||
+          assignment.primitiveId === "timing.reaction")
+      ) {
+        playTimings.push(binding);
+        return;
+      }
+
+      addBindingToStructuredClause(structuredClause, assignment.family, binding);
+    });
+
+    return structuredClause;
+  });
 
   return {
     id: parsed.cardCode,
@@ -145,11 +210,52 @@ export function buildCanonicalCardDocument(
     card,
     sourceTextHash: parsed.sourceTextHash,
     status: "approved",
-    behaviorBindings,
+    behaviorModel: { playTimings, clauses },
     approval: { adminNotes: parsed.adminNotes, approvedAt: updatedAt },
     createdAt,
     updatedAt
   };
+}
+
+function addBindingToStructuredClause(
+  clause: CanonicalBehaviorClause,
+  family: ApprovedPrimitiveAssignment["family"],
+  binding: CanonicalBehaviorBinding
+): void {
+  switch (family) {
+    case "ability":
+      clause.abilities.push(binding);
+      return;
+    case "trigger":
+      clause.triggers.push(binding);
+      return;
+    case "condition":
+      clause.conditions.push(binding);
+      return;
+    case "selector":
+      clause.selectors.push(binding);
+      return;
+    case "choice":
+      clause.choices.push(binding);
+      return;
+    case "cost":
+      clause.costs.push(binding);
+      return;
+    case "timing":
+      clause.timings.push(binding);
+      return;
+    case "action":
+    case "modifier":
+    case "replacement":
+    case "prevention":
+      clause.effects.push(binding);
+      return;
+    case "keyword":
+      clause.keywords.push(binding);
+      return;
+    case "unsupported":
+      throw new Error(`Unsupported behavior cannot be published: ${binding.behaviorId}`);
+  }
 }
 
 export function normalizeCanonicalCard(card: Card): Card {

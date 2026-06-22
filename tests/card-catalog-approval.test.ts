@@ -9,7 +9,7 @@ import {
 } from "../src/server/card-catalog";
 import type { Card } from "../src/server/catalog";
 
-test("builds an approved canonical card with reusable behavior bindings", () => {
+test("builds an approved canonical card with a structured behavior model", () => {
   const input = createPublicationInput();
   const document = buildCanonicalCardDocument(
     input,
@@ -21,13 +21,15 @@ test("builds an approved canonical card with reusable behavior bindings", () => 
   assert.equal(document.id, "OGN-095");
   assert.equal(document.card.name, "Stupefy");
   assert.equal(document.status, "approved");
-  assert.equal(document.behaviorBindings[0]?.behaviorId, "timing.reaction");
+  assert.equal(document.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
   assert.equal(
-    document.behaviorBindings.find(
+    document.behaviorModel.clauses[0]?.effects.find(
       (binding) => binding.behaviorId === "modifier.modify_numeric_value"
     )?.parameters.amount,
     1
   );
+  assert.equal(document.behaviorModel.clauses[0]?.sequence, 0);
+  assert.equal(document.behaviorModel.clauses[0]?.selectors[0]?.order, 1);
 });
 
 test("rejects non-approved canonical publication", () => {
@@ -57,8 +59,32 @@ test("allows multiple canonical cards to reference one reusable behavior", () =>
   const first = buildCanonicalCardDocument(firstInput, catalog, "a", "b");
   const second = buildCanonicalCardDocument(secondInput, catalog, "a", "b");
 
-  assert.equal(first.behaviorBindings[0]?.behaviorId, "timing.reaction");
-  assert.equal(second.behaviorBindings[0]?.behaviorId, "timing.reaction");
+  assert.equal(first.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
+  assert.equal(second.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
+});
+
+test("rejects unsupported and ambiguous clauses before publication", () => {
+  const unsupported = structuredClone(createPublicationInput());
+  unsupported.clauses[0]!.unsupportedReason = "Manual behavior is incomplete.";
+
+  assert.throws(
+    () => buildCanonicalCardDocument(unsupported, buildPrimitiveCatalog(), "a", "b"),
+    /Unsupported behavior clause/
+  );
+
+  const ambiguous = structuredClone(createPublicationInput());
+  ambiguous.clauses[0]!.assignments.push({
+    primitiveId: "condition.if",
+    family: "condition",
+    sourceText: "if something happens",
+    parameters: {},
+    confidence: "low"
+  });
+
+  assert.throws(
+    () => buildCanonicalCardDocument(ambiguous, buildPrimitiveCatalog(), "a", "b"),
+    /Ambiguous behavior condition/
+  );
 });
 
 test("rejects unknown and invalid behavior bindings", () => {
