@@ -11,6 +11,7 @@ export type PrimitiveParameterType =
   | "boolean"
   | "player"
   | "target"
+  | "unitTarget"
   | "area"
   | "locationRelation"
   | "zone"
@@ -143,6 +144,12 @@ export const targetReferenceKinds = [
   "runes",
   "source",
   "unit"
+] as const;
+
+export const unitTargetReferenceKinds = [
+  "unit",
+  "friendly_unit",
+  "enemy_unit"
 ] as const;
 
 export const runeEntryStates = ["default", "exhausted"] as const;
@@ -546,7 +553,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Marks damage on one or more units.",
     parameters: [
       required("amount", "number", "The amount of damage."),
-      required("target", "target", "The damaged target.")
+      required(
+        "target",
+        "unitTarget",
+        "The unit receiving damage.",
+        unitTargetReferenceKinds
+      )
     ],
     emitsEvents: ["unit.damaged"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -1076,6 +1088,10 @@ function parameterOptions(
     return { options: targetReferenceKinds };
   }
 
+  if (type === "unitTarget") {
+    return { options: unitTargetReferenceKinds };
+  }
+
   if (type === "area") {
     return { options: unitTargetAreas };
   }
@@ -1145,6 +1161,7 @@ function isParameterTypeValid(
     case "string":
     case "player":
     case "target":
+    case "unitTarget":
     case "area":
     case "locationRelation":
     case "zone":

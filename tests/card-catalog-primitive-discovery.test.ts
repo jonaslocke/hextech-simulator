@@ -24,6 +24,7 @@ import {
   unitLocationRelations,
   unitScopeKinds,
   unitTargetAreas,
+  unitTargetReferenceKinds,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
 import {
@@ -603,6 +604,28 @@ test("catalogs rune resource behavior with known resource type enum", () => {
     invalidResourceValidation.issues[0]?.message ?? "",
     /must be one of/
   );
+});
+
+test("limits deal damage targets to unit references", () => {
+  const dealDamage = getPrimitiveCatalogEntry("action.deal_damage", "action");
+  const targetParameter = dealDamage.parameters.find(
+    (parameter) => parameter.name === "target"
+  );
+  const invalidTarget = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: "action.deal_damage",
+      family: "action",
+      sourceText: "Deal 2 to an equipment.",
+      parameters: { amount: 2, target: "equipment" },
+      confidence: "low"
+    },
+    dealDamage
+  );
+
+  assert.equal(targetParameter?.type, "unitTarget");
+  assert.deepEqual(targetParameter?.options, [...unitTargetReferenceKinds]);
+  assert.equal(invalidTarget.complete, false);
+  assert.match(invalidTarget.issues[0]?.message ?? "", /must be one of/);
 });
 
 test("catalogs player parameters as known player reference enum", () => {
