@@ -1,5 +1,6 @@
 import { getMongoClient, getMongoDatabaseName } from "../src/server/db";
-import { CARD_BEHAVIOR_VALIDATIONS_COLLECTION } from "../src/server/card-catalog";
+
+const CARD_BEHAVIOR_VALIDATIONS_COLLECTION = "cardBehaviorValidations";
 
 if (!process.argv.includes("--confirm")) {
   throw new Error("Refusing to clear card behavior validations without --confirm.");

@@ -3,8 +3,9 @@ import { test } from "node:test";
 import {
   CardCatalogImportPreviewError,
   buildPrimitiveCatalog,
+  hashCardRulesText,
   previewCardCatalogImport,
-  type PersistedCardValidationSummary
+  type PersistedCanonicalCardSummary
 } from "../src/server/card-catalog";
 import type { Card } from "../src/server/catalog";
 
@@ -88,10 +89,10 @@ test("marks uploaded cards that already exist in the persisted catalog", async (
     publicCode: "OGN-206/298",
     text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give two friendly units each +2 :rb_might: this turn."
   });
-  const persisted: PersistedCardValidationSummary = {
+  const persisted: PersistedCanonicalCardSummary = {
     cardCode: "OGN-206",
     status: "approved",
-    sourceTextHash: null,
+    sourceTextHash: hashCardRulesText(card),
     updatedAt: "2026-06-19T00:00:00.000Z"
   };
 

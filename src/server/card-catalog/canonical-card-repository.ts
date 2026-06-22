@@ -1,0 +1,200 @@
+import type { Db } from "mongodb";
+import { z } from "zod";
+import { cardSchema, type Card } from "../catalog";
+import { loadBehaviorDefinitions } from "./behavior-definition-repository";
+import { deriveCardCodeFromCard } from "./identity";
+import { hashCardRulesText } from "./import-preview";
+import {
+  validatePrimitiveAssignmentParameters,
+  type PrimitiveCatalogEntry
+} from "./primitive-catalog";
+
+export const CANONICAL_CARDS_COLLECTION = "canonicalCards";
+
+const primitiveFamilySchema = z.enum([
+  "ability", "timing", "selector", "action", "modifier", "trigger",
+  "condition", "choice", "cost", "replacement", "prevention", "keyword",
+  "unsupported"
+]);
+const primitiveParameterValueSchema = z.union([
+  z.string(), z.number(), z.boolean(), z.null()
+]);
+
+export const approvedPrimitiveAssignmentSchema = z.object({
+  primitiveId: z.string().min(1),
+  family: primitiveFamilySchema,
+  sourceText: z.string(),
+  parameters: z.record(primitiveParameterValueSchema),
+  confidence: z.enum(["high", "medium", "low"])
+});
+export const approvedBehaviorClauseSchema = z.object({
+  id: z.string().min(1),
+  sourceText: z.string(),
+  normalizedText: z.string(),
+  assignments: z.array(approvedPrimitiveAssignmentSchema),
+  unsupportedReason: z.string().nullable()
+});
+export const canonicalCardPublicationInputSchema = z.object({
+  cardCode: z.string().min(1),
+  card: cardSchema,
+  sourceTextHash: z.string().min(1),
+  status: z.literal("approved"),
+  clauses: z.array(approvedBehaviorClauseSchema),
+  adminNotes: z.string()
+});
+
+export type ApprovedPrimitiveAssignment = z.infer<typeof approvedPrimitiveAssignmentSchema>;
+export type ApprovedBehaviorClause = z.infer<typeof approvedBehaviorClauseSchema>;
+export type CanonicalCardPublicationInput = z.infer<typeof canonicalCardPublicationInputSchema>;
+
+export type CanonicalBehaviorBinding = {
+  behaviorId: string;
+  clauseId: string;
+  sourceText: string;
+  parameters: ApprovedPrimitiveAssignment["parameters"];
+  confidence: ApprovedPrimitiveAssignment["confidence"];
+};
+
+export type CanonicalCardDocument = {
+  id: string;
+  cardCode: string;
+  card: Card;
+  sourceTextHash: string;
+  status: "approved";
+  behaviorBindings: CanonicalBehaviorBinding[];
+  approval: { adminNotes: string; approvedAt: string };
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CanonicalCardMongoDocument = CanonicalCardDocument & { _id: string };
+
+export async function publishCanonicalCard(
+  db: Db,
+  input: CanonicalCardPublicationInput,
+  now = new Date().toISOString(),
+  behaviorCatalog?: PrimitiveCatalogEntry[]
+): Promise<CanonicalCardDocument> {
+  const catalog = behaviorCatalog ?? (await loadBehaviorDefinitions(db));
+  const collection = db.collection<CanonicalCardMongoDocument>(CANONICAL_CARDS_COLLECTION);
+  const parsed = canonicalCardPublicationInputSchema.parse(input);
+  const existing = await collection.findOne({ _id: parsed.cardCode });
+  const document = buildCanonicalCardDocument(
+    parsed,
+    catalog,
+    existing?.createdAt ?? now,
+    now
+  );
+  const { id, createdAt, ...mutableFields } = document;
+
+  await collection.updateOne(
+    { _id: id },
+    { $set: { ...mutableFields, id }, $setOnInsert: { _id: id, createdAt } },
+    { upsert: true }
+  );
+  return document;
+}
+
+export function buildCanonicalCardDocument(
+  input: CanonicalCardPublicationInput,
+  behaviorCatalog: PrimitiveCatalogEntry[],
+  createdAt: string,
+  updatedAt: string
+): CanonicalCardDocument {
+  const parsed = canonicalCardPublicationInputSchema.parse(input);
+  const card = normalizeCanonicalCard(parsed.card);
+  const derivedCardCode = deriveCardCodeFromCard(card);
+
+  if (parsed.cardCode !== derivedCardCode) {
+    throw new Error(`Card code ${parsed.cardCode} does not match uploaded card ${derivedCardCode}.`);
+  }
+  if (parsed.sourceTextHash !== hashCardRulesText(card)) {
+    throw new Error("Card rules text changed after preview.");
+  }
+
+  const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
+  const behaviorBindings = parsed.clauses.flatMap((clause) =>
+    clause.assignments.map((assignment) => {
+      const behavior = catalogById.get(assignment.primitiveId);
+      if (!behavior) {
+        throw new Error(`Unknown behavior definition: ${assignment.primitiveId}`);
+      }
+      if (behavior.family !== assignment.family) {
+        throw new Error(`Behavior family mismatch: ${assignment.primitiveId}`);
+      }
+      const validation = validatePrimitiveAssignmentParameters(assignment, behavior);
+      if (!validation.complete) {
+        throw new Error(
+          `Invalid behavior binding ${assignment.primitiveId}: ${validation.issues
+            .map((issue) => issue.message).join(" ")}`
+        );
+      }
+      return {
+        behaviorId: assignment.primitiveId,
+        clauseId: clause.id,
+        sourceText: assignment.sourceText,
+        parameters: assignment.parameters,
+        confidence: assignment.confidence
+      } satisfies CanonicalBehaviorBinding;
+    })
+  );
+
+  return {
+    id: parsed.cardCode,
+    cardCode: parsed.cardCode,
+    card,
+    sourceTextHash: parsed.sourceTextHash,
+    status: "approved",
+    behaviorBindings,
+    approval: { adminNotes: parsed.adminNotes, approvedAt: updatedAt },
+    createdAt,
+    updatedAt
+  };
+}
+
+export function normalizeCanonicalCard(card: Card): Card {
+  return {
+    id: card.id,
+    name: card.name,
+    ...(card.riftbound_id ? { riftbound_id: card.riftbound_id } : {}),
+    public_code: card.public_code,
+    ...(card.collector_number !== undefined ? { collector_number: card.collector_number } : {}),
+    attributes: { ...card.attributes },
+    classification: {
+      type: card.classification.type,
+      supertype: card.classification.supertype,
+      ...(card.classification.rarity !== undefined ? { rarity: card.classification.rarity } : {}),
+      domain: [...card.classification.domain]
+    },
+    text: { plain: card.text.plain, ...(card.text.rich !== undefined ? { rich: card.text.rich } : {}) },
+    set: { ...card.set },
+    media: { ...card.media },
+    tags: [...card.tags],
+    metadata: { ...card.metadata }
+  };
+}
+
+export type PersistedCanonicalCardSummary = {
+  cardCode: string;
+  status: "approved";
+  sourceTextHash: string;
+  updatedAt: string;
+};
+export type ExistingCanonicalCardLookup = (
+  cardCodes: string[]
+) => Promise<Map<string, PersistedCanonicalCardSummary>>;
+
+export function createMongoCanonicalCardLookup(db: Db): ExistingCanonicalCardLookup {
+  return async (cardCodes) => {
+    const uniqueCardCodes = [...new Set(cardCodes)];
+    if (uniqueCardCodes.length === 0) return new Map();
+    const documents = await db.collection<CanonicalCardMongoDocument>(CANONICAL_CARDS_COLLECTION)
+      .find({ _id: { $in: uniqueCardCodes } }).toArray();
+    return new Map(documents.map((document) => [document.cardCode, {
+      cardCode: document.cardCode,
+      status: "approved" as const,
+      sourceTextHash: document.sourceTextHash,
+      updatedAt: document.updatedAt
+    }]));
+  };
+}

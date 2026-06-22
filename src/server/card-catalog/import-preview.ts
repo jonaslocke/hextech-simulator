@@ -5,9 +5,9 @@ import { analyzeCardBehaviorSuggestions, type CardBehaviorSuggestion } from "./b
 import { deriveCardCodeFromCard } from "./identity";
 import type { PrimitiveCatalogEntry } from "./primitive-catalog";
 import type {
-  ExistingCardValidationLookup,
-  PersistedCardValidationSummary
-} from "./validated-card-lookup";
+  ExistingCanonicalCardLookup,
+  PersistedCanonicalCardSummary
+} from "./canonical-card-repository";
 
 export type ExistingCardCatalogState =
   | "new"
@@ -15,6 +15,7 @@ export type ExistingCardCatalogState =
   | "changed_since_persisted";
 
 export type CardCatalogImportPreviewCard = {
+  card: Card;
   cardCode: string;
   publicCode: string;
   name: string;
@@ -24,7 +25,7 @@ export type CardCatalogImportPreviewCard = {
   sourceTextHash: string;
   existingCatalog: {
     state: ExistingCardCatalogState;
-    persisted: PersistedCardValidationSummary | null;
+    persisted: PersistedCanonicalCardSummary | null;
   };
   suggestion: CardBehaviorSuggestion | null;
   isVanilla: boolean;
@@ -62,7 +63,7 @@ export async function previewCardCatalogImport(input: {
   sourceLabel: string;
   rawJson: string;
   behaviorCatalog: PrimitiveCatalogEntry[];
-  existingCardLookup?: ExistingCardValidationLookup;
+  existingCardLookup?: ExistingCanonicalCardLookup;
 }): Promise<CardCatalogImportPreviewResult> {
   const cards = parseUploadedCardSetJson(input.rawJson);
   const suggestionReport = analyzeCardBehaviorSuggestions(
@@ -85,7 +86,7 @@ export async function previewCardCatalogImport(input: {
   const existingCards =
     input.existingCardLookup?.(
       previewCardsWithoutExistingState.map((card) => card.cardCode)
-    ) ?? Promise.resolve(new Map<string, PersistedCardValidationSummary>());
+    ) ?? Promise.resolve(new Map<string, PersistedCanonicalCardSummary>());
   const existingCardsByCode = await existingCards;
   const previewCards = previewCardsWithoutExistingState.map(
     ({ card, cardCode, sourceTextHash }) => {
@@ -93,6 +94,7 @@ export async function previewCardCatalogImport(input: {
       const suggestion = suggestionsByCardCode.get(cardCode) ?? null;
 
       return {
+        card,
         cardCode,
         publicCode: card.public_code,
         name: card.name,
@@ -164,7 +166,7 @@ function parseUploadedCardSetJson(rawJson: string): Card[] {
   }
 }
 
-function hashCardRulesText(card: Card): string {
+export function hashCardRulesText(card: Card): string {
   return createHash("sha256")
     .update(normalizeRulesText(card.text.plain))
     .digest("hex");
@@ -175,7 +177,7 @@ function normalizeRulesText(text: string): string {
 }
 
 function readExistingCatalogState(
-  persisted: PersistedCardValidationSummary | null,
+  persisted: PersistedCanonicalCardSummary | null,
   sourceTextHash: string
 ): ExistingCardCatalogState {
   if (!persisted) {

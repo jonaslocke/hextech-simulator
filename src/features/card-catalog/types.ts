@@ -1,7 +1,7 @@
 import type {
-  ApprovedCardBehaviorInput,
+  CanonicalCardPublicationInput,
   CardCatalogImportPreviewResult,
-  PersistedCardValidationStatus
+  PersistedCanonicalCardSummary
 } from "@/server/card-catalog";
 
 export type CardCatalogPreviewResponse =
@@ -18,14 +18,14 @@ export type CardCatalogPreviewResponse =
       };
     };
 
-export type CardCatalogApprovalRequest = ApprovedCardBehaviorInput;
+export type CardCatalogApprovalRequest = CanonicalCardPublicationInput;
 
 export type CardCatalogApprovalResponse =
   | {
       accepted: true;
       behavior: {
         cardCode: string;
-        status: PersistedCardValidationStatus;
+        status: PersistedCanonicalCardSummary["status"];
         sourceTextHash: string;
         updatedAt: string;
       };

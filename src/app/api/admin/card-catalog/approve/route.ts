@@ -1,24 +1,31 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
-  approvedCardBehaviorInputSchema,
-  saveApprovedCardBehavior
+  canonicalCardPublicationInputSchema,
+  loadBehaviorDefinitions,
+  publishCanonicalCard
 } from "@/server/card-catalog";
 import { getMongoDatabase } from "@/server/db";
 
 export async function POST(request: Request) {
   try {
-    const input = approvedCardBehaviorInputSchema.parse(await request.json());
+    const input = canonicalCardPublicationInputSchema.parse(await request.json());
     const db = await getMongoDatabase();
-    const behavior = await saveApprovedCardBehavior(db, input);
+    const behaviorCatalog = await loadBehaviorDefinitions(db);
+    const canonicalCard = await publishCanonicalCard(
+      db,
+      input,
+      undefined,
+      behaviorCatalog
+    );
 
     return NextResponse.json({
       accepted: true,
       behavior: {
-        cardCode: behavior.cardCode,
-        status: behavior.status,
-        sourceTextHash: behavior.sourceTextHash,
-        updatedAt: behavior.updatedAt
+        cardCode: canonicalCard.cardCode,
+        status: canonicalCard.status,
+        sourceTextHash: canonicalCard.sourceTextHash,
+        updatedAt: canonicalCard.updatedAt
       }
     });
   } catch (caught) {
@@ -28,7 +35,7 @@ export async function POST(request: Request) {
           accepted: false,
           error: {
             code: "invalid_approval_payload",
-            message: "Approved behavior payload is malformed.",
+            message: "Canonical card publication payload is malformed.",
             details: caught.issues.slice(0, 12).map((issue) => issue.message)
           }
         },

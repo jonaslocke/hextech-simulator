@@ -56,7 +56,7 @@ type PreviewCard = Preview["cards"][number];
 type PrimitiveCatalogEntry = Preview["primitiveCatalog"][number];
 type EditableClause = CardCatalogApprovalRequest["clauses"][number];
 type EditableAssignment = EditableClause["assignments"][number];
-type ApprovalStatus = CardCatalogApprovalRequest["status"];
+type ApprovalStatus = "approved" | "requires_engine_support" | "rejected";
 
 const SUPPORT_STYLES: Record<string, string> = {
   supported: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
@@ -147,13 +147,9 @@ export function CardCatalogImportPreview() {
     try {
       const response = await approveCardCatalogBehavior({
         cardCode: card.cardCode,
-        publicCode: card.publicCode,
-        name: card.name,
-        setCode: card.setCode,
-        type: card.type,
-        sourceText: card.rulesText,
+        card: card.card,
         sourceTextHash: card.sourceTextHash,
-        status: draft.status,
+        status: "approved",
         clauses: draft.clauses,
         adminNotes: draft.adminNotes
       });
@@ -344,7 +340,7 @@ function markCardPersisted(
   card: PreviewCard,
   persisted: {
     cardCode: string;
-    status: ApprovalStatus;
+    status: "approved";
     sourceTextHash: string;
     updatedAt: string;
   }
@@ -615,9 +611,13 @@ function ReviewPanel({
             <option value="requires_engine_support">requires engine support</option>
             <option value="rejected">rejected</option>
           </select>
-          <Button disabled={isSaving} onClick={onSave} type="button">
+          <Button
+            disabled={isSaving || draft.status !== "approved"}
+            onClick={onSave}
+            type="button"
+          >
             <Save className="size-4" aria-hidden="true" />
-            {isSaving ? "Saving..." : "Persist"}
+            {isSaving ? "Publishing..." : "Publish"}
           </Button>
           <Button onClick={onClose} type="button" variant="secondary">
             Close

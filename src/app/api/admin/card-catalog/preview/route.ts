@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   CardCatalogImportPreviewError,
   BehaviorCatalogNotInitializedError,
-  createMongoCardValidationLookup,
+  createMongoCanonicalCardLookup,
   loadBehaviorDefinitions,
   previewCardCatalogImport
 } from "@/server/card-catalog";
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const preview = await previewCardCatalogImport({
       ...upload,
       behaviorCatalog,
-      existingCardLookup: createMongoCardValidationLookup(db)
+      existingCardLookup: createMongoCanonicalCardLookup(db)
     });
 
     return NextResponse.json({
