@@ -3,7 +3,7 @@ import type {
   PrimitiveAssignment,
   PrimitiveFamily
 } from "./primitive-discovery";
-import { gameZoneKinds, modifierDurations, runeResourceTypes } from "../match/game";
+import { gameZoneKinds, runeResourceTypes } from "../match/game";
 
 export type PrimitiveParameterType =
   | "string"
@@ -189,6 +189,11 @@ export const numericModifierOperations = [
   "reduce",
   "multiply",
   "set"
+] as const;
+
+export const behaviorDurationKinds = [
+  "thisTurn",
+  "whileSourceOnBoard"
 ] as const;
 
 export const numericOperandKinds = [
@@ -677,7 +682,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ),
       optional("amount", "number", "The constant operand when operand is constant."),
       required("target", "target", "The object or game value being modified."),
-      optional("duration", "duration", "How long the modifier lasts.", modifierDurations),
+      optional(
+        "duration",
+        "duration",
+        "How long the modifier lasts.",
+        behaviorDurationKinds
+      ),
       optional("minimum", "number", "The minimum resulting value.")
     ],
     fixedRules: [
@@ -1105,7 +1115,7 @@ function parameterOptions(
   }
 
   if (type === "duration") {
-    return { options: modifierDurations };
+    return { options: behaviorDurationKinds };
   }
 
   return {};

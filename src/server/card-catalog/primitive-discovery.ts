@@ -1134,7 +1134,7 @@ function readNumericModifier(
     operand,
     amount: readNumericAmount(rulesText, attribute, operation, operand),
     target: readNumericTarget(rulesText, attribute),
-    duration: readDuration(rulesText),
+    duration: readDuration(rulesText, attribute),
     minimum: readMinimum(rulesText)
   };
 }
@@ -1265,13 +1265,13 @@ function readMinimum(rulesText: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function readDuration(rulesText: string): string | null {
+function readDuration(rulesText: string, attribute: string): string | null {
   if (rulesText.includes("this turn")) {
     return "thisTurn";
   }
 
-  if (rulesText.includes("while") && rulesText.includes("battlefield")) {
-    return "whileSourceAtBattlefield";
+  if (attribute === "victoryRequirement" || rulesText.includes("while")) {
+    return "whileSourceOnBoard";
   }
 
   return null;

@@ -4,6 +4,7 @@ import {
   analyzeCardBehaviorSuggestions,
   analyzeLocalCardSetBehaviorSuggestions,
   analyzeLocalCardSetCorpus,
+  behaviorDurationKinds,
   buildPrimitiveCatalog,
   costResourceTypes,
   deriveCardCode,
@@ -27,10 +28,7 @@ import {
   unitTargetReferenceKinds,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
-import {
-  modifierDurations,
-  runeResourceTypes
-} from "../src/server/match/game";
+import { runeResourceTypes } from "../src/server/match/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
@@ -207,7 +205,8 @@ test("discovers corpus-backed numeric modifier operations", () => {
       operation: "increase",
       operand: "constant",
       amount: 1,
-      target: "game"
+      target: "game",
+      duration: "whileSourceOnBoard"
     }
   );
   assert.deepEqual(
@@ -237,7 +236,8 @@ test("discovers corpus-backed numeric modifier operations", () => {
       operation: "increase",
       operand: "constant",
       amount: 1,
-      target: "event_subject"
+      target: "event_subject",
+      duration: "whileSourceOnBoard"
     }
   );
   assert.deepEqual(findAssignment(baroness, "selector.token")?.parameters, {
@@ -568,7 +568,7 @@ test("catalogs numeric modifier duration as a known duration enum", () => {
     getPrimitiveCatalogEntry("modifier.modify_numeric_value", "modifier")
   );
 
-  assert.deepEqual(durationParameter?.options, [...modifierDurations]);
+  assert.deepEqual(durationParameter?.options, [...behaviorDurationKinds]);
   assert.equal(invalidDurationValidation.complete, false);
   assert.match(
     invalidDurationValidation.issues[0]?.message ?? "",
