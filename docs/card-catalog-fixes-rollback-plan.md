@@ -10,6 +10,74 @@
 | Numeric modifiers | `4459787` | Replaces narrow numeric modifiers with the corpus-backed modifier-chain primitive. |
 | Resource abilities | `ae5e58d` | Splits Basic Rune abilities and reuses exhaust-for-resource behavior. |
 
+## Catalog Persistence Milestones
+
+| Milestone | Commit | Scope |
+| --- | --- | --- |
+| Damage targets | `2ae05e5` | Restricts `action.deal_damage` to unit target references. |
+| Source duration | `c894964` | Adds catalog-owned `whileSourceOnBoard` duration. |
+| Behavior catalog | `887c09e` | Adds reusable behavior persistence and synchronization. |
+| Canonical cards | `9b617f4` | Publishes approved canonical cards with reusable behavior bindings. |
+
+These milestones change only the card-catalog pipeline and admin workflow. They do
+not integrate database behaviors or canonical cards into the game engine.
+
+### Pre-deployment Backup
+
+Back up all affected collections before clearing or synchronizing data:
+
+```powershell
+$dbName = if ($env:MONGODB_DB_NAME) { $env:MONGODB_DB_NAME } else { "hextech_simulator" }
+mongodump --uri=$env:MONGODB_URI --db=$dbName --collection=cardBehaviorValidations --out=backups/card-catalog-before-persistence
+mongodump --uri=$env:MONGODB_URI --db=$dbName --collection=behaviors --out=backups/card-catalog-before-persistence
+mongodump --uri=$env:MONGODB_URI --db=$dbName --collection=canonicalCards --out=backups/card-catalog-before-persistence
+```
+
+Do not continue if the backup command fails.
+
+### Deployment Data Steps
+
+The implementation intentionally provides no migration from mixed validation
+documents. After creating the backup:
+
+```powershell
+npm run catalog:clear-validations
+npm run catalog:sync-behaviors
+```
+
+The admin catalog must report `behavior_catalog_not_initialized` until behavior
+definitions have been synchronized. Only cards explicitly published with status
+`approved` are written to `canonicalCards`.
+
+### Persistence Rollback
+
+Revert the implementation commits newest-first:
+
+```powershell
+git revert --no-commit 9b617f4 887c09e c894964 2ae05e5
+git commit -m "Rollback catalog persistence fixes"
+```
+
+Then restore the legacy validation collection used by the reverted application:
+
+```powershell
+$dbName = if ($env:MONGODB_DB_NAME) { $env:MONGODB_DB_NAME } else { "hextech_simulator" }
+mongorestore --uri=$env:MONGODB_URI --db=$dbName --drop backups/card-catalog-before-persistence/$dbName/cardBehaviorValidations.bson
+```
+
+If `behaviors` or `canonicalCards` existed before deployment, restore their backup
+files as well. If they were created only by these milestones, retain a backup of
+newly published data before removing them. Reverting code does not delete data.
+
+Run the full verification suite after rollback:
+
+```powershell
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
 ## Full Rollback
 
 Revert milestones newest-first because later catalog definitions depend on earlier ones:
