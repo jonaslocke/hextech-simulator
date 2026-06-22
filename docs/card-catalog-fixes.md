@@ -63,6 +63,6 @@
   "updatedAt": "2026-06-22T09:11:49.773Z"
 }
 there is a mix of real card metadata with the behavior that we are applying to that card, this seems off, we need to work on a better separation and card catalog shape.
-[ ] the "Clause Source" inside card catalog could use the same card text to element transpiler and show it here, if that feature is not a service/internal API it should become one
+[x] the "Clause Source" inside card catalog could use the same card text to element transpiler and show it here, if that feature is not a service/internal API it should become one
 [ ] action.deal_damage have targets that are too wide, only units on board can be delt damage, so the options for target should not include equipment for instance and others
 [ ] the Aspirant's Climb clause have a duration that is not set, in this case is important to notice that a battlefield is possible to be removed from play, so this might need something like while is on the board or something ![alt text](image-11.png)
