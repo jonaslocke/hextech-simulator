@@ -318,6 +318,17 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "modifier.targeting_restriction", "modifier", {}, "medium")
       : null
   ),
+  primitive("condition.compare_numeric_value", "condition", "Compare numeric value", "Guard a clause by comparing a numeric event or game value.", ["valueSource", "operator", "comparisonValue"], (context) => {
+    const comparisonValue = readPlayedCardEnergyCostThreshold(context.rulesText);
+
+    return comparisonValue === null
+      ? null
+      : assignment(context, "condition.compare_numeric_value", "condition", {
+          valueSource: "eventSubject.effectiveEnergyCost",
+          operator: "greaterThanOrEqual",
+          comparisonValue
+        }, "high");
+  }),
   primitive("condition.if", "condition", "If condition", "Behavior applies only if a condition is true.", [], (context) =>
     /\bif\b/.test(context.rulesText) ? assignment(context, "condition.if", "condition", {}, "medium") : null
   ),
@@ -1096,6 +1107,14 @@ function isEnergyCostModifier(rulesText: string): boolean {
     /\bcosts?\s+:rb_energy_\d+:\s+(less|more)\b/.test(rulesText) ||
     /\breduce its energy cost\b/.test(rulesText)
   );
+}
+
+function readPlayedCardEnergyCostThreshold(rulesText: string): number | null {
+  const match = rulesText.match(
+    /\b(?:spell|card|unit|gear)\s+that costs\s+:rb_energy_(\d+):\s+or more\b/
+  );
+
+  return match ? Number(match[1]) : null;
 }
 
 function isPowerCostModifier(rulesText: string): boolean {

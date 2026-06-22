@@ -390,6 +390,71 @@ test("models play, choose, and ready clauses as event listeners", () => {
   assert.equal(findAssignment(irelia, "action.ready_cards"), undefined);
 });
 
+test("models a played spell Energy-cost threshold as a typed clause condition", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Lux, Illuminated",
+      publicCode: "OGS-000/???",
+      text: "When you play a spell that costs :rb_energy_5: or more, give me +3 :rb_might: this turn."
+    })
+  );
+
+  assert.deepEqual(findAssignment(discovery, "trigger.on_play")?.parameters, {
+    actor: "player",
+    subject: "spell"
+  });
+  assert.deepEqual(
+    findAssignment(discovery, "condition.compare_numeric_value")?.parameters,
+    {
+      valueSource: "eventSubject.effectiveEnergyCost",
+      operator: "greaterThanOrEqual",
+      comparisonValue: 5
+    }
+  );
+});
+
+test("validates numeric comparison sources, operators, and values", () => {
+  const condition = getPrimitiveCatalogEntry(
+    "condition.compare_numeric_value",
+    "condition"
+  );
+  const valid = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: condition.id,
+      family: condition.family,
+      sourceText: "spell that costs 5 or more",
+      parameters: {
+        valueSource: "eventSubject.effectiveEnergyCost",
+        operator: "greaterThanOrEqual",
+        comparisonValue: 5
+      },
+      confidence: "high"
+    },
+    condition
+  );
+  const invalid = validatePrimitiveAssignmentParameters(
+    {
+      primitiveId: condition.id,
+      family: condition.family,
+      sourceText: "spell that costs 5 or more",
+      parameters: {
+        valueSource: "unknown.value",
+        operator: "approximately",
+        comparisonValue: "5"
+      },
+      confidence: "high"
+    },
+    condition
+  );
+
+  assert.equal(valid.complete, true);
+  assert.equal(invalid.complete, false);
+  assert.deepEqual(
+    invalid.issues.map((issue) => issue.parameterName),
+    ["valueSource", "operator", "comparisonValue"]
+  );
+});
+
 test("models Targon's Peak as a conquer listener with delayed resolution", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({

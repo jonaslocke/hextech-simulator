@@ -93,6 +93,19 @@ export const delayedTimingKinds = [
   "endOfOpponentTurn"
 ] as const;
 
+export const numericComparisonValueSources = [
+  "eventSubject.effectiveEnergyCost"
+] as const;
+
+export const numericComparisonOperators = [
+  "equal",
+  "notEqual",
+  "greaterThan",
+  "greaterThanOrEqual",
+  "lessThan",
+  "lessThanOrEqual"
+] as const;
+
 export const gameEventKinds = [
   "turn.awaken",
   "turn.beginning",
@@ -721,6 +734,35 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "If condition",
     description: "Applies behavior only when a condition is true.",
     engineSupport: ambiguous("The condition expression must be reviewed before implementation support can be determined.")
+  }),
+  "condition.compare_numeric_value": primitiveSeed({
+    id: "condition.compare_numeric_value",
+    family: "condition",
+    name: "Compare numeric value",
+    description: "Guards a clause by comparing a numeric event or game value.",
+    parameters: [
+      required(
+        "valueSource",
+        "string",
+        "The numeric value evaluated when the clause trigger fires.",
+        numericComparisonValueSources
+      ),
+      required(
+        "operator",
+        "string",
+        "The comparison applied to the resolved value.",
+        numericComparisonOperators
+      ),
+      required("comparisonValue", "number", "The constant value used by the comparison.")
+    ],
+    fixedRules: [
+      "The comparison is evaluated after the clause trigger fires and before its effects resolve.",
+      "A false comparison prevents the other behavior assignments in the same clause from resolving.",
+      "The event subject's effective Energy cost includes applicable cost modifiers recorded for the play event."
+    ],
+    engineSupport: requiresEngineSupport(
+      "The catalog defines typed numeric clause guards; generalized runtime condition evaluation remains future engine work."
+    )
   }),
   "condition.while": primitiveSeed({
     id: "condition.while",
