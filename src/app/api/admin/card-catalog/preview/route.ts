@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
   CardCatalogImportPreviewError,
+  BehaviorCatalogNotInitializedError,
   createMongoCardValidationLookup,
+  loadBehaviorDefinitions,
   previewCardCatalogImport
 } from "@/server/card-catalog";
 import { getMongoDatabase } from "@/server/db";
@@ -10,8 +12,10 @@ export async function POST(request: Request) {
   try {
     const upload = await readUploadRequest(request);
     const db = await getMongoDatabase();
+    const behaviorCatalog = await loadBehaviorDefinitions(db);
     const preview = await previewCardCatalogImport({
       ...upload,
+      behaviorCatalog,
       existingCardLookup: createMongoCardValidationLookup(db)
     });
 
@@ -20,6 +24,20 @@ export async function POST(request: Request) {
       preview
     });
   } catch (caught) {
+    if (caught instanceof BehaviorCatalogNotInitializedError) {
+      return NextResponse.json(
+        {
+          accepted: false,
+          error: {
+            code: caught.code,
+            message: caught.message,
+            details: caught.details
+          }
+        },
+        { status: 503 }
+      );
+    }
+
     if (caught instanceof CardCatalogImportPreviewError) {
       return NextResponse.json(
         {

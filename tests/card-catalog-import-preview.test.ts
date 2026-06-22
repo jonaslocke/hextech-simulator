@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CardCatalogImportPreviewError,
+  buildPrimitiveCatalog,
   previewCardCatalogImport,
   type PersistedCardValidationSummary
 } from "../src/server/card-catalog";
@@ -22,6 +23,7 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   const lookupCalls: string[][] = [];
 
   const preview = await previewCardCatalogImport({
+    behaviorCatalog: buildPrimitiveCatalog(),
     sourceLabel: "mvp.json",
     rawJson: JSON.stringify([stupefy, megaMech]),
     existingCardLookup: async (cardCodes) => {
@@ -65,6 +67,7 @@ test("previews textless Basic Runes as intrinsic behavior cards", async () => {
   });
 
   const preview = await previewCardCatalogImport({
+    behaviorCatalog: buildPrimitiveCatalog(),
     sourceLabel: "runes.json",
     rawJson: JSON.stringify([mindRune]),
     existingCardLookup: async () => new Map()
@@ -93,6 +96,7 @@ test("marks uploaded cards that already exist in the persisted catalog", async (
   };
 
   const preview = await previewCardCatalogImport({
+    behaviorCatalog: buildPrimitiveCatalog(),
     sourceLabel: "uploaded.json",
     rawJson: JSON.stringify([card]),
     existingCardLookup: async () => new Map([[persisted.cardCode, persisted]])
@@ -112,6 +116,7 @@ test("marks persisted cards as changed when the source text hash differs", async
   });
 
   const preview = await previewCardCatalogImport({
+    behaviorCatalog: buildPrimitiveCatalog(),
     sourceLabel: "uploaded.json",
     rawJson: JSON.stringify([card]),
     existingCardLookup: async () =>
@@ -136,6 +141,7 @@ test("rejects invalid uploaded JSON before behavior discovery", async () => {
   await assert.rejects(
     () =>
       previewCardCatalogImport({
+        behaviorCatalog: buildPrimitiveCatalog(),
         sourceLabel: "broken.json",
         rawJson: "{",
         existingCardLookup: async () => new Map()

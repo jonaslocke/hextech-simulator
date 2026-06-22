@@ -8,6 +8,7 @@
     "next:dev": "next dev",
     "build": "next build",
     "catalog:clear-validations": "node --env-file=.env --import tsx scripts/clear-card-behavior-validations.ts --confirm",
+    "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

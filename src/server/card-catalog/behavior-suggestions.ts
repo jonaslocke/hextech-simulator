@@ -9,7 +9,6 @@ import {
 import {
   buildPrimitiveCatalog,
   combineSupportStatuses,
-  getPrimitiveCatalogEntry,
   validatePrimitiveAssignmentParameters,
   type EngineSupportStatus,
   type PrimitiveCatalogEntry,
@@ -71,16 +70,27 @@ export async function analyzeLocalCardSetBehaviorSuggestions(): Promise<CorpusBe
 
 export function analyzeCardBehaviorSuggestions(
   cards: Card[],
-  sourceFiles: string[] = []
+  sourceFiles: string[] = [],
+  primitiveCatalog?: PrimitiveCatalogEntry[]
 ): CorpusBehaviorSuggestionReport {
-  return buildCorpusBehaviorSuggestionReport(analyzeCardCorpus(cards, sourceFiles));
+  return buildCorpusBehaviorSuggestionReport(
+    analyzeCardCorpus(cards, sourceFiles),
+    primitiveCatalog
+  );
 }
 
 export function buildCorpusBehaviorSuggestionReport(
-  discoveryReport: CorpusPrimitiveDiscoveryReport
+  discoveryReport: CorpusPrimitiveDiscoveryReport,
+  suppliedPrimitiveCatalog?: PrimitiveCatalogEntry[]
 ): CorpusBehaviorSuggestionReport {
-  const primitiveCatalog = buildPrimitiveCatalog(discoveryReport.primitives);
-  const cards = discoveryReport.cards.map(buildCardBehaviorSuggestion);
+  const primitiveCatalog =
+    suppliedPrimitiveCatalog ?? buildPrimitiveCatalog(discoveryReport.primitives);
+  const primitiveCatalogById = new Map(
+    primitiveCatalog.map((entry) => [entry.id, entry])
+  );
+  const cards = discoveryReport.cards.map((card) =>
+    buildCardBehaviorSuggestion(card, primitiveCatalogById)
+  );
   const completeSuggestionCount = cards.filter(isCompleteSuggestion).length;
 
   return {
@@ -108,9 +118,15 @@ export function buildCorpusBehaviorSuggestionReport(
 }
 
 export function buildCardBehaviorSuggestion(
-  discovery: CardPrimitiveDiscovery
+  discovery: CardPrimitiveDiscovery,
+  primitiveCatalogById?: ReadonlyMap<string, PrimitiveCatalogEntry>
 ): CardBehaviorSuggestion {
-  const clauses = discovery.clauses.map(buildClauseBehaviorSuggestion);
+  const catalogById =
+    primitiveCatalogById ??
+    new Map(buildPrimitiveCatalog().map((entry) => [entry.id, entry]));
+  const clauses = discovery.clauses.map((clause) =>
+    buildClauseBehaviorSuggestion(clause, catalogById)
+  );
   const supportStatus = combineSupportStatuses(
     clauses.map((clause) => clause.supportStatus)
   );
@@ -134,9 +150,12 @@ export function buildCardBehaviorSuggestion(
 }
 
 function buildClauseBehaviorSuggestion(
-  clause: ClauseDiscovery
+  clause: ClauseDiscovery,
+  primitiveCatalogById: ReadonlyMap<string, PrimitiveCatalogEntry>
 ): ClauseBehaviorSuggestion {
-  const assignments = clause.assignments.map(buildSuggestedPrimitiveAssignment);
+  const assignments = clause.assignments.map((assignment) =>
+    buildSuggestedPrimitiveAssignment(assignment, primitiveCatalogById)
+  );
   const missingRequiredParameters = assignments.flatMap(
     (assignment) => assignment.parameterValidation.missingRequired
   );
@@ -162,9 +181,14 @@ function buildClauseBehaviorSuggestion(
 }
 
 function buildSuggestedPrimitiveAssignment(
-  assignment: PrimitiveAssignment
+  assignment: PrimitiveAssignment,
+  primitiveCatalogById: ReadonlyMap<string, PrimitiveCatalogEntry>
 ): SuggestedPrimitiveAssignment {
-  const catalogEntry = getPrimitiveCatalogEntry(assignment.primitiveId, assignment.family);
+  const catalogEntry = primitiveCatalogById.get(assignment.primitiveId);
+
+  if (!catalogEntry) {
+    throw new Error(`Behavior definition is unavailable: ${assignment.primitiveId}`);
+  }
   const parameterValidation = validatePrimitiveAssignmentParameters(
     assignment,
     catalogEntry

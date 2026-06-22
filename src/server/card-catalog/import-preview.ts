@@ -61,10 +61,15 @@ export class CardCatalogImportPreviewError extends Error {
 export async function previewCardCatalogImport(input: {
   sourceLabel: string;
   rawJson: string;
+  behaviorCatalog: PrimitiveCatalogEntry[];
   existingCardLookup?: ExistingCardValidationLookup;
 }): Promise<CardCatalogImportPreviewResult> {
   const cards = parseUploadedCardSetJson(input.rawJson);
-  const suggestionReport = analyzeCardBehaviorSuggestions(cards, [input.sourceLabel]);
+  const suggestionReport = analyzeCardBehaviorSuggestions(
+    cards,
+    [input.sourceLabel],
+    input.behaviorCatalog
+  );
   const suggestionsByCardCode = new Map(
     suggestionReport.cards.map((suggestion) => [suggestion.cardCode, suggestion])
   );
