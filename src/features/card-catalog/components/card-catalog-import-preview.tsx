@@ -19,6 +19,7 @@ import {
   Trash2,
   Upload
 } from "lucide-react";
+import { CardRulesText } from "@/features/card-presentation";
 import { Button } from "@/shared/components/button";
 import {
   Command,
@@ -471,9 +472,13 @@ function CardTable({
                   <p className="mt-1 text-slate-500 text-xs">{card.type}</p>
                 </td>
                 <td className="px-4 py-4 max-w-xl">
-                  <p className="text-slate-200 leading-relaxed">
-                    {card.rulesText || "No rules text."}
-                  </p>
+                  <div className="grid gap-1.5 text-slate-200 leading-relaxed">
+                    {card.rulesText?.trim() ? (
+                      <CardRulesText text={card.rulesText} />
+                    ) : (
+                      <p>No rules text.</p>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <Badge
@@ -592,9 +597,13 @@ function ReviewPanel({
           <h2 className="mt-1 font-semibold text-xl" id="card-catalog-review-title">
             {card.name}
           </h2>
-          <p className="mt-2 max-w-3xl text-slate-300 text-sm leading-relaxed">
-            {card.rulesText || "No rules text."}
-          </p>
+          <div className="grid gap-1.5 mt-2 max-w-3xl text-slate-300 text-sm leading-relaxed">
+            {card.rulesText?.trim() ? (
+              <CardRulesText text={card.rulesText} />
+            ) : (
+              <p>No rules text.</p>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 h-fit">
           <select

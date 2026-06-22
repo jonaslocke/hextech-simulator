@@ -92,3 +92,36 @@ test("unknown and malformed notation remains readable text", () => {
     { kind: "text", value: " (unfinished" },
   ]);
 });
+
+test("parser handles representative catalog rules text", () => {
+  const switcheroo = parseCardText(
+    "[Hidden] (Hide now for :rb_rune_rainbow: to react with later for :rb_energy_0:.)[Action]_ (Play on your turn or in showdowns.)_Swap the Might of two units at the same battlefield this turn.",
+  );
+  const equipment = parseCardText(
+    "[Equip] :rb_energy_1::rb_rune_calm: (:rb_energy_1::rb_rune_calm:: Attach this to a unit you control.)As this is attached to a unit, copy that unit's text to this Equipment's effect text for as long as this is attached to it.",
+  );
+
+  assert.equal(switcheroo.length, 2);
+  assert.deepEqual(
+    switcheroo.map(({ segments }) => segments[0]),
+    [
+      { count: undefined, keyword: "hidden", kind: "keyword" },
+      { count: undefined, keyword: "action", kind: "keyword" },
+    ],
+  );
+
+  const equipmentResources = equipment
+    .flatMap(({ segments }) => segments)
+    .flatMap((segment) =>
+      segment.kind === "parenthetical" ? segment.children : [segment],
+    )
+    .filter((segment) => segment.kind === "resource")
+    .map((segment) => segment.resource);
+
+  assert.deepEqual(equipmentResources, [
+    { kind: "energy", value: "1" },
+    { domain: "calm", kind: "rune" },
+    { kind: "energy", value: "1" },
+    { domain: "calm", kind: "rune" },
+  ]);
+});
