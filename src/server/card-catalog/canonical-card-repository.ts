@@ -28,14 +28,14 @@ export const approvedPrimitiveAssignmentSchema = z.object({
   sourceText: z.string(),
   parameters: z.record(primitiveParameterValueSchema),
   confidence: z.enum(["high", "medium", "low"])
-});
+}).strict();
 export const approvedBehaviorClauseSchema = z.object({
   id: z.string().min(1),
   sourceText: z.string(),
   normalizedText: z.string(),
   assignments: z.array(approvedPrimitiveAssignmentSchema),
   unsupportedReason: z.string().nullable()
-});
+}).strict();
 export const canonicalCardPublicationInputSchema = z.object({
   cardCode: z.string().min(1),
   card: cardSchema,
@@ -43,7 +43,7 @@ export const canonicalCardPublicationInputSchema = z.object({
   modelingStatus: z.literal("approved"),
   clauses: z.array(approvedBehaviorClauseSchema),
   adminNotes: z.string()
-});
+}).strict();
 
 export type ApprovedPrimitiveAssignment = z.infer<typeof approvedPrimitiveAssignmentSchema>;
 export type ApprovedBehaviorClause = z.infer<typeof approvedBehaviorClauseSchema>;
@@ -136,9 +136,15 @@ export function buildCanonicalCardDocument(
   }
 
   const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
+  const clauseIds = new Set<string>();
   const playTimings: CanonicalBehaviorBinding[] = [];
   const runtimeSupportStatuses: EngineSupportStatus[] = [];
   const clauses = parsed.clauses.map((clause, sequence) => {
+    if (clauseIds.has(clause.id)) {
+      throw new Error(`Duplicate behavior clause id: ${clause.id}`);
+    }
+    clauseIds.add(clause.id);
+
     if (clause.unsupportedReason !== null) {
       throw new Error(
         `Unsupported behavior clause ${clause.id}: ${clause.unsupportedReason}`
@@ -174,6 +180,24 @@ export function buildCanonicalCardDocument(
         throw new Error(
           `Invalid behavior binding ${assignment.primitiveId}: ${validation.issues
             .map((issue) => issue.message).join(" ")}`
+        );
+      }
+      if (
+        assignment.primitiveId === "selector.friendly_unit" &&
+        assignment.parameters.controller !== undefined &&
+        assignment.parameters.controller !== "controller"
+      ) {
+        throw new Error(
+          "Invalid behavior binding selector.friendly_unit: controller must reference the source controller."
+        );
+      }
+      if (
+        assignment.primitiveId === "selector.enemy_unit" &&
+        assignment.parameters.controller !== undefined &&
+        assignment.parameters.controller !== "opponent"
+      ) {
+        throw new Error(
+          "Invalid behavior binding selector.enemy_unit: controller must reference an opponent."
         );
       }
 
