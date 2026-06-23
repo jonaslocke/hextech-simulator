@@ -3,6 +3,7 @@ import {
   compileBehaviorModelV2,
   createBehaviorContext,
   executeBehaviorClauseV2,
+  submitTriggerOrderV2,
   targetRequirementsForClauseV2
 } from "./behavior-runtime";
 import {
@@ -13,6 +14,7 @@ import {
   effectiveEnergyCostV2,
   type RuntimeCardIndexV2
 } from "./primitive-handlers";
+import { dispatchBehaviorEventV2, resolveDelayedEffectsV2 } from "./triggers";
 import type { DeckSnapshotDocumentV2 } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocumentV2 } from "./state";
@@ -28,6 +30,14 @@ export function gameplayActionsV2(
   const player = game.state.players[actorPlayerId];
   if (!player) return [];
   const actions: ProjectedAction[] = [];
+  if (game.state.pendingChoice) {
+    if (game.state.pendingChoice.playerId !== actorPlayerId) return [];
+    for (const order of permutations(game.state.pendingChoice.optionIds)) {
+      const labels = order.map((id) => game.state.pendingChoice!.pendingItems.find((item) => item.id === id)?.label ?? id);
+      actions.push(action(game, "orderTriggers", `Resolve ${labels.join(" → ")}`, null, true, null, JSON.stringify(order)));
+    }
+    return actions;
+  }
   const hasPriority = game.state.chain
     ? game.state.chain.priorityPlayerId === actorPlayerId
     : game.state.showdown
@@ -74,7 +84,7 @@ export function performGameplayActionV2(input: {
   const index = createRuntimeCardIndexV2(input.decks);
   const handlers = createPrimitiveHandlersV2(index);
   const [, , , kind, encodedSource, encodedExtra] = input.actionId.split(":");
-  const source = encodedSource ? decodeURIComponent(encodedSource) : "";
+  const source = encodedSource && encodedSource !== "_" ? decodeURIComponent(encodedSource) : "";
   const extra = encodedExtra ? decodeURIComponent(encodedExtra) : "";
   const player = game.state.players[input.actorPlayerId]!;
 
@@ -86,7 +96,10 @@ export function performGameplayActionV2(input: {
       draw(player.zones.runeDeck, player.zones.base, 1);
       break;
     case "play":
-      playCard(game, input.actorPlayerId, source, input.selectedIds, index, handlers);
+      playCard(game, input.actorPlayerId, source, input.selectedIds, index, handlers, input.decks);
+      break;
+    case "orderTriggers":
+      submitTriggerOrderV2(game, input.actorPlayerId, JSON.parse(extra) as string[]);
       break;
     case "activate": {
       const [clauseId, behaviorId] = extra.split("|");
@@ -111,10 +124,10 @@ export function performGameplayActionV2(input: {
       break;
     }
     case "pass":
-      passPriority(game, input.actorPlayerId, index, handlers);
+      passPriority(game, input.actorPlayerId, index, handlers, input.decks);
       break;
     case "endTurn":
-      endTurn(game, input.actorPlayerId, index);
+      endTurn(game, input.actorPlayerId, index, input.decks);
       break;
     default:
       throw new Error("Action kind is not implemented.");
@@ -124,19 +137,24 @@ export function performGameplayActionV2(input: {
   return game;
 }
 
-function playCard(game: GameDocumentV2, playerId: string, cardId: string, selectedIds: string[], index: RuntimeCardIndexV2, handlers: ReturnType<typeof createPrimitiveHandlersV2>) {
+function playCard(game: GameDocumentV2, playerId: string, cardId: string, selectedIds: string[], index: RuntimeCardIndexV2, handlers: ReturnType<typeof createPrimitiveHandlersV2>, decks: readonly DeckSnapshotDocumentV2[]) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstanceV2(cardId, index);
-  pay(player, definition, effectiveEnergyCostV2(game, playerId, definition));
+  const effectiveEnergyCost = effectiveEnergyCostV2(game, playerId, definition);
+  pay(player, definition, effectiveEnergyCost);
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   if (definition.card.classification.type === "Unit") {
     player.zones.base.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
     executeImmediateClauses(game, definition, playerId, cardId, selectedIds, handlers);
+    dispatchBehaviorEventV2(game, {
+      type: "card.played", actorPlayerId: playerId, subjectCardInstanceId: cardId,
+      values: { "eventSubject.effectiveEnergyCost": effectiveEnergyCost }
+    }, decks);
     return;
   }
-  const item = { id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: selectedIds, behaviorClauseId: null };
+  const item = { id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: selectedIds, behaviorClauseId: null, behaviorEvent: null };
   if (game.state.chain) {
     game.state.chain.items.push(item);
     game.state.chain.priorityPlayerId = otherPlayer(game, playerId);
@@ -146,7 +164,7 @@ function playCard(game: GameDocumentV2, playerId: string, cardId: string, select
   }
 }
 
-function passPriority(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2, handlers: ReturnType<typeof createPrimitiveHandlersV2>) {
+function passPriority(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2, handlers: ReturnType<typeof createPrimitiveHandlersV2>, decks: readonly DeckSnapshotDocumentV2[]) {
   if (game.state.chain) {
     const passed = [...new Set([...game.state.chain.passedPlayerIds, actor])];
     if (passed.length === 2) {
@@ -157,10 +175,16 @@ function passPriority(game: GameDocumentV2, actor: string, index: RuntimeCardInd
         if (item.behaviorClauseId) {
           const compiled = compileBehaviorModelV2(definition.behaviorModel, handlers);
           const clause = compiled.clauses.find((candidate) => candidate.id === item.behaviorClauseId);
-          if (clause) executeBehaviorClauseV2({ clause, context: createBehaviorContext(game, owner, item.sourceCardInstanceId, null, item.targetCardInstanceIds), handlers });
+          if (clause) executeBehaviorClauseV2({ clause, context: createBehaviorContext(game, owner, item.sourceCardInstanceId, item.behaviorEvent, item.targetCardInstanceIds), handlers });
         } else {
           executeImmediateClauses(game, definition, owner, item.sourceCardInstanceId, item.targetCardInstanceIds, handlers);
-          if (definition.card.classification.type === "Spell") game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+          if (definition.card.classification.type === "Spell") {
+            game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+            dispatchBehaviorEventV2(game, {
+              type: "card.played", actorPlayerId: owner, subjectCardInstanceId: item.sourceCardInstanceId,
+              values: { "eventSubject.effectiveEnergyCost": effectiveEnergyCostV2(game, owner, definition) }
+            }, decks);
+          }
         }
       }
       game.state.chain = game.state.chain.items.length
@@ -182,7 +206,7 @@ function passPriority(game: GameDocumentV2, actor: string, index: RuntimeCardInd
   }
 }
 
-function endTurn(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2) {
+function endTurn(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2, decks: readonly DeckSnapshotDocumentV2[]) {
   if (game.state.turn?.activePlayerId !== actor) throw new Error("Only the active player can end the turn.");
   const next = otherPlayer(game, actor);
   const player = game.state.players[next]!;
@@ -191,13 +215,16 @@ function endTurn(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2)
   }
   draw(player.zones.runeDeck, player.zones.base, game.state.turn.turnNumber === 1 ? 2 : 1);
   draw(player.zones.mainDeck, player.zones.hand, 1);
+  resolveDelayedEffectsV2(game, "endOfThisTurn", decks);
   cleanupTurnModifiersV2(game, index);
   for (const candidate of Object.values(game.state.players)) candidate.conditionalEnergy = 0;
   game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
 }
 
 function action(game: GameDocumentV2, kind: string, label: string, source: string | null, enabled = true, disabledReason: string | null = null, extra?: string, targets: ProjectedAction["targets"] = []): ProjectedAction {
-  return { id: ["v2", game.stateVersion, "game", kind, source === null ? null : encodeURIComponent(source), extra === undefined ? undefined : encodeURIComponent(extra)].filter((value) => value !== null && value !== undefined).join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets };
+  const parts = ["v2", String(game.stateVersion), "game", kind, source === null ? "_" : encodeURIComponent(source)];
+  if (extra !== undefined) parts.push(encodeURIComponent(extra));
+  return { id: parts.join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets };
 }
 function canPay(player: GameDocumentV2["state"]["players"][string], definition: GameCardDefinition, energy: number) {
   const power = definition.card.attributes.power ?? 0;
@@ -308,4 +335,12 @@ function draw(source: string[], destination: string[], count: number) {
 }
 function otherPlayer(game: GameDocumentV2, playerId: string) {
   return game.state.setup.playerIds.find((id) => id !== playerId)!;
+}
+
+function permutations(values: string[]): string[][] {
+  if (values.length <= 1) return [[...values]];
+  return values.flatMap((value, index) =>
+    permutations([...values.slice(0, index), ...values.slice(index + 1)])
+      .map((rest) => [value, ...rest])
+  );
 }

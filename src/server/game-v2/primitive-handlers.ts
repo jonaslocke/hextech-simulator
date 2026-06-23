@@ -30,10 +30,34 @@ export function createPrimitiveHandlersV2(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault", "keyword.tank"
   ]) handlers.set(id, passive);
-  for (const id of ["trigger.on_play", "trigger.conquer_battlefield", "trigger.hold_battlefield"]) {
-    handlers.set(id, { matches: () => false });
-  }
-  handlers.set("condition.compare_numeric_value", { matches: () => false });
+  handlers.set("trigger.on_play", {
+    matches(binding, context) {
+      if (context.event?.type !== "card.played" || context.event.actorPlayerId !== context.controllerPlayerId) return false;
+      if (binding.parameters.subject === "source") return context.event.subjectCardInstanceId === context.sourceCardInstanceId;
+      if (binding.parameters.subject === "spell" && context.event.subjectCardInstanceId) {
+        return definitionForInstanceV2(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
+      }
+      return false;
+    }
+  });
+  handlers.set("trigger.conquer_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.conquered" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("condition.compare_numeric_value", {
+    matches(binding, context) {
+      const source = binding.parameters.valueSource;
+      const value = typeof source === "string" ? context.event?.values[source] : undefined;
+      const comparison = binding.parameters.comparisonValue;
+      if (typeof value !== "number" || typeof comparison !== "number") return false;
+      switch (binding.parameters.operator) {
+        case "greaterThanOrEqual": return value >= comparison;
+        case "greaterThan": return value > comparison;
+        case "equal": return value === comparison;
+        case "lessThanOrEqual": return value <= comparison;
+        case "lessThan": return value < comparison;
+        default: return false;
+      }
+    }
+  });
 
   handlers.set("selector.unit", {
     targets(binding, context) {
@@ -217,4 +241,3 @@ function stringParam(binding: BehaviorBindingV2, key: string) {
   return value;
 }
 function draw(source: string[], destination: string[], count: number) { destination.push(...source.splice(0, Math.min(count, source.length))); }
-

@@ -112,6 +112,18 @@ export function executeBehaviorClauseV2(input: {
   return { executed: true, delayed: false };
 }
 
+export function executeBehaviorEffectsV2(
+  clause: CompiledBehaviorClause,
+  context: BehaviorExecutionContext,
+  handlers: BehaviorHandlerRegistry
+): void {
+  for (const binding of clause.orderedEffects) {
+    const handler = requireHandler(binding, handlers);
+    if (!handler.execute) throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
+    handler.execute(binding, context);
+  }
+}
+
 export function queueTriggeredClausesV2(input: {
   game: GameDocumentV2;
   controllerPlayerId: string;
@@ -130,7 +142,8 @@ export function queueTriggeredClausesV2(input: {
       controllerPlayerId: input.controllerPlayerId,
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
-      behaviorClauseId: clause.id
+      behaviorClauseId: clause.id,
+      behaviorEvent: input.event
     }];
   }));
   if (items.length === 0) return;
@@ -211,4 +224,3 @@ function validateSelections(requirements: ProjectedTargetRequirement[], selected
 function selectedForRequirement(requirement: ProjectedTargetRequirement, selectedIds: string[]) {
   return selectedIds.filter((id) => requirement.legalIds.includes(id)).slice(0, requirement.maximum);
 }
-

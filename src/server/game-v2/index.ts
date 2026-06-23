@@ -9,3 +9,4 @@ export * from "./match-service";
 export * from "./actions";
 export * from "./behavior-runtime";
 export * from "./primitive-handlers";
+export * from "./triggers";

@@ -72,7 +72,12 @@ export const gameStateV2Schema = z.object({
     items: z.array(z.object({
       id: z.string(), label: z.string(), controllerPlayerId: z.string(),
       sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
-      behaviorClauseId: z.string().nullable().default(null)
+      behaviorClauseId: z.string().nullable().default(null),
+      behaviorEvent: z.object({
+        type: z.string(), actorPlayerId: z.string().nullable(),
+        subjectCardInstanceId: z.string().nullable(),
+        values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      }).nullable().default(null)
     })),
     priorityPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
@@ -99,7 +104,12 @@ export const gameStateV2Schema = z.object({
     optionIds: z.array(z.string().min(1)), pendingItems: z.array(z.object({
       id: z.string(), label: z.string(), controllerPlayerId: z.string(),
       sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
-      behaviorClauseId: z.string().nullable().default(null)
+      behaviorClauseId: z.string().nullable().default(null),
+      behaviorEvent: z.object({
+        type: z.string(), actorPlayerId: z.string().nullable(),
+        subjectCardInstanceId: z.string().nullable(),
+        values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      }).nullable().default(null)
     }))
   }).nullable()
 });
