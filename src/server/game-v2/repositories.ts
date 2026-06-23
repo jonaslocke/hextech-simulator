@@ -1,5 +1,6 @@
 import type { Collection, Db, Filter, OptionalUnlessRequiredId, WithId } from "mongodb";
 import type { DeckSnapshotV2 } from "./schemas";
+import type { CardInstanceV2, GameDocumentV2, MatchDocumentV2 } from "./state";
 
 export const gameV2CollectionNames = {
   matches: "matchesV2",
@@ -13,6 +14,12 @@ export type DeckSnapshotDocumentV2 = BaseDocumentV2 & {
   matchId: string | null;
   playerId: string;
   snapshot: DeckSnapshotV2;
+  instances: CardInstanceV2[];
+};
+
+export type GameEventDocumentV2 = BaseDocumentV2 & {
+  matchId: string; gameId: string; sequence: number; actorPlayerId: string | null;
+  type: string; message: string;
 };
 
 export type DocumentRepositoryV2<T extends BaseDocumentV2> = {
@@ -24,18 +31,30 @@ export type DocumentRepositoryV2<T extends BaseDocumentV2> = {
 type Stored<T extends { id: string }> = T & { _id: string };
 
 export type GameV2Repositories = {
-  matches: DocumentRepositoryV2<BaseDocumentV2>;
-  games: DocumentRepositoryV2<BaseDocumentV2>;
-  gameEvents: DocumentRepositoryV2<BaseDocumentV2>;
+  matches: DocumentRepositoryV2<MatchDocumentV2>;
+  games: DocumentRepositoryV2<GameDocumentV2>;
+  gameEvents: DocumentRepositoryV2<GameEventDocumentV2> & {
+    findByGameId(gameId: string): Promise<GameEventDocumentV2[]>;
+  };
   deckSnapshots: DocumentRepositoryV2<DeckSnapshotDocumentV2>;
 };
 
 export function createGameV2Repositories(db: Db): GameV2Repositories {
+  const matches = db.collection<Stored<MatchDocumentV2>>(gameV2CollectionNames.matches);
+  const games = db.collection<Stored<GameDocumentV2>>(gameV2CollectionNames.games);
+  const events = db.collection<Stored<GameEventDocumentV2>>(gameV2CollectionNames.gameEvents);
+  const deckSnapshots = db.collection<Stored<DeckSnapshotDocumentV2>>(gameV2CollectionNames.deckSnapshots);
   return {
-    matches: createRepository(db.collection(gameV2CollectionNames.matches)),
-    games: createRepository(db.collection(gameV2CollectionNames.games)),
-    gameEvents: createRepository(db.collection(gameV2CollectionNames.gameEvents)),
-    deckSnapshots: createRepository(db.collection(gameV2CollectionNames.deckSnapshots))
+    matches: createRepository(matches),
+    games: createRepository(games),
+    gameEvents: {
+      ...createRepository(events),
+      async findByGameId(gameId) {
+        const documents = await events.find({ gameId } as Filter<Stored<GameEventDocumentV2>>).sort({ sequence: 1 }).toArray();
+        return documents.map((document) => fromStored(document)!);
+      }
+    },
+    deckSnapshots: createRepository(deckSnapshots)
   };
 }
 

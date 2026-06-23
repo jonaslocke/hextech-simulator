@@ -26,6 +26,20 @@ export const gameActionIntentSchema = z.object({
   })
 });
 
+export const gameV2IntentRequestSchema = z.object({
+  playerToken: z.string().min(1),
+  stateVersion: z.number().int().nonnegative(),
+  intent: gameActionIntentSchema
+});
+
+export const createMatchV2RequestSchema = z.object({
+  playerDecks: z.object({
+    player1: z.literal("lux"),
+    player2: z.literal("lux")
+  }),
+  rngSeed: z.string().min(1).optional()
+});
+
 export const projectedCardViewSchema = z.object({
   instanceId: z.string().min(1),
   ownerPlayerId: z.string().min(1),

@@ -2,4 +2,7 @@ export * from "./catalog";
 export * from "./repositories";
 export * from "./runtime-coverage";
 export * from "./schemas";
-
+export * from "./state";
+export * from "./setup";
+export * from "./projection";
+export * from "./match-service";
