@@ -40,7 +40,7 @@ export function GameBoardV2({
   return (
     <main className="min-h-screen bg-slate-950 p-4 text-slate-100">
       <header className="mb-4 flex items-center justify-between rounded-lg border border-white/10 bg-slate-900 p-3">
-        <div><h1 className="font-semibold">Game Engine V2</h1><p className="text-xs text-slate-400">State {projection.stateVersion}</p></div>
+        <div><h1 className="font-semibold">Riftbound Simulator</h1><p className="text-xs text-slate-400">State {projection.stateVersion}</p></div>
         <div className="flex gap-2">
           {actionsForSource(projection.actions, null).map((action) => (
             <Button disabled={!action.enabled} key={action.id} onClick={() => beginAction(action)} size="sm" type="button">{action.label}</Button>
@@ -104,4 +104,3 @@ function PlayerArea({ actions, label, onAction, player }: {
     </section>
   );
 }
-

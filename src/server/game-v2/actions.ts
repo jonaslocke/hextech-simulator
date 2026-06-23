@@ -224,7 +224,19 @@ function endTurn(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2,
 function action(game: GameDocumentV2, kind: string, label: string, source: string | null, enabled = true, disabledReason: string | null = null, extra?: string, targets: ProjectedAction["targets"] = []): ProjectedAction {
   const parts = ["v2", String(game.stateVersion), "game", kind, source === null ? "_" : encodeURIComponent(source)];
   if (extra !== undefined) parts.push(encodeURIComponent(extra));
-  return { id: parts.join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets };
+  const surface = kind === "orderTriggers"
+    ? "choice-dialog"
+    : source
+      ? "card-menu"
+      : "action-rail";
+  return {
+    id: parts.join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets,
+    presentation: {
+      surface,
+      style: kind === "endTurn" || kind === "pass" ? "secondary" : "primary",
+      prompt: kind === "orderTriggers" ? "Choose the order for triggered abilities." : null
+    }
+  };
 }
 type PaymentPlanV2 = {
   conditionalEnergy: number;

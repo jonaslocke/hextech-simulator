@@ -35,14 +35,51 @@ export function projectGameV2(input: {
     return { playerId, isViewer, energy: player.energy, conditionalEnergy: player.conditionalEnergy, power: player.power, zones };
   });
   return gameProjectionV2Schema.parse({
-    id: input.game.id, matchId: input.game.matchId, stateVersion: input.game.stateVersion,
+    id: input.game.id, matchId: input.game.matchId, gameNumber: 1, stateVersion: input.game.stateVersion,
     status: input.game.status, viewerPlayerId: input.viewerPlayerId,
     activePlayerId: input.game.state.turn?.activePlayerId ?? null,
     winnerPlayerId: input.game.winnerPlayerId, players,
+    setup: {
+      playerIds: input.game.state.setup.playerIds,
+      startingPlayerChooserId: input.game.state.setup.startingPlayerChooserId,
+      startingPlayerId: input.game.state.setup.startingPlayerId,
+      battlefieldChoices: Object.fromEntries(input.game.state.setup.playerIds.map((playerId) => {
+        const choice = input.game.state.setup.battlefieldChoices[playerId]!;
+        return [playerId, {
+          status: choice.status,
+          cardInstanceId: choice.status === "revealed" || playerId === input.viewerPlayerId ? choice.cardInstanceId : null
+        }];
+      })),
+      mulligans: Object.fromEntries(input.game.state.setup.playerIds.map((playerId) => [playerId, {
+        status: input.game.state.setup.mulligans[playerId]?.status ?? "unlocked"
+      }])),
+      waitingReason: waitingReason(input.game, input.viewerPlayerId)
+    },
+    turn: input.game.state.turn ? { ...input.game.state.turn, passedPlayerIds: [] } : null,
+    showdown: input.game.state.showdown ? {
+      ...input.game.state.showdown,
+      relevantPlayerIds: [...input.game.state.setup.playerIds],
+      focusPlayerId: input.game.state.showdown.priorityPlayerId
+    } : null,
+    pendingChoice: input.game.state.pendingChoice && input.game.state.pendingChoice.playerId === input.viewerPlayerId ? {
+      id: input.game.state.pendingChoice.id,
+      playerId: input.game.state.pendingChoice.playerId,
+      prompt: "Choose the order for triggered abilities.",
+      optionIds: input.game.state.pendingChoice.optionIds
+    } : null,
     battlefields: input.game.state.battlefields.map((battlefield) => ({
-      battlefieldId: battlefield.battlefieldId, card: view(battlefield.cardInstanceId), units: battlefield.units.map(view)
+      battlefieldId: battlefield.battlefieldId, selectedByPlayerId: battlefield.selectedByPlayerId,
+      card: view(battlefield.cardInstanceId), units: battlefield.units.map(view), facedownCard: null
     })),
-    chain: input.game.state.chain?.items ?? [],
+    chain: input.game.state.chain ? {
+      items: input.game.state.chain.items.map((item) => ({
+        ...item,
+        kind: item.behaviorClauseId ? "trigger" : definitionKind(item.sourceCardInstanceId, definitions, instances)
+      })),
+      relevantPlayerIds: [...input.game.state.setup.playerIds],
+      priorityPlayerId: input.game.state.chain.priorityPlayerId,
+      passedPlayerIds: input.game.state.chain.passedPlayerIds
+    } : null,
     actions: (input.game.status === "setup_pending"
       ? setupActionsV2(input.game, input.viewerPlayerId)
       : gameplayActionsV2(input.game, input.viewerPlayerId, input.decks))
@@ -53,4 +90,28 @@ export function projectGameV2(input: {
       }),
     logEntries: (input.events ?? []).map((event) => ({ id: event.id, message: event.message, createdAt: event.createdAt }))
   });
+}
+
+function waitingReason(game: GameDocumentV2, viewerPlayerId: string): string | null {
+  if (game.status !== "setup_pending") return null;
+  const choice = game.state.setup.battlefieldChoices[viewerPlayerId];
+  if (choice?.status === "locked") return "Waiting for the other player to choose a battlefield.";
+  if (game.state.setup.startingPlayerId === null && game.state.setup.startingPlayerChooserId !== viewerPlayerId) {
+    return "Waiting for the starting-player choice.";
+  }
+  if (game.state.setup.mulligans[viewerPlayerId]?.status === "locked") return "Waiting for the other player to finish their mulligan.";
+  return null;
+}
+
+function definitionKind(
+  sourceId: string | null,
+  definitions: Map<string, DeckSnapshotDocumentV2["snapshot"]["cards"][number]>,
+  instances: Map<string, DeckSnapshotDocumentV2["instances"][number]>
+): "spell" | "ability" | "trigger" | "unit" {
+  if (!sourceId) return "ability";
+  const instance = instances.get(sourceId);
+  const type = instance ? definitions.get(instance.cardCode)?.card.classification.type : null;
+  if (type === "Spell") return "spell";
+  if (type === "Unit") return "unit";
+  return "ability";
 }

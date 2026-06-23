@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const projectedTargetRequirementSchema = z.object({
   kind: z.enum(["card", "battlefield", "player"]),
+  label: z.string().min(1).optional(),
   legalIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative()
@@ -15,7 +16,12 @@ export const projectedActionSchema = z.object({
   sourceCardInstanceId: z.string().min(1).nullable(),
   enabled: z.boolean(),
   disabledReason: z.string().min(1).nullable(),
-  targets: z.array(projectedTargetRequirementSchema)
+  targets: z.array(projectedTargetRequirementSchema),
+  presentation: z.object({
+    surface: z.enum(["setup-dialog", "card-menu", "action-rail", "choice-dialog"]),
+    style: z.enum(["primary", "secondary", "danger"]),
+    prompt: z.string().min(1).nullable()
+  })
 });
 
 export const gameActionIntentSchema = z.object({
@@ -79,8 +85,10 @@ export const projectedPlayerV2Schema = z.object({
 
 export const projectedBattlefieldV2Schema = z.object({
   battlefieldId: z.string().min(1),
+  selectedByPlayerId: z.string().min(1),
   card: projectedCardViewSchema,
-  units: z.array(projectedCardViewSchema)
+  units: z.array(projectedCardViewSchema),
+  facedownCard: projectedCardViewSchema.nullable().default(null)
 });
 
 export const projectedChainItemV2Schema = z.object({
@@ -88,20 +96,61 @@ export const projectedChainItemV2Schema = z.object({
   label: z.string().min(1),
   controllerPlayerId: z.string().min(1),
   sourceCardInstanceId: z.string().min(1).nullable(),
-  targetCardInstanceIds: z.array(z.string().min(1))
+  targetCardInstanceIds: z.array(z.string().min(1)),
+  kind: z.enum(["spell", "ability", "trigger", "unit"])
 });
+
+export const projectedChainV2Schema = z.object({
+  items: z.array(projectedChainItemV2Schema),
+  relevantPlayerIds: z.array(z.string().min(1)),
+  priorityPlayerId: z.string().min(1),
+  passedPlayerIds: z.array(z.string().min(1))
+}).nullable();
 
 export const gameProjectionV2Schema = z.object({
   id: z.string().min(1),
   matchId: z.string().min(1),
+  gameNumber: z.number().int().positive(),
   stateVersion: z.number().int().nonnegative(),
   status: z.enum(["setup_pending", "ready", "in_progress", "complete"]),
   viewerPlayerId: z.string().min(1),
   activePlayerId: z.string().min(1).nullable(),
   winnerPlayerId: z.string().min(1).nullable(),
+  setup: z.object({
+    playerIds: z.tuple([z.string().min(1), z.string().min(1)]),
+    startingPlayerChooserId: z.string().min(1),
+    startingPlayerId: z.string().min(1).nullable(),
+    battlefieldChoices: z.record(z.object({
+      status: z.enum(["unlocked", "locked", "revealed"]),
+      cardInstanceId: z.string().min(1).nullable()
+    })),
+    mulligans: z.record(z.object({
+      status: z.enum(["unlocked", "locked"])
+    })),
+    waitingReason: z.string().min(1).nullable()
+  }),
+  turn: z.object({
+    turnNumber: z.number().int().positive(),
+    activePlayerId: z.string().min(1),
+    phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
+    passedPlayerIds: z.array(z.string().min(1))
+  }).nullable(),
+  showdown: z.object({
+    battlefieldId: z.string().min(1),
+    relevantPlayerIds: z.array(z.string().min(1)),
+    focusPlayerId: z.string().min(1),
+    priorityPlayerId: z.string().min(1),
+    passedPlayerIds: z.array(z.string().min(1))
+  }).nullable(),
+  pendingChoice: z.object({
+    id: z.string().min(1),
+    playerId: z.string().min(1),
+    prompt: z.string().min(1),
+    optionIds: z.array(z.string().min(1))
+  }).nullable(),
   players: z.array(projectedPlayerV2Schema).length(2),
   battlefields: z.array(projectedBattlefieldV2Schema),
-  chain: z.array(projectedChainItemV2Schema),
+  chain: projectedChainV2Schema,
   actions: z.array(projectedActionSchema),
   logEntries: z.array(z.object({
     id: z.string().min(1),
@@ -120,4 +169,5 @@ export type ProjectedZoneV2 = z.infer<typeof projectedZoneV2Schema>;
 export type ProjectedPlayerV2 = z.infer<typeof projectedPlayerV2Schema>;
 export type ProjectedBattlefieldV2 = z.infer<typeof projectedBattlefieldV2Schema>;
 export type ProjectedChainItemV2 = z.infer<typeof projectedChainItemV2Schema>;
+export type ProjectedChainV2 = z.infer<typeof projectedChainV2Schema>;
 export type GameProjectionV2 = z.infer<typeof gameProjectionV2Schema>;

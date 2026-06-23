@@ -9,7 +9,8 @@ export function setupActionsV2(game: GameDocumentV2, actorPlayerId: string): Pro
   if (choice?.status === "unlocked") {
     return (setup.battlefieldPools[actorPlayerId] ?? []).map((cardId) => ({
       id: actionId(game, "lockBattlefield", cardId), label: "Choose battlefield",
-      sourceCardInstanceId: null, enabled: true, disabledReason: null, targets: []
+      sourceCardInstanceId: cardId, enabled: true, disabledReason: null, targets: [],
+      presentation: { surface: "setup-dialog", style: "primary", prompt: "Choose a battlefield." }
     }));
   }
   const allRevealed = setup.playerIds.every((id) => setup.battlefieldChoices[id]?.status === "revealed");
@@ -17,14 +18,16 @@ export function setupActionsV2(game: GameDocumentV2, actorPlayerId: string): Pro
     return [{
       id: actionId(game, "chooseStartingPlayer"), label: "Choose starting player",
       sourceCardInstanceId: null, enabled: true, disabledReason: null,
-      targets: [{ kind: "player", legalIds: [...setup.playerIds], minimum: 1, maximum: 1 }]
+      targets: [{ kind: "player", label: "starting player", legalIds: [...setup.playerIds], minimum: 1, maximum: 1 }],
+      presentation: { surface: "choice-dialog", style: "primary", prompt: "Choose the starting player." }
     }];
   }
   if (setup.startingPlayerId !== null && setup.mulligans[actorPlayerId]?.status === "unlocked") {
     return [{
       id: actionId(game, "commitMulligan"), label: "Keep opening hand",
       sourceCardInstanceId: null, enabled: true, disabledReason: null,
-      targets: [{ kind: "card", legalIds: [...game.state.players[actorPlayerId]!.zones.hand], minimum: 0, maximum: 2 }]
+      targets: [{ kind: "card", label: "cards to mulligan", legalIds: [...game.state.players[actorPlayerId]!.zones.hand], minimum: 0, maximum: 2 }],
+      presentation: { surface: "choice-dialog", style: "primary", prompt: "Choose up to two cards to mulligan." }
     }];
   }
   return [];

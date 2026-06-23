@@ -33,7 +33,7 @@ export function MatchSimulatorV2() {
       const result = await createMatchV2Client();
       if (!result.accepted) setError(result.error.message);
       else { setMatch(result); setViewerSeat("player1"); }
-    } catch { setError("Unable to create the v2 match."); }
+    } catch { setError("Unable to create the match."); }
     finally { setBusy(false); }
   }
 
@@ -52,9 +52,9 @@ export function MatchSimulatorV2() {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100">
         <section className="w-full max-w-xl rounded-xl border border-cyan-300/20 bg-slate-900 p-6 shadow-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">Game Engine V2</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">Riftbound Simulator</p>
           <h1 className="mt-2 text-2xl font-semibold">Create match</h1>
-          <p className="mt-2 text-sm text-slate-400">The initial v2 release uses approved canonical card definitions. Lux is currently the only available deck.</p>
+          <p className="mt-2 text-sm text-slate-400">Choose a deck for each player and start a Riftbound match.</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {(["Player 1", "Player 2"] as const).map((label) => (
               <label className="grid gap-2 text-sm" key={label}>
@@ -64,8 +64,8 @@ export function MatchSimulatorV2() {
             ))}
           </div>
           {error && <p className="mt-4 rounded border border-red-400/40 bg-red-950/60 px-3 py-2 text-sm text-red-100">{error}</p>}
-          <Button className="mt-5 w-full" disabled={busy} onClick={createMatch} type="button">{busy ? "Creating…" : "Create Lux mirror match"}</Button>
-          <a className="mt-4 block text-center text-xs text-slate-500 underline hover:text-slate-300" href="/legacy">Open legacy simulator</a>
+          <Button className="mt-5 w-full" disabled={busy} onClick={createMatch} type="button">{busy ? "Creating…" : "Create match"}</Button>
+          <a className="mt-4 block text-center text-xs text-slate-500 underline hover:text-slate-300" href="/legacy">Open previous version</a>
         </section>
       </main>
     );
