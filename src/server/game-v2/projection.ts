@@ -43,9 +43,14 @@ export function projectGameV2(input: {
       battlefieldId: battlefield.battlefieldId, card: view(battlefield.cardInstanceId), units: battlefield.units.map(view)
     })),
     chain: input.game.state.chain?.items ?? [],
-    actions: input.game.status === "setup_pending"
+    actions: (input.game.status === "setup_pending"
       ? setupActionsV2(input.game, input.viewerPlayerId)
-      : gameplayActionsV2(input.game, input.viewerPlayerId, input.decks),
+      : gameplayActionsV2(input.game, input.viewerPlayerId, input.decks))
+      .map((action) => {
+        if (!action.id.includes(":setup:lockBattlefield:")) return action;
+        const cardId = action.id.split(":").slice(4).join(":");
+        return { ...action, label: `Choose ${view(cardId).name}` };
+      }),
     logEntries: (input.events ?? []).map((event) => ({ id: event.id, message: event.message, createdAt: event.createdAt }))
   });
 }

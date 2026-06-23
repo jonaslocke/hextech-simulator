@@ -1,5 +1,5 @@
-import { MatchSimulator } from "@/features/match-simulator";
+import { MatchSimulatorV2 } from "@/features/match-simulator-v2";
 
 export default function Home() {
-  return <MatchSimulator />;
+  return <MatchSimulatorV2 />;
 }
