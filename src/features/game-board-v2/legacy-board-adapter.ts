@@ -133,9 +133,8 @@ export function adaptProjectionToLegacyBoard(projection: GameProjectionV2): {
       pendingChoice: projection.pendingChoice ? {
         ...projection.pendingChoice,
         type: "orderTriggers",
-        pendingChainItems: projection.chain?.items
-          .filter((item) => projection.pendingChoice?.optionIds.includes(item.id))
-          .map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null })) ?? []
+        pendingChainItems: projection.pendingChoice.pendingChainItems
+          .map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
       } : null,
       players,
       battlefields: projection.battlefields.map((battlefield) => ({
@@ -153,7 +152,9 @@ export function adaptProjectionToLegacyBoard(projection: GameProjectionV2): {
 function allVisibleCards(projection: GameProjectionV2): ProjectedCardView[] {
   const cards = [
     ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
-    ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units, ...(battlefield.facedownCard ? [battlefield.facedownCard] : [])])
+    ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units, ...(battlefield.facedownCard ? [battlefield.facedownCard] : [])]),
+    ...(projection.chain?.items.flatMap((item) => item.card ? [item.card] : []) ?? []),
+    ...(projection.pendingChoice?.pendingChainItems.flatMap((item) => item.card ? [item.card] : []) ?? [])
   ];
   return [...new Map(cards.map((card) => [card.instanceId, card])).values()];
 }

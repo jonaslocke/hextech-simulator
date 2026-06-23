@@ -97,7 +97,8 @@ export const projectedChainItemV2Schema = z.object({
   controllerPlayerId: z.string().min(1),
   sourceCardInstanceId: z.string().min(1).nullable(),
   targetCardInstanceIds: z.array(z.string().min(1)),
-  kind: z.enum(["spell", "ability", "trigger", "unit"])
+  kind: z.enum(["spell", "ability", "trigger", "unit"]),
+  card: projectedCardViewSchema.nullable()
 });
 
 export const projectedChainV2Schema = z.object({
@@ -147,7 +148,8 @@ export const gameProjectionV2Schema = z.object({
     id: z.string().min(1),
     playerId: z.string().min(1),
     prompt: z.string().min(1),
-    optionIds: z.array(z.string().min(1))
+    optionIds: z.array(z.string().min(1)),
+    pendingChainItems: z.array(projectedChainItemV2Schema)
   }).nullable(),
   players: z.array(projectedPlayerV2Schema).length(2),
   battlefields: z.array(projectedBattlefieldV2Schema),

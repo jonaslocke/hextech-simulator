@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   dispatchBehaviorEventV2, gameplayActionsV2, performGameplayActionV2,
-  victoryRequirementV2, GAME_V2_RUNTIME_COVERAGE,
+  projectGameV2, victoryRequirementV2, GAME_V2_RUNTIME_COVERAGE,
   type DeckSnapshotDocumentV2, type GameDocumentV2
 } from "../src/server/game-v2";
 
@@ -14,6 +14,9 @@ test("orders and resolves event-conditioned play triggers without card identity 
     values: { "eventSubject.effectiveEnergyCost": 5 }
   }, decks);
   assert.equal(game.state.pendingChoice?.optionIds.length, 2);
+  const choiceProjection = projectGameV2({ game, viewerPlayerId: "p1", decks });
+  assert.equal(choiceProjection.pendingChoice?.pendingChainItems.length, 2);
+  assert.ok(choiceProjection.pendingChoice?.pendingChainItems.every((item) => item.card !== null));
   const order = gameplayActionsV2(game, "p1", decks)[0]!;
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
   game = resolveAllChainItems(game, decks);
