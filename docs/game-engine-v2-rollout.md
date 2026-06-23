@@ -12,6 +12,14 @@
 | Initial direct behavior execution | `1580321` |
 | Triggered and deferred behavior coverage | `2badaf4` |
 | V2 simulator launch | `68d44b6` |
+| V2 launch acceptance completion | `0e2f18c` |
+
+Milestone 8 was completed in two implementation commits. `68d44b6` connected
+the v2 simulator, API, root route, and legacy route. `0e2f18c` completed
+behavior-backed automatic Rune payment and expanded the Lux mirror acceptance
+test across setup, hidden information, resources, payment, targeting, chain and
+trigger resolution, modifiers, cleanup, movement, showdown, and both viewer
+projections.
 
 The legacy engine remains at `/legacy` and continues using `/api/matches` and
 the original MongoDB collections. V2 uses `/api/v2/matches` and the independent
@@ -80,7 +88,7 @@ foreach ($collection in @("matchesV2", "gamesV2", "gameEventsV2", "deckSnapshots
 Revert implementation commits newest-first:
 
 ```powershell
-git revert --no-commit 68d44b6 2badaf4 1580321 e92e288 2be14c6 4de1e92 d5234a6 170e930
+git revert --no-commit 0e2f18c 68d44b6 2badaf4 1580321 e92e288 2be14c6 4de1e92 d5234a6 170e930
 git commit -m "Rollback game engine v2"
 ```
 
