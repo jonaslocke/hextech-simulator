@@ -23,7 +23,8 @@ export async function POST(request: Request) {
       accepted: true,
       behavior: {
         cardCode: canonicalCard.cardCode,
-        status: canonicalCard.status,
+        modelingStatus: canonicalCard.modelingStatus,
+        runtimeSupportStatus: canonicalCard.runtimeSupportStatus,
         sourceTextHash: canonicalCard.sourceTextHash,
         updatedAt: canonicalCard.updatedAt
       }

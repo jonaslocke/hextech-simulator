@@ -91,7 +91,8 @@ test("marks uploaded cards that already exist in the persisted catalog", async (
   });
   const persisted: PersistedCanonicalCardSummary = {
     cardCode: "OGN-206",
-    status: "approved",
+    modelingStatus: "approved",
+    runtimeSupportStatus: "requires_engine_support",
     sourceTextHash: hashCardRulesText(card),
     updatedAt: "2026-06-19T00:00:00.000Z"
   };
@@ -106,7 +107,10 @@ test("marks uploaded cards that already exist in the persisted catalog", async (
   assert.equal(preview.summary.alreadyPersistedCardCount, 1);
   assert.equal(preview.summary.newCardCount, 0);
   assert.equal(preview.cards[0]?.existingCatalog.state, "already_persisted");
-  assert.equal(preview.cards[0]?.existingCatalog.persisted?.status, "approved");
+  assert.equal(
+    preview.cards[0]?.existingCatalog.persisted?.modelingStatus,
+    "approved"
+  );
 });
 
 test("marks persisted cards as changed when the source text hash differs", async () => {
@@ -126,7 +130,8 @@ test("marks persisted cards as changed when the source text hash differs", async
           "OGN-087",
           {
             cardCode: "OGN-087",
-            status: "approved",
+            modelingStatus: "approved",
+            runtimeSupportStatus: "supported",
             sourceTextHash: "different-hash",
             updatedAt: "2026-06-19T00:00:00.000Z"
           }

@@ -4,7 +4,8 @@ import {
   buildBehaviorDefinitionDocument,
   buildCurrentBehaviorCatalog,
   buildPrimitiveCatalog,
-  findBehaviorCatalogSyncIssues
+  findBehaviorCatalogSyncIssues,
+  findObsoleteBehaviorDefinitionIds
 } from "../src/server/card-catalog";
 
 test("builds stable reusable behavior definitions without card examples", () => {
@@ -54,5 +55,17 @@ test("reports missing and outdated behavior definitions", () => {
       `Outdated behavior definition: ${entries[0]!.id}`,
       `Missing behavior definition: ${entries[1]!.id}`
     ]
+  );
+});
+
+test("identifies obsolete behavior definitions during synchronization", () => {
+  const entries = buildPrimitiveCatalog().slice(0, 2);
+
+  assert.deepEqual(
+    findObsoleteBehaviorDefinitionIds(
+      [entries[0]!.id, entries[1]!.id, "keyword.obsolete"],
+      entries
+    ),
+    ["keyword.obsolete"]
   );
 });

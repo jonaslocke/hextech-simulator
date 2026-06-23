@@ -45,7 +45,7 @@ export async function syncBehaviorDefinitions(
   db: Db,
   entries?: PrimitiveCatalogEntry[],
   now = new Date().toISOString()
-): Promise<{ synchronizedCount: number }> {
+): Promise<{ synchronizedCount: number; removedCount: number }> {
   const definitions = entries ?? (await buildCurrentBehaviorCatalog());
   const collection = db.collection<BehaviorDefinitionMongoDocument>(
     BEHAVIORS_COLLECTION
@@ -65,7 +65,29 @@ export async function syncBehaviorDefinitions(
     );
   }
 
-  return { synchronizedCount: definitions.length };
+  const obsoleteIds = await collection
+    .find({ _id: { $nin: definitions.map((definition) => definition.id) } })
+    .project<{ _id: string }>({ _id: 1 })
+    .toArray();
+  const obsoleteDefinitionIds = findObsoleteBehaviorDefinitionIds(
+    obsoleteIds.map(({ _id }) => _id),
+    definitions
+  );
+  const removedCount = obsoleteDefinitionIds.length > 0
+    ? (await collection.deleteMany({ _id: { $in: obsoleteDefinitionIds } }))
+        .deletedCount
+    : 0;
+
+  return { synchronizedCount: definitions.length, removedCount };
+}
+
+export function findObsoleteBehaviorDefinitionIds(
+  storedIds: readonly string[],
+  expectedEntries: PrimitiveCatalogEntry[]
+): string[] {
+  const expectedIds = new Set(expectedEntries.map((entry) => entry.id));
+
+  return storedIds.filter((id) => !expectedIds.has(id));
 }
 
 export async function loadBehaviorDefinitions(

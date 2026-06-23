@@ -25,7 +25,8 @@ export type CardCatalogApprovalResponse =
       accepted: true;
       behavior: {
         cardCode: string;
-        status: PersistedCanonicalCardSummary["status"];
+        modelingStatus: PersistedCanonicalCardSummary["modelingStatus"];
+        runtimeSupportStatus: PersistedCanonicalCardSummary["runtimeSupportStatus"];
         sourceTextHash: string;
         updatedAt: string;
       };

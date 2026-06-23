@@ -56,7 +56,7 @@ type PreviewCard = Preview["cards"][number];
 type PrimitiveCatalogEntry = Preview["primitiveCatalog"][number];
 type EditableClause = CardCatalogApprovalRequest["clauses"][number];
 type EditableAssignment = EditableClause["assignments"][number];
-type ApprovalStatus = "approved" | "requires_engine_support" | "rejected";
+type ModelingStatus = "approved" | "rejected";
 
 const SUPPORT_STYLES: Record<string, string> = {
   supported: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
@@ -149,7 +149,7 @@ export function CardCatalogImportPreview() {
         cardCode: card.cardCode,
         card: card.card,
         sourceTextHash: card.sourceTextHash,
-        status: "approved",
+        modelingStatus: "approved",
         clauses: draft.clauses,
         adminNotes: draft.adminNotes
       });
@@ -276,10 +276,10 @@ export function CardCatalogImportPreview() {
                       updateClauseSourceText(draft, clauseId, sourceText)
                     )
                   }
-                  onChangeStatus={(status) =>
+                  onChangeModelingStatus={(modelingStatus) =>
                     updateDraft(reviewCard.cardCode, (draft) => ({
                       ...draft,
-                      status
+                      modelingStatus
                     }))
                   }
                   onClose={() => setReviewCardCode(null)}
@@ -307,16 +307,14 @@ export function CardCatalogImportPreview() {
 }
 
 type ReviewDraft = {
-  status: ApprovalStatus;
+  modelingStatus: ModelingStatus;
   adminNotes: string;
   clauses: EditableClause[];
 };
 
 function createReviewDraft(card: PreviewCard): ReviewDraft {
   return {
-    status: card.suggestion?.supportStatus === "requires_engine_support"
-      ? "requires_engine_support"
-      : "approved",
+    modelingStatus: isCardModelingComplete(card) ? "approved" : "rejected",
     adminNotes: "",
     clauses:
       card.suggestion?.clauses.map((clause) => ({
@@ -338,12 +336,7 @@ function createReviewDraft(card: PreviewCard): ReviewDraft {
 function markCardPersisted(
   preview: Preview,
   card: PreviewCard,
-  persisted: {
-    cardCode: string;
-    status: "approved";
-    sourceTextHash: string;
-    updatedAt: string;
-  }
+  persisted: NonNullable<PreviewCard["existingCatalog"]["persisted"]>
 ): Preview {
   const previousState = card.existingCatalog.state;
   const nextCards = preview.cards.map((candidate) =>
@@ -354,7 +347,8 @@ function markCardPersisted(
             state: "already_persisted" as const,
             persisted: {
               cardCode: persisted.cardCode,
-              status: persisted.status,
+              modelingStatus: persisted.modelingStatus,
+              runtimeSupportStatus: persisted.runtimeSupportStatus,
               sourceTextHash: persisted.sourceTextHash,
               updatedAt: persisted.updatedAt
             }
@@ -481,9 +475,9 @@ function CardTable({
                     className={EXISTING_STATE_STYLES[card.existingCatalog.state]}
                     value={formatStatus(card.existingCatalog.state)}
                   />
-                  {card.existingCatalog.persisted?.status && (
+                  {card.existingCatalog.persisted?.modelingStatus && (
                     <p className="mt-2 text-slate-500 text-xs">
-                      {formatStatus(card.existingCatalog.persisted.status)}
+                      {formatStatus(card.existingCatalog.persisted.modelingStatus)} modeling
                     </p>
                   )}
                 </td>
@@ -558,7 +552,7 @@ function ReviewPanel({
   onChangeAdminNotes,
   onChangeClauseSourceText,
   onChangeParameter,
-  onChangeStatus,
+  onChangeModelingStatus,
   onClose,
   onRemovePrimitive,
   onSave,
@@ -578,7 +572,7 @@ function ReviewPanel({
     parameterName: string,
     value: string
   ): void;
-  onChangeStatus(status: ApprovalStatus): void;
+  onChangeModelingStatus(status: ModelingStatus): void;
   onClose(): void;
   onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
   onSave(): void;
@@ -602,17 +596,22 @@ function ReviewPanel({
           </div>
         </div>
         <div className="flex flex-wrap gap-2 h-fit">
+          <Badge
+            className={SUPPORT_STYLES[readSupportStatus(card)]}
+            value={`runtime: ${formatStatus(readSupportStatus(card))}`}
+          />
           <select
             className="bg-slate-950 px-3 py-2 border border-white/15 rounded-md text-sm"
-            onChange={(event) => onChangeStatus(event.target.value as ApprovalStatus)}
-            value={draft.status}
+            onChange={(event) =>
+              onChangeModelingStatus(event.target.value as ModelingStatus)
+            }
+            value={draft.modelingStatus}
           >
             <option value="approved">approved</option>
-            <option value="requires_engine_support">requires engine support</option>
             <option value="rejected">rejected</option>
           </select>
           <Button
-            disabled={isSaving || draft.status !== "approved"}
+            disabled={isSaving || draft.modelingStatus !== "approved"}
             onClick={onSave}
             type="button"
           >
@@ -1182,6 +1181,22 @@ function Badge({ className, value }: { className?: string; value: string }) {
 
 function readSupportStatus(card: PreviewCard): string {
   return card.isVanilla ? "vanilla" : card.suggestion?.supportStatus ?? "unsupported";
+}
+
+function isCardModelingComplete(card: PreviewCard): boolean {
+  if (card.isVanilla) {
+    return true;
+  }
+
+  const suggestion = card.suggestion;
+
+  return Boolean(
+    suggestion &&
+      suggestion.unsupportedClauseCount === 0 &&
+      suggestion.missingRequiredParameterCount === 0 &&
+      suggestion.supportStatus !== "ambiguous" &&
+      suggestion.supportStatus !== "unsupported"
+  );
 }
 
 function formatStatus(status: string): string {

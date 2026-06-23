@@ -9,7 +9,9 @@ const client = await getMongoClient();
 
 try {
   const result = await syncBehaviorDefinitions(client.db(getMongoDatabaseName()));
-  console.log(`Synchronized ${result.synchronizedCount} behavior definitions.`);
+  console.log(
+    `Synchronized ${result.synchronizedCount} behavior definitions and removed ${result.removedCount} obsolete definitions.`
+  );
 } finally {
   await client.close();
 }

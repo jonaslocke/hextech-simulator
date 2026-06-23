@@ -20,7 +20,8 @@ test("builds an approved canonical card with a structured behavior model", () =>
 
   assert.equal(document.id, "OGN-095");
   assert.equal(document.card.name, "Stupefy");
-  assert.equal(document.status, "approved");
+  assert.equal(document.modelingStatus, "approved");
+  assert.equal(document.runtimeSupportStatus, "requires_engine_support");
   assert.equal(document.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
   assert.equal(
     document.behaviorModel.clauses[0]?.effects.find(
@@ -36,9 +37,44 @@ test("rejects non-approved canonical publication", () => {
   assert.throws(() =>
     canonicalCardPublicationInputSchema.parse({
       ...createPublicationInput(),
-      status: "requires_engine_support"
+      modelingStatus: "requires_engine_support"
     })
   );
+});
+
+test("publishes runtime-pending and vanilla behavior models", () => {
+  const runtimePending = buildCanonicalCardDocument(
+    createPublicationInput(),
+    buildPrimitiveCatalog(),
+    "a",
+    "b"
+  );
+  const vanillaCard = {
+    ...createCard(),
+    id: "TST-001/100",
+    name: "Vanilla Unit",
+    public_code: "TST-001/100",
+    text: { plain: "" }
+  };
+  const vanilla = buildCanonicalCardDocument(
+    {
+      cardCode: "TST-001",
+      card: vanillaCard,
+      sourceTextHash: hashCardRulesText(vanillaCard),
+      modelingStatus: "approved",
+      adminNotes: "Confirmed vanilla.",
+      clauses: []
+    },
+    buildPrimitiveCatalog(),
+    "a",
+    "b"
+  );
+
+  assert.equal(runtimePending.modelingStatus, "approved");
+  assert.equal(runtimePending.runtimeSupportStatus, "requires_engine_support");
+  assert.equal(vanilla.modelingStatus, "approved");
+  assert.equal(vanilla.runtimeSupportStatus, "supported");
+  assert.deepEqual(vanilla.behaviorModel, { playTimings: [], clauses: [] });
 });
 
 test("allows multiple canonical cards to reference one reusable behavior", () => {
@@ -116,7 +152,7 @@ function createPublicationInput(): CanonicalCardPublicationInput {
     cardCode: "OGN-095",
     card,
     sourceTextHash: hashCardRulesText(card),
-    status: "approved",
+    modelingStatus: "approved",
     adminNotes: "Validated from uploaded set.",
     clauses: [
       {

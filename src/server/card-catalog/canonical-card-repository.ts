@@ -5,7 +5,9 @@ import { loadBehaviorDefinitions } from "./behavior-definition-repository";
 import { deriveCardCodeFromCard } from "./identity";
 import { hashCardRulesText } from "./import-preview";
 import {
+  combineSupportStatuses,
   validatePrimitiveAssignmentParameters,
+  type EngineSupportStatus,
   type PrimitiveCatalogEntry
 } from "./primitive-catalog";
 
@@ -38,7 +40,7 @@ export const canonicalCardPublicationInputSchema = z.object({
   cardCode: z.string().min(1),
   card: cardSchema,
   sourceTextHash: z.string().min(1),
-  status: z.literal("approved"),
+  modelingStatus: z.literal("approved"),
   clauses: z.array(approvedBehaviorClauseSchema),
   adminNotes: z.string()
 });
@@ -80,7 +82,8 @@ export type CanonicalCardDocument = {
   cardCode: string;
   card: Card;
   sourceTextHash: string;
-  status: "approved";
+  modelingStatus: "approved";
+  runtimeSupportStatus: EngineSupportStatus;
   behaviorModel: CanonicalBehaviorModel;
   approval: { adminNotes: string; approvedAt: string };
   createdAt: string;
@@ -134,6 +137,7 @@ export function buildCanonicalCardDocument(
 
   const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
   const playTimings: CanonicalBehaviorBinding[] = [];
+  const runtimeSupportStatuses: EngineSupportStatus[] = [];
   const clauses = parsed.clauses.map((clause, sequence) => {
     if (clause.unsupportedReason !== null) {
       throw new Error(
@@ -188,6 +192,7 @@ export function buildCanonicalCardDocument(
         confidence: assignment.confidence,
         order
       } satisfies CanonicalBehaviorBinding;
+      runtimeSupportStatuses.push(behavior.engineSupport.status);
 
       if (
         card.classification.type === "Spell" &&
@@ -209,7 +214,8 @@ export function buildCanonicalCardDocument(
     cardCode: parsed.cardCode,
     card,
     sourceTextHash: parsed.sourceTextHash,
-    status: "approved",
+    modelingStatus: "approved",
+    runtimeSupportStatus: combineSupportStatuses(runtimeSupportStatuses),
     behaviorModel: { playTimings, clauses },
     approval: { adminNotes: parsed.adminNotes, approvedAt: updatedAt },
     createdAt,
@@ -282,7 +288,8 @@ export function normalizeCanonicalCard(card: Card): Card {
 
 export type PersistedCanonicalCardSummary = {
   cardCode: string;
-  status: "approved";
+  modelingStatus: "approved";
+  runtimeSupportStatus: EngineSupportStatus;
   sourceTextHash: string;
   updatedAt: string;
 };
@@ -298,7 +305,8 @@ export function createMongoCanonicalCardLookup(db: Db): ExistingCanonicalCardLoo
       .find({ _id: { $in: uniqueCardCodes } }).toArray();
     return new Map(documents.map((document) => [document.cardCode, {
       cardCode: document.cardCode,
-      status: "approved" as const,
+      modelingStatus: "approved" as const,
+      runtimeSupportStatus: document.runtimeSupportStatus,
       sourceTextHash: document.sourceTextHash,
       updatedAt: document.updatedAt
     }]));
