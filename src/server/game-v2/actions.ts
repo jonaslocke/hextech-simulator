@@ -141,7 +141,7 @@ function playCard(game: GameDocumentV2, playerId: string, cardId: string, select
   const player = game.state.players[playerId]!;
   const definition = definitionForInstanceV2(cardId, index);
   const effectiveEnergyCost = effectiveEnergyCostV2(game, playerId, definition);
-  pay(player, definition, effectiveEnergyCost);
+  pay(game, playerId, definition, effectiveEnergyCost, index);
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   if (definition.card.classification.type === "Unit") {
@@ -226,32 +226,67 @@ function action(game: GameDocumentV2, kind: string, label: string, source: strin
   if (extra !== undefined) parts.push(encodeURIComponent(extra));
   return { id: parts.join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets };
 }
-function canPay(player: GameDocumentV2["state"]["players"][string], definition: GameCardDefinition, energy: number) {
-  const power = definition.card.attributes.power ?? 0;
-  const availableEnergy = player.energy + (definition.card.classification.type === "Spell" ? player.conditionalEnergy : 0);
-  return availableEnergy >= energy && Object.values(player.power).reduce((sum, value) => sum + value, 0) >= power;
+type PaymentPlanV2 = {
+  conditionalEnergy: number;
+  pooledEnergy: number;
+  energyRuneIds: string[];
+  powerFromPool: Record<string, number>;
+  powerRuneIds: string[];
+};
+
+function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndexV2): PaymentPlanV2 | null {
+  const player = game.state.players[playerId]!;
+  let remainingEnergy = energyCost;
+  const conditionalEnergy = definition.card.classification.type === "Spell" ? Math.min(player.conditionalEnergy, remainingEnergy) : 0;
+  remainingEnergy -= conditionalEnergy;
+  const pooledEnergy = Math.min(player.energy, remainingEnergy);
+  remainingEnergy -= pooledEnergy;
+  const energyRuneIds: string[] = [];
+  for (const id of player.zones.base) {
+    if (remainingEnergy === 0) break;
+    if (game.state.cardStates[id]?.exhausted || !hasAbility(id, "ability.exhaust_for_resource", index)) continue;
+    energyRuneIds.push(id);
+    remainingEnergy -= 1;
+  }
+  if (remainingEnergy > 0) return null;
+
+  let remainingPower = definition.card.attributes.power ?? 0;
+  const allowedDomains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
+  if (remainingPower > 0 && allowedDomains.length === 0) return null;
+  const powerFromPool: Record<string, number> = {};
+  for (const domain of [...allowedDomains, "Rainbow"]) {
+    const spend = Math.min(player.power[domain] ?? 0, remainingPower);
+    if (spend > 0) powerFromPool[domain] = spend;
+    remainingPower -= spend;
+  }
+  const powerRuneIds: string[] = [];
+  for (const id of player.zones.base) {
+    if (remainingPower === 0) break;
+    if (energyRuneIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
+    const runeDomain = definitionForInstanceV2(id, index).card.classification.domain[0];
+    if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
+    powerRuneIds.push(id);
+    remainingPower -= 1;
+  }
+  return remainingPower === 0 ? { conditionalEnergy, pooledEnergy, energyRuneIds, powerFromPool, powerRuneIds } : null;
 }
-function pay(player: GameDocumentV2["state"]["players"][string], definition: GameCardDefinition, energy: number) {
-  const power = definition.card.attributes.power ?? 0;
-  if (!canPay(player, definition, energy)) throw new Error("Card costs cannot be paid.");
-  if (definition.card.classification.type === "Spell") {
-    const conditional = Math.min(player.conditionalEnergy, energy);
-    player.conditionalEnergy -= conditional;
-    energy -= conditional;
+
+function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndexV2) {
+  const plan = buildPaymentPlanV2(game, playerId, definition, energyCost, index);
+  if (!plan) throw new Error("Card costs cannot be paid.");
+  const player = game.state.players[playerId]!;
+  player.conditionalEnergy -= plan.conditionalEnergy;
+  player.energy -= plan.pooledEnergy;
+  plan.energyRuneIds.forEach((id) => { game.state.cardStates[id]!.exhausted = true; });
+  for (const [domain, amount] of Object.entries(plan.powerFromPool)) player.power[domain] = (player.power[domain] ?? 0) - amount;
+  for (const id of plan.powerRuneIds) {
+    player.zones.base = player.zones.base.filter((candidate) => candidate !== id);
+    player.zones.runeDeck.push(id);
   }
-  player.energy -= energy;
-  let remaining = power;
-  for (const domain of definition.card.classification.domain) {
-    const spend = Math.min(player.power[domain] ?? 0, remaining);
-    player.power[domain] = (player.power[domain] ?? 0) - spend;
-    remaining -= spend;
-  }
-  for (const domain of Object.keys(player.power)) {
-    if (!remaining) break;
-    const spend = Math.min(player.power[domain] ?? 0, remaining);
-    player.power[domain] = (player.power[domain] ?? 0) - spend;
-    remaining -= spend;
-  }
+}
+
+function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndexV2) {
+  return definitionForInstanceV2(id, index).behaviorModel.clauses.some((clause) => clause.abilities.some((ability) => ability.behaviorId === behaviorId));
 }
 function addPlayableCardActions(
   actions: ProjectedAction[], game: GameDocumentV2, playerId: string,
@@ -268,7 +303,7 @@ function addPlayableCardActions(
     if (reactionOnly && !timings.includes("timing.reaction")) continue;
     if (!reactionOnly && game.state.chain && !timings.includes("timing.reaction")) continue;
     const cost = effectiveEnergyCostV2(game, playerId, definition);
-    if (!canPay(player, definition, cost)) continue;
+    if (!buildPaymentPlanV2(game, playerId, definition, cost, index)) continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     const targets = compiled.clauses
       .filter((clause) => clause.triggers.length === 0)
