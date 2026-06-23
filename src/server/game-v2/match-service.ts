@@ -3,6 +3,7 @@ import type { GameProjectionV2 } from "../../shared/game-v2";
 import { loadInitialDeckSnapshot } from "./catalog";
 import type { DeckSnapshotDocumentV2, GameV2Repositories } from "./repositories";
 import { performSetupActionV2 } from "./setup";
+import { performGameplayActionV2 } from "./actions";
 import { projectGameV2 } from "./projection";
 import {
   createInitialGameV2, createMatchIdV2, createPlayerTokenV2,
@@ -53,8 +54,10 @@ export async function performMatchActionV2(repositories: GameV2Repositories, inp
   const { match, game, seat, decks } = await loadContext(repositories, input.matchId, input.playerToken);
   if (game.stateVersion !== input.stateVersion) throw new Error("Game state version is stale.");
   const deckRuntime = Object.fromEntries(decks.map((deck) => [deck.playerId, { template: deck.snapshot, instances: deck.instances }]));
-  const next = performSetupActionV2({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now: input.now ?? new Date().toISOString() });
   const now = input.now ?? new Date().toISOString();
+  const next = game.status === "setup_pending"
+    ? performSetupActionV2({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now })
+    : performGameplayActionV2({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decks, now });
   const nextMatch = next.status === "in_progress"
     ? { ...match, status: "in_progress" as const, updatedAt: now }
     : match;

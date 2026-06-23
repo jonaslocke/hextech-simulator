@@ -1,6 +1,7 @@
 import { gameProjectionV2Schema, type GameProjectionV2, type ProjectedCardView, type ProjectedZoneV2 } from "../../shared/game-v2";
 import type { DeckSnapshotDocumentV2, GameEventDocumentV2 } from "./repositories";
 import { setupActionsV2 } from "./setup";
+import { gameplayActionsV2 } from "./actions";
 import type { GameDocumentV2 } from "./state";
 
 export function projectGameV2(input: {
@@ -41,9 +42,10 @@ export function projectGameV2(input: {
     battlefields: input.game.state.battlefields.map((battlefield) => ({
       battlefieldId: battlefield.battlefieldId, card: view(battlefield.cardInstanceId), units: battlefield.units.map(view)
     })),
-    chain: input.game.state.chain,
-    actions: setupActionsV2(input.game, input.viewerPlayerId),
+    chain: input.game.state.chain?.items ?? [],
+    actions: input.game.status === "setup_pending"
+      ? setupActionsV2(input.game, input.viewerPlayerId)
+      : gameplayActionsV2(input.game, input.viewerPlayerId, input.decks),
     logEntries: (input.events ?? []).map((event) => ({ id: event.id, message: event.message, createdAt: event.createdAt }))
   });
 }
-

@@ -67,10 +67,19 @@ export const gameStateV2Schema = z.object({
   battlefields: z.array(battlefieldStateV2Schema),
   cardStates: z.record(cardStateV2Schema),
   turn: turnStateV2Schema.nullable(),
-  chain: z.array(z.object({
-    id: z.string(), label: z.string(), controllerPlayerId: z.string(),
-    sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string())
-  }))
+  chain: z.object({
+    items: z.array(z.object({
+      id: z.string(), label: z.string(), controllerPlayerId: z.string(),
+      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string())
+    })),
+    priorityPlayerId: z.string().min(1),
+    passedPlayerIds: z.array(z.string().min(1))
+  }).nullable(),
+  showdown: z.object({
+    battlefieldId: z.string().min(1),
+    priorityPlayerId: z.string().min(1),
+    passedPlayerIds: z.array(z.string().min(1))
+  }).nullable()
 });
 
 export const gameDocumentV2Schema = z.object({
@@ -164,7 +173,7 @@ export function createInitialGameV2(input: {
         battlefieldChoices: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", cardInstanceId: null }])),
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
-      players, battlefields: [], cardStates, turn: null, chain: []
+      players, battlefields: [], cardStates, turn: null, chain: null, showdown: null
     }
   });
 }
@@ -180,4 +189,3 @@ function cardByCode(deck: DeckRuntimeSnapshotV2, code: string): GameCardDefiniti
 function sectionSource(section: DeckSnapshotV2["entries"][number]["section"]): CardInstanceV2["source"] {
   return ({ Legend: "legend", Champion: "champion", Runes: "runeDeck", Battlefields: "battlefield", MainDeck: "mainDeck", Sideboard: "sideboard" } as const)[section];
 }
-

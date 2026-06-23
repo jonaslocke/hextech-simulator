@@ -6,3 +6,4 @@ export * from "./state";
 export * from "./setup";
 export * from "./projection";
 export * from "./match-service";
+export * from "./actions";
