@@ -132,7 +132,7 @@ function playCard(game: GameDocumentV2, playerId: string, cardId: string, index:
     return;
   }
   game.state.chain = {
-    items: [{ id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: [] }],
+    items: [{ id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: [], behaviorClauseId: null }],
     priorityPlayerId: otherPlayer(game, playerId),
     passedPlayerIds: []
   };

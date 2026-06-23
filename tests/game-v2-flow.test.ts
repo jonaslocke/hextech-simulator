@@ -63,7 +63,8 @@ function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
       players: { p1: { playerId: "p1", energy: 0, power: {}, zones: zones(["p1:rune", "p1:mover"], ["p1:draw"], ["p1:unit", "p1:spell"]) }, p2: { playerId: "p2", energy: 0, power: {}, zones: zones([], [], []) } },
       battlefields: [{ battlefieldId: "p1:bf", cardInstanceId: "p1:bf", selectedByPlayerId: "p1", units: [] }],
       cardStates: { "p1:rune": { exhausted: false, damage: 0, computedMight: null }, "p1:unit": { exhausted: false, damage: 0, computedMight: 1 }, "p1:mover": { exhausted: false, damage: 0, computedMight: 1 }, "p1:spell": { exhausted: false, damage: 0, computedMight: null }, "p1:draw": { exhausted: false, damage: 0, computedMight: 1 }, "p1:bf": { exhausted: false, damage: 0, computedMight: null } },
-      turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null
+      turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null,
+      modifiers: [], delayedEffects: [], pendingChoice: null
     }
   };
   return { game, decks };

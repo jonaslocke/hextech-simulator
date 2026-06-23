@@ -70,7 +70,8 @@ export const gameStateV2Schema = z.object({
   chain: z.object({
     items: z.array(z.object({
       id: z.string(), label: z.string(), controllerPlayerId: z.string(),
-      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string())
+      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
+      behaviorClauseId: z.string().nullable().default(null)
     })),
     priorityPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
@@ -79,6 +80,26 @@ export const gameStateV2Schema = z.object({
     battlefieldId: z.string().min(1),
     priorityPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
+  }).nullable(),
+  modifiers: z.array(z.object({
+    id: z.string().min(1), sourceCardInstanceId: z.string().nullable(),
+    targetCardInstanceId: z.string().nullable(), attribute: z.string().min(1),
+    operation: z.enum(["increase", "reduce", "multiply", "set"]),
+    amount: z.number(), minimum: z.number().nullable(), duration: z.string().min(1),
+    createdAtTurn: z.number().int().nonnegative()
+  })),
+  delayedEffects: z.array(z.object({
+    id: z.string().min(1), point: z.string().min(1), controllerPlayerId: z.string().min(1),
+    sourceCardInstanceId: z.string().min(1), clauseId: z.string().min(1),
+    selectedIds: z.array(z.string())
+  })),
+  pendingChoice: z.object({
+    id: z.string().min(1), playerId: z.string().min(1), type: z.literal("orderTriggers"),
+    optionIds: z.array(z.string().min(1)), pendingItems: z.array(z.object({
+      id: z.string(), label: z.string(), controllerPlayerId: z.string(),
+      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
+      behaviorClauseId: z.string().nullable().default(null)
+    }))
   }).nullable()
 });
 
@@ -173,7 +194,8 @@ export function createInitialGameV2(input: {
         battlefieldChoices: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", cardInstanceId: null }])),
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
-      players, battlefields: [], cardStates, turn: null, chain: null, showdown: null
+      players, battlefields: [], cardStates, turn: null, chain: null, showdown: null,
+      modifiers: [], delayedEffects: [], pendingChoice: null
     }
   });
 }
