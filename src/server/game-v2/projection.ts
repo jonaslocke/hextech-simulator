@@ -32,7 +32,7 @@ export function projectGameV2(input: {
       const visibility = kind === "hand" ? (isViewer ? "private" : "secret") : (["mainDeck", "runeDeck"].includes(kind) ? "secret" : "public");
       return { kind, visibility, count: ids.length, cards: visibility === "secret" ? [] : ids.map(view) };
     });
-    return { playerId, isViewer, energy: player.energy, power: player.power, zones };
+    return { playerId, isViewer, energy: player.energy, conditionalEnergy: player.conditionalEnergy, power: player.power, zones };
   });
   return gameProjectionV2Schema.parse({
     id: input.game.id, matchId: input.game.matchId, stateVersion: input.game.stateVersion,

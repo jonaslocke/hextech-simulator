@@ -60,7 +60,7 @@ function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
     status: "in_progress", winnerPlayerId: null,
     state: {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
-      players: { p1: { playerId: "p1", energy: 0, power: {}, zones: zones(["p1:rune", "p1:mover"], ["p1:draw"], ["p1:unit", "p1:spell"]) }, p2: { playerId: "p2", energy: 0, power: {}, zones: zones([], [], []) } },
+      players: { p1: { playerId: "p1", energy: 0, conditionalEnergy: 0, power: {}, zones: zones(["p1:rune", "p1:mover"], ["p1:draw"], ["p1:unit", "p1:spell"]) }, p2: { playerId: "p2", energy: 0, conditionalEnergy: 0, power: {}, zones: zones([], [], []) } },
       battlefields: [{ battlefieldId: "p1:bf", cardInstanceId: "p1:bf", selectedByPlayerId: "p1", units: [] }],
       cardStates: { "p1:rune": { exhausted: false, damage: 0, computedMight: null }, "p1:unit": { exhausted: false, damage: 0, computedMight: 1 }, "p1:mover": { exhausted: false, damage: 0, computedMight: 1 }, "p1:spell": { exhausted: false, damage: 0, computedMight: null }, "p1:draw": { exhausted: false, damage: 0, computedMight: 1 }, "p1:bf": { exhausted: false, damage: 0, computedMight: null } },
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null,
@@ -71,5 +71,10 @@ function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
 }
 
 function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Battlefield", energy: number, might: number) {
-  return { cardCode: code, sourceTextHash: "h", behaviorModel: { playTimings: [], clauses: [] }, card: { id: code, name, public_code: `${code}/1`, attributes: { energy, might, power: 0 }, classification: { type, supertype: type === "Rune" ? "Basic" as const : null, domain: ["Mind"] }, text: { plain: "" }, set: { set_id: "T", label: "Test" }, media: {}, tags: [], metadata: {} } };
+  const runeClauses = type === "Rune" ? [{
+    id: "energy", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [{ behaviorId: "ability.exhaust_for_resource", parameters: { resourceType: "energy", amountSource: "constant", amount: 1, usage: "unrestricted" }, confidence: "high" as const, order: 0 }],
+    triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: []
+  }] : [];
+  return { cardCode: code, sourceTextHash: "h", behaviorModel: { playTimings: [], clauses: runeClauses }, card: { id: code, name, public_code: `${code}/1`, attributes: { energy, might, power: 0 }, classification: { type, supertype: type === "Rune" ? "Basic" as const : null, domain: ["Mind"] }, text: { plain: "" }, set: { set_id: "T", label: "Test" }, media: {}, tags: [], metadata: {} } };
 }

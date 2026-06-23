@@ -23,6 +23,7 @@ export const playerZonesV2Schema = z.object({
 export const playerStateV2Schema = z.object({
   playerId: z.string().min(1),
   energy: z.number().int().nonnegative(),
+  conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
   zones: playerZonesV2Schema
 });
@@ -170,7 +171,7 @@ export function createInitialGameV2(input: {
   const players = Object.fromEntries(input.playerIds.map((playerId, index) => {
     const deck = input.decks[index]!;
     return [playerId, {
-      playerId, energy: 0, power: {},
+      playerId, energy: 0, conditionalEnergy: 0, power: {},
       zones: {
         legend: null, champion: null,
         mainDeck: idsBySource(deck, "mainDeck"), runeDeck: idsBySource(deck, "runeDeck"),

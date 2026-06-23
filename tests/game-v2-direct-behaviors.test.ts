@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { test } from "node:test";
+import {
+  analyzeCardBehaviorSuggestions, buildBehaviorDefinitionDocument,
+  buildCanonicalCardDocument, buildCurrentBehaviorCatalog, hashCardRulesText
+} from "../src/server/card-catalog";
+import { loadCardCatalog } from "../src/server/catalog";
+import { parseDeckList } from "../src/server/deck";
+import {
+  buildDeckSnapshotV2, createInitialGameV2, createRuntimeDeckSnapshot,
+  gameplayActionsV2, performGameplayActionV2,
+  type DeckSnapshotDocumentV2
+} from "../src/server/game-v2";
+
+test("executes projected rune abilities and ordered targeted spell effects from canonical models", async () => {
+  const template = await fixtureSnapshot();
+  const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
+  const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
+    id: `d${index}`, createdAt: "a", updatedAt: "a", matchId: "m",
+    playerId: index ? "p2" : "p1", snapshot: deck.template, instances: deck.instances
+  }));
+  let game = createInitialGameV2({ matchId: "m", gameId: "g", now: "2026-01-01T00:00:00.000Z", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
+  game.status = "in_progress";
+  game.state.setup.startingPlayerId = "p1";
+  game.state.turn = { turnNumber: 1, activePlayerId: "p1", phase: "action" };
+  game.state.players.p1!.energy = 20;
+  game.state.players.p1!.power = { Mind: 20, Order: 20 };
+
+  const rune = instanceNamed(decks, "p1", "Mind Rune");
+  const stupefy = instanceNamed(decks, "p1", "Stupefy");
+  const friendlyOne = instanceNamed(decks, "p1", "Vanguard Sergeant");
+  const friendlyTwo = instanceNamed(decks, "p1", "Daring Poro");
+  const enemy = instanceNamed(decks, "p2", "Vanguard Sergeant");
+  relocate(game, rune, "base");
+  relocate(game, stupefy, "hand");
+  relocateToBattlefield(game, friendlyOne, "p1");
+  relocateToBattlefield(game, friendlyTwo, "p1");
+  relocateToBattlefield(game, enemy, "p2");
+
+  const energyAction = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
+  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: energyAction.id, selectedIds: [], decks, now: "b" });
+  assert.equal(game.state.players.p1!.energy, 21);
+  assert.equal(game.state.cardStates[rune]!.exhausted, true);
+
+  const handBefore = game.state.players.p1!.zones.hand.length;
+  const enemyMightBefore = game.state.cardStates[enemy]!.computedMight!;
+  const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
+  assert.deepEqual(play.targets[0], { kind: "card", legalIds: [friendlyOne, friendlyTwo, enemy], minimum: 1, maximum: 1 });
+  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "c" });
+  for (const playerId of ["p2", "p1"]) {
+    const pass = gameplayActionsV2(game, playerId, decks).find((action) => action.label === "Pass priority")!;
+    game = performGameplayActionV2({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "d" });
+  }
+  assert.equal(game.state.cardStates[enemy]!.computedMight, enemyMightBefore - 1);
+  assert.ok(game.state.players.p1!.zones.trash.includes(stupefy));
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore);
+});
+
+function instanceNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+  const deck = decks.find((item) => item.playerId === playerId)!;
+  const code = deck.snapshot.cards.find((item) => item.card.name === name)!.cardCode;
+  return deck.instances.find((item) => item.cardCode === code)!.instanceId;
+}
+function relocate(game: ReturnType<typeof createInitialGameV2>, id: string, zone: "base" | "hand") {
+  const player = Object.values(game.state.players).find((item) => Object.values(item.zones).some((value) => Array.isArray(value) ? value.includes(id) : value === id))!;
+  for (const [key, value] of Object.entries(player.zones)) {
+    if (Array.isArray(value)) (player.zones as unknown as Record<string, string[]>)[key] = value.filter((item) => item !== id);
+  }
+  player.zones[zone].push(id);
+}
+function relocateToBattlefield(game: ReturnType<typeof createInitialGameV2>, id: string, owner: string) {
+  relocate(game, id, "base");
+  let battlefield = game.state.battlefields.find((item) => item.selectedByPlayerId === owner);
+  if (!battlefield) {
+    const battlefieldCard = Object.values(game.state.setup.battlefieldPools)[0]?.[0] ?? `bf:${owner}`;
+    battlefield = { battlefieldId: battlefieldCard, cardInstanceId: battlefieldCard, selectedByPlayerId: owner, units: [] };
+    game.state.battlefields.push(battlefield);
+  }
+  game.state.players[owner]!.zones.base = game.state.players[owner]!.zones.base.filter((item) => item !== id);
+  battlefield.units.push(id);
+}
+
+async function fixtureSnapshot() {
+  const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
+  const catalog = await loadCardCatalog();
+  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => entry.name))].map((name) => catalog.byName.get(name)!);
+  const primitives = await buildCurrentBehaviorCatalog();
+  const report = analyzeCardBehaviorSuggestions(cards, [], primitives);
+  const documents = cards.map((card) => {
+    const cardCode = card.public_code.split("/")[0]!;
+    const suggestion = report.cards.find((item) => item.cardCode === cardCode)!;
+    return buildCanonicalCardDocument({ cardCode, card, sourceTextHash: hashCardRulesText(card), modelingStatus: "approved", adminNotes: "", clauses: suggestion.clauses.map((clause) => ({ id: clause.id, sourceText: clause.sourceText, normalizedText: clause.normalizedText, unsupportedReason: clause.unsupportedReason, assignments: clause.assignments.map((item) => item.assignment) })) }, primitives, "a", "b");
+  });
+  return buildDeckSnapshotV2(sourceText, documents, primitives.map((entry) => buildBehaviorDefinitionDocument(entry, "a")));
+}

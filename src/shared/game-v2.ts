@@ -72,6 +72,7 @@ export const projectedPlayerV2Schema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
   energy: z.number().int().nonnegative(),
+  conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
   zones: z.array(projectedZoneV2Schema)
 });
