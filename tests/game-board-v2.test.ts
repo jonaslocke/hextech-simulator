@@ -28,6 +28,36 @@ test("game board v2 contains no initial-deck or behavior identities", async () =
   assert.deepEqual(forbidden.filter((value) => source.includes(value)), []);
 });
 
+test("game board v2 preserves the legacy presentation component structure", async () => {
+  const legacyRoot = path.join(process.cwd(), "src", "features", "game-board", "components");
+  const v2Root = path.join(process.cwd(), "src", "features", "game-board-v2", "components");
+  const copiedComponents = [
+    "action-button.tsx", "action-rail.tsx", "battlefield-board.tsx", "board-slot.tsx",
+    "card-tile.tsx", "card-zone-transfer-overlay.tsx", "empty-state.tsx", "player-board.tsx",
+    "player-hand-fan.tsx", "score-header.tsx", "score-track.tsx", "temporary-zone-overlay.tsx",
+    "zone-area.tsx"
+  ];
+  for (const file of copiedComponents) {
+    const legacy = await readFile(path.join(legacyRoot, file), "utf8");
+    const v2 = await readFile(path.join(v2Root, file), "utf8");
+    const legacyMarkup = normalizeLineEndings(legacy.slice(legacy.indexOf("export "))).trimEnd();
+    const v2Markup = normalizeLineEndings(v2.slice(v2.indexOf("export "))).trimEnd();
+    if (file === "temporary-zone-overlay.tsx") {
+      assert.equal(normalizeLogType(v2Markup), normalizeLogType(legacyMarkup), file);
+    } else {
+      assert.equal(v2Markup, legacyMarkup, file);
+    }
+  }
+});
+
+function normalizeLogType(value: string) {
+  return value.replaceAll("GameLogEntryV2", "GameLogEntry");
+}
+
+function normalizeLineEndings(value: string) {
+  return value.replaceAll("\r\n", "\n");
+}
+
 async function collect(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files: string[] = [];
