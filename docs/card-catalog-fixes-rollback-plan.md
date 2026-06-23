@@ -19,6 +19,97 @@
 | Behavior catalog | `887c09e` | Adds reusable behavior persistence and synchronization. |
 | Canonical cards | `9b617f4` | Publishes approved canonical cards with reusable behavior bindings. |
 
+## Lux MVP Behavior Catalog
+
+### Milestone Commits
+
+| Milestone | Commit | Scope |
+| --- | --- | --- |
+| Structured behavior clauses | `9041b99` | Replaces flat canonical bindings with play timings and ordered, categorized clauses. |
+| Lux behavior definitions | `4c927ce` | Completes behavior discovery and definitions for the 21-card Lux MVP catalog. |
+| Runtime-pending publication | `27f9103` | Separates modeling approval from runtime support and adds canonical reset operations. |
+| Lux deck acceptance | `572d5fd` | Validates exact behavior models and canonical publication for every unique Lux MVP card. |
+
+These commits model and publish card behavior only. They do not wire canonical
+behaviors into the game engine, match runtime, or game board.
+
+### Rollout
+
+Back up both affected collections before deploying. Use a unique backup directory
+for each rollout and stop if either command fails:
+
+```powershell
+$dbName = if ($env:MONGODB_DB_NAME) { $env:MONGODB_DB_NAME } else { "hextech_simulator" }
+$backupPath = "backups/lux-mvp-behaviors-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+mongodump --uri=$env:MONGODB_URI --db=$dbName --collection=behaviors --out=$backupPath
+if ($LASTEXITCODE -ne 0) { throw "Behavior backup failed." }
+mongodump --uri=$env:MONGODB_URI --db=$dbName --collection=canonicalCards --out=$backupPath
+if ($LASTEXITCODE -ne 0) { throw "Canonical-card backup failed." }
+```
+
+Then deploy the structured behavior code and run these operations in order:
+
+```powershell
+npm run catalog:reset-canonical-cards
+npm run catalog:sync-behaviors
+```
+
+Both commands are destructive database operations and require the explicit
+confirmation flag embedded in their npm scripts. Do not run them as part of an
+application startup or automated deployment hook.
+
+After synchronization:
+
+1. Open `/admin/card-catalog`.
+2. Upload or resynchronize the set data containing every card referenced by
+   `data/decks/lux.dec.txt`.
+3. Confirm that the report contains 21 unique cards, with no incomplete,
+   ambiguous, unsupported, missing, or invalid behavior bindings.
+4. Review each card's clauses, parameters, modeling approval, and separate
+   runtime-support status.
+5. Publish all 21 cards. Runtime-pending status is expected for some cards and
+   must not disable publication when modeling is complete.
+6. Confirm `Vanguard Sergeant` (`OGN-219`) and `Mega-Mech` (`OGN-088`) publish
+   with zero clauses.
+
+No database reset, synchronization, upload, or publication was executed while
+implementing these milestones.
+
+### Rollback
+
+Retain a backup of any canonical cards published after rollout, then revert the
+Lux commits newest-first:
+
+```powershell
+git revert --no-commit 572d5fd 27f9103 4c927ce 9041b99
+git commit -m "Rollback Lux MVP behavior catalog"
+```
+
+Restore both pre-rollout collections from the same backup directory:
+
+```powershell
+$dbName = if ($env:MONGODB_DB_NAME) { $env:MONGODB_DB_NAME } else { "hextech_simulator" }
+$backupPath = "backups/lux-mvp-behaviors-YYYYMMDD-HHMMSS"
+mongorestore --uri=$env:MONGODB_URI --db=$dbName --drop "$backupPath/$dbName/behaviors.bson"
+if ($LASTEXITCODE -ne 0) { throw "Behavior restore failed." }
+mongorestore --uri=$env:MONGODB_URI --db=$dbName --drop "$backupPath/$dbName/canonicalCards.bson"
+if ($LASTEXITCODE -ne 0) { throw "Canonical-card restore failed." }
+```
+
+Run the behavior synchronization command from the reverted revision only when
+the restored `behaviors` collection does not match that revision's code-authored
+contract. Do not synchronize before restoring, because synchronization removes
+definitions that are not in the active code set.
+
+Finally, rerun the full verification suite:
+
+```powershell
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
 These milestones change only the card-catalog pipeline and admin workflow. They do
 not integrate database behaviors or canonical cards into the game engine.
 
