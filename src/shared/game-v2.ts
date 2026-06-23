@@ -127,6 +127,7 @@ export const gameProjectionV2Schema = z.object({
     mulligans: z.record(z.object({
       status: z.enum(["unlocked", "locked"])
     })),
+    battlefieldPool: z.array(projectedCardViewSchema),
     waitingReason: z.string().min(1).nullable()
   }),
   turn: z.object({

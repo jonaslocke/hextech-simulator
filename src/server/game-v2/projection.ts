@@ -53,6 +53,7 @@ export function projectGameV2(input: {
       mulligans: Object.fromEntries(input.game.state.setup.playerIds.map((playerId) => [playerId, {
         status: input.game.state.setup.mulligans[playerId]?.status ?? "unlocked"
       }])),
+      battlefieldPool: (input.game.state.setup.battlefieldPools[input.viewerPlayerId] ?? []).map(view),
       waitingReason: waitingReason(input.game, input.viewerPlayerId)
     },
     turn: input.game.state.turn ? { ...input.game.state.turn, passedPlayerIds: [] } : null,
