@@ -52,7 +52,7 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   p1Runes.forEach((id) => relocate(game, "p1", id, "base"));
   relocate(game, "p1", stupefy, "hand");
   relocate(game, "p1", mover, "base");
-  relocateToBattlefield(game, "p1", ravenbloom);
+  relocate(game, "p1", ravenbloom, "base");
   relocateToBattlefield(game, "p2", enemy);
 
   const readyRunesBefore = p1Runes.filter((id) => !game.state.cardStates[id]!.exhausted).length;

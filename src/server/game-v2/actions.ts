@@ -1,4 +1,5 @@
 import type { ProjectedAction } from "../../shared/game-v2";
+import { createHash } from "node:crypto";
 import {
   compileBehaviorModelV2,
   createBehaviorContext,
@@ -54,8 +55,6 @@ export function gameplayActionsV2(
   }
   if (!hasPriority) return actions;
 
-  actions.push(action(game, "draw", "Draw a card", null));
-  actions.push(action(game, "channel", "Channel a rune", null));
   actions.push(action(game, "endTurn", "End turn", null));
 
   addPlayableCardActions(actions, game, actorPlayerId, decks, index, false);
@@ -64,7 +63,7 @@ export function gameplayActionsV2(
     const definition = definitionForInstanceV2(cardId, index);
     const state = game.state.cardStates[cardId]!;
     if (definition.card.classification.type === "Unit" && !state.exhausted) {
-      for (const battlefield of game.state.battlefields) {
+      for (const battlefield of game.state.battlefields.filter((candidate) => candidate.units.length === 0)) {
         actions.push(action(game, "move", `Move to ${definitionForInstanceV2(battlefield.cardInstanceId, index).card.name}`, cardId, true, null, battlefield.battlefieldId));
       }
     }
@@ -89,12 +88,6 @@ export function performGameplayActionV2(input: {
   const player = game.state.players[input.actorPlayerId]!;
 
   switch (kind) {
-    case "draw":
-      draw(player.zones.mainDeck, player.zones.hand, 1);
-      break;
-    case "channel":
-      draw(player.zones.runeDeck, player.zones.base, 1);
-      break;
     case "play":
       playCard(game, input.actorPlayerId, source, input.selectedIds, index, handlers, input.decks);
       break;
@@ -118,6 +111,7 @@ export function performGameplayActionV2(input: {
       player.zones.base = player.zones.base.filter((id) => id !== cardId);
       const battlefield = game.state.battlefields.find((item) => item.battlefieldId === battlefieldId);
       if (!battlefield) throw new Error("Battlefield is unavailable.");
+      if (battlefield.units.length > 0) throw new Error("Only movement to an empty battlefield is supported.");
       battlefield.units.push(cardId);
       game.state.cardStates[cardId]!.exhausted = true;
       game.state.showdown = { battlefieldId, priorityPlayerId: input.actorPlayerId, passedPlayerIds: [] };
@@ -209,16 +203,28 @@ function passPriority(game: GameDocumentV2, actor: string, index: RuntimeCardInd
 function endTurn(game: GameDocumentV2, actor: string, index: RuntimeCardIndexV2, decks: readonly DeckSnapshotDocumentV2[]) {
   if (game.state.turn?.activePlayerId !== actor) throw new Error("Only the active player can end the turn.");
   const next = otherPlayer(game, actor);
-  const player = game.state.players[next]!;
+  resolveDelayedEffectsV2(game, "endOfThisTurn", decks);
+  cleanupTurnModifiersV2(game, index);
+  game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
+  applyStartOfTurnV2(game);
+}
+
+export function applyStartOfTurnV2(game: GameDocumentV2) {
+  const turn = game.state.turn;
+  if (!turn) throw new Error("A turn is required to apply start-of-turn steps.");
+  for (const candidate of Object.values(game.state.players)) {
+    candidate.energy = 0;
+    candidate.power = {};
+    candidate.conditionalEnergy = 0;
+  }
+  for (const state of Object.values(game.state.cardStates)) state.damage = 0;
+  const player = game.state.players[turn.activePlayerId]!;
   for (const cardId of [...player.zones.base, ...game.state.battlefields.flatMap((battlefield) => battlefield.units)]) {
     if (game.state.cardStates[cardId]) game.state.cardStates[cardId]!.exhausted = false;
   }
-  draw(player.zones.runeDeck, player.zones.base, game.state.turn.turnNumber === 1 ? 2 : 1);
+  const isNonStartingPlayersFirstTurn = turn.turnNumber === 2 && turn.activePlayerId !== game.state.setup.startingPlayerId;
+  draw(player.zones.runeDeck, player.zones.base, isNonStartingPlayersFirstTurn ? 3 : 2);
   draw(player.zones.mainDeck, player.zones.hand, 1);
-  resolveDelayedEffectsV2(game, "endOfThisTurn", decks);
-  cleanupTurnModifiersV2(game, index);
-  for (const candidate of Object.values(game.state.players)) candidate.conditionalEnergy = 0;
-  game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
 }
 
 function action(game: GameDocumentV2, kind: string, label: string, source: string | null, enabled = true, disabledReason: string | null = null, extra?: string, targets: ProjectedAction["targets"] = []): ProjectedAction {
@@ -254,7 +260,7 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
   const energyRuneIds: string[] = [];
-  for (const id of player.zones.base) {
+  for (const id of deterministicOrder(game, player.zones.base)) {
     if (remainingEnergy === 0) break;
     if (game.state.cardStates[id]?.exhausted || !hasAbility(id, "ability.exhaust_for_resource", index)) continue;
     energyRuneIds.push(id);
@@ -272,7 +278,7 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
     remainingPower -= spend;
   }
   const powerRuneIds: string[] = [];
-  for (const id of player.zones.base) {
+  for (const id of deterministicOrder(game, player.zones.base)) {
     if (remainingPower === 0) break;
     if (energyRuneIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstanceV2(id, index).card.classification.domain[0];
@@ -281,6 +287,11 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
     remainingPower -= 1;
   }
   return remainingPower === 0 ? { conditionalEnergy, pooledEnergy, energyRuneIds, powerFromPool, powerRuneIds } : null;
+}
+
+function deterministicOrder(game: GameDocumentV2, values: string[]) {
+  const score = (value: string) => createHash("sha256").update(`${game.id}:${game.stateVersion}:payment:${value}`).digest("hex");
+  return [...values].sort((left, right) => score(left).localeCompare(score(right)));
 }
 
 function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndexV2) {

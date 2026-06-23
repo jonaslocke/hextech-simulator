@@ -1,6 +1,7 @@
 import type { ProjectedAction } from "../../shared/game-v2";
 import { createHash } from "node:crypto";
 import type { DeckRuntimeSnapshotV2, GameDocumentV2 } from "./state";
+import { applyStartOfTurnV2 } from "./actions";
 
 export function setupActionsV2(game: GameDocumentV2, actorPlayerId: string): ProjectedAction[] {
   if (game.status !== "setup_pending") return [];
@@ -59,6 +60,7 @@ export function performSetupActionV2(input: {
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
       game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "action" };
+      applyStartOfTurnV2(game);
     }
   }
   game.stateVersion += 1;

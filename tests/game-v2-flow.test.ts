@@ -6,9 +6,7 @@ import { gameplayActionsV2, performGameplayActionV2, type GameDocumentV2 } from 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
-  const draw = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "Draw a card")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: draw.id, selectedIds: [], decks, now: "b" });
-  assert.equal(game.state.players.p1?.zones.hand.length, 3);
+  assert.equal(gameplayActionsV2(game, "p1", decks).some((action) => action.label === "Draw a card" || action.label === "Channel a rune"), false);
 
   const rune = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "Add Energy")!;
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: rune.id, selectedIds: [], decks, now: "c" });

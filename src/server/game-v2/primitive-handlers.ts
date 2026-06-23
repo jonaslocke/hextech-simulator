@@ -130,6 +130,7 @@ export function createPrimitiveHandlersV2(
         const modifier = {
           id: `modifier:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.modifiers.length}`,
           sourceCardInstanceId: context.sourceCardInstanceId,
+          controllerPlayerId: context.controllerPlayerId,
           targetCardInstanceId: target,
           attribute,
           operation: stringParam(binding, "operation") as "increase" | "reduce" | "multiply" | "set",
@@ -174,13 +175,13 @@ export function effectiveEnergyCostV2(
   let value = definition.card.attributes.energy ?? 0;
   for (const modifier of game.state.modifiers) {
     if (modifier.attribute !== "energyCost" || !modifierIsActive(game, modifier.sourceCardInstanceId, modifier.duration)) continue;
+    if (modifier.controllerPlayerId && modifier.controllerPlayerId !== controllerPlayerId) continue;
     if (modifier.operation === "reduce") value -= modifier.amount;
     if (modifier.operation === "increase") value += modifier.amount;
     if (modifier.operation === "multiply") value *= modifier.amount;
     if (modifier.operation === "set") value = modifier.amount;
     if (modifier.minimum !== null) value = Math.max(value, modifier.minimum);
   }
-  void controllerPlayerId;
   return Math.max(0, value);
 }
 

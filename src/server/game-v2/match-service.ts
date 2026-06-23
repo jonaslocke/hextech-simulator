@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import type { GameProjectionV2 } from "../../shared/game-v2";
 import { loadInitialDeckSnapshot } from "./catalog";
 import type { DeckSnapshotDocumentV2, GameV2Repositories } from "./repositories";
-import { performSetupActionV2 } from "./setup";
-import { performGameplayActionV2 } from "./actions";
+import { performSetupActionV2, setupActionsV2 } from "./setup";
+import { gameplayActionsV2, performGameplayActionV2 } from "./actions";
 import { projectGameV2 } from "./projection";
 import {
   createInitialGameV2, createMatchIdV2, createPlayerTokenV2,
@@ -55,6 +55,10 @@ export async function performMatchActionV2(repositories: GameV2Repositories, inp
   if (game.stateVersion !== input.stateVersion) throw new Error("Game state version is stale.");
   const deckRuntime = Object.fromEntries(decks.map((deck) => [deck.playerId, { template: deck.snapshot, instances: deck.instances }]));
   const now = input.now ?? new Date().toISOString();
+  const acceptedAction = (game.status === "setup_pending"
+    ? setupActionsV2(game, seat.playerId)
+    : gameplayActionsV2(game, seat.playerId, decks))
+    .find((action) => action.id === input.actionId);
   const next = game.status === "setup_pending"
     ? performSetupActionV2({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now })
     : performGameplayActionV2({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decks, now });
@@ -72,8 +76,8 @@ export async function performMatchActionV2(repositories: GameV2Repositories, inp
       gameId: next.id,
       sequence: next.stateVersion,
       actorPlayerId: seat.playerId,
-      type: "game.action.accepted",
-      message: `Player action accepted: ${input.actionId}`
+      type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
+      message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`
     })
   ]);
   const events = await repositories.gameEvents.findByGameId(next.id);
