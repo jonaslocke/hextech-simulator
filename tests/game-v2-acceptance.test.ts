@@ -39,6 +39,14 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
     game = performSetupActionV2({ game, actorPlayerId: playerId, actionId: mulligan.id, selectedIds: [], decksByPlayerId: byPlayer, now: "d" });
   }
   assert.equal(game.status, "in_progress");
+  assert.equal(game.state.turn?.activePlayerId, "p1");
+  assert.equal(game.state.players.p1!.zones.base.length, 2, "the starting player channels two Runes automatically");
+  assert.equal(game.state.players.p1!.zones.hand.length, 5, "the starting player draws automatically");
+  assert.equal(game.state.players.p2!.zones.base.length, 0, "the other player channels when their turn begins");
+  assert.equal(game.state.players.p2!.zones.hand.length, 4);
+  const initialActionLabels = gameplayActionsV2(game, "p1", decks).map((action) => action.label);
+  assert.ok(!initialActionLabels.includes("Draw card"));
+  assert.ok(!initialActionLabels.includes("Channel Rune"));
   assertPrivateProjection(game, decks, "p1", "p2");
   assertPrivateProjection(game, decks, "p2", "p1");
 
@@ -64,6 +72,11 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   assert.ok(play, "Stupefy should be payable directly from ready Basic Runes");
   assert.ok(play.targets[0]!.legalIds.includes(enemy));
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "e" });
+  assert.throws(
+    () => performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "stale" }),
+    /not legal/i,
+    "an action ID from an earlier state version must be rejected"
+  );
   assert.ok(game.state.chain?.items.some((item) => item.sourceCardInstanceId === stupefy));
   assert.ok(
     p1Runes.some((id) => game.state.cardStates[id]!.exhausted) || game.state.players.p1!.zones.runeDeck.length > runeDeckBefore,
@@ -97,6 +110,8 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   const endTurn = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "End turn")!;
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "j" });
   assert.equal(game.state.turn?.activePlayerId, "p2");
+  assert.equal(game.state.players.p2!.zones.base.length, 3, "the non-starting player channels three Runes on their first turn");
+  assert.equal(game.state.players.p2!.zones.hand.length, 5, "the next player draws automatically");
   assert.equal(game.state.cardStates[enemy]!.computedMight, enemyMightBefore);
   assert.equal(game.state.cardStates[ravenbloom]!.computedMight, ravenbloomMightBefore);
 });
