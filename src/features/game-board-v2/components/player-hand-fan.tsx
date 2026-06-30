@@ -391,6 +391,7 @@ export function PlayerHandFan({
                     }
                     showMight={false}
                     {...card}
+                    size="xl"
                   />
                 </motion.div>
               </div>
