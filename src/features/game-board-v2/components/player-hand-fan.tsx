@@ -31,6 +31,7 @@ type PlayerHandFanProps = {
 const MAX_HAND_WIDTH = 1080;
 const DEFAULT_HAND_WIDTH = 1024;
 const ESTIMATED_CARD_WIDTH = 96;
+const MENU_INTERACTION_FREEZE_MS = 650;
 
 export function PlayerHandFan({
   cards,
@@ -43,6 +44,20 @@ export function PlayerHandFan({
   const [handWidth, setHandWidth] = useState(DEFAULT_HAND_WIDTH);
 
   const handRef = useRef<HTMLDivElement | null>(null);
+  const selectionFreezeUntilRef = useRef(0);
+
+  const freezePointerSelection = useCallback(() => {
+    selectionFreezeUntilRef.current = Date.now() + MENU_INTERACTION_FREEZE_MS;
+  }, []);
+
+  const releasePointerSelectionFreeze = useCallback(() => {
+    selectionFreezeUntilRef.current = 0;
+  }, []);
+
+  const isPointerSelectionFrozen = useCallback(
+    () => Date.now() < selectionFreezeUntilRef.current,
+    [],
+  );
 
   useEffect(() => {
     setActiveIndex((currentIndex) => {
@@ -97,11 +112,17 @@ export function PlayerHandFan({
   };
 
   const getIndexFromPointerPosition = useCallback(
-    (clientX: number, target: HTMLDivElement) => {
+    (
+      clientX: number,
+      target: HTMLDivElement,
+      currentIndex: number | null,
+      options?: { sticky?: boolean },
+    ) => {
       const rect = target.getBoundingClientRect();
 
       return getCardIndexFromClientX({
         clientX,
+        currentIndex: options?.sticky === false ? null : currentIndex,
         handLeft: rect.left,
         handWidth: rect.width || handWidth,
         layout,
@@ -112,26 +133,46 @@ export function PlayerHandFan({
   );
 
   const updateActiveIndexFromPointer = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (
+      event: ReactPointerEvent<HTMLDivElement>,
+      options?: { force?: boolean },
+    ) => {
       if (cards.length === 0) {
         return;
       }
 
-      const nextIndex = getIndexFromPointerPosition(
-        event.clientX,
-        event.currentTarget,
-      );
+      if (!options?.force && isPointerSelectionFrozen()) {
+        return;
+      }
 
-      setActiveIndex((currentIndex) =>
-        currentIndex === nextIndex ? currentIndex : nextIndex,
-      );
+      const clientX = event.clientX;
+      const target = event.currentTarget;
+
+      setActiveIndex((currentIndex) => {
+        const nextIndex = getIndexFromPointerPosition(
+          clientX,
+          target,
+          currentIndex,
+        );
+
+        return currentIndex === nextIndex ? currentIndex : nextIndex;
+      });
     },
-    [cards.length, getIndexFromPointerPosition],
+    [cards.length, getIndexFromPointerPosition, isPointerSelectionFrozen],
   );
 
   const clearActiveIndex = useCallback(() => {
+    releasePointerSelectionFreeze();
     setActiveIndex(null);
-  }, []);
+  }, [releasePointerSelectionFreeze]);
+
+  const clearActiveIndexFromPointer = useCallback(() => {
+    if (isPointerSelectionFrozen()) {
+      return;
+    }
+
+    setActiveIndex(null);
+  }, [isPointerSelectionFrozen]);
 
   const selectCardAtIndex = useCallback(
     (index: number | null) => {
@@ -159,8 +200,10 @@ export function PlayerHandFan({
       const pointerIndex = getIndexFromPointerPosition(
         event.clientX,
         event.currentTarget,
+        activeIndex,
+        { sticky: false },
       );
-      const nextIndex = pointerIndex ?? activeIndex;
+      const nextIndex = activeIndex ?? pointerIndex;
 
       if (nextIndex === null) {
         return;
@@ -175,10 +218,17 @@ export function PlayerHandFan({
       event.preventDefault();
       event.stopPropagation();
 
+      freezePointerSelection();
       setActiveIndex(nextIndex);
       onCardContextAction?.(card, event);
     },
-    [activeIndex, cards, getIndexFromPointerPosition, onCardContextAction],
+    [
+      activeIndex,
+      cards,
+      freezePointerSelection,
+      getIndexFromPointerPosition,
+      onCardContextAction,
+    ],
   );
 
   const moveKeyboardSelection = useCallback(
@@ -187,11 +237,12 @@ export function PlayerHandFan({
         return;
       }
 
+      releasePointerSelectionFreeze();
       setActiveIndex((currentIndex) =>
         clamp((currentIndex ?? 0) + delta, 0, cards.length - 1),
       );
     },
-    [cards.length],
+    [cards.length, releasePointerSelectionFreeze],
   );
 
   const handleKeyDown = useCallback(
@@ -211,12 +262,14 @@ export function PlayerHandFan({
 
         case "Home": {
           event.preventDefault();
+          releasePointerSelectionFreeze();
           setActiveIndex(0);
           return;
         }
 
         case "End": {
           event.preventDefault();
+          releasePointerSelectionFreeze();
           setActiveIndex(cards.length - 1);
           return;
         }
@@ -243,6 +296,7 @@ export function PlayerHandFan({
       cards.length,
       clearActiveIndex,
       moveKeyboardSelection,
+      releasePointerSelectionFreeze,
       selectCardAtIndex,
     ],
   );
@@ -272,7 +326,7 @@ export function PlayerHandFan({
             !(nextFocusedTarget instanceof Node) ||
             !event.currentTarget.contains(nextFocusedTarget)
           ) {
-            clearActiveIndex();
+            clearActiveIndexFromPointer();
           }
         }}
         onClick={openCardMenuFromEvent}
@@ -281,10 +335,13 @@ export function PlayerHandFan({
           setActiveIndex((currentIndex) => currentIndex ?? 0);
         }}
         onKeyDown={handleKeyDown}
-        onPointerCancel={clearActiveIndex}
-        onPointerDown={updateActiveIndexFromPointer}
+        onPointerCancel={clearActiveIndexFromPointer}
+        onPointerDown={(event) => {
+          releasePointerSelectionFreeze();
+          updateActiveIndexFromPointer(event, { force: true });
+        }}
         onPointerEnter={updateActiveIndexFromPointer}
-        onPointerLeave={clearActiveIndex}
+        onPointerLeave={clearActiveIndexFromPointer}
         onPointerMove={updateActiveIndexFromPointer}
         role="listbox"
         tabIndex={0}
@@ -355,6 +412,7 @@ type HandLayout = {
   restScale: number;
   rotationStep: number;
   spacing: number;
+  switchRadius: number;
 };
 
 function getHandCardMotion({
@@ -453,7 +511,7 @@ function createHandLayout({
   const maxEdgeRotation = total <= 2 ? 4 : clamp(21 - total * 0.45, 12, 18);
 
   return {
-    activeLift: large ? 12 : 24,
+    activeLift: large ? 10 : 20,
     activeScale: large ? 1.08 : 1.1,
     centerLift: large ? 10 : 12,
     edgeDrop: clamp(26 - total * 0.55, 15, 22),
@@ -462,17 +520,20 @@ function createHandLayout({
     restScale: 1,
     rotationStep: total <= 1 ? 0 : maxEdgeRotation / middle,
     spacing,
+    switchRadius: clamp(spacing * 0.7, 26, 36),
   };
 }
 
 function getCardIndexFromClientX({
   clientX,
+  currentIndex,
   handLeft,
   handWidth,
   layout,
   total,
 }: {
   clientX: number;
+  currentIndex: number | null;
   handLeft: number;
   handWidth: number;
   layout: HandLayout;
@@ -497,6 +558,16 @@ function getCardIndexFromClientX({
     clientX > lastCardCenterX + layout.hitPadding
   ) {
     return null;
+  }
+
+  if (currentIndex !== null) {
+    const safeCurrentIndex = clamp(currentIndex, 0, total - 1);
+    const currentCardCenterX =
+      firstCardCenterX + safeCurrentIndex * layout.spacing;
+
+    if (Math.abs(clientX - currentCardCenterX) <= layout.switchRadius) {
+      return safeCurrentIndex;
+    }
   }
 
   return clamp(
