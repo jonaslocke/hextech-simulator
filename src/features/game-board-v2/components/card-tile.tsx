@@ -19,6 +19,50 @@ import {
 import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
 
+const CARD_ASPECT_RATIO = 130 / 181;
+
+export type CardTileSize = "sm" | "md" | "lg" | "xl";
+
+export const CARD_TILE_SIZE_CONFIG: Record<
+  CardTileSize,
+  {
+    imageClassName: string;
+    width: number;
+    height: number;
+    mightBadgeClassName: string;
+    damageBadgeClassName: string;
+  }
+> = {
+  sm: {
+    imageClassName: "h-24",
+    width: Math.round(96 * CARD_ASPECT_RATIO),
+    height: 96,
+    mightBadgeClassName: "-right-1 -top-1 h-4 min-w-4 px-1 text-[10px]",
+    damageBadgeClassName: "-left-1.5 h-5 min-w-5 px-1 text-[10px]",
+  },
+  md: {
+    imageClassName: "h-30",
+    width: Math.round(120 * CARD_ASPECT_RATIO),
+    height: 120,
+    mightBadgeClassName: "-right-1 -top-1 h-5 min-w-5 px-1 text-xs",
+    damageBadgeClassName: "-left-2 h-6 min-w-6 px-1 text-xs",
+  },
+  lg: {
+    imageClassName: "h-36",
+    width: Math.round(144 * CARD_ASPECT_RATIO),
+    height: 144,
+    mightBadgeClassName: "-right-1.5 -top-1.5 h-6 min-w-6 px-1.5 text-sm",
+    damageBadgeClassName: "-left-2 h-7 min-w-7 px-1.5 text-sm",
+  },
+  xl: {
+    imageClassName: "h-44",
+    width: Math.round(176 * CARD_ASPECT_RATIO),
+    height: 176,
+    mightBadgeClassName: "-right-2 -top-2 h-7 min-w-7 px-1.5 text-sm",
+    damageBadgeClassName: "-left-2.5 h-8 min-w-8 px-1.5 text-sm",
+  },
+};
+
 type CardTileProps = Card & {
   enableHoverPreview?: boolean;
   enableZoneAnimation?: boolean;
@@ -33,6 +77,7 @@ type CardTileProps = Card & {
   ownerLabel?: string;
   ownerSeat?: "player" | "opponent";
   showMight?: boolean;
+  size?: CardTileSize;
 };
 
 export const CardTile: FC<CardTileProps> = ({
@@ -61,6 +106,7 @@ export const CardTile: FC<CardTileProps> = ({
   rulesText,
   setLabel,
   showMight = true,
+  size = "md",
   supertype,
   type,
 }) => {
@@ -71,6 +117,7 @@ export const CardTile: FC<CardTileProps> = ({
   const tileRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
 
   const clearPreview = () => {
     if (previewTimeoutRef.current) {
@@ -192,7 +239,8 @@ export const CardTile: FC<CardTileProps> = ({
         <img
           alt={name}
           className={cn(
-            "block h-30 aspect-130/181 rounded-md border border-white/15 bg-slate-900 object-cover shadow-md transition",
+            "block bg-slate-900 shadow-md border border-white/15 rounded-md object-cover aspect-130/181 transition",
+            sizeConfig.imageClassName,
             "hover:border-yellow-300/70 hover:shadow-lg hover:shadow-black/40",
             isHighlighted &&
               "border-cyan-300 ring-2 ring-cyan-300 shadow-cyan-300/40 shadow-lg",
@@ -200,19 +248,29 @@ export const CardTile: FC<CardTileProps> = ({
           src={img}
         />
         {showMight && might !== undefined && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-900/70 bg-white px-1 text-xs font-bold text-slate-950 shadow">
+          <span
+            className={cn(
+              "absolute flex justify-center items-center bg-white shadow border border-slate-900/70 rounded-full font-bold text-slate-950",
+              sizeConfig.mightBadgeClassName,
+            )}
+          >
             {might}
           </span>
         )}
         {damage !== undefined && damage > 0 && (
-          <span className="absolute top-1/2 -left-2 flex h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-full border border-red-100 bg-red-500 px-1 text-xs font-black text-white shadow">
+          <span
+            className={cn(
+              "top-1/2 absolute flex justify-center items-center bg-red-500 shadow border border-red-100 rounded-full font-black text-white -translate-y-1/2",
+              sizeConfig.damageBadgeClassName,
+            )}
+          >
             {damage}
           </span>
         )}
       </motion.div>
       {previewPosition && (
         <div
-          className="pointer-events-none fixed z-[2147483647] flex max-h-[min(24rem,calc(100vh-1.5rem))] w-[min(35rem,calc(100vw-1.5rem))] gap-3 overflow-hidden rounded-lg bg-slate-950/95 p-2 text-slate-100 shadow-[0_28px_80px_rgba(0,0,0,0.88)] ring-1 ring-yellow-300/40 drop-shadow-[0_18px_30px_rgba(0,0,0,0.75)]"
+          className="z-[2147483647] fixed flex gap-3 bg-slate-950/95 shadow-[0_28px_80px_rgba(0,0,0,0.88)] drop-shadow-[0_18px_30px_rgba(0,0,0,0.75)] p-2 rounded-lg ring-1 ring-yellow-300/40 w-[min(35rem,calc(100vw-1.5rem))] max-h-[min(24rem,calc(100vh-1.5rem))] overflow-hidden text-slate-100 pointer-events-none"
           style={{
             left: previewPosition.left,
             top: previewPosition.top,
@@ -222,7 +280,7 @@ export const CardTile: FC<CardTileProps> = ({
           {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
           <img
             alt={name}
-            className="block w-[220px] shrink-0 rounded-md object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)]"
+            className="block drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)] rounded-md w-55 object-contain shrink-0"
             src={img}
           />
           <CardSummary
@@ -277,14 +335,14 @@ function CardSummary({
     energy !== undefined || power !== undefined || might !== undefined;
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-auto pr-1">
+    <div className="flex flex-col flex-1 gap-2 pr-1 min-w-0 overflow-auto">
       <div>
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-base font-semibold leading-tight">{name}</div>
+        <div className="flex justify-between items-start gap-2">
+          <div className="font-semibold text-base leading-tight">{name}</div>
           {ownerLabel && ownerSeat && (
             <span
               className={cn(
-                "shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white",
+                "px-2 py-0.5 rounded font-semibold text-[10px] text-white uppercase tracking-wide shrink-0",
                 ownerSeat === "player"
                   ? "bg-player-accent"
                   : "bg-opponent-accent",
@@ -295,7 +353,7 @@ function CardSummary({
           )}
         </div>
         {typeLine && (
-          <div className="mt-1 text-xs uppercase tracking-wide text-slate-400">
+          <div className="mt-1 text-slate-400 text-xs uppercase tracking-wide">
             {typeLine}
           </div>
         )}
@@ -304,7 +362,7 @@ function CardSummary({
         <div className="flex flex-wrap gap-1.5">
           {domains.map((domain) => (
             <span
-              className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/10 px-2 py-0.5 text-[11px] text-slate-200"
+              className="inline-flex items-center gap-1 bg-white/10 px-2 py-0.5 border border-white/10 rounded text-[11px] text-slate-200"
               key={domain}
             >
               <DomainIcon compact decorative domain={domain} />
@@ -326,7 +384,7 @@ function CardSummary({
           )}
         </div>
       )}
-      <div className="grid gap-1.5 rounded border border-white/10 bg-black/25 p-2 text-sm text-slate-100">
+      <div className="gap-1.5 grid bg-black/25 p-2 border border-white/10 rounded text-slate-100 text-sm">
         {rulesText?.trim() ? (
           <CardRulesText text={rulesText} />
         ) : (
@@ -350,10 +408,9 @@ function SummaryStatChip({
   label: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-yellow-300/30 bg-yellow-300/10 px-2 py-0.5 text-[11px] text-yellow-100">
+    <span className="inline-flex items-center gap-1 bg-yellow-300/10 px-2 py-0.5 border border-yellow-300/30 rounded text-[11px] text-yellow-100">
       <span>{label}</span>
       {children}
     </span>
   );
 }
-
