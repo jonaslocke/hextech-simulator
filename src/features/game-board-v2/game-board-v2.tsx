@@ -3,6 +3,7 @@
 import {
   FC,
   MouseEvent,
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -58,9 +59,10 @@ type GameBoardProps = {
 
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
 type CardActionMenuItem = {
+  accessibleLabel?: string;
   disabled?: boolean;
   id: string;
-  label: string;
+  label: ReactNode;
   onSelect?: () => void;
 };
 type CardActionMenuState = {
@@ -84,10 +86,6 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     if (actionId) onPerformAction({ actionId, selectedIds });
   };
   const sourceActions = (sourceCardInstanceId: string) => sourceProjection.actions.filter((action) => action.sourceCardInstanceId === sourceCardInstanceId);
-  const onAddRuneResource = (input: { cardInstanceId: string; resourceType: "energy" | "power" }) => {
-    const label = input.resourceType === "energy" ? "Add Energy" : "Add Power";
-    submitProjectedAction(sourceActions(input.cardInstanceId).find((action) => action.label === label)?.id);
-  };
   const onEndTurn = () => submitProjectedAction(sourceProjection.actions.find((action) => action.label === "End turn")?.id);
   const onPass = () => submitProjectedAction(sourceProjection.actions.find((action) => action.label === "Pass priority")?.id);
   const onPlayCard = (input: { cardInstanceId: string; choices?: { targetCardInstanceIds?: string[] }; selectedModeId?: string }) => {
@@ -294,13 +292,10 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     },
     [capturePendingAnimationSnapshot, onPlayCard],
   );
-  const submitRuneResource = useCallback(
-    (input: { cardInstanceId: string; resourceType: "energy" | "power" }) => {
-      capturePendingAnimationSnapshot();
-      onAddRuneResource?.(input);
-    },
-    [capturePendingAnimationSnapshot, onAddRuneResource],
-  );
+  const submitRuneAction = (actionId: string) => {
+    capturePendingAnimationSnapshot();
+    submitProjectedAction(actionId);
+  };
   const closeCardActionMenu = () => setCardActionMenu(null);
   const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
     if (isChainLockedOpen) {
@@ -532,19 +527,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
   };
-  const handleRunePrimaryAction = (card: Card) => {
-    closeCardActionMenu();
-
-    if (!card.instanceId) {
-      return;
-    }
-
-    submitRuneResource({
-      cardInstanceId: card.instanceId,
-      resourceType: "energy",
-    });
-  };
-  const handleRuneContextAction = (
+  const openRuneActionMenu = (
     card: Card,
     event: MouseEvent<HTMLElement>,
   ) => {
@@ -552,28 +535,29 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       return;
     }
 
-    openCardActionMenu(event, [
-      {
-        disabled: card.isExhausted,
-        id: `${card.instanceId}:add-energy`,
-        label: card.isExhausted ? "Add Energy (exhausted)" : "Add Energy",
-        onSelect: () =>
-          submitRuneResource({
-            cardInstanceId: card.instanceId!,
-            resourceType: "energy",
-          }),
-      },
-      {
-        id: `${card.instanceId}:add-power`,
-        label: "Add Power",
-        onSelect: () =>
-          submitRuneResource({
-            cardInstanceId: card.instanceId!,
-            resourceType: "power",
-          }),
-      },
-    ]);
+    const actions = sourceActions(card.instanceId);
+    const powerDomain = actions
+      .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
+      .find((domain) => domain !== undefined);
+
+    openCardActionMenu(
+      event,
+      actions.map((action) => ({
+        accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
+        disabled: !action.enabled,
+        id: action.id,
+        label: runeActionMenuLabel(action, powerDomain),
+        onSelect: () => submitRuneAction(action.id),
+      })),
+    );
   };
+  const handleRunePrimaryAction = (
+    card: Card,
+    event?: MouseEvent<HTMLElement>,
+  ) => {
+    if (event) openRuneActionMenu(card, event);
+  };
+  const handleRuneContextAction = openRuneActionMenu;
 
   useEffect(() => {
     if (isChainLockedOpen) {
@@ -1021,6 +1005,7 @@ function CardActionMenu({
     >
       {items.map((item) => (
         <button
+          aria-label={item.accessibleLabel}
           className="flex items-center enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full disabled:text-slate-500 text-xs text-left transition disabled:cursor-not-allowed"
           disabled={item.disabled}
           key={item.id}
@@ -1035,6 +1020,59 @@ function CardActionMenu({
       ))}
     </div>
   );
+}
+
+function runeActionMenuLabel(
+  action: GameProjectionV2["actions"][number],
+  powerDomain: string | undefined,
+): ReactNode {
+  let content: ReactNode = action.label;
+  if (action.label === "Add Energy") {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <EnergyResource compact value={1} />
+      </span>
+    );
+  } else if (action.label.startsWith("Add Power [") && powerDomain) {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <DomainIcon decorative domain={powerDomain} />
+      </span>
+    );
+  } else if (action.label === "Add Energy and Power" && powerDomain) {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <EnergyResource compact value={1} />
+        <span>and</span>
+        <DomainIcon decorative domain={powerDomain} />
+      </span>
+    );
+  }
+
+  if (action.enabled) return content;
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      {content}
+      <span>({action.disabledReason ?? "unavailable"})</span>
+    </span>
+  );
+}
+
+function runeActionAccessibleLabel(
+  action: GameProjectionV2["actions"][number],
+  powerDomain: string | undefined,
+) {
+  const domain = powerDomain ? formatDomain(powerDomain) : "Power";
+  if (action.label === "Add Energy") return "Add 1 Energy";
+  if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;
+  if (action.label === "Add Energy and Power") {
+    return `Add 1 Energy and 1 ${domain} Power`;
+  }
+  return action.label;
 }
 
 function createBoardModel({

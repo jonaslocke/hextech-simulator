@@ -28,22 +28,59 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   game.state.players.p1!.power = { Mind: 20, Order: 20 };
 
   const rune = instanceNamed(decks, "p1", "Mind Rune");
+  const orderRune = instanceNamed(decks, "p1", "Order Rune");
   const stupefy = instanceNamed(decks, "p1", "Stupefy");
   const friendlyOne = instanceNamed(decks, "p1", "Vanguard Sergeant");
   const friendlyTwo = instanceNamed(decks, "p1", "Daring Poro");
   const friendlyBase = instanceNamed(decks, "p1", "Mega-Mech");
   const enemy = instanceNamed(decks, "p2", "Vanguard Sergeant");
   relocate(game, rune, "base");
+  relocate(game, orderRune, "base");
   relocate(game, stupefy, "hand");
   relocate(game, friendlyBase, "base");
   relocateToBattlefield(game, friendlyOne, "p1");
   relocateToBattlefield(game, friendlyTwo, "p1");
   relocateToBattlefield(game, enemy, "p2");
 
+  const orderRuneActions = gameplayActionsV2(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === orderRune
+  );
+  assert.deepEqual(
+    orderRuneActions.map((action) => action.label),
+    ["Add Energy", "Add Power [Order]", "Add Energy and Power"]
+  );
+  const combinedAction = orderRuneActions.find(
+    (action) => action.label === "Add Energy and Power"
+  )!;
+  game = performGameplayActionV2({
+    game,
+    actorPlayerId: "p1",
+    actionId: combinedAction.id,
+    selectedIds: [],
+    decks,
+    now: "combined-rune-resource"
+  });
+  assert.equal(game.state.players.p1!.energy, 21);
+  assert.equal(game.state.players.p1!.power.Order, 21);
+  assert.equal(game.state.players.p1!.zones.base.includes(orderRune), false);
+  assert.equal(game.state.players.p1!.zones.runeDeck.includes(orderRune), true);
+  assert.equal(game.state.cardStates[orderRune]!.exhausted, false);
+
   const energyAction = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: energyAction.id, selectedIds: [], decks, now: "b" });
-  assert.equal(game.state.players.p1!.energy, 21);
+  assert.equal(game.state.players.p1!.energy, 22);
   assert.equal(game.state.cardStates[rune]!.exhausted, true);
+  const exhaustedRuneActions = gameplayActionsV2(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === rune
+  );
+  assert.deepEqual(
+    exhaustedRuneActions.map((action) => [action.label, action.enabled]),
+    [
+      ["Add Energy", false],
+      ["Add Power [Mind]", true],
+      ["Add Energy and Power", false]
+    ]
+  );
 
   const handBefore = game.state.players.p1!.zones.hand.length;
   const enemyMightBefore = game.state.cardStates[enemy]!.computedMight!;

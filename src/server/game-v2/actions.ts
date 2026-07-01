@@ -95,13 +95,35 @@ export function performGameplayActionV2(input: {
       break;
     case "activate": {
       const [clauseId, behaviorId] = extra.split("|");
-      const definition = definitionForInstanceV2(source, index);
-      const clause = definition.behaviorModel.clauses.find((item) => item.id === clauseId);
-      const binding = clause?.abilities.find((item) => item.behaviorId === behaviorId);
-      if (!binding) throw new Error("Activated ability is unavailable.");
-      const handler = handlers.get(binding.behaviorId);
-      if (!handler?.execute) throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
-      handler.execute(binding, createBehaviorContext(game, input.actorPlayerId, source, null, input.selectedIds));
+      executeActivatedAbility(
+        game,
+        input.actorPlayerId,
+        source,
+        clauseId,
+        behaviorId,
+        input.selectedIds,
+        index,
+        handlers
+      );
+      break;
+    }
+    case "activateMany": {
+      const activations = JSON.parse(extra) as Array<{
+        behaviorId: string;
+        clauseId: string;
+      }>;
+      for (const activation of activations) {
+        executeActivatedAbility(
+          game,
+          input.actorPlayerId,
+          source,
+          activation.clauseId,
+          activation.behaviorId,
+          input.selectedIds,
+          index,
+          handlers
+        );
+      }
       break;
     }
     case "move": {
@@ -439,16 +461,88 @@ function addAbilityActions(
   for (const sourceId of controlled) {
     const definition = definitionForInstanceV2(sourceId, index);
     const compiled = compileBehaviorModelV2(definition.behaviorModel, handlers);
+    const activations = compiled.clauses.flatMap((clause) =>
+      clause.abilities.map((ability) => ({ ability, clauseId: clause.id }))
+    );
+    const powerDomain =
+      definition.card.classification.domain.find(
+        (domain) => domain !== "Colorless"
+      ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
         const enabled = ability.behaviorId === "ability.recycle_for_power" || !game.state.cardStates[sourceId]!.exhausted;
         const label = ability.behaviorId === "ability.recycle_for_power"
-          ? "Add Power"
+          ? `Add Power [${powerDomain}]`
           : ability.parameters.usage === "spellsOnly" ? "Add spell Energy" : "Add Energy";
         actions.push(action(game, "activate", label, sourceId, enabled, enabled ? null : "Source is exhausted.", `${clause.id}|${ability.behaviorId}`));
       }
     }
+    const energyActivation = activations.find(
+      ({ ability }) =>
+        ability.behaviorId === "ability.exhaust_for_resource" &&
+        ability.parameters.resourceType === "energy"
+    );
+    const powerActivation = activations.find(
+      ({ ability }) => ability.behaviorId === "ability.recycle_for_power"
+    );
+    if (energyActivation && powerActivation) {
+      const enabled = !game.state.cardStates[sourceId]!.exhausted;
+      actions.push(
+        action(
+          game,
+          "activateMany",
+          "Add Energy and Power",
+          sourceId,
+          enabled,
+          enabled ? null : "Source is exhausted.",
+          JSON.stringify([
+            {
+              clauseId: energyActivation.clauseId,
+              behaviorId: energyActivation.ability.behaviorId
+            },
+            {
+              clauseId: powerActivation.clauseId,
+              behaviorId: powerActivation.ability.behaviorId
+            }
+          ])
+        )
+      );
+    }
   }
+}
+
+function executeActivatedAbility(
+  game: GameDocumentV2,
+  actorPlayerId: string,
+  sourceId: string,
+  clauseId: string,
+  behaviorId: string,
+  selectedIds: string[],
+  index: RuntimeCardIndexV2,
+  handlers: ReturnType<typeof createPrimitiveHandlersV2>
+) {
+  const definition = definitionForInstanceV2(sourceId, index);
+  const clause = definition.behaviorModel.clauses.find(
+    (item) => item.id === clauseId
+  );
+  const binding = clause?.abilities.find(
+    (item) => item.behaviorId === behaviorId
+  );
+  if (!binding) throw new Error("Activated ability is unavailable.");
+  const handler = handlers.get(binding.behaviorId);
+  if (!handler?.execute) {
+    throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
+  }
+  handler.execute(
+    binding,
+    createBehaviorContext(
+      game,
+      actorPlayerId,
+      sourceId,
+      null,
+      selectedIds
+    )
+  );
 }
 
 function executeImmediateClauses(
