@@ -134,6 +134,44 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   assert.equal(game.state.players.p1!.zones.mainDeck.length, yordleDeckBefore - 1);
 });
 
+test("autopayment only uses Lux Crownguard's Energy for spells", async () => {
+  const template = await fixtureSnapshot();
+  const { game, decks } = runtimeFixture(template);
+  const crownguards = instancesNamed(decks, "p1", "Lux, Crownguard").slice(0, 2);
+  const unit = instanceNamed(decks, "p1", "Daring Poro");
+  const spell = instanceNamed(decks, "p1", "Stupefy");
+
+  game.state.players.p1!.energy = 0;
+  game.state.players.p1!.conditionalEnergy = 0;
+  game.state.players.p1!.power = {};
+  crownguards.forEach((id) => relocate(game, "p1", id, "base"));
+  relocate(game, "p1", unit, "hand");
+  relocate(game, "p1", spell, "hand");
+
+  const actions = gameplayActionsV2(game, "p1", decks);
+  assert.equal(
+    actions.some((action) => action.sourceCardInstanceId === unit),
+    false,
+    "spell-only Energy sources must not make a Unit payable"
+  );
+  const playSpell = actions.find((action) => action.sourceCardInstanceId === spell);
+  assert.ok(playSpell, "Lux should remain an eligible autopayment source for a Spell");
+
+  const next = performGameplayActionV2({
+    game,
+    actorPlayerId: "p1",
+    actionId: playSpell.id,
+    selectedIds: [crownguards[0]!],
+    decks,
+    now: "spell-payment"
+  });
+  assert.equal(
+    crownguards.filter((id) => next.state.cardStates[id]!.exhausted).length,
+    1
+  );
+  assert.equal(next.state.players.p1!.conditionalEnergy, 1);
+});
+
 function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
   const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
@@ -169,9 +207,14 @@ function resolveAll(initial: GameDocumentV2, decks: DeckSnapshotDocumentV2[]) {
 }
 
 function instanceNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+  return instancesNamed(decks, playerId, name)[0]!;
+}
+function instancesNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
   const deck = decks.find((item) => item.playerId === playerId)!;
   const code = deck.snapshot.cards.find((item) => item.card.name === name)!.cardCode;
-  return deck.instances.find((item) => item.cardCode === code)!.instanceId;
+  return deck.instances
+    .filter((item) => item.cardCode === code)
+    .map((item) => item.instanceId);
 }
 function definitionNamed(decks: DeckSnapshotDocumentV2[], name: string) {
   return decks[0]!.snapshot.cards.find((item) => item.card.name === name)!;

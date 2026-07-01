@@ -247,7 +247,9 @@ function action(game: GameDocumentV2, kind: string, label: string, source: strin
 type PaymentPlanV2 = {
   conditionalEnergy: number;
   pooledEnergy: number;
-  energyRuneIds: string[];
+  energySourceIds: string[];
+  generatedConditionalEnergy: number;
+  generatedPooledEnergy: number;
   powerFromPool: Record<string, number>;
   powerRuneIds: string[];
 };
@@ -259,12 +261,23 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   remainingEnergy -= conditionalEnergy;
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
-  const energyRuneIds: string[] = [];
+  const energySourceIds: string[] = [];
+  let generatedConditionalEnergy = 0;
+  let generatedPooledEnergy = 0;
   for (const id of deterministicOrder(game, player.zones.base)) {
     if (remainingEnergy === 0) break;
-    if (game.state.cardStates[id]?.exhausted || !hasAbility(id, "ability.exhaust_for_resource", index)) continue;
-    energyRuneIds.push(id);
-    remainingEnergy -= 1;
+    if (game.state.cardStates[id]?.exhausted) continue;
+    const ability = exhaustForEnergyAbility(
+      id,
+      definition.card.classification.type,
+      index
+    );
+    if (!ability) continue;
+    energySourceIds.push(id);
+    const unusedEnergy = Math.max(0, ability.amount - remainingEnergy);
+    remainingEnergy = Math.max(0, remainingEnergy - ability.amount);
+    if (ability.usage === "spellsOnly") generatedConditionalEnergy += unusedEnergy;
+    else generatedPooledEnergy += unusedEnergy;
   }
   if (remainingEnergy > 0) return null;
 
@@ -280,13 +293,21 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   const powerRuneIds: string[] = [];
   for (const id of deterministicOrder(game, player.zones.base)) {
     if (remainingPower === 0) break;
-    if (energyRuneIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
+    if (energySourceIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstanceV2(id, index).card.classification.domain[0];
     if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
     powerRuneIds.push(id);
     remainingPower -= 1;
   }
-  return remainingPower === 0 ? { conditionalEnergy, pooledEnergy, energyRuneIds, powerFromPool, powerRuneIds } : null;
+  return remainingPower === 0 ? {
+    conditionalEnergy,
+    pooledEnergy,
+    energySourceIds,
+    generatedConditionalEnergy,
+    generatedPooledEnergy,
+    powerFromPool,
+    powerRuneIds
+  } : null;
 }
 
 function deterministicOrder(game: GameDocumentV2, values: string[]) {
@@ -300,7 +321,9 @@ function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinit
   const player = game.state.players[playerId]!;
   player.conditionalEnergy -= plan.conditionalEnergy;
   player.energy -= plan.pooledEnergy;
-  plan.energyRuneIds.forEach((id) => { game.state.cardStates[id]!.exhausted = true; });
+  player.conditionalEnergy += plan.generatedConditionalEnergy;
+  player.energy += plan.generatedPooledEnergy;
+  plan.energySourceIds.forEach((id) => { game.state.cardStates[id]!.exhausted = true; });
   for (const [domain, amount] of Object.entries(plan.powerFromPool)) player.power[domain] = (player.power[domain] ?? 0) - amount;
   for (const id of plan.powerRuneIds) {
     player.zones.base = player.zones.base.filter((candidate) => candidate !== id);
@@ -310,6 +333,35 @@ function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinit
 
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndexV2) {
   return definitionForInstanceV2(id, index).behaviorModel.clauses.some((clause) => clause.abilities.some((ability) => ability.behaviorId === behaviorId));
+}
+
+function exhaustForEnergyAbility(
+  id: string,
+  cardType: string,
+  index: RuntimeCardIndexV2
+): { amount: number; usage: string } | null {
+  for (const clause of definitionForInstanceV2(id, index).behaviorModel.clauses) {
+    for (const ability of clause.abilities) {
+      if (
+        ability.behaviorId !== "ability.exhaust_for_resource" ||
+        ability.parameters.resourceType !== "energy"
+      ) {
+        continue;
+      }
+      const amount = ability.parameters.amount;
+      const usage = ability.parameters.usage;
+      if (
+        typeof amount !== "number" ||
+        amount <= 0 ||
+        typeof usage !== "string" ||
+        (usage === "spellsOnly" && cardType !== "Spell")
+      ) {
+        continue;
+      }
+      return { amount, usage };
+    }
+  }
+  return null;
 }
 function addPlayableCardActions(
   actions: ProjectedAction[], game: GameDocumentV2, playerId: string,
