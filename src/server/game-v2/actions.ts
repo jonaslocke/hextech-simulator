@@ -1,5 +1,4 @@
 import type { ProjectedAction } from "../../shared/game-v2";
-import { createHash } from "node:crypto";
 import {
   compileBehaviorModelV2,
   createBehaviorContext,
@@ -264,7 +263,7 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   const energySourceIds: string[] = [];
   let generatedConditionalEnergy = 0;
   let generatedPooledEnergy = 0;
-  for (const id of deterministicOrder(game, player.zones.base)) {
+  for (const id of player.zones.base) {
     if (remainingEnergy === 0) break;
     if (game.state.cardStates[id]?.exhausted) continue;
     const ability = exhaustForEnergyAbility(
@@ -291,7 +290,7 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
     remainingPower -= spend;
   }
   const powerRuneIds: string[] = [];
-  for (const id of deterministicOrder(game, player.zones.base)) {
+  for (const id of player.zones.base) {
     if (remainingPower === 0) break;
     if (energySourceIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstanceV2(id, index).card.classification.domain[0];
@@ -308,11 +307,6 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
     powerFromPool,
     powerRuneIds
   } : null;
-}
-
-function deterministicOrder(game: GameDocumentV2, values: string[]) {
-  const score = (value: string) => createHash("sha256").update(`${game.id}:${game.stateVersion}:payment:${value}`).digest("hex");
-  return [...values].sort((left, right) => score(left).localeCompare(score(right)));
 }
 
 function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndexV2) {
