@@ -233,6 +233,29 @@ export function TemporaryZoneOverlay({
     chainCards.length > 0 &&
     canPassChain &&
     Boolean(onPassChain);
+  const canCloseWithShortcut = Boolean(openZone) && !isCloseDisabled;
+
+  useEffect(() => {
+    if (!canCloseWithShortcut) {
+      return;
+    }
+
+    function handleWindowKeyDown(event: KeyboardEvent) {
+      if (shouldIgnoreCloseShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    }
+
+    window.addEventListener("keydown", handleWindowKeyDown, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown, true);
+    };
+  }, [canCloseWithShortcut, onClose]);
 
   useEffect(() => {
     if (!canUsePassShortcut) {
@@ -296,17 +319,24 @@ export function TemporaryZoneOverlay({
             <GripVertical className="size-4 text-slate-500 shrink-0" />
             <span className="truncate">{title}</span>
           </div>
-          <Button
-            aria-label="Close temporary zone"
-            className="bg-white/10 hover:bg-white/20 disabled:opacity-40 p-0 border border-white/10 size-7 text-slate-100 disabled:cursor-not-allowed"
-            disabled={isCloseDisabled}
-            onClick={onClose}
-            onPointerDown={(event) => event.stopPropagation()}
-            type="button"
-            variant="secondary"
-          >
-            <X className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            {!isCloseDisabled && (
+              <Kbd className="hidden sm:inline-flex bg-white/10 shadow-none px-1.5 py-0.5 border-white/15 text-[10px] text-slate-300">
+                Esc
+              </Kbd>
+            )}
+            <Button
+              aria-label="Close temporary zone"
+              className="bg-white/10 hover:bg-white/20 disabled:opacity-40 p-0 border border-white/10 size-7 text-slate-100 disabled:cursor-not-allowed"
+              disabled={isCloseDisabled}
+              onClick={onClose}
+              onPointerDown={(event) => event.stopPropagation()}
+              type="button"
+              variant="secondary"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
         {openZone === "banish" ? (
           <div className="gap-2 grid">
@@ -516,6 +546,19 @@ function getTemporaryZoneEmptyMessage(openZone: TemporaryZone) {
     default:
       return "No accepted server events are present in the current preview state.";
   }
+}
+
+function shouldIgnoreCloseShortcut(event: KeyboardEvent) {
+  return (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    isEditableTarget(event.target) ||
+    event.key !== "Escape"
+  );
 }
 
 function shouldIgnorePassShortcut(event: KeyboardEvent) {
