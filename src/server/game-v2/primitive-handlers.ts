@@ -126,6 +126,7 @@ export function createPrimitiveHandlersV2(
         : binding.parameters.target === "game" || binding.parameters.target === "controller_spell"
           ? [null]
           : context.selectedIds;
+      const mightTargets: string[] = [];
       for (const target of targets) {
         const modifier = {
           id: `modifier:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.modifiers.length}`,
@@ -140,8 +141,12 @@ export function createPrimitiveHandlersV2(
           createdAtTurn: context.game.state.turn?.turnNumber ?? 0
         };
         context.game.state.modifiers.push(modifier);
-        if (target && attribute === "might") recomputeMight(context.game, target, index);
+        if (target && attribute === "might") {
+          recomputeMight(context.game, target, index);
+          mightTargets.push(target);
+        }
       }
+      cleanupLethalDamage(context.game, mightTargets, index);
     }
   });
   handlers.set("ability.exhaust_for_resource", {
@@ -190,6 +195,7 @@ export function cleanupTurnModifiersV2(game: GameDocumentV2, index: RuntimeCardI
   const affected = game.state.modifiers.filter((item) => item.duration === "thisTurn" && item.targetCardInstanceId).map((item) => item.targetCardInstanceId!);
   game.state.modifiers = game.state.modifiers.filter((item) => item.duration !== "thisTurn");
   affected.forEach((id) => recomputeMight(game, id, index));
+  cleanupLethalDamage(game, [...new Set(affected)], index);
 }
 
 function selectorTargets(binding: BehaviorBindingV2, game: GameDocumentV2, index: RuntimeCardIndexV2, predicate: (id: string) => boolean) {
@@ -232,7 +238,9 @@ function recomputeMight(game: GameDocumentV2, id: string, index: RuntimeCardInde
 function cleanupLethalDamage(game: GameDocumentV2, ids: string[], index: RuntimeCardIndexV2) {
   for (const id of ids) {
     const state = game.state.cardStates[id];
-    if (state && state.damage >= (state.computedMight ?? definitionForInstanceV2(id, index).card.attributes.might ?? Infinity)) moveUnitToTrash(game, id, index);
+    if (state && state.damage > 0 && state.damage >= (state.computedMight ?? definitionForInstanceV2(id, index).card.attributes.might ?? Infinity)) {
+      moveUnitToTrash(game, id, index);
+    }
   }
 }
 function moveUnitToTrash(game: GameDocumentV2, id: string, index: RuntimeCardIndexV2) {

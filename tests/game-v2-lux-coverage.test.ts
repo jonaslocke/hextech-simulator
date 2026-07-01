@@ -196,7 +196,9 @@ test("does not project mandatory-target spells without enough legal targets", as
 
 test("lethal damage moves a base Unit exclusively to trash and resets board state", async () => {
   const template = await fixtureSnapshot();
-  let { game, decks } = runtimeFixture(template);
+  const fixture = runtimeFixture(template);
+  let game = fixture.game;
+  const decks = fixture.decks;
   const finalSpark = instanceNamed(decks, "p1", "Final Spark");
   const target = instanceNamed(decks, "p2", "Daring Poro");
 
@@ -227,9 +229,49 @@ test("lethal damage moves a base Unit exclusively to trash and resets board stat
   assert.equal(game.state.cardStates[target]!.exhausted, false);
 });
 
+test("reducing Might to marked damage kills the Unit during cleanup", async () => {
+  const template = await fixtureSnapshot();
+  const fixture = runtimeFixture(template);
+  let game = fixture.game;
+  const decks = fixture.decks;
+  const singularity = instanceNamed(decks, "p1", "Singularity");
+  const stupefies = instancesNamed(decks, "p1", "Stupefy").slice(0, 2);
+  const target = instanceNamed(decks, "p2", "Mega-Mech");
+
+  relocate(game, "p1", singularity, "hand");
+  stupefies.forEach((id) => relocate(game, "p1", id, "hand"));
+  relocate(game, "p2", target, "base");
+
+  for (const spell of [singularity, ...stupefies]) {
+    const play = gameplayActionsV2(game, "p1", decks).find(
+      (action) => action.sourceCardInstanceId === spell
+    );
+    assert.ok(play);
+    game = performGameplayActionV2({
+      game,
+      actorPlayerId: "p1",
+      actionId: play.id,
+      selectedIds: [target],
+      decks,
+      now: `play-${spell}`
+    });
+    game = resolveAll(game, decks);
+  }
+
+  assert.equal(game.state.players.p2!.zones.base.includes(target), false);
+  assert.equal(
+    game.state.players.p2!.zones.trash.filter((id) => id === target).length,
+    1
+  );
+  assert.equal(game.state.cardStates[target]!.damage, 0);
+  assert.equal(game.state.cardStates[target]!.computedMight, 6);
+});
+
 test("autopayment can exhaust and recycle the same rune for Energy and Power", async () => {
   const template = await fixtureSnapshot();
-  let { game, decks } = runtimeFixture(template);
+  const fixture = runtimeFixture(template);
+  let game = fixture.game;
+  const decks = fixture.decks;
   const player = game.state.players.p1!;
   const runes = decks
     .find((deck) => deck.playerId === "p1")!
