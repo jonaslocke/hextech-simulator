@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import { GripVertical, X } from "lucide-react";
+import { Button } from "@/shared/components/button";
+import { Kbd } from "@/shared/components/kbd";
 import { cn } from "@/shared/utils/cn";
 import {
   Card,
@@ -212,6 +214,48 @@ export function TemporaryZoneOverlay({
     };
   }, [clampOverlayPosition, openZone, position]);
 
+  useEffect(() => {
+    if (!openZone) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      panelRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [openZone]);
+
+  const canUsePassShortcut =
+    openZone === "chain" &&
+    chainCards.length > 0 &&
+    canPassChain &&
+    Boolean(onPassChain);
+
+  useEffect(() => {
+    if (!canUsePassShortcut) {
+      return;
+    }
+
+    function handleWindowKeyDown(event: KeyboardEvent) {
+      if (shouldIgnorePassShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      onPassChain?.();
+    }
+
+    window.addEventListener("keydown", handleWindowKeyDown, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown, true);
+    };
+  }, [canUsePassShortcut, onPassChain]);
+
   if (!openZone) {
     return null;
   }
@@ -222,11 +266,13 @@ export function TemporaryZoneOverlay({
   return (
     <div className="z-30 fixed inset-0 overflow-hidden pointer-events-none">
       <div
+        aria-label={title}
         className={cn(
-          "fixed bg-slate-950/55 supports-[backdrop-filter]:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl ring-1 ring-cyan-300/10 w-72 text-slate-100 pointer-events-auto select-none",
+          "fixed bg-slate-950/55 supports-[backdrop-filter]:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl outline-none ring-1 ring-cyan-300/10 w-72 text-slate-100 pointer-events-auto select-none",
           position ? "left-0 top-0" : "right-16 top-20",
         )}
         ref={panelRef}
+        role="dialog"
         style={
           position
             ? {
@@ -234,6 +280,7 @@ export function TemporaryZoneOverlay({
               }
             : undefined
         }
+        tabIndex={-1}
       >
         <div className="flex justify-between items-center gap-2 mb-3">
           <div
@@ -249,16 +296,17 @@ export function TemporaryZoneOverlay({
             <GripVertical className="size-4 text-slate-500 shrink-0" />
             <span className="truncate">{title}</span>
           </div>
-          <button
+          <Button
             aria-label="Close temporary zone"
-            className="bg-white/10 hover:bg-white/20 disabled:opacity-40 p-1 border border-white/10 rounded text-slate-100 transition disabled:cursor-not-allowed"
+            className="bg-white/10 hover:bg-white/20 disabled:opacity-40 p-0 border border-white/10 size-7 text-slate-100 disabled:cursor-not-allowed"
             disabled={isCloseDisabled}
             onClick={onClose}
             onPointerDown={(event) => event.stopPropagation()}
             type="button"
+            variant="secondary"
           >
             <X className="size-4" />
-          </button>
+          </Button>
         </div>
         {openZone === "banish" ? (
           <div className="gap-2 grid">
@@ -293,14 +341,24 @@ export function TemporaryZoneOverlay({
               onItemPointerLeave={onChainItemPointerLeave}
             />
             {chainCards.length > 0 && (
-              <button
-                className="bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 px-3 py-2 rounded font-semibold text-slate-950 text-sm transition disabled:cursor-not-allowed"
-                disabled={!canPassChain}
+              <Button
+                className="bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 w-full font-semibold text-slate-950 text-sm disabled:cursor-not-allowed"
+                disabled={!canUsePassShortcut}
                 onClick={onPassChain}
                 type="button"
               >
-                {canPassChain ? chainPassLabel : "Waiting for priority"}
-              </button>
+                <span>
+                  {canPassChain ? chainPassLabel : "Waiting for priority"}
+                </span>
+                {canUsePassShortcut && (
+                  <span className="inline-flex items-center gap-1 ml-2 font-medium text-slate-950/75 text-xs">
+                    <span className="hidden sm:inline">Press</span>
+                    <Kbd className="bg-slate-950/10 shadow-none px-1.5 py-0.5 border-slate-950/20 text-[10px] text-slate-950/80">
+                      J
+                    </Kbd>
+                  </span>
+                )}
+              </Button>
             )}
           </div>
         ) : (
@@ -419,7 +477,10 @@ function LogList({ entries }: { entries: GameLogEntryV2[] }) {
   return (
     <ol className="gap-2 grid max-h-80 overflow-auto text-slate-200 text-xs">
       {entries.map((entry) => (
-        <li key={entry.id} className="bg-white/[0.07] shadow-black/20 shadow-sm p-2 border border-white/10 rounded">
+        <li
+          key={entry.id}
+          className="bg-white/[0.07] shadow-black/20 shadow-sm p-2 border border-white/10 rounded"
+        >
           <div className="text-[10px] text-slate-500 uppercase">
             Event {entry.sequence}
           </div>
@@ -455,6 +516,31 @@ function getTemporaryZoneEmptyMessage(openZone: TemporaryZone) {
     default:
       return "No accepted server events are present in the current preview state.";
   }
+}
+
+function shouldIgnorePassShortcut(event: KeyboardEvent) {
+  return (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    isEditableTarget(event.target) ||
+    event.key.toLowerCase() !== "j"
+  );
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [role="textbox"]',
+    ),
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
