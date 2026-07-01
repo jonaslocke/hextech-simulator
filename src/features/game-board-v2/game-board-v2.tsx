@@ -59,6 +59,7 @@ type GameBoardProps = {
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
 type CardActionMenuItem = {
   disabled?: boolean;
+  id: string;
   label: string;
   onSelect?: () => void;
 };
@@ -356,12 +357,14 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
+          id: mode.id,
           label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
           }))
         : [
             {
               disabled: true,
+              id: `${card.instanceId}:not-playable`,
               label: "Not playable",
             },
           ],
@@ -443,6 +446,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     if (actions.length === 0) return;
     openCardActionMenu(event, actions.map((action) => ({
       disabled: !action.enabled,
+      id: action.id,
       label: action.enabled ? action.label : `${action.label} (${action.disabledReason ?? "unavailable"})`,
       onSelect: () => beginPlayOrTargetSelection(card, action.id)
     })));
@@ -551,6 +555,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     openCardActionMenu(event, [
       {
         disabled: card.isExhausted,
+        id: `${card.instanceId}:add-energy`,
         label: card.isExhausted ? "Add Energy (exhausted)" : "Add Energy",
         onSelect: () =>
           submitRuneResource({
@@ -559,6 +564,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
           }),
       },
       {
+        id: `${card.instanceId}:add-power`,
         label: "Add Power",
         onSelect: () =>
           submitRuneResource({
@@ -1017,7 +1023,7 @@ function CardActionMenu({
         <button
           className="flex items-center enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full disabled:text-slate-500 text-xs text-left transition disabled:cursor-not-allowed"
           disabled={item.disabled}
-          key={item.label}
+          key={item.id}
           onClick={() => {
             onClose();
             item.onSelect?.();
