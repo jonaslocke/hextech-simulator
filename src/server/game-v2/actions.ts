@@ -260,26 +260,6 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   remainingEnergy -= conditionalEnergy;
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
-  const energySourceIds: string[] = [];
-  let generatedConditionalEnergy = 0;
-  let generatedPooledEnergy = 0;
-  for (const id of player.zones.base) {
-    if (remainingEnergy === 0) break;
-    if (game.state.cardStates[id]?.exhausted) continue;
-    const ability = exhaustForEnergyAbility(
-      id,
-      definition.card.classification.type,
-      index
-    );
-    if (!ability) continue;
-    energySourceIds.push(id);
-    const unusedEnergy = Math.max(0, ability.amount - remainingEnergy);
-    remainingEnergy = Math.max(0, remainingEnergy - ability.amount);
-    if (ability.usage === "spellsOnly") generatedConditionalEnergy += unusedEnergy;
-    else generatedPooledEnergy += unusedEnergy;
-  }
-  if (remainingEnergy > 0) return null;
-
   let remainingPower = definition.card.attributes.power ?? 0;
   const allowedDomains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
   if (remainingPower > 0 && allowedDomains.length === 0) return null;
@@ -292,12 +272,41 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
   const powerRuneIds: string[] = [];
   for (const id of player.zones.base) {
     if (remainingPower === 0) break;
-    if (energySourceIds.includes(id) || !hasAbility(id, "ability.recycle_for_power", index)) continue;
+    if (!hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstanceV2(id, index).card.classification.domain[0];
     if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
     powerRuneIds.push(id);
     remainingPower -= 1;
   }
+  if (remainingPower > 0) return null;
+
+  const energySourceIds: string[] = [];
+  let generatedConditionalEnergy = 0;
+  let generatedPooledEnergy = 0;
+  const consumeEnergySource = (id: string) => {
+    if (
+      remainingEnergy === 0 ||
+      energySourceIds.includes(id) ||
+      game.state.cardStates[id]?.exhausted
+    ) {
+      return;
+    }
+    const ability = exhaustForEnergyAbility(
+      id,
+      definition.card.classification.type,
+      index
+    );
+    if (!ability) return;
+    energySourceIds.push(id);
+    const unusedEnergy = Math.max(0, ability.amount - remainingEnergy);
+    remainingEnergy = Math.max(0, remainingEnergy - ability.amount);
+    if (ability.usage === "spellsOnly") generatedConditionalEnergy += unusedEnergy;
+    else generatedPooledEnergy += unusedEnergy;
+  };
+  powerRuneIds.forEach(consumeEnergySource);
+  player.zones.base.forEach(consumeEnergySource);
+  if (remainingEnergy > 0) return null;
+
   return remainingPower === 0 ? {
     conditionalEnergy,
     pooledEnergy,
@@ -322,6 +331,11 @@ function pay(game: GameDocumentV2, playerId: string, definition: GameCardDefinit
   for (const id of plan.powerRuneIds) {
     player.zones.base = player.zones.base.filter((candidate) => candidate !== id);
     player.zones.runeDeck.push(id);
+    const state = game.state.cardStates[id];
+    if (state) {
+      state.damage = 0;
+      state.exhausted = false;
+    }
   }
 }
 

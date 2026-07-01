@@ -194,6 +194,81 @@ test("does not project mandatory-target spells without enough legal targets", as
   );
 });
 
+test("lethal damage moves a base Unit exclusively to trash and resets board state", async () => {
+  const template = await fixtureSnapshot();
+  let { game, decks } = runtimeFixture(template);
+  const finalSpark = instanceNamed(decks, "p1", "Final Spark");
+  const target = instanceNamed(decks, "p2", "Daring Poro");
+
+  relocate(game, "p1", finalSpark, "hand");
+  relocate(game, "p2", target, "base");
+  game.state.cardStates[target]!.exhausted = true;
+
+  const play = gameplayActionsV2(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === finalSpark
+  );
+  assert.ok(play);
+  game = performGameplayActionV2({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [target],
+    decks,
+    now: "lethal-base-damage"
+  });
+  game = resolveAll(game, decks);
+
+  assert.equal(game.state.players.p2!.zones.base.includes(target), false);
+  assert.equal(
+    game.state.players.p2!.zones.trash.filter((id) => id === target).length,
+    1
+  );
+  assert.equal(game.state.cardStates[target]!.damage, 0);
+  assert.equal(game.state.cardStates[target]!.exhausted, false);
+});
+
+test("autopayment can exhaust and recycle the same rune for Energy and Power", async () => {
+  const template = await fixtureSnapshot();
+  let { game, decks } = runtimeFixture(template);
+  const player = game.state.players.p1!;
+  const runes = decks
+    .find((deck) => deck.playerId === "p1")!
+    .instances.filter((instance) => instance.source === "runeDeck")
+    .map((instance) => instance.instanceId);
+  const attendants = instancesNamed(decks, "p1", "Vanguard Attendant").slice(0, 2);
+
+  player.energy = 0;
+  player.conditionalEnergy = 0;
+  player.power = {};
+  runes.forEach((id) => relocate(game, "p1", id, "base"));
+  attendants.forEach((id) => relocate(game, "p1", id, "hand"));
+
+  for (const attendant of attendants) {
+    const play = gameplayActionsV2(game, "p1", decks).find(
+      (action) => action.sourceCardInstanceId === attendant
+    );
+    assert.ok(play, "twelve runes should pay for two Vanguard Attendants");
+    game = performGameplayActionV2({
+      game,
+      actorPlayerId: "p1",
+      actionId: play.id,
+      selectedIds: [],
+      decks,
+      now: `play-${attendant}`
+    });
+  }
+
+  const finalPlayer = game.state.players.p1!;
+  assert.equal(
+    attendants.every((id) => finalPlayer.zones.base.includes(id)),
+    true
+  );
+  assert.equal(
+    runes.filter((id) => finalPlayer.zones.runeDeck.includes(id)).length,
+    2
+  );
+});
+
 function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
   const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({

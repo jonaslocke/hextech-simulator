@@ -160,6 +160,7 @@ export function createPrimitiveHandlersV2(
       const player = context.game.state.players[context.controllerPlayerId]!;
       player.zones.base = player.zones.base.filter((id) => id !== context.sourceCardInstanceId);
       player.zones.runeDeck.push(context.sourceCardInstanceId);
+      resetStateAfterLeavingBoard(context.game, context.sourceCardInstanceId);
       const domain = definitionForInstanceV2(context.sourceCardInstanceId, index).card.classification.domain[0] ?? "Rainbow";
       player.power[domain] = (player.power[domain] ?? 0) + 1;
     }
@@ -235,10 +236,32 @@ function cleanupLethalDamage(game: GameDocumentV2, ids: string[], index: Runtime
   }
 }
 function moveUnitToTrash(game: GameDocumentV2, id: string, index: RuntimeCardIndexV2) {
-  game.state.battlefields.forEach((battlefield) => { battlefield.units = battlefield.units.filter((item) => item !== id); });
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
-  game.state.players[owner]!.zones.trash.push(id);
+  const zones = game.state.players[owner]!.zones;
+  for (const zone of [
+    "mainDeck",
+    "runeDeck",
+    "hand",
+    "trash",
+    "banishment",
+    "base"
+  ] as const) {
+    zones[zone] = zones[zone].filter((item) => item !== id);
+  }
+  if (zones.legend === id) zones.legend = null;
+  if (zones.champion === id) zones.champion = null;
+  game.state.battlefields.forEach((battlefield) => {
+    battlefield.units = battlefield.units.filter((item) => item !== id);
+  });
+  zones.trash.push(id);
+  resetStateAfterLeavingBoard(game, id);
+}
+function resetStateAfterLeavingBoard(game: GameDocumentV2, id: string) {
+  const state = game.state.cardStates[id];
+  if (!state) return;
+  state.damage = 0;
+  state.exhausted = false;
 }
 function numberParam(binding: BehaviorBindingV2, key: string) {
   const value = binding.parameters[key];
