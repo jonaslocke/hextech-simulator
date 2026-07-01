@@ -269,6 +269,49 @@ test("autopayment can exhaust and recycle the same rune for Energy and Power", a
   );
 });
 
+test("autopayment prioritizes Lux spell Energy before unrestricted rune Energy", async () => {
+  const template = await fixtureSnapshot();
+  const { game, decks } = runtimeFixture(template);
+  const player = game.state.players.p1!;
+  const lux = instanceNamed(decks, "p1", "Lux, Crownguard");
+  const singularity = instanceNamed(decks, "p1", "Singularity");
+  const mindRunes = instancesNamed(decks, "p1", "Mind Rune").slice(0, 2);
+  const orderRunes = instancesNamed(decks, "p1", "Order Rune").slice(0, 3);
+
+  player.energy = 0;
+  player.conditionalEnergy = 0;
+  player.power = {};
+  [...mindRunes, ...orderRunes, lux].forEach((id) =>
+    relocate(game, "p1", id, "base")
+  );
+  relocate(game, "p1", singularity, "hand");
+
+  const play = gameplayActionsV2(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === singularity
+  );
+  assert.ok(play);
+  const next = performGameplayActionV2({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "singularity-payment"
+  });
+  const nextPlayer = next.state.players.p1!;
+
+  assert.equal(next.state.cardStates[lux]!.exhausted, true);
+  assert.equal(nextPlayer.conditionalEnergy, 0);
+  assert.equal(
+    mindRunes.every((id) => nextPlayer.zones.runeDeck.includes(id)),
+    true
+  );
+  assert.equal(
+    orderRunes.filter((id) => next.state.cardStates[id]!.exhausted).length,
+    2
+  );
+});
+
 function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
   const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({

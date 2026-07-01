@@ -303,6 +303,14 @@ function buildPaymentPlanV2(game: GameDocumentV2, playerId: string, definition: 
     if (ability.usage === "spellsOnly") generatedConditionalEnergy += unusedEnergy;
     else generatedPooledEnergy += unusedEnergy;
   };
+  for (const id of player.zones.base) {
+    const ability = exhaustForEnergyAbility(
+      id,
+      definition.card.classification.type,
+      index
+    );
+    if (ability?.usage === "spellsOnly") consumeEnergySource(id);
+  }
   powerRuneIds.forEach(consumeEnergySource);
   player.zones.base.forEach(consumeEnergySource);
   if (remainingEnergy > 0) return null;
