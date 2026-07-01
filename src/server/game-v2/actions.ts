@@ -377,9 +377,31 @@ function addPlayableCardActions(
     const targets = compiled.clauses
       .filter((clause) => clause.triggers.length === 0)
       .flatMap((clause) => targetRequirementsForClauseV2(clause, context, handlers));
+    if (!canSatisfyTargetRequirements(targets)) continue;
     actions.push(action(game, "play", `Play ${definition.card.name}`, cardId, true, null, undefined, targets));
   }
   void decks;
+}
+
+function canSatisfyTargetRequirements(
+  requirements: ProjectedAction["targets"]
+): boolean {
+  if (
+    requirements.some(
+      (requirement) =>
+        new Set(requirement.legalIds).size < requirement.minimum
+    )
+  ) {
+    return false;
+  }
+  const minimumSelections = requirements.reduce(
+    (total, requirement) => total + requirement.minimum,
+    0
+  );
+  const legalSelections = new Set(
+    requirements.flatMap((requirement) => requirement.legalIds)
+  );
+  return legalSelections.size >= minimumSelections;
 }
 
 function addAbilityActions(

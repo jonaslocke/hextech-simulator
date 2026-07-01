@@ -172,6 +172,28 @@ test("autopayment only uses Lux Crownguard's Energy for spells", async () => {
   assert.equal(next.state.players.p1!.conditionalEnergy, 1);
 });
 
+test("does not project mandatory-target spells without enough legal targets", async () => {
+  const template = await fixtureSnapshot();
+  const { game, decks } = runtimeFixture(template);
+  const stupefy = instanceNamed(decks, "p1", "Stupefy");
+  const singularity = instanceNamed(decks, "p1", "Singularity");
+
+  relocate(game, "p1", stupefy, "hand");
+  relocate(game, "p1", singularity, "hand");
+
+  const actions = gameplayActionsV2(game, "p1", decks);
+  assert.equal(
+    actions.some((action) => action.sourceCardInstanceId === stupefy),
+    false,
+    "Stupefy requires one Unit target"
+  );
+  assert.equal(
+    actions.some((action) => action.sourceCardInstanceId === singularity),
+    true,
+    "Singularity permits zero targets"
+  );
+});
+
 function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
   const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
