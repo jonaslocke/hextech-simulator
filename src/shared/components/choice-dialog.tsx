@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "./button";
+import { DialogPortal } from "./dialog-portal";
 
 export type ChoiceDialogOption = {
   description?: string;
@@ -53,48 +54,50 @@ export function ChoiceDialog({
     selectionMode === "ordered" ? orderedIds : selectedId ? [selectedId] : [];
 
   return (
-    <div className="fixed inset-0 z-[2147483646] flex items-center justify-center bg-black/55 p-4">
-      <section
-        aria-modal="true"
-        className="grid max-h-[min(42rem,calc(100vh-2rem))] w-full max-w-xl gap-4 overflow-hidden rounded-lg border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/70"
-        role="dialog"
-      >
-        <header>
-          <h2 className="text-lg font-semibold leading-tight">{title}</h2>
-          {description && (
-            <p className="mt-1 text-sm text-slate-400">{description}</p>
+    <DialogPortal>
+      <div className="fixed inset-0 z-[2147483646] flex items-center justify-center bg-black/55 p-4">
+        <section
+          aria-modal="true"
+          className="grid max-h-[min(42rem,calc(100vh-2rem))] w-full max-w-xl gap-4 overflow-hidden rounded-lg border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/70"
+          role="dialog"
+        >
+          <header>
+            <h2 className="text-lg font-semibold leading-tight">{title}</h2>
+            {description && (
+              <p className="mt-1 text-sm text-slate-400">{description}</p>
+            )}
+          </header>
+          {selectionMode === "single" ? (
+            <SingleChoiceList
+              onSelect={setSelectedId}
+              options={options}
+              selectedId={selectedId}
+            />
+          ) : (
+            <OrderedChoiceList
+              onOrderChange={setOrderedIds}
+              options={options}
+              orderedIds={orderedIds}
+            />
           )}
-        </header>
-        {selectionMode === "single" ? (
-          <SingleChoiceList
-            onSelect={setSelectedId}
-            options={options}
-            selectedId={selectedId}
-          />
-        ) : (
-          <OrderedChoiceList
-            onOrderChange={setOrderedIds}
-            options={options}
-            orderedIds={orderedIds}
-          />
-        )}
-        <footer className="flex justify-end gap-2 border-t border-white/10 pt-3">
-          {onCancel && (
-            <Button onClick={onCancel} type="button" variant="secondary">
-              Cancel
+          <footer className="flex justify-end gap-2 border-t border-white/10 pt-3">
+            {onCancel && (
+              <Button onClick={onCancel} type="button" variant="secondary">
+                Cancel
+              </Button>
+            )}
+            <Button
+              disabled={!canConfirm}
+              onClick={() => onConfirm(selectedIds)}
+              type="button"
+            >
+              {confirmLabel ??
+                (selectionMode === "ordered" ? "Submit order" : "Confirm")}
             </Button>
-          )}
-          <Button
-            disabled={!canConfirm}
-            onClick={() => onConfirm(selectedIds)}
-            type="button"
-          >
-            {confirmLabel ??
-              (selectionMode === "ordered" ? "Submit order" : "Confirm")}
-          </Button>
-        </footer>
-      </section>
-    </div>
+          </footer>
+        </section>
+      </div>
+    </DialogPortal>
   );
 }
 

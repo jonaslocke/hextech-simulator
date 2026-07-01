@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "./button";
+import { DialogPortal } from "./dialog-portal";
 
 export type ChoiceDialogOption = {
   description?: string;
@@ -158,76 +159,82 @@ export function ChoiceDialog({
   }
 
   return (
-    <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4">
-      <section
-        aria-modal="true"
-        className={cx(
-          "grid max-h-[min(46rem,calc(100vh-2rem))] w-full gap-4 overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/80",
-          usesCardPresentation ? getCardDialogMaxWidth(cardSize) : "max-w-xl",
-        )}
-        role="dialog"
-      >
-        <header className="space-y-1">
-          <h2 className="font-semibold text-lg leading-tight">{title}</h2>
-          {description && (
-            <p className="max-w-2xl text-slate-400 text-sm">{description}</p>
+    <DialogPortal>
+      <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4">
+        <section
+          aria-modal="true"
+          className={cx(
+            "grid max-h-[min(46rem,calc(100vh-2rem))] w-full gap-4 overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/80",
+            usesCardPresentation ? getCardDialogMaxWidth(cardSize) : "max-w-xl",
           )}
-        </header>
+          role="dialog"
+        >
+          <header className="space-y-1">
+            <h2 className="font-semibold text-lg leading-tight">{title}</h2>
+            {description && (
+              <p className="max-w-2xl text-slate-400 text-sm">{description}</p>
+            )}
+          </header>
 
-        {usesCardPresentation ? (
-          <CardChoiceGrid
-            cardSize={cardSize}
-            maxSelected={maxSelected}
-            onOrderChange={setOrderedIds}
-            onSelect={selectOption}
-            options={selectionMode === "ordered" ? sortOptions(options, orderedIds) : options}
-            orderedIds={orderedIds}
-            selectedIds={currentSelectedIds}
-            selectionLimitReached={selectionLimitReached}
-            selectionMode={selectionMode}
-          />
-        ) : selectionMode === "ordered" ? (
-          <OrderedChoiceList
-            onOrderChange={setOrderedIds}
-            options={options}
-            orderedIds={orderedIds}
-          />
-        ) : (
-          <ChoiceList
-            maxSelected={maxSelected}
-            onSelect={selectOption}
-            options={options}
-            selectedIds={selectedIds}
-            selectionLimitReached={selectionLimitReached}
-            selectionMode={selectionMode}
-          />
-        )}
+          {usesCardPresentation ? (
+            <CardChoiceGrid
+              cardSize={cardSize}
+              maxSelected={maxSelected}
+              onOrderChange={setOrderedIds}
+              onSelect={selectOption}
+              options={
+                selectionMode === "ordered"
+                  ? sortOptions(options, orderedIds)
+                  : options
+              }
+              orderedIds={orderedIds}
+              selectedIds={currentSelectedIds}
+              selectionLimitReached={selectionLimitReached}
+              selectionMode={selectionMode}
+            />
+          ) : selectionMode === "ordered" ? (
+            <OrderedChoiceList
+              onOrderChange={setOrderedIds}
+              options={options}
+              orderedIds={orderedIds}
+            />
+          ) : (
+            <ChoiceList
+              maxSelected={maxSelected}
+              onSelect={selectOption}
+              options={options}
+              selectedIds={selectedIds}
+              selectionLimitReached={selectionLimitReached}
+              selectionMode={selectionMode}
+            />
+          )}
 
-        <footer className="flex justify-end items-center gap-2 pt-3 border-white/10 border-t">
-          <SelectionSummary
-            maxSelected={maxSelected}
-            selectedIds={currentSelectedIds}
-            selectionMode={selectionMode}
-          />
-          {onCancel && (
-            <Button onClick={onCancel} type="button" variant="secondary">
-              Cancel
+          <footer className="flex justify-end items-center gap-2 pt-3 border-white/10 border-t">
+            <SelectionSummary
+              maxSelected={maxSelected}
+              selectedIds={currentSelectedIds}
+              selectionMode={selectionMode}
+            />
+            {onCancel && (
+              <Button onClick={onCancel} type="button" variant="secondary">
+                Cancel
+              </Button>
+            )}
+            <Button
+              disabled={!canConfirm}
+              onClick={() => onConfirm(currentSelectedIds)}
+              type="button"
+            >
+              {resolveConfirmLabel({
+                confirmLabel,
+                selectedIds: currentSelectedIds,
+                selectionMode,
+              })}
             </Button>
-          )}
-          <Button
-            disabled={!canConfirm}
-            onClick={() => onConfirm(currentSelectedIds)}
-            type="button"
-          >
-            {resolveConfirmLabel({
-              confirmLabel,
-              selectedIds: currentSelectedIds,
-              selectionMode,
-            })}
-          </Button>
-        </footer>
-      </section>
-    </div>
+          </footer>
+        </section>
+      </div>
+    </DialogPortal>
   );
 }
 
