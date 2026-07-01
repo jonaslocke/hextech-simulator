@@ -151,10 +151,10 @@ function playCard(game: GameDocumentV2, playerId: string, cardId: string, select
   const item = { id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: selectedIds, behaviorClauseId: null, behaviorEvent: null };
   if (game.state.chain) {
     game.state.chain.items.push(item);
-    game.state.chain.priorityPlayerId = otherPlayer(game, playerId);
+    game.state.chain.priorityPlayerId = playerId;
     game.state.chain.passedPlayerIds = [];
   } else {
-    game.state.chain = { items: [item], priorityPlayerId: otherPlayer(game, playerId), passedPlayerIds: [] };
+    game.state.chain = { items: [item], priorityPlayerId: playerId, passedPlayerIds: [] };
   }
 }
 

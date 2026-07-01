@@ -31,9 +31,11 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   const stupefy = instanceNamed(decks, "p1", "Stupefy");
   const friendlyOne = instanceNamed(decks, "p1", "Vanguard Sergeant");
   const friendlyTwo = instanceNamed(decks, "p1", "Daring Poro");
+  const friendlyBase = instanceNamed(decks, "p1", "Mega-Mech");
   const enemy = instanceNamed(decks, "p2", "Vanguard Sergeant");
   relocate(game, rune, "base");
   relocate(game, stupefy, "hand");
+  relocate(game, friendlyBase, "base");
   relocateToBattlefield(game, friendlyOne, "p1");
   relocateToBattlefield(game, friendlyTwo, "p1");
   relocateToBattlefield(game, enemy, "p2");
@@ -46,9 +48,10 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   const handBefore = game.state.players.p1!.zones.hand.length;
   const enemyMightBefore = game.state.cardStates[enemy]!.computedMight!;
   const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
-  assert.deepEqual(play.targets[0], { kind: "card", legalIds: [friendlyOne, friendlyTwo, enemy], minimum: 1, maximum: 1 });
+  assert.deepEqual(play.targets[0], { kind: "card", legalIds: [friendlyBase, friendlyOne, friendlyTwo, enemy], minimum: 1, maximum: 1 });
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "c" });
-  for (const playerId of ["p2", "p1"]) {
+  assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActionsV2(game, playerId, decks).find((action) => action.label === "Pass priority")!;
     game = performGameplayActionV2({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "d" });
   }

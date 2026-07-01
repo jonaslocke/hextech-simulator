@@ -24,7 +24,8 @@ test("plays a spell through priority resolution and advances the turn", () => {
   const play = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "Play Spell")!;
   game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
   assert.equal(game.state.chain?.items.length, 1);
-  for (const playerId of ["p2", "p1"]) {
+  assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActionsV2(game, playerId, decks)[0]!;
     game = performGameplayActionV2({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "c" });
   }

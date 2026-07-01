@@ -192,7 +192,16 @@ export function cleanupTurnModifiersV2(game: GameDocumentV2, index: RuntimeCardI
 }
 
 function selectorTargets(binding: BehaviorBindingV2, game: GameDocumentV2, index: RuntimeCardIndexV2, predicate: (id: string) => boolean) {
-  const legalIds = game.state.battlefields.flatMap((battlefield) => battlefield.units)
+  const baseUnits = game.state.setup.playerIds.flatMap(
+    (playerId) => game.state.players[playerId]?.zones.base ?? []
+  );
+  const battlefieldUnits = game.state.battlefields.flatMap((battlefield) => battlefield.units);
+  const candidates = binding.parameters.area === "battlefield"
+    ? battlefieldUnits
+    : binding.parameters.area === "base"
+      ? baseUnits
+      : [...baseUnits, ...battlefieldUnits];
+  const legalIds = candidates
     .filter((id) => definitionForInstanceV2(id, index).card.classification.type === "Unit")
     .filter(predicate);
   return {

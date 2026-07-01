@@ -68,6 +68,8 @@ type CardActionMenuState = {
   top: number;
 } | null;
 
+const EMPTY_TARGET_IDS: string[] = [];
+
 export const GameBoardV2: FC<GameBoardProps> = ({
   onPerformAction,
   playerNames = {},
@@ -112,11 +114,11 @@ export const GameBoardV2: FC<GameBoardProps> = ({
   const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
     useState<CardZoneAnimationSnapshot | null>(null);
   const [targetSelection, setTargetSelection] = useState<{
-    cardInstanceId: string;
+    actionId: string;
+    legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
     selectedTargetIds: string[];
-    selectedModeId?: string;
   } | null>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
@@ -226,11 +228,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     },
   );
   const viewerState = projection.players[projection.viewerPlayerId];
-  const legalTargetIds =
-    targetSelection && viewerState
-      ? (viewerState.legalTargetsByCard[targetSelection.cardInstanceId]
-          ?.cardInstanceIds ?? [])
-      : [];
+  const legalTargetIds = targetSelection?.legalTargetIds ?? EMPTY_TARGET_IDS;
   const displayedHighlightedCardInstanceIds = useMemo(() => {
     const next = new Set(highlightedCardInstanceIds);
 
@@ -377,25 +375,25 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     const projectedAction = selectedModeId
       ? sourceProjection.actions.find((action) => action.id === selectedModeId)
       : sourceActions(card.instanceId)[0];
-    const requirement = projectedAction?.targets.find((target) => target.kind === "card");
-    const targetConfig = requirement
-      ? { minTargets: requirement.minimum, maxTargets: requirement.maximum }
-      : null;
-    const legalTargets =
-      viewerState.legalTargetsByCard[card.instanceId]?.cardInstanceIds ?? [];
+    if (!projectedAction) {
+      return;
+    }
+    const requirement = projectedAction.targets.find(
+      (target) => target.kind === "card",
+    );
 
-    if (targetConfig && targetConfig.maxTargets > 0) {
+    if (requirement && requirement.maximum > 0) {
       setTargetSelection({
-        cardInstanceId: card.instanceId,
-        maxTargets: targetConfig.maxTargets,
-        minTargets: targetConfig.minTargets,
-        selectedModeId,
+        actionId: projectedAction.id,
+        legalTargetIds: requirement.legalIds,
+        maxTargets: requirement.maximum,
+        minTargets: requirement.minimum,
         selectedTargetIds: [],
       });
       return;
     }
 
-    if (targetConfig && targetConfig.maxTargets === 0 && legalTargets.length >= 0) {
+    if (requirement && requirement.maximum === 0) {
       submitPlayCard({
         canPlay: true,
         cardInstanceId: card.instanceId,
@@ -434,7 +432,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     event?: MouseEvent<HTMLElement>,
   ) => {
     if (targetSelection) {
-      chooseBoardTarget(card);
+      chooseBoardTarget(card.instanceId);
       return;
     }
 
@@ -449,24 +447,20 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       onSelect: () => beginPlayOrTargetSelection(card, action.id)
     })));
   };
-  const chooseBoardTarget = (card: Card) => {
-    if (!targetSelection || !card.instanceId || !viewerState) {
+  const chooseBoardTarget = (cardInstanceId: string | undefined) => {
+    if (!targetSelection || !cardInstanceId) {
       return;
     }
 
-    const legalTargets =
-      viewerState.legalTargetsByCard[targetSelection.cardInstanceId]
-        ?.cardInstanceIds ?? [];
-
-    if (!legalTargets.includes(card.instanceId)) {
+    if (!targetSelection.legalTargetIds.includes(cardInstanceId)) {
       return;
     }
 
     const selectedTargetIds = targetSelection.selectedTargetIds.includes(
-      card.instanceId,
+      cardInstanceId,
     )
-      ? targetSelection.selectedTargetIds.filter((id) => id !== card.instanceId)
-      : [...targetSelection.selectedTargetIds, card.instanceId].slice(
+      ? targetSelection.selectedTargetIds.filter((id) => id !== cardInstanceId)
+      : [...targetSelection.selectedTargetIds, cardInstanceId].slice(
           0,
           targetSelection.maxTargets,
         );
@@ -483,6 +477,24 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     ) {
       submitTargetedPlay(nextSelection);
     }
+  };
+  const handleTargetClickCapture = (event: MouseEvent<HTMLElement>) => {
+    if (!targetSelection || !(event.target instanceof Element)) {
+      return;
+    }
+
+    const cardElement = event.target.closest("[data-card-instance-id]") as
+      | HTMLElement
+      | null;
+    const cardInstanceId = cardElement?.dataset.cardInstanceId;
+
+    if (!cardInstanceId || !targetSelection.legalTargetIds.includes(cardInstanceId)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    chooseBoardTarget(cardInstanceId);
   };
   const handleTargetPointerEnter = (card: Card) => {
     if (!targetSelection || !card.instanceId) {
@@ -511,14 +523,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       return;
     }
 
-    submitPlayCard({
-      canPlay: true,
-      cardInstanceId: selection.cardInstanceId,
-      choices: {
-        targetCardInstanceIds: selection.selectedTargetIds,
-      },
-      selectedModeId: selection.selectedModeId,
-    });
+    submitProjectedAction(selection.actionId, selection.selectedTargetIds);
     setPendingSubmittedTargetIds(selection.selectedTargetIds);
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
@@ -603,7 +608,10 @@ export const GameBoardV2: FC<GameBoardProps> = ({
   }, [cardActionMenu]);
 
   return (
-    <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
+    <main
+      className="relative flex flex-col h-screen overflow-hidden text-slate-100"
+      onClickCapture={handleTargetClickCapture}
+    >
       <ScoreHeader opponent={board.opponent} player={board.player} />
       <section className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] min-h-0 p-2 overflow-hidden">
