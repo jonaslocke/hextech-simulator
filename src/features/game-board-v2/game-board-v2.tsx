@@ -1,6 +1,13 @@
 "use client";
 
 import {
+  DomainIcon,
+  EnergyResource,
+  formatDomain,
+} from "@/features/card-presentation";
+import { ChoiceDialog } from "@/shared/components/choice-dialog";
+import type { GameProjectionV2 } from "@/shared/game-v2";
+import {
   FC,
   MouseEvent,
   ReactNode,
@@ -9,17 +16,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  DomainIcon,
-  EnergyResource,
-  formatDomain,
-} from "@/features/card-presentation";
-import type { GameProjectionV2 } from "@/shared/game-v2";
-import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
-import { ScoreHeader } from "./components/score-header";
-import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import {
   CardZoneAnimationSnapshot,
@@ -28,8 +26,18 @@ import {
   ZoneAnimationCount,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
-import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
+import { PlayerHandFan } from "./components/player-hand-fan";
+import { ScoreHeader } from "./components/score-header";
+import { TargetSelectionPrompt } from "./components/target-selection-prompt";
+import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
+import {
+  adaptProjectionToLegacyBoard,
+  type BoardCatalogCard,
+  type BoardPlayerProjection,
+  type BoardZoneProjection,
+  type LegacyBoardProjection,
+} from "./legacy-board-adapter";
 import {
   BattlefieldData,
   Card,
@@ -39,13 +47,6 @@ import {
   ZoneData,
   ZoneKind,
 } from "./types";
-import {
-  adaptProjectionToLegacyBoard,
-  type BoardCatalogCard,
-  type BoardPlayerProjection,
-  type BoardZoneProjection,
-  type LegacyBoardProjection,
-} from "./legacy-board-adapter";
 
 type ProjectedBattlefield = LegacyBoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
@@ -79,28 +80,67 @@ export const GameBoardV2: FC<GameBoardProps> = ({
   projection: sourceProjection,
   scores = {},
 }) => {
-  const adapted = useMemo(() => adaptProjectionToLegacyBoard(sourceProjection), [sourceProjection]);
+  const adapted = useMemo(
+    () => adaptProjectionToLegacyBoard(sourceProjection),
+    [sourceProjection],
+  );
   const { cardsByInstanceId, projection } = adapted;
-  const logEntries = sourceProjection.logEntries.map((entry, index) => ({ ...entry, sequence: index + 1 }));
-  const submitProjectedAction = (actionId: string | undefined, selectedIds: string[] = []) => {
+  const logEntries = sourceProjection.logEntries.map((entry, index) => ({
+    ...entry,
+    sequence: index + 1,
+  }));
+  const submitProjectedAction = (
+    actionId: string | undefined,
+    selectedIds: string[] = [],
+  ) => {
     if (actionId) onPerformAction({ actionId, selectedIds });
   };
-  const sourceActions = (sourceCardInstanceId: string) => sourceProjection.actions.filter((action) => action.sourceCardInstanceId === sourceCardInstanceId);
-  const onEndTurn = () => submitProjectedAction(sourceProjection.actions.find((action) => action.label === "End turn")?.id);
-  const onPass = () => submitProjectedAction(sourceProjection.actions.find((action) => action.label === "Pass priority")?.id);
-  const onPlayCard = (input: { cardInstanceId: string; choices?: { targetCardInstanceIds?: string[] }; selectedModeId?: string }) => {
+  const sourceActions = (sourceCardInstanceId: string) =>
+    sourceProjection.actions.filter(
+      (action) => action.sourceCardInstanceId === sourceCardInstanceId,
+    );
+  const onEndTurn = () =>
+    submitProjectedAction(
+      sourceProjection.actions.find((action) => action.label === "End turn")
+        ?.id,
+    );
+  const onPass = () =>
+    submitProjectedAction(
+      sourceProjection.actions.find(
+        (action) => action.label === "Pass priority",
+      )?.id,
+    );
+  const onPlayCard = (input: {
+    cardInstanceId: string;
+    choices?: { targetCardInstanceIds?: string[] };
+    selectedModeId?: string;
+  }) => {
     const action = input.selectedModeId
-      ? sourceProjection.actions.find((candidate) => candidate.id === input.selectedModeId)
+      ? sourceProjection.actions.find(
+          (candidate) => candidate.id === input.selectedModeId,
+        )
       : sourceActions(input.cardInstanceId)[0];
-    submitProjectedAction(action?.id, input.choices?.targetCardInstanceIds ?? []);
+    submitProjectedAction(
+      action?.id,
+      input.choices?.targetCardInstanceIds ?? [],
+    );
   };
-  const onSubmitChoice = (input: { choiceId: string; orderedIds: string[] }) => {
+  const onSubmitChoice = (input: {
+    choiceId: string;
+    orderedIds: string[];
+  }) => {
     const action = sourceProjection.actions.find((candidate) => {
       if (candidate.presentation.surface !== "choice-dialog") return false;
       const encoded = candidate.id.split(":").at(-1);
       if (!encoded) return false;
-      try { return JSON.stringify(JSON.parse(decodeURIComponent(encoded))) === JSON.stringify(input.orderedIds); }
-      catch { return false; }
+      try {
+        return (
+          JSON.stringify(JSON.parse(decodeURIComponent(encoded))) ===
+          JSON.stringify(input.orderedIds)
+        );
+      } catch {
+        return false;
+      }
     });
     submitProjectedAction(action?.id);
   };
@@ -161,7 +201,8 @@ export const GameBoardV2: FC<GameBoardProps> = ({
         description: item ? formatChainItemKind(item.kind) : undefined,
         id,
         imageUrl: cardInstanceId
-          ? cardsByInstanceId[cardInstanceId]?.media.image_url ?? cardBackImage.src
+          ? (cardsByInstanceId[cardInstanceId]?.media.image_url ??
+            cardBackImage.src)
           : undefined,
         label: item?.label ?? id,
       };
@@ -352,8 +393,8 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
-          id: mode.id,
-          label: mode.label,
+            id: mode.id,
+            label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
           }))
         : [
@@ -439,12 +480,17 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     }
     const actions = sourceActions(card.instanceId);
     if (actions.length === 0) return;
-    openCardActionMenu(event, actions.map((action) => ({
-      disabled: !action.enabled,
-      id: action.id,
-      label: action.enabled ? action.label : `${action.label} (${action.disabledReason ?? "unavailable"})`,
-      onSelect: () => beginPlayOrTargetSelection(card, action.id)
-    })));
+    openCardActionMenu(
+      event,
+      actions.map((action) => ({
+        disabled: !action.enabled,
+        id: action.id,
+        label: action.enabled
+          ? action.label
+          : `${action.label} (${action.disabledReason ?? "unavailable"})`,
+        onSelect: () => beginPlayOrTargetSelection(card, action.id),
+      })),
+    );
   };
   const chooseBoardTarget = (cardInstanceId: string | undefined) => {
     if (!targetSelection || !cardInstanceId) {
@@ -482,12 +528,15 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       return;
     }
 
-    const cardElement = event.target.closest("[data-card-instance-id]") as
-      | HTMLElement
-      | null;
+    const cardElement = event.target.closest(
+      "[data-card-instance-id]",
+    ) as HTMLElement | null;
     const cardInstanceId = cardElement?.dataset.cardInstanceId;
 
-    if (!cardInstanceId || !targetSelection.legalTargetIds.includes(cardInstanceId)) {
+    if (
+      !cardInstanceId ||
+      !targetSelection.legalTargetIds.includes(cardInstanceId)
+    ) {
       return;
     }
 
@@ -527,10 +576,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
   };
-  const openRuneActionMenu = (
-    card: Card,
-    event: MouseEvent<HTMLElement>,
-  ) => {
+  const openRuneActionMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
     if (!card.instanceId) {
       return;
     }
@@ -604,7 +650,7 @@ export const GameBoardV2: FC<GameBoardProps> = ({
     >
       <ScoreHeader opponent={board.opponent} player={board.player} />
       <section className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] min-h-0 p-2 overflow-hidden">
+        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
           <PlayerBoard
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
@@ -695,7 +741,8 @@ export const GameBoardV2: FC<GameBoardProps> = ({
       {targetSelection && (
         <TargetSelectionPrompt
           canSubmit={
-            targetSelection.selectedTargetIds.length >= targetSelection.minTargets
+            targetSelection.selectedTargetIds.length >=
+            targetSelection.minTargets
           }
           maxTargets={targetSelection.maxTargets}
           minTargets={targetSelection.minTargets}
@@ -867,46 +914,6 @@ function areSetsEqual<T>(left: Set<T>, right: Set<T>) {
   return true;
 }
 
-function TargetSelectionPrompt({
-  canSubmit,
-  maxTargets,
-  minTargets,
-  onCancel,
-  onSubmit,
-  selectedCount,
-}: {
-  canSubmit: boolean;
-  maxTargets: number;
-  minTargets: number;
-  onCancel: () => void;
-  onSubmit: () => void;
-  selectedCount: number;
-}) {
-  return (
-    <div className="bottom-24 left-1/2 z-[2147483646] fixed flex items-center gap-3 bg-slate-950/95 shadow-2xl px-4 py-3 border border-cyan-300/30 rounded-md text-sm text-slate-100 -translate-x-1/2">
-      <span>
-        Choose targets {selectedCount}/{maxTargets}
-        {minTargets === 0 ? " (optional)" : ""}
-      </span>
-      <button
-        className="px-3 py-1 border border-white/15 rounded text-slate-300 hover:text-white"
-        onClick={onCancel}
-        type="button"
-      >
-        Cancel
-      </button>
-      <button
-        className="disabled:opacity-40 bg-cyan-300 px-3 py-1 rounded font-semibold text-slate-950"
-        disabled={!canSubmit}
-        onClick={onSubmit}
-        type="button"
-      >
-        Play
-      </button>
-    </div>
-  );
-}
-
 function RunePoolBar({
   runePool,
 }: {
@@ -924,7 +931,11 @@ function RunePoolBar({
       ([left], [right]) => powerDomainOrder(left) - powerDomainOrder(right),
     );
 
-  if (energy === 0 && powerEntries.length === 0 && conditionalEntries.length === 0) {
+  if (
+    energy === 0 &&
+    powerEntries.length === 0 &&
+    conditionalEntries.length === 0
+  ) {
     return null;
   }
 
@@ -1314,7 +1325,10 @@ function buildCard(
       img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,
       isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
-      might: cardStates[cardInstanceId]?.computedMight ?? card.attributes.might ?? undefined,
+      might:
+        cardStates[cardInstanceId]?.computedMight ??
+        card.attributes.might ??
+        undefined,
       name: card.name,
       power: card.attributes.power ?? undefined,
       publicCode: card.public_code,
