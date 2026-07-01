@@ -12,6 +12,13 @@ export default async function VisualParityPage({
   const { engine } = await params;
   const { variant = "normal" } = await searchParams;
   if (engine !== "legacy" && engine !== "v2") notFound();
-  if (!(["normal", "chain", "showdown"] as const).includes(variant as "normal" | "chain" | "showdown")) notFound();
-  return <VisualParityBoard engine={engine} variant={variant as "normal" | "chain" | "showdown"} />;
+  if (!(["normal", "chain", "showdown", "hand-small", "hand-large"] as const).includes(
+    variant as "normal" | "chain" | "showdown" | "hand-small" | "hand-large"
+  )) notFound();
+  return (
+    <VisualParityBoard
+      engine={engine}
+      variant={variant as "normal" | "chain" | "showdown" | "hand-small" | "hand-large"}
+    />
+  );
 }

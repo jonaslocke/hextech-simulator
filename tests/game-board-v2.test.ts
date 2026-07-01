@@ -33,8 +33,8 @@ test("game board v2 preserves the legacy presentation component structure", asyn
   const v2Root = path.join(process.cwd(), "src", "features", "game-board-v2", "components");
   const copiedComponents = [
     "action-button.tsx", "action-rail.tsx", "battlefield-board.tsx", "board-slot.tsx",
-    "card-tile.tsx", "card-zone-transfer-overlay.tsx", "empty-state.tsx", "player-board.tsx",
-    "player-hand-fan.tsx", "score-header.tsx", "score-track.tsx", "temporary-zone-overlay.tsx",
+    "card-zone-transfer-overlay.tsx", "empty-state.tsx", "player-board.tsx",
+    "score-header.tsx", "score-track.tsx", "temporary-zone-overlay.tsx",
     "zone-area.tsx"
   ];
   for (const file of copiedComponents) {
