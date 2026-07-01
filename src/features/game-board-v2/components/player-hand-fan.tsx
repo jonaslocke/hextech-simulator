@@ -30,7 +30,18 @@ type PlayerHandFanProps = {
 
 const MAX_HAND_WIDTH = 1080;
 const DEFAULT_HAND_WIDTH = 1024;
-const ESTIMATED_CARD_WIDTH = 96;
+const HAND_CARD_SIZE = "lg" as const;
+
+const HAND_CARD_DIMENSIONS_BY_SIZE = {
+  sm: { width: 69, height: 96 },
+  md: { width: 86, height: 120 },
+  lg: { width: 103, height: 144 },
+  xl: { width: 126, height: 176 },
+} as const;
+
+const ESTIMATED_CARD_WIDTH = HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].width;
+const ESTIMATED_CARD_HEIGHT = HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].height;
+const HIT_AREA_TOP_PADDING = 18;
 const MENU_INTERACTION_FREEZE_MS = 650;
 
 export function PlayerHandFan({
@@ -43,7 +54,7 @@ export function PlayerHandFan({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [handWidth, setHandWidth] = useState(DEFAULT_HAND_WIDTH);
 
-  const handRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const selectionFreezeUntilRef = useRef(0);
 
   const freezePointerSelection = useCallback(() => {
@@ -70,7 +81,7 @@ export function PlayerHandFan({
   }, [cards.length]);
 
   useEffect(() => {
-    const node = handRef.current;
+    const node = containerRef.current;
 
     if (!node || typeof ResizeObserver === "undefined") {
       return;
@@ -124,12 +135,12 @@ export function PlayerHandFan({
         clientX,
         currentIndex: options?.sticky === false ? null : currentIndex,
         handLeft: rect.left,
-        handWidth: rect.width || handWidth,
+        handWidth: rect.width,
         layout,
         total: cards.length,
       });
     },
-    [cards.length, handWidth, layout],
+    [cards.length, layout],
   );
 
   const updateActiveIndexFromPointer = useCallback(
@@ -197,15 +208,14 @@ export function PlayerHandFan({
         return;
       }
 
-      const pointerIndex = getIndexFromPointerPosition(
+      const nextIndex = getIndexFromPointerPosition(
         event.clientX,
         event.currentTarget,
         activeIndex,
-        { sticky: false },
       );
-      const nextIndex = activeIndex ?? pointerIndex;
 
       if (nextIndex === null) {
+        clearActiveIndexFromPointer();
         return;
       }
 
@@ -225,6 +235,7 @@ export function PlayerHandFan({
     [
       activeIndex,
       cards,
+      clearActiveIndexFromPointer,
       freezePointerSelection,
       getIndexFromPointerPosition,
       onCardContextAction,
@@ -313,90 +324,98 @@ export function PlayerHandFan({
   return (
     <div className="right-0 bottom-0 left-0 z-40 absolute flex justify-center h-64 overflow-visible pointer-events-none">
       <div
-        ref={handRef}
-        aria-activedescendant={activeCardId}
-        aria-label="Player hand"
-        className="relative w-full max-w-270 h-full overflow-visible touch-none pointer-events-auto"
-        data-active-index={activeIndex ?? undefined}
-        data-zone-animation-id={`${playerId}:hand`}
-        onBlur={(event) => {
-          const nextFocusedTarget = event.relatedTarget;
-
-          if (
-            !(nextFocusedTarget instanceof Node) ||
-            !event.currentTarget.contains(nextFocusedTarget)
-          ) {
-            clearActiveIndexFromPointer();
-          }
-        }}
-        onClick={openCardMenuFromEvent}
-        onContextMenu={openCardMenuFromEvent}
-        onFocus={() => {
-          setActiveIndex((currentIndex) => currentIndex ?? 0);
-        }}
-        onKeyDown={handleKeyDown}
-        onPointerCancel={clearActiveIndexFromPointer}
-        onPointerDown={(event) => {
-          releasePointerSelectionFreeze();
-          updateActiveIndexFromPointer(event, { force: true });
-        }}
-        onPointerEnter={updateActiveIndexFromPointer}
-        onPointerLeave={clearActiveIndexFromPointer}
-        onPointerMove={updateActiveIndexFromPointer}
-        role="listbox"
-        tabIndex={0}
+        className="relative w-full max-w-270 h-full overflow-visible pointer-events-none"
+        ref={containerRef}
       >
-        <div className="absolute inset-0 overflow-visible pointer-events-none">
-          {cards.map((card, index) => {
-            const selected = activeIndex === index;
-            const motionStyle = getHandCardMotion({
-              activeIndex,
-              index,
-              layout,
-              total: cards.length,
-            });
+        <div
+          aria-activedescendant={activeCardId}
+          aria-label="Player hand"
+          className="bottom-0 left-1/2 absolute overflow-visible -translate-x-1/2 touch-none pointer-events-auto"
+          data-active-index={activeIndex ?? undefined}
+          data-zone-animation-id={`${playerId}:hand`}
+          onBlur={(event) => {
+            const nextFocusedTarget = event.relatedTarget;
 
-            return (
-              <div
-                id={getCardDomId(playerId, card, index)}
-                aria-label={card.name}
-                aria-selected={selected}
-                className="bottom-0 left-1/2 absolute"
-                key={card.instanceId ?? `${card.name}-${index}`}
-                role="option"
-                style={{ zIndex: motionStyle.zIndex }}
-              >
-                <motion.div
-                  animate={{
-                    rotate: motionStyle.rotate,
-                    scale: motionStyle.scale,
-                    x: motionStyle.x,
-                    y: motionStyle.y,
-                  }}
-                  data-selected={selected ? "true" : "false"}
-                  initial={false}
-                  style={{
-                    transformOrigin: "50% 100%",
-                    willChange: "transform",
-                  }}
-                  transition={cardTransition}
+            if (
+              !(nextFocusedTarget instanceof Node) ||
+              !event.currentTarget.contains(nextFocusedTarget)
+            ) {
+              clearActiveIndexFromPointer();
+            }
+          }}
+          onClick={openCardMenuFromEvent}
+          onContextMenu={openCardMenuFromEvent}
+          onFocus={() => {
+            setActiveIndex((currentIndex) => currentIndex ?? 0);
+          }}
+          onKeyDown={handleKeyDown}
+          onPointerCancel={clearActiveIndexFromPointer}
+          onPointerDown={(event) => {
+            releasePointerSelectionFreeze();
+            updateActiveIndexFromPointer(event, { force: true });
+          }}
+          onPointerEnter={updateActiveIndexFromPointer}
+          onPointerLeave={clearActiveIndexFromPointer}
+          onPointerMove={updateActiveIndexFromPointer}
+          role="listbox"
+          style={{
+            height: layout.hitAreaHeight,
+            width: layout.interactionWidth,
+          }}
+          tabIndex={0}
+        >
+          <div className="right-0 bottom-0 left-0 absolute h-full overflow-visible pointer-events-none">
+            {cards.map((card, index) => {
+              const selected = activeIndex === index;
+              const motionStyle = getHandCardMotion({
+                activeIndex,
+                index,
+                layout,
+                total: cards.length,
+              });
+
+              return (
+                <div
+                  id={getCardDomId(playerId, card, index)}
+                  aria-label={card.name}
+                  aria-selected={selected}
+                  className="bottom-0 left-1/2 absolute -translate-x-1/2"
+                  key={card.instanceId ?? `${card.name}-${index}`}
+                  role="option"
+                  style={{ zIndex: motionStyle.zIndex }}
                 >
-                  <CardTile
-                    enableHoverPreview={false}
-                    focusablePreview={false}
-                    isTransferHidden={
-                      card.instanceId
-                        ? hiddenCardInstanceIds?.has(card.instanceId)
-                        : false
-                    }
-                    showMight={false}
-                    {...card}
-                    size="lg"
-                  />
-                </motion.div>
-              </div>
-            );
-          })}
+                  <motion.div
+                    animate={{
+                      rotate: motionStyle.rotate,
+                      scale: motionStyle.scale,
+                      x: motionStyle.x,
+                      y: motionStyle.y,
+                    }}
+                    data-selected={selected ? "true" : "false"}
+                    initial={false}
+                    style={{
+                      transformOrigin: "50% 100%",
+                      willChange: "transform",
+                    }}
+                    transition={cardTransition}
+                  >
+                    <CardTile
+                      enableHoverPreview={false}
+                      focusablePreview={false}
+                      isTransferHidden={
+                        card.instanceId
+                          ? hiddenCardInstanceIds?.has(card.instanceId)
+                          : false
+                      }
+                      showMight={false}
+                      {...card}
+                      size={HAND_CARD_SIZE}
+                    />
+                  </motion.div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -408,7 +427,9 @@ type HandLayout = {
   activeScale: number;
   centerLift: number;
   edgeDrop: number;
-  hitPadding: number;
+  edgeHitPadding: number;
+  hitAreaHeight: number;
+  interactionWidth: number;
   neighborPush: number;
   restScale: number;
   rotationStep: number;
@@ -510,18 +531,23 @@ function createHandLayout({
 
   const middle = Math.max((total - 1) / 2, 1);
   const maxEdgeRotation = total <= 2 ? 4 : clamp(21 - total * 0.45, 12, 18);
+  const edgeHitPadding = clamp(ESTIMATED_CARD_WIDTH * 0.46, 38, 50);
 
   return {
     activeLift: large ? 10 : 20,
     activeScale: large ? 1.08 : 1.1,
     centerLift: large ? 10 : 12,
     edgeDrop: clamp(26 - total * 0.55, 15, 22),
-    hitPadding: Math.max(spacing * 0.72, ESTIMATED_CARD_WIDTH * 0.42),
+    edgeHitPadding,
+    hitAreaHeight:
+      ESTIMATED_CARD_HEIGHT + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
+    interactionWidth:
+      total <= 1 ? edgeHitPadding * 2 : (total - 1) * spacing + edgeHitPadding * 2,
     neighborPush: clamp(spacing * 0.28, 10, 16),
     restScale: 1,
     rotationStep: total <= 1 ? 0 : maxEdgeRotation / middle,
     spacing,
-    switchRadius: clamp(spacing * 0.7, 26, 36),
+    switchRadius: clamp(spacing * 0.42, 16, 22),
   };
 }
 
@@ -547,7 +573,7 @@ function getCardIndexFromClientX({
   const handCenterX = handLeft + handWidth / 2;
 
   if (total === 1) {
-    return Math.abs(clientX - handCenterX) <= layout.hitPadding ? 0 : null;
+    return Math.abs(clientX - handCenterX) <= layout.edgeHitPadding ? 0 : null;
   }
 
   const middle = (total - 1) / 2;
@@ -555,8 +581,8 @@ function getCardIndexFromClientX({
   const lastCardCenterX = handCenterX + middle * layout.spacing;
 
   if (
-    clientX < firstCardCenterX - layout.hitPadding ||
-    clientX > lastCardCenterX + layout.hitPadding
+    clientX < firstCardCenterX - layout.edgeHitPadding ||
+    clientX > lastCardCenterX + layout.edgeHitPadding
   ) {
     return null;
   }
