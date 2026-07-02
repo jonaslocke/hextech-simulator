@@ -25,7 +25,12 @@ import { dispatchBehaviorEvent, resolveDelayedEffects } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
-import { addConsecutivePass, nextRelevantPlayer } from "./timing";
+import {
+  addConsecutivePass,
+  currentTiming,
+  nextRelevantPlayer,
+  type TurnTiming
+} from "./timing";
 import {
   acceptedActionEvent,
   type GameTransition
@@ -65,9 +70,23 @@ export function gameplayActions(
         null
       ));
     }
-    if (canAct && game.state.chain) {
-      addPlayableCardActions(actions, game, actorPlayerId, decks, index, true);
-      addAbilityActions(actions, game, actorPlayerId, index, handlers);
+    if (canAct) {
+      addPlayableCardActions(
+        actions,
+        game,
+        actorPlayerId,
+        decks,
+        index,
+        currentTiming(game)
+      );
+      addAbilityActions(
+        actions,
+        game,
+        actorPlayerId,
+        index,
+        handlers,
+        currentTiming(game)
+      );
     }
     return actions;
   }
@@ -75,8 +94,8 @@ export function gameplayActions(
 
   actions.push(action(game, "endTurn", "End turn", null));
 
-  addPlayableCardActions(actions, game, actorPlayerId, decks, index, false);
-  addAbilityActions(actions, game, actorPlayerId, index, handlers);
+  addPlayableCardActions(actions, game, actorPlayerId, decks, index, "neutralOpen");
+  addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen");
   for (const cardId of player.zones.base) {
     const definition = definitionForInstance(cardId, index);
     const state = game.state.cardStates[cardId]!;
@@ -253,7 +272,8 @@ function playCard(game: GameDocument, playerId: string, cardId: string, selected
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
   const energyCost = effectiveEnergyCost(game, playerId, definition);
-  pay(game, playerId, definition, energyCost, index);
+  pay(game, playerId, definition, energyCost, index, !game.state.showdown);
+  if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   if (definition.card.classification.type === "Unit") {
@@ -264,6 +284,15 @@ function playCard(game: GameDocument, playerId: string, cardId: string, selected
       type: "card.played", actorPlayerId: playerId, subjectCardInstanceId: cardId,
       values: { "eventSubject.effectiveEnergyCost": energyCost }
     }, decks);
+    cleanupBoard(game, index);
+    if (game.state.showdown) {
+      game.state.showdown.focusPlayerId = nextRelevantPlayer(
+        game,
+        playerId,
+        game.state.showdown.relevantPlayerIds
+      );
+      game.state.showdown.passedPlayerIds = [];
+    }
     return;
   }
   const item = {
@@ -353,6 +382,7 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
           game.state.showdown.passedPlayerIds = [];
         }
       }
+      cleanupBoard(game, index);
     } else {
       game.state.chain.passedPlayerIds = passed;
       game.state.chain.priorityPlayerId = nextRelevantPlayer(
@@ -453,7 +483,14 @@ type PaymentPlan = {
   powerRuneIds: string[];
 };
 
-function buildPaymentPlan(game: GameDocument, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndex): PaymentPlan | null {
+function buildPaymentPlan(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  energyCost: number,
+  index: RuntimeCardIndex,
+  allowAutomaticSources = true
+): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   let remainingEnergy = energyCost;
   const conditionalEnergy = definition.card.classification.type === "Spell" ? Math.min(player.conditionalEnergy, remainingEnergy) : 0;
@@ -470,7 +507,7 @@ function buildPaymentPlan(game: GameDocument, playerId: string, definition: Game
     remainingPower -= spend;
   }
   const powerRuneIds: string[] = [];
-  for (const id of player.zones.base) {
+  for (const id of allowAutomaticSources ? player.zones.base : []) {
     if (remainingPower === 0) break;
     if (!hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstance(id, index).card.classification.domain[0];
@@ -503,7 +540,7 @@ function buildPaymentPlan(game: GameDocument, playerId: string, definition: Game
     if (ability.usage === "spellsOnly") generatedConditionalEnergy += unusedEnergy;
     else generatedPooledEnergy += unusedEnergy;
   };
-  for (const id of player.zones.base) {
+  for (const id of allowAutomaticSources ? player.zones.base : []) {
     const ability = exhaustForEnergyAbility(
       id,
       definition.card.classification.type,
@@ -526,8 +563,22 @@ function buildPaymentPlan(game: GameDocument, playerId: string, definition: Game
   } : null;
 }
 
-function pay(game: GameDocument, playerId: string, definition: GameCardDefinition, energyCost: number, index: RuntimeCardIndex) {
-  const plan = buildPaymentPlan(game, playerId, definition, energyCost, index);
+function pay(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  energyCost: number,
+  index: RuntimeCardIndex,
+  allowAutomaticSources = true
+) {
+  const plan = buildPaymentPlan(
+    game,
+    playerId,
+    definition,
+    energyCost,
+    index,
+    allowAutomaticSources
+  );
   if (!plan) throw new Error("Card costs cannot be paid.");
   const player = game.state.players[playerId]!;
   player.conditionalEnergy -= plan.conditionalEnergy;
@@ -607,7 +658,7 @@ function exhaustForEnergyAbility(
 function addPlayableCardActions(
   actions: ProjectedAction[], game: GameDocument, playerId: string,
   decks: readonly DeckSnapshotDocument[], index: RuntimeCardIndex,
-  reactionOnly: boolean
+  timing: TurnTiming
 ) {
   const player = game.state.players[playerId]!;
   const handlers = createPrimitiveHandlers(index);
@@ -616,10 +667,26 @@ function addPlayableCardActions(
     if (!["Unit", "Spell"].includes(definition.card.classification.type)) continue;
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const timings = compiled.playTimings.map((binding) => binding.behaviorId);
-    if (reactionOnly && !timings.includes("timing.reaction")) continue;
-    if (!reactionOnly && game.state.chain && !timings.includes("timing.reaction")) continue;
+    const hasAction = timings.includes("timing.action");
+    const hasReaction = timings.includes("timing.reaction");
+    if (
+      timing === "showdownOpen" &&
+      !hasAction &&
+      !hasReaction
+    ) continue;
+    if (
+      (timing === "neutralClosed" || timing === "showdownClosed") &&
+      !hasReaction
+    ) continue;
     const cost = effectiveEnergyCost(game, playerId, definition);
-    if (!buildPaymentPlan(game, playerId, definition, cost, index)) continue;
+    if (!buildPaymentPlan(
+      game,
+      playerId,
+      definition,
+      cost,
+      index,
+      timing !== "showdownOpen" && timing !== "showdownClosed"
+    )) continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     const targets = compiled.clauses
       .filter((clause) => clause.triggers.length === 0)
@@ -653,7 +720,8 @@ function canSatisfyTargetRequirements(
 
 function addAbilityActions(
   actions: ProjectedAction[], game: GameDocument, playerId: string,
-  index: RuntimeCardIndex, handlers: ReturnType<typeof createPrimitiveHandlers>
+  index: RuntimeCardIndex, handlers: ReturnType<typeof createPrimitiveHandlers>,
+  timing: TurnTiming
 ) {
   const player = game.state.players[playerId]!;
   const controlled = [
@@ -673,6 +741,19 @@ function addAbilityActions(
       ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
+        const timingIds = [
+          ...compiled.playTimings,
+          ...clause.timings
+        ].map((candidate) => candidate.behaviorId);
+        if (
+          timing === "showdownOpen" &&
+          !timingIds.includes("timing.action") &&
+          !timingIds.includes("timing.reaction")
+        ) continue;
+        if (
+          (timing === "neutralClosed" || timing === "showdownClosed") &&
+          !timingIds.includes("timing.reaction")
+        ) continue;
         const enabled = ability.behaviorId === "ability.recycle_for_power" || !game.state.cardStates[sourceId]!.exhausted;
         const label = ability.behaviorId === "ability.recycle_for_power"
           ? `Add Power [${powerDomain}]`
@@ -688,7 +769,7 @@ function addAbilityActions(
     const powerActivation = activations.find(
       ({ ability }) => ability.behaviorId === "ability.recycle_for_power"
     );
-    if (energyActivation && powerActivation) {
+    if (energyActivation && powerActivation && timing === "neutralOpen") {
       const enabled = !game.state.cardStates[sourceId]!.exhausted;
       actions.push(
         action(

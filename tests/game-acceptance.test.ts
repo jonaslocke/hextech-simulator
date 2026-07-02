@@ -116,6 +116,82 @@ test("runs a Lux mirror through the complete game launch acceptance flow", async
   assert.equal(game.state.cardStates[ravenbloom]!.computedMight, ravenbloomMightBefore);
 });
 
+test("plays approved Action and Reaction cards through showdown focus and priority", async () => {
+  const template = await approvedDeckFixture();
+  const runtime = [
+    createRuntimeDeckSnapshot(template, "p1"),
+    createRuntimeDeckSnapshot(template, "p2")
+  ] as const;
+  const decks: DeckSnapshotDocument[] = runtime.map((deck, index) => ({
+    id: `showdown-d${index}`,
+    createdAt: "a",
+    updatedAt: "a",
+    matchId: "showdown",
+    playerId: index ? "p2" : "p1",
+    snapshot: deck.template,
+    instances: deck.instances
+  }));
+  let game = createInitialGame({
+    matchId: "showdown",
+    gameId: "showdown-game",
+    now: "a",
+    rngSeed: "showdown",
+    playerIds: ["p1", "p2"],
+    decks: [runtime[0], runtime[1]]
+  });
+  game.status = "in_progress";
+  game.state.setup.startingPlayerId = "p1";
+  game.state.turn = {
+    turnNumber: 1,
+    activePlayerId: "p1",
+    phase: "action"
+  };
+  const battlefieldId = game.state.setup.battlefieldPools.p1![0]!;
+  game.state.battlefields = [{
+    battlefieldId,
+    cardInstanceId: battlefieldId,
+    selectedByPlayerId: "p1",
+    controllerPlayerId: null,
+    contestedByPlayerId: null,
+    units: []
+  }];
+  const mover = instanceNamed(decks, "p1", "Vanguard Sergeant");
+  const stupefy = instanceNamed(decks, "p1", "Stupefy");
+  relocate(game, "p1", mover, "base");
+  relocate(game, "p1", stupefy, "hand");
+  game.state.players.p1!.energy = 20;
+  game.state.players.p1!.power = { Mind: 20, Order: 20, Rainbow: 20 };
+
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === mover &&
+      action.label.startsWith("Move to ")
+  )!;
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [],
+    decks,
+    now: "b"
+  });
+  const actionPlay = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === stupefy
+  );
+  assert.ok(actionPlay, "Reaction must also be legal in Showdown Open");
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: actionPlay.id,
+    selectedIds: [mover],
+    decks,
+    now: "c"
+  });
+  assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  game = passUntilCurrentChainItemResolves(game, decks, "d");
+  assert.equal(game.state.showdown?.focusPlayerId, "p2");
+  assert.deepEqual(game.state.showdown?.passedPlayerIds, []);
+});
+
 function assertPrivateProjection(
   game: Parameters<typeof projectGame>[0]["game"],
   decks: DeckSnapshotDocument[],
