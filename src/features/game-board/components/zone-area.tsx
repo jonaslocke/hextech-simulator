@@ -7,22 +7,23 @@ interface Props extends PropsWithChildren {
   contentClassName?: string;
   density?: "compact" | "default" | "roomy";
   isCentered?: boolean;
+  isHighlighted?: boolean;
   /**
-   * Kept for compatibility with the previous typo in the public prop.
+   * Backwards-compatible typo kept so existing consumers do not break.
+   * Prefer `isHighlighted` for new usages.
    */
   isHightlighted?: boolean;
-  isHighlighted?: boolean;
   totalCardsCount?: {
     ready: number;
     total: number;
   };
 }
 
-const DENSITY_CLASS_NAMES: Record<NonNullable<Props["density"]>, string> = {
-  compact: "gap-1.5 px-2 py-1.5",
-  default: "gap-2 px-3 py-2",
+const densityClassNames = {
+  compact: "gap-1.5 px-2 py-2",
+  default: "gap-2 px-3 py-2.5",
   roomy: "gap-3 px-4 py-3",
-};
+} satisfies Record<NonNullable<Props["density"]>, string>;
 
 export const ZoneArea: FC<Props> = ({
   animationZoneId,
@@ -31,35 +32,63 @@ export const ZoneArea: FC<Props> = ({
   contentClassName,
   density = "default",
   isCentered = false,
-  isHightlighted = false,
   isHighlighted,
+  isHightlighted,
   totalCardsCount,
 }) => {
+  const highlighted = Boolean(isHighlighted ?? isHightlighted);
   const hasTotalCardsCount = !totalCardsCount
     ? false
     : Object.values(totalCardsCount).reduce((acc, cur) => acc + cur, 0) > 0;
-
-  const highlighted = isHighlighted ?? isHightlighted;
 
   return (
     <div
       data-zone-animation-id={animationZoneId}
       className={cn(
-        "relative flex items-center border rounded-md min-h-0 overflow-visible",
-        highlighted ? "border-[#88F6F6]" : "border-white/15",
+        "relative flex items-center border rounded-md min-h-0 overflow-visible select-none",
+        "bg-slate-950/20 supports-backdrop-filter:bg-slate-950/10 supports-backdrop-filter:backdrop-blur-[2px]",
+        "transition-[border-color,background-color,box-shadow] duration-700 ease-out",
+        highlighted
+          ? "border-cyan-200/35 bg-cyan-300/5 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.10),0_0_18px_rgba(34,211,238,0.10)]"
+          : "border-cyan-100/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]",
         className,
       )}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-0 rounded-[inherit] pointer-events-none",
+          "bg-cyan-300/5 opacity-0 blur-[1px]",
+          "transition-opacity duration-700 ease-out",
+          highlighted && "opacity-100",
+        )}
+      />
+
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-0 rounded-[inherit] pointer-events-none",
+          "ring-1 ring-inset ring-cyan-200/0",
+          "transition-[--tw-ring-color] duration-700 ease-out",
+          highlighted && "ring-cyan-200/20",
+        )}
+      />
+
       {hasTotalCardsCount && (
-        <div className="top-1 right-1 z-20 absolute font-mono text-[10px] text-white/65 pointer-events-none">
+        <div
+          className={cn(
+            "top-1 right-1 z-10 absolute font-mono text-[10px] transition-colors duration-700 ease-out pointer-events-none",
+            highlighted ? "text-cyan-100/75" : "text-white/60",
+          )}
+        >
           {`${totalCardsCount?.ready}/${totalCardsCount?.total}`}
         </div>
       )}
 
       <div
         className={cn(
-          "flex items-center w-full min-w-0 min-h-full overflow-visible",
-          DENSITY_CLASS_NAMES[density],
+          "z-[1] relative flex flex-1 items-center min-w-0 min-h-full overflow-visible",
+          densityClassNames[density],
           isCentered && "justify-center",
           contentClassName,
         )}
