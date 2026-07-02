@@ -87,7 +87,7 @@ export const ZoneArea: FC<Props> = ({
 
       <div
         className={cn(
-          "z-[1] relative flex flex-1 items-center min-w-0 min-h-full overflow-visible",
+          "z-1 relative flex flex-1 items-center min-w-0 min-h-full overflow-visible",
           densityClassNames[density],
           isCentered && "justify-center",
           contentClassName,

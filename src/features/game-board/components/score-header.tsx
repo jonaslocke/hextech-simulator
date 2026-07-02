@@ -1,10 +1,10 @@
 "use client";
 
-import { FC } from "react";
-import { ScoreTrack } from "./score-track";
-import { GameScore } from "../types";
-import { cn } from "@/shared/utils/cn";
+import { FC, CSSProperties } from "react";
 import { Hand } from "lucide-react";
+import { cn } from "@/shared/utils/cn";
+import { GameScore } from "../types";
+import { ScoreTrack } from "./score-track";
 
 const SeatName = ({
   handCount,
@@ -14,24 +14,58 @@ const SeatName = ({
   handCount: number;
   name: string;
   seat: "player" | "opponent";
-}) => (
-  <div
-    className={cn(
-      "flex items-center gap-2 px-4 py-2 rounded-md font-semibold text-sm",
-      seat === "opponent" ? "bg-opponent-accent" : "bg-player-accent",
-    )}
-  >
-    <span>{name}</span>
-    <span
-      aria-label={`${handCount} cards in hand`}
-      className="inline-flex items-center gap-1 rounded bg-black/25 px-2 py-0.5 text-xs text-slate-100"
-      title={`${handCount} cards in hand`}
+}) => {
+  const isOpponent = seat === "opponent";
+
+  const seatStyle = {
+    "--seat-accent": isOpponent
+      ? "var(--opponent-accent)"
+      : "var(--player-accent)",
+    "--seat-accent-soft": isOpponent
+      ? "var(--opponent-accent-soft)"
+      : "var(--player-accent-soft)",
+    borderLeftColor: isOpponent ? undefined : "var(--seat-accent)",
+    borderRightColor: isOpponent ? "var(--seat-accent)" : undefined,
+  } as CSSProperties;
+
+  return (
+    <div
+      className={cn(
+        "relative flex items-center gap-2 border border-white/10 rounded-md overflow-hidden",
+        "bg-slate-950/28 px-3 py-1.5 font-semibold text-sm text-slate-100",
+        "shadow-[0_8px_20px_rgba(0,0,0,0.28)] ring-1 ring-white/5",
+        "supports-backdrop-filter:bg-slate-950/16 supports-backdrop-filter:backdrop-blur-md",
+        "transition-[background-color,border-color,box-shadow] duration-300 ease-out",
+        isOpponent ? "border-r-[3px]" : "border-l-[3px]",
+      )}
+      style={seatStyle}
     >
-      <Hand className="size-3.5" />
-      {handCount}
-    </span>
-  </div>
-);
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 opacity-100 pointer-events-none"
+        style={{
+          background: `linear-gradient(${isOpponent ? "270deg" : "90deg"}, var(--seat-accent-soft), transparent 68%)`,
+        }}
+      />
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 opacity-70 pointer-events-none"
+        style={{
+          boxShadow: `inset ${isOpponent ? "-" : ""}10px 0 18px -18px var(--seat-accent)`,
+        }}
+      />
+      <span className="z-10 relative truncate">{name}</span>
+      <span
+        aria-label={`${handCount} cards in hand`}
+        className="inline-flex z-10 relative items-center gap-1 bg-white/10 shadow-black/20 shadow-inner px-2 py-0.5 border border-white/10 rounded-md font-semibold text-slate-100/90 text-xs"
+        title={`${handCount} cards in hand`}
+      >
+        <Hand className="opacity-85 size-3.5" />
+        {handCount}
+      </span>
+    </div>
+  );
+};
 
 export const ScoreHeader: FC<GameScore> = ({ opponent, player }) => {
   return (

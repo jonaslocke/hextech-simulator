@@ -225,7 +225,7 @@ export function MatchSimulator() {
       </div>
 
       {error && (
-        <div className="right-4 bottom-4 z-[60] fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+        <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
           {error}
         </div>
       )}

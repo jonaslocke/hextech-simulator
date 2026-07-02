@@ -62,11 +62,11 @@ export function ActionRail({
     >
       <div
         aria-hidden="true"
-        className="left-0 absolute inset-y-3 bg-gradient-to-b from-transparent via-cyan-200/20 to-transparent w-px pointer-events-none"
+        className="left-0 absolute inset-y-3 bg-linear-to-b from-transparent via-cyan-200/20 to-transparent w-px pointer-events-none"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-b from-white/[3%] via-transparent to-black/10 pointer-events-none"
+        className="absolute inset-0 bg-linear-to-b from-white/3 via-transparent to-black/10 pointer-events-none"
       />
       <div className="z-10 relative flex flex-col items-center gap-3">
         <ActionButton
