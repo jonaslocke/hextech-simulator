@@ -115,7 +115,7 @@ export function MatchSimulator() {
 
   if (!match || !projection) {
     return (
-      <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100">
+      <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
         <section className="bg-slate-900 shadow-2xl p-6 border border-cyan-300/20 rounded-xl w-full max-w-xl">
           <p className="font-semibold text-cyan-200 text-xs uppercase tracking-[0.2em]">
             Riftbound Simulator
@@ -200,7 +200,7 @@ export function MatchSimulator() {
   }));
 
   return (
-    <main className="relative bg-slate-950 min-h-screen">
+    <main className="relative bg-slate-950 min-h-screen tabletop-background">
       <div className="top-2 left-14 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
         <span className="text-slate-400">Viewer</span>
         <Button

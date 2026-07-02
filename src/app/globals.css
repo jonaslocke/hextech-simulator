@@ -53,3 +53,14 @@ textarea,
 select {
   font: inherit;
 }
+
+.tabletop-background {
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(2, 6, 23, 0.18), rgba(2, 6, 23, 0.18)),
+    url("/backgrounds/tabletop-background.png");
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
