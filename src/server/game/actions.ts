@@ -470,12 +470,13 @@ function endTurn(game: GameDocument, actor: string, index: RuntimeCardIndex, dec
   resolveDelayedEffects(game, "endOfThisTurn", decks);
   cleanupTurnModifiers(game, index);
   game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
-  applyStartOfTurn(game, decks);
+  applyStartOfTurn(game, decks, index);
 }
 
 export function applyStartOfTurn(
   game: GameDocument,
-  decks: readonly DeckSnapshotDocument[] = []
+  decks: readonly DeckSnapshotDocument[] = [],
+  runtimeIndex?: RuntimeCardIndex
 ) {
   const turn = game.state.turn;
   if (!turn) throw new Error("A turn is required to apply start-of-turn steps.");
@@ -488,7 +489,16 @@ export function applyStartOfTurn(
   const player = game.state.players[turn.activePlayerId]!;
   player.scoredBattlefieldIdsThisTurn = [];
   if (decks.length) applyHoldScoring(game, turn.activePlayerId, decks);
-  for (const cardId of [...player.zones.base, ...game.state.battlefields.flatMap((battlefield) => battlefield.units)]) {
+  const index = runtimeIndex ?? (decks.length
+    ? createRuntimeCardIndex(decks)
+    : null);
+  const controlledBattlefieldUnits = game.state.battlefields
+    .flatMap((battlefield) => battlefield.units)
+    .filter(
+      (cardId) =>
+        index?.instances.get(cardId)?.ownerPlayerId === turn.activePlayerId
+    );
+  for (const cardId of [...player.zones.base, ...controlledBattlefieldUnits]) {
     if (game.state.cardStates[cardId]) game.state.cardStates[cardId]!.exhausted = false;
   }
   const isNonStartingPlayersFirstTurn = turn.turnNumber === 2 && turn.activePlayerId !== game.state.setup.startingPlayerId;

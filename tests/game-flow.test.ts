@@ -54,6 +54,42 @@ test("plays a spell through priority resolution and advances the turn", () => {
   assert.equal(game.state.turn?.activePlayerId, "p2");
 });
 
+test("awakening readies only the new turn player's battlefield units", () => {
+  const { game: initial, decks } = fixture();
+  const game = structuredClone(initial);
+  decks[1]!.instances.push({
+    instanceId: "p2:unit",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT"
+  });
+  game.state.battlefields[0]!.units = ["p1:mover", "p2:unit"];
+  game.state.players.p1!.zones.base =
+    game.state.players.p1!.zones.base.filter((id) => id !== "p1:mover");
+  game.state.cardStates["p1:mover"]!.exhausted = true;
+  game.state.cardStates["p2:unit"] = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 1
+  };
+
+  const end = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "End turn"
+  )!;
+  const nextTurn = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: end.id,
+    selectedIds: [],
+    decks,
+    now: "d"
+  });
+
+  assert.equal(nextTurn.state.turn?.activePlayerId, "p2");
+  assert.equal(nextTurn.state.cardStates["p2:unit"]!.exhausted, false);
+  assert.equal(nextTurn.state.cardStates["p1:mover"]!.exhausted, true);
+});
+
 test("automatically pays card costs with behavior-backed rune abilities", () => {
   const { game: initial, decks } = fixture();
   const play = gameplayActions(initial, "p1", decks).find((action) => action.label === "Play Unit")!;
