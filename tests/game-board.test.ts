@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { actionsForSource } from "../src/features/game-board/model";
+import {
+  actionsForSource,
+  showdownPromptState
+} from "../src/features/game-board/model";
 import type { ProjectedAction } from "../src/shared/game";
 
 test("groups opaque projected actions without card-specific rules", () => {
@@ -14,6 +17,29 @@ test("groups opaque projected actions without card-specific rules", () => {
   assert.deepEqual(actionsForSource(actions, "card-a"), [actions[0]]);
   assert.deepEqual(actionsForSource(actions, "card-b"), [actions[1]]);
   assert.deepEqual(actionsForSource(actions, null), [actions[2]]);
+});
+
+test("derives active and waiting showdown prompts from Focus", () => {
+  const showdown = {
+    kind: "nonCombat" as const,
+    battlefieldId: "battlefield",
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    priorityPlayerId: null,
+    passedPlayerIds: []
+  };
+  assert.equal(
+    showdownPromptState({ showdown, viewerPlayerId: "p1" })?.hasFocus,
+    true
+  );
+  assert.equal(
+    showdownPromptState({ showdown, viewerPlayerId: "p2" })?.hasFocus,
+    false
+  );
+  assert.equal(
+    showdownPromptState({ showdown: null, viewerPlayerId: "p1" }),
+    null
+  );
 });
 
 test("game board contains no initial-deck or behavior identities", async () => {

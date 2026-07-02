@@ -31,6 +31,7 @@ import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { CombatDamageDialog } from "./components/combat-damage-dialog";
+import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import {
   adaptProjectionToBoard,
@@ -39,6 +40,7 @@ import {
   type BoardZoneProjection,
   type BoardProjection,
 } from "./board-view-model";
+import { showdownPromptState } from "./model";
 import {
   BattlefieldData,
   Card,
@@ -215,6 +217,13 @@ export const GameBoard: FC<GameBoardProps> = ({
   const combatDamageAction = sourceProjection.actions.find(
     (action) => action.choice?.kind === "combatDamage",
   );
+  const showdownPrompt = showdownPromptState(sourceProjection);
+  const showdownBattlefieldName = showdownPrompt
+    ? sourceProjection.battlefields.find(
+        (battlefield) =>
+          battlefield.battlefieldId === showdownPrompt.battlefieldId,
+      )?.card.name ?? "Battlefield"
+    : null;
   const globalActions = sourceProjection.actions.filter(
     (action) =>
       action.sourceCardInstanceId === null &&
@@ -695,6 +704,15 @@ export const GameBoard: FC<GameBoardProps> = ({
       onClickCapture={handleTargetClickCapture}
     >
       <ScoreHeader opponent={board.opponent} player={board.player} />
+      {showdownPrompt && showdownBattlefieldName && (
+        <ShowdownPrompt
+          battlefieldName={showdownBattlefieldName}
+          focusPlayerId={showdownPrompt.focusPlayerId}
+          hasFocus={showdownPrompt.hasFocus}
+          isCombat={showdownPrompt.kind === "combat"}
+          onPassFocus={showdownPrompt.hasFocus ? onPass : undefined}
+        />
+      )}
       <section className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
           <PlayerBoard
