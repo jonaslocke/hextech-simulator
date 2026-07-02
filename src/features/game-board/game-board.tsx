@@ -179,7 +179,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
-    purpose: "move" | "play";
+    purpose: "choice" | "move" | "play";
     selectedTargetIds: string[];
   } | null>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
@@ -237,6 +237,9 @@ export const GameBoard: FC<GameBoardProps> = ({
       !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
       action.choice?.kind !== "combatDamage",
   );
+  const readyCardsAction = sourceProjection.actions.find(
+    (action) => action.id.split(":")[3] === "readyCards",
+  );
   const pendingChoiceOptions =
     projection.pendingChoice?.optionIds.map((id) => {
       const item = projection.pendingChoice?.pendingChainItems.find(
@@ -266,12 +269,18 @@ export const GameBoard: FC<GameBoardProps> = ({
       submitProjectedAction(action.id);
       return;
     }
+    const kind = action.id.split(":")[3];
     setTargetSelection({
       actionId: action.id,
       legalTargetIds: requirement.legalIds,
       maxTargets: requirement.maximum,
       minTargets: requirement.minimum,
-      purpose: action.id.split(":")[3] === "moveMany" ? "move" : "play",
+      purpose:
+        kind === "moveMany"
+          ? "move"
+          : kind === "readyCards"
+            ? "choice"
+            : "play",
       selectedTargetIds: [],
     });
   };
@@ -586,7 +595,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     setTargetSelection(nextSelection);
 
     if (
-      nextSelection.purpose !== "move" &&
+      nextSelection.purpose === "play" &&
       nextSelection.minTargets === nextSelection.maxTargets &&
       selectedTargetIds.length === nextSelection.maxTargets
     ) {
@@ -691,6 +700,26 @@ export const GameBoard: FC<GameBoardProps> = ({
     setHoveredTargetCardInstanceId(null);
     setPendingSubmittedTargetIds([]);
   }, [projection.stateVersion]);
+
+  useEffect(() => {
+    if (!readyCardsAction) return;
+    const requirement = readyCardsAction.targets.find(
+      (target) => target.kind === "card",
+    );
+    if (!requirement) return;
+    setTargetSelection((current) =>
+      current?.actionId === readyCardsAction.id
+        ? current
+        : {
+            actionId: readyCardsAction.id,
+            legalTargetIds: requirement.legalIds,
+            maxTargets: requirement.maximum,
+            minTargets: requirement.minimum,
+            purpose: "choice",
+            selectedTargetIds: [],
+          },
+    );
+  }, [readyCardsAction]);
 
   useEffect(() => {
     if (!cardActionMenu) {
@@ -846,10 +875,18 @@ export const GameBoard: FC<GameBoardProps> = ({
           onSubmit={() => submitTargetedPlay()}
           selectedCount={targetSelection.selectedTargetIds.length}
           cancelLabel={
-            targetSelection.purpose === "move" ? "Cancel move" : "Cancel"
+            targetSelection.purpose === "move"
+              ? "Cancel move"
+              : targetSelection.purpose === "choice"
+                ? "Close"
+                : "Cancel"
           }
           confirmLabel={
-            targetSelection.purpose === "move" ? "Confirm move" : "Play"
+            targetSelection.purpose === "move"
+              ? "Confirm move"
+              : targetSelection.purpose === "choice"
+                ? "Confirm"
+                : "Play"
           }
           title={
             targetSelection.purpose === "move"
@@ -859,6 +896,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   ),
                   sourceProjection.battlefields,
                 )
+              : targetSelection.purpose === "choice"
+                ? readyCardsAction?.label
               : undefined
           }
         />

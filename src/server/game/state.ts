@@ -100,6 +100,17 @@ const combatDamageChoiceSchema = z.object({
   targetUnitIds: z.array(z.string().min(1))
 });
 
+const readyCardsChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("readyCards"),
+  delayedEffectId: z.string().min(1),
+  endingPlayerId: z.string().min(1),
+  legalCardIds: z.array(z.string().min(1)),
+  minimum: z.number().int().nonnegative(),
+  maximum: z.number().int().nonnegative()
+});
+
 const damageAssignmentSchema = z.object({
   targetUnitId: z.string().min(1),
   amount: z.number().int().positive()
@@ -151,7 +162,8 @@ export const gameStateSchema = z.object({
   })),
   pendingChoice: z.discriminatedUnion("type", [
     triggerOrderChoiceSchema,
-    combatDamageChoiceSchema
+    combatDamageChoiceSchema,
+    readyCardsChoiceSchema
   ]).nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema)
 });

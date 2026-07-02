@@ -3,6 +3,7 @@ import {
   compileBehaviorModel,
   createBehaviorContext,
   executeBehaviorClause,
+  executeBehaviorEffects,
   submitTriggerOrder,
   targetRequirementsForClause
 } from "./behavior-runtime";
@@ -74,6 +75,25 @@ export function gameplayActions(
           totalDamage: pendingChoice.totalDamage,
           targets: combatChoiceTargets(game, index)
         }
+      ));
+      return actions;
+    }
+    if (pendingChoice.type === "readyCards") {
+      actions.push(action(
+        game,
+        "readyCards",
+        `Choose ${pendingChoice.maximum} runes to ready`,
+        null,
+        true,
+        null,
+        undefined,
+        [{
+          kind: "card",
+          label: "runes to ready",
+          legalIds: pendingChoice.legalCardIds,
+          minimum: pendingChoice.minimum,
+          maximum: pendingChoice.maximum
+        }]
       ));
       return actions;
     }
@@ -276,6 +296,16 @@ export function performGameplayAction(input: {
         input.decks
       );
       break;
+    case "readyCards":
+      submitReadyCards(
+        game,
+        input.actorPlayerId,
+        input.selectedIds,
+        index,
+        handlers,
+        input.decks
+      );
+      break;
     case "pass":
       passPriority(game, input.actorPlayerId, index, handlers, input.decks);
       break;
@@ -466,11 +496,72 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
 
 function endTurn(game: GameDocument, actor: string, index: RuntimeCardIndex, decks: readonly DeckSnapshotDocument[]) {
   if (game.state.turn?.activePlayerId !== actor) throw new Error("Only the active player can end the turn.");
+  if (!resolveDelayedEffects(game, "endOfThisTurn", decks, actor)) return;
+  completeEndTurn(game, actor, index, decks);
+}
+
+function completeEndTurn(
+  game: GameDocument,
+  actor: string,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[]
+) {
+  const turn = game.state.turn;
+  if (!turn || turn.activePlayerId !== actor) {
+    throw new Error("The ending turn is no longer active.");
+  }
   const next = otherPlayer(game, actor);
-  resolveDelayedEffects(game, "endOfThisTurn", decks);
   cleanupTurnModifiers(game, index);
-  game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
+  game.state.turn = { turnNumber: turn.turnNumber + 1, activePlayerId: next, phase: "action" };
   applyStartOfTurn(game, decks, index);
+}
+
+function submitReadyCards(
+  game: GameDocument,
+  actor: string,
+  selectedIds: string[],
+  index: RuntimeCardIndex,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+  decks: readonly DeckSnapshotDocument[]
+) {
+  const pending = game.state.pendingChoice;
+  if (!pending || pending.type !== "readyCards" || pending.playerId !== actor) {
+    throw new Error("Ready cards choice is not available.");
+  }
+  const effect = game.state.delayedEffects.find(
+    (candidate) => candidate.id === pending.delayedEffectId
+  );
+  if (!effect) throw new Error("Delayed ready effect is unavailable.");
+  const definition = definitionForInstance(effect.sourceCardInstanceId, index);
+  const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses
+    .find((candidate) => candidate.id === effect.clauseId);
+  if (!clause) throw new Error(`Delayed behavior clause is unavailable: ${effect.clauseId}`);
+
+  game.state.pendingChoice = null;
+  executeBehaviorEffects(
+    clause,
+    createBehaviorContext(
+      game,
+      effect.controllerPlayerId,
+      effect.sourceCardInstanceId,
+      null,
+      selectedIds
+    ),
+    handlers
+  );
+  game.state.delayedEffects = game.state.delayedEffects.filter(
+    (candidate) => candidate.id !== effect.id
+  );
+  if (
+    resolveDelayedEffects(
+      game,
+      "endOfThisTurn",
+      decks,
+      pending.endingPlayerId
+    )
+  ) {
+    completeEndTurn(game, pending.endingPlayerId, index, decks);
+  }
 }
 
 export function applyStartOfTurn(

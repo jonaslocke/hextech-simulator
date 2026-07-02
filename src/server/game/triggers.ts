@@ -36,21 +36,58 @@ export function dispatchBehaviorEvent(
 export function resolveDelayedEffects(
   game: GameDocument,
   point: string,
-  decks: readonly DeckSnapshotDocument[]
-): void {
+  decks: readonly DeckSnapshotDocument[],
+  endingPlayerId: string
+): boolean {
   const index = createRuntimeCardIndex(decks);
   const handlers = createPrimitiveHandlers(index);
-  const due = game.state.delayedEffects.filter((effect) => effect.point === point);
-  game.state.delayedEffects = game.state.delayedEffects.filter((effect) => effect.point !== point);
-  for (const effect of due) {
+  while (true) {
+    const effect = game.state.delayedEffects.find(
+      (candidate) => candidate.point === point
+    );
+    if (!effect) return true;
     const definition = definitionForInstance(effect.sourceCardInstanceId, index);
     const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses
       .find((candidate) => candidate.id === effect.clauseId);
     if (!clause) throw new Error(`Delayed behavior clause is unavailable: ${effect.clauseId}`);
+    const readyRunes = clause.orderedEffects.find(
+      (binding) =>
+        binding.behaviorId === "action.ready_cards" &&
+        binding.parameters.target === "runes"
+    );
+    if (readyRunes) {
+      const count = readyRunes.parameters.count;
+      if (typeof count !== "number") {
+        throw new Error("Ready cards count is unavailable.");
+      }
+      const legalCardIds = game.state.players[effect.controllerPlayerId]!.zones.base
+        .filter(
+          (cardId) =>
+            definitionForInstance(cardId, index).card.classification.type === "Rune" &&
+            game.state.cardStates[cardId]?.exhausted
+        );
+      const required = Math.min(count, legalCardIds.length);
+      if (required > 0) {
+        game.state.pendingChoice = {
+          id: `choice:${effect.id}`,
+          playerId: effect.controllerPlayerId,
+          type: "readyCards",
+          delayedEffectId: effect.id,
+          endingPlayerId,
+          legalCardIds,
+          minimum: required,
+          maximum: required
+        };
+        return false;
+      }
+    }
     executeBehaviorEffects(
       clause,
       createBehaviorContext(game, effect.controllerPlayerId, effect.sourceCardInstanceId, null, effect.selectedIds),
       handlers
+    );
+    game.state.delayedEffects = game.state.delayedEffects.filter(
+      (candidate) => candidate.id !== effect.id
     );
   }
 }

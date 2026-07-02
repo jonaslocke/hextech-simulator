@@ -95,7 +95,7 @@ export function executeBehaviorClause(input: {
     const point = delayed.parameters.point;
     if (typeof point !== "string") throw new Error("Delayed timing point is missing.");
     context.game.state.delayedEffects.push({
-      id: `delayed:${context.game.stateVersion}:${context.sourceCardInstanceId}:${clause.id}`,
+      id: `delayed:${context.game.stateVersion}:${context.sourceCardInstanceId}:${clause.id}:${context.game.state.delayedEffects.length}`,
       point,
       controllerPlayerId: context.controllerPlayerId,
       sourceCardInstanceId: context.sourceCardInstanceId,

@@ -45,9 +45,108 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
   assert.equal(game.state.delayedEffects.length, 1);
   const endTurn = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "z" });
-  assert.equal(game.state.cardStates.rune1!.exhausted, false);
+  assert.equal(game.state.pendingChoice?.type, "readyCards");
+  assert.equal(game.state.turn?.activePlayerId, "p1");
+  assert.equal(
+    projectGame({ game, viewerPlayerId: "p2", decks }).actions.length,
+    0
+  );
+  const ready = gameplayActions(game, "p1", decks)[0]!;
+  assert.equal(ready.label, "Choose 2 runes to ready");
+  assert.deepEqual(ready.targets[0]?.legalIds, ["rune1", "rune2", "rune3"]);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: ready.id,
+    selectedIds: ["rune2", "rune3"],
+    decks,
+    now: "zz"
+  });
+  assert.equal(game.state.cardStates.rune1!.exhausted, true);
   assert.equal(game.state.cardStates.rune2!.exhausted, false);
+  assert.equal(game.state.cardStates.rune3!.exhausted, false);
+  assert.equal(game.state.turn?.activePlayerId, "p2");
   assert.equal(victoryRequirement(game, decks), 9);
+});
+
+test("each conquered Targon's Peak readies two independently chosen runes", () => {
+  const { game: initial, decks } = fixture();
+  let game = initial;
+  const extraInstances = [
+    instance("peak2", "p1", "PEAK"),
+    instance("rune5", "p1", "RUNE"),
+    instance("rune6", "p1", "RUNE")
+  ];
+  decks[0]!.instances.push(...extraInstances);
+  game.state.battlefields.push({
+    battlefieldId: "peak2",
+    cardInstanceId: "peak2",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: []
+  });
+  game.state.players.p1!.zones.base.push("rune5", "rune6");
+  for (const card of extraInstances) {
+    game.state.cardStates[card.instanceId] = {
+      exhausted: card.cardCode === "RUNE",
+      damage: 0,
+      computedMight: null
+    };
+  }
+
+  for (const peakId of ["peak", "peak2"]) {
+    dispatchBehaviorEvent(game, {
+      type: "battlefield.conquered",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: peakId,
+      values: {}
+    }, decks);
+    game = resolveAllChainItems(game, decks);
+  }
+  assert.equal(game.state.delayedEffects.length, 2);
+
+  const endTurn = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "End turn"
+  )!;
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: endTurn.id,
+    selectedIds: [],
+    decks,
+    now: "end"
+  });
+
+  const firstReady = gameplayActions(game, "p1", decks)[0]!;
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: firstReady.id,
+    selectedIds: ["rune1", "rune2"],
+    decks,
+    now: "ready-1"
+  });
+  assert.equal(game.state.pendingChoice?.type, "readyCards");
+  assert.equal(game.state.turn?.activePlayerId, "p1");
+
+  const secondReady = gameplayActions(game, "p1", decks)[0]!;
+  assert.deepEqual(secondReady.targets[0]?.legalIds, ["rune5", "rune6"]);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: secondReady.id,
+    selectedIds: ["rune5", "rune6"],
+    decks,
+    now: "ready-2"
+  });
+
+  for (const runeId of ["rune1", "rune2", "rune5", "rune6"]) {
+    assert.equal(game.state.cardStates[runeId]!.exhausted, false);
+  }
+  assert.equal(game.state.delayedEffects.length, 0);
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.turn?.activePlayerId, "p2");
 });
 
 test("classifies every initial runtime primitive without planned placeholders", () => {

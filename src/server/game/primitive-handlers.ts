@@ -103,7 +103,11 @@ export function createPrimitiveHandlers(
   handlers.set("action.ready_cards", {
     execute(binding, context) {
       const ids = binding.parameters.target === "runes"
-        ? context.game.state.players[context.controllerPlayerId]!.zones.base.filter((id) => definitionForInstance(id, index).card.classification.type === "Rune").slice(0, numberParam(binding, "count"))
+        ? context.selectedIds.length > 0
+          ? context.selectedIds
+          : context.game.state.players[context.controllerPlayerId]!.zones.base
+            .filter((id) => definitionForInstance(id, index).card.classification.type === "Rune")
+            .slice(0, numberParam(binding, "count"))
         : context.selectedIds;
       ids.forEach((id) => { context.game.state.cardStates[id]!.exhausted = false; });
     }
