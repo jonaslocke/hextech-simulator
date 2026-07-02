@@ -8,35 +8,35 @@ import {
 import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
-  buildDeckSnapshotV2, compileBehaviorModelV2, createInitialGameV2,
-  createPrimitiveHandlersV2, createRuntimeCardIndexV2, createRuntimeDeckSnapshot,
-  gameplayActionsV2, performGameplayActionV2, performSetupActionV2,
-  projectGameV2, setupActionsV2, type DeckSnapshotDocumentV2
-} from "../src/server/game-v2";
+  buildDeckSnapshot, compileBehaviorModel, createInitialGame,
+  createPrimitiveHandlers, createRuntimeCardIndex, createRuntimeDeckSnapshot,
+  gameplayActions, performGameplayAction, performSetupAction,
+  projectGame, setupActions, type DeckSnapshotDocument
+} from "../src/server/game";
 
-test("runs a Lux mirror through the complete game v2 launch acceptance flow", async () => {
+test("runs a Lux mirror through the complete game launch acceptance flow", async () => {
   const template = await approvedDeckFixture();
   assert.equal(template.cards.length, 21);
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
-  const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
+  const decks: DeckSnapshotDocument[] = runtime.map((deck, index) => ({
     id: `d${index}`, createdAt: "a", updatedAt: "a", matchId: "m",
     playerId: index ? "p2" : "p1", snapshot: deck.template, instances: deck.instances
   }));
-  const handlers = createPrimitiveHandlersV2(createRuntimeCardIndexV2(decks));
-  template.cards.forEach((definition) => compileBehaviorModelV2(definition.behaviorModel, handlers));
+  const handlers = createPrimitiveHandlers(createRuntimeCardIndex(decks));
+  template.cards.forEach((definition) => compileBehaviorModel(definition.behaviorModel, handlers));
 
-  let game = createInitialGameV2({ matchId: "m", gameId: "g", now: "2026-01-01T00:00:00.000Z", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
+  let game = createInitialGame({ matchId: "m", gameId: "g", now: "2026-01-01T00:00:00.000Z", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
   const byPlayer = { p1: runtime[0], p2: runtime[1] };
   for (const playerId of ["p1", "p2"]) {
-    const chooseBattlefield = setupActionsV2(game, playerId)[0]!;
-    game = performSetupActionV2({ game, actorPlayerId: playerId, actionId: chooseBattlefield.id, selectedIds: [], decksByPlayerId: byPlayer, now: "b" });
+    const chooseBattlefield = setupActions(game, playerId)[0]!;
+    game = performSetupAction({ game, actorPlayerId: playerId, actionId: chooseBattlefield.id, selectedIds: [], decksByPlayerId: byPlayer, now: "b" });
   }
   const chooser = game.state.setup.startingPlayerChooserId;
-  const chooseStarting = setupActionsV2(game, chooser)[0]!;
-  game = performSetupActionV2({ game, actorPlayerId: chooser, actionId: chooseStarting.id, selectedIds: ["p1"], decksByPlayerId: byPlayer, now: "c" });
+  const chooseStarting = setupActions(game, chooser)[0]!;
+  game = performSetupAction({ game, actorPlayerId: chooser, actionId: chooseStarting.id, selectedIds: ["p1"], decksByPlayerId: byPlayer, now: "c" });
   for (const playerId of ["p1", "p2"]) {
-    const mulligan = setupActionsV2(game, playerId)[0]!;
-    game = performSetupActionV2({ game, actorPlayerId: playerId, actionId: mulligan.id, selectedIds: [], decksByPlayerId: byPlayer, now: "d" });
+    const mulligan = setupActions(game, playerId)[0]!;
+    game = performSetupAction({ game, actorPlayerId: playerId, actionId: mulligan.id, selectedIds: [], decksByPlayerId: byPlayer, now: "d" });
   }
   assert.equal(game.status, "in_progress");
   assert.equal(game.state.turn?.activePlayerId, "p1");
@@ -44,7 +44,7 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   assert.equal(game.state.players.p1!.zones.hand.length, 5, "the starting player draws automatically");
   assert.equal(game.state.players.p2!.zones.base.length, 0, "the other player channels when their turn begins");
   assert.equal(game.state.players.p2!.zones.hand.length, 4);
-  const initialActionLabels = gameplayActionsV2(game, "p1", decks).map((action) => action.label);
+  const initialActionLabels = gameplayActions(game, "p1", decks).map((action) => action.label);
   assert.ok(!initialActionLabels.includes("Draw card"));
   assert.ok(!initialActionLabels.includes("Channel Rune"));
   assertPrivateProjection(game, decks, "p1", "p2");
@@ -68,12 +68,12 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   const handBefore = game.state.players.p1!.zones.hand.length;
   const enemyMightBefore = game.state.cardStates[enemy]!.computedMight!;
   const ravenbloomMightBefore = game.state.cardStates[ravenbloom]!.computedMight!;
-  const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
+  const play = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
   assert.ok(play, "Stupefy should be payable directly from ready Basic Runes");
   assert.ok(play.targets[0]!.legalIds.includes(enemy));
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "e" });
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "e" });
   assert.throws(
-    () => performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "stale" }),
+    () => performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "stale" }),
     /not legal/i,
     "an action ID from an earlier state version must be rejected"
   );
@@ -94,21 +94,21 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
   assert.equal(game.state.chain, null);
   assert.equal(game.state.cardStates[ravenbloom]!.computedMight, ravenbloomMightBefore + 1);
 
-  const move = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === mover && action.label.startsWith("Move to "))!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "h" });
+  const move = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === mover && action.label.startsWith("Move to "))!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "h" });
   assert.ok(game.state.showdown);
   assert.ok(game.state.battlefields.some((battlefield) => battlefield.units.includes(mover)));
   game = passUntilShowdownCloses(game, decks, "i");
 
-  const p1View = projectGameV2({ game, viewerPlayerId: "p1", decks });
-  const p2View = projectGameV2({ game, viewerPlayerId: "p2", decks });
+  const p1View = projectGame({ game, viewerPlayerId: "p1", decks });
+  const p2View = projectGame({ game, viewerPlayerId: "p2", decks });
   assert.ok(p1View.battlefields.some((battlefield) => battlefield.units.some((unit) => unit.instanceId === mover)));
   assert.ok(p2View.battlefields.some((battlefield) => battlefield.units.some((unit) => unit.instanceId === mover)));
   assertPrivateProjection(game, decks, "p1", "p2");
   assertPrivateProjection(game, decks, "p2", "p1");
 
-  const endTurn = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "End turn")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "j" });
+  const endTurn = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "j" });
   assert.equal(game.state.turn?.activePlayerId, "p2");
   assert.equal(game.state.players.p2!.zones.base.length, 3, "the non-starting player channels three Runes on their first turn");
   assert.equal(game.state.players.p2!.zones.hand.length, 5, "the next player draws automatically");
@@ -117,12 +117,12 @@ test("runs a Lux mirror through the complete game v2 launch acceptance flow", as
 });
 
 function assertPrivateProjection(
-  game: Parameters<typeof projectGameV2>[0]["game"],
-  decks: DeckSnapshotDocumentV2[],
+  game: Parameters<typeof projectGame>[0]["game"],
+  decks: DeckSnapshotDocument[],
   viewerPlayerId: string,
   opponentPlayerId: string
 ) {
-  const projection = projectGameV2({ game, viewerPlayerId, decks });
+  const projection = projectGame({ game, viewerPlayerId, decks });
   const viewer = projection.players.find((player) => player.playerId === viewerPlayerId)!;
   const opponent = projection.players.find((player) => player.playerId === opponentPlayerId)!;
   assert.equal(viewer.zones.find((zone) => zone.kind === "hand")!.cards.length, game.state.players[viewerPlayerId]!.zones.hand.length);
@@ -132,43 +132,43 @@ function assertPrivateProjection(
 }
 
 function passUntilCurrentChainItemResolves(
-  initial: Parameters<typeof gameplayActionsV2>[0],
-  decks: DeckSnapshotDocumentV2[],
+  initial: Parameters<typeof gameplayActions>[0],
+  decks: DeckSnapshotDocument[],
   now: string
 ) {
   let game = initial;
   for (let passIndex = 0; passIndex < 2; passIndex += 1) {
     assert.ok(game.state.chain, "The chain closed before both players passed");
     const actor = game.state.chain.priorityPlayerId;
-    const pass = gameplayActionsV2(game, actor, decks).find((action) => action.label === "Pass priority")!;
-    game = performGameplayActionV2({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now });
+    const pass = gameplayActions(game, actor, decks).find((action) => action.label === "Pass priority")!;
+    game = performGameplayAction({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now });
   }
   return game;
 }
 
 function passUntilShowdownCloses(
-  initial: Parameters<typeof gameplayActionsV2>[0],
-  decks: DeckSnapshotDocumentV2[],
+  initial: Parameters<typeof gameplayActions>[0],
+  decks: DeckSnapshotDocument[],
   now: string
 ) {
   let game = initial;
   for (let passIndex = 0; passIndex < 2; passIndex += 1) {
     assert.ok(game.state.showdown, "The showdown closed before both players passed");
     const actor = game.state.showdown.priorityPlayerId;
-    const pass = gameplayActionsV2(game, actor, decks).find((action) => action.label === "Pass priority")!;
-    game = performGameplayActionV2({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now });
+    const pass = gameplayActions(game, actor, decks).find((action) => action.label === "Pass priority")!;
+    game = performGameplayAction({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now });
   }
   return game;
 }
 
-function instanceNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+function instanceNamed(decks: DeckSnapshotDocument[], playerId: string, name: string) {
   const deck = decks.find((item) => item.playerId === playerId)!;
   const cardCode = deck.snapshot.cards.find((definition) => definition.card.name === name)!.cardCode;
   return deck.instances.find((instance) => instance.cardCode === cardCode)!.instanceId;
 }
 
 function relocate(
-  game: Parameters<typeof gameplayActionsV2>[0],
+  game: Parameters<typeof gameplayActions>[0],
   playerId: string,
   cardId: string,
   destination: "base" | "hand"
@@ -187,7 +187,7 @@ function relocate(
 }
 
 function relocateToBattlefield(
-  game: Parameters<typeof gameplayActionsV2>[0],
+  game: Parameters<typeof gameplayActions>[0],
   playerId: string,
   cardId: string
 ) {
@@ -208,5 +208,5 @@ async function approvedDeckFixture() {
     const suggestion = report.cards.find((item) => item.cardCode === cardCode)!;
     return buildCanonicalCardDocument({ cardCode, card, sourceTextHash: hashCardRulesText(card), modelingStatus: "approved", adminNotes: "", clauses: suggestion.clauses.map((clause) => ({ id: clause.id, sourceText: clause.sourceText, normalizedText: clause.normalizedText, unsupportedReason: clause.unsupportedReason, assignments: clause.assignments.map((item) => item.assignment) })) }, primitives, "a", "b");
   });
-  return buildDeckSnapshotV2(sourceText, documents, primitives.map((entry) => buildBehaviorDefinitionDocument(entry, "a")));
+  return buildDeckSnapshot(sourceText, documents, primitives.map((entry) => buildBehaviorDefinitionDocument(entry, "a")));
 }

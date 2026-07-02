@@ -3,53 +3,38 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import type { Db } from "mongodb";
 import {
-  collectionNames,
-  createRepositories,
   fromMongoDocument,
   getMongoDatabaseName,
   toMongoDocument,
-  type MatchDocument
+  type CardCatalogVersionDocument
 } from "../src/server/db";
+import {
+  createGameRepositories,
+  gameCollectionNames
+} from "../src/server/game";
 
 test("maps application documents to Mongo _id documents and back", () => {
   const now = new Date("2026-06-11T00:00:00.000Z").toISOString();
-  const match: MatchDocument = {
-    id: "match-1",
+  const document: CardCatalogVersionDocument = {
+    id: "catalog-1",
     createdAt: now,
     updatedAt: now,
-    format: "best-of-3",
-    status: "setup_pending",
-    playerSeats: [
-      {
-        playerId: "player-a",
-        seat: "player-1",
-        deckSnapshotId: "deck-a",
-        tokenHash: "hash-a"
-      },
-      {
-        playerId: "player-b",
-        seat: "player-2",
-        deckSnapshotId: "deck-b",
-        tokenHash: "hash-b"
-      }
-    ],
-    currentGameId: null,
-    gameIds: [],
-    matchScore: {
-      "player-a": 0,
-      "player-b": 0
-    },
-    winnerPlayerId: null
+    versionHash: "catalog-1",
+    setFiles: ["set.json"],
+    cardCount: 1
   };
 
-  const mongoDocument = toMongoDocument(match);
+  const mongoDocument = toMongoDocument(document);
 
-  assert.equal(mongoDocument._id, "match-1");
-  assert.equal(mongoDocument.id, "match-1");
-  assert.deepEqual(fromMongoDocument<MatchDocument>(mongoDocument), match);
+  assert.equal(mongoDocument._id, "catalog-1");
+  assert.equal(mongoDocument.id, "catalog-1");
+  assert.deepEqual(
+    fromMongoDocument<CardCatalogVersionDocument>(mongoDocument),
+    document
+  );
 });
 
-test("creates repositories for all planned collections", () => {
+test("creates repositories for canonical match collections", () => {
   const requestedCollections: string[] = [];
   const db = {
     collection(name: string) {
@@ -58,20 +43,13 @@ test("creates repositories for all planned collections", () => {
     }
   } as unknown as Db;
 
-  const repositories = createRepositories(db);
+  const repositories = createGameRepositories(db);
 
-  assert.deepEqual(requestedCollections, [
-    collectionNames.matches,
-    collectionNames.games,
-    collectionNames.gameEvents,
-    collectionNames.deckSnapshots,
-    collectionNames.cardCatalogVersions
-  ]);
+  assert.deepEqual(requestedCollections, Object.values(gameCollectionNames));
   assert.equal(typeof repositories.matches.findById, "function");
   assert.equal(typeof repositories.games.upsert, "function");
-  assert.equal(typeof repositories.gameEvents.append, "function");
+  assert.equal(typeof repositories.gameEvents.findByGameId, "function");
   assert.equal(typeof repositories.deckSnapshots.insert, "function");
-  assert.equal(typeof repositories.cardCatalogVersions.findById, "function");
 });
 
 test("uses default MongoDB database name when env is not set", () => {

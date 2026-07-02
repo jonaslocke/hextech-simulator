@@ -1,4 +1,4 @@
-import type { GameProjectionV2, ProjectedAction, ProjectedCardView } from "@/shared/game-v2";
+import type { GameProjection, ProjectedAction, ProjectedCardView } from "@/shared/game";
 
 export type BoardCatalogCard = {
   attributes: { energy: number | undefined; might: number | undefined; power: number | undefined };
@@ -31,19 +31,19 @@ export type BoardPlayerProjection = {
   zones: Record<"legend" | "champion" | "mainDeck" | "runeDeck" | "hand" | "trash" | "banishment" | "base", BoardZoneProjection>;
 };
 
-export type LegacyBoardProjection = {
+export type BoardProjection = {
   id: string;
   matchId: string;
   gameNumber: number;
-  status: GameProjectionV2["status"];
+  status: GameProjection["status"];
   stateVersion: number;
   viewerPlayerId: string;
   winnerPlayerId: string | null;
-  setup: GameProjectionV2["setup"];
-  turn: GameProjectionV2["turn"];
-  showdown: GameProjectionV2["showdown"];
+  setup: GameProjection["setup"];
+  turn: GameProjection["turn"];
+  showdown: GameProjection["showdown"];
   chain: null | {
-    items: Array<GameProjectionV2["chain"] extends infer T ? T extends { items: infer I } ? I extends Array<infer Item> ? Item & { cardInstanceId: string | null } : never : never : never>;
+    items: Array<GameProjection["chain"] extends infer T ? T extends { items: infer I } ? I extends Array<infer Item> ? Item & { cardInstanceId: string | null } : never : never : never>;
     relevantPlayerIds: string[];
     priorityPlayerId: string;
     passedPlayerIds: string[];
@@ -54,7 +54,7 @@ export type LegacyBoardProjection = {
     type: "orderTriggers";
     prompt: string;
     optionIds: string[];
-    pendingChainItems: NonNullable<LegacyBoardProjection["chain"]>["items"];
+    pendingChainItems: NonNullable<BoardProjection["chain"]>["items"];
   };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{
@@ -67,9 +67,9 @@ export type LegacyBoardProjection = {
   cardStates: Record<string, { exhausted: boolean; damage: number; computedMight?: number }>;
 };
 
-export function adaptProjectionToLegacyBoard(projection: GameProjectionV2): {
+export function adaptProjectionToBoard(projection: GameProjection): {
   cardsByInstanceId: Record<string, BoardCatalogCard>;
-  projection: LegacyBoardProjection;
+  projection: BoardProjection;
 } {
   const visibleCards = allVisibleCards(projection);
   const cardsByInstanceId = Object.fromEntries(visibleCards.map((card) => [card.instanceId, toCatalogCard(card)]));
@@ -149,7 +149,7 @@ export function adaptProjectionToLegacyBoard(projection: GameProjectionV2): {
   };
 }
 
-function allVisibleCards(projection: GameProjectionV2): ProjectedCardView[] {
+function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
   const cards = [
     ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
     ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units, ...(battlefield.facedownCard ? [battlefield.facedownCard] : [])]),

@@ -28,7 +28,7 @@ import {
   unitTargetReferenceKinds,
   validatePrimitiveAssignmentParameters
 } from "../src/server/card-catalog";
-import { runeResourceTypes } from "../src/server/match/game";
+import { runeResourceTypes } from "../src/shared/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {

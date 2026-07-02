@@ -2,7 +2,7 @@ export const runtimeCoverageStatuses = ["planned", "executable", "deferred"] as 
 
 export type RuntimeCoverageStatus = (typeof runtimeCoverageStatuses)[number];
 
-export const GAME_V2_RUNTIME_COVERAGE = {
+export const GAME__RUNTIME_COVERAGE = {
   "ability.exhaust_for_resource": "executable",
   "ability.recycle_for_power": "executable",
   "timing.action": "executable",
@@ -28,7 +28,7 @@ export const GAME_V2_RUNTIME_COVERAGE = {
 export function getRuntimeCoverageStatus(
   behaviorId: string
 ): RuntimeCoverageStatus | null {
-  return GAME_V2_RUNTIME_COVERAGE[
-    behaviorId as keyof typeof GAME_V2_RUNTIME_COVERAGE
+  return GAME__RUNTIME_COVERAGE[
+    behaviorId as keyof typeof GAME__RUNTIME_COVERAGE
   ] ?? null;
 }

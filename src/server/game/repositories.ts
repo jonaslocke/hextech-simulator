@@ -1,28 +1,28 @@
 import type { Collection, Db, Filter, OptionalUnlessRequiredId, WithId } from "mongodb";
-import type { DeckSnapshotV2 } from "./schemas";
-import type { CardInstanceV2, GameDocumentV2, MatchDocumentV2 } from "./state";
+import type { DeckSnapshot } from "./schemas";
+import type { CardInstance, GameDocument, MatchDocument } from "./state";
 
-export const gameV2CollectionNames = {
-  matches: "matchesV2",
-  games: "gamesV2",
-  gameEvents: "gameEventsV2",
-  deckSnapshots: "deckSnapshotsV2"
+export const gameCollectionNames = {
+  matches: "matches",
+  games: "games",
+  gameEvents: "gameEvents",
+  deckSnapshots: "deckSnapshots"
 } as const;
 
-export type BaseDocumentV2 = { id: string; createdAt: string; updatedAt: string };
-export type DeckSnapshotDocumentV2 = BaseDocumentV2 & {
+export type BaseDocument = { id: string; createdAt: string; updatedAt: string };
+export type DeckSnapshotDocument = BaseDocument & {
   matchId: string | null;
   playerId: string;
-  snapshot: DeckSnapshotV2;
-  instances: CardInstanceV2[];
+  snapshot: DeckSnapshot;
+  instances: CardInstance[];
 };
 
-export type GameEventDocumentV2 = BaseDocumentV2 & {
+export type GameEventDocument = BaseDocument & {
   matchId: string; gameId: string; sequence: number; actorPlayerId: string | null;
   type: string; message: string;
 };
 
-export type DocumentRepositoryV2<T extends BaseDocumentV2> = {
+export type DocumentRepository<T extends BaseDocument> = {
   findById(id: string): Promise<T | null>;
   insert(document: T): Promise<void>;
   upsert(document: T): Promise<void>;
@@ -30,27 +30,27 @@ export type DocumentRepositoryV2<T extends BaseDocumentV2> = {
 
 type Stored<T extends { id: string }> = T & { _id: string };
 
-export type GameV2Repositories = {
-  matches: DocumentRepositoryV2<MatchDocumentV2>;
-  games: DocumentRepositoryV2<GameDocumentV2>;
-  gameEvents: DocumentRepositoryV2<GameEventDocumentV2> & {
-    findByGameId(gameId: string): Promise<GameEventDocumentV2[]>;
+export type GameRepositories = {
+  matches: DocumentRepository<MatchDocument>;
+  games: DocumentRepository<GameDocument>;
+  gameEvents: DocumentRepository<GameEventDocument> & {
+    findByGameId(gameId: string): Promise<GameEventDocument[]>;
   };
-  deckSnapshots: DocumentRepositoryV2<DeckSnapshotDocumentV2>;
+  deckSnapshots: DocumentRepository<DeckSnapshotDocument>;
 };
 
-export function createGameV2Repositories(db: Db): GameV2Repositories {
-  const matches = db.collection<Stored<MatchDocumentV2>>(gameV2CollectionNames.matches);
-  const games = db.collection<Stored<GameDocumentV2>>(gameV2CollectionNames.games);
-  const events = db.collection<Stored<GameEventDocumentV2>>(gameV2CollectionNames.gameEvents);
-  const deckSnapshots = db.collection<Stored<DeckSnapshotDocumentV2>>(gameV2CollectionNames.deckSnapshots);
+export function createGameRepositories(db: Db): GameRepositories {
+  const matches = db.collection<Stored<MatchDocument>>(gameCollectionNames.matches);
+  const games = db.collection<Stored<GameDocument>>(gameCollectionNames.games);
+  const events = db.collection<Stored<GameEventDocument>>(gameCollectionNames.gameEvents);
+  const deckSnapshots = db.collection<Stored<DeckSnapshotDocument>>(gameCollectionNames.deckSnapshots);
   return {
     matches: createRepository(matches),
     games: createRepository(games),
     gameEvents: {
       ...createRepository(events),
       async findByGameId(gameId) {
-        const documents = await events.find({ gameId } as Filter<Stored<GameEventDocumentV2>>).sort({ sequence: 1 }).toArray();
+        const documents = await events.find({ gameId } as Filter<Stored<GameEventDocument>>).sort({ sequence: 1 }).toArray();
         return documents.map((document) => fromStored(document)!);
       }
     },
@@ -58,9 +58,9 @@ export function createGameV2Repositories(db: Db): GameV2Repositories {
   };
 }
 
-function createRepository<T extends BaseDocumentV2>(
+function createRepository<T extends BaseDocument>(
   collection: Collection<Stored<T>>
-): DocumentRepositoryV2<T> {
+): DocumentRepository<T> {
   return {
     async findById(id) {
       const result = await collection.findOne({ _id: id } as Filter<Stored<T>>);

@@ -3,7 +3,7 @@ import type {
   PrimitiveAssignment,
   PrimitiveFamily
 } from "./primitive-discovery";
-import { gameZoneKinds, runeResourceTypes } from "../match/game";
+import { gameZoneKinds, runeResourceTypes } from "@/shared/game";
 
 export type PrimitiveParameterType =
   | "string"
@@ -335,7 +335,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "timing",
     name: "Action timing",
     description: "The card or ability can be played at action timing.",
-    engineSupport: supported("Declared as a foundational timing primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational timing primitive for the catalog pipeline."),
     timingRequirements: ["action phase", "showdown when allowed"]
   }),
   "timing.reaction": primitiveSeed({
@@ -343,7 +343,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "timing",
     name: "Reaction timing",
     description: "The card or ability can be played while players have reaction priority.",
-    engineSupport: supported("Declared as a foundational timing primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational timing primitive for the catalog pipeline."),
     timingRequirements: ["open chain priority"]
   }),
   "timing.delayed": primitiveSeed({
@@ -463,7 +463,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
-    engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a unit"]
   }),
   "selector.friendly_unit": primitiveSeed({
@@ -479,7 +479,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
-    engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
   }),
   "selector.enemy_unit": primitiveSeed({
@@ -495,7 +495,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
     ],
-    engineSupport: supported("Declared as a foundational selector primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
   }),
   "selector.token": primitiveSeed({
@@ -817,7 +817,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The player who makes the choice.")
     ],
-    engineSupport: supported("Declared as a foundational choice primitive for the new catalog pipeline; not inherited from legacy runtime code."),
+    engineSupport: supported("Declared as a foundational choice primitive for the catalog pipeline."),
     targetingRequirements: [
       "candidate legality and count bounds come from selector primitives in the same behavior clause"
     ]

@@ -5,16 +5,16 @@ const parameterValueSchema = z.union([
   z.string(), z.number(), z.boolean(), z.null()
 ]);
 
-export const behaviorBindingV2Schema = z.object({
+export const behaviorBindingSchema = z.object({
   behaviorId: z.string().min(1),
   parameters: z.record(parameterValueSchema),
   confidence: z.enum(["high", "medium", "low"]),
   order: z.number().int().nonnegative()
 }).strict();
 
-const bindingListSchema = z.array(behaviorBindingV2Schema);
+const bindingListSchema = z.array(behaviorBindingSchema);
 
-export const behaviorClauseV2Schema = z.object({
+export const behaviorClauseSchema = z.object({
   id: z.string().min(1),
   sequence: z.number().int().nonnegative(),
   sourceText: z.string(),
@@ -30,19 +30,19 @@ export const behaviorClauseV2Schema = z.object({
   keywords: bindingListSchema
 }).strict();
 
-export const behaviorModelV2Schema = z.object({
+export const behaviorModelSchema = z.object({
   playTimings: bindingListSchema,
-  clauses: z.array(behaviorClauseV2Schema)
+  clauses: z.array(behaviorClauseSchema)
 }).strict();
 
 export const gameCardDefinitionSchema = z.object({
   cardCode: z.string().min(1),
   sourceTextHash: z.string().min(1),
   card: cardSchema,
-  behaviorModel: behaviorModelV2Schema
+  behaviorModel: behaviorModelSchema
 }).strict();
 
-export const deckEntryV2Schema = z.object({
+export const deckEntrySchema = z.object({
   section: z.enum([
     "Legend", "Champion", "Runes", "Battlefields", "MainDeck", "Sideboard"
   ]),
@@ -50,17 +50,16 @@ export const deckEntryV2Schema = z.object({
   cardCode: z.string().min(1)
 }).strict();
 
-export const deckSnapshotV2Schema = z.object({
+export const deckSnapshotSchema = z.object({
   sourceText: z.string(),
   catalogDigest: z.string().min(1),
-  entries: z.array(deckEntryV2Schema),
+  entries: z.array(deckEntrySchema),
   cards: z.array(gameCardDefinitionSchema)
 }).strict();
 
-export type BehaviorBindingV2 = z.infer<typeof behaviorBindingV2Schema>;
-export type BehaviorClauseV2 = z.infer<typeof behaviorClauseV2Schema>;
-export type BehaviorModelV2 = z.infer<typeof behaviorModelV2Schema>;
+export type BehaviorBinding = z.infer<typeof behaviorBindingSchema>;
+export type BehaviorClause = z.infer<typeof behaviorClauseSchema>;
+export type BehaviorModel = z.infer<typeof behaviorModelSchema>;
 export type GameCardDefinition = z.infer<typeof gameCardDefinitionSchema>;
-export type DeckEntryV2 = z.infer<typeof deckEntryV2Schema>;
-export type DeckSnapshotV2 = z.infer<typeof deckSnapshotV2Schema>;
-
+export type DeckEntry = z.infer<typeof deckEntrySchema>;
+export type DeckSnapshot = z.infer<typeof deckSnapshotSchema>;

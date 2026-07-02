@@ -1,9 +1,9 @@
 import type {
-  GameProjectionV2,
+  GameProjection,
   ProjectedAction,
   ProjectedCardView,
-  ProjectedZoneV2
-} from "@/shared/game-v2";
+  ProjectedZone
+} from "@/shared/game";
 
 export function actionsForSource(
   actions: readonly ProjectedAction[],
@@ -12,7 +12,7 @@ export function actionsForSource(
   return actions.filter((action) => action.sourceCardInstanceId === sourceCardInstanceId);
 }
 
-export function visibleCards(projection: GameProjectionV2): ProjectedCardView[] {
+export function visibleCards(projection: GameProjection): ProjectedCardView[] {
   return [
     ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
     ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units])
@@ -20,9 +20,9 @@ export function visibleCards(projection: GameProjectionV2): ProjectedCardView[] 
 }
 
 export function zoneByKind(
-  zones: readonly ProjectedZoneV2[],
-  kind: ProjectedZoneV2["kind"]
-): ProjectedZoneV2 | null {
+  zones: readonly ProjectedZone[],
+  kind: ProjectedZone["kind"]
+): ProjectedZone | null {
   return zones.find((zone) => zone.kind === kind) ?? null;
 }
 

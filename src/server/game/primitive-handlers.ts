@@ -1,29 +1,29 @@
 import type { BehaviorHandler, BehaviorHandlerRegistry } from "./behavior-runtime";
-import type { DeckSnapshotDocumentV2 } from "./repositories";
-import type { BehaviorBindingV2, GameCardDefinition } from "./schemas";
-import type { CardInstanceV2, GameDocumentV2 } from "./state";
+import type { DeckSnapshotDocument } from "./repositories";
+import type { BehaviorBinding, GameCardDefinition } from "./schemas";
+import type { CardInstance, GameDocument } from "./state";
 
-export type RuntimeCardIndexV2 = {
+export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
-  instances: Map<string, CardInstanceV2>;
+  instances: Map<string, CardInstance>;
 };
 
-export function createRuntimeCardIndexV2(decks: readonly DeckSnapshotDocumentV2[]): RuntimeCardIndexV2 {
+export function createRuntimeCardIndex(decks: readonly DeckSnapshotDocument[]): RuntimeCardIndex {
   return {
     definitions: new Map(decks.flatMap((deck) => deck.snapshot.cards.map((item) => [item.cardCode, item] as const))),
     instances: new Map(decks.flatMap((deck) => deck.instances.map((item) => [item.instanceId, item] as const)))
   };
 }
 
-export function definitionForInstanceV2(id: string, index: RuntimeCardIndexV2): GameCardDefinition {
+export function definitionForInstance(id: string, index: RuntimeCardIndex): GameCardDefinition {
   const instance = index.instances.get(id);
   const definition = instance && index.definitions.get(instance.cardCode);
   if (!definition) throw new Error(`Card definition unavailable: ${id}`);
   return definition;
 }
 
-export function createPrimitiveHandlersV2(
-  index: RuntimeCardIndexV2
+export function createPrimitiveHandlers(
+  index: RuntimeCardIndex
 ): BehaviorHandlerRegistry {
   const handlers = new Map<string, BehaviorHandler>();
   const passive: BehaviorHandler = {};
@@ -35,7 +35,7 @@ export function createPrimitiveHandlersV2(
       if (context.event?.type !== "card.played" || context.event.actorPlayerId !== context.controllerPlayerId) return false;
       if (binding.parameters.subject === "source") return context.event.subjectCardInstanceId === context.sourceCardInstanceId;
       if (binding.parameters.subject === "spell" && context.event.subjectCardInstanceId) {
-        return definitionForInstanceV2(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
+        return definitionForInstance(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
       }
       return false;
     }
@@ -92,7 +92,7 @@ export function createPrimitiveHandlersV2(
   handlers.set("action.ready_cards", {
     execute(binding, context) {
       const ids = binding.parameters.target === "runes"
-        ? context.game.state.players[context.controllerPlayerId]!.zones.base.filter((id) => definitionForInstanceV2(id, index).card.classification.type === "Rune").slice(0, numberParam(binding, "count"))
+        ? context.game.state.players[context.controllerPlayerId]!.zones.base.filter((id) => definitionForInstance(id, index).card.classification.type === "Rune").slice(0, numberParam(binding, "count"))
         : context.selectedIds;
       ids.forEach((id) => { context.game.state.cardStates[id]!.exhausted = false; });
     }
@@ -166,15 +166,15 @@ export function createPrimitiveHandlersV2(
       player.zones.base = player.zones.base.filter((id) => id !== context.sourceCardInstanceId);
       player.zones.runeDeck.push(context.sourceCardInstanceId);
       resetStateAfterLeavingBoard(context.game, context.sourceCardInstanceId);
-      const domain = definitionForInstanceV2(context.sourceCardInstanceId, index).card.classification.domain[0] ?? "Rainbow";
+      const domain = definitionForInstance(context.sourceCardInstanceId, index).card.classification.domain[0] ?? "Rainbow";
       player.power[domain] = (player.power[domain] ?? 0) + 1;
     }
   });
   return handlers;
 }
 
-export function effectiveEnergyCostV2(
-  game: GameDocumentV2,
+export function effectiveEnergyCost(
+  game: GameDocument,
   controllerPlayerId: string,
   definition: GameCardDefinition
 ): number {
@@ -191,14 +191,14 @@ export function effectiveEnergyCostV2(
   return Math.max(0, value);
 }
 
-export function cleanupTurnModifiersV2(game: GameDocumentV2, index: RuntimeCardIndexV2) {
+export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {
   const affected = game.state.modifiers.filter((item) => item.duration === "thisTurn" && item.targetCardInstanceId).map((item) => item.targetCardInstanceId!);
   game.state.modifiers = game.state.modifiers.filter((item) => item.duration !== "thisTurn");
   affected.forEach((id) => recomputeMight(game, id, index));
   cleanupLethalDamage(game, [...new Set(affected)], index);
 }
 
-function selectorTargets(binding: BehaviorBindingV2, game: GameDocumentV2, index: RuntimeCardIndexV2, predicate: (id: string) => boolean) {
+function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: RuntimeCardIndex, predicate: (id: string) => boolean) {
   const baseUnits = game.state.setup.playerIds.flatMap(
     (playerId) => game.state.players[playerId]?.zones.base ?? []
   );
@@ -209,7 +209,7 @@ function selectorTargets(binding: BehaviorBindingV2, game: GameDocumentV2, index
       ? baseUnits
       : [...baseUnits, ...battlefieldUnits];
   const legalIds = candidates
-    .filter((id) => definitionForInstanceV2(id, index).card.classification.type === "Unit")
+    .filter((id) => definitionForInstance(id, index).card.classification.type === "Unit")
     .filter(predicate);
   return {
     kind: "card" as const,
@@ -218,14 +218,14 @@ function selectorTargets(binding: BehaviorBindingV2, game: GameDocumentV2, index
     maximum: typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
   };
 }
-function modifierIsActive(game: GameDocumentV2, sourceId: string | null, duration: string) {
+function modifierIsActive(game: GameDocument, sourceId: string | null, duration: string) {
   if (!sourceId) return true;
   if (duration === "whileSourceAtBattlefield") return game.state.battlefields.some((battlefield) => battlefield.units.includes(sourceId));
   if (duration === "whileSourceOnBoard") return game.state.battlefields.some((battlefield) => battlefield.cardInstanceId === sourceId || battlefield.units.includes(sourceId));
   return true;
 }
-function recomputeMight(game: GameDocumentV2, id: string, index: RuntimeCardIndexV2) {
-  let value = definitionForInstanceV2(id, index).card.attributes.might ?? 0;
+function recomputeMight(game: GameDocument, id: string, index: RuntimeCardIndex) {
+  let value = definitionForInstance(id, index).card.attributes.might ?? 0;
   for (const modifier of game.state.modifiers.filter((item) => item.attribute === "might" && item.targetCardInstanceId === id && modifierIsActive(game, item.sourceCardInstanceId, item.duration))) {
     if (modifier.operation === "increase") value += modifier.amount;
     if (modifier.operation === "reduce") value -= modifier.amount;
@@ -235,15 +235,15 @@ function recomputeMight(game: GameDocumentV2, id: string, index: RuntimeCardInde
   }
   game.state.cardStates[id]!.computedMight = Math.max(0, value);
 }
-function cleanupLethalDamage(game: GameDocumentV2, ids: string[], index: RuntimeCardIndexV2) {
+function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
     const state = game.state.cardStates[id];
-    if (state && state.damage > 0 && state.damage >= (state.computedMight ?? definitionForInstanceV2(id, index).card.attributes.might ?? Infinity)) {
+    if (state && state.damage > 0 && state.damage >= (state.computedMight ?? definitionForInstance(id, index).card.attributes.might ?? Infinity)) {
       moveUnitToTrash(game, id, index);
     }
   }
 }
-function moveUnitToTrash(game: GameDocumentV2, id: string, index: RuntimeCardIndexV2) {
+function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
   const zones = game.state.players[owner]!.zones;
@@ -265,18 +265,18 @@ function moveUnitToTrash(game: GameDocumentV2, id: string, index: RuntimeCardInd
   zones.trash.push(id);
   resetStateAfterLeavingBoard(game, id);
 }
-function resetStateAfterLeavingBoard(game: GameDocumentV2, id: string) {
+function resetStateAfterLeavingBoard(game: GameDocument, id: string) {
   const state = game.state.cardStates[id];
   if (!state) return;
   state.damage = 0;
   state.exhausted = false;
 }
-function numberParam(binding: BehaviorBindingV2, key: string) {
+function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "number") throw new Error(`Behavior parameter ${key} must be numeric.`);
   return value;
 }
-function stringParam(binding: BehaviorBindingV2, key: string) {
+function stringParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "string") throw new Error(`Behavior parameter ${key} must be text.`);
   return value;

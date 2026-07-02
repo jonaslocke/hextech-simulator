@@ -17,9 +17,9 @@ import { deriveCardCodeFromCard } from "../card-catalog/identity";
 import { parseDeckList } from "../deck";
 import { getRuntimeCoverageStatus } from "./runtime-coverage";
 import {
-  deckSnapshotV2Schema,
+  deckSnapshotSchema,
   gameCardDefinitionSchema,
-  type DeckSnapshotV2,
+  type DeckSnapshot,
   type GameCardDefinition
 } from "./schemas";
 
@@ -30,18 +30,18 @@ export const INITIAL_DECK_UNIQUE_CARD_COUNT = 21;
 type CanonicalCardStoredDocument = CanonicalCardDocument & { _id: string };
 type BehaviorStoredDocument = BehaviorDefinitionDocument & { _id: string };
 
-export class GameV2CatalogError extends Error {
-  readonly code = "game_v2_catalog_unavailable";
+export class GameCatalogError extends Error {
+  readonly code = "game_catalog_unavailable";
 
   constructor(public readonly issues: string[]) {
-    super(`Game v2 catalog is unavailable: ${issues.join("; ")}`);
+    super(`Game catalog is unavailable: ${issues.join("; ")}`);
   }
 }
 
 export async function loadInitialDeckSnapshot(
   db: Db,
   sourceText?: string
-): Promise<DeckSnapshotV2> {
+): Promise<DeckSnapshot> {
   const text = sourceText ?? await readFile(path.join(process.cwd(), INITIAL_DECK_PATH), "utf8");
   const parsedDeck = parseDeckList(text);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
@@ -52,14 +52,14 @@ export async function loadInitialDeckSnapshot(
     loadBehaviorDefinitions(db)
   ]);
 
-  return buildDeckSnapshotV2(text, storedCards, behaviorDefinitions);
+  return buildDeckSnapshot(text, storedCards, behaviorDefinitions);
 }
 
-export function buildDeckSnapshotV2(
+export function buildDeckSnapshot(
   sourceText: string,
   canonicalCards: readonly CanonicalCardDocument[],
   behaviorDefinitions: readonly BehaviorDefinitionDocument[]
-): DeckSnapshotV2 {
+): DeckSnapshot {
   const parsedDeck = parseDeckList(sourceText);
   const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
   const cardsByName = new Map(canonicalCards.map((document) => [document.card.name, document]));
@@ -92,14 +92,14 @@ export function buildDeckSnapshotV2(
     return [result.data];
   });
 
-  if (issues.length > 0) throw new GameV2CatalogError(issues);
+  if (issues.length > 0) throw new GameCatalogError(issues);
 
   const cardsByNameResolved = new Map(cards.map((definition) => [definition.card.name, definition]));
   const digest = createHash("sha256")
     .update(JSON.stringify([...cards].sort((left, right) => left.cardCode.localeCompare(right.cardCode))))
     .digest("hex");
 
-  return deckSnapshotV2Schema.parse({
+  return deckSnapshotSchema.parse({
     sourceText,
     catalogDigest: digest,
     entries: parsedDeck.entries.map((entry) => ({
@@ -175,7 +175,7 @@ function validateBindings(
       }
     }
     if (!getRuntimeCoverageStatus(binding.behaviorId)) {
-      issues.push(`Missing game v2 runtime coverage: ${binding.behaviorId}`);
+      issues.push(`Missing game runtime coverage: ${binding.behaviorId}`);
     }
   }
 }

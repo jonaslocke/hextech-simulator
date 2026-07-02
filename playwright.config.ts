@@ -11,7 +11,7 @@ export default defineConfig({
   },
   webServer: {
     command: `npm run next:dev -- -p ${port}`,
-    env: { ...process.env, VISUAL_PARITY: "1" },
+    env: { ...process.env, VISUAL_TEST: "1" },
     reuseExistingServer: false,
     url: `http://127.0.0.1:${port}`,
     timeout: 120_000

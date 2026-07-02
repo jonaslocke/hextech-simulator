@@ -1,24 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  dispatchBehaviorEventV2, gameplayActionsV2, performGameplayActionV2,
-  projectGameV2, victoryRequirementV2, GAME_V2_RUNTIME_COVERAGE,
-  type DeckSnapshotDocumentV2, type GameDocumentV2
-} from "../src/server/game-v2";
+  dispatchBehaviorEvent, gameplayActions, performGameplayAction,
+  projectGame, victoryRequirement, GAME__RUNTIME_COVERAGE,
+  type DeckSnapshotDocument, type GameDocument
+} from "../src/server/game";
 
 test("orders and resolves event-conditioned play triggers without card identity branches", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
-  dispatchBehaviorEventV2(game, {
+  dispatchBehaviorEvent(game, {
     type: "card.played", actorPlayerId: "p1", subjectCardInstanceId: "spell",
     values: { "eventSubject.effectiveEnergyCost": 5 }
   }, decks);
   assert.equal(game.state.pendingChoice?.optionIds.length, 2);
-  const choiceProjection = projectGameV2({ game, viewerPlayerId: "p1", decks });
+  const choiceProjection = projectGame({ game, viewerPlayerId: "p1", decks });
   assert.equal(choiceProjection.pendingChoice?.pendingChainItems.length, 2);
   assert.ok(choiceProjection.pendingChoice?.pendingChainItems.every((item) => item.card !== null));
-  const order = gameplayActionsV2(game, "p1", decks)[0]!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
+  const order = gameplayActions(game, "p1", decks)[0]!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
   game = resolveAllChainItems(game, decks);
   assert.equal(game.state.players.p1!.zones.hand.length, 1);
   assert.equal(game.state.cardStates.raven!.computedMight, 2);
@@ -27,44 +27,44 @@ test("orders and resolves event-conditioned play triggers without card identity 
 test("executes synthetic hold and conquer events, delayed readiness, and victory modifiers", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
-  dispatchBehaviorEventV2(game, {
+  dispatchBehaviorEvent(game, {
     type: "battlefield.held", actorPlayerId: "p1", subjectCardInstanceId: "paper", values: {}
   }, decks);
   game = resolveAllChainItems(game, decks);
   assert.equal(game.state.players.p1!.zones.base.length, 4);
   assert.equal(game.state.players.p2!.zones.base.length, 1);
 
-  dispatchBehaviorEventV2(game, {
+  dispatchBehaviorEvent(game, {
     type: "battlefield.conquered", actorPlayerId: "p1", subjectCardInstanceId: "peak", values: {}
   }, decks);
   game = resolveAllChainItems(game, decks);
   assert.equal(game.state.delayedEffects.length, 1);
-  const endTurn = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "End turn")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "z" });
+  const endTurn = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "z" });
   assert.equal(game.state.cardStates.rune1!.exhausted, false);
   assert.equal(game.state.cardStates.rune2!.exhausted, false);
-  assert.equal(victoryRequirementV2(game, decks), 9);
+  assert.equal(victoryRequirement(game, decks), 9);
 });
 
 test("classifies every initial runtime primitive without planned placeholders", () => {
-  assert.ok(Object.values(GAME_V2_RUNTIME_COVERAGE).every((status) => status === "executable" || status === "deferred"));
-  assert.equal(GAME_V2_RUNTIME_COVERAGE["keyword.assault"], "deferred");
-  assert.equal(GAME_V2_RUNTIME_COVERAGE["keyword.tank"], "deferred");
+  assert.ok(Object.values(GAME__RUNTIME_COVERAGE).every((status) => status === "executable" || status === "deferred"));
+  assert.equal(GAME__RUNTIME_COVERAGE["keyword.assault"], "deferred");
+  assert.equal(GAME__RUNTIME_COVERAGE["keyword.tank"], "deferred");
 });
 
-function resolveAllChainItems(game: GameDocumentV2, decks: DeckSnapshotDocumentV2[]) {
+function resolveAllChainItems(game: GameDocument, decks: DeckSnapshotDocument[]) {
   let current = game;
   while (current.state.chain) {
     for (let count = 0; count < 2 && current.state.chain; count += 1) {
       const actor = current.state.chain.priorityPlayerId;
-      const pass = gameplayActionsV2(current, actor, decks).find((action) => action.label === "Pass priority")!;
-      current = performGameplayActionV2({ game: current, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now: "r" });
+      const pass = gameplayActions(current, actor, decks).find((action) => action.label === "Pass priority")!;
+      current = performGameplayAction({ game: current, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now: "r" });
     }
   }
   return current;
 }
 
-function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
+function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const definitions = [
     card("LADY", "Lady", "Legend", [clause("lady", {
       triggers: [binding("trigger.on_play", 0, { actor: "controller", subject: "spell" })],
@@ -101,7 +101,7 @@ function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
   ];
   const zones = (id: string) => ({ legend: id === "p1" ? "lady" : null, champion: null, mainDeck: id === "p1" ? ["draw1"] : [], runeDeck: id === "p1" ? ["rune3"] : ["rune4"], hand: [], trash: [], banishment: [], base: id === "p1" ? ["raven", "rune1", "rune2"] : [] });
   const states = Object.fromEntries(instances.map((item) => [item.instanceId, { exhausted: item.instanceId.startsWith("rune"), damage: 0, computedMight: item.instanceId === "raven" ? 1 : null }]));
-  const game: GameDocumentV2 = {
+  const game: GameDocument = {
     id: "g", matchId: "m", createdAt: "a", updatedAt: "a", stateVersion: 1, status: "in_progress", winnerPlayerId: null,
     state: {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },

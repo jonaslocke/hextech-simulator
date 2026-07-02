@@ -1,45 +1,45 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DeckSnapshotDocumentV2 } from "../src/server/game-v2";
-import { gameplayActionsV2, performGameplayActionV2, type GameDocumentV2 } from "../src/server/game-v2";
+import type { DeckSnapshotDocument } from "../src/server/game";
+import { gameplayActions, performGameplayAction, type GameDocument } from "../src/server/game";
 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
-  assert.equal(gameplayActionsV2(game, "p1", decks).some((action) => action.label === "Draw a card" || action.label === "Channel a rune"), false);
+  assert.equal(gameplayActions(game, "p1", decks).some((action) => action.label === "Draw a card" || action.label === "Channel a rune"), false);
 
-  const rune = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "Add Energy")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: rune.id, selectedIds: [], decks, now: "c" });
+  const rune = gameplayActions(game, "p1", decks).find((action) => action.label === "Add Energy")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: rune.id, selectedIds: [], decks, now: "c" });
   assert.equal(game.state.players.p1?.energy, 1);
 
-  const move = gameplayActionsV2(game, "p1", decks).find((action) => action.label.startsWith("Move to"))!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "d" });
+  const move = gameplayActions(game, "p1", decks).find((action) => action.label.startsWith("Move to"))!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "d" });
   assert.ok(game.state.showdown);
-  assert.throws(() => performGameplayActionV2({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "e" }), /not legal/);
+  assert.throws(() => performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "e" }), /not legal/);
 });
 
 test("plays a spell through priority resolution and advances the turn", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
-  const play = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "Play Spell")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
+  const play = gameplayActions(game, "p1", decks).find((action) => action.label === "Play Spell")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
   assert.equal(game.state.chain?.items.length, 1);
   assert.equal(game.state.chain?.priorityPlayerId, "p1");
   for (const playerId of ["p1", "p2"]) {
-    const pass = gameplayActionsV2(game, playerId, decks)[0]!;
-    game = performGameplayActionV2({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "c" });
+    const pass = gameplayActions(game, playerId, decks)[0]!;
+    game = performGameplayAction({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "c" });
   }
   assert.equal(game.state.chain, null);
   assert.ok(game.state.players.p1?.zones.trash.includes("p1:spell"));
-  const end = gameplayActionsV2(game, "p1", decks).find((action) => action.label === "End turn")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: end.id, selectedIds: [], decks, now: "d" });
+  const end = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: end.id, selectedIds: [], decks, now: "d" });
   assert.equal(game.state.turn?.activePlayerId, "p2");
 });
 
 test("automatically pays card costs with behavior-backed rune abilities", () => {
   const { game: initial, decks } = fixture();
-  const play = gameplayActionsV2(initial, "p1", decks).find((action) => action.label === "Play Unit")!;
-  const game = performGameplayActionV2({ game: initial, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
+  const play = gameplayActions(initial, "p1", decks).find((action) => action.label === "Play Unit")!;
+  const game = performGameplayAction({ game: initial, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
   assert.ok(game.state.players.p1!.zones.runeDeck.includes("p1:rune"));
   assert.equal(game.state.cardStates["p1:rune"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:rune-b"));
@@ -47,7 +47,7 @@ test("automatically pays card costs with behavior-backed rune abilities", () => 
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
 });
 
-function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
+function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const cards = [
     definition("RUNE", "Rune", "Rune", 0, 0),
     definition("UNIT", "Unit", "Unit", 1, 1, 1),
@@ -66,7 +66,7 @@ function fixture(): { game: GameDocumentV2; decks: DeckSnapshotDocumentV2[] } {
   const snapshot = { sourceText: "", catalogDigest: "x", entries: [], cards };
   const decks = [{ id: "d1", createdAt: "a", updatedAt: "a", matchId: "m", playerId: "p1", snapshot, instances }, { id: "d2", createdAt: "a", updatedAt: "a", matchId: "m", playerId: "p2", snapshot, instances: [] }];
   const zones = (base: string[], mainDeck: string[], hand: string[]) => ({ legend: null, champion: null, mainDeck, runeDeck: [], hand, trash: [], banishment: [], base });
-  const game: GameDocumentV2 = {
+  const game: GameDocument = {
     id: "g", matchId: "m", createdAt: "a", updatedAt: "a", stateVersion: 0,
     status: "in_progress", winnerPlayerId: null,
     state: {

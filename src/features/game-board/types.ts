@@ -1,6 +1,4 @@
-import type { Card as CatalogCard, CardType } from "@/server/catalog";
-import type { GameLogEntry } from "@/server/events";
-import type { GameProjection } from "@/server/match";
+import type { ProjectedCardView } from "@/shared/game";
 
 export type TemporaryZone =
   | "chain"
@@ -21,33 +19,6 @@ export type ZoneKind =
   | "mainDeck"
   | "runeDeck"
   | "trash";
-
-export type GameBoardProps = {
-  cardsByInstanceId: Record<string, CatalogCard>;
-  logEntries?: GameLogEntry[];
-  onActivateAbility?: (input: {
-    abilityId: string;
-    sourceCardInstanceId: string;
-  }) => void;
-  onAddRuneResource?: (input: {
-    cardInstanceId: string;
-    resourceType: "energy" | "power";
-  }) => void;
-  onPlayCard?: (input: {
-    canPlay: boolean;
-    cardInstanceId: string;
-    choices?: {
-      targetCardInstanceIds?: string[];
-    };
-    selectedModeId?: string;
-  }) => void;
-  onEndTurn?: () => void;
-  onPass?: () => void;
-  onSubmitChoice?: (input: { choiceId: string; orderedIds: string[] }) => void;
-  playerNames?: Partial<Record<string, string>>;
-  projection: GameProjection;
-  scores?: Partial<Record<string, number>>;
-};
 
 export type PlayerData = {
   playerId: string;
@@ -81,8 +52,8 @@ export type Card = {
   publicCode?: string;
   rulesText?: string;
   setLabel?: string;
-  supertype?: CatalogCard["classification"]["supertype"];
-  type?: CardType;
+  supertype?: ProjectedCardView["supertype"];
+  type?: ProjectedCardView["type"];
   isExhausted?: boolean;
   damage?: number;
   comesToPlayReady?: boolean;
@@ -113,4 +84,11 @@ export type BattlefieldData = {
   playerUnits: Card[];
   opponentUnits: Card[];
   img: HTMLImageElement["src"];
+};
+
+export type GameLogEntry = {
+  id: string;
+  message: string;
+  createdAt: string;
+  sequence: number;
 };

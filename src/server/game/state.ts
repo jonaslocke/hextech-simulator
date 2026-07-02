@@ -1,15 +1,15 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { DeckSnapshotV2, GameCardDefinition } from "./schemas";
+import type { DeckSnapshot, GameCardDefinition } from "./schemas";
 
-export const cardInstanceV2Schema = z.object({
+export const cardInstanceSchema = z.object({
   instanceId: z.string().min(1),
   ownerPlayerId: z.string().min(1),
   source: z.enum(["legend", "champion", "mainDeck", "runeDeck", "battlefield", "sideboard"]),
   cardCode: z.string().min(1)
 });
 
-export const playerZonesV2Schema = z.object({
+export const playerZonesSchema = z.object({
   legend: z.string().nullable(),
   champion: z.string().nullable(),
   mainDeck: z.array(z.string()),
@@ -20,22 +20,22 @@ export const playerZonesV2Schema = z.object({
   base: z.array(z.string())
 });
 
-export const playerStateV2Schema = z.object({
+export const playerStateSchema = z.object({
   playerId: z.string().min(1),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
-  zones: playerZonesV2Schema
+  zones: playerZonesSchema
 });
 
-export const battlefieldStateV2Schema = z.object({
+export const battlefieldStateSchema = z.object({
   battlefieldId: z.string().min(1),
   cardInstanceId: z.string().min(1),
   selectedByPlayerId: z.string().min(1),
   units: z.array(z.string())
 });
 
-export const setupStateV2Schema = z.object({
+export const setupStateSchema = z.object({
   playerIds: z.tuple([z.string().min(1), z.string().min(1)]),
   startingPlayerChooserId: z.string().min(1),
   startingPlayerId: z.string().nullable(),
@@ -50,24 +50,24 @@ export const setupStateV2Schema = z.object({
   }))
 });
 
-export const turnStateV2Schema = z.object({
+export const turnStateSchema = z.object({
   turnNumber: z.number().int().positive(),
   activePlayerId: z.string().min(1),
   phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"])
 });
 
-export const cardStateV2Schema = z.object({
+export const cardStateSchema = z.object({
   exhausted: z.boolean(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable()
 });
 
-export const gameStateV2Schema = z.object({
-  setup: setupStateV2Schema,
-  players: z.record(playerStateV2Schema),
-  battlefields: z.array(battlefieldStateV2Schema),
-  cardStates: z.record(cardStateV2Schema),
-  turn: turnStateV2Schema.nullable(),
+export const gameStateSchema = z.object({
+  setup: setupStateSchema,
+  players: z.record(playerStateSchema),
+  battlefields: z.array(battlefieldStateSchema),
+  cardStates: z.record(cardStateSchema),
+  turn: turnStateSchema.nullable(),
   chain: z.object({
     items: z.array(z.object({
       id: z.string(), label: z.string(), controllerPlayerId: z.string(),
@@ -115,19 +115,19 @@ export const gameStateV2Schema = z.object({
   }).nullable()
 });
 
-export const gameDocumentV2Schema = z.object({
+export const gameDocumentSchema = z.object({
   id: z.string().min(1), createdAt: z.string(), updatedAt: z.string(),
   matchId: z.string().min(1), stateVersion: z.number().int().nonnegative(),
   status: z.enum(["setup_pending", "ready", "in_progress", "complete"]),
-  winnerPlayerId: z.string().nullable(), state: gameStateV2Schema
+  winnerPlayerId: z.string().nullable(), state: gameStateSchema
 });
 
-export type CardInstanceV2 = z.infer<typeof cardInstanceV2Schema>;
-export type PlayerStateV2 = z.infer<typeof playerStateV2Schema>;
-export type GameStateV2 = z.infer<typeof gameStateV2Schema>;
-export type GameDocumentV2 = z.infer<typeof gameDocumentV2Schema>;
+export type CardInstance = z.infer<typeof cardInstanceSchema>;
+export type PlayerState = z.infer<typeof playerStateSchema>;
+export type GameState = z.infer<typeof gameStateSchema>;
+export type GameDocument = z.infer<typeof gameDocumentSchema>;
 
-export type MatchDocumentV2 = {
+export type MatchDocument = {
   id: string; createdAt: string; updatedAt: string;
   status: "setup_pending" | "in_progress" | "complete";
   currentGameId: string;
@@ -137,29 +137,29 @@ export type MatchDocumentV2 = {
   ];
 };
 
-export type DeckRuntimeSnapshotV2 = {
-  template: DeckSnapshotV2;
-  instances: CardInstanceV2[];
+export type DeckRuntimeSnapshot = {
+  template: DeckSnapshot;
+  instances: CardInstance[];
 };
 
-export function createPlayerTokenV2(): { token: string; tokenHash: string } {
+export function createPlayerToken(): { token: string; tokenHash: string } {
   const token = randomBytes(24).toString("base64url");
-  return { token, tokenHash: hashPlayerTokenV2(token) };
+  return { token, tokenHash: hashPlayerToken(token) };
 }
 
-export function hashPlayerTokenV2(token: string): string {
+export function hashPlayerToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function verifyPlayerTokenV2(token: string, hash: string): boolean {
-  return hashPlayerTokenV2(token) === hash;
+export function verifyPlayerToken(token: string, hash: string): boolean {
+  return hashPlayerToken(token) === hash;
 }
 
 export function createRuntimeDeckSnapshot(
-  template: DeckSnapshotV2,
+  template: DeckSnapshot,
   playerId: string
-): DeckRuntimeSnapshotV2 {
-  const instances: CardInstanceV2[] = [];
+): DeckRuntimeSnapshot {
+  const instances: CardInstance[] = [];
   for (const entry of template.entries) {
     const source = sectionSource(entry.section);
     for (let copy = 1; copy <= entry.quantity; copy += 1) {
@@ -174,10 +174,10 @@ export function createRuntimeDeckSnapshot(
   return { template, instances };
 }
 
-export function createInitialGameV2(input: {
+export function createInitialGame(input: {
   matchId: string; gameId?: string; now: string; rngSeed: string;
-  playerIds: [string, string]; decks: [DeckRuntimeSnapshotV2, DeckRuntimeSnapshotV2];
-}): GameDocumentV2 {
+  playerIds: [string, string]; decks: [DeckRuntimeSnapshot, DeckRuntimeSnapshot];
+}): GameDocument {
   const chooserIndex = createHash("sha256").update(input.rngSeed).digest()[0]! % 2;
   const players = Object.fromEntries(input.playerIds.map((playerId, index) => {
     const deck = input.decks[index]!;
@@ -195,7 +195,7 @@ export function createInitialGameV2(input: {
       exhausted: false, damage: 0, computedMight: cardByCode(deck, instance.cardCode).card.attributes.might
     }])
   ));
-  return gameDocumentV2Schema.parse({
+  return gameDocumentSchema.parse({
     id: input.gameId ?? `${input.matchId}:game:1`, createdAt: input.now, updatedAt: input.now,
     matchId: input.matchId, stateVersion: 0, status: "setup_pending", winnerPlayerId: null,
     state: {
@@ -212,14 +212,14 @@ export function createInitialGameV2(input: {
   });
 }
 
-export function createMatchIdV2(): string { return randomUUID(); }
+export function createMatchId(): string { return randomUUID(); }
 
-function idsBySource(deck: DeckRuntimeSnapshotV2, source: CardInstanceV2["source"]): string[] {
+function idsBySource(deck: DeckRuntimeSnapshot, source: CardInstance["source"]): string[] {
   return deck.instances.filter((instance) => instance.source === source).map((instance) => instance.instanceId);
 }
-function cardByCode(deck: DeckRuntimeSnapshotV2, code: string): GameCardDefinition {
+function cardByCode(deck: DeckRuntimeSnapshot, code: string): GameCardDefinition {
   return deck.template.cards.find((definition) => definition.cardCode === code)!;
 }
-function sectionSource(section: DeckSnapshotV2["entries"][number]["section"]): CardInstanceV2["source"] {
+function sectionSource(section: DeckSnapshot["entries"][number]["section"]): CardInstance["source"] {
   return ({ Legend: "legend", Champion: "champion", Runes: "runeDeck", Battlefields: "battlefield", MainDeck: "mainDeck", Sideboard: "sideboard" } as const)[section];
 }

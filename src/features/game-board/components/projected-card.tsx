@@ -1,6 +1,6 @@
 import { CardRulesText, DomainIcon, EnergyResource, MightResource } from "@/features/card-presentation";
 import { Button } from "@/shared/components/button";
-import type { ProjectedAction, ProjectedCardView } from "@/shared/game-v2";
+import type { ProjectedAction, ProjectedCardView } from "@/shared/game";
 
 export function ProjectedCard({
   actions,

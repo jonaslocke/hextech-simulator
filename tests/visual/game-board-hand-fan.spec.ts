@@ -4,10 +4,10 @@ for (const scenario of [
   { expectedCards: 4, variant: "hand-small", viewport: { width: 1440, height: 900 } },
   { expectedCards: 16, variant: "hand-large", viewport: { width: 1680, height: 1400 } }
 ] as const) {
-  test(`v2 ${scenario.variant} supports pointer and keyboard selection`, async ({ browser }) => {
+  test(`${scenario.variant} supports pointer and keyboard selection`, async ({ browser }) => {
     const context = await browser.newContext({ viewport: scenario.viewport });
     const page = await context.newPage();
-    await page.goto(`/visual-parity/v2?variant=${scenario.variant}`);
+    await page.goto(`/visual-test/game-board?variant=${scenario.variant}`);
     await page.waitForLoadState("networkidle");
 
     const hand = page.getByRole("listbox", { name: "Player hand" });

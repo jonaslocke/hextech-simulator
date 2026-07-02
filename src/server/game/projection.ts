@@ -1,13 +1,13 @@
-import { gameProjectionV2Schema, type GameProjectionV2, type ProjectedCardView, type ProjectedZoneV2 } from "../../shared/game-v2";
-import type { DeckSnapshotDocumentV2, GameEventDocumentV2 } from "./repositories";
-import { setupActionsV2 } from "./setup";
-import { gameplayActionsV2 } from "./actions";
-import type { GameDocumentV2 } from "./state";
+import { gameProjectionSchema, type GameProjection, type ProjectedCardView, type ProjectedZone } from "../../shared/game";
+import type { DeckSnapshotDocument, GameEventDocument } from "./repositories";
+import { setupActions } from "./setup";
+import { gameplayActions } from "./actions";
+import type { GameDocument } from "./state";
 
-export function projectGameV2(input: {
-  game: GameDocumentV2; viewerPlayerId: string;
-  decks: DeckSnapshotDocumentV2[]; events?: GameEventDocumentV2[];
-}): GameProjectionV2 {
+export function projectGame(input: {
+  game: GameDocument; viewerPlayerId: string;
+  decks: DeckSnapshotDocument[]; events?: GameEventDocument[];
+}): GameProjection {
   const definitions = new Map(input.decks.flatMap((deck) => deck.snapshot.cards.map((definition) => [definition.cardCode, definition] as const)));
   const instances = new Map(input.decks.flatMap((deck) => deck.instances.map((instance) => [instance.instanceId, instance] as const)));
   const view = (id: string): ProjectedCardView => {
@@ -27,14 +27,14 @@ export function projectGameV2(input: {
   const players = input.game.state.setup.playerIds.map((playerId) => {
     const player = input.game.state.players[playerId]!;
     const isViewer = playerId === input.viewerPlayerId;
-    const zones = (Object.entries(player.zones) as Array<[ProjectedZoneV2["kind"], string[] | string | null]>).map(([kind, value]) => {
+    const zones = (Object.entries(player.zones) as Array<[ProjectedZone["kind"], string[] | string | null]>).map(([kind, value]) => {
       const ids = Array.isArray(value) ? value : value ? [value] : [];
       const visibility = kind === "hand" ? (isViewer ? "private" : "secret") : (["mainDeck", "runeDeck"].includes(kind) ? "secret" : "public");
       return { kind, visibility, count: ids.length, cards: visibility === "secret" ? [] : ids.map(view) };
     });
     return { playerId, isViewer, energy: player.energy, conditionalEnergy: player.conditionalEnergy, power: player.power, zones };
   });
-  return gameProjectionV2Schema.parse({
+  return gameProjectionSchema.parse({
     id: input.game.id, matchId: input.game.matchId, gameNumber: 1, stateVersion: input.game.stateVersion,
     status: input.game.status, viewerPlayerId: input.viewerPlayerId,
     activePlayerId: input.game.state.turn?.activePlayerId ?? null,
@@ -80,8 +80,8 @@ export function projectGameV2(input: {
       passedPlayerIds: input.game.state.chain.passedPlayerIds
     } : null,
     actions: (input.game.status === "setup_pending"
-      ? setupActionsV2(input.game, input.viewerPlayerId)
-      : gameplayActionsV2(input.game, input.viewerPlayerId, input.decks))
+      ? setupActions(input.game, input.viewerPlayerId)
+      : gameplayActions(input.game, input.viewerPlayerId, input.decks))
       .map((action) => {
         if (!action.id.includes(":setup:lockBattlefield:")) return action;
         const cardId = action.id.split(":").slice(4).join(":");
@@ -92,12 +92,12 @@ export function projectGameV2(input: {
 }
 
 function projectChainItem(
-  item: GameDocumentV2["state"]["pendingChoice"] extends infer Choice
+  item: GameDocument["state"]["pendingChoice"] extends infer Choice
     ? NonNullable<Choice> extends { pendingItems: Array<infer Entry> } ? Entry : never
     : never,
   view: (id: string) => ProjectedCardView,
-  definitions: Map<string, DeckSnapshotDocumentV2["snapshot"]["cards"][number]>,
-  instances: Map<string, DeckSnapshotDocumentV2["instances"][number]>
+  definitions: Map<string, DeckSnapshotDocument["snapshot"]["cards"][number]>,
+  instances: Map<string, DeckSnapshotDocument["instances"][number]>
 ) {
   return {
     id: item.id,
@@ -110,7 +110,7 @@ function projectChainItem(
   };
 }
 
-function waitingReason(game: GameDocumentV2, viewerPlayerId: string): string | null {
+function waitingReason(game: GameDocument, viewerPlayerId: string): string | null {
   if (game.status !== "setup_pending") return null;
   const choice = game.state.setup.battlefieldChoices[viewerPlayerId];
   if (choice?.status === "locked") return "Waiting for the other player to choose a battlefield.";
@@ -123,8 +123,8 @@ function waitingReason(game: GameDocumentV2, viewerPlayerId: string): string | n
 
 function definitionKind(
   sourceId: string | null,
-  definitions: Map<string, DeckSnapshotDocumentV2["snapshot"]["cards"][number]>,
-  instances: Map<string, DeckSnapshotDocumentV2["instances"][number]>
+  definitions: Map<string, DeckSnapshotDocument["snapshot"]["cards"][number]>,
+  instances: Map<string, DeckSnapshotDocument["instances"][number]>
 ): "spell" | "ability" | "trigger" | "unit" {
   if (!sourceId) return "ability";
   const instance = instances.get(sourceId);

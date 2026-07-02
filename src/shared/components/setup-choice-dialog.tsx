@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "./button";
 import { DialogPortal } from "./dialog-portal";
 
-export type ChoiceDialogOption = {
+export type SetupChoiceDialogOption = {
   description?: string;
   disabled?: boolean;
   id: string;
@@ -12,15 +12,15 @@ export type ChoiceDialogOption = {
   label: string;
 };
 
-export type ChoiceDialogPresentation = "auto" | "cards" | "list";
-export type ChoiceDialogSelectionMode = "multiple" | "ordered" | "single";
-export type ChoiceDialogCardSize = "md" | "lg" | "xl";
+export type SetupChoiceDialogPresentation = "auto" | "cards" | "list";
+export type SetupChoiceDialogSelectionMode = "multiple" | "ordered" | "single";
+export type SetupChoiceDialogCardSize = "md" | "lg" | "xl";
 
 type ConfirmLabelResolver = string | ((selectedIds: string[]) => string);
 
-export type ChoiceDialogProps = {
+export type SetupChoiceDialogProps = {
   confirmLabel?: ConfirmLabelResolver;
-  cardSize?: ChoiceDialogCardSize;
+  cardSize?: SetupChoiceDialogCardSize;
   confirmOnSelect?: boolean;
   description?: string;
   initialSelectedIds?: string[];
@@ -29,13 +29,13 @@ export type ChoiceDialogProps = {
   minSelected?: number;
   onCancel?: () => void;
   onConfirm: (selectedIds: string[]) => void;
-  options: ChoiceDialogOption[];
-  presentation?: ChoiceDialogPresentation;
-  selectionMode?: ChoiceDialogSelectionMode;
+  options: SetupChoiceDialogOption[];
+  presentation?: SetupChoiceDialogPresentation;
+  selectionMode?: SetupChoiceDialogSelectionMode;
   title: string;
 };
 
-export function ChoiceDialog({
+export function SetupChoiceDialog({
   cardSize = "md",
   confirmLabel,
   confirmOnSelect = false,
@@ -50,7 +50,7 @@ export function ChoiceDialog({
   presentation = "auto",
   selectionMode = "single",
   title,
-}: ChoiceDialogProps) {
+}: SetupChoiceDialogProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
 
@@ -123,7 +123,7 @@ export function ChoiceDialog({
     selectedIds.length >= maxSelected;
 
   const selectOption = useCallback(
-    (option: ChoiceDialogOption) => {
+    (option: SetupChoiceDialogOption) => {
       if (option.disabled || selectionMode === "ordered") {
         return;
       }
@@ -249,15 +249,15 @@ function CardChoiceGrid({
   selectionLimitReached,
   selectionMode,
 }: {
-  cardSize: ChoiceDialogCardSize;
+  cardSize: SetupChoiceDialogCardSize;
   maxSelected?: number;
   onOrderChange: (ids: string[]) => void;
-  onSelect: (option: ChoiceDialogOption) => void;
-  options: ChoiceDialogOption[];
+  onSelect: (option: SetupChoiceDialogOption) => void;
+  options: SetupChoiceDialogOption[];
   orderedIds: string[];
   selectedIds: string[];
   selectionLimitReached: boolean;
-  selectionMode: ChoiceDialogSelectionMode;
+  selectionMode: SetupChoiceDialogSelectionMode;
 }) {
   const compactGrid = options.length > 3;
   const gridColumnClass = getCardGridColumnClass(cardSize);
@@ -367,11 +367,11 @@ function ChoiceList({
   selectionMode,
 }: {
   maxSelected?: number;
-  onSelect: (option: ChoiceDialogOption) => void;
-  options: ChoiceDialogOption[];
+  onSelect: (option: SetupChoiceDialogOption) => void;
+  options: SetupChoiceDialogOption[];
   selectedIds: string[];
   selectionLimitReached: boolean;
-  selectionMode: Exclude<ChoiceDialogSelectionMode, "ordered">;
+  selectionMode: Exclude<SetupChoiceDialogSelectionMode, "ordered">;
 }) {
   return (
     <div className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
@@ -415,7 +415,7 @@ function OrderedChoiceList({
   orderedIds,
 }: {
   onOrderChange: (ids: string[]) => void;
-  options: ChoiceDialogOption[];
+  options: SetupChoiceDialogOption[];
   orderedIds: string[];
 }) {
   const optionById = new Map(options.map((option) => [option.id, option]));
@@ -462,7 +462,7 @@ function OrderedChoiceList({
   );
 }
 
-function OptionImage({ option }: { option: ChoiceDialogOption }) {
+function OptionImage({ option }: { option: SetupChoiceDialogOption }) {
   if (!option.imageUrl) {
     return null;
   }
@@ -477,7 +477,7 @@ function OptionImage({ option }: { option: ChoiceDialogOption }) {
   );
 }
 
-function OptionText({ option }: { option: ChoiceDialogOption }) {
+function OptionText({ option }: { option: SetupChoiceDialogOption }) {
   return (
     <span className="min-w-0">
       <span className="block font-semibold text-slate-100 text-sm truncate">
@@ -499,7 +499,7 @@ function SelectionSummary({
 }: {
   maxSelected?: number;
   selectedIds: string[];
-  selectionMode: ChoiceDialogSelectionMode;
+  selectionMode: SetupChoiceDialogSelectionMode;
 }) {
   if (selectionMode !== "multiple" || maxSelected === undefined) {
     return null;
@@ -513,7 +513,7 @@ function SelectionSummary({
 }
 
 
-function getCardDialogMaxWidth(cardSize: ChoiceDialogCardSize) {
+function getCardDialogMaxWidth(cardSize: SetupChoiceDialogCardSize) {
   switch (cardSize) {
     case "xl":
       return "max-w-7xl";
@@ -525,7 +525,7 @@ function getCardDialogMaxWidth(cardSize: ChoiceDialogCardSize) {
   }
 }
 
-function getCardGridColumnClass(cardSize: ChoiceDialogCardSize) {
+function getCardGridColumnClass(cardSize: SetupChoiceDialogCardSize) {
   switch (cardSize) {
     case "xl":
       return "grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]";
@@ -537,7 +537,7 @@ function getCardGridColumnClass(cardSize: ChoiceDialogCardSize) {
   }
 }
 
-function getCardChoiceWidthClass(cardSize: ChoiceDialogCardSize) {
+function getCardChoiceWidthClass(cardSize: SetupChoiceDialogCardSize) {
   switch (cardSize) {
     case "xl":
       return "w-[min(23rem,calc(100vw-3rem))]";
@@ -549,7 +549,7 @@ function getCardChoiceWidthClass(cardSize: ChoiceDialogCardSize) {
   }
 }
 
-function getCardChoiceImageHeightClass(cardSize: ChoiceDialogCardSize) {
+function getCardChoiceImageHeightClass(cardSize: SetupChoiceDialogCardSize) {
   switch (cardSize) {
     case "xl":
       return "max-h-[min(34rem,62vh)]";
@@ -592,7 +592,7 @@ function resolveConfirmLabel({
 }: {
   confirmLabel?: ConfirmLabelResolver;
   selectedIds: string[];
-  selectionMode: ChoiceDialogSelectionMode;
+  selectionMode: SetupChoiceDialogSelectionMode;
 }) {
   if (typeof confirmLabel === "function") {
     return confirmLabel(selectedIds);
@@ -613,12 +613,12 @@ function resolveConfirmLabel({
   return "Confirm";
 }
 
-function sortOptions(options: ChoiceDialogOption[], orderedIds: string[]) {
+function sortOptions(options: SetupChoiceDialogOption[], orderedIds: string[]) {
   const optionById = new Map(options.map((option) => [option.id, option]));
 
   return orderedIds
     .map((id) => optionById.get(id))
-    .filter((option): option is ChoiceDialogOption => Boolean(option));
+    .filter((option): option is SetupChoiceDialogOption => Boolean(option));
 }
 
 function moveItem(items: string[], index: number, direction: -1 | 1) {

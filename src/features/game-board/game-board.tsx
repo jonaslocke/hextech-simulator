@@ -1,29 +1,23 @@
 "use client";
 
 import {
+  DomainIcon,
+  EnergyResource,
+  formatDomain,
+} from "@/features/card-presentation";
+import { ChoiceDialog } from "@/shared/components/choice-dialog";
+import type { GameProjection } from "@/shared/game";
+import {
   FC,
   MouseEvent,
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import {
-  DomainIcon,
-  EnergyResource,
-  formatDomain,
-} from "@/features/card-presentation";
-import type { Card as CatalogCard } from "@/server/catalog";
-import type {
-  ProjectedBattlefield,
-  ProjectedPlayerState,
-  ProjectedZone,
-} from "@/server/match";
-import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
-import { ScoreHeader } from "./components/score-header";
-import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import {
   CardZoneAnimationSnapshot,
@@ -32,23 +26,44 @@ import {
   ZoneAnimationCount,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
-import { PlayerHandFan } from "./components/player-hand-fan";
 import { PlayerBoard } from "./components/player-board";
+import { PlayerHandFan } from "./components/player-hand-fan";
+import { ScoreHeader } from "./components/score-header";
+import { TargetSelectionPrompt } from "./components/target-selection-prompt";
+import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
+import {
+  adaptProjectionToBoard,
+  type BoardCatalogCard,
+  type BoardPlayerProjection,
+  type BoardZoneProjection,
+  type BoardProjection,
+} from "./board-view-model";
 import {
   BattlefieldData,
   Card,
   ChainCardEntry,
-  GameBoardProps,
   PlayerData,
   TemporaryZone,
   ZoneData,
   ZoneKind,
 } from "./types";
 
+type ProjectedBattlefield = BoardProjection["battlefields"][number];
+type ProjectedPlayerState = BoardPlayerProjection;
+type ProjectedZone = BoardZoneProjection;
+type GameBoardProps = {
+  onPerformAction: (input: { actionId: string; selectedIds: string[] }) => void;
+  playerNames?: Partial<Record<string, string>>;
+  projection: GameProjection;
+  scores?: Partial<Record<string, number>>;
+};
+
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
 type CardActionMenuItem = {
+  accessibleLabel?: string;
   disabled?: boolean;
-  label: string;
+  id: string;
+  label: ReactNode;
   onSelect?: () => void;
 };
 type CardActionMenuState = {
@@ -57,19 +72,78 @@ type CardActionMenuState = {
   top: number;
 } | null;
 
+const EMPTY_TARGET_IDS: string[] = [];
+
 export const GameBoard: FC<GameBoardProps> = ({
-  cardsByInstanceId,
-  logEntries = [],
-  onActivateAbility,
-  onAddRuneResource,
-  onEndTurn,
-  onPass,
-  onPlayCard,
-  onSubmitChoice,
+  onPerformAction,
   playerNames = {},
-  projection,
+  projection: sourceProjection,
   scores = {},
 }) => {
+  const adapted = useMemo(
+    () => adaptProjectionToBoard(sourceProjection),
+    [sourceProjection],
+  );
+  const { cardsByInstanceId, projection } = adapted;
+  const logEntries = sourceProjection.logEntries.map((entry, index) => ({
+    ...entry,
+    sequence: index + 1,
+  }));
+  const submitProjectedAction = (
+    actionId: string | undefined,
+    selectedIds: string[] = [],
+  ) => {
+    if (actionId) onPerformAction({ actionId, selectedIds });
+  };
+  const sourceActions = (sourceCardInstanceId: string) =>
+    sourceProjection.actions.filter(
+      (action) => action.sourceCardInstanceId === sourceCardInstanceId,
+    );
+  const onEndTurn = () =>
+    submitProjectedAction(
+      sourceProjection.actions.find((action) => action.label === "End turn")
+        ?.id,
+    );
+  const onPass = () =>
+    submitProjectedAction(
+      sourceProjection.actions.find(
+        (action) => action.label === "Pass priority",
+      )?.id,
+    );
+  const onPlayCard = (input: {
+    cardInstanceId: string;
+    choices?: { targetCardInstanceIds?: string[] };
+    selectedModeId?: string;
+  }) => {
+    const action = input.selectedModeId
+      ? sourceProjection.actions.find(
+          (candidate) => candidate.id === input.selectedModeId,
+        )
+      : sourceActions(input.cardInstanceId)[0];
+    submitProjectedAction(
+      action?.id,
+      input.choices?.targetCardInstanceIds ?? [],
+    );
+  };
+  const onSubmitChoice = (input: {
+    choiceId: string;
+    orderedIds: string[];
+  }) => {
+    const action = sourceProjection.actions.find((candidate) => {
+      if (candidate.presentation.surface !== "choice-dialog") return false;
+      const encoded = candidate.id.split(":").at(-1);
+      if (!encoded) return false;
+      try {
+        return (
+          JSON.stringify(JSON.parse(decodeURIComponent(encoded))) ===
+          JSON.stringify(input.orderedIds)
+        );
+      } catch {
+        return false;
+      }
+    });
+    submitProjectedAction(action?.id);
+  };
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
   const [cardActionMenu, setCardActionMenu] =
     useState<CardActionMenuState>(null);
@@ -79,11 +153,11 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
     useState<CardZoneAnimationSnapshot | null>(null);
   const [targetSelection, setTargetSelection] = useState<{
-    cardInstanceId: string;
+    actionId: string;
+    legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
     selectedTargetIds: string[];
-    selectedModeId?: string;
   } | null>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
@@ -127,7 +201,8 @@ export const GameBoard: FC<GameBoardProps> = ({
         description: item ? formatChainItemKind(item.kind) : undefined,
         id,
         imageUrl: cardInstanceId
-          ? cardsByInstanceId[cardInstanceId]?.media.image_url ?? cardBackImage.src
+          ? (cardsByInstanceId[cardInstanceId]?.media.image_url ??
+            cardBackImage.src)
           : undefined,
         label: item?.label ?? id,
       };
@@ -193,11 +268,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
   );
   const viewerState = projection.players[projection.viewerPlayerId];
-  const legalTargetIds =
-    targetSelection && viewerState
-      ? (viewerState.legalTargetsByCard[targetSelection.cardInstanceId]
-          ?.cardInstanceIds ?? [])
-      : [];
+  const legalTargetIds = targetSelection?.legalTargetIds ?? EMPTY_TARGET_IDS;
   const displayedHighlightedCardInstanceIds = useMemo(() => {
     const next = new Set(highlightedCardInstanceIds);
 
@@ -262,13 +333,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [capturePendingAnimationSnapshot, onPlayCard],
   );
-  const submitRuneResource = useCallback(
-    (input: { cardInstanceId: string; resourceType: "energy" | "power" }) => {
-      capturePendingAnimationSnapshot();
-      onAddRuneResource?.(input);
-    },
-    [capturePendingAnimationSnapshot, onAddRuneResource],
-  );
+  const submitRuneAction = (actionId: string) => {
+    capturePendingAnimationSnapshot();
+    submitProjectedAction(actionId);
+  };
   const closeCardActionMenu = () => setCardActionMenu(null);
   const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
     if (isChainLockedOpen) {
@@ -325,12 +393,14 @@ export const GameBoard: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
-          label: `Play ${mode.label}`,
+            id: mode.id,
+            label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
           }))
         : [
             {
               disabled: true,
+              id: `${card.instanceId}:not-playable`,
               label: "Not playable",
             },
           ],
@@ -341,22 +411,28 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    const targetConfig = getTargetConfig(card);
-    const legalTargets =
-      viewerState.legalTargetsByCard[card.instanceId]?.cardInstanceIds ?? [];
+    const projectedAction = selectedModeId
+      ? sourceProjection.actions.find((action) => action.id === selectedModeId)
+      : sourceActions(card.instanceId)[0];
+    if (!projectedAction) {
+      return;
+    }
+    const requirement = projectedAction.targets.find(
+      (target) => target.kind === "card",
+    );
 
-    if (targetConfig && targetConfig.maxTargets > 0) {
+    if (requirement && requirement.maximum > 0) {
       setTargetSelection({
-        cardInstanceId: card.instanceId,
-        maxTargets: targetConfig.maxTargets,
-        minTargets: targetConfig.minTargets,
-        selectedModeId,
+        actionId: projectedAction.id,
+        legalTargetIds: requirement.legalIds,
+        maxTargets: requirement.maximum,
+        minTargets: requirement.minimum,
         selectedTargetIds: [],
       });
       return;
     }
 
-    if (targetConfig && targetConfig.maxTargets === 0 && legalTargets.length >= 0) {
+    if (requirement && requirement.maximum === 0) {
       submitPlayCard({
         canPlay: true,
         cardInstanceId: card.instanceId,
@@ -395,51 +471,41 @@ export const GameBoard: FC<GameBoardProps> = ({
     event?: MouseEvent<HTMLElement>,
   ) => {
     if (targetSelection) {
-      chooseBoardTarget(card);
+      chooseBoardTarget(card.instanceId);
       return;
     }
 
-    if (card.name !== "Lux, Crownguard" || !card.instanceId || !event) {
+    if (!card.instanceId || !event) {
       return;
     }
-
-    const abilityId = "lux-crownguard-add-spell-energy";
-    const availableAbilityIds =
-      viewerState?.availableAbilityIdsByCard[card.instanceId] ?? [];
-    const canActivate = availableAbilityIds.includes(abilityId);
-    openCardActionMenu(event, [
-      {
-        disabled: !canActivate,
-        label: luxAbilityMenuLabel({
-          canActivate,
-          isExhausted: card.isExhausted ?? false,
-        }),
-        onSelect: () =>
-          onActivateAbility?.({
-            abilityId,
-            sourceCardInstanceId: card.instanceId!,
-          }),
-      },
-    ]);
+    const actions = sourceActions(card.instanceId);
+    if (actions.length === 0) return;
+    openCardActionMenu(
+      event,
+      actions.map((action) => ({
+        disabled: !action.enabled,
+        id: action.id,
+        label: action.enabled
+          ? action.label
+          : `${action.label} (${action.disabledReason ?? "unavailable"})`,
+        onSelect: () => beginPlayOrTargetSelection(card, action.id),
+      })),
+    );
   };
-  const chooseBoardTarget = (card: Card) => {
-    if (!targetSelection || !card.instanceId || !viewerState) {
+  const chooseBoardTarget = (cardInstanceId: string | undefined) => {
+    if (!targetSelection || !cardInstanceId) {
       return;
     }
 
-    const legalTargets =
-      viewerState.legalTargetsByCard[targetSelection.cardInstanceId]
-        ?.cardInstanceIds ?? [];
-
-    if (!legalTargets.includes(card.instanceId)) {
+    if (!targetSelection.legalTargetIds.includes(cardInstanceId)) {
       return;
     }
 
     const selectedTargetIds = targetSelection.selectedTargetIds.includes(
-      card.instanceId,
+      cardInstanceId,
     )
-      ? targetSelection.selectedTargetIds.filter((id) => id !== card.instanceId)
-      : [...targetSelection.selectedTargetIds, card.instanceId].slice(
+      ? targetSelection.selectedTargetIds.filter((id) => id !== cardInstanceId)
+      : [...targetSelection.selectedTargetIds, cardInstanceId].slice(
           0,
           targetSelection.maxTargets,
         );
@@ -456,6 +522,27 @@ export const GameBoard: FC<GameBoardProps> = ({
     ) {
       submitTargetedPlay(nextSelection);
     }
+  };
+  const handleTargetClickCapture = (event: MouseEvent<HTMLElement>) => {
+    if (!targetSelection || !(event.target instanceof Element)) {
+      return;
+    }
+
+    const cardElement = event.target.closest(
+      "[data-card-instance-id]",
+    ) as HTMLElement | null;
+    const cardInstanceId = cardElement?.dataset.cardInstanceId;
+
+    if (
+      !cardInstanceId ||
+      !targetSelection.legalTargetIds.includes(cardInstanceId)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    chooseBoardTarget(cardInstanceId);
   };
   const handleTargetPointerEnter = (card: Card) => {
     if (!targetSelection || !card.instanceId) {
@@ -484,58 +571,39 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    submitPlayCard({
-      canPlay: true,
-      cardInstanceId: selection.cardInstanceId,
-      choices: {
-        targetCardInstanceIds: selection.selectedTargetIds,
-      },
-      selectedModeId: selection.selectedModeId,
-    });
+    submitProjectedAction(selection.actionId, selection.selectedTargetIds);
     setPendingSubmittedTargetIds(selection.selectedTargetIds);
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
   };
-  const handleRunePrimaryAction = (card: Card) => {
-    closeCardActionMenu();
-
+  const openRuneActionMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
     if (!card.instanceId) {
       return;
     }
 
-    submitRuneResource({
-      cardInstanceId: card.instanceId,
-      resourceType: "energy",
-    });
+    const actions = sourceActions(card.instanceId);
+    const powerDomain = actions
+      .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
+      .find((domain) => domain !== undefined);
+
+    openCardActionMenu(
+      event,
+      actions.map((action) => ({
+        accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
+        disabled: !action.enabled,
+        id: action.id,
+        label: runeActionMenuLabel(action, powerDomain),
+        onSelect: () => submitRuneAction(action.id),
+      })),
+    );
   };
-  const handleRuneContextAction = (
+  const handleRunePrimaryAction = (
     card: Card,
-    event: MouseEvent<HTMLElement>,
+    event?: MouseEvent<HTMLElement>,
   ) => {
-    if (!card.instanceId) {
-      return;
-    }
-
-    openCardActionMenu(event, [
-      {
-        disabled: card.isExhausted,
-        label: card.isExhausted ? "Add Energy (exhausted)" : "Add Energy",
-        onSelect: () =>
-          submitRuneResource({
-            cardInstanceId: card.instanceId!,
-            resourceType: "energy",
-          }),
-      },
-      {
-        label: "Add Power",
-        onSelect: () =>
-          submitRuneResource({
-            cardInstanceId: card.instanceId!,
-            resourceType: "power",
-          }),
-      },
-    ]);
+    if (event) openRuneActionMenu(card, event);
   };
+  const handleRuneContextAction = openRuneActionMenu;
 
   useEffect(() => {
     if (isChainLockedOpen) {
@@ -576,10 +644,13 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [cardActionMenu]);
 
   return (
-    <main className="relative flex flex-col h-screen overflow-hidden text-slate-100">
+    <main
+      className="relative flex flex-col h-screen overflow-hidden text-slate-100"
+      onClickCapture={handleTargetClickCapture}
+    >
       <ScoreHeader opponent={board.opponent} player={board.player} />
       <section className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] min-h-0 p-2 overflow-hidden">
+        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
           <PlayerBoard
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
@@ -670,7 +741,8 @@ export const GameBoard: FC<GameBoardProps> = ({
       {targetSelection && (
         <TargetSelectionPrompt
           canSubmit={
-            targetSelection.selectedTargetIds.length >= targetSelection.minTargets
+            targetSelection.selectedTargetIds.length >=
+            targetSelection.minTargets
           }
           maxTargets={targetSelection.maxTargets}
           minTargets={targetSelection.minTargets}
@@ -842,94 +914,6 @@ function areSetsEqual<T>(left: Set<T>, right: Set<T>) {
   return true;
 }
 
-function getTargetConfig(card: Card):
-  | {
-      minTargets: number;
-      maxTargets: number;
-    }
-  | null {
-  switch (card.name) {
-    case "Stupefy":
-    case "Falling Comet":
-    case "Blast of Power":
-    case "Final Spark":
-      return {
-        minTargets: 1,
-        maxTargets: 1,
-      };
-    case "Back to Back":
-      return {
-        minTargets: 2,
-        maxTargets: 2,
-      };
-    case "Singularity":
-      return {
-        minTargets: 0,
-        maxTargets: 2,
-      };
-    default:
-      return null;
-  }
-}
-
-function TargetSelectionPrompt({
-  canSubmit,
-  maxTargets,
-  minTargets,
-  onCancel,
-  onSubmit,
-  selectedCount,
-}: {
-  canSubmit: boolean;
-  maxTargets: number;
-  minTargets: number;
-  onCancel: () => void;
-  onSubmit: () => void;
-  selectedCount: number;
-}) {
-  return (
-    <div className="bottom-24 left-1/2 z-[2147483646] fixed flex items-center gap-3 bg-slate-950/95 shadow-2xl px-4 py-3 border border-cyan-300/30 rounded-md text-sm text-slate-100 -translate-x-1/2">
-      <span>
-        Choose targets {selectedCount}/{maxTargets}
-        {minTargets === 0 ? " (optional)" : ""}
-      </span>
-      <button
-        className="px-3 py-1 border border-white/15 rounded text-slate-300 hover:text-white"
-        onClick={onCancel}
-        type="button"
-      >
-        Cancel
-      </button>
-      <button
-        className="disabled:opacity-40 bg-cyan-300 px-3 py-1 rounded font-semibold text-slate-950"
-        disabled={!canSubmit}
-        onClick={onSubmit}
-        type="button"
-      >
-        Play
-      </button>
-    </div>
-  );
-}
-
-function luxAbilityMenuLabel({
-  canActivate,
-  isExhausted,
-}: {
-  canActivate: boolean;
-  isExhausted: boolean;
-}) {
-  if (canActivate) {
-    return "Add spell Energy";
-  }
-
-  if (isExhausted) {
-    return "Add spell Energy (exhausted)";
-  }
-
-  return "Add spell Energy (no priority)";
-}
-
 function RunePoolBar({
   runePool,
 }: {
@@ -947,7 +931,11 @@ function RunePoolBar({
       ([left], [right]) => powerDomainOrder(left) - powerDomainOrder(right),
     );
 
-  if (energy === 0 && powerEntries.length === 0 && conditionalEntries.length === 0) {
+  if (
+    energy === 0 &&
+    powerEntries.length === 0 &&
+    conditionalEntries.length === 0
+  ) {
     return null;
   }
 
@@ -1028,9 +1016,10 @@ function CardActionMenu({
     >
       {items.map((item) => (
         <button
+          aria-label={item.accessibleLabel}
           className="flex items-center enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full disabled:text-slate-500 text-xs text-left transition disabled:cursor-not-allowed"
           disabled={item.disabled}
-          key={item.label}
+          key={item.id}
           onClick={() => {
             onClose();
             item.onSelect?.();
@@ -1044,15 +1033,68 @@ function CardActionMenu({
   );
 }
 
+function runeActionMenuLabel(
+  action: GameProjection["actions"][number],
+  powerDomain: string | undefined,
+): ReactNode {
+  let content: ReactNode = action.label;
+  if (action.label === "Add Energy") {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <EnergyResource compact value={1} />
+      </span>
+    );
+  } else if (action.label.startsWith("Add Power [") && powerDomain) {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <DomainIcon decorative domain={powerDomain} />
+      </span>
+    );
+  } else if (action.label === "Add Energy and Power" && powerDomain) {
+    content = (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        <EnergyResource compact value={1} />
+        <span>and</span>
+        <DomainIcon decorative domain={powerDomain} />
+      </span>
+    );
+  }
+
+  if (action.enabled) return content;
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      {content}
+      <span>({action.disabledReason ?? "unavailable"})</span>
+    </span>
+  );
+}
+
+function runeActionAccessibleLabel(
+  action: GameProjection["actions"][number],
+  powerDomain: string | undefined,
+) {
+  const domain = powerDomain ? formatDomain(powerDomain) : "Power";
+  if (action.label === "Add Energy") return "Add 1 Energy";
+  if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;
+  if (action.label === "Add Energy and Power") {
+    return `Add 1 Energy and 1 ${domain} Power`;
+  }
+  return action.label;
+}
+
 function createBoardModel({
   cardsByInstanceId,
   playerNames,
   projection,
   scores,
 }: {
-  cardsByInstanceId: GameBoardProps["cardsByInstanceId"];
+  cardsByInstanceId: Record<string, BoardCatalogCard>;
   playerNames: NonNullable<GameBoardProps["playerNames"]>;
-  projection: GameBoardProps["projection"];
+  projection: BoardProjection;
   scores: NonNullable<GameBoardProps["scores"]>;
 }) {
   const viewerPlayerId = projection.viewerPlayerId;
@@ -1136,10 +1178,10 @@ function buildPlayerData({
   projection,
   scores,
 }: {
-  cardsByInstanceId: Record<string, CatalogCard>;
+  cardsByInstanceId: Record<string, BoardCatalogCard>;
   player: ProjectedPlayerState | undefined;
   playerNames: Partial<Record<string, string>>;
-  projection: GameBoardProps["projection"];
+  projection: BoardProjection;
   scores: Partial<Record<string, number>>;
 }): PlayerData {
   if (!player) {
@@ -1196,8 +1238,8 @@ function buildPlayerData({
 function buildZone(
   kind: ZoneKind,
   zone: ProjectedZone,
-  cardsByInstanceId: Record<string, CatalogCard>,
-  projection: GameBoardProps["projection"],
+  cardsByInstanceId: Record<string, BoardCatalogCard>,
+  projection: BoardProjection,
 ): ZoneData {
   const cards = zone.cardInstanceIds
     .flatMap((cardInstanceId) =>
@@ -1223,11 +1265,11 @@ function buildBattlefieldData({
   viewerPlayerId,
 }: {
   battlefield: ProjectedBattlefield | undefined;
-  cardsByInstanceId: Record<string, CatalogCard>;
+  cardsByInstanceId: Record<string, BoardCatalogCard>;
   cardOwnerByInstanceId: Record<string, string>;
   fallbackSelectedByPlayerId: string;
   opponentPlayerId: string;
-  projection: GameBoardProps["projection"];
+  projection: BoardProjection;
   viewerPlayerId: string;
 }): BattlefieldData {
   const battlefieldCard = battlefield
@@ -1266,8 +1308,8 @@ function buildBattlefieldData({
 
 function buildCard(
   cardInstanceId: string,
-  cardsByInstanceId: Record<string, CatalogCard>,
-  cardStates: GameBoardProps["projection"]["cardStates"],
+  cardsByInstanceId: Record<string, BoardCatalogCard>,
+  cardStates: BoardProjection["cardStates"],
 ): Card[] {
   const card = cardsByInstanceId[cardInstanceId];
 
@@ -1283,7 +1325,10 @@ function buildCard(
       img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,
       isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
-      might: cardStates[cardInstanceId]?.computedMight ?? card.attributes.might ?? undefined,
+      might:
+        cardStates[cardInstanceId]?.computedMight ??
+        card.attributes.might ??
+        undefined,
       name: card.name,
       power: card.attributes.power ?? undefined,
       publicCode: card.public_code,
@@ -1322,7 +1367,7 @@ function isCardAllowedInZone(kind: ZoneKind, card: Card) {
 
 function inferCardOwners(
   playerIds: readonly string[],
-  cardsByInstanceId: Record<string, CatalogCard>,
+  cardsByInstanceId: Record<string, BoardCatalogCard>,
 ) {
   return Object.fromEntries(
     Object.keys(cardsByInstanceId).flatMap((cardInstanceId) => {

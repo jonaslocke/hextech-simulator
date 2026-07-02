@@ -8,10 +8,10 @@ import {
 import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
-  buildDeckSnapshotV2, createInitialGameV2, createRuntimeDeckSnapshot,
-  effectiveEnergyCostV2, gameplayActionsV2, performGameplayActionV2,
-  type DeckSnapshotDocumentV2, type GameDocumentV2
-} from "../src/server/game-v2";
+  buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot,
+  effectiveEnergyCost, gameplayActions, performGameplayAction,
+  type DeckSnapshotDocument, type GameDocument
+} from "../src/server/game";
 
 const EXECUTABLE = [
   "Lady of Luminosity - Starter", "Lux, Illuminated", "Lux, Crownguard", "Mind Rune", "Order Rune",
@@ -49,9 +49,9 @@ test("executes all direct non-combat Lux spell and unit families", async () => {
         ? [enemyOne, enemyTwo]
         : [enemyOne];
     const before = Object.fromEntries(selected.map((id) => [id, game.state.cardStates[id]!.computedMight]));
-    const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === source)!;
+    const play = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === source)!;
     assert.ok(play, `${spell} should be playable`);
-    game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: selected, decks, now: "b" });
+    game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: selected, decks, now: "b" });
     game = resolveAll(game, decks);
     assert.ok(game.state.players.p1!.zones.trash.includes(source));
     if (spell === "Back to Back") {
@@ -67,8 +67,8 @@ test("executes all direct non-combat Lux spell and unit families", async () => {
     const decks = fixture.decks;
     const source = instanceNamed(decks, "p1", unit);
     relocate(game, "p1", source, "hand");
-    const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === source)!;
-    game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "c" });
+    const play = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === source)!;
+    game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "c" });
     assert.ok(game.state.players.p1!.zones.base.includes(source));
     assert.equal(game.state.cardStates[source]!.exhausted, unit !== "Vanguard Attendant");
   }
@@ -80,15 +80,15 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   for (const runeName of ["Mind Rune", "Order Rune"] as const) {
     const rune = instanceNamed(decks, "p1", runeName);
     relocate(game, "p1", rune, "base");
-    const addEnergy = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
-    game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: addEnergy.id, selectedIds: [], decks, now: "d" });
+    const addEnergy = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
+    game = performGameplayAction({ game, actorPlayerId: "p1", actionId: addEnergy.id, selectedIds: [], decks, now: "d" });
     assert.equal(game.state.cardStates[rune]!.exhausted, true);
   }
   const crownguard = instanceNamed(decks, "p1", "Lux, Crownguard");
   relocate(game, "p1", crownguard, "base");
   const energyBefore = game.state.players.p1!.conditionalEnergy;
-  const ability = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === crownguard)!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: ability.id, selectedIds: [], decks, now: "e" });
+  const ability = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === crownguard)!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: ability.id, selectedIds: [], decks, now: "e" });
   assert.equal(game.state.players.p1!.conditionalEnergy, energyBefore + 2);
 
   ({ game, decks } = runtimeFixture(template));
@@ -100,8 +100,8 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
     attribute: "energyCost", operation: "reduce", amount: 1, minimum: 1,
     duration: "whileSourceAtBattlefield", createdAtTurn: 1
   });
-  assert.equal(effectiveEnergyCostV2(game, "p1", spellDefinition), Math.max(1, (spellDefinition.card.attributes.energy ?? 0) - 1));
-  assert.equal(effectiveEnergyCostV2(game, "p2", spellDefinition), spellDefinition.card.attributes.energy);
+  assert.equal(effectiveEnergyCost(game, "p1", spellDefinition), Math.max(1, (spellDefinition.card.attributes.energy ?? 0) - 1));
+  assert.equal(effectiveEnergyCost(game, "p2", spellDefinition), spellDefinition.card.attributes.energy);
 
   ({ game, decks } = runtimeFixture(template));
   const lady = instanceNamed(decks, "p1", "Lady of Luminosity - Starter");
@@ -117,8 +117,8 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   const luxBefore = game.state.cardStates[illuminated]!.computedMight!;
   const ravenBefore = game.state.cardStates[raven]!.computedMight!;
   const deckBefore = game.state.players.p1!.zones.mainDeck.length;
-  const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === finalSpark)!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [target], decks, now: "f" });
+  const play = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === finalSpark)!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [target], decks, now: "f" });
   game = resolveAll(game, decks);
   assert.equal(game.state.players.p1!.zones.mainDeck.length, deckBefore - 1);
   assert.equal(game.state.cardStates[illuminated]!.computedMight, luxBefore + 3);
@@ -128,8 +128,8 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   const yordle = instanceNamed(decks, "p1", "Lecturing Yordle");
   relocate(game, "p1", yordle, "hand");
   const yordleDeckBefore = game.state.players.p1!.zones.mainDeck.length;
-  const playYordle = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === yordle)!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: playYordle.id, selectedIds: [], decks, now: "g" });
+  const playYordle = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === yordle)!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: playYordle.id, selectedIds: [], decks, now: "g" });
   game = resolveAll(game, decks);
   assert.equal(game.state.players.p1!.zones.mainDeck.length, yordleDeckBefore - 1);
 });
@@ -148,7 +148,7 @@ test("autopayment only uses Lux Crownguard's Energy for spells", async () => {
   relocate(game, "p1", unit, "hand");
   relocate(game, "p1", spell, "hand");
 
-  const actions = gameplayActionsV2(game, "p1", decks);
+  const actions = gameplayActions(game, "p1", decks);
   assert.equal(
     actions.some((action) => action.sourceCardInstanceId === unit),
     false,
@@ -157,7 +157,7 @@ test("autopayment only uses Lux Crownguard's Energy for spells", async () => {
   const playSpell = actions.find((action) => action.sourceCardInstanceId === spell);
   assert.ok(playSpell, "Lux should remain an eligible autopayment source for a Spell");
 
-  const next = performGameplayActionV2({
+  const next = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: playSpell.id,
@@ -181,7 +181,7 @@ test("does not project mandatory-target spells without enough legal targets", as
   relocate(game, "p1", stupefy, "hand");
   relocate(game, "p1", singularity, "hand");
 
-  const actions = gameplayActionsV2(game, "p1", decks);
+  const actions = gameplayActions(game, "p1", decks);
   assert.equal(
     actions.some((action) => action.sourceCardInstanceId === stupefy),
     false,
@@ -206,11 +206,11 @@ test("lethal damage moves a base Unit exclusively to trash and resets board stat
   relocate(game, "p2", target, "base");
   game.state.cardStates[target]!.exhausted = true;
 
-  const play = gameplayActionsV2(game, "p1", decks).find(
+  const play = gameplayActions(game, "p1", decks).find(
     (action) => action.sourceCardInstanceId === finalSpark
   );
   assert.ok(play);
-  game = performGameplayActionV2({
+  game = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: play.id,
@@ -243,11 +243,11 @@ test("reducing Might to marked damage kills the Unit during cleanup", async () =
   relocate(game, "p2", target, "base");
 
   for (const spell of [singularity, ...stupefies]) {
-    const play = gameplayActionsV2(game, "p1", decks).find(
+    const play = gameplayActions(game, "p1", decks).find(
       (action) => action.sourceCardInstanceId === spell
     );
     assert.ok(play);
-    game = performGameplayActionV2({
+    game = performGameplayAction({
       game,
       actorPlayerId: "p1",
       actionId: play.id,
@@ -286,11 +286,11 @@ test("autopayment can exhaust and recycle the same rune for Energy and Power", a
   attendants.forEach((id) => relocate(game, "p1", id, "hand"));
 
   for (const attendant of attendants) {
-    const play = gameplayActionsV2(game, "p1", decks).find(
+    const play = gameplayActions(game, "p1", decks).find(
       (action) => action.sourceCardInstanceId === attendant
     );
     assert.ok(play, "twelve runes should pay for two Vanguard Attendants");
-    game = performGameplayActionV2({
+    game = performGameplayAction({
       game,
       actorPlayerId: "p1",
       actionId: play.id,
@@ -328,11 +328,11 @@ test("autopayment prioritizes Lux spell Energy before unrestricted rune Energy",
   );
   relocate(game, "p1", singularity, "hand");
 
-  const play = gameplayActionsV2(game, "p1", decks).find(
+  const play = gameplayActions(game, "p1", decks).find(
     (action) => action.sourceCardInstanceId === singularity
   );
   assert.ok(play);
-  const next = performGameplayActionV2({
+  const next = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: play.id,
@@ -356,10 +356,10 @@ test("autopayment prioritizes Lux spell Energy before unrestricted rune Energy",
 
 function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
-  const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
+  const decks: DeckSnapshotDocument[] = runtime.map((deck, index) => ({
     id: `d${index}`, createdAt: "a", updatedAt: "a", matchId: "m", playerId: index ? "p2" : "p1", snapshot: deck.template, instances: deck.instances
   }));
-  const game = createInitialGameV2({ matchId: "m", gameId: "g", now: "a", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
+  const game = createInitialGame({ matchId: "m", gameId: "g", now: "a", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
   game.status = "in_progress";
   game.state.setup.startingPlayerId = "p1";
   game.state.turn = { turnNumber: 1, activePlayerId: "p1", phase: "action" };
@@ -372,48 +372,48 @@ function runtimeFixture(template: Awaited<ReturnType<typeof fixtureSnapshot>>) {
   return { game, decks };
 }
 
-function resolveAll(initial: GameDocumentV2, decks: DeckSnapshotDocumentV2[]) {
+function resolveAll(initial: GameDocument, decks: DeckSnapshotDocument[]) {
   let game = initial;
   while (game.state.pendingChoice || game.state.chain) {
     if (game.state.pendingChoice) {
       const actor = game.state.pendingChoice.playerId;
-      const order = gameplayActionsV2(game, actor, decks)[0]!;
-      game = performGameplayActionV2({ game, actorPlayerId: actor, actionId: order.id, selectedIds: [], decks, now: "r" });
+      const order = gameplayActions(game, actor, decks)[0]!;
+      game = performGameplayAction({ game, actorPlayerId: actor, actionId: order.id, selectedIds: [], decks, now: "r" });
       continue;
     }
     const actor = game.state.chain!.priorityPlayerId;
-    const pass = gameplayActionsV2(game, actor, decks).find((action) => action.label === "Pass priority")!;
-    game = performGameplayActionV2({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now: "r" });
+    const pass = gameplayActions(game, actor, decks).find((action) => action.label === "Pass priority")!;
+    game = performGameplayAction({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now: "r" });
   }
   return game;
 }
 
-function instanceNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+function instanceNamed(decks: DeckSnapshotDocument[], playerId: string, name: string) {
   return instancesNamed(decks, playerId, name)[0]!;
 }
-function instancesNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+function instancesNamed(decks: DeckSnapshotDocument[], playerId: string, name: string) {
   const deck = decks.find((item) => item.playerId === playerId)!;
   const code = deck.snapshot.cards.find((item) => item.card.name === name)!.cardCode;
   return deck.instances
     .filter((item) => item.cardCode === code)
     .map((item) => item.instanceId);
 }
-function definitionNamed(decks: DeckSnapshotDocumentV2[], name: string) {
+function definitionNamed(decks: DeckSnapshotDocument[], name: string) {
   return decks[0]!.snapshot.cards.find((item) => item.card.name === name)!;
 }
-function relocate(game: GameDocumentV2, playerId: string, id: string, zone: "base" | "hand") {
+function relocate(game: GameDocument, playerId: string, id: string, zone: "base" | "hand") {
   const player = game.state.players[playerId]!;
   for (const [key, value] of Object.entries(player.zones)) if (Array.isArray(value)) (player.zones as unknown as Record<string, string[]>)[key] = value.filter((item) => item !== id);
   game.state.battlefields.forEach((battlefield) => { battlefield.units = battlefield.units.filter((item) => item !== id); });
   player.zones[zone].push(id);
   game.state.cardStates[id]!.exhausted = false;
 }
-function relocateToBattlefield(game: GameDocumentV2, playerId: string, id: string) {
+function relocateToBattlefield(game: GameDocument, playerId: string, id: string) {
   relocate(game, playerId, id, "base");
   game.state.players[playerId]!.zones.base = game.state.players[playerId]!.zones.base.filter((item) => item !== id);
   game.state.battlefields.find((item) => item.selectedByPlayerId === playerId)!.units.push(id);
 }
-function relocateLegend(game: GameDocumentV2, playerId: string, id: string) {
+function relocateLegend(game: GameDocument, playerId: string, id: string) {
   relocate(game, playerId, id, "base");
   game.state.players[playerId]!.zones.base = game.state.players[playerId]!.zones.base.filter((item) => item !== id);
   game.state.players[playerId]!.zones.legend = id;
@@ -430,5 +430,5 @@ async function fixtureSnapshot() {
     const suggestion = report.cards.find((item) => item.cardCode === cardCode)!;
     return buildCanonicalCardDocument({ cardCode, card, sourceTextHash: hashCardRulesText(card), modelingStatus: "approved", adminNotes: "", clauses: suggestion.clauses.map((clause) => ({ id: clause.id, sourceText: clause.sourceText, normalizedText: clause.normalizedText, unsupportedReason: clause.unsupportedReason, assignments: clause.assignments.map((item) => item.assignment) })) }, primitives, "a", "b");
   });
-  return buildDeckSnapshotV2(sourceText, documents, primitives.map((item) => buildBehaviorDefinitionDocument(item, "a")));
+  return buildDeckSnapshot(sourceText, documents, primitives.map((item) => buildBehaviorDefinitionDocument(item, "a")));
 }

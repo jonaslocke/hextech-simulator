@@ -12,14 +12,14 @@ import {
 import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
-  buildDeckSnapshotV2,
-  GameV2CatalogError,
+  buildDeckSnapshot,
+  GameCatalogError,
   INITIAL_DECK_UNIQUE_CARD_COUNT
-} from "../src/server/game-v2";
+} from "../src/server/game";
 
-test("builds an immutable v2 snapshot for every unique initial-deck card", async () => {
+test("builds an immutable snapshot for every unique initial-deck card", async () => {
   const fixture = await buildFixture();
-  const snapshot = buildDeckSnapshotV2(fixture.sourceText, fixture.documents, fixture.definitions);
+  const snapshot = buildDeckSnapshot(fixture.sourceText, fixture.documents, fixture.definitions);
 
   assert.equal(snapshot.cards.length, INITIAL_DECK_UNIQUE_CARD_COUNT);
   assert.equal(snapshot.entries.length, parseDeckList(fixture.sourceText).entries.length);
@@ -30,14 +30,14 @@ test("builds an immutable v2 snapshot for every unique initial-deck card", async
 test("rejects missing, stale, unsynchronized, and uncovered canonical cards", async () => {
   const fixture = await buildFixture();
   assert.throws(
-    () => buildDeckSnapshotV2(fixture.sourceText, fixture.documents.slice(1), fixture.definitions),
-    GameV2CatalogError
+    () => buildDeckSnapshot(fixture.sourceText, fixture.documents.slice(1), fixture.definitions),
+    GameCatalogError
   );
 
   const stale = structuredClone(fixture.documents);
   stale[0]!.sourceTextHash = "stale";
   assert.throws(
-    () => buildDeckSnapshotV2(fixture.sourceText, stale, fixture.definitions),
+    () => buildDeckSnapshot(fixture.sourceText, stale, fixture.definitions),
     /Stale canonical rules text/
   );
 
@@ -45,7 +45,7 @@ test("rejects missing, stale, unsynchronized, and uncovered canonical cards", as
     (definition) => definition.id !== "trigger.on_play"
   );
   assert.throws(
-    () => buildDeckSnapshotV2(fixture.sourceText, fixture.documents, missingDefinition),
+    () => buildDeckSnapshot(fixture.sourceText, fixture.documents, missingDefinition),
     /Missing synchronized behavior definition/
   );
 
@@ -54,8 +54,8 @@ test("rejects missing, stale, unsynchronized, and uncovered canonical cards", as
     .flatMap((clause) => clause.effects)[0]!;
   binding.behaviorId = "action.future_behavior";
   assert.throws(
-    () => buildDeckSnapshotV2(fixture.sourceText, uncovered, fixture.definitions),
-    /Missing game v2 runtime coverage/
+    () => buildDeckSnapshot(fixture.sourceText, uncovered, fixture.definitions),
+    /Missing game runtime coverage/
   );
 });
 
@@ -91,4 +91,3 @@ async function buildFixture() {
   );
   return { sourceText, documents, definitions };
 }
-

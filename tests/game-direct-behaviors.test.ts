@@ -8,19 +8,19 @@ import {
 import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
-  buildDeckSnapshotV2, createInitialGameV2, createRuntimeDeckSnapshot,
-  gameplayActionsV2, performGameplayActionV2,
-  type DeckSnapshotDocumentV2
-} from "../src/server/game-v2";
+  buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot,
+  gameplayActions, performGameplayAction,
+  type DeckSnapshotDocument
+} from "../src/server/game";
 
 test("executes projected rune abilities and ordered targeted spell effects from canonical models", async () => {
   const template = await fixtureSnapshot();
   const runtime = [createRuntimeDeckSnapshot(template, "p1"), createRuntimeDeckSnapshot(template, "p2")] as const;
-  const decks: DeckSnapshotDocumentV2[] = runtime.map((deck, index) => ({
+  const decks: DeckSnapshotDocument[] = runtime.map((deck, index) => ({
     id: `d${index}`, createdAt: "a", updatedAt: "a", matchId: "m",
     playerId: index ? "p2" : "p1", snapshot: deck.template, instances: deck.instances
   }));
-  let game = createInitialGameV2({ matchId: "m", gameId: "g", now: "2026-01-01T00:00:00.000Z", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
+  let game = createInitialGame({ matchId: "m", gameId: "g", now: "2026-01-01T00:00:00.000Z", rngSeed: "seed", playerIds: ["p1", "p2"], decks: [runtime[0], runtime[1]] });
   game.status = "in_progress";
   game.state.setup.startingPlayerId = "p1";
   game.state.turn = { turnNumber: 1, activePlayerId: "p1", phase: "action" };
@@ -42,7 +42,7 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   relocateToBattlefield(game, friendlyTwo, "p1");
   relocateToBattlefield(game, enemy, "p2");
 
-  const orderRuneActions = gameplayActionsV2(game, "p1", decks).filter(
+  const orderRuneActions = gameplayActions(game, "p1", decks).filter(
     (action) => action.sourceCardInstanceId === orderRune
   );
   assert.deepEqual(
@@ -52,7 +52,7 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   const combinedAction = orderRuneActions.find(
     (action) => action.label === "Add Energy and Power"
   )!;
-  game = performGameplayActionV2({
+  game = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: combinedAction.id,
@@ -66,11 +66,11 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   assert.equal(game.state.players.p1!.zones.runeDeck.includes(orderRune), true);
   assert.equal(game.state.cardStates[orderRune]!.exhausted, false);
 
-  const energyAction = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: energyAction.id, selectedIds: [], decks, now: "b" });
+  const energyAction = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === rune && action.label === "Add Energy")!;
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: energyAction.id, selectedIds: [], decks, now: "b" });
   assert.equal(game.state.players.p1!.energy, 22);
   assert.equal(game.state.cardStates[rune]!.exhausted, true);
-  const exhaustedRuneActions = gameplayActionsV2(game, "p1", decks).filter(
+  const exhaustedRuneActions = gameplayActions(game, "p1", decks).filter(
     (action) => action.sourceCardInstanceId === rune
   );
   assert.deepEqual(
@@ -84,32 +84,32 @@ test("executes projected rune abilities and ordered targeted spell effects from 
 
   const handBefore = game.state.players.p1!.zones.hand.length;
   const enemyMightBefore = game.state.cardStates[enemy]!.computedMight!;
-  const play = gameplayActionsV2(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
+  const play = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === stupefy)!;
   assert.deepEqual(play.targets[0], { kind: "card", legalIds: [friendlyBase, friendlyOne, friendlyTwo, enemy], minimum: 1, maximum: 1 });
-  game = performGameplayActionV2({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "c" });
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [enemy], decks, now: "c" });
   assert.equal(game.state.chain?.priorityPlayerId, "p1");
   for (const playerId of ["p1", "p2"]) {
-    const pass = gameplayActionsV2(game, playerId, decks).find((action) => action.label === "Pass priority")!;
-    game = performGameplayActionV2({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "d" });
+    const pass = gameplayActions(game, playerId, decks).find((action) => action.label === "Pass priority")!;
+    game = performGameplayAction({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "d" });
   }
   assert.equal(game.state.cardStates[enemy]!.computedMight, enemyMightBefore - 1);
   assert.ok(game.state.players.p1!.zones.trash.includes(stupefy));
   assert.equal(game.state.players.p1!.zones.hand.length, handBefore);
 });
 
-function instanceNamed(decks: DeckSnapshotDocumentV2[], playerId: string, name: string) {
+function instanceNamed(decks: DeckSnapshotDocument[], playerId: string, name: string) {
   const deck = decks.find((item) => item.playerId === playerId)!;
   const code = deck.snapshot.cards.find((item) => item.card.name === name)!.cardCode;
   return deck.instances.find((item) => item.cardCode === code)!.instanceId;
 }
-function relocate(game: ReturnType<typeof createInitialGameV2>, id: string, zone: "base" | "hand") {
+function relocate(game: ReturnType<typeof createInitialGame>, id: string, zone: "base" | "hand") {
   const player = Object.values(game.state.players).find((item) => Object.values(item.zones).some((value) => Array.isArray(value) ? value.includes(id) : value === id))!;
   for (const [key, value] of Object.entries(player.zones)) {
     if (Array.isArray(value)) (player.zones as unknown as Record<string, string[]>)[key] = value.filter((item) => item !== id);
   }
   player.zones[zone].push(id);
 }
-function relocateToBattlefield(game: ReturnType<typeof createInitialGameV2>, id: string, owner: string) {
+function relocateToBattlefield(game: ReturnType<typeof createInitialGame>, id: string, owner: string) {
   relocate(game, id, "base");
   let battlefield = game.state.battlefields.find((item) => item.selectedByPlayerId === owner);
   if (!battlefield) {
@@ -132,5 +132,5 @@ async function fixtureSnapshot() {
     const suggestion = report.cards.find((item) => item.cardCode === cardCode)!;
     return buildCanonicalCardDocument({ cardCode, card, sourceTextHash: hashCardRulesText(card), modelingStatus: "approved", adminNotes: "", clauses: suggestion.clauses.map((clause) => ({ id: clause.id, sourceText: clause.sourceText, normalizedText: clause.normalizedText, unsupportedReason: clause.unsupportedReason, assignments: clause.assignments.map((item) => item.assignment) })) }, primitives, "a", "b");
   });
-  return buildDeckSnapshotV2(sourceText, documents, primitives.map((entry) => buildBehaviorDefinitionDocument(entry, "a")));
+  return buildDeckSnapshot(sourceText, documents, primitives.map((entry) => buildBehaviorDefinitionDocument(entry, "a")));
 }

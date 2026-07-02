@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+export const gameZoneKinds = [
+  "legend",
+  "champion",
+  "mainDeck",
+  "runeDeck",
+  "hand",
+  "trash",
+  "banishment",
+  "base",
+  "battlefield"
+] as const;
+
+export const runeResourceTypes = ["energy", "power"] as const;
+
 export const projectedTargetRequirementSchema = z.object({
   kind: z.enum(["card", "battlefield", "player"]),
   label: z.string().min(1).optional(),
@@ -32,13 +46,13 @@ export const gameActionIntentSchema = z.object({
   })
 });
 
-export const gameV2IntentRequestSchema = z.object({
+export const gameIntentRequestSchema = z.object({
   playerToken: z.string().min(1),
   stateVersion: z.number().int().nonnegative(),
   intent: gameActionIntentSchema
 });
 
-export const createMatchV2RequestSchema = z.object({
+export const createMatchRequestSchema = z.object({
   playerDecks: z.object({
     player1: z.literal("lux"),
     player2: z.literal("lux")
@@ -64,7 +78,7 @@ export const projectedCardViewSchema = z.object({
   exhausted: z.boolean()
 });
 
-export const projectedZoneV2Schema = z.object({
+export const projectedZoneSchema = z.object({
   kind: z.enum([
     "legend", "champion", "mainDeck", "runeDeck", "hand", "trash",
     "banishment", "base"
@@ -74,16 +88,16 @@ export const projectedZoneV2Schema = z.object({
   cards: z.array(projectedCardViewSchema)
 });
 
-export const projectedPlayerV2Schema = z.object({
+export const projectedPlayerSchema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
-  zones: z.array(projectedZoneV2Schema)
+  zones: z.array(projectedZoneSchema)
 });
 
-export const projectedBattlefieldV2Schema = z.object({
+export const projectedBattlefieldSchema = z.object({
   battlefieldId: z.string().min(1),
   selectedByPlayerId: z.string().min(1),
   card: projectedCardViewSchema,
@@ -91,7 +105,7 @@ export const projectedBattlefieldV2Schema = z.object({
   facedownCard: projectedCardViewSchema.nullable().default(null)
 });
 
-export const projectedChainItemV2Schema = z.object({
+export const projectedChainItemSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   controllerPlayerId: z.string().min(1),
@@ -101,14 +115,14 @@ export const projectedChainItemV2Schema = z.object({
   card: projectedCardViewSchema.nullable()
 });
 
-export const projectedChainV2Schema = z.object({
-  items: z.array(projectedChainItemV2Schema),
+export const projectedChainSchema = z.object({
+  items: z.array(projectedChainItemSchema),
   relevantPlayerIds: z.array(z.string().min(1)),
   priorityPlayerId: z.string().min(1),
   passedPlayerIds: z.array(z.string().min(1))
 }).nullable();
 
-export const gameProjectionV2Schema = z.object({
+export const gameProjectionSchema = z.object({
   id: z.string().min(1),
   matchId: z.string().min(1),
   gameNumber: z.number().int().positive(),
@@ -149,11 +163,11 @@ export const gameProjectionV2Schema = z.object({
     playerId: z.string().min(1),
     prompt: z.string().min(1),
     optionIds: z.array(z.string().min(1)),
-    pendingChainItems: z.array(projectedChainItemV2Schema)
+    pendingChainItems: z.array(projectedChainItemSchema)
   }).nullable(),
-  players: z.array(projectedPlayerV2Schema).length(2),
-  battlefields: z.array(projectedBattlefieldV2Schema),
-  chain: projectedChainV2Schema,
+  players: z.array(projectedPlayerSchema).length(2),
+  battlefields: z.array(projectedBattlefieldSchema),
+  chain: projectedChainSchema,
   actions: z.array(projectedActionSchema),
   logEntries: z.array(z.object({
     id: z.string().min(1),
@@ -168,9 +182,9 @@ export type ProjectedTargetRequirement = z.infer<
 export type ProjectedAction = z.infer<typeof projectedActionSchema>;
 export type GameActionIntent = z.infer<typeof gameActionIntentSchema>;
 export type ProjectedCardView = z.infer<typeof projectedCardViewSchema>;
-export type ProjectedZoneV2 = z.infer<typeof projectedZoneV2Schema>;
-export type ProjectedPlayerV2 = z.infer<typeof projectedPlayerV2Schema>;
-export type ProjectedBattlefieldV2 = z.infer<typeof projectedBattlefieldV2Schema>;
-export type ProjectedChainItemV2 = z.infer<typeof projectedChainItemV2Schema>;
-export type ProjectedChainV2 = z.infer<typeof projectedChainV2Schema>;
-export type GameProjectionV2 = z.infer<typeof gameProjectionV2Schema>;
+export type ProjectedZone = z.infer<typeof projectedZoneSchema>;
+export type ProjectedPlayer = z.infer<typeof projectedPlayerSchema>;
+export type ProjectedBattlefield = z.infer<typeof projectedBattlefieldSchema>;
+export type ProjectedChainItem = z.infer<typeof projectedChainItemSchema>;
+export type ProjectedChain = z.infer<typeof projectedChainSchema>;
+export type GameProjection = z.infer<typeof gameProjectionSchema>;

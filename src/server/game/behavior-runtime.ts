@@ -1,8 +1,8 @@
-import type { ProjectedTargetRequirement } from "../../shared/game-v2";
-import type { BehaviorBindingV2, BehaviorClauseV2, BehaviorModelV2 } from "./schemas";
-import type { GameDocumentV2 } from "./state";
+import type { ProjectedTargetRequirement } from "../../shared/game";
+import type { BehaviorBinding, BehaviorClause, BehaviorModel } from "./schemas";
+import type { GameDocument } from "./state";
 
-export type BehaviorEventV2 = {
+export type BehaviorEvent = {
   type: string;
   actorPlayerId: string | null;
   subjectCardInstanceId: string | null;
@@ -10,34 +10,34 @@ export type BehaviorEventV2 = {
 };
 
 export type BehaviorExecutionContext = {
-  game: GameDocumentV2;
+  game: GameDocument;
   controllerPlayerId: string;
   sourceCardInstanceId: string;
-  event: BehaviorEventV2 | null;
+  event: BehaviorEvent | null;
   selectedIds: string[];
   selectedBySelector: Record<string, string[]>;
 };
 
 export type BehaviorHandler = {
-  validate?(binding: BehaviorBindingV2): void;
-  matches?(binding: BehaviorBindingV2, context: BehaviorExecutionContext): boolean;
-  targets?(binding: BehaviorBindingV2, context: BehaviorExecutionContext): ProjectedTargetRequirement;
-  execute?(binding: BehaviorBindingV2, context: BehaviorExecutionContext): void;
+  validate?(binding: BehaviorBinding): void;
+  matches?(binding: BehaviorBinding, context: BehaviorExecutionContext): boolean;
+  targets?(binding: BehaviorBinding, context: BehaviorExecutionContext): ProjectedTargetRequirement;
+  execute?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
 };
 
 export type BehaviorHandlerRegistry = ReadonlyMap<string, BehaviorHandler>;
 
-export type CompiledBehaviorClause = BehaviorClauseV2 & {
-  orderedEffects: BehaviorBindingV2[];
+export type CompiledBehaviorClause = BehaviorClause & {
+  orderedEffects: BehaviorBinding[];
 };
 
 export type CompiledBehaviorModel = {
-  playTimings: BehaviorBindingV2[];
+  playTimings: BehaviorBinding[];
   clauses: CompiledBehaviorClause[];
 };
 
-export function compileBehaviorModelV2(
-  model: BehaviorModelV2,
+export function compileBehaviorModel(
+  model: BehaviorModel,
   handlers: BehaviorHandlerRegistry
 ): CompiledBehaviorModel {
   validateOrders("playTimings", model.playTimings);
@@ -57,11 +57,11 @@ export function compileBehaviorModelV2(
   return { playTimings: [...model.playTimings].sort((a, b) => a.order - b.order), clauses };
 }
 
-export function playTimingIdsV2(model: CompiledBehaviorModel): string[] {
+export function playTimingIds(model: CompiledBehaviorModel): string[] {
   return model.playTimings.map((binding) => binding.behaviorId);
 }
 
-export function targetRequirementsForClauseV2(
+export function targetRequirementsForClause(
   clause: CompiledBehaviorClause,
   context: BehaviorExecutionContext,
   handlers: BehaviorHandlerRegistry
@@ -73,7 +73,7 @@ export function targetRequirementsForClauseV2(
   });
 }
 
-export function executeBehaviorClauseV2(input: {
+export function executeBehaviorClause(input: {
   clause: CompiledBehaviorClause;
   context: BehaviorExecutionContext;
   handlers: BehaviorHandlerRegistry;
@@ -85,7 +85,7 @@ export function executeBehaviorClauseV2(input: {
   if (!clause.conditions.every((binding) => matches(binding, context, handlers))) {
     return { executed: false, delayed: false };
   }
-  const requirements = targetRequirementsForClauseV2(clause, context, handlers);
+  const requirements = targetRequirementsForClause(clause, context, handlers);
   validateSelections(requirements, context.selectedIds);
   clause.selectors.forEach((binding, index) => {
     context.selectedBySelector[binding.behaviorId] = selectedForRequirement(requirements[index]!, context.selectedIds);
@@ -112,7 +112,7 @@ export function executeBehaviorClauseV2(input: {
   return { executed: true, delayed: false };
 }
 
-export function executeBehaviorEffectsV2(
+export function executeBehaviorEffects(
   clause: CompiledBehaviorClause,
   context: BehaviorExecutionContext,
   handlers: BehaviorHandlerRegistry
@@ -124,11 +124,11 @@ export function executeBehaviorEffectsV2(
   }
 }
 
-export function queueTriggeredClausesV2(input: {
-  game: GameDocumentV2;
+export function queueTriggeredClauses(input: {
+  game: GameDocument;
   controllerPlayerId: string;
   sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel }>;
-  event: BehaviorEventV2;
+  event: BehaviorEvent;
   handlers: BehaviorHandlerRegistry;
 }): void {
   const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
@@ -164,7 +164,7 @@ export function queueTriggeredClausesV2(input: {
   input.game.state.chain = chain;
 }
 
-export function submitTriggerOrderV2(game: GameDocumentV2, playerId: string, orderedIds: string[]): void {
+export function submitTriggerOrder(game: GameDocument, playerId: string, orderedIds: string[]): void {
   const pending = game.state.pendingChoice;
   if (!pending || pending.playerId !== playerId) throw new Error("No trigger-order choice is pending.");
   if (orderedIds.length !== pending.optionIds.length || new Set(orderedIds).size !== orderedIds.length || orderedIds.some((id) => !pending.optionIds.includes(id))) {
@@ -178,31 +178,31 @@ export function submitTriggerOrderV2(game: GameDocumentV2, playerId: string, ord
 }
 
 export function createBehaviorContext(
-  game: GameDocumentV2,
+  game: GameDocument,
   controllerPlayerId: string,
   sourceCardInstanceId: string,
-  event: BehaviorEventV2 | null,
+  event: BehaviorEvent | null,
   selectedIds: string[]
 ): BehaviorExecutionContext {
   return { game, controllerPlayerId, sourceCardInstanceId, event, selectedIds, selectedBySelector: {} };
 }
 
-function matches(binding: BehaviorBindingV2, context: BehaviorExecutionContext, handlers: BehaviorHandlerRegistry): boolean {
+function matches(binding: BehaviorBinding, context: BehaviorExecutionContext, handlers: BehaviorHandlerRegistry): boolean {
   const handler = requireHandler(binding, handlers);
   if (!handler.matches) throw new Error(`Behavior handler cannot evaluate: ${binding.behaviorId}`);
   return handler.matches(binding, context);
 }
-function requireHandler(binding: BehaviorBindingV2, handlers: BehaviorHandlerRegistry): BehaviorHandler {
+function requireHandler(binding: BehaviorBinding, handlers: BehaviorHandlerRegistry): BehaviorHandler {
   const handler = handlers.get(binding.behaviorId);
-  if (!handler) throw new Error(`Unknown game v2 behavior handler: ${binding.behaviorId}`);
+  if (!handler) throw new Error(`Unknown game behavior handler: ${binding.behaviorId}`);
   handler.validate?.(binding);
   return handler;
 }
-function validateOrders(group: string, bindings: readonly BehaviorBindingV2[]) {
+function validateOrders(group: string, bindings: readonly BehaviorBinding[]) {
   const orders = new Set(bindings.map((binding) => binding.order));
   if (orders.size !== bindings.length) throw new Error(`Duplicate behavior order: ${group}`);
 }
-function bindingGroups(clause: BehaviorClauseV2) {
+function bindingGroups(clause: BehaviorClause) {
   return {
     abilities: clause.abilities, triggers: clause.triggers, conditions: clause.conditions,
     selectors: clause.selectors, choices: clause.choices, costs: clause.costs,

@@ -1,130 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button } from "@/shared/components/button";
-import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import { GameBoard } from "@/features/game-board";
+import { Button } from "@/shared/components/button";
+import { SetupChoiceDialog } from "@/shared/components/setup-choice-dialog";
+import { useEffect, useState } from "react";
 import {
-  createFixedDeckMatch,
-  getViewerState,
-  submitMatchIntent
+  createMatchClient,
+  loadProjectionClient,
+  performActionClient,
 } from "../api";
-import { DECK_OPTIONS } from "../constants";
-import type {
-  AcceptedMatch,
-  FixedDeckId,
-  GameProjection,
-  MatchIntent,
-  SeatKey
-} from "../types";
+import type { AcceptedMatch, SeatKey } from "../types";
 
 export function MatchSimulator() {
-  const [playerDecks, setPlayerDecks] = useState<Record<SeatKey, FixedDeckId>>({
-    player1: "annie",
-    player2: "lux"
-  });
-  const [viewerSeat, setViewerSeat] = useState<SeatKey>("player1");
   const [match, setMatch] = useState<AcceptedMatch | null>(null);
+  const [viewerSeat, setViewerSeat] = useState<SeatKey>("player1");
   const [error, setError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const viewer = match?.players[viewerSeat];
+  const projection = viewer && match?.projections[viewer.playerId];
   const currentMatchId = match?.matchId;
-  const currentViewer = match?.players[viewerSeat];
+  const viewerPlayerId = viewer?.playerId;
+  const viewerToken = viewer?.playerToken;
 
   useEffect(() => {
-    if (!currentMatchId || !currentViewer) {
+    if (!currentMatchId || !viewerPlayerId || !viewerToken) {
       return;
     }
 
-    let isActive = true;
-    const matchId = currentMatchId;
-    const viewer = currentViewer;
+    let active = true;
 
-    async function refreshViewerState() {
-      try {
-        const payload = await getViewerState({
-          matchId,
-          playerToken: viewer.playerToken
-        });
-
-        if (!isActive || !payload.accepted) {
-          return;
-        }
-
-        setMatch((current) =>
-          current
-            ? {
-                ...current,
-                cardsByInstanceId: payload.cardsByInstanceId,
-                logEntries: {
-                  ...current.logEntries,
-                  [viewer.playerId]: payload.logEntries
-                },
-                projections: {
-                  ...current.projections,
-                  [viewer.playerId]: payload.projection
-                },
-                stateVersion: payload.projection.stateVersion
-              }
-            : current
-        );
-      } catch {
-        if (isActive) {
-          setError("Unable to refresh viewer state.");
-        }
-      }
-    }
-
-    void refreshViewerState();
-
-    return () => {
-      isActive = false;
-    };
-  }, [currentMatchId, currentViewer]);
-
-  async function createMatch() {
-    setIsCreating(true);
-    setError(null);
-
-    try {
-      const payload = await createFixedDeckMatch(playerDecks);
-
-      if (!payload.accepted) {
-        setError(payload.error.message);
-        return;
-      }
-
-      setMatch(payload);
-      setViewerSeat("player1");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create match.");
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  async function submitIntent(intent: MatchIntent) {
-    if (!match) {
-      return;
-    }
-
-    const viewer = match.players[viewerSeat];
-    const projection = match.projections[viewer.playerId];
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const payload = await submitMatchIntent({
-        gameId: match.gameId,
-        intent,
-        matchId: match.matchId,
-        playerToken: viewer.playerToken,
-        stateVersion: projection.stateVersion
-      });
-
-      if (!payload.accepted) {
-        setError(payload.error.message);
+    void loadProjectionClient(currentMatchId, viewerToken).then((result) => {
+      if (!active || !result.accepted) {
         return;
       }
 
@@ -132,60 +38,105 @@ export function MatchSimulator() {
         current
           ? {
               ...current,
-              gameStatus: payload.projection.status,
-              logEntries: {
-                ...current.logEntries,
-                [viewer.playerId]: [
-                  ...(current.logEntries[viewer.playerId] ?? []),
-                  ...payload.logEntries
-                ]
-              },
               projections: {
                 ...current.projections,
-                [viewer.playerId]: payload.projection
+                [viewerPlayerId]: result.projection,
               },
-              stateVersion: payload.projection.stateVersion
             }
-          : current
+          : current,
       );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Intent request failed.");
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [currentMatchId, viewerPlayerId, viewerToken]);
+
+  async function createMatch() {
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await createMatchClient();
+
+      if (!result.accepted) {
+        setError(result.error.message);
+      } else {
+        setMatch(result);
+        setViewerSeat("player1");
+      }
+    } catch {
+      setError("Unable to create the match.");
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
   }
 
-  if (!match) {
+  async function performAction(input: {
+    actionId: string;
+    selectedIds: string[];
+  }) {
+    if (!match || !viewer || !projection) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await performActionClient({
+        matchId: match.matchId,
+        playerToken: viewer.playerToken,
+        stateVersion: projection.stateVersion,
+        ...input,
+      });
+
+      if (!result.accepted) {
+        setError(result.error.message);
+      } else {
+        setMatch((current) =>
+          current
+            ? {
+                ...current,
+                projections: {
+                  ...current.projections,
+                  [viewer.playerId]: result.projection,
+                },
+              }
+            : current,
+        );
+      }
+    } catch {
+      setError("The action request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!match || !projection) {
     return (
-      <main className="flex justify-center items-center bg-slate-950 p-6 min-h-screen text-slate-100">
-        <section className="bg-slate-900 shadow-xl p-5 border border-white/10 rounded-lg w-full max-w-xl">
-          <div className="mb-5">
-            <h1 className="font-semibold text-xl">Riftbound Simulator</h1>
-            <p className="mt-1 text-slate-400 text-sm">
-              Select fixed MVP decks for both seats. Uploads are out of scope for now.
-            </p>
-          </div>
-          <div className="gap-4 grid sm:grid-cols-2">
-            <DeckSelect
-              label="Player 1 deck"
-              value={playerDecks.player1}
-              onChange={(deckId) =>
-                setPlayerDecks((current) => ({
-                  ...current,
-                  player1: deckId
-                }))
-              }
-            />
-            <DeckSelect
-              label="Player 2 deck"
-              value={playerDecks.player2}
-              onChange={(deckId) =>
-                setPlayerDecks((current) => ({
-                  ...current,
-                  player2: deckId
-                }))
-              }
-            />
+      <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100">
+        <section className="bg-slate-900 shadow-2xl p-6 border border-cyan-300/20 rounded-xl w-full max-w-xl">
+          <p className="font-semibold text-cyan-200 text-xs uppercase tracking-[0.2em]">
+            Riftbound Simulator
+          </p>
+          <h1 className="mt-2 font-semibold text-2xl">Create match</h1>
+          <p className="mt-2 text-slate-400 text-sm">
+            Choose a deck for each player and start a Riftbound match.
+          </p>
+          <div className="gap-4 grid sm:grid-cols-2 mt-5">
+            {(["Player 1", "Player 2"] as const).map((label) => (
+              <label className="gap-2 grid text-sm" key={label}>
+                <span className="text-slate-300">{label} deck</span>
+                <select
+                  className="bg-slate-950 px-3 py-2 border border-white/10 rounded"
+                  disabled
+                  value="lux"
+                >
+                  <option value="lux">Lux</option>
+                </select>
+              </label>
+            ))}
           </div>
           {error && (
             <p className="bg-red-950/60 mt-4 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
@@ -194,182 +145,77 @@ export function MatchSimulator() {
           )}
           <Button
             className="mt-5 w-full"
-            disabled={isCreating}
+            disabled={busy}
             onClick={createMatch}
             type="button"
           >
-            {isCreating ? "Creating match..." : "Create match"}
+            {busy ? "Creating…" : "Create match"}
           </Button>
         </section>
       </main>
     );
   }
 
-  const viewer = match.players[viewerSeat];
-  const projection = match.projections[viewer.playerId];
-  const opponentPlayerId = projection.setup.playerIds.find(
-    (playerId) => playerId !== viewer.playerId
+  const battlefieldActions = projection.actions.filter(
+    (action) => action.presentation.surface === "setup-dialog",
   );
-  const battlefieldChoicesRevealed = projection.setup.playerIds.every(
-    (playerId) =>
-      projection.setup.battlefieldChoices[playerId]?.status === "revealed"
+  const startingPlayerAction = projection.actions.find((action) =>
+    action.targets.some((target) => target.kind === "player"),
   );
-  const startingPlayerChoiceOpen =
-    projection.status === "setup_pending" &&
-    battlefieldChoicesRevealed &&
-    projection.setup.startingPlayerId === null &&
-    projection.setup.startingPlayerChooserId === viewer.playerId;
-  const startingPlayerOptions = projection.setup.playerIds.map((playerId) => ({
-    description:
-      playerId === viewer.playerId
-        ? "You take the first turn."
-        : "Your opponent takes the first turn.",
-    id: playerId,
-    label: playerLabel(match, playerId)
-  }));
-  const viewerBattlefieldChoice =
-    projection.setup.battlefieldChoices[viewer.playerId];
-  const opponentBattlefieldChoice = opponentPlayerId
-    ? projection.setup.battlefieldChoices[opponentPlayerId]
-    : undefined;
-  const viewerBattlefieldPool =
-    projection.setup.battlefieldPools[viewer.playerId];
-  const startingPlayerId = projection.setup.startingPlayerId;
-  const startingPlayerLabel = startingPlayerId
-    ? playerLabel(match, startingPlayerId)
-    : null;
-  const battlefieldChoiceOpen =
-    !startingPlayerChoiceOpen &&
-    projection.status === "setup_pending" &&
-    viewerBattlefieldChoice?.status === "unlocked" &&
-    (viewerBattlefieldPool?.registeredCardInstanceIds.length ?? 0) > 0;
-  const setupWaitingState = getSetupWaitingState({
-    battlefieldChoiceOpen,
-    battlefieldChoicesRevealed,
-    match,
-    opponentBattlefieldChoiceStatus: opponentBattlefieldChoice?.status,
-    projection,
-    startingPlayerChoiceOpen,
-    viewerBattlefieldChoiceStatus: viewerBattlefieldChoice?.status,
-    viewerPlayerId: viewer.playerId
-  });
-  const battlefieldOptions =
-    viewerBattlefieldPool?.registeredCardInstanceIds.map((cardInstanceId) => {
-      const card = match.cardsByInstanceId[cardInstanceId];
+  const mulliganAction = projection.actions.find(
+    (action) => action.label === "Keep opening hand",
+  );
+  const handCards =
+    projection.players
+      .find((player) => player.playerId === projection.viewerPlayerId)
+      ?.zones.find((zone) => zone.kind === "hand")?.cards ?? [];
 
-      return {
-        description: card?.text.plain || card?.set.label,
-        id: cardInstanceId,
-        imageUrl: card?.media.image_url,
-        label: card?.name ?? "Battlefield"
-      };
-    }) ?? [];
-  const playCardFromHand = ({
-    canPlay,
-    cardInstanceId,
-    choices,
-    selectedModeId
-  }: {
-    canPlay: boolean;
-    cardInstanceId: string;
-    choices?: {
-      targetCardInstanceIds?: string[];
+  const battlefieldOptions = battlefieldActions.map((action) => {
+    const card = projection.setup.battlefieldPool.find(
+      (candidate) => candidate.instanceId === action.sourceCardInstanceId,
+    );
+
+    return {
+      id: action.id,
+      imageUrl: card?.imageUrl ?? undefined,
+      label: card?.name ?? action.label,
     };
-    selectedModeId?: string;
-  }) => {
-    if (!canPlay) {
-      setError("This card is not currently playable.");
-      return;
-    }
+  });
 
-    void submitIntent({
-      type: "game.playCard",
-      payload: {
-        cardInstanceId,
-        choices,
-        selectedModeId,
-        destination: "base"
-      }
-    });
-  };
-  const activateAbility = ({
-    abilityId,
-    sourceCardInstanceId
-  }: {
-    abilityId: string;
-    sourceCardInstanceId: string;
-  }) => {
-    void submitIntent({
-      type: "game.activateAbility",
-      payload: {
-        abilityId,
-        sourceCardInstanceId
-      }
-    });
-  };
-  const submitChoice = ({
-    choiceId,
-    orderedIds
-  }: {
-    choiceId: string;
-    orderedIds: string[];
-  }) => {
-    void submitIntent({
-      type: "game.submitChoice",
-      payload: {
-        choiceId,
-        orderedIds
-      }
-    });
-  };
-  const addRuneResourceFromBoard = ({
-    cardInstanceId,
-    resourceType
-  }: {
-    cardInstanceId: string;
-    resourceType: "energy" | "power";
-  }) => {
-    void submitIntent({
-      type: "game.addRuneResource",
-      payload: {
-        runeCardInstanceId: cardInstanceId,
-        resourceType
-      }
-    });
-  };
-  const passPriority = () => {
-    void submitIntent({
-      type: "game.pass"
-    });
-  };
-  const endTurn = () => {
-    if (projection.chain) {
-      setError("Resolve the chain before passing the turn.");
-      return;
-    }
+  const startingPlayerOptions =
+    startingPlayerAction?.targets[0]?.legalIds.map((playerId) => ({
+      description:
+        playerId === viewer.playerId
+          ? "You take the first turn."
+          : "Your opponent takes the first turn.",
+      id: playerId,
+      label:
+        playerId === match.players.player1.playerId ? "Player 1" : "Player 2",
+    })) ?? [];
 
-    void submitIntent({
-      type: "game.endTurn"
-    });
-  };
+  const mulliganOptions = handCards.map((card) => ({
+    id: card.instanceId,
+    imageUrl: card.imageUrl ?? undefined,
+    label: card.name,
+  }));
 
   return (
     <main className="relative bg-slate-950 min-h-screen">
       <div className="top-2 left-14 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
         <span className="text-slate-400">Viewer</span>
         <Button
-          size="sm"
-          variant={viewerSeat === "player1" ? "default" : "secondary"}
           onClick={() => setViewerSeat("player1")}
+          size="sm"
           type="button"
+          variant={viewerSeat === "player1" ? "default" : "secondary"}
         >
           Player 1
         </Button>
         <Button
-          size="sm"
-          variant={viewerSeat === "player2" ? "default" : "secondary"}
           onClick={() => setViewerSeat("player2")}
+          size="sm"
           type="button"
+          variant={viewerSeat === "player2" ? "default" : "secondary"}
         >
           Player 2
         </Button>
@@ -377,210 +223,109 @@ export function MatchSimulator() {
           Match {match.matchId} - State {projection.stateVersion}
         </span>
       </div>
-      {error && <ErrorToast message={error} onClose={() => setError(null)} />}
-      <ChoiceDialog
-        confirmLabel="Choose starting player"
-        description="The selected player will take the first turn of this game."
-        isOpen={startingPlayerChoiceOpen}
-        onConfirm={([startingPlayerId]) => {
-          if (!startingPlayerId) {
-            return;
-          }
 
-          void submitIntent({
-            type: "setup.chooseStartingPlayer",
-            payload: {
-              startingPlayerId
-            }
-          });
-        }}
-        options={startingPlayerOptions}
-        selectionMode="single"
-        title="Choose Starting Player"
-      />
-      <ChoiceDialog
+      {error && (
+        <div className="right-4 bottom-4 z-[60] fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+          {error}
+        </div>
+      )}
+
+      <SetupChoiceDialog
+        cardSize="xl"
         confirmLabel="Lock battlefield"
         description={
-          startingPlayerLabel
-            ? `${startingPlayerLabel} starts this game. This battlefield will be revealed after both players lock their choices.`
+          projection.setup.startingPlayerId
+            ? `${
+                projection.setup.startingPlayerId ===
+                match.players.player1.playerId
+                  ? "Player 1"
+                  : "Player 2"
+              } starts this game. This battlefield will be revealed after both players lock their choices.`
             : "Turn order will be determined after both players lock their battlefield choices."
         }
-        isOpen={battlefieldChoiceOpen}
-        onConfirm={([cardInstanceId]) => {
-          if (!cardInstanceId) {
-            return;
+        isOpen={battlefieldOptions.length > 0}
+        onConfirm={([actionId]) => {
+          if (actionId) {
+            void performAction({ actionId, selectedIds: [] });
           }
-
-          void submitIntent({
-            type: "setup.lockBattlefieldChoice",
-            payload: {
-              cardInstanceId
-            }
-          });
         }}
         options={battlefieldOptions}
+        presentation="cards"
         selectionMode="single"
         title="Choose Battlefield"
       />
-      {setupWaitingState && <SetupWaitingOverlay {...setupWaitingState} />}
+
+      <SetupChoiceDialog
+        confirmLabel="Choose starting player"
+        description="The selected player will take the first turn of this game."
+        isOpen={Boolean(startingPlayerAction)}
+        onConfirm={([playerId]) => {
+          if (playerId && startingPlayerAction) {
+            void performAction({
+              actionId: startingPlayerAction.id,
+              selectedIds: [playerId],
+            });
+          }
+        }}
+        options={startingPlayerOptions}
+        presentation="list"
+        selectionMode="single"
+        title="Choose Starting Player"
+      />
+
+      <SetupChoiceDialog
+        confirmLabel={(selectedIds) =>
+          selectedIds.length ? "Mulligan selected" : "Keep opening hand"
+        }
+        description="Keep your hand or replace up to two cards."
+        isOpen={Boolean(mulliganAction)}
+        maxSelected={2}
+        minSelected={0}
+        onConfirm={(selectedIds) => {
+          if (mulliganAction) {
+            void performAction({ actionId: mulliganAction.id, selectedIds });
+          }
+        }}
+        options={mulliganOptions}
+        presentation="cards"
+        selectionMode="multiple"
+        title="Choose Mulligan"
+      />
+
+      {projection.setup.waitingReason && (
+        <SetupWaitingOverlay detail={projection.setup.waitingReason} />
+      )}
+
       <GameBoard
-        cardsByInstanceId={match.cardsByInstanceId}
-        logEntries={match.logEntries[viewer.playerId] ?? []}
-        onActivateAbility={activateAbility}
-        onAddRuneResource={addRuneResourceFromBoard}
-        onEndTurn={endTurn}
-        onPass={passPriority}
-        onPlayCard={playCardFromHand}
-        onSubmitChoice={submitChoice}
+        onPerformAction={(input) => {
+          if (!busy) {
+            void performAction(input);
+          }
+        }}
         projection={projection}
       />
     </main>
   );
 }
 
-function getSetupWaitingState({
-  battlefieldChoiceOpen,
-  battlefieldChoicesRevealed,
-  match,
-  opponentBattlefieldChoiceStatus,
-  projection,
-  startingPlayerChoiceOpen,
-  viewerBattlefieldChoiceStatus,
-  viewerPlayerId
-}: {
-  battlefieldChoiceOpen: boolean;
-  battlefieldChoicesRevealed: boolean;
-  match: AcceptedMatch;
-  opponentBattlefieldChoiceStatus: string | undefined;
-  projection: GameProjection;
-  startingPlayerChoiceOpen: boolean;
-  viewerBattlefieldChoiceStatus: string | undefined;
-  viewerPlayerId: string;
-}): { detail: string; title: string } | null {
-  if (
-    projection.status !== "setup_pending" ||
-    battlefieldChoiceOpen ||
-    startingPlayerChoiceOpen
-  ) {
-    return null;
-  }
-
-  if (
-    viewerBattlefieldChoiceStatus === "locked" &&
-    opponentBattlefieldChoiceStatus === "unlocked"
-  ) {
-    return {
-      detail:
-        "Your battlefield is locked. It will be revealed after both players have locked their choices.",
-      title: "Waiting for opponent to choose a battlefield"
-    };
-  }
-
-  if (
-    battlefieldChoicesRevealed &&
-    projection.setup.startingPlayerId === null &&
-    projection.setup.startingPlayerChooserId !== null &&
-    projection.setup.startingPlayerChooserId !== viewerPlayerId
-  ) {
-    return {
-      detail: `${playerLabel(
-        match,
-        projection.setup.startingPlayerChooserId
-      )} is choosing who takes the first turn.`,
-      title: "Waiting for starting player choice"
-    };
-  }
-
-  if (
-    viewerBattlefieldChoiceStatus === "locked" &&
-    opponentBattlefieldChoiceStatus === "locked" &&
-    !battlefieldChoicesRevealed
-  ) {
-    return {
-      detail: "Both battlefield choices are locked. Waiting for the server to reveal them.",
-      title: "Revealing battlefield choices"
-    };
-  }
-
-  return null;
-}
-
-function SetupWaitingOverlay({
-  detail,
-  title
-}: {
-  detail: string;
-  title: string;
-}) {
+function SetupWaitingOverlay({ detail }: { detail: string }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-6 text-slate-100">
-      <section className="w-full max-w-md rounded-lg border border-cyan-300/25 bg-slate-950/95 p-5 text-center shadow-2xl shadow-black/70">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+    <div className="z-[2147483645] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100">
+      <section
+        aria-live="polite"
+        className="gap-3 grid bg-slate-950/95 shadow-2xl shadow-black/80 p-5 border border-cyan-300/25 rounded-xl w-full max-w-md overflow-hidden text-center"
+        role="status"
+      >
+        <p className="font-semibold text-cyan-200/80 text-xs uppercase tracking-[0.18em]">
           Setup
         </p>
-        <h2 className="mt-2 text-lg font-semibold">{title}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
+        <div>
+          <h2 className="font-semibold text-lg leading-tight">
+            Waiting for opponent
+          </h2>
+          <p className="mt-2 text-slate-400 text-sm leading-6">{detail}</p>
+        </div>
       </section>
     </div>
-  );
-}
-
-function playerLabel(match: AcceptedMatch, playerId: string) {
-  if (match.players.player1.playerId === playerId) {
-    return "Player 1";
-  }
-
-  if (match.players.player2.playerId === playerId) {
-    return "Player 2";
-  }
-
-  return playerId;
-}
-
-function ErrorToast({
-  message,
-  onClose
-}: {
-  message: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="right-16 bottom-5 z-50 fixed flex items-center gap-3 bg-red-950/90 shadow-xl px-3 py-2 border border-red-400/50 rounded-md text-red-100 text-sm">
-      <span>{message}</span>
-      <button
-        className="text-red-200 hover:text-white"
-        onClick={onClose}
-        type="button"
-      >
-        Close
-      </button>
-    </div>
-  );
-}
-
-function DeckSelect({
-  label,
-  onChange,
-  value
-}: {
-  label: string;
-  onChange: (deckId: FixedDeckId) => void;
-  value: FixedDeckId;
-}) {
-  return (
-    <label className="gap-2 grid text-sm">
-      <span className="font-medium text-slate-300">{label}</span>
-      <select
-        className="bg-slate-950 px-3 py-2 border border-white/10 rounded text-slate-100"
-        value={value}
-        onChange={(event) => onChange(event.target.value as FixedDeckId)}
-      >
-        {DECK_OPTIONS.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

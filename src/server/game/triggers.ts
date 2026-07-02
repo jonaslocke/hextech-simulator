@@ -1,53 +1,53 @@
 import {
-  compileBehaviorModelV2,
+  compileBehaviorModel,
   createBehaviorContext,
-  executeBehaviorEffectsV2,
-  queueTriggeredClausesV2,
-  type BehaviorEventV2
+  executeBehaviorEffects,
+  queueTriggeredClauses,
+  type BehaviorEvent
 } from "./behavior-runtime";
 import {
-  createPrimitiveHandlersV2,
-  createRuntimeCardIndexV2,
-  definitionForInstanceV2
+  createPrimitiveHandlers,
+  createRuntimeCardIndex,
+  definitionForInstance
 } from "./primitive-handlers";
-import type { DeckSnapshotDocumentV2 } from "./repositories";
-import type { GameDocumentV2 } from "./state";
+import type { DeckSnapshotDocument } from "./repositories";
+import type { GameDocument } from "./state";
 
-export function dispatchBehaviorEventV2(
-  game: GameDocumentV2,
-  event: BehaviorEventV2,
-  decks: readonly DeckSnapshotDocumentV2[]
+export function dispatchBehaviorEvent(
+  game: GameDocument,
+  event: BehaviorEvent,
+  decks: readonly DeckSnapshotDocument[]
 ): void {
-  const index = createRuntimeCardIndexV2(decks);
-  const handlers = createPrimitiveHandlersV2(index);
+  const index = createRuntimeCardIndex(decks);
+  const handlers = createPrimitiveHandlers(index);
   for (const controllerPlayerId of game.state.setup.playerIds) {
     const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => ({
       sourceCardInstanceId,
-      label: definitionForInstanceV2(sourceCardInstanceId, index).card.name,
-      model: compileBehaviorModelV2(
-        definitionForInstanceV2(sourceCardInstanceId, index).behaviorModel,
+      label: definitionForInstance(sourceCardInstanceId, index).card.name,
+      model: compileBehaviorModel(
+        definitionForInstance(sourceCardInstanceId, index).behaviorModel,
         handlers
       )
     }));
-    queueTriggeredClausesV2({ game, controllerPlayerId, sources, event, handlers });
+    queueTriggeredClauses({ game, controllerPlayerId, sources, event, handlers });
   }
 }
 
-export function resolveDelayedEffectsV2(
-  game: GameDocumentV2,
+export function resolveDelayedEffects(
+  game: GameDocument,
   point: string,
-  decks: readonly DeckSnapshotDocumentV2[]
+  decks: readonly DeckSnapshotDocument[]
 ): void {
-  const index = createRuntimeCardIndexV2(decks);
-  const handlers = createPrimitiveHandlersV2(index);
+  const index = createRuntimeCardIndex(decks);
+  const handlers = createPrimitiveHandlers(index);
   const due = game.state.delayedEffects.filter((effect) => effect.point === point);
   game.state.delayedEffects = game.state.delayedEffects.filter((effect) => effect.point !== point);
   for (const effect of due) {
-    const definition = definitionForInstanceV2(effect.sourceCardInstanceId, index);
-    const clause = compileBehaviorModelV2(definition.behaviorModel, handlers).clauses
+    const definition = definitionForInstance(effect.sourceCardInstanceId, index);
+    const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses
       .find((candidate) => candidate.id === effect.clauseId);
     if (!clause) throw new Error(`Delayed behavior clause is unavailable: ${effect.clauseId}`);
-    executeBehaviorEffectsV2(
+    executeBehaviorEffects(
       clause,
       createBehaviorContext(game, effect.controllerPlayerId, effect.sourceCardInstanceId, null, effect.selectedIds),
       handlers
@@ -55,16 +55,16 @@ export function resolveDelayedEffectsV2(
   }
 }
 
-export function victoryRequirementV2(
-  game: GameDocumentV2,
-  decks: readonly DeckSnapshotDocumentV2[],
+export function victoryRequirement(
+  game: GameDocument,
+  decks: readonly DeckSnapshotDocument[],
   baseRequirement = 8
 ): number {
-  const index = createRuntimeCardIndexV2(decks);
+  const index = createRuntimeCardIndex(decks);
   let result = baseRequirement;
   const battlefieldCards = game.state.battlefields.map((battlefield) => battlefield.cardInstanceId);
   for (const sourceId of battlefieldCards) {
-    const model = definitionForInstanceV2(sourceId, index).behaviorModel;
+    const model = definitionForInstance(sourceId, index).behaviorModel;
     for (const binding of model.clauses.flatMap((clause) => clause.effects)) {
       if (
         binding.behaviorId === "modifier.modify_numeric_value" &&
@@ -83,9 +83,9 @@ export function victoryRequirementV2(
 }
 
 function activeSourceIds(
-  game: GameDocumentV2,
+  game: GameDocument,
   controllerPlayerId: string,
-  index: ReturnType<typeof createRuntimeCardIndexV2>
+  index: ReturnType<typeof createRuntimeCardIndex>
 ): string[] {
   const player = game.state.players[controllerPlayerId]!;
   return [...new Set([
@@ -99,4 +99,3 @@ function activeSourceIds(
       .filter((id) => index.instances.get(id)?.ownerPlayerId === controllerPlayerId)
   ])];
 }
-

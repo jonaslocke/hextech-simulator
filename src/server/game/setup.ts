@@ -1,9 +1,9 @@
-import type { ProjectedAction } from "../../shared/game-v2";
+import type { ProjectedAction } from "../../shared/game";
 import { createHash } from "node:crypto";
-import type { DeckRuntimeSnapshotV2, GameDocumentV2 } from "./state";
-import { applyStartOfTurnV2 } from "./actions";
+import type { DeckRuntimeSnapshot, GameDocument } from "./state";
+import { applyStartOfTurn } from "./actions";
 
-export function setupActionsV2(game: GameDocumentV2, actorPlayerId: string): ProjectedAction[] {
+export function setupActions(game: GameDocument, actorPlayerId: string): ProjectedAction[] {
   if (game.status !== "setup_pending") return [];
   const setup = game.state.setup;
   const choice = setup.battlefieldChoices[actorPlayerId];
@@ -34,11 +34,11 @@ export function setupActionsV2(game: GameDocumentV2, actorPlayerId: string): Pro
   return [];
 }
 
-export function performSetupActionV2(input: {
-  game: GameDocumentV2; actorPlayerId: string; actionId: string; selectedIds: string[];
-  decksByPlayerId: Record<string, DeckRuntimeSnapshotV2>; now: string;
-}): GameDocumentV2 {
-  const legal = setupActionsV2(input.game, input.actorPlayerId);
+export function performSetupAction(input: {
+  game: GameDocument; actorPlayerId: string; actionId: string; selectedIds: string[];
+  decksByPlayerId: Record<string, DeckRuntimeSnapshot>; now: string;
+}): GameDocument {
+  const legal = setupActions(input.game, input.actorPlayerId);
   const action = legal.find((candidate) => candidate.id === input.actionId);
   if (!action) throw new Error("Action is not legal for the current game state.");
   validateTargets(action, input.selectedIds);
@@ -60,7 +60,7 @@ export function performSetupActionV2(input: {
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
       game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "action" };
-      applyStartOfTurnV2(game);
+      applyStartOfTurn(game);
     }
   }
   game.stateVersion += 1;
@@ -68,7 +68,7 @@ export function performSetupActionV2(input: {
   return game;
 }
 
-function initializeBoardAndHands(game: GameDocumentV2, decks: Record<string, DeckRuntimeSnapshotV2>) {
+function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckRuntimeSnapshot>) {
   for (const playerId of game.state.setup.playerIds) {
     const deck = decks[playerId]!;
     const player = game.state.players[playerId]!;
@@ -84,7 +84,7 @@ function initializeBoardAndHands(game: GameDocumentV2, decks: Record<string, Dec
   }
 }
 
-function applyMulligan(game: GameDocumentV2, playerId: string, selected: string[]) {
+function applyMulligan(game: GameDocument, playerId: string, selected: string[]) {
   const zones = game.state.players[playerId]!.zones;
   zones.hand = zones.hand.filter((id) => !selected.includes(id));
   zones.mainDeck.push(...selected);
@@ -95,8 +95,8 @@ function deterministicShuffle(values: string[], seed: string): string[] {
   const score = (value: string) => createHash("sha256").update(seed).update(value).digest("hex");
   return [...values].sort((left, right) => score(left).localeCompare(score(right)));
 }
-function actionId(game: GameDocumentV2, kind: string, suffix?: string) {
-  return [`v2`, game.stateVersion, "setup", kind, suffix].filter((value) => value !== undefined).join(":");
+function actionId(game: GameDocument, kind: string, suffix?: string) {
+  return ["game", game.stateVersion, "setup", kind, suffix].filter((value) => value !== undefined).join(":");
 }
 function validateTargets(action: ProjectedAction, selected: string[]) {
   const requirement = action.targets[0];

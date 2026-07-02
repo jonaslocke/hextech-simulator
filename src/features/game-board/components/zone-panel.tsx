@@ -1,4 +1,4 @@
-import type { ProjectedAction, ProjectedZoneV2 } from "@/shared/game-v2";
+import type { ProjectedAction, ProjectedZone } from "@/shared/game";
 import { actionsForSource } from "../model";
 import { ProjectedCard } from "./projected-card";
 
@@ -9,7 +9,7 @@ export function ZonePanel({
 }: {
   actions: readonly ProjectedAction[];
   onAction: (action: ProjectedAction) => void;
-  zone: ProjectedZoneV2;
+  zone: ProjectedZone;
 }) {
   return (
     <section className="rounded-lg border border-white/10 bg-slate-950/60 p-3">
