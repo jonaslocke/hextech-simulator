@@ -14,6 +14,13 @@ import {
   effectiveEnergyCost,
   type RuntimeCardIndex
 } from "./primitive-handlers";
+import {
+  applyHoldScoring,
+  cleanupBoard,
+  markBattlefieldContested,
+  openNonCombatShowdown,
+  resolveNonCombatShowdown
+} from "./board-rules";
 import { dispatchBehaviorEvent, resolveDelayedEffects } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
@@ -79,6 +86,48 @@ export function gameplayActions(
       }
     }
   }
+  for (const battlefield of game.state.battlefields) {
+    for (const cardId of battlefield.units) {
+      if (index.instances.get(cardId)?.ownerPlayerId !== actorPlayerId) continue;
+      const state = game.state.cardStates[cardId];
+      if (!state || state.exhausted) continue;
+      actions.push(action(
+        game,
+        "move",
+        "Move to Base",
+        cardId,
+        true,
+        null,
+        "base"
+      ));
+    }
+  }
+  const readyBaseUnits = player.zones.base.filter((cardId) => {
+    const definition = definitionForInstance(cardId, index);
+    return definition.card.classification.type === "Unit"
+      && !game.state.cardStates[cardId]?.exhausted;
+  });
+  for (const battlefield of game.state.battlefields.filter(
+    (candidate) => candidate.units.length === 0
+  )) {
+    if (readyBaseUnits.length < 2) continue;
+    actions.push(action(
+      game,
+      "moveMany",
+      `Move units to ${definitionForInstance(battlefield.cardInstanceId, index).card.name}`,
+      null,
+      true,
+      null,
+      battlefield.battlefieldId,
+      [{
+        kind: "card",
+        label: "units to move",
+        legalIds: readyBaseUnits,
+        minimum: 1,
+        maximum: readyBaseUnits.length
+      }]
+    ));
+  }
   return actions;
 }
 
@@ -140,20 +189,32 @@ export function performGameplayAction(input: {
     }
     case "move": {
       const cardId = source;
-      const battlefieldId = extra;
-      player.zones.base = player.zones.base.filter((id) => id !== cardId);
-      const battlefield = game.state.battlefields.find((item) => item.battlefieldId === battlefieldId);
-      if (!battlefield) throw new Error("Battlefield is unavailable.");
-      if (battlefield.units.length > 0) throw new Error("Only movement to an empty battlefield is supported.");
-      battlefield.units.push(cardId);
-      game.state.cardStates[cardId]!.exhausted = true;
-      game.state.showdown = {
-        kind: "nonCombat",
-        battlefieldId,
-        relevantPlayerIds: [...game.state.setup.playerIds],
-        focusPlayerId: input.actorPlayerId,
-        passedPlayerIds: []
-      };
+      if (extra === "base") {
+        for (const battlefield of game.state.battlefields) {
+          battlefield.units = battlefield.units.filter((id) => id !== cardId);
+        }
+        player.zones.base.push(cardId);
+        game.state.cardStates[cardId]!.exhausted = true;
+        cleanupBoard(game, index);
+        break;
+      }
+      moveUnitsToBattlefield(
+        game,
+        input.actorPlayerId,
+        [cardId],
+        extra,
+        index
+      );
+      break;
+    }
+    case "moveMany": {
+      moveUnitsToBattlefield(
+        game,
+        input.actorPlayerId,
+        input.selectedIds,
+        extra,
+        index
+      );
       break;
     }
     case "pass":
@@ -304,7 +365,18 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
   }
   if (game.state.showdown) {
     const passed = addConsecutivePass(game.state.showdown.passedPlayerIds, actor);
-    if (passed.length === game.state.showdown.relevantPlayerIds.length) game.state.showdown = null;
+    if (passed.length === game.state.showdown.relevantPlayerIds.length) {
+      const showdown = game.state.showdown;
+      game.state.showdown = null;
+      if (showdown.kind === "nonCombat") {
+        resolveNonCombatShowdown(
+          game,
+          showdown.battlefieldId,
+          index,
+          decks
+        );
+      }
+    }
     else {
       game.state.showdown.passedPlayerIds = passed;
       game.state.showdown.focusPlayerId = nextRelevantPlayer(
@@ -322,10 +394,13 @@ function endTurn(game: GameDocument, actor: string, index: RuntimeCardIndex, dec
   resolveDelayedEffects(game, "endOfThisTurn", decks);
   cleanupTurnModifiers(game, index);
   game.state.turn = { turnNumber: game.state.turn.turnNumber + 1, activePlayerId: next, phase: "action" };
-  applyStartOfTurn(game);
+  applyStartOfTurn(game, decks);
 }
 
-export function applyStartOfTurn(game: GameDocument) {
+export function applyStartOfTurn(
+  game: GameDocument,
+  decks: readonly DeckSnapshotDocument[] = []
+) {
   const turn = game.state.turn;
   if (!turn) throw new Error("A turn is required to apply start-of-turn steps.");
   for (const candidate of Object.values(game.state.players)) {
@@ -335,6 +410,8 @@ export function applyStartOfTurn(game: GameDocument) {
   }
   for (const state of Object.values(game.state.cardStates)) state.damage = 0;
   const player = game.state.players[turn.activePlayerId]!;
+  player.scoredBattlefieldIdsThisTurn = [];
+  if (decks.length) applyHoldScoring(game, turn.activePlayerId, decks);
   for (const cardId of [...player.zones.base, ...game.state.battlefields.flatMap((battlefield) => battlefield.units)]) {
     if (game.state.cardStates[cardId]) game.state.cardStates[cardId]!.exhausted = false;
   }
@@ -468,6 +545,31 @@ function pay(game: GameDocument, playerId: string, definition: GameCardDefinitio
       state.exhausted = false;
     }
   }
+}
+
+function moveUnitsToBattlefield(
+  game: GameDocument,
+  actorPlayerId: string,
+  cardIds: string[],
+  battlefieldId: string,
+  index: RuntimeCardIndex
+) {
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === battlefieldId
+  );
+  if (!battlefield) throw new Error("Battlefield is unavailable.");
+  if (battlefield.units.length > 0) {
+    throw new Error("Only movement to an empty battlefield is supported.");
+  }
+  const player = game.state.players[actorPlayerId]!;
+  for (const cardId of cardIds) {
+    player.zones.base = player.zones.base.filter((id) => id !== cardId);
+    battlefield.units.push(cardId);
+    game.state.cardStates[cardId]!.exhausted = true;
+  }
+  markBattlefieldContested(game, battlefieldId, actorPlayerId);
+  cleanupBoard(game, index);
+  openNonCombatShowdown(game, battlefieldId, actorPlayerId);
 }
 
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {

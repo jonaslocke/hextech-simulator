@@ -10,3 +10,6 @@ export * from "./actions";
 export * from "./behavior-runtime";
 export * from "./primitive-handlers";
 export * from "./triggers";
+export * from "./board-rules";
+export * from "./timing";
+export * from "./transitions";

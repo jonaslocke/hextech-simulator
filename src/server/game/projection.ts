@@ -32,7 +32,15 @@ export function projectGame(input: {
       const visibility = kind === "hand" ? (isViewer ? "private" : "secret") : (["mainDeck", "runeDeck"].includes(kind) ? "secret" : "public");
       return { kind, visibility, count: ids.length, cards: visibility === "secret" ? [] : ids.map(view) };
     });
-    return { playerId, isViewer, energy: player.energy, conditionalEnergy: player.conditionalEnergy, power: player.power, zones };
+    return {
+      playerId,
+      isViewer,
+      points: player.points ?? 0,
+      energy: player.energy,
+      conditionalEnergy: player.conditionalEnergy,
+      power: player.power,
+      zones
+    };
   });
   return gameProjectionSchema.parse({
     id: input.game.id, matchId: input.game.matchId, gameNumber: 1, stateVersion: input.game.stateVersion,
@@ -70,6 +78,8 @@ export function projectGame(input: {
     } : null,
     battlefields: input.game.state.battlefields.map((battlefield) => ({
       battlefieldId: battlefield.battlefieldId, selectedByPlayerId: battlefield.selectedByPlayerId,
+      controllerPlayerId: battlefield.controllerPlayerId ?? null,
+      contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
       card: view(battlefield.cardInstanceId), units: battlefield.units.map(view), facedownCard: null
     })),
     chain: input.game.state.chain ? {

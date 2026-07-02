@@ -15,7 +15,25 @@ test("generates and validates generic turn, resource, movement, and priority act
   const move = gameplayActions(game, "p1", decks).find((action) => action.label.startsWith("Move to"))!;
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "d" });
   assert.ok(game.state.showdown);
+  assert.equal(game.state.battlefields[0]!.contestedByPlayerId, "p1");
   assert.throws(() => performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "e" }), /not legal/);
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (candidate) => candidate.label === "Pass focus"
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: "f"
+    });
+  }
+  assert.equal(game.state.showdown, null);
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
+  assert.equal(game.state.battlefields[0]!.contestedByPlayerId, null);
+  assert.equal(game.state.players.p1!.points, 1);
 });
 
 test("plays a spell through priority resolution and advances the turn", () => {

@@ -91,6 +91,7 @@ export const projectedZoneSchema = z.object({
 export const projectedPlayerSchema = z.object({
   playerId: z.string().min(1),
   isViewer: z.boolean(),
+  points: z.number().int().nonnegative(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
@@ -100,6 +101,8 @@ export const projectedPlayerSchema = z.object({
 export const projectedBattlefieldSchema = z.object({
   battlefieldId: z.string().min(1),
   selectedByPlayerId: z.string().min(1),
+  controllerPlayerId: z.string().min(1).nullable(),
+  contestedByPlayerId: z.string().min(1).nullable(),
   card: projectedCardViewSchema,
   units: z.array(projectedCardViewSchema),
   facedownCard: projectedCardViewSchema.nullable().default(null)

@@ -80,7 +80,14 @@ function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckR
     player.zones.runeDeck = deterministicShuffle(player.zones.runeDeck, `${game.id}:${playerId}:rune`);
     player.zones.hand = player.zones.mainDeck.splice(0, 4);
     const selected = game.state.setup.battlefieldChoices[playerId]!.cardInstanceId!;
-    game.state.battlefields.push({ battlefieldId: selected, cardInstanceId: selected, selectedByPlayerId: playerId, units: [] });
+    game.state.battlefields.push({
+      battlefieldId: selected,
+      cardInstanceId: selected,
+      selectedByPlayerId: playerId,
+      controllerPlayerId: null,
+      contestedByPlayerId: null,
+      units: []
+    });
   }
 }
 

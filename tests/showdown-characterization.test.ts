@@ -17,7 +17,8 @@ test("characterizes the separated showdown timing kernel", async () => {
   );
   assert.match(stateSource, /chain: z\.object\(\{[\s\S]*priorityPlayerId:/);
   assert.doesNotMatch(stateSource, /combat: z\.object/);
-  assert.doesNotMatch(stateSource, /controllerPlayerId: z\.string\(\)\.nullable/);
+  assert.match(stateSource, /controllerPlayerId: z\.string\(\)\.nullable/);
+  assert.match(stateSource, /contestedByPlayerId: z\.string\(\)\.nullable/);
 
   const result = gameStateSchema.safeParse({});
   assert.equal(result.success, false);

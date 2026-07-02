@@ -235,7 +235,7 @@ function recomputeMight(game: GameDocument, id: string, index: RuntimeCardIndex)
   }
   game.state.cardStates[id]!.computedMight = Math.max(0, value);
 }
-function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
+export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
     const state = game.state.cardStates[id];
     if (state && state.damage > 0 && state.damage >= (state.computedMight ?? definitionForInstance(id, index).card.attributes.might ?? Infinity)) {
@@ -243,7 +243,7 @@ function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCa
     }
   }
 }
-function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
+export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
   const zones = game.state.players[owner]!.zones;
