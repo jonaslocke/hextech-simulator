@@ -49,6 +49,7 @@ export function moveSelectionTitle(
   battlefields: readonly {
     battlefieldId: string;
     card: { name: string };
+    units: readonly unknown[];
   }[]
 ): string | undefined {
   if (!action || actionKind(action) !== "moveMany") return undefined;
@@ -57,7 +58,7 @@ export function moveSelectionTitle(
     (candidate) => candidate.battlefieldId === destination
   );
   return battlefield
-    ? `Choose units to Contest/Conquer ${battlefield.card.name}`
+    ? `Choose units to ${battlefield.units.length === 0 ? "Conquer" : "Contest"} ${battlefield.card.name}`
     : undefined;
 }
 

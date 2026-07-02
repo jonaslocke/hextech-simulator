@@ -87,9 +87,18 @@ test("stages a single-unit move through the simultaneous move action", () => {
   assert.equal(
     moveSelectionTitle(simultaneousMove, [{
       battlefieldId: "battlefield",
-      card: { name: "The Papertree" }
+      card: { name: "The Papertree" },
+      units: []
     }]),
-    "Choose units to Contest/Conquer The Papertree"
+    "Choose units to Conquer The Papertree"
+  );
+  assert.equal(
+    moveSelectionTitle(simultaneousMove, [{
+      battlefieldId: "battlefield",
+      card: { name: "The Papertree" },
+      units: [{}]
+    }]),
+    "Choose units to Contest The Papertree"
   );
 });
 
