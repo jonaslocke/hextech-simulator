@@ -64,14 +64,18 @@ export function SetupChoiceDialog({
     [options],
   );
 
-  const initialSelectionKey = initialSelectedIds?.join("|") ?? "";
+  const initialSelectionKey = JSON.stringify(initialSelectedIds ?? []);
+  const normalizedInitialSelectedIds = useMemo<string[]>(
+    () => JSON.parse(initialSelectionKey) as string[],
+    [initialSelectionKey],
+  );
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    const validInitialIds = (initialSelectedIds ?? []).filter((id) =>
+    const validInitialIds = normalizedInitialSelectedIds.filter((id) =>
       enabledOptionIds.includes(id),
     );
 
@@ -93,9 +97,9 @@ export function SetupChoiceDialog({
     );
   }, [
     enabledOptionIds,
-    initialSelectionKey,
     isOpen,
     maxSelected,
+    normalizedInitialSelectedIds,
     selectionMode,
   ]);
 

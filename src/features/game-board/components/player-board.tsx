@@ -141,7 +141,6 @@ const BaseLine = ({
 };
 
 interface RunesProps extends BaseLineProps {
-  isMirrored?: boolean;
   onRuneContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onRunePrimaryAction?: (card: Card) => void;
   onOpenBanish?: () => void;
@@ -151,7 +150,6 @@ interface RunesProps extends BaseLineProps {
 const RunesLine = ({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
-  isMirrored = false,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -273,7 +271,6 @@ export const PlayerBoard: FC<Props> = ({
         <RunesLine
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
-          isMirrored
           onOpenBanish={onOpenBanish}
           onOpenTrash={onOpenTrash}
           player={player}

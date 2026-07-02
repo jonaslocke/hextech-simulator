@@ -89,16 +89,19 @@ export const GameBoard: FC<GameBoardProps> = ({
     ...entry,
     sequence: index + 1,
   }));
-  const submitProjectedAction = (
-    actionId: string | undefined,
-    selectedIds: string[] = [],
-  ) => {
-    if (actionId) onPerformAction({ actionId, selectedIds });
-  };
-  const sourceActions = (sourceCardInstanceId: string) =>
-    sourceProjection.actions.filter(
-      (action) => action.sourceCardInstanceId === sourceCardInstanceId,
-    );
+  const submitProjectedAction = useCallback(
+    (actionId: string | undefined, selectedIds: string[] = []) => {
+      if (actionId) onPerformAction({ actionId, selectedIds });
+    },
+    [onPerformAction],
+  );
+  const sourceActions = useCallback(
+    (sourceCardInstanceId: string) =>
+      sourceProjection.actions.filter(
+        (action) => action.sourceCardInstanceId === sourceCardInstanceId,
+      ),
+    [sourceProjection.actions],
+  );
   const onEndTurn = () =>
     submitProjectedAction(
       sourceProjection.actions.find((action) => action.label === "End turn")
@@ -110,21 +113,24 @@ export const GameBoard: FC<GameBoardProps> = ({
         (action) => action.label === "Pass priority",
       )?.id,
     );
-  const onPlayCard = (input: {
-    cardInstanceId: string;
-    choices?: { targetCardInstanceIds?: string[] };
-    selectedModeId?: string;
-  }) => {
-    const action = input.selectedModeId
-      ? sourceProjection.actions.find(
-          (candidate) => candidate.id === input.selectedModeId,
-        )
-      : sourceActions(input.cardInstanceId)[0];
-    submitProjectedAction(
-      action?.id,
-      input.choices?.targetCardInstanceIds ?? [],
-    );
-  };
+  const onPlayCard = useCallback(
+    (input: {
+      cardInstanceId: string;
+      choices?: { targetCardInstanceIds?: string[] };
+      selectedModeId?: string;
+    }) => {
+      const action = input.selectedModeId
+        ? sourceProjection.actions.find(
+            (candidate) => candidate.id === input.selectedModeId,
+          )
+        : sourceActions(input.cardInstanceId)[0];
+      submitProjectedAction(
+        action?.id,
+        input.choices?.targetCardInstanceIds ?? [],
+      );
+    },
+    [sourceActions, sourceProjection.actions, submitProjectedAction],
+  );
   const onSubmitChoice = (input: {
     choiceId: string;
     orderedIds: string[];
