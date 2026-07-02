@@ -40,7 +40,11 @@ import {
   type BoardZoneProjection,
   type BoardProjection,
 } from "./board-view-model";
-import { showdownPromptState, simultaneousMoveAction } from "./model";
+import {
+  moveSelectionTitle,
+  showdownPromptState,
+  simultaneousMoveAction,
+} from "./model";
 import {
   BattlefieldData,
   Card,
@@ -846,7 +850,12 @@ export const GameBoard: FC<GameBoardProps> = ({
           }
           title={
             targetSelection.purpose === "move"
-              ? "Choose units for this move"
+              ? moveSelectionTitle(
+                  sourceProjection.actions.find(
+                    (action) => action.id === targetSelection.actionId,
+                  ),
+                  sourceProjection.battlefields,
+                )
               : undefined
           }
         />

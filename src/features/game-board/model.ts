@@ -44,6 +44,23 @@ export function simultaneousMoveAction(
   ) ?? null;
 }
 
+export function moveSelectionTitle(
+  action: ProjectedAction | undefined,
+  battlefields: readonly {
+    battlefieldId: string;
+    card: { name: string };
+  }[]
+): string | undefined {
+  if (!action || actionKind(action) !== "moveMany") return undefined;
+  const destination = actionExtra(action);
+  const battlefield = battlefields.find(
+    (candidate) => candidate.battlefieldId === destination
+  );
+  return battlefield
+    ? `Choose units to Contest/Conquer ${battlefield.card.name}`
+    : undefined;
+}
+
 function actionKind(action: ProjectedAction) {
   return action.id.split(":")[3] ?? "";
 }

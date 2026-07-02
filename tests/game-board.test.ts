@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   actionsForSource,
+  moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction
 } from "../src/features/game-board/model";
@@ -82,6 +83,13 @@ test("stages a single-unit move through the simultaneous move action", () => {
       "unit-a"
     ),
     simultaneousMove
+  );
+  assert.equal(
+    moveSelectionTitle(simultaneousMove, [{
+      battlefieldId: "battlefield",
+      card: { name: "The Papertree" }
+    }]),
+    "Choose units to Contest/Conquer The Papertree"
   );
 });
 
