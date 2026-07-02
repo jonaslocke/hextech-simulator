@@ -59,8 +59,7 @@ export function projectGame(input: {
     turn: input.game.state.turn ? { ...input.game.state.turn, passedPlayerIds: [] } : null,
     showdown: input.game.state.showdown ? {
       ...input.game.state.showdown,
-      relevantPlayerIds: [...input.game.state.setup.playerIds],
-      focusPlayerId: input.game.state.showdown.priorityPlayerId
+      priorityPlayerId: input.game.state.chain?.priorityPlayerId ?? null
     } : null,
     pendingChoice: input.game.state.pendingChoice && input.game.state.pendingChoice.playerId === input.viewerPlayerId ? {
       id: input.game.state.pendingChoice.id,
@@ -75,7 +74,7 @@ export function projectGame(input: {
     })),
     chain: input.game.state.chain ? {
       items: input.game.state.chain.items.map((item) => projectChainItem(item, view, definitions, instances)),
-      relevantPlayerIds: [...input.game.state.setup.playerIds],
+      relevantPlayerIds: input.game.state.chain.relevantPlayerIds,
       priorityPlayerId: input.game.state.chain.priorityPlayerId,
       passedPlayerIds: input.game.state.chain.passedPlayerIds
     } : null,
@@ -105,7 +104,11 @@ function projectChainItem(
     controllerPlayerId: item.controllerPlayerId,
     sourceCardInstanceId: item.sourceCardInstanceId,
     targetCardInstanceIds: item.targetCardInstanceIds,
-    kind: item.behaviorClauseId ? "trigger" as const : definitionKind(item.sourceCardInstanceId, definitions, instances),
+    kind: item.kind === "activatedAbility"
+      ? "ability" as const
+      : item.kind === "trigger"
+        ? "trigger" as const
+        : definitionKind(item.sourceCardInstanceId, definitions, instances),
     card: item.sourceCardInstanceId ? view(item.sourceCardInstanceId) : null
   };
 }

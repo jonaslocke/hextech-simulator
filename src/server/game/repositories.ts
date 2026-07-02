@@ -20,6 +20,9 @@ export type DeckSnapshotDocument = BaseDocument & {
 export type GameEventDocument = BaseDocument & {
   matchId: string; gameId: string; sequence: number; actorPlayerId: string | null;
   type: string; message: string;
+  actionVersion?: number;
+  eventIndex?: number;
+  payload?: Record<string, string | number | boolean | null>;
 };
 
 export type DocumentRepository<T extends BaseDocument> = {

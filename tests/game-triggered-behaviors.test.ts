@@ -107,7 +107,7 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
       players: { p1: { playerId: "p1", energy: 0, conditionalEnergy: 0, power: {}, zones: zones("p1") }, p2: { playerId: "p2", energy: 0, conditionalEnergy: 0, power: {}, zones: zones("p2") } },
       battlefields: ["paper", "peak", "climb"].map((id) => ({ battlefieldId: id, cardInstanceId: id, selectedByPlayerId: "p1", units: [] })),
-      cardStates: states, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null, modifiers: [], delayedEffects: [], pendingChoice: null
+      cardStates: states, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null, modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
     }
   };
   return { game, decks };

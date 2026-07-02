@@ -62,6 +62,31 @@ export const cardStateSchema = z.object({
   computedMight: z.number().nullable()
 });
 
+export const chainItemSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["spell", "permanent", "activatedAbility", "trigger"]),
+  label: z.string(),
+  controllerPlayerId: z.string(),
+  sourceCardInstanceId: z.string().nullable(),
+  targetCardInstanceIds: z.array(z.string()),
+  behaviorClauseId: z.string().nullable().default(null),
+  activatedBehaviorId: z.string().nullable().default(null),
+  behaviorEvent: z.object({
+    type: z.string(),
+    actorPlayerId: z.string().nullable(),
+    subjectCardInstanceId: z.string().nullable(),
+    values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  }).nullable().default(null)
+});
+
+const triggerOrderChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("orderTriggers"),
+  optionIds: z.array(z.string().min(1)),
+  pendingItems: z.array(chainItemSchema)
+});
+
 export const gameStateSchema = z.object({
   setup: setupStateSchema,
   players: z.record(playerStateSchema),
@@ -69,22 +94,16 @@ export const gameStateSchema = z.object({
   cardStates: z.record(cardStateSchema),
   turn: turnStateSchema.nullable(),
   chain: z.object({
-    items: z.array(z.object({
-      id: z.string(), label: z.string(), controllerPlayerId: z.string(),
-      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
-      behaviorClauseId: z.string().nullable().default(null),
-      behaviorEvent: z.object({
-        type: z.string(), actorPlayerId: z.string().nullable(),
-        subjectCardInstanceId: z.string().nullable(),
-        values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
-      }).nullable().default(null)
-    })),
+    items: z.array(chainItemSchema),
+    relevantPlayerIds: z.array(z.string().min(1)).min(1),
     priorityPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
   }).nullable(),
   showdown: z.object({
+    kind: z.enum(["nonCombat", "combat"]),
     battlefieldId: z.string().min(1),
-    priorityPlayerId: z.string().min(1),
+    relevantPlayerIds: z.array(z.string().min(1)).min(1),
+    focusPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
   }).nullable(),
   modifiers: z.array(z.object({
@@ -100,19 +119,8 @@ export const gameStateSchema = z.object({
     sourceCardInstanceId: z.string().min(1), clauseId: z.string().min(1),
     selectedIds: z.array(z.string())
   })),
-  pendingChoice: z.object({
-    id: z.string().min(1), playerId: z.string().min(1), type: z.literal("orderTriggers"),
-    optionIds: z.array(z.string().min(1)), pendingItems: z.array(z.object({
-      id: z.string(), label: z.string(), controllerPlayerId: z.string(),
-      sourceCardInstanceId: z.string().nullable(), targetCardInstanceIds: z.array(z.string()),
-      behaviorClauseId: z.string().nullable().default(null),
-      behaviorEvent: z.object({
-        type: z.string(), actorPlayerId: z.string().nullable(),
-        subjectCardInstanceId: z.string().nullable(),
-        values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
-      }).nullable().default(null)
-    }))
-  }).nullable()
+  pendingChoice: triggerOrderChoiceSchema.nullable(),
+  queuedTriggerChoices: z.array(triggerOrderChoiceSchema)
 });
 
 export const gameDocumentSchema = z.object({
@@ -207,7 +215,7 @@ export function createInitialGame(input: {
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
       players, battlefields: [], cardStates, turn: null, chain: null, showdown: null,
-      modifiers: [], delayedEffects: [], pendingChoice: null
+      modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
     }
   });
 }

@@ -2,18 +2,44 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { gameStateSchema } from "../src/server/game/state";
+import { currentTiming } from "../src/server/game/timing";
+import type { GameDocument } from "../src/server/game/state";
 
-test("characterizes the pre-implementation showdown shell", async () => {
+test("characterizes the separated showdown timing kernel", async () => {
   const actionsSource = await readFile("src/server/game/actions.ts", "utf8");
   const stateSource = await readFile("src/server/game/state.ts", "utf8");
 
   assert.match(actionsSource, /Only movement to an empty battlefield is supported/);
-  assert.match(stateSource, /showdown: z\.object\(\{\s*battlefieldId:[\s\S]*priorityPlayerId:/);
+  assert.match(stateSource, /showdown: z\.object\(\{[\s\S]*focusPlayerId:/);
+  assert.doesNotMatch(
+    stateSource.match(/showdown: z\.object\(\{[\s\S]*?\}\)\.nullable\(\)/)?.[0] ?? "",
+    /priorityPlayerId/
+  );
+  assert.match(stateSource, /chain: z\.object\(\{[\s\S]*priorityPlayerId:/);
   assert.doesNotMatch(stateSource, /combat: z\.object/);
   assert.doesNotMatch(stateSource, /controllerPlayerId: z\.string\(\)\.nullable/);
 
   const result = gameStateSchema.safeParse({});
   assert.equal(result.success, false);
+  const game = {
+    state: { showdown: null, chain: null }
+  } as unknown as GameDocument;
+  assert.equal(currentTiming(game), "neutralOpen");
+  game.state.showdown = {
+    kind: "nonCombat",
+    battlefieldId: "bf",
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: []
+  };
+  assert.equal(currentTiming(game), "showdownOpen");
+  game.state.chain = {
+    items: [],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p2",
+    passedPlayerIds: []
+  };
+  assert.equal(currentTiming(game), "showdownClosed");
 });
 
 test("records the controlling showdown rules and non-combat interpretation", async () => {

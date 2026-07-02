@@ -18,6 +18,11 @@ import { dispatchBehaviorEvent, resolveDelayedEffects } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
+import { addConsecutivePass, nextRelevantPlayer } from "./timing";
+import {
+  acceptedActionEvent,
+  type GameTransition
+} from "./transitions";
 
 export function gameplayActions(
   game: GameDocument,
@@ -38,21 +43,28 @@ export function gameplayActions(
     }
     return actions;
   }
-  const hasPriority = game.state.chain
+  const canAct = game.state.chain
     ? game.state.chain.priorityPlayerId === actorPlayerId
     : game.state.showdown
-      ? game.state.showdown.priorityPlayerId === actorPlayerId
+      ? game.state.showdown.focusPlayerId === actorPlayerId
       : game.state.turn?.activePlayerId === actorPlayerId;
 
   if (game.state.chain || game.state.showdown) {
-    if (hasPriority) actions.push(action(game, "pass", "Pass priority", null));
-    if (hasPriority && game.state.chain) {
+    if (canAct) {
+      actions.push(action(
+        game,
+        "pass",
+        game.state.chain ? "Pass priority" : "Pass focus",
+        null
+      ));
+    }
+    if (canAct && game.state.chain) {
       addPlayableCardActions(actions, game, actorPlayerId, decks, index, true);
       addAbilityActions(actions, game, actorPlayerId, index, handlers);
     }
     return actions;
   }
-  if (!hasPriority) return actions;
+  if (!canAct) return actions;
 
   actions.push(action(game, "endTurn", "End turn", null));
 
@@ -135,7 +147,13 @@ export function performGameplayAction(input: {
       if (battlefield.units.length > 0) throw new Error("Only movement to an empty battlefield is supported.");
       battlefield.units.push(cardId);
       game.state.cardStates[cardId]!.exhausted = true;
-      game.state.showdown = { battlefieldId, priorityPlayerId: input.actorPlayerId, passedPlayerIds: [] };
+      game.state.showdown = {
+        kind: "nonCombat",
+        battlefieldId,
+        relevantPlayerIds: [...game.state.setup.playerIds],
+        focusPlayerId: input.actorPlayerId,
+        passedPlayerIds: []
+      };
       break;
     }
     case "pass":
@@ -150,6 +168,24 @@ export function performGameplayAction(input: {
   game.stateVersion += 1;
   game.updatedAt = input.now;
   return game;
+}
+
+export function performGameplayTransition(input: {
+  game: GameDocument; actorPlayerId: string; actionId: string;
+  selectedIds: string[]; decks: readonly DeckSnapshotDocument[]; now: string;
+}): GameTransition {
+  const projected = gameplayActions(
+    input.game,
+    input.actorPlayerId,
+    input.decks
+  ).find((candidate) => candidate.id === input.actionId);
+  const game = performGameplayAction(input);
+  return {
+    game,
+    events: projected
+      ? [acceptedActionEvent(input.actorPlayerId, projected)]
+      : []
+  };
 }
 
 function playCard(game: GameDocument, playerId: string, cardId: string, selectedIds: string[], index: RuntimeCardIndex, handlers: ReturnType<typeof createPrimitiveHandlers>, decks: readonly DeckSnapshotDocument[]) {
@@ -169,25 +205,62 @@ function playCard(game: GameDocument, playerId: string, cardId: string, selected
     }, decks);
     return;
   }
-  const item = { id: `chain:${game.stateVersion + 1}:${cardId}`, label: definition.card.name, controllerPlayerId: playerId, sourceCardInstanceId: cardId, targetCardInstanceIds: selectedIds, behaviorClauseId: null, behaviorEvent: null };
+  const item = {
+    id: `chain:${game.stateVersion + 1}:${cardId}`,
+    kind: "spell" as const,
+    label: definition.card.name,
+    controllerPlayerId: playerId,
+    sourceCardInstanceId: cardId,
+    targetCardInstanceIds: selectedIds,
+    behaviorClauseId: null,
+    activatedBehaviorId: null,
+    behaviorEvent: null
+  };
   if (game.state.chain) {
     game.state.chain.items.push(item);
     game.state.chain.priorityPlayerId = playerId;
     game.state.chain.passedPlayerIds = [];
   } else {
-    game.state.chain = { items: [item], priorityPlayerId: playerId, passedPlayerIds: [] };
+    game.state.chain = {
+      items: [item],
+      relevantPlayerIds: game.state.showdown?.relevantPlayerIds
+        ?? [...game.state.setup.playerIds],
+      priorityPlayerId: playerId,
+      passedPlayerIds: []
+    };
   }
 }
 
 function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex, handlers: ReturnType<typeof createPrimitiveHandlers>, decks: readonly DeckSnapshotDocument[]) {
   if (game.state.chain) {
-    const passed = [...new Set([...game.state.chain.passedPlayerIds, actor])];
-    if (passed.length === 2) {
+    const passed = addConsecutivePass(game.state.chain.passedPlayerIds, actor);
+    if (passed.length === game.state.chain.relevantPlayerIds.length) {
       const item = game.state.chain.items.pop();
       if (item?.sourceCardInstanceId) {
         const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
         const definition = definitionForInstance(item.sourceCardInstanceId, index);
-        if (item.behaviorClauseId) {
+        if (item.kind === "activatedAbility" && item.activatedBehaviorId) {
+          const clause = definition.behaviorModel.clauses.find(
+            (candidate) => candidate.id === item.behaviorClauseId
+          );
+          const binding = clause?.abilities.find(
+            (candidate) => candidate.behaviorId === item.activatedBehaviorId
+          );
+          const handler = binding ? handlers.get(binding.behaviorId) : null;
+          if (!binding || !handler?.execute) {
+            throw new Error("Activated ability is unavailable during resolution.");
+          }
+          handler.execute(
+            binding,
+            createBehaviorContext(
+              game,
+              owner,
+              item.sourceCardInstanceId,
+              null,
+              item.targetCardInstanceIds
+            )
+          );
+        } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
           const clause = compiled.clauses.find((candidate) => candidate.id === item.behaviorClauseId);
           if (clause) executeBehaviorClause({ clause, context: createBehaviorContext(game, owner, item.sourceCardInstanceId, item.behaviorEvent, item.targetCardInstanceIds), handlers });
@@ -202,21 +275,43 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
           }
         }
       }
-      game.state.chain = game.state.chain.items.length
-        ? { ...game.state.chain, priorityPlayerId: item?.controllerPlayerId ?? actor, passedPlayerIds: [] }
-        : null;
+      if (game.state.chain.items.length) {
+        game.state.chain = {
+          ...game.state.chain,
+          priorityPlayerId: game.state.chain.items.at(-1)!.controllerPlayerId,
+          passedPlayerIds: []
+        };
+      } else {
+        game.state.chain = null;
+        if (game.state.showdown) {
+          game.state.showdown.focusPlayerId = nextRelevantPlayer(
+            game,
+            game.state.showdown.focusPlayerId,
+            game.state.showdown.relevantPlayerIds
+          );
+          game.state.showdown.passedPlayerIds = [];
+        }
+      }
     } else {
       game.state.chain.passedPlayerIds = passed;
-      game.state.chain.priorityPlayerId = otherPlayer(game, actor);
+      game.state.chain.priorityPlayerId = nextRelevantPlayer(
+        game,
+        actor,
+        game.state.chain.relevantPlayerIds
+      );
     }
     return;
   }
   if (game.state.showdown) {
-    const passed = [...new Set([...game.state.showdown.passedPlayerIds, actor])];
-    if (passed.length === 2) game.state.showdown = null;
+    const passed = addConsecutivePass(game.state.showdown.passedPlayerIds, actor);
+    if (passed.length === game.state.showdown.relevantPlayerIds.length) game.state.showdown = null;
     else {
       game.state.showdown.passedPlayerIds = passed;
-      game.state.showdown.priorityPlayerId = otherPlayer(game, actor);
+      game.state.showdown.focusPlayerId = nextRelevantPlayer(
+        game,
+        actor,
+        game.state.showdown.relevantPlayerIds
+      );
     }
   }
 }
@@ -539,16 +634,43 @@ function executeActivatedAbility(
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
-  handler.execute(
-    binding,
-    createBehaviorContext(
-      game,
-      actorPlayerId,
-      sourceId,
-      null,
-      selectedIds
-    )
-  );
+  const resolvesImmediately =
+    binding.behaviorId === "ability.exhaust_for_resource" ||
+    binding.behaviorId === "ability.recycle_for_power";
+  if (resolvesImmediately) {
+    handler.execute(
+      binding,
+      createBehaviorContext(
+        game,
+        actorPlayerId,
+        sourceId,
+        null,
+        selectedIds
+      )
+    );
+    return;
+  }
+  const item = {
+    id: `ability:${game.stateVersion + 1}:${sourceId}:${clauseId}`,
+    kind: "activatedAbility" as const,
+    label: definition.card.name,
+    controllerPlayerId: actorPlayerId,
+    sourceCardInstanceId: sourceId,
+    targetCardInstanceIds: selectedIds,
+    behaviorClauseId: clauseId,
+    activatedBehaviorId: behaviorId,
+    behaviorEvent: null
+  };
+  game.state.chain = game.state.chain ?? {
+    items: [],
+    relevantPlayerIds: game.state.showdown?.relevantPlayerIds
+      ?? [...game.state.setup.playerIds],
+    priorityPlayerId: actorPlayerId,
+    passedPlayerIds: []
+  };
+  game.state.chain.items.push(item);
+  game.state.chain.priorityPlayerId = actorPlayerId;
+  game.state.chain.passedPlayerIds = [];
 }
 
 function executeImmediateClauses(

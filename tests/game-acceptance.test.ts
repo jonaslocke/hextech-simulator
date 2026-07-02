@@ -154,8 +154,8 @@ function passUntilShowdownCloses(
   let game = initial;
   for (let passIndex = 0; passIndex < 2; passIndex += 1) {
     assert.ok(game.state.showdown, "The showdown closed before both players passed");
-    const actor = game.state.showdown.priorityPlayerId;
-    const pass = gameplayActions(game, actor, decks).find((action) => action.label === "Pass priority")!;
+    const actor = game.state.showdown.focusPlayerId;
+    const pass = gameplayActions(game, actor, decks).find((action) => action.label === "Pass focus")!;
     game = performGameplayAction({ game, actorPlayerId: actor, actionId: pass.id, selectedIds: [], decks, now });
   }
   return game;

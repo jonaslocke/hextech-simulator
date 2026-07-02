@@ -3,7 +3,10 @@ import type { GameProjection } from "../../shared/game";
 import { loadInitialDeckSnapshot } from "./catalog";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
 import { performSetupAction, setupActions } from "./setup";
-import { gameplayActions, performGameplayAction } from "./actions";
+import {
+  gameplayActions,
+  performGameplayTransition
+} from "./actions";
 import { projectGame } from "./projection";
 import {
   createInitialGame, createMatchId, createPlayerToken,
@@ -59,26 +62,45 @@ export async function performMatchAction(repositories: GameRepositories, input: 
     ? setupActions(game, seat.playerId)
     : gameplayActions(game, seat.playerId, decks))
     .find((action) => action.id === input.actionId);
-  const next = game.status === "setup_pending"
-    ? performSetupAction({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now })
-    : performGameplayAction({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decks, now });
+  const transition = game.status === "setup_pending"
+    ? null
+    : performGameplayTransition({
+      game,
+      actorPlayerId: seat.playerId,
+      actionId: input.actionId,
+      selectedIds: input.selectedIds,
+      decks,
+      now
+    });
+  const next = transition
+    ? transition.game
+    : performSetupAction({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now });
   const nextMatch = next.status === "in_progress"
     ? { ...match, status: "in_progress" as const, updatedAt: now }
     : match;
+  const transitionEvents = transition?.events ?? [{
+    type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
+    actorPlayerId: seat.playerId,
+    message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`,
+    payload: { actionId: input.actionId }
+  }];
   await Promise.all([
     repositories.games.upsert(next),
     repositories.matches.upsert(nextMatch),
-    repositories.gameEvents.insert({
-      id: `${next.id}:event:${next.stateVersion}`,
+    ...transitionEvents.map((event, eventIndex) => repositories.gameEvents.insert({
+      id: `${next.id}:event:${next.stateVersion}:${eventIndex}`,
       createdAt: now,
       updatedAt: now,
       matchId: match.id,
       gameId: next.id,
-      sequence: next.stateVersion,
-      actorPlayerId: seat.playerId,
-      type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
-      message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`
-    })
+      sequence: next.stateVersion * 100 + eventIndex,
+      actionVersion: next.stateVersion,
+      eventIndex,
+      actorPlayerId: event.actorPlayerId,
+      type: event.type,
+      message: event.message,
+      payload: event.payload
+    }))
   ]);
   const events = await repositories.gameEvents.findByGameId(next.id);
   return projectGame({ game: next, viewerPlayerId: seat.playerId, decks, events });

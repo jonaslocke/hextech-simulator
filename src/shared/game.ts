@@ -152,10 +152,11 @@ export const gameProjectionSchema = z.object({
     passedPlayerIds: z.array(z.string().min(1))
   }).nullable(),
   showdown: z.object({
+    kind: z.enum(["nonCombat", "combat"]),
     battlefieldId: z.string().min(1),
     relevantPlayerIds: z.array(z.string().min(1)),
     focusPlayerId: z.string().min(1),
-    priorityPlayerId: z.string().min(1),
+    priorityPlayerId: z.string().min(1).nullable(),
     passedPlayerIds: z.array(z.string().min(1))
   }).nullable(),
   pendingChoice: z.object({

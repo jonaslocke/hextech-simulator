@@ -138,27 +138,38 @@ export function queueTriggeredClauses(input: {
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
     return [{
       id: `trigger:${input.game.stateVersion}:${source.sourceCardInstanceId}:${clause.id}`,
+      kind: "trigger" as const,
       label: source.label,
       controllerPlayerId: input.controllerPlayerId,
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
       behaviorClauseId: clause.id,
+      activatedBehaviorId: null,
       behaviorEvent: input.event
     }];
   }));
   if (items.length === 0) return;
   if (items.length > 1) {
-    input.game.state.pendingChoice = {
+    const choice = {
       id: `choice:${input.game.stateVersion}:${input.controllerPlayerId}:triggers`,
       playerId: input.controllerPlayerId,
-      type: "orderTriggers",
+      type: "orderTriggers" as const,
       optionIds: items.map((item) => item.id),
       pendingItems: items
     };
+    if (input.game.state.pendingChoice) {
+      input.game.state.queuedTriggerChoices.push(choice);
+    } else {
+      input.game.state.pendingChoice = choice;
+    }
     return;
   }
   const chain = input.game.state.chain ?? {
-    items: [], priorityPlayerId: input.controllerPlayerId, passedPlayerIds: []
+    items: [],
+    relevantPlayerIds: input.game.state.showdown?.relevantPlayerIds
+      ?? [...input.game.state.setup.playerIds],
+    priorityPlayerId: input.controllerPlayerId,
+    passedPlayerIds: []
   };
   chain.items.push(...items);
   input.game.state.chain = chain;
@@ -171,10 +182,18 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
     throw new Error("Trigger ordering must contain every pending trigger exactly once.");
   }
   const byId = new Map(pending.pendingItems.map((item) => [item.id, item]));
-  const chain = game.state.chain ?? { items: [], priorityPlayerId: playerId, passedPlayerIds: [] };
+  const chain = game.state.chain ?? {
+    items: [],
+    relevantPlayerIds: game.state.showdown?.relevantPlayerIds
+      ?? [...game.state.setup.playerIds],
+    priorityPlayerId: playerId,
+    passedPlayerIds: []
+  };
   chain.items.push(...orderedIds.map((id) => byId.get(id)!));
+  chain.priorityPlayerId = playerId;
+  chain.passedPlayerIds = [];
   game.state.chain = chain;
-  game.state.pendingChoice = null;
+  game.state.pendingChoice = game.state.queuedTriggerChoices.shift() ?? null;
 }
 
 export function createBehaviorContext(
