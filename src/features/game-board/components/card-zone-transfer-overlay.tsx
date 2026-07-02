@@ -86,7 +86,10 @@ export function CardZoneTransferOverlay({
   const placementSignature = useMemo(
     () =>
       placements
-        .map((placement) => `${placement.card.instanceId ?? ""}:${placement.zoneId}`)
+        .map(
+          (placement) =>
+            `${placement.card.instanceId ?? ""}:${placement.zoneId}`,
+        )
         .sort()
         .join("|"),
     [placements],
@@ -150,9 +153,13 @@ export function CardZoneTransferOverlay({
         continue;
       }
 
-      const destinationZoneId = nextPlacement?.zoneId ?? hiddenDestination?.zoneId;
+      const destinationZoneId =
+        nextPlacement?.zoneId ?? hiddenDestination?.zoneId;
 
-      if (!destinationZoneId || destinationZoneId === previousPlacement.zoneId) {
+      if (
+        !destinationZoneId ||
+        destinationZoneId === previousPlacement.zoneId
+      ) {
         continue;
       }
 
@@ -216,7 +223,7 @@ export function CardZoneTransferOverlay({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[2147483645]">
+    <div className="z-[2147483645] fixed inset-0 pointer-events-none">
       {transfers.map((transfer) => (
         <TransferCard
           key={transfer.id}
@@ -258,53 +265,58 @@ function TransferCard({
   transfer: TransferAnimation;
 }) {
   const target = targetGeometry(transfer);
+  const delay = transfer.index * 0.045;
 
   return (
     <motion.div
       animate={{
-        left: target.left,
         opacity: transfer.isVisibleDestination ? 1 : 0,
         rotate: transfer.toRotation,
         scale: target.scale,
-        top: target.top,
+        x: target.x,
+        y: target.y,
       }}
-      className="fixed rounded-md border border-yellow-300/50 bg-slate-900 shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
+      className="fixed bg-slate-900 shadow-[0_18px_45px_rgba(0,0,0,0.65)] border border-yellow-300/50 rounded-md transform-gpu"
       initial={{
-        left: transfer.from.left,
         opacity: 1,
         rotate: transfer.fromRotation,
         scale: 1,
-        top: transfer.from.top,
+        x: 0,
+        y: 0,
       }}
       onAnimationComplete={onComplete}
       style={{
         height: transfer.from.height,
+        left: transfer.from.left,
+        top: transfer.from.top,
         transformOrigin: "center center",
         width: transfer.from.width,
+        willChange: "transform, opacity",
       }}
       transition={{
-        delay: transfer.index * 0.06,
-        duration: transfer.isVisibleDestination ? 0.34 : 0.42,
-        ease: [0.22, 1, 0.36, 1],
+        delay,
+        duration: transfer.isVisibleDestination ? 0.42 : 0.48,
+        ease: [0.16, 1, 0.3, 1],
       }}
     >
       <motion.div
         animate={{ rotateY: transfer.flipToBack ? 180 : 0 }}
-        className="relative h-full w-full"
+        className="relative w-full h-full transform-gpu"
         initial={{ rotateY: 0 }}
         style={{
           transformStyle: "preserve-3d",
+          willChange: "transform",
         }}
         transition={{
-          delay: transfer.index * 0.06,
-          duration: 0.32,
-          ease: [0.22, 1, 0.36, 1],
+          delay: delay + 0.04,
+          duration: 0.34,
+          ease: [0.16, 1, 0.3, 1],
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders existing card art. */}
         <img
           alt=""
-          className="absolute inset-0 block h-full w-full rounded-md object-cover"
+          className="block absolute inset-0 rounded-md w-full h-full object-cover"
           draggable={false}
           src={transfer.card.img}
           style={{ backfaceVisibility: "hidden" }}
@@ -312,7 +324,7 @@ function TransferCard({
         {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders the local card back asset. */}
         <img
           alt=""
-          className="absolute inset-0 block h-full w-full rounded-md object-cover"
+          className="block absolute inset-0 rounded-md w-full h-full object-cover"
           draggable={false}
           src={cardBackImage.src}
           style={{
@@ -412,23 +424,34 @@ function isBaseToBattlefield(
 }
 
 function targetGeometry(transfer: TransferAnimation) {
+  const fromCenterX = transfer.from.left + transfer.from.width / 2;
+  const fromCenterY = transfer.from.top + transfer.from.height / 2;
+  const toCenterX = transfer.to.left + transfer.to.width / 2;
+  const toCenterY = transfer.to.top + transfer.to.height / 2;
+
   if (transfer.isVisibleDestination) {
     return {
-      left: transfer.to.left,
-      scale: transfer.to.width / transfer.from.width,
-      top: transfer.to.top,
+      scale: Math.min(
+        transfer.to.width / transfer.from.width,
+        transfer.to.height / transfer.from.height,
+      ),
+      x: toCenterX - fromCenterX,
+      y: toCenterY - fromCenterY,
     };
   }
 
   const scale = Math.min(
     0.72,
-    Math.max(0.38, Math.min(transfer.to.width, transfer.to.height) / transfer.from.width),
+    Math.max(
+      0.38,
+      Math.min(transfer.to.width, transfer.to.height) / transfer.from.width,
+    ),
   );
 
   return {
-    left: transfer.to.left + transfer.to.width / 2 - transfer.from.width / 2,
     scale,
-    top: transfer.to.top + transfer.to.height / 2 - transfer.from.height / 2,
+    x: toCenterX - fromCenterX,
+    y: toCenterY - fromCenterY,
   };
 }
 

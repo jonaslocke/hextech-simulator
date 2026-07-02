@@ -40,7 +40,8 @@ const HAND_CARD_DIMENSIONS_BY_SIZE = {
 } as const;
 
 const ESTIMATED_CARD_WIDTH = HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].width;
-const ESTIMATED_CARD_HEIGHT = HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].height;
+const ESTIMATED_CARD_HEIGHT =
+  HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].height;
 const HIT_AREA_TOP_PADDING = 18;
 const MENU_INTERACTION_FREEZE_MS = 650;
 
@@ -117,9 +118,11 @@ export function PlayerHandFan({
 
   const cardTransition = {
     type: "spring" as const,
-    stiffness: 520,
-    damping: 42,
-    mass: 0.5,
+    stiffness: 460,
+    damping: 44,
+    mass: 0.55,
+    restDelta: 0.001,
+    restSpeed: 0.001,
   };
 
   const getIndexFromPointerPosition = useCallback(
@@ -391,6 +394,7 @@ export function PlayerHandFan({
                       x: motionStyle.x,
                       y: motionStyle.y,
                     }}
+                    className="transform-gpu"
                     data-selected={selected ? "true" : "false"}
                     initial={false}
                     style={{
@@ -542,7 +546,9 @@ function createHandLayout({
     hitAreaHeight:
       ESTIMATED_CARD_HEIGHT + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
     interactionWidth:
-      total <= 1 ? edgeHitPadding * 2 : (total - 1) * spacing + edgeHitPadding * 2,
+      total <= 1
+        ? edgeHitPadding * 2
+        : (total - 1) * spacing + edgeHitPadding * 2,
     neighborPush: clamp(spacing * 0.28, 10, 16),
     restScale: 1,
     rotationStep: total <= 1 ? 0 : maxEdgeRotation / middle,

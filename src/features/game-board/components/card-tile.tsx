@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  FC,
-  MouseEvent,
-  ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { FC, MouseEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   CardRulesText,
@@ -61,6 +54,15 @@ export const CARD_TILE_SIZE_CONFIG: Record<
     mightBadgeClassName: "-right-2 -top-2 h-7 min-w-7 px-1.5 text-sm",
     damageBadgeClassName: "-left-2.5 h-8 min-w-8 px-1.5 text-sm",
   },
+};
+
+const CARD_ORIENTATION_TRANSITION = {
+  type: "spring" as const,
+  stiffness: 420,
+  damping: 40,
+  mass: 0.7,
+  restDelta: 0.001,
+  restSpeed: 0.001,
 };
 
 type CardTileProps = Card & {
@@ -167,7 +169,10 @@ export const CardTile: FC<CardTileProps> = ({
         Math.max(gutter, viewportWidth - previewWidth - gutter),
       );
       const top = placeBelow
-        ? Math.min(rect.bottom + gutter, viewportHeight - previewHeight - gutter)
+        ? Math.min(
+            rect.bottom + gutter,
+            viewportHeight - previewHeight - gutter,
+          )
         : Math.max(gutter, rect.top - previewHeight - gutter);
 
       setPreviewPosition({ left, top });
@@ -234,18 +239,14 @@ export const CardTile: FC<CardTileProps> = ({
           scale: isExhausted && !preserveOrientation ? 0.98 : 1,
           y: isExhausted && !preserveOrientation ? -2 : 0,
         }}
-        className="relative shrink-0"
+        className="relative transform-gpu shrink-0"
         initial={false}
         ref={bodyRef}
         style={{
           transformOrigin: motionOrigin,
+          willChange: "transform",
         }}
-        transition={{
-          type: "spring",
-          stiffness: 360,
-          damping: 28,
-          mass: 0.75,
-        }}
+        transition={CARD_ORIENTATION_TRANSITION}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
         <img
