@@ -79,6 +79,8 @@ export type ZoneData = {
 export type BattlefieldData = {
   id: string;
   selectedByPlayerId: string;
+  controllerPlayerId: string | null;
+  contestedByPlayerId: string | null;
   name: string;
   description: string;
   playerUnits: Card[];

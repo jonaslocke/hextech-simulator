@@ -18,6 +18,7 @@ export async function loadProjectionClient(matchId: string, playerToken: string)
 export async function performActionClient(input: {
   matchId: string; playerToken: string; stateVersion: number;
   actionId: string; selectedIds: string[];
+  allocations?: Array<{ targetUnitId: string; amount: number }>;
 }): Promise<{ accepted: true; projection: GameProjection } | ApiFailure> {
   const response = await fetch(`/api/matches/${input.matchId}/intents`, {
     method: "POST",
@@ -25,7 +26,14 @@ export async function performActionClient(input: {
     body: JSON.stringify({
       playerToken: input.playerToken,
       stateVersion: input.stateVersion,
-      intent: { type: "game.performAction", payload: { actionId: input.actionId, selectedIds: input.selectedIds } }
+      intent: {
+        type: "game.performAction",
+        payload: {
+          actionId: input.actionId,
+          selectedIds: input.selectedIds,
+          allocations: input.allocations ?? []
+        }
+      }
     })
   });
   return response.json() as Promise<{ accepted: true; projection: GameProjection } | ApiFailure>;

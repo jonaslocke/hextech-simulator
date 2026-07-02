@@ -25,7 +25,16 @@ const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
 
 export const BattlefieldBoard: FC<Props> = ({
-  battlefield: { description, id, name, opponentUnits, playerUnits, img },
+  battlefield: {
+    contestedByPlayerId,
+    controllerPlayerId,
+    description,
+    id,
+    name,
+    opponentUnits,
+    playerUnits,
+    img
+  },
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardPointerEnter,
@@ -120,6 +129,13 @@ export const BattlefieldBoard: FC<Props> = ({
             <Info aria-hidden="true" className="size-3" />
           </button>
         </div>
+        {(controllerPlayerId || contestedByPlayerId) && (
+          <div className="top-1.5 right-2 z-[98] absolute bg-slate-950/70 px-2 py-0.5 border border-amber-200/25 rounded-full font-mono text-[9px] text-amber-100">
+            {contestedByPlayerId
+              ? `Contested by ${contestedByPlayerId}`
+              : `Controlled by ${controllerPlayerId}`}
+          </div>
+        )}
 
         {isBattlefieldCardOpen && (
           <div className="top-9 left-2 z-[120] absolute bg-slate-950/72 supports-backdrop-filter:bg-slate-950/56 shadow-2xl shadow-black/70 supports-backdrop-filter:backdrop-blur-md p-1 border border-white/12 rounded-lg ring-1 ring-cyan-300/10">

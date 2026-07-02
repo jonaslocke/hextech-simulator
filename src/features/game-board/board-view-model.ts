@@ -20,6 +20,7 @@ export type BoardZoneProjection = {
 export type BoardPlayerProjection = {
   playerId: string;
   isViewer: boolean;
+  points: number;
   runePool: {
     conditionalEnergy: Record<string, { amount: number; restriction: "spell" }>;
     energy: number;
@@ -42,6 +43,7 @@ export type BoardProjection = {
   setup: GameProjection["setup"];
   turn: GameProjection["turn"];
   showdown: GameProjection["showdown"];
+  combat: GameProjection["combat"];
   chain: null | {
     items: Array<GameProjection["chain"] extends infer T ? T extends { items: infer I } ? I extends Array<infer Item> ? Item & { cardInstanceId: string | null } : never : never : never>;
     relevantPlayerIds: string[];
@@ -60,6 +62,8 @@ export type BoardProjection = {
   battlefields: Array<{
     battlefieldId: string;
     selectedByPlayerId: string;
+    controllerPlayerId: string | null;
+    contestedByPlayerId: string | null;
     cardInstanceId: string;
     units: string[];
     facedownSlot: null;
@@ -100,6 +104,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
     return [player.playerId, {
       playerId: player.playerId,
       isViewer: player.isViewer,
+      points: player.points,
       runePool: {
         conditionalEnergy: player.conditionalEnergy > 0
           ? { spell: { amount: player.conditionalEnergy, restriction: "spell" as const } }
@@ -126,6 +131,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       setup: projection.setup,
       turn: projection.turn,
       showdown: projection.showdown,
+      combat: projection.combat,
       chain: projection.chain ? {
         ...projection.chain,
         items: projection.chain.items.map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
@@ -140,6 +146,8 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       battlefields: projection.battlefields.map((battlefield) => ({
         battlefieldId: battlefield.battlefieldId,
         selectedByPlayerId: battlefield.selectedByPlayerId,
+        controllerPlayerId: battlefield.controllerPlayerId,
+        contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
         facedownSlot: null

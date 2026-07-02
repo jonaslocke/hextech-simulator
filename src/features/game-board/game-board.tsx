@@ -30,6 +30,7 @@ import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
+import { CombatDamageDialog } from "./components/combat-damage-dialog";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import {
   adaptProjectionToBoard,
@@ -52,7 +53,11 @@ type ProjectedBattlefield = BoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
 type ProjectedZone = BoardZoneProjection;
 type GameBoardProps = {
-  onPerformAction: (input: { actionId: string; selectedIds: string[] }) => void;
+  onPerformAction: (input: {
+    actionId: string;
+    selectedIds: string[];
+    allocations?: Array<{ targetUnitId: string; amount: number }>;
+  }) => void;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
@@ -90,8 +95,12 @@ export const GameBoard: FC<GameBoardProps> = ({
     sequence: index + 1,
   }));
   const submitProjectedAction = useCallback(
-    (actionId: string | undefined, selectedIds: string[] = []) => {
-      if (actionId) onPerformAction({ actionId, selectedIds });
+    (
+      actionId: string | undefined,
+      selectedIds: string[] = [],
+      allocations?: Array<{ targetUnitId: string; amount: number }>,
+    ) => {
+      if (actionId) onPerformAction({ actionId, selectedIds, allocations });
     },
     [onPerformAction],
   );
@@ -110,7 +119,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   const onPass = () =>
     submitProjectedAction(
       sourceProjection.actions.find(
-        (action) => action.label === "Pass priority",
+        (action) =>
+          action.label === "Pass priority" || action.label === "Pass focus",
       )?.id,
     );
   const onPlayCard = useCallback(
@@ -188,14 +198,30 @@ export const GameBoard: FC<GameBoardProps> = ({
   const chainPassLabel = chainPassWillResolve
     ? "Pass and Resolve"
     : "Pass Priority";
-  const canViewerEndTurn =
-    !isChainLockedOpen &&
-    projection.turn?.activePlayerId === projection.viewerPlayerId;
+  const endTurnAction = sourceProjection.actions.find(
+    (action) => action.label === "End turn",
+  );
+  const passFocusAction = sourceProjection.actions.find(
+    (action) => action.label === "Pass focus",
+  );
+  const canViewerEndTurn = Boolean(endTurnAction || passFocusAction);
   const passTurnLabel = isChainLockedOpen
     ? "Resolve chain first"
-    : canViewerEndTurn
+    : passFocusAction
+      ? "Pass Focus"
+      : canViewerEndTurn
       ? "Pass Turn"
       : "Waiting for turn";
+  const combatDamageAction = sourceProjection.actions.find(
+    (action) => action.choice?.kind === "combatDamage",
+  );
+  const globalActions = sourceProjection.actions.filter(
+    (action) =>
+      action.sourceCardInstanceId === null &&
+      action.presentation.surface === "action-rail" &&
+      !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
+      action.choice?.kind !== "combatDamage",
+  );
   const pendingChoiceOptions =
     projection.pendingChoice?.optionIds.map((id) => {
       const item = projection.pendingChoice?.pendingChainItems.find(
@@ -219,6 +245,20 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const beginGlobalAction = (action: GameProjection["actions"][number]) => {
+    const requirement = action.targets.find((target) => target.kind === "card");
+    if (!requirement) {
+      submitProjectedAction(action.id);
+      return;
+    }
+    setTargetSelection({
+      actionId: action.id,
+      legalTargetIds: requirement.legalIds,
+      maxTargets: requirement.maximum,
+      minTargets: requirement.minimum,
+      selectedTargetIds: [],
+    });
+  };
   const chainControllerDetails = (controllerPlayerId: string) => {
     if (controllerPlayerId === board.player.playerId) {
       return {
@@ -710,13 +750,27 @@ export const GameBoard: FC<GameBoardProps> = ({
         </div>
         <ActionRail
           isChainLockedOpen={isChainLockedOpen}
-          onPassTurn={onEndTurn}
+          onPassTurn={passFocusAction ? onPass : onEndTurn}
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn}
           passTurnLabel={passTurnLabel}
           setOpenZone={setOpenZoneRespectingChain}
         />
       </section>
+      {globalActions.length > 0 && (
+        <div className="top-12 left-1/2 z-50 fixed flex gap-2 -translate-x-1/2">
+          {globalActions.map((action) => (
+            <button
+              className="bg-slate-950/90 hover:bg-slate-800 px-3 py-1.5 border border-cyan-300/30 rounded text-cyan-100 text-xs"
+              key={action.id}
+              onClick={() => beginGlobalAction(action)}
+              type="button"
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
       <TemporaryZoneOverlay
         canPassChain={canViewerPassChain}
         chainCards={chainCards}
@@ -771,6 +825,15 @@ export const GameBoard: FC<GameBoardProps> = ({
           options={pendingChoiceOptions}
           selectionMode="ordered"
           title={projection.pendingChoice.prompt}
+        />
+      )}
+      {combatDamageAction?.choice?.kind === "combatDamage" && (
+        <CombatDamageDialog
+          cardsByInstanceId={cardsByInstanceId}
+          choice={combatDamageAction.choice}
+          onSubmit={(allocations) =>
+            submitProjectedAction(combatDamageAction.id, [], allocations)
+          }
         />
       )}
       <CardZoneTransferOverlay
@@ -1197,7 +1260,7 @@ function buildPlayerData({
   return {
     playerId: player.playerId,
     name: playerNames[player.playerId] ?? player.playerId,
-    score: scores[player.playerId] ?? 0,
+    score: scores[player.playerId] ?? player.points,
     zones: {
       banishment: buildZone(
         "banishment",
@@ -1300,6 +1363,8 @@ function buildBattlefieldData({
     id: battlefield?.battlefieldId ?? `missing:${fallbackSelectedByPlayerId}`,
     selectedByPlayerId:
       battlefield?.selectedByPlayerId ?? fallbackSelectedByPlayerId,
+    controllerPlayerId: battlefield?.controllerPlayerId ?? null,
+    contestedByPlayerId: battlefield?.contestedByPlayerId ?? null,
     name: battlefieldCard?.name ?? "Battlefield",
     description: battlefieldCard?.text.plain ?? "No battlefield selected.",
     img: battlefieldCard?.media.image_url ?? "",

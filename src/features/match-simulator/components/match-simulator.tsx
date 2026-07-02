@@ -75,6 +75,7 @@ export function MatchSimulator() {
   async function performAction(input: {
     actionId: string;
     selectedIds: string[];
+    allocations?: Array<{ targetUnitId: string; amount: number }>;
   }) {
     if (!match || !viewer || !projection) {
       return;
