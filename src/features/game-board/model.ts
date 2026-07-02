@@ -13,16 +13,23 @@ export function actionsForSource(
 }
 
 export function showdownPromptState(
-  projection: Pick<GameProjection, "showdown" | "viewerPlayerId">
+  projection: Pick<GameProjection, "chain" | "showdown" | "viewerPlayerId">
 ) {
   const showdown = projection.showdown;
   if (!showdown) return null;
+  const isClosed = projection.chain !== null;
+  const hasFocus = showdown.focusPlayerId === projection.viewerPlayerId;
+  const priorityPlayerId = projection.chain?.priorityPlayerId ?? null;
   return {
     battlefieldId: showdown.battlefieldId,
+    canPassFocus: hasFocus && !isClosed,
     focusPlayerId: showdown.focusPlayerId,
-    hasFocus: showdown.focusPlayerId === projection.viewerPlayerId,
+    hasFocus,
+    hasPriority: priorityPlayerId === projection.viewerPlayerId,
+    isClosed,
     kind: showdown.kind,
-    passedPlayerIds: showdown.passedPlayerIds
+    passedPlayerIds: showdown.passedPlayerIds,
+    priorityPlayerId
   };
 }
 

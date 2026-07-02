@@ -724,8 +724,11 @@ export const GameBoard: FC<GameBoardProps> = ({
           battlefieldName={showdownBattlefieldName}
           focusPlayerId={showdownPrompt.focusPlayerId}
           hasFocus={showdownPrompt.hasFocus}
+          hasPriority={showdownPrompt.hasPriority}
+          isClosed={showdownPrompt.isClosed}
           isCombat={showdownPrompt.kind === "combat"}
-          onPassFocus={showdownPrompt.hasFocus ? onPass : undefined}
+          onPassFocus={showdownPrompt.canPassFocus ? onPass : undefined}
+          priorityPlayerId={showdownPrompt.priorityPlayerId}
         />
       )}
       <section className="flex flex-1 min-h-0 overflow-hidden">

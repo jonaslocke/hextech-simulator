@@ -6,14 +6,20 @@ export function ShowdownPrompt({
   battlefieldName,
   focusPlayerId,
   hasFocus,
+  hasPriority,
+  isClosed,
   isCombat,
-  onPassFocus
+  onPassFocus,
+  priorityPlayerId
 }: {
   battlefieldName: string;
   focusPlayerId: string;
   hasFocus: boolean;
+  hasPriority: boolean;
+  isClosed: boolean;
   isCombat: boolean;
   onPassFocus?: () => void;
+  priorityPlayerId: string | null;
 }) {
   return (
     <section
@@ -31,9 +37,15 @@ export function ShowdownPrompt({
           </p>
           <h2 className="font-semibold truncate">{battlefieldName}</h2>
           <p className="text-slate-300 text-sm">
-            {hasFocus
-              ? "You have Focus. Play an Action or Reaction, or pass Focus."
-              : `Waiting for ${focusPlayerId} to act.`}
+            {isClosed
+              ? hasPriority
+                ? "You have Priority. Play a Reaction or pass Priority."
+                : hasFocus
+                  ? "You retain Focus while waiting for Priority."
+                  : `Waiting for ${priorityPlayerId} to act. ${focusPlayerId} retains Focus.`
+              : hasFocus
+                ? "You have Focus. Play an Action or Reaction, or pass Focus."
+                : `Waiting for ${focusPlayerId} to act.`}
           </p>
         </div>
         {hasFocus && onPassFocus && (

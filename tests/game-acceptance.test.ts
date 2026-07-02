@@ -187,6 +187,17 @@ test("plays approved Action and Reaction cards through showdown focus and priori
     now: "c"
   });
   assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  assert.deepEqual(
+    gameplayActions(game, "p1", decks)
+      .filter((action) => action.label.startsWith("Pass "))
+      .map((action) => action.label),
+    ["Pass priority"]
+  );
+  assert.equal(
+    gameplayActions(game, "p2", decks)
+      .some((action) => action.label === "Pass focus"),
+    false
+  );
   game = passUntilCurrentChainItemResolves(game, decks, "d");
   assert.equal(game.state.showdown?.focusPlayerId, "p2");
   assert.deepEqual(game.state.showdown?.passedPlayerIds, []);

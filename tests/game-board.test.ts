@@ -31,17 +31,44 @@ test("derives active and waiting showdown prompts from Focus", () => {
     passedPlayerIds: []
   };
   assert.equal(
-    showdownPromptState({ showdown, viewerPlayerId: "p1" })?.hasFocus,
+    showdownPromptState({
+      chain: null,
+      showdown,
+      viewerPlayerId: "p1"
+    })?.hasFocus,
     true
   );
   assert.equal(
-    showdownPromptState({ showdown, viewerPlayerId: "p2" })?.hasFocus,
+    showdownPromptState({
+      chain: null,
+      showdown,
+      viewerPlayerId: "p2"
+    })?.hasFocus,
     false
   );
   assert.equal(
-    showdownPromptState({ showdown: null, viewerPlayerId: "p1" }),
+    showdownPromptState({
+      chain: null,
+      showdown: null,
+      viewerPlayerId: "p1"
+    }),
     null
   );
+  const closed = showdownPromptState({
+    chain: {
+      items: [],
+      relevantPlayerIds: ["p1", "p2"],
+      priorityPlayerId: "p2",
+      passedPlayerIds: []
+    },
+    showdown,
+    viewerPlayerId: "p1"
+  });
+  assert.equal(closed?.hasFocus, true);
+  assert.equal(closed?.hasPriority, false);
+  assert.equal(closed?.isClosed, true);
+  assert.equal(closed?.canPassFocus, false);
+  assert.equal(closed?.priorityPlayerId, "p2");
 });
 
 test("stages a single-unit move through the simultaneous move action", () => {
