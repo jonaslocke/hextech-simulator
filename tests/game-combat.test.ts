@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   gameplayActions,
   performGameplayAction,
+  performGameplayTransition,
   type DeckSnapshotDocument,
   type BehaviorBinding,
   type GameDocument
@@ -83,6 +84,40 @@ test("locks Assault and Shield modifiers into combat Might totals", () => {
   assert.equal(game.state.combat?.attackerMight, 4);
   assert.equal(game.state.combat?.defenderMight, 5);
   assert.equal(game.state.pendingChoice?.type, "assignCombatDamage");
+});
+
+test("emits structured showdown and combat transition events", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 3,
+    defenders: [{ id: "defender", might: 3 }]
+  });
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "attacker"
+  )!;
+  const transition = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [],
+    decks,
+    now: "events"
+  });
+  assert.deepEqual(
+    transition.events.map((event) => event.type),
+    ["game.action.accepted", "showdown.started", "combat.started"]
+  );
+});
+
+test("leaves an empty battlefield when equal units kill each other", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }]
+  });
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+  assert.equal(game.state.battlefields[0]!.units.length, 0);
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, null);
+  assert.ok(game.state.players.p1!.zones.trash.includes("attacker"));
+  assert.ok(game.state.players.p2!.zones.trash.includes("defender"));
 });
 
 function moveAttacker(

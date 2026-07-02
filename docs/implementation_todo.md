@@ -241,7 +241,7 @@ implemented, tested, and documented where relevant.
 ## 15B. Full Lux Non-Showdown Runtime
 
 - [x] Add canonical non-showdown chain state for spells, triggers, and pass-to-resolve sequencing.
-- [x] Keep Action/Reaction play during showdown rejected as unsupported.
+- [x] Support Action/Reaction play during showdown with separate Focus and Priority.
 - [x] Add `game.playCard` target-choice payload support.
 - [x] Add `game.activateAbility` support for `Lux, Crownguard`.
 - [x] Add `game.submitChoice` support for trigger ordering.
@@ -272,10 +272,10 @@ implemented, tested, and documented where relevant.
 - [x] Show rejected intent feedback separately from accepted event log.
 - [x] Add game-log projection tests.
 
-## 14. Showdown Shell
+## 14. Showdown and Combat
 
-- [x] Keep showdown engine shell available for tests and later integration.
-- [ ] Defer player-facing showdown UI and full showdown play flow until after the non-showdown playable MVP.
+- [x] Replace the showdown shell with the complete two-player engine flow.
+- [x] Add player-facing showdown, combat, and damage-assignment UI.
 - [x] Detect supported movement into empty battlefield.
 - [x] Enter showdown state.
 - [x] Establish relevant players.
@@ -283,7 +283,8 @@ implemented, tested, and documented where relevant.
 - [x] Establish priority.
 - [x] Track pass sequence.
 - [x] Close showdown after all relevant players pass.
-- [x] Reject Action/Reaction play during showdown as unsupported.
+- [x] Support legal Action/Reaction play and activation during showdowns.
+- [x] Resolve combat damage, Tank, Assault, Shield, recall, control, and Conquer.
 - [x] Add Annie vs Lux scripted acceptance test through showdown close.
 
 ## 15. First End-To-End Acceptance

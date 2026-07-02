@@ -528,9 +528,10 @@ Cancellation:
   selecting among modes, optional costs, targets, or other choices.
 - Add-Reaction payment windows are intentionally not implemented.
 
-## Showdown MVP
+## Showdown and Combat
 
-The first showdown milestone is not full combat resolution.
+The current two-player implementation includes full showdown and combat
+resolution for approved runtime behavior.
 
 It must implement:
 
@@ -544,18 +545,10 @@ It must implement:
 - Closing the showdown after all relevant players pass in sequence.
 - Cleanup after showdown close when required by rules.
 
-It does not yet require:
-
-- Full combat damage assignment.
-- Tank damage assignment rules.
-- Initial chain from attack/defend triggers.
-- Action/Reaction card play during showdown unless explicitly included in the
-  implemented primitive catalog.
-- Full Conquer resolution from combat.
-
-Any client or test that reaches full combat requirements before those features
-exist must receive an unsupported-feature rejection or pause at a documented
-unsupported boundary.
+It also includes combat damage assignment, Tank ordering, Assault and Shield,
+attack/defend trigger events, legal Action/Reaction play, recall, Control,
+Conquer, scoring, and victory. Team play, third-player invitations, Hidden,
+Ganking, and Vision remain separate boundaries.
 
 ## Card Runtime And Primitive Coverage
 

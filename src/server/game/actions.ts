@@ -41,6 +41,7 @@ import {
 } from "./timing";
 import {
   acceptedActionEvent,
+  stateChangeEvents,
   type GameTransition
 } from "./transitions";
 
@@ -303,7 +304,10 @@ export function performGameplayTransition(input: {
   return {
     game,
     events: projected
-      ? [acceptedActionEvent(input.actorPlayerId, projected)]
+      ? [
+        acceptedActionEvent(input.actorPlayerId, projected),
+        ...stateChangeEvents(input.game, game)
+      ]
       : []
   };
 }

@@ -21,8 +21,11 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.kill_unit": "executable",
   "modifier.modify_numeric_value": "executable",
   "modifier.enter_ready": "executable",
-  "keyword.assault": "deferred",
-  "keyword.tank": "deferred"
+  "trigger.attack": "executable",
+  "trigger.defend": "executable",
+  "keyword.assault": "executable",
+  "keyword.shield": "executable",
+  "keyword.tank": "executable"
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 
 export function getRuntimeCoverageStatus(

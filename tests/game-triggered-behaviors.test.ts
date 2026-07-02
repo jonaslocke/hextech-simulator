@@ -52,8 +52,9 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
 
 test("classifies every initial runtime primitive without planned placeholders", () => {
   assert.ok(Object.values(GAME__RUNTIME_COVERAGE).every((status) => status === "executable" || status === "deferred"));
-  assert.equal(GAME__RUNTIME_COVERAGE["keyword.assault"], "deferred");
-  assert.equal(GAME__RUNTIME_COVERAGE["keyword.tank"], "deferred");
+  assert.equal(GAME__RUNTIME_COVERAGE["keyword.assault"], "executable");
+  assert.equal(GAME__RUNTIME_COVERAGE["keyword.shield"], "executable");
+  assert.equal(GAME__RUNTIME_COVERAGE["keyword.tank"], "executable");
 });
 
 function resolveAllChainItems(game: GameDocument, decks: DeckSnapshotDocument[]) {
