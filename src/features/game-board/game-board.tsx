@@ -229,6 +229,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     (action) =>
       action.sourceCardInstanceId === null &&
       action.presentation.surface === "action-rail" &&
+      action.id.split(":")[3] !== "moveMany" &&
       !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
       action.choice?.kind !== "combatDamage",
   );
