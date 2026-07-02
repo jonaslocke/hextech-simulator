@@ -19,8 +19,12 @@ test("orders and resolves event-conditioned play triggers without card identity 
   }
   assert.equal(game.state.pendingChoice.optionIds.length, 2);
   const choiceProjection = projectGame({ game, viewerPlayerId: "p1", decks });
-  assert.equal(choiceProjection.pendingChoice?.pendingChainItems.length, 2);
-  assert.ok(choiceProjection.pendingChoice?.pendingChainItems.every((item) => item.card !== null));
+  assert.equal(choiceProjection.pendingChoice?.type, "orderTriggers");
+  if (choiceProjection.pendingChoice?.type !== "orderTriggers") {
+    throw new Error("Expected projected trigger-order choice.");
+  }
+  assert.equal(choiceProjection.pendingChoice.pendingChainItems.length, 2);
+  assert.ok(choiceProjection.pendingChoice.pendingChainItems.every((item) => item.card !== null));
   const order = gameplayActions(game, "p1", decks)[0]!;
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
   game = resolveAllChainItems(game, decks);
@@ -47,10 +51,14 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "z" });
   assert.equal(game.state.pendingChoice?.type, "readyCards");
   assert.equal(game.state.turn?.activePlayerId, "p1");
-  assert.equal(
-    projectGame({ game, viewerPlayerId: "p2", decks }).actions.length,
-    0
-  );
+  const waitingProjection = projectGame({
+    game,
+    viewerPlayerId: "p2",
+    decks
+  });
+  assert.equal(waitingProjection.actions.length, 0);
+  assert.equal(waitingProjection.pendingChoice?.type, "readyCards");
+  assert.equal(waitingProjection.pendingChoice?.playerId, "p1");
   const ready = gameplayActions(game, "p1", decks)[0]!;
   assert.equal(ready.label, "Choose 2 runes to ready");
   assert.deepEqual(ready.targets[0]?.legalIds, ["rune1", "rune2", "rune3"]);

@@ -19,6 +19,7 @@ import {
 import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
+import { PendingChoiceStatus } from "./components/pending-choice-status";
 import {
   CardZoneAnimationSnapshot,
   CardZonePlacement,
@@ -240,9 +241,13 @@ export const GameBoard: FC<GameBoardProps> = ({
   const readyCardsAction = sourceProjection.actions.find(
     (action) => action.id.split(":")[3] === "readyCards",
   );
+  const triggerOrderChoice =
+    projection.pendingChoice?.type === "orderTriggers"
+      ? projection.pendingChoice
+      : null;
   const pendingChoiceOptions =
-    projection.pendingChoice?.optionIds.map((id) => {
-      const item = projection.pendingChoice?.pendingChainItems.find(
+    triggerOrderChoice?.optionIds.map((id) => {
+      const item = triggerOrderChoice.pendingChainItems.find(
         (candidate) => candidate.id === id,
       );
       const cardInstanceId = item?.cardInstanceId ?? item?.sourceCardInstanceId;
@@ -263,6 +268,16 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const waitingReadyChoice =
+    sourceProjection.pendingChoice?.type === "readyCards" &&
+    sourceProjection.pendingChoice.playerId !== sourceProjection.viewerPlayerId
+      ? sourceProjection.pendingChoice
+      : null;
+  const waitingChoicePlayerName = waitingReadyChoice
+    ? waitingReadyChoice.playerId === board.player.playerId
+      ? board.player.name
+      : board.opponent.name
+    : null;
   const beginGlobalAction = (action: GameProjection["actions"][number]) => {
     const requirement = action.targets.find((target) => target.kind === "card");
     if (!requirement) {
@@ -748,6 +763,12 @@ export const GameBoard: FC<GameBoardProps> = ({
       onClickCapture={handleTargetClickCapture}
     >
       <ScoreHeader opponent={board.opponent} player={board.player} />
+      {waitingReadyChoice && waitingChoicePlayerName && (
+        <PendingChoiceStatus
+          count={waitingReadyChoice.maximum}
+          playerName={waitingChoicePlayerName}
+        />
+      )}
       {showdownPrompt && showdownBattlefieldName && (
         <ShowdownPrompt
           battlefieldName={showdownBattlefieldName}
@@ -902,20 +923,20 @@ export const GameBoard: FC<GameBoardProps> = ({
           }
         />
       )}
-      {projection.pendingChoice && (
+      {triggerOrderChoice && (
         <ChoiceDialog
           confirmLabel="Submit order"
           description="Move triggered effects into the order they should resolve."
           isOpen
           onConfirm={(orderedIds) =>
             onSubmitChoice?.({
-              choiceId: projection.pendingChoice!.id,
+              choiceId: triggerOrderChoice.id,
               orderedIds,
             })
           }
           options={pendingChoiceOptions}
           selectionMode="ordered"
-          title={projection.pendingChoice.prompt}
+          title={triggerOrderChoice.prompt}
         />
       )}
       {combatDamageAction?.choice?.kind === "combatDamage" && (

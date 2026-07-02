@@ -57,6 +57,13 @@ export type BoardProjection = {
     prompt: string;
     optionIds: string[];
     pendingChainItems: NonNullable<BoardProjection["chain"]>["items"];
+  } | {
+    id: string;
+    playerId: string;
+    type: "readyCards";
+    prompt: string;
+    minimum: number;
+    maximum: number;
   };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{
@@ -136,12 +143,11 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         ...projection.chain,
         items: projection.chain.items.map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
       } : null,
-      pendingChoice: projection.pendingChoice ? {
+      pendingChoice: projection.pendingChoice?.type === "orderTriggers" ? {
         ...projection.pendingChoice,
-        type: "orderTriggers",
         pendingChainItems: projection.pendingChoice.pendingChainItems
           .map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
-      } : null,
+      } : projection.pendingChoice,
       players,
       battlefields: projection.battlefields.map((battlefield) => ({
         battlefieldId: battlefield.battlefieldId,
@@ -162,7 +168,9 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
     ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units, ...(battlefield.facedownCard ? [battlefield.facedownCard] : [])]),
     ...(projection.chain?.items.flatMap((item) => item.card ? [item.card] : []) ?? []),
-    ...(projection.pendingChoice?.pendingChainItems.flatMap((item) => item.card ? [item.card] : []) ?? [])
+    ...(projection.pendingChoice?.type === "orderTriggers"
+      ? projection.pendingChoice.pendingChainItems.flatMap((item) => item.card ? [item.card] : [])
+      : [])
   ];
   return [...new Map(cards.map((card) => [card.instanceId, card])).values()];
 }

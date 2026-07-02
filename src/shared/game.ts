@@ -187,13 +187,24 @@ export const gameProjectionSchema = z.object({
     attackerMight: z.number().int().nonnegative().nullable(),
     defenderMight: z.number().int().nonnegative().nullable()
   }).nullable(),
-  pendingChoice: z.object({
-    id: z.string().min(1),
-    playerId: z.string().min(1),
-    prompt: z.string().min(1),
-    optionIds: z.array(z.string().min(1)),
-    pendingChainItems: z.array(projectedChainItemSchema)
-  }).nullable(),
+  pendingChoice: z.discriminatedUnion("type", [
+    z.object({
+      type: z.literal("orderTriggers"),
+      id: z.string().min(1),
+      playerId: z.string().min(1),
+      prompt: z.string().min(1),
+      optionIds: z.array(z.string().min(1)),
+      pendingChainItems: z.array(projectedChainItemSchema)
+    }),
+    z.object({
+      type: z.literal("readyCards"),
+      id: z.string().min(1),
+      playerId: z.string().min(1),
+      prompt: z.string().min(1),
+      minimum: z.number().int().nonnegative(),
+      maximum: z.number().int().nonnegative()
+    })
+  ]).nullable(),
   players: z.array(projectedPlayerSchema).length(2),
   battlefields: z.array(projectedBattlefieldSchema),
   chain: projectedChainSchema,
