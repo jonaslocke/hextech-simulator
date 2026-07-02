@@ -28,7 +28,8 @@ export function createPrimitiveHandlers(
   const handlers = new Map<string, BehaviorHandler>();
   const passive: BehaviorHandler = {};
   for (const id of [
-    "timing.action", "timing.reaction", "timing.delayed", "keyword.assault", "keyword.tank"
+    "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
+    "keyword.tank", "keyword.shield"
   ]) handlers.set(id, passive);
   handlers.set("trigger.on_play", {
     matches(binding, context) {
@@ -42,6 +43,16 @@ export function createPrimitiveHandlers(
   });
   handlers.set("trigger.conquer_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.conquered" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
   handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.attack", {
+    matches: (_binding, context) =>
+      context.event?.type === "unit.attacks" &&
+      context.event.subjectCardInstanceId === context.sourceCardInstanceId
+  });
+  handlers.set("trigger.defend", {
+    matches: (_binding, context) =>
+      context.event?.type === "unit.defends" &&
+      context.event.subjectCardInstanceId === context.sourceCardInstanceId
+  });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
       const source = binding.parameters.valueSource;

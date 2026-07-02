@@ -43,9 +43,14 @@ test("schedules delayed clauses and requires explicit trigger ordering", () => {
     { sourceCardInstanceId: "one", label: "One", model: compiled },
     { sourceCardInstanceId: "two", label: "Two", model: compiled }
   ] });
-  assert.equal(game.state.pendingChoice?.optionIds.length, 2);
-  assert.throws(() => submitTriggerOrder(game, "p1", [game.state.pendingChoice!.optionIds[0]!]), /every pending trigger/);
-  submitTriggerOrder(game, "p1", [...game.state.pendingChoice!.optionIds].reverse());
+  const pending = game.state.pendingChoice;
+  assert.equal(pending?.type, "orderTriggers");
+  if (!pending || pending.type !== "orderTriggers") {
+    throw new Error("Expected trigger-order choice.");
+  }
+  assert.equal(pending.optionIds.length, 2);
+  assert.throws(() => submitTriggerOrder(game, "p1", [pending.optionIds[0]!]), /every pending trigger/);
+  submitTriggerOrder(game, "p1", [...pending.optionIds].reverse());
   assert.equal(game.state.chain?.items.length, 2);
 });
 
@@ -78,7 +83,7 @@ function gameFixture(): GameDocument {
     state: {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
       players: {}, battlefields: [], cardStates: {}, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },
-      chain: null, showdown: null, modifiers: [], delayedEffects: [], pendingChoice: null,
+      chain: null, showdown: null, combat: null, modifiers: [], delayedEffects: [], pendingChoice: null,
       queuedTriggerChoices: []
     }
   };

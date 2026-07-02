@@ -2,7 +2,7 @@ import { gameProjectionSchema, type GameProjection, type ProjectedCardView, type
 import type { DeckSnapshotDocument, GameEventDocument } from "./repositories";
 import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
-import type { GameDocument } from "./state";
+import type { ChainItem, GameDocument } from "./state";
 
 export function projectGame(input: {
   game: GameDocument; viewerPlayerId: string;
@@ -69,12 +69,23 @@ export function projectGame(input: {
       ...input.game.state.showdown,
       priorityPlayerId: input.game.state.chain?.priorityPlayerId ?? null
     } : null,
-    pendingChoice: input.game.state.pendingChoice && input.game.state.pendingChoice.playerId === input.viewerPlayerId ? {
+    pendingChoice: input.game.state.pendingChoice?.type === "orderTriggers"
+      && input.game.state.pendingChoice.playerId === input.viewerPlayerId ? {
       id: input.game.state.pendingChoice.id,
       playerId: input.game.state.pendingChoice.playerId,
       prompt: "Choose the order for triggered abilities.",
       optionIds: input.game.state.pendingChoice.optionIds,
       pendingChainItems: input.game.state.pendingChoice.pendingItems.map((item) => projectChainItem(item, view, definitions, instances))
+    } : null,
+    combat: input.game.state.combat ? {
+      battlefieldId: input.game.state.combat.battlefieldId,
+      stage: input.game.state.combat.stage,
+      attackerPlayerId: input.game.state.combat.attackerPlayerId,
+      defenderPlayerId: input.game.state.combat.defenderPlayerId,
+      attackerUnitIds: input.game.state.combat.attackerUnitIds,
+      defenderUnitIds: input.game.state.combat.defenderUnitIds,
+      attackerMight: input.game.state.combat.attackerMight,
+      defenderMight: input.game.state.combat.defenderMight
     } : null,
     battlefields: input.game.state.battlefields.map((battlefield) => ({
       battlefieldId: battlefield.battlefieldId, selectedByPlayerId: battlefield.selectedByPlayerId,
@@ -101,9 +112,7 @@ export function projectGame(input: {
 }
 
 function projectChainItem(
-  item: GameDocument["state"]["pendingChoice"] extends infer Choice
-    ? NonNullable<Choice> extends { pendingItems: Array<infer Entry> } ? Entry : never
-    : never,
+  item: ChainItem,
   view: (id: string) => ProjectedCardView,
   definitions: Map<string, DeckSnapshotDocument["snapshot"]["cards"][number]>,
   instances: Map<string, DeckSnapshotDocument["instances"][number]>

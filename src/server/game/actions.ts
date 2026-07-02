@@ -19,8 +19,16 @@ import {
   cleanupBoard,
   markBattlefieldContested,
   openNonCombatShowdown,
-  resolveNonCombatShowdown
+  resolveNonCombatShowdown,
+  unitControllers
 } from "./board-rules";
+import {
+  beginCombatDamage,
+  combatChoiceTargets,
+  startCombat,
+  submitCombatDamage,
+  type DamageAssignment
+} from "./combat";
 import { dispatchBehaviorEvent, resolveDelayedEffects } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
@@ -48,9 +56,30 @@ export function gameplayActions(
   if (!player) return [];
   const actions: ProjectedAction[] = [];
   if (game.state.pendingChoice) {
-    if (game.state.pendingChoice.playerId !== actorPlayerId) return [];
-    for (const order of permutations(game.state.pendingChoice.optionIds)) {
-      const labels = order.map((id) => game.state.pendingChoice!.pendingItems.find((item) => item.id === id)?.label ?? id);
+    const pendingChoice = game.state.pendingChoice;
+    if (pendingChoice.playerId !== actorPlayerId) return [];
+    if (pendingChoice.type === "assignCombatDamage") {
+      actions.push(action(
+        game,
+        "assignCombatDamage",
+        `Assign ${pendingChoice.totalDamage} combat damage`,
+        null,
+        true,
+        null,
+        undefined,
+        [],
+        {
+          kind: "combatDamage",
+          totalDamage: pendingChoice.totalDamage,
+          targets: combatChoiceTargets(game, index)
+        }
+      ));
+      return actions;
+    }
+    for (const order of permutations(pendingChoice.optionIds)) {
+      const labels = order.map((id) =>
+        pendingChoice.pendingItems.find((item) => item.id === id)?.label ?? id
+      );
       actions.push(action(game, "orderTriggers", `Resolve ${labels.join(" → ")}`, null, true, null, JSON.stringify(order)));
     }
     return actions;
@@ -100,7 +129,7 @@ export function gameplayActions(
     const definition = definitionForInstance(cardId, index);
     const state = game.state.cardStates[cardId]!;
     if (definition.card.classification.type === "Unit" && !state.exhausted) {
-      for (const battlefield of game.state.battlefields.filter((candidate) => candidate.units.length === 0)) {
+      for (const battlefield of game.state.battlefields) {
         actions.push(action(game, "move", `Move to ${definitionForInstance(battlefield.cardInstanceId, index).card.name}`, cardId, true, null, battlefield.battlefieldId));
       }
     }
@@ -126,9 +155,7 @@ export function gameplayActions(
     return definition.card.classification.type === "Unit"
       && !game.state.cardStates[cardId]?.exhausted;
   });
-  for (const battlefield of game.state.battlefields.filter(
-    (candidate) => candidate.units.length === 0
-  )) {
+  for (const battlefield of game.state.battlefields) {
     if (readyBaseUnits.length < 2) continue;
     actions.push(action(
       game,
@@ -152,7 +179,8 @@ export function gameplayActions(
 
 export function performGameplayAction(input: {
   game: GameDocument; actorPlayerId: string; actionId: string;
-  selectedIds: string[]; decks: readonly DeckSnapshotDocument[]; now: string;
+  selectedIds: string[]; allocations?: DamageAssignment[];
+  decks: readonly DeckSnapshotDocument[]; now: string;
 }): GameDocument {
   const legal = gameplayActions(input.game, input.actorPlayerId, input.decks);
   const projected = legal.find((candidate) => candidate.id === input.actionId);
@@ -222,7 +250,8 @@ export function performGameplayAction(input: {
         input.actorPlayerId,
         [cardId],
         extra,
-        index
+        index,
+        input.decks
       );
       break;
     }
@@ -232,10 +261,20 @@ export function performGameplayAction(input: {
         input.actorPlayerId,
         input.selectedIds,
         extra,
-        index
+        index,
+        input.decks
       );
       break;
     }
+    case "assignCombatDamage":
+      submitCombatDamage(
+        game,
+        input.actorPlayerId,
+        input.allocations ?? [],
+        index,
+        input.decks
+      );
+      break;
     case "pass":
       passPriority(game, input.actorPlayerId, index, handlers, input.decks);
       break;
@@ -252,7 +291,8 @@ export function performGameplayAction(input: {
 
 export function performGameplayTransition(input: {
   game: GameDocument; actorPlayerId: string; actionId: string;
-  selectedIds: string[]; decks: readonly DeckSnapshotDocument[]; now: string;
+  selectedIds: string[]; allocations?: DamageAssignment[];
+  decks: readonly DeckSnapshotDocument[]; now: string;
 }): GameTransition {
   const projected = gameplayActions(
     input.game,
@@ -405,6 +445,8 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
           index,
           decks
         );
+      } else {
+        beginCombatDamage(game, index, decks);
       }
     }
     else {
@@ -450,7 +492,17 @@ export function applyStartOfTurn(
   draw(player.zones.mainDeck, player.zones.hand, 1);
 }
 
-function action(game: GameDocument, kind: string, label: string, source: string | null, enabled = true, disabledReason: string | null = null, extra?: string, targets: ProjectedAction["targets"] = []): ProjectedAction {
+function action(
+  game: GameDocument,
+  kind: string,
+  label: string,
+  source: string | null,
+  enabled = true,
+  disabledReason: string | null = null,
+  extra?: string,
+  targets: ProjectedAction["targets"] = [],
+  choice?: ProjectedAction["choice"]
+): ProjectedAction {
   const parts = [
     "game",
     String(game.stateVersion),
@@ -465,7 +517,8 @@ function action(game: GameDocument, kind: string, label: string, source: string 
       ? "card-menu"
       : "action-rail";
   return {
-    id: parts.join(":"), label, sourceCardInstanceId: source, enabled, disabledReason, targets,
+    id: parts.join(":"), label, sourceCardInstanceId: source, enabled,
+    disabledReason, targets, choice,
     presentation: {
       surface,
       style: kind === "endTurn" || kind === "pass" ? "secondary" : "primary",
@@ -603,15 +656,13 @@ function moveUnitsToBattlefield(
   actorPlayerId: string,
   cardIds: string[],
   battlefieldId: string,
-  index: RuntimeCardIndex
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[]
 ) {
   const battlefield = game.state.battlefields.find(
     (candidate) => candidate.battlefieldId === battlefieldId
   );
   if (!battlefield) throw new Error("Battlefield is unavailable.");
-  if (battlefield.units.length > 0) {
-    throw new Error("Only movement to an empty battlefield is supported.");
-  }
   const player = game.state.players[actorPlayerId]!;
   for (const cardId of cardIds) {
     player.zones.base = player.zones.base.filter((id) => id !== cardId);
@@ -620,7 +671,14 @@ function moveUnitsToBattlefield(
   }
   markBattlefieldContested(game, battlefieldId, actorPlayerId);
   cleanupBoard(game, index);
-  openNonCombatShowdown(game, battlefieldId, actorPlayerId);
+  const controllers = unitControllers(game, battlefield.units, index);
+  if (controllers.length === 2) {
+    startCombat(game, battlefieldId, actorPlayerId, index, decks);
+  } else if (battlefield.controllerPlayerId !== actorPlayerId) {
+    openNonCombatShowdown(game, battlefieldId, actorPlayerId);
+  } else {
+    battlefield.contestedByPlayerId = null;
+  }
 }
 
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {

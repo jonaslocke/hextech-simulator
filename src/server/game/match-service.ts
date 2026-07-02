@@ -14,6 +14,7 @@ import {
   type DeckRuntimeSnapshot, type MatchDocument
 } from "./state";
 import type { Db } from "mongodb";
+import type { DamageAssignment } from "./combat";
 
 export async function createMatch(input: {
   db: Db; repositories: GameRepositories; now?: string; matchId?: string; rngSeed?: string;
@@ -52,7 +53,8 @@ export async function getViewerState(repositories: GameRepositories, matchId: st
 }
 
 export async function performMatchAction(repositories: GameRepositories, input: {
-  matchId: string; playerToken: string; stateVersion: number; actionId: string; selectedIds: string[]; now?: string;
+  matchId: string; playerToken: string; stateVersion: number; actionId: string;
+  selectedIds: string[]; allocations?: DamageAssignment[]; now?: string;
 }) {
   const { match, game, seat, decks } = await loadContext(repositories, input.matchId, input.playerToken);
   if (game.stateVersion !== input.stateVersion) throw new Error("Game state version is stale.");
@@ -69,6 +71,7 @@ export async function performMatchAction(repositories: GameRepositories, input: 
       actorPlayerId: seat.playerId,
       actionId: input.actionId,
       selectedIds: input.selectedIds,
+      allocations: input.allocations,
       decks,
       now
     });

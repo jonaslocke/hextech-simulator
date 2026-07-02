@@ -93,7 +93,10 @@ function activeSourceIds(
     ...(player.zones.champion ? [player.zones.champion] : []),
     ...player.zones.base,
     ...game.state.battlefields
-      .filter((battlefield) => battlefield.selectedByPlayerId === controllerPlayerId)
+      .filter((battlefield) =>
+        (battlefield.controllerPlayerId ?? battlefield.selectedByPlayerId)
+          === controllerPlayerId
+      )
       .map((battlefield) => battlefield.cardInstanceId),
     ...game.state.battlefields.flatMap((battlefield) => battlefield.units)
       .filter((id) => index.instances.get(id)?.ownerPlayerId === controllerPlayerId)

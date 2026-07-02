@@ -63,7 +63,8 @@ export const turnStateSchema = z.object({
 export const cardStateSchema = z.object({
   exhausted: z.boolean(),
   damage: z.number().int().nonnegative(),
-  computedMight: z.number().nullable()
+  computedMight: z.number().nullable(),
+  combatRole: z.enum(["attacker", "defender"]).nullable().optional()
 });
 
 export const chainItemSchema = z.object({
@@ -91,6 +92,19 @@ const triggerOrderChoiceSchema = z.object({
   pendingItems: z.array(chainItemSchema)
 });
 
+const combatDamageChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("assignCombatDamage"),
+  totalDamage: z.number().int().nonnegative(),
+  targetUnitIds: z.array(z.string().min(1))
+});
+
+const damageAssignmentSchema = z.object({
+  targetUnitId: z.string().min(1),
+  amount: z.number().int().positive()
+});
+
 export const gameStateSchema = z.object({
   setup: setupStateSchema,
   players: z.record(playerStateSchema),
@@ -110,6 +124,18 @@ export const gameStateSchema = z.object({
     focusPlayerId: z.string().min(1),
     passedPlayerIds: z.array(z.string().min(1))
   }).nullable(),
+  combat: z.object({
+    battlefieldId: z.string().min(1),
+    stage: z.enum(["showdown", "attackerAssignment", "defenderAssignment"]),
+    attackerPlayerId: z.string().min(1),
+    defenderPlayerId: z.string().min(1),
+    attackerUnitIds: z.array(z.string().min(1)),
+    defenderUnitIds: z.array(z.string().min(1)),
+    attackerMight: z.number().int().nonnegative().nullable(),
+    defenderMight: z.number().int().nonnegative().nullable(),
+    attackerAssignments: z.array(damageAssignmentSchema),
+    defenderAssignments: z.array(damageAssignmentSchema)
+  }).nullable(),
   modifiers: z.array(z.object({
     id: z.string().min(1), sourceCardInstanceId: z.string().nullable(),
     controllerPlayerId: z.string().min(1).optional(),
@@ -123,7 +149,10 @@ export const gameStateSchema = z.object({
     sourceCardInstanceId: z.string().min(1), clauseId: z.string().min(1),
     selectedIds: z.array(z.string())
   })),
-  pendingChoice: triggerOrderChoiceSchema.nullable(),
+  pendingChoice: z.discriminatedUnion("type", [
+    triggerOrderChoiceSchema,
+    combatDamageChoiceSchema
+  ]).nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema)
 });
 
@@ -135,6 +164,7 @@ export const gameDocumentSchema = z.object({
 });
 
 export type CardInstance = z.infer<typeof cardInstanceSchema>;
+export type ChainItem = z.infer<typeof chainItemSchema>;
 export type PlayerState = z.infer<typeof playerStateSchema>;
 export type GameState = z.infer<typeof gameStateSchema>;
 export type GameDocument = z.infer<typeof gameDocumentSchema>;
@@ -219,7 +249,7 @@ export function createInitialGame(input: {
         battlefieldChoices: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", cardInstanceId: null }])),
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
-      players, battlefields: [], cardStates, turn: null, chain: null, showdown: null,
+      players, battlefields: [], cardStates, turn: null, chain: null, showdown: null, combat: null,
       modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
     }
   });

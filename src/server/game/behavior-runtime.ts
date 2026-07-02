@@ -177,7 +177,11 @@ export function queueTriggeredClauses(input: {
 
 export function submitTriggerOrder(game: GameDocument, playerId: string, orderedIds: string[]): void {
   const pending = game.state.pendingChoice;
-  if (!pending || pending.playerId !== playerId) throw new Error("No trigger-order choice is pending.");
+  if (
+    !pending ||
+    pending.type !== "orderTriggers" ||
+    pending.playerId !== playerId
+  ) throw new Error("No trigger-order choice is pending.");
   if (orderedIds.length !== pending.optionIds.length || new Set(orderedIds).size !== orderedIds.length || orderedIds.some((id) => !pending.optionIds.includes(id))) {
     throw new Error("Trigger ordering must contain every pending trigger exactly once.");
   }

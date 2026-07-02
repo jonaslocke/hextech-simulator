@@ -9,14 +9,14 @@ test("characterizes the separated showdown timing kernel", async () => {
   const actionsSource = await readFile("src/server/game/actions.ts", "utf8");
   const stateSource = await readFile("src/server/game/state.ts", "utf8");
 
-  assert.match(actionsSource, /Only movement to an empty battlefield is supported/);
+  assert.match(actionsSource, /startCombat/);
   assert.match(stateSource, /showdown: z\.object\(\{[\s\S]*focusPlayerId:/);
   assert.doesNotMatch(
     stateSource.match(/showdown: z\.object\(\{[\s\S]*?\}\)\.nullable\(\)/)?.[0] ?? "",
     /priorityPlayerId/
   );
   assert.match(stateSource, /chain: z\.object\(\{[\s\S]*priorityPlayerId:/);
-  assert.doesNotMatch(stateSource, /combat: z\.object/);
+  assert.match(stateSource, /combat: z\.object/);
   assert.match(stateSource, /controllerPlayerId: z\.string\(\)\.nullable/);
   assert.match(stateSource, /contestedByPlayerId: z\.string\(\)\.nullable/);
 

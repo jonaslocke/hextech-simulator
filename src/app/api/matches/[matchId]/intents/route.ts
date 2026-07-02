@@ -11,7 +11,8 @@ export async function POST(request: Request, context: { params: Promise<{ matchI
     const projection = await performMatchAction(createGameRepositories(db), {
       matchId: (await context.params).matchId, playerToken: parsed.data.playerToken,
       stateVersion: parsed.data.stateVersion, actionId: parsed.data.intent.payload.actionId,
-      selectedIds: parsed.data.intent.payload.selectedIds
+      selectedIds: parsed.data.intent.payload.selectedIds,
+      allocations: parsed.data.intent.payload.allocations
     });
     return NextResponse.json({ accepted: true, projection });
   } catch (error) {

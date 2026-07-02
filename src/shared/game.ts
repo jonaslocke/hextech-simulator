@@ -31,6 +31,17 @@ export const projectedActionSchema = z.object({
   enabled: z.boolean(),
   disabledReason: z.string().min(1).nullable(),
   targets: z.array(projectedTargetRequirementSchema),
+  choice: z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("combatDamage"),
+      totalDamage: z.number().int().nonnegative(),
+      targets: z.array(z.object({
+        unitId: z.string().min(1),
+        lethalAmount: z.number().int().positive(),
+        hasTank: z.boolean()
+      }))
+    })
+  ]).nullable().optional(),
   presentation: z.object({
     surface: z.enum(["setup-dialog", "card-menu", "action-rail", "choice-dialog"]),
     style: z.enum(["primary", "secondary", "danger"]),
@@ -42,7 +53,11 @@ export const gameActionIntentSchema = z.object({
   type: z.literal("game.performAction"),
   payload: z.object({
     actionId: z.string().min(1),
-    selectedIds: z.array(z.string().min(1)).default([])
+    selectedIds: z.array(z.string().min(1)).default([]),
+    allocations: z.array(z.object({
+      targetUnitId: z.string().min(1),
+      amount: z.number().int().positive()
+    })).default([])
   })
 });
 
@@ -161,6 +176,16 @@ export const gameProjectionSchema = z.object({
     focusPlayerId: z.string().min(1),
     priorityPlayerId: z.string().min(1).nullable(),
     passedPlayerIds: z.array(z.string().min(1))
+  }).nullable(),
+  combat: z.object({
+    battlefieldId: z.string().min(1),
+    stage: z.enum(["showdown", "attackerAssignment", "defenderAssignment"]),
+    attackerPlayerId: z.string().min(1),
+    defenderPlayerId: z.string().min(1),
+    attackerUnitIds: z.array(z.string().min(1)),
+    defenderUnitIds: z.array(z.string().min(1)),
+    attackerMight: z.number().int().nonnegative().nullable(),
+    defenderMight: z.number().int().nonnegative().nullable()
   }).nullable(),
   pendingChoice: z.object({
     id: z.string().min(1),
