@@ -291,7 +291,7 @@ export function TemporaryZoneOverlay({
       <div
         aria-label={title}
         className={cn(
-          "fixed bg-slate-950/55 supports-[backdrop-filter]:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl outline-none ring-1 ring-cyan-300/10 w-72 text-slate-100 pointer-events-auto select-none",
+          "fixed bg-slate-950/55 supports-backdrop-filter:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl outline-none ring-1 ring-cyan-300/10 w-72 text-slate-100 pointer-events-auto select-none",
           position ? "left-0 top-0" : "right-16 top-20",
         )}
         ref={panelRef}
