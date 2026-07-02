@@ -40,7 +40,7 @@ import {
   type BoardZoneProjection,
   type BoardProjection,
 } from "./board-view-model";
-import { showdownPromptState } from "./model";
+import { showdownPromptState, simultaneousMoveAction } from "./model";
 import {
   BattlefieldData,
   Card,
@@ -175,6 +175,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
+    purpose: "move" | "play";
     selectedTargetIds: string[];
   } | null>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
@@ -265,6 +266,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       legalTargetIds: requirement.legalIds,
       maxTargets: requirement.maximum,
       minTargets: requirement.minimum,
+      purpose: action.id.split(":")[3] === "moveMany" ? "move" : "play",
       selectedTargetIds: [],
     });
   };
@@ -472,17 +474,24 @@ export const GameBoard: FC<GameBoardProps> = ({
     if (!projectedAction) {
       return;
     }
-    const requirement = projectedAction.targets.find(
+    const stagedMoveAction = simultaneousMoveAction(
+      sourceProjection.actions,
+      projectedAction,
+      card.instanceId,
+    );
+    const actionToSubmit = stagedMoveAction ?? projectedAction;
+    const requirement = actionToSubmit.targets.find(
       (target) => target.kind === "card",
     );
 
     if (requirement && requirement.maximum > 0) {
       setTargetSelection({
-        actionId: projectedAction.id,
+        actionId: actionToSubmit.id,
         legalTargetIds: requirement.legalIds,
         maxTargets: requirement.maximum,
         minTargets: requirement.minimum,
-        selectedTargetIds: [],
+        purpose: stagedMoveAction ? "move" : "play",
+        selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
       });
       return;
     }
@@ -572,6 +581,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     setTargetSelection(nextSelection);
 
     if (
+      nextSelection.purpose !== "move" &&
       nextSelection.minTargets === nextSelection.maxTargets &&
       selectedTargetIds.length === nextSelection.maxTargets
     ) {
@@ -827,6 +837,17 @@ export const GameBoard: FC<GameBoardProps> = ({
           onCancel={() => setTargetSelection(null)}
           onSubmit={() => submitTargetedPlay()}
           selectedCount={targetSelection.selectedTargetIds.length}
+          cancelLabel={
+            targetSelection.purpose === "move" ? "Cancel move" : "Cancel"
+          }
+          confirmLabel={
+            targetSelection.purpose === "move" ? "Confirm move" : "Play"
+          }
+          title={
+            targetSelection.purpose === "move"
+              ? "Choose units for this move"
+              : undefined
+          }
         />
       )}
       {projection.pendingChoice && (

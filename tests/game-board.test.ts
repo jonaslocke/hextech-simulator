@@ -4,7 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   actionsForSource,
-  showdownPromptState
+  showdownPromptState,
+  simultaneousMoveAction
 } from "../src/features/game-board/model";
 import type { ProjectedAction } from "../src/shared/game";
 
@@ -39,6 +40,48 @@ test("derives active and waiting showdown prompts from Focus", () => {
   assert.equal(
     showdownPromptState({ showdown: null, viewerPlayerId: "p1" }),
     null
+  );
+});
+
+test("stages a single-unit move through the simultaneous move action", () => {
+  const singleMove: ProjectedAction = {
+    id: "game:1:action:move:unit-a:battlefield",
+    label: "Move to Arena",
+    sourceCardInstanceId: "unit-a",
+    enabled: true,
+    disabledReason: null,
+    targets: [],
+    presentation: {
+      surface: "card-menu",
+      style: "primary",
+      prompt: null
+    }
+  };
+  const simultaneousMove: ProjectedAction = {
+    id: "game:1:action:moveMany:_:battlefield",
+    label: "Move units to Arena",
+    sourceCardInstanceId: null,
+    enabled: true,
+    disabledReason: null,
+    targets: [{
+      kind: "card",
+      legalIds: ["unit-a", "unit-b"],
+      minimum: 1,
+      maximum: 2
+    }],
+    presentation: {
+      surface: "action-rail",
+      style: "primary",
+      prompt: null
+    }
+  };
+  assert.equal(
+    simultaneousMoveAction(
+      [singleMove, simultaneousMove],
+      singleMove,
+      "unit-a"
+    ),
+    simultaneousMove
   );
 });
 

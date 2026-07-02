@@ -6,18 +6,24 @@ import { Kbd } from "@/shared/components/kbd";
 
 export function TargetSelectionPrompt({
   canSubmit,
+  cancelLabel = "Cancel",
+  confirmLabel = "Play",
   maxTargets,
   minTargets,
   onCancel,
   onSubmit,
   selectedCount,
+  title,
 }: {
   canSubmit: boolean;
+  cancelLabel?: string;
+  confirmLabel?: string;
   maxTargets: number;
   minTargets: number;
   onCancel: () => void;
   onSubmit: () => void;
   selectedCount: number;
+  title?: string;
 }) {
   const isOptional = minTargets === 0;
   const targetRequirementLabel = isOptional
@@ -63,7 +69,7 @@ export function TargetSelectionPrompt({
         <div className="flex justify-between items-center gap-4 px-4 py-3 border-white/10 border-b">
           <div className="min-w-0">
             <div className="font-semibold text-sm leading-tight">
-              {targetRequirementLabel}
+              {title ?? targetRequirementLabel}
             </div>
             <div className="mt-1 text-slate-400 text-xs">
               {selectedCount}/{maxTargets} selected
@@ -82,15 +88,19 @@ export function TargetSelectionPrompt({
         <div className="flex justify-between items-center gap-3 px-4 py-3">
           <div className="flex items-center gap-2 text-slate-500 text-xs">
             <ShortcutHint label="Cancel" value="Esc" />
-            <ShortcutHint disabled={!canSubmit} label="Play" value="J" />
+            <ShortcutHint
+              disabled={!canSubmit}
+              label={confirmLabel}
+              value="J"
+            />
           </div>
 
           <div className="flex items-center gap-2">
             <Button onClick={onCancel} type="button" variant="secondary">
-              Cancel
+              {cancelLabel}
             </Button>
             <Button disabled={!canSubmit} onClick={onSubmit} type="button">
-              Play
+              {confirmLabel}
             </Button>
           </div>
         </div>

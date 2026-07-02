@@ -157,7 +157,7 @@ export function gameplayActions(
       && !game.state.cardStates[cardId]?.exhausted;
   });
   for (const battlefield of game.state.battlefields) {
-    if (readyBaseUnits.length < 2) continue;
+    if (readyBaseUnits.length < 1) continue;
     actions.push(action(
       game,
       "moveMany",

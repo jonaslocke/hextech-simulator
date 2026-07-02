@@ -26,6 +26,33 @@ export function showdownPromptState(
   };
 }
 
+export function simultaneousMoveAction(
+  actions: readonly ProjectedAction[],
+  selectedAction: ProjectedAction,
+  sourceCardInstanceId: string
+): ProjectedAction | null {
+  if (actionKind(selectedAction) !== "move") return null;
+  const destination = actionExtra(selectedAction);
+  if (!destination || destination === "base") return null;
+  return actions.find((candidate) =>
+    actionKind(candidate) === "moveMany" &&
+    actionExtra(candidate) === destination &&
+    candidate.targets.some((target) =>
+      target.kind === "card" &&
+      target.legalIds.includes(sourceCardInstanceId)
+    )
+  ) ?? null;
+}
+
+function actionKind(action: ProjectedAction) {
+  return action.id.split(":")[3] ?? "";
+}
+
+function actionExtra(action: ProjectedAction) {
+  const encoded = action.id.split(":")[5];
+  return encoded ? decodeURIComponent(encoded) : null;
+}
+
 export function visibleCards(projection: GameProjection): ProjectedCardView[] {
   return [
     ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
