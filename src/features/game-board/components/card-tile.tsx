@@ -118,6 +118,15 @@ export const CardTile: FC<CardTileProps> = ({
   const bodyRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
+  const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
+
+  const footprintStyle = {
+    width: isRotatedExhausted ? sizeConfig.height : sizeConfig.width,
+    height: sizeConfig.height,
+    zIndex: previewPosition ? 2147483647 : undefined,
+  };
+
+  const motionOrigin = "50% 50%";
 
   const clearPreview = () => {
     if (previewTimeoutRef.current) {
@@ -180,7 +189,7 @@ export const CardTile: FC<CardTileProps> = ({
         enableZoneAnimation && instanceId ? instanceId : undefined
       }
       className={cn(
-        "relative shrink-0",
+        "relative flex justify-center items-center overflow-visible shrink-0",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
         isTransferHidden && "invisible pointer-events-none",
         previewPosition ? "z-[2147483647]" : isHighlighted ? "z-20" : "z-10",
@@ -216,7 +225,7 @@ export const CardTile: FC<CardTileProps> = ({
         clearPreview();
       }}
       ref={tileRef}
-      style={{ zIndex: previewPosition ? 2147483647 : undefined }}
+      style={footprintStyle}
       tabIndex={enableHoverPreview && focusablePreview ? 0 : undefined}
     >
       <motion.div
@@ -225,9 +234,12 @@ export const CardTile: FC<CardTileProps> = ({
           scale: isExhausted && !preserveOrientation ? 0.98 : 1,
           y: isExhausted && !preserveOrientation ? -2 : 0,
         }}
-        className="relative"
+        className="relative shrink-0"
         initial={false}
         ref={bodyRef}
+        style={{
+          transformOrigin: motionOrigin,
+        }}
         transition={{
           type: "spring",
           stiffness: 360,
