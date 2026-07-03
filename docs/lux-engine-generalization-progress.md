@@ -17,13 +17,13 @@
 - [x] 6. `refactor(game-board): render projected choices generically`
 - [x] 7. `fix(game): require executable behavior snapshots`
 - [x] 8. `test(game): certify generalized Lux runtime`
-- [ ] 9. `docs(game): record Lux engine rollout and rollback`
+- [x] 9. `docs(game): record Lux engine rollout and rollback`
 
 ## Current checkpoint
 
-- Completed through: milestone 8
-- Last verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check`
-- Next milestone: record actual commit hashes and the final rollout/rollback procedure.
+- Completed through: milestone 9
+- Last verification: 120 tests passed; `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check` passed.
+- Next milestone: none. Perform the documented runtime reset and manual rollout checks when deploying.
 
 ## Resume procedure
 
