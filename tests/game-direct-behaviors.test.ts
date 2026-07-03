@@ -9,7 +9,7 @@ import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
   buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot,
-  gameplayActions, performGameplayAction,
+  gameplayActions, isAbilityTimingAllowed, performGameplayAction,
   type DeckSnapshotDocument
 } from "../src/server/game";
 
@@ -179,6 +179,39 @@ test("projects combined Add and requires pooled showdown resources for targeted 
     actions.find((action) => action.sourceCardInstanceId === blastOfPower)
       ?.enabled,
     true,
+  );
+});
+
+test("restores standard Add timing when the priority override is disabled", () => {
+  assert.equal(
+    isAbilityTimingAllowed({
+      allowPriorityAddOverride: true,
+      hasActionTiming: false,
+      hasReactionTiming: false,
+      isAddAbility: true,
+      timing: "showdownClosed"
+    }),
+    true
+  );
+  assert.equal(
+    isAbilityTimingAllowed({
+      allowPriorityAddOverride: false,
+      hasActionTiming: false,
+      hasReactionTiming: false,
+      isAddAbility: true,
+      timing: "showdownClosed"
+    }),
+    false
+  );
+  assert.equal(
+    isAbilityTimingAllowed({
+      allowPriorityAddOverride: false,
+      hasActionTiming: false,
+      hasReactionTiming: true,
+      isAddAbility: true,
+      timing: "showdownClosed"
+    }),
+    true
   );
 });
 

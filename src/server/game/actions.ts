@@ -1366,19 +1366,37 @@ function abilityAvailableAtTiming(
   const hasReactionTiming =
     timingIds.includes("timing.reaction") ||
     /\[Reaction\]/i.test(`${clause.sourceText} ${clause.normalizedText}`);
-  const hasPriorityAddOverride =
-    ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY &&
-    isAddResourceAbility(ability.behaviorId);
+  return isAbilityTimingAllowed({
+    hasActionTiming: timingIds.includes("timing.action"),
+    hasReactionTiming,
+    isAddAbility: isAddResourceAbility(ability.behaviorId),
+    allowPriorityAddOverride:
+      ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY,
+    timing,
+  });
+}
 
-  if (timing === "showdownOpen") {
+export function isAbilityTimingAllowed(input: {
+  allowPriorityAddOverride: boolean;
+  hasActionTiming: boolean;
+  hasReactionTiming: boolean;
+  isAddAbility: boolean;
+  timing: TurnTiming;
+}) {
+  const hasPriorityAddOverride =
+    input.allowPriorityAddOverride && input.isAddAbility;
+  if (input.timing === "showdownOpen") {
     return (
-      timingIds.includes("timing.action") ||
-      hasReactionTiming ||
+      input.hasActionTiming ||
+      input.hasReactionTiming ||
       hasPriorityAddOverride
     );
   }
-  if (timing === "neutralClosed" || timing === "showdownClosed") {
-    return hasReactionTiming || hasPriorityAddOverride;
+  if (
+    input.timing === "neutralClosed" ||
+    input.timing === "showdownClosed"
+  ) {
+    return input.hasReactionTiming || hasPriorityAddOverride;
   }
   return true;
 }

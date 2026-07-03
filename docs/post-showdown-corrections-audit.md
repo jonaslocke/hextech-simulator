@@ -6,14 +6,14 @@ remaining engine and projection gaps are corrected.
 
 | Checklist item | Current status | Required correction |
 | --- | --- | --- |
-| Combined rune resource action | Partial | The menu renderer already supports `Add Energy and Power`; the server only projects it in Neutral Open and must project it with the priority Add override. |
-| Final pass explanation | Missing | The Chain surface detects a resolving Priority pass, but does not name the item. The showdown prompt does not identify a final Focus pass or current combat Might leader. |
-| Action spell shown as not playable | Partial | Battlefield selectors work. The captured state had no pooled resources, and Blast of Power also required Order Power. Showdown payment must stop implicitly using Energy sources and disabled actions must explain their resource shortfall. |
-| Eager Apprentice discount | Engine defect | The catalog records `controller_spell`, but canonical modifiers discard that scope and reduce Unit costs too. |
-| Assault | Engine and presentation defect | Assault is added only when combat damage is locked. Live `computedMight`, lethal cleanup, and card presentation do not include it during the showdown. |
-| Tank | Implemented; certification required | Server validation and the damage dialog already enforce Tank-first assignment. Real-catalog and multiple-Tank regression coverage is still required. |
-| Play Units to controlled battlefields | Missing | Unit play is hardcoded to Base. The existing single-choice dialog can be reused for destination selection. |
-| Opponent waits for trigger ordering | Partial | A reusable pending-choice status exists, but trigger-order choices are projected only to the chooser, leaving the opponent on a stale showdown prompt. |
+| Combined rune resource action | Verified | The existing renderer is retained and the server projects the combined action whenever both component Add abilities are legal under the override. |
+| Final pass explanation | Verified | Final Priority names the resolving Chain item. Final combat Focus identifies that combat will resolve and displays the current Might leader or tie. |
+| Action spell shown as not playable | Verified | Battlefield selectors remain valid. Disabled cards now explain pooled-resource requirements and become enabled after Energy and Power are manually added. |
+| Eager Apprentice discount | Verified | Canonical modifiers retain `controller_spell`; Unit costs remain unchanged. |
+| Assault | Verified | Assault and Shield modify live `computedMight`, cleanup, projection, and locked damage for the duration of combat roles. |
+| Tank | Verified | The existing dialog is retained. Server validation now also rejects interleaving a non-Tank between multiple Tanks. |
+| Play Units to controlled battlefields | Verified | Server-issued actions provide Base and controlled battlefield destinations through the reused single-choice dialog. |
+| Opponent waits for trigger ordering | Verified | Both viewers receive safe pending status, private ordering details remain chooser-only, and stale pass controls are suppressed. |
 
 ## Rules contract
 
