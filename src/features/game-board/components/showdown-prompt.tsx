@@ -8,20 +8,26 @@ import { cn } from "@/shared/utils/cn";
 
 export function ShowdownPrompt({
   battlefieldName,
+  attackerMight,
+  defenderMight,
   focusPlayerId,
   hasFocus,
   hasPriority,
   isClosed,
   isCombat,
+  isFinalFocusPass,
   onPassFocus,
   priorityPlayerId,
 }: {
   battlefieldName: string;
+  attackerMight: number | null;
+  defenderMight: number | null;
   focusPlayerId: string;
   hasFocus: boolean;
   hasPriority: boolean;
   isClosed: boolean;
   isCombat: boolean;
+  isFinalFocusPass: boolean;
   onPassFocus?: () => void;
   priorityPlayerId: string | null;
 }) {
@@ -31,6 +37,10 @@ export function ShowdownPrompt({
     hasFocus,
     hasPriority,
     isClosed,
+    isCombat,
+    isFinalFocusPass,
+    attackerMight,
+    defenderMight,
     priorityPlayerId,
   });
 
@@ -109,7 +119,9 @@ export function ShowdownPrompt({
               onClick={onPassFocus}
               type="button"
             >
-              Pass Focus
+              {isCombat && isFinalFocusPass
+                ? "Pass and resolve combat"
+                : "Pass Focus"}
             </Button>
           </div>
         )}
@@ -123,12 +135,20 @@ function getShowdownMessage({
   hasFocus,
   hasPriority,
   isClosed,
+  isCombat,
+  isFinalFocusPass,
+  attackerMight,
+  defenderMight,
   priorityPlayerId,
 }: {
   focusPlayerId: string;
   hasFocus: boolean;
   hasPriority: boolean;
   isClosed: boolean;
+  isCombat: boolean;
+  isFinalFocusPass: boolean;
+  attackerMight: number | null;
+  defenderMight: number | null;
   priorityPlayerId: string | null;
 }) {
   if (isClosed) {
@@ -144,6 +164,20 @@ function getShowdownMessage({
   }
 
   if (hasFocus) {
+    if (
+      isCombat &&
+      isFinalFocusPass &&
+      attackerMight !== null &&
+      defenderMight !== null
+    ) {
+      const leader =
+        attackerMight === defenderMight
+          ? "The combat is tied"
+          : attackerMight > defenderMight
+            ? "Attackers lead"
+            : "Defenders lead";
+      return `Passing ends the showdown. ${leader} ${attackerMight}–${defenderMight} in Might.`;
+    }
     return "You have Focus. Play an Action or Reaction, or pass Focus.";
   }
 

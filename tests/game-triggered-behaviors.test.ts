@@ -25,6 +25,19 @@ test("orders and resolves event-conditioned play triggers without card identity 
   }
   assert.equal(choiceProjection.pendingChoice.pendingChainItems.length, 2);
   assert.ok(choiceProjection.pendingChoice.pendingChainItems.every((item) => item.card !== null));
+  const waitingProjection = projectGame({
+    game,
+    viewerPlayerId: "p2",
+    decks
+  });
+  assert.equal(waitingProjection.pendingChoice?.type, "orderTriggers");
+  if (waitingProjection.pendingChoice?.type !== "orderTriggers") {
+    throw new Error("Expected waiting trigger-order projection.");
+  }
+  assert.equal(waitingProjection.pendingChoice.playerId, "p1");
+  assert.deepEqual(waitingProjection.pendingChoice.optionIds, []);
+  assert.deepEqual(waitingProjection.pendingChoice.pendingChainItems, []);
+  assert.deepEqual(waitingProjection.actions, []);
   const order = gameplayActions(game, "p1", decks)[0]!;
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
   game = resolveAllChainItems(game, decks);

@@ -209,7 +209,9 @@ export const GameBoard: FC<GameBoardProps> = ({
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
   const canViewerPassChain =
     isChainLockedOpen &&
-    projection.chain?.priorityPlayerId === projection.viewerPlayerId;
+    sourceProjection.actions.some(
+      (action) => action.label === "Pass priority",
+    );
   const chainPassWillResolve =
     canViewerPassChain &&
     projection.chain !== null &&
@@ -219,7 +221,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         projection.chain?.passedPlayerIds.includes(playerId),
     );
   const chainPassLabel = chainPassWillResolve
-    ? "Pass and Resolve"
+    ? `Pass and resolve ${projection.chain?.items.at(-1)?.label ?? "item"}`
     : "Pass Priority";
   const endTurnAction = sourceProjection.actions.find(
     (action) => action.label === "End turn",
@@ -257,7 +259,13 @@ export const GameBoard: FC<GameBoardProps> = ({
     (action) => action.id.split(":")[3] === "readyCards",
   );
   const triggerOrderChoice =
-    projection.pendingChoice?.type === "orderTriggers"
+    projection.pendingChoice?.type === "orderTriggers" &&
+    projection.pendingChoice.playerId === projection.viewerPlayerId
+      ? projection.pendingChoice
+      : null;
+  const waitingTriggerOrderChoice =
+    projection.pendingChoice?.type === "orderTriggers" &&
+    projection.pendingChoice.playerId !== projection.viewerPlayerId
       ? projection.pendingChoice
       : null;
   const pendingChoiceOptions =
@@ -283,6 +291,11 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const waitingTriggerOrderPlayerName = waitingTriggerOrderChoice
+    ? waitingTriggerOrderChoice.playerId === board.player.playerId
+      ? board.player.name
+      : board.opponent.name
+    : null;
   const waitingReadyChoice =
     sourceProjection.pendingChoice?.type === "readyCards" &&
     sourceProjection.pendingChoice.playerId !== sourceProjection.viewerPlayerId
@@ -840,14 +853,31 @@ export const GameBoard: FC<GameBoardProps> = ({
             tone="amber"
           />
         )}
-      {showdownPrompt && showdownBattlefieldName && (
+      {waitingTriggerOrderChoice && waitingTriggerOrderPlayerName && (
+        <PendingChoiceStatus
+          message={
+            <>
+              Waiting for {waitingTriggerOrderPlayerName} to choose the order
+              of triggered abilities.
+            </>
+          }
+          title="Triggered abilities"
+          tone="amber"
+        />
+      )}
+      {showdownPrompt &&
+        showdownBattlefieldName &&
+        !sourceProjection.pendingChoice && (
         <ShowdownPrompt
+          attackerMight={showdownPrompt.attackerMight}
           battlefieldName={showdownBattlefieldName}
+          defenderMight={showdownPrompt.defenderMight}
           focusPlayerId={showdownPrompt.focusPlayerId}
           hasFocus={showdownPrompt.hasFocus}
           hasPriority={showdownPrompt.hasPriority}
           isClosed={showdownPrompt.isClosed}
           isCombat={showdownPrompt.kind === "combat"}
+          isFinalFocusPass={showdownPrompt.isFinalFocusPass}
           onPassFocus={showdownPrompt.canPassFocus ? onPass : undefined}
           priorityPlayerId={showdownPrompt.priorityPlayerId}
         />

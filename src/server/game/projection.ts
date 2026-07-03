@@ -69,14 +69,17 @@ export function projectGame(input: {
       ...input.game.state.showdown,
       priorityPlayerId: input.game.state.chain?.priorityPlayerId ?? null
     } : null,
-    pendingChoice: input.game.state.pendingChoice?.type === "orderTriggers"
-      && input.game.state.pendingChoice.playerId === input.viewerPlayerId ? {
+    pendingChoice: input.game.state.pendingChoice?.type === "orderTriggers" ? {
       type: "orderTriggers",
       id: input.game.state.pendingChoice.id,
       playerId: input.game.state.pendingChoice.playerId,
       prompt: "Choose the order for triggered abilities.",
-      optionIds: input.game.state.pendingChoice.optionIds,
-      pendingChainItems: input.game.state.pendingChoice.pendingItems.map((item) => projectChainItem(item, view, definitions, instances))
+      optionIds: input.game.state.pendingChoice.playerId === input.viewerPlayerId
+        ? input.game.state.pendingChoice.optionIds
+        : [],
+      pendingChainItems: input.game.state.pendingChoice.playerId === input.viewerPlayerId
+        ? input.game.state.pendingChoice.pendingItems.map((item) => projectChainItem(item, view, definitions, instances))
+        : []
     } : input.game.state.pendingChoice?.type === "readyCards" ? {
       type: "readyCards",
       id: input.game.state.pendingChoice.id,

@@ -13,20 +13,52 @@ export function actionsForSource(
 }
 
 export function showdownPromptState(
-  projection: Pick<GameProjection, "chain" | "showdown" | "viewerPlayerId">
+  projection: Pick<GameProjection, "chain" | "showdown" | "viewerPlayerId"> &
+    Partial<Pick<GameProjection, "battlefields" | "combat" | "pendingChoice">>
 ) {
   const showdown = projection.showdown;
   if (!showdown) return null;
   const isClosed = projection.chain !== null;
   const hasFocus = showdown.focusPlayerId === projection.viewerPlayerId;
   const priorityPlayerId = projection.chain?.priorityPlayerId ?? null;
+  const isFinalFocusPass =
+    hasFocus &&
+    !isClosed &&
+    showdown.relevantPlayerIds.every(
+      (playerId) =>
+        playerId === projection.viewerPlayerId ||
+        showdown.passedPlayerIds.includes(playerId)
+    );
+  const battlefield = projection.battlefields?.find(
+    (candidate) => candidate.battlefieldId === showdown.battlefieldId
+  );
+  const combat = projection.combat;
+  const mightFor = (unitIds: readonly string[]) =>
+    battlefield?.units
+      .filter((unit) => unitIds.includes(unit.instanceId))
+      .reduce(
+        (total, unit) =>
+          total + (unit.computedMight ?? unit.might ?? 0),
+        0
+      ) ?? null;
+  const attackerMight =
+    combat?.battlefieldId === showdown.battlefieldId
+      ? mightFor(combat.attackerUnitIds)
+      : null;
+  const defenderMight =
+    combat?.battlefieldId === showdown.battlefieldId
+      ? mightFor(combat.defenderUnitIds)
+      : null;
   return {
+    attackerMight,
     battlefieldId: showdown.battlefieldId,
-    canPassFocus: hasFocus && !isClosed,
+    canPassFocus: hasFocus && !isClosed && !projection.pendingChoice,
+    defenderMight,
     focusPlayerId: showdown.focusPlayerId,
     hasFocus,
     hasPriority: priorityPlayerId === projection.viewerPlayerId,
     isClosed,
+    isFinalFocusPass,
     kind: showdown.kind,
     passedPlayerIds: showdown.passedPlayerIds,
     priorityPlayerId

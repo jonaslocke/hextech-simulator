@@ -71,6 +71,89 @@ test("derives active and waiting showdown prompts from Focus", () => {
   assert.equal(closed?.priorityPlayerId, "p2");
 });
 
+test("describes the final combat Focus pass with live Might", () => {
+  const card = (
+    instanceId: string,
+    ownerPlayerId: string,
+    might: number
+  ) => ({
+    instanceId,
+    ownerPlayerId,
+    name: instanceId,
+    imageUrl: null,
+    rulesText: "",
+    publicCode: `${instanceId}/1`,
+    type: "Unit",
+    supertype: null,
+    domains: [],
+    energy: 0,
+    might,
+    power: 0,
+    computedMight: might,
+    damage: 0,
+    exhausted: false
+  });
+  const showdown = {
+    kind: "combat" as const,
+    battlefieldId: "arena",
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p2",
+    priorityPlayerId: null,
+    passedPlayerIds: ["p1"]
+  };
+  const prompt = showdownPromptState({
+    battlefields: [{
+      battlefieldId: "arena",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      contestedByPlayerId: "p1",
+      card: {
+        ...card("arena-card", "p2", 0),
+        type: "Battlefield"
+      },
+      units: [
+        card("attacker", "p1", 5),
+        card("defender", "p2", 3)
+      ],
+      facedownCard: null
+    }],
+    chain: null,
+    combat: {
+      battlefieldId: "arena",
+      stage: "showdown",
+      attackerPlayerId: "p1",
+      defenderPlayerId: "p2",
+      attackerUnitIds: ["attacker"],
+      defenderUnitIds: ["defender"],
+      attackerMight: null,
+      defenderMight: null
+    },
+    pendingChoice: null,
+    showdown,
+    viewerPlayerId: "p2"
+  });
+
+  assert.equal(prompt?.isFinalFocusPass, true);
+  assert.equal(prompt?.attackerMight, 5);
+  assert.equal(prompt?.defenderMight, 3);
+  assert.equal(prompt?.canPassFocus, true);
+
+  const blocked = showdownPromptState({
+    chain: null,
+    pendingChoice: {
+      type: "orderTriggers",
+      id: "choice",
+      playerId: "p1",
+      prompt: "Order triggers",
+      optionIds: [],
+      pendingChainItems: []
+    },
+    showdown,
+    viewerPlayerId: "p2"
+  });
+  assert.equal(blocked?.canPassFocus, false);
+});
+
 test("stages a single-unit move through the simultaneous move action", () => {
   const singleMove: ProjectedAction = {
     id: "game:1:action:move:unit-a:battlefield",
