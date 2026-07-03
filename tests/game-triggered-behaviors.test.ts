@@ -66,7 +66,7 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
   assert.equal(game.state.chain?.items.at(-1)?.controllerPlayerId, "p1");
   assert.equal(game.state.turn?.phase, "end");
   game = resolveTopChainItem(game, decks);
-  assert.equal(game.state.pendingChoice?.type, "readyCards");
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
   assert.equal(game.state.turn?.activePlayerId, "p1");
   const waitingProjection = projectGame({
     game,
@@ -177,7 +177,7 @@ test("each conquered Targon's Peak readies two independently chosen runes", () =
   assert.equal(game.state.turn?.activePlayerId, "p1");
 
   game = resolveTopChainItem(game, decks);
-  assert.equal(game.state.pendingChoice?.type, "readyCards");
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
   const secondReady = gameplayActions(game, "p1", decks)[0]!;
   assert.deepEqual(secondReady.targets[0]?.legalIds, ["rune5", "rune6"]);
   game = performGameplayAction({
@@ -283,7 +283,7 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
       players: { p1: { playerId: "p1", energy: 0, conditionalEnergy: 0, power: {}, zones: zones("p1") }, p2: { playerId: "p2", energy: 0, conditionalEnergy: 0, power: {}, zones: zones("p2") } },
       battlefields: ["paper", "peak", "climb"].map((id) => ({ battlefieldId: id, cardInstanceId: id, selectedByPlayerId: "p1", units: [] })),
-      cardStates: states, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null, combat: null, modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
+      cardStates: states, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null, combat: null, modifiers: [], delayedEffects: [], effectResolutions: [], pendingChoice: null, queuedTriggerChoices: []
     }
   };
   return { game, decks };

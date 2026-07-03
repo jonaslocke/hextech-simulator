@@ -105,6 +105,26 @@ export function createPrimitiveHandlers(
     }
   });
   handlers.set("action.ready_cards", {
+    choice(binding, context) {
+      if (binding.parameters.target !== "runes") return null;
+      const legalIds = context.game.state.players[
+        context.controllerPlayerId
+      ]!.zones.base.filter(
+        (id) =>
+          definitionForInstance(id, index).card.classification.type ===
+            "Rune" && context.game.state.cardStates[id]?.exhausted,
+      );
+      const count = numberParam(binding, "count");
+      const required = Math.min(count, legalIds.length);
+      return required > 0
+        ? {
+            legalIds,
+            minimum: required,
+            maximum: required,
+            prompt: `Choose ${required} runes to ready.`,
+          }
+        : null;
+    },
     execute(binding, context) {
       const ids = binding.parameters.target === "runes"
         ? context.selectedIds.length > 0

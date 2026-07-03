@@ -100,12 +100,13 @@ const combatDamageChoiceSchema = z.object({
   targetUnitIds: z.array(z.string().min(1))
 });
 
-const readyCardsChoiceSchema = z.object({
+const effectSelectionChoiceSchema = z.object({
   id: z.string().min(1),
   playerId: z.string().min(1),
-  type: z.literal("readyCards"),
-  delayedEffectId: z.string().min(1),
-  endingPlayerId: z.string().min(1),
+  type: z.literal("effectSelection"),
+  resolutionId: z.string().min(1),
+  bindingKey: z.string().min(1),
+  prompt: z.string().min(1),
   legalCardIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative()
@@ -161,10 +162,20 @@ export const gameStateSchema = z.object({
     sourceCardInstanceId: z.string().min(1), clauseId: z.string().min(1),
     selectedIds: z.array(z.string())
   })),
+  effectResolutions: z.array(z.object({
+    id: z.string().min(1),
+    controllerPlayerId: z.string().min(1),
+    sourceCardInstanceId: z.string().min(1),
+    clauseId: z.string().min(1),
+    nextEffectIndex: z.number().int().nonnegative(),
+    delayedEffectId: z.string().min(1).nullable(),
+    endingPlayerId: z.string().min(1).nullable(),
+    selectionsByBinding: z.record(z.array(z.string()))
+  })),
   pendingChoice: z.discriminatedUnion("type", [
     triggerOrderChoiceSchema,
     combatDamageChoiceSchema,
-    readyCardsChoiceSchema
+    effectSelectionChoiceSchema
   ]).nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema)
 });
@@ -263,7 +274,8 @@ export function createInitialGame(input: {
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
       players, battlefields: [], cardStates, turn: null, chain: null, showdown: null, combat: null,
-      modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
+      modifiers: [], delayedEffects: [], effectResolutions: [],
+      pendingChoice: null, queuedTriggerChoices: []
     }
   });
 }

@@ -83,11 +83,11 @@ export function projectGame(input: {
       pendingChainItems: input.game.state.pendingChoice.playerId === input.viewerPlayerId
         ? input.game.state.pendingChoice.pendingItems.map((item) => projectChainItem(item, view, definitions, instances))
         : []
-    } : input.game.state.pendingChoice?.type === "readyCards" ? {
+    } : input.game.state.pendingChoice?.type === "effectSelection" ? {
       type: "readyCards",
       id: input.game.state.pendingChoice.id,
       playerId: input.game.state.pendingChoice.playerId,
-      prompt: `Choose ${input.game.state.pendingChoice.maximum} runes to ready.`,
+      prompt: input.game.state.pendingChoice.prompt,
       minimum: input.game.state.pendingChoice.minimum,
       maximum: input.game.state.pendingChoice.maximum
     } : input.game.state.pendingChoice?.type === "assignCombatDamage" ? {

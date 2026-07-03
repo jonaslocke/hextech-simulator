@@ -194,7 +194,7 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
       battlefields: [{ battlefieldId: "p1:bf", cardInstanceId: "p1:bf", selectedByPlayerId: "p1", units: [] }],
       cardStates: { "p1:rune": { exhausted: false, damage: 0, computedMight: null }, "p1:rune-b": { exhausted: false, damage: 0, computedMight: null }, "p1:unit": { exhausted: false, damage: 0, computedMight: 1 }, "p1:mover": { exhausted: false, damage: 0, computedMight: 1 }, "p1:spell": { exhausted: false, damage: 0, computedMight: null }, "p1:draw": { exhausted: false, damage: 0, computedMight: 1 }, "p1:bf": { exhausted: false, damage: 0, computedMight: null } },
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" }, chain: null, showdown: null, combat: null,
-      modifiers: [], delayedEffects: [], pendingChoice: null, queuedTriggerChoices: []
+      modifiers: [], delayedEffects: [], effectResolutions: [], pendingChoice: null, queuedTriggerChoices: []
     }
   };
   return { game, decks };

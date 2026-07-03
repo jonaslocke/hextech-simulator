@@ -23,6 +23,15 @@ export type BehaviorHandler = {
   matches?(binding: BehaviorBinding, context: BehaviorExecutionContext): boolean;
   targets?(binding: BehaviorBinding, context: BehaviorExecutionContext): ProjectedTargetRequirement;
   execute?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
+  choice?(
+    binding: BehaviorBinding,
+    context: BehaviorExecutionContext,
+  ): {
+    legalIds: string[];
+    minimum: number;
+    maximum: number;
+    prompt: string;
+  } | null;
 };
 
 export type BehaviorHandlerRegistry = ReadonlyMap<string, BehaviorHandler>;
@@ -88,7 +97,9 @@ export function executeBehaviorClause(input: {
   const requirements = targetRequirementsForClause(clause, context, handlers);
   validateSelections(requirements, context.selectedIds);
   clause.selectors.forEach((binding, index) => {
-    context.selectedBySelector[binding.behaviorId] = selectedForRequirement(requirements[index]!, context.selectedIds);
+    context.selectedBySelector[
+      `${clause.id}:selectors:${binding.order}`
+    ] = selectedForRequirement(requirements[index]!, context.selectedIds);
   });
   const delayed = clause.timings.find((binding) => binding.behaviorId === "timing.delayed");
   if (delayed) {

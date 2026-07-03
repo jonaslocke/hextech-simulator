@@ -373,6 +373,7 @@ function combatFixture(input: {
       combat: null,
       modifiers: [],
       delayedEffects: [],
+      effectResolutions: [],
       pendingChoice: null,
       queuedTriggerChoices: []
     }

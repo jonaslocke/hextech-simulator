@@ -3,7 +3,6 @@ import {
   compileBehaviorModel,
   createBehaviorContext,
   executeBehaviorClause,
-  executeBehaviorEffects,
   submitTriggerOrder,
   targetRequirementsForClause,
 } from "./behavior-runtime";
@@ -50,6 +49,7 @@ import {
   type GameTransition,
 } from "./transitions";
 import { buildPaymentPlan, payCardCost } from "./payment";
+import { submitEffectSelection } from "./effect-resolution";
 
 // Non-standard rules override. Disable to require normal Action/Reaction timing.
 const ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY = true;
@@ -88,7 +88,7 @@ export function gameplayActions(
       );
       return actions;
     }
-    if (pendingChoice.type === "readyCards") {
+    if (pendingChoice.type === "effectSelection") {
       actions.push(
         action(
           game,
@@ -453,14 +453,13 @@ export function performGameplayAction(input: {
       );
       break;
     case "readyCards":
-      submitReadyCards(
+      submitEffectSelection(
         game,
         input.actorPlayerId,
         input.selectedIds,
-        index,
-        handlers,
         input.decks,
       );
+      finishEndTurnIfReady(game, index, input.decks);
       break;
     case "pass":
       passPriority(game, input.actorPlayerId, index, handlers, input.decks);
@@ -793,50 +792,6 @@ function completeEndTurn(
     phase: "action",
   };
   applyStartOfTurn(game, decks, index);
-}
-
-function submitReadyCards(
-  game: GameDocument,
-  actor: string,
-  selectedIds: string[],
-  index: RuntimeCardIndex,
-  handlers: ReturnType<typeof createPrimitiveHandlers>,
-  decks: readonly DeckSnapshotDocument[],
-) {
-  const pending = game.state.pendingChoice;
-  if (!pending || pending.type !== "readyCards" || pending.playerId !== actor) {
-    throw new Error("Ready cards choice is not available.");
-  }
-  const effect = game.state.delayedEffects.find(
-    (candidate) => candidate.id === pending.delayedEffectId,
-  );
-  if (!effect) throw new Error("Delayed ready effect is unavailable.");
-  const definition = definitionForInstance(effect.sourceCardInstanceId, index);
-  const clause = compileBehaviorModel(
-    definition.behaviorModel,
-    handlers,
-  ).clauses.find((candidate) => candidate.id === effect.clauseId);
-  if (!clause)
-    throw new Error(
-      `Delayed behavior clause is unavailable: ${effect.clauseId}`,
-    );
-
-  game.state.pendingChoice = null;
-  executeBehaviorEffects(
-    clause,
-    createBehaviorContext(
-      game,
-      effect.controllerPlayerId,
-      effect.sourceCardInstanceId,
-      null,
-      selectedIds,
-    ),
-    handlers,
-  );
-  game.state.delayedEffects = game.state.delayedEffects.filter(
-    (candidate) => candidate.id !== effect.id,
-  );
-  finishEndTurnIfReady(game, index, decks);
 }
 
 function finishEndTurnIfReady(
