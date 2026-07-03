@@ -89,6 +89,8 @@ type AssignCombatDamagePendingChoice = {
   totalDamage: number;
   type: "assignCombatDamage";
 };
+type PaymentMode =
+  BoardPlayerProjection["availablePaymentModes"][string][number];
 
 const EMPTY_TARGET_IDS: string[] = [];
 
@@ -188,6 +190,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     minTargets: number;
     purpose: "choice" | "move" | "play";
     selectedTargetIds: string[];
+  } | null>(null);
+  const [unitPlayChoice, setUnitPlayChoice] = useState<{
+    card: Card;
+    modes: PaymentMode[];
   } | null>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
@@ -492,8 +498,14 @@ export const GameBoard: FC<GameBoardProps> = ({
     }
 
     const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+    const enabledModes = modes.filter((candidate) => candidate.enabled);
 
-    const mode = modes.find((candidate) => candidate.enabled);
+    if (enabledModes.length > 1) {
+      setUnitPlayChoice({ card, modes });
+      return;
+    }
+
+    const mode = enabledModes[0];
 
     submitPlayCard({
       canPlay: Boolean(mode),
@@ -1002,6 +1014,28 @@ export const GameBoard: FC<GameBoardProps> = ({
           options={pendingChoiceOptions}
           selectionMode="ordered"
           title={triggerOrderChoice.prompt}
+        />
+      )}
+      {unitPlayChoice && (
+        <ChoiceDialog
+          confirmLabel="Play unit"
+          description="Units may be played to your Base or a battlefield you control."
+          isOpen
+          onCancel={() => setUnitPlayChoice(null)}
+          onConfirm={([actionId]) => {
+            const card = unitPlayChoice.card;
+            setUnitPlayChoice(null);
+            if (actionId) beginPlayOrTargetSelection(card, actionId);
+          }}
+          options={unitPlayChoice.modes.map((mode) => ({
+            disabled: !mode.enabled,
+            id: mode.id,
+            label: mode.enabled
+              ? mode.label
+              : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
+          }))}
+          selectionMode="single"
+          title={`Choose where to play ${unitPlayChoice.card.name}`}
         />
       )}
       {combatDamageAction?.choice?.kind === "combatDamage" && (

@@ -363,6 +363,7 @@ export function performGameplayAction(input: {
         game,
         input.actorPlayerId,
         source,
+        extra,
         input.selectedIds,
         index,
         handlers,
@@ -504,6 +505,7 @@ function playCard(
   game: GameDocument,
   playerId: string,
   cardId: string,
+  destinationId: string,
   selectedIds: string[],
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
@@ -511,13 +513,29 @@ function playCard(
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
+  const isUnit = definition.card.classification.type === "Unit";
+  const destinationBattlefield = isUnit && destinationId !== "base"
+    ? game.state.battlefields.find(
+        (battlefield) =>
+          battlefield.battlefieldId === destinationId &&
+          battlefield.controllerPlayerId === playerId,
+      )
+    : null;
+  if (
+    isUnit &&
+    destinationId !== "base" &&
+    !destinationBattlefield
+  ) {
+    throw new Error("Unit play destination is not controlled by the player.");
+  }
   const energyCost = effectiveEnergyCost(game, playerId, definition);
   pay(game, playerId, definition, energyCost, index, !game.state.showdown);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
-  if (definition.card.classification.type === "Unit") {
-    player.zones.base.push(cardId);
+  if (isUnit) {
+    if (destinationBattlefield) destinationBattlefield.units.push(cardId);
+    else player.zones.base.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
     executeImmediateClauses(
       game,
@@ -1171,18 +1189,40 @@ function addPlayableCardActions(
         : allowAutomaticSources
           ? "Card costs cannot be paid."
           : showdownPaymentRequirement(definition, cost);
-    actions.push(
-      action(
-        game,
-        "play",
-        `Play ${definition.card.name}`,
-        cardId,
-        enabled,
-        disabledReason,
-        undefined,
-        targets,
-      ),
-    );
+    const unitDestinations =
+      definition.card.classification.type === "Unit"
+        ? [
+            { id: "base", name: "Base" },
+            ...game.state.battlefields
+              .filter(
+                (battlefield) =>
+                  battlefield.controllerPlayerId === playerId,
+              )
+              .map((battlefield) => ({
+                id: battlefield.battlefieldId,
+                name: definitionForInstance(
+                  battlefield.cardInstanceId,
+                  index,
+                ).card.name,
+              })),
+          ]
+        : null;
+    for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
+      actions.push(
+        action(
+          game,
+          "play",
+          unitDestinations
+            ? `Play ${definition.card.name} to ${destination.name}`
+            : `Play ${definition.card.name}`,
+          cardId,
+          enabled,
+          disabledReason,
+          destination.id,
+          targets,
+        ),
+      );
+    }
   }
   void decks;
 }

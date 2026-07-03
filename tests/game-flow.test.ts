@@ -112,13 +112,58 @@ test("awakening readies only the new turn player's battlefield units", () => {
 
 test("automatically pays card costs with behavior-backed rune abilities", () => {
   const { game: initial, decks } = fixture();
-  const play = gameplayActions(initial, "p1", decks).find((action) => action.label === "Play Unit")!;
+  const play = gameplayActions(initial, "p1", decks).find(
+    (action) => action.label === "Play Unit to Base"
+  )!;
   const game = performGameplayAction({ game: initial, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
   assert.ok(game.state.players.p1!.zones.runeDeck.includes("p1:rune"));
   assert.equal(game.state.cardStates["p1:rune"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:rune-b"));
   assert.equal(game.state.cardStates["p1:rune-b"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
+});
+
+test("plays Units to Base or a controlled battlefield and rejects forged destinations", () => {
+  const { game, decks } = fixture();
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+
+  const actions = gameplayActions(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === "p1:unit"
+  );
+  assert.deepEqual(
+    actions.map((action) => action.label),
+    ["Play Unit to Base", "Play Unit to Arena"]
+  );
+
+  const battlefieldPlay = actions.find(
+    (action) => action.label === "Play Unit to Arena"
+  )!;
+  assert.throws(
+    () => performGameplayAction({
+      game,
+      actorPlayerId: "p1",
+      actionId: battlefieldPlay.id.replace(
+        encodeURIComponent("p1:bf"),
+        encodeURIComponent("forged-battlefield")
+      ),
+      selectedIds: [],
+      decks,
+      now: "forged"
+    }),
+    /Action is not legal/
+  );
+
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: battlefieldPlay.id,
+    selectedIds: [],
+    decks,
+    now: "battlefield-play"
+  });
+  assert.ok(next.state.battlefields[0]!.units.includes("p1:unit"));
+  assert.equal(next.state.players.p1!.zones.base.includes("p1:unit"), false);
+  assert.equal(next.state.cardStates["p1:unit"]!.exhausted, true);
 });
 
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
