@@ -21,7 +21,6 @@ import {
   resolveNonCombatShowdown,
   unitControllers,
 } from "./board-rules";
-import { applyHoldScoring } from "./scoring";
 import {
   beginCombatDamage,
   combatChoiceTargets,
@@ -50,6 +49,7 @@ import {
 } from "./transitions";
 import { buildPaymentPlan, payCardCost } from "./payment";
 import { submitEffectSelection } from "./effect-resolution";
+import { applyStartOfTurn, isStartOfTurnPhase } from "./turns";
 
 // Non-standard rules override. Disable to require normal Action/Reaction timing.
 const ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY = true;
@@ -391,7 +391,7 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
-        finishEndTurnIfReady(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       }
       break;
     case "activate": {
@@ -737,7 +737,7 @@ function passPriority(
         }
       }
       cleanupBoard(game, index);
-      finishEndTurnIfReady(game, index, decks);
+      finishTurnProgressionIfReady(game, index, decks);
     } else {
       game.state.chain.passedPlayerIds = passed;
       game.state.chain.priorityPlayerId = nextRelevantPlayer(
@@ -801,61 +801,23 @@ function completeEndTurn(
   game.state.turn = {
     turnNumber: turn.turnNumber + 1,
     activePlayerId: next,
-    phase: "action",
+    phase: "awaken",
   };
   applyStartOfTurn(game, decks, index);
 }
 
-function finishEndTurnIfReady(
+function finishTurnProgressionIfReady(
   game: GameDocument,
   index: RuntimeCardIndex,
   decks: readonly DeckSnapshotDocument[],
 ) {
   const turn = game.state.turn;
-  if (turn?.phase === "end" && !game.state.chain && !game.state.pendingChoice) {
+  if (!turn || game.state.chain || game.state.pendingChoice) return;
+  if (turn.phase === "end") {
     completeEndTurn(game, turn.activePlayerId, index, decks);
+  } else if (isStartOfTurnPhase(turn.phase)) {
+    applyStartOfTurn(game, decks, index);
   }
-}
-
-export function applyStartOfTurn(
-  game: GameDocument,
-  decks: readonly DeckSnapshotDocument[] = [],
-  runtimeIndex?: RuntimeCardIndex,
-) {
-  const turn = game.state.turn;
-  if (!turn)
-    throw new Error("A turn is required to apply start-of-turn steps.");
-  for (const candidate of Object.values(game.state.players)) {
-    candidate.energy = 0;
-    candidate.power = {};
-    candidate.conditionalEnergy = 0;
-  }
-  for (const state of Object.values(game.state.cardStates)) state.damage = 0;
-  const player = game.state.players[turn.activePlayerId]!;
-  player.scoredBattlefieldIdsThisTurn = [];
-  if (decks.length) applyHoldScoring(game, turn.activePlayerId, decks);
-  if (game.status === "complete") return;
-  const index =
-    runtimeIndex ?? (decks.length ? createRuntimeCardIndex(decks) : null);
-  const controlledBattlefieldUnits = game.state.battlefields
-    .flatMap((battlefield) => battlefield.units)
-    .filter(
-      (cardId) =>
-        index?.instances.get(cardId)?.ownerPlayerId === turn.activePlayerId,
-    );
-  for (const cardId of [...player.zones.base, ...controlledBattlefieldUnits]) {
-    if (game.state.cardStates[cardId])
-      game.state.cardStates[cardId]!.exhausted = false;
-  }
-  const isNonStartingPlayersFirstTurn =
-    turn.turnNumber === 2 &&
-    turn.activePlayerId !== game.state.setup.startingPlayerId;
-  draw(
-    player.zones.runeDeck,
-    player.zones.base,
-    isNonStartingPlayersFirstTurn ? 3 : 2,
-  );
-  draw(player.zones.mainDeck, player.zones.hand, 1);
 }
 
 function action(
@@ -1309,9 +1271,6 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
   ) {
     throw new Error("Selected targets are not legal for this action.");
   }
-}
-function draw(source: string[], destination: string[], count: number) {
-  destination.push(...source.splice(0, Math.min(count, source.length)));
 }
 function otherPlayer(game: GameDocument, playerId: string) {
   return game.state.setup.playerIds.find((id) => id !== playerId)!;

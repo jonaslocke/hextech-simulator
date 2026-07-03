@@ -9,7 +9,7 @@ Baseline: `ca93632`
   payment continues to use the discounted cost.
 - [x] 2. Keep the rune zone usable with more than seven runes.
 - [x] 3. Close the chain overlay when its final item resolves.
-- [ ] 4. Pause start-of-turn progression for Hold triggers before Channel.
+- [x] 4. Pause start-of-turn progression for Hold triggers before Channel.
 - [ ] 5. Run the complete regression gate and record the delivered commits.
 
 Each implementation milestone receives one normal commit after its focused
@@ -27,7 +27,7 @@ typecheck, lint, and production-build gate. Resume by inspecting this document,
   ![Rune spacing overflow](image-50.png)
 - [x] When the last item leaves the chain, the chain overlay should close.
   ![Empty chain overlay](image-51.png)
-- [ ] The Papertree trigger is sequenced incorrectly. Hold happens during step
+- [x] The Papertree trigger is sequenced incorrectly. Hold happens during step
   B of the ABCD start-of-turn sequence, so its trigger must resolve before step
   C, Channel.
   ![Papertree Hold trigger after Channel](image-52.png)
@@ -35,4 +35,4 @@ typecheck, lint, and production-build gate. Resume by inspecting this document,
 ## Verification record
 
 - Runtime reset required: no.
-- Current milestone: 4.
+- Current milestone: 5.

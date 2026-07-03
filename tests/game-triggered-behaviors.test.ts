@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  applyHoldScoring, dispatchBehaviorEvent, gameplayActions, performGameplayAction,
+  applyHoldScoring, applyStartOfTurn, createRuntimeCardIndex,
+  dispatchBehaviorEvent, gameplayActions, performGameplayAction,
   projectGame, victoryRequirement, GAME__RUNTIME_COVERAGE,
   scoreBattlefield, stateChangeEvents,
   type DeckSnapshotDocument, type GameDocument
@@ -93,6 +94,39 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
   assert.equal(game.state.cardStates.rune3!.exhausted, false);
   assert.equal(game.state.turn?.activePlayerId, "p2");
   assert.equal(victoryRequirement(game, decks), 9);
+});
+
+test("resolves Beginning Hold triggers before Channel and Draw", () => {
+  const { game: initial, decks } = fixture();
+  let game = initial;
+  const papertree = game.state.battlefields.find(
+    (battlefield) => battlefield.cardInstanceId === "paper",
+  )!;
+  papertree.controllerPlayerId = "p1";
+  game.state.turn = {
+    turnNumber: 3,
+    activePlayerId: "p1",
+    phase: "awaken",
+  };
+  const handBefore = game.state.players.p1!.zones.hand.length;
+
+  applyStartOfTurn(game, decks, createRuntimeCardIndex(decks));
+
+  assert.equal(game.state.turn!.phase, "channel");
+  assert.equal(game.state.chain?.items.at(-1)?.label, "Paper");
+  assert.deepEqual(game.state.players.p1!.zones.runeDeck, ["rune3"]);
+  assert.deepEqual(game.state.players.p2!.zones.runeDeck, ["rune4"]);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore);
+
+  game = resolveTopChainItem(game, decks);
+
+  assert.equal(game.state.chain, null);
+  assert.equal(game.state.turn!.phase, "action");
+  assert.ok(game.state.players.p1!.zones.base.includes("rune3"));
+  assert.ok(game.state.players.p2!.zones.base.includes("rune4"));
+  assert.equal(game.state.cardStates.rune3!.exhausted, true);
+  assert.equal(game.state.cardStates.rune4!.exhausted, true);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
 });
 
 test("each conquered Targon's Peak readies two independently chosen runes", () => {

@@ -1,7 +1,7 @@
 import type { ProjectedAction } from "../../shared/game";
 import { createHash } from "node:crypto";
 import type { DeckRuntimeSnapshot, GameDocument } from "./state";
-import { applyStartOfTurn } from "./actions";
+import { applyStartOfTurn } from "./turns";
 
 export function setupActions(game: GameDocument, actorPlayerId: string): ProjectedAction[] {
   if (game.status !== "setup_pending") return [];
@@ -59,7 +59,7 @@ export function performSetupAction(input: {
     if (input.selectedIds.length > 0) applyMulligan(game, input.actorPlayerId, input.selectedIds);
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
-      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "action" };
+      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken" };
       applyStartOfTurn(game);
     }
   }
