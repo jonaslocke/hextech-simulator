@@ -181,7 +181,11 @@ export function createPrimitiveHandlers(
       const player = context.game.state.players[context.controllerPlayerId]!;
       player.zones.base = player.zones.base.filter((id) => id !== context.sourceCardInstanceId);
       player.zones.runeDeck.push(context.sourceCardInstanceId);
-      resetStateAfterLeavingBoard(context.game, context.sourceCardInstanceId);
+      resetStateAfterLeavingBoard(
+        context.game,
+        context.sourceCardInstanceId,
+        index,
+      );
       const domain = definitionForInstance(context.sourceCardInstanceId, index).card.classification.domain[0] ?? "Rainbow";
       player.power[domain] = (player.power[domain] ?? 0) + 1;
     }
@@ -244,7 +248,11 @@ function modifierIsActive(game: GameDocument, sourceId: string | null, duration:
   if (duration === "whileSourceOnBoard") return game.state.battlefields.some((battlefield) => battlefield.cardInstanceId === sourceId || battlefield.units.includes(sourceId));
   return true;
 }
-function recomputeMight(game: GameDocument, id: string, index: RuntimeCardIndex) {
+export function recomputeMight(
+  game: GameDocument,
+  id: string,
+  index: RuntimeCardIndex,
+) {
   let value = definitionForInstance(id, index).card.attributes.might ?? 0;
   for (const modifier of game.state.modifiers.filter((item) => item.attribute === "might" && item.targetCardInstanceId === id && modifierIsActive(game, item.sourceCardInstanceId, item.duration))) {
     if (modifier.operation === "increase") value += modifier.amount;
@@ -253,7 +261,35 @@ function recomputeMight(game: GameDocument, id: string, index: RuntimeCardIndex)
     if (modifier.operation === "set") value = modifier.amount;
     if (modifier.minimum !== null) value = Math.max(value, modifier.minimum);
   }
+  const combatRole = game.state.cardStates[id]?.combatRole;
+  if (combatRole === "attacker") {
+    value += keywordAmount(id, "keyword.assault", index);
+  }
+  if (combatRole === "defender") {
+    value += keywordAmount(id, "keyword.shield", index);
+  }
   game.state.cardStates[id]!.computedMight = Math.max(0, value);
+}
+
+export function keywordAmount(
+  cardInstanceId: string,
+  behaviorId: string,
+  index: RuntimeCardIndex,
+) {
+  return definitionForInstance(
+    cardInstanceId,
+    index,
+  ).behaviorModel.clauses
+    .flatMap((clause) => clause.keywords)
+    .filter((binding) => binding.behaviorId === behaviorId)
+    .reduce(
+      (sum, binding) =>
+        sum +
+        (typeof binding.parameters.amount === "number"
+          ? binding.parameters.amount
+          : 1),
+      0,
+    );
 }
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
@@ -283,13 +319,24 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     battlefield.units = battlefield.units.filter((item) => item !== id);
   });
   zones.trash.push(id);
-  resetStateAfterLeavingBoard(game, id);
+  resetStateAfterLeavingBoard(game, id, index);
 }
-function resetStateAfterLeavingBoard(game: GameDocument, id: string) {
+function resetStateAfterLeavingBoard(
+  game: GameDocument,
+  id: string,
+  index?: RuntimeCardIndex,
+) {
   const state = game.state.cardStates[id];
   if (!state) return;
   state.damage = 0;
   state.exhausted = false;
+  state.combatRole = null;
+  if (
+    index &&
+    definitionForInstance(id, index).card.classification.type === "Unit"
+  ) {
+    recomputeMight(game, id, index);
+  }
 }
 function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];

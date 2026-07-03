@@ -71,6 +71,47 @@ test("requires lethal Tank assignment before non-Tank combat damage", () => {
   assert.ok(game.state.battlefields[0]!.units.includes("other"));
 });
 
+test("allows Tank ordering but requires every Tank before non-Tank damage", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 8,
+    defenders: [
+      { id: "tank-a", might: 3, tank: true },
+      { id: "tank-b", might: 2, tank: true },
+      { id: "other", might: 3 }
+    ]
+  });
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+  const assignment = gameplayActions(game, "p1", decks)[0]!;
+
+  assert.throws(() => performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: assignment.id,
+    selectedIds: [],
+    allocations: [
+      { targetUnitId: "tank-b", amount: 2 },
+      { targetUnitId: "other", amount: 3 },
+      { targetUnitId: "tank-a", amount: 3 }
+    ],
+    decks,
+    now: "invalid-multiple-tanks"
+  }), /Tank units must be assigned lethal damage first/);
+
+  assert.doesNotThrow(() => performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: assignment.id,
+    selectedIds: [],
+    allocations: [
+      { targetUnitId: "tank-b", amount: 2 },
+      { targetUnitId: "tank-a", amount: 3 },
+      { targetUnitId: "other", amount: 3 }
+    ],
+    decks,
+    now: "valid-multiple-tanks"
+  }));
+});
+
 test("locks Assault and Shield modifiers into combat Might totals", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 2,
@@ -80,7 +121,12 @@ test("locks Assault and Shield modifiers into combat Might totals", () => {
       { id: "support", might: 2 }
     ]
   });
-  const game = passShowdown(moveAttacker(initial, decks), decks);
+  const showdown = moveAttacker(initial, decks);
+  assert.equal(showdown.state.cardStates.attacker!.computedMight, 4);
+  assert.equal(showdown.state.cardStates.shield!.computedMight, 3);
+  assert.equal(showdown.state.cardStates.support!.computedMight, 2);
+
+  const game = passShowdown(showdown, decks);
   assert.equal(game.state.combat?.attackerMight, 4);
   assert.equal(game.state.combat?.defenderMight, 5);
   assert.equal(game.state.pendingChoice?.type, "assignCombatDamage");

@@ -5,6 +5,7 @@ import {
 } from "./board-rules";
 import {
   definitionForInstance,
+  recomputeMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
@@ -47,9 +48,11 @@ export function startCombat(
   );
   attackerUnitIds.forEach((id) => {
     game.state.cardStates[id]!.combatRole = "attacker";
+    recomputeMight(game, id, index);
   });
   defenderUnitIds.forEach((id) => {
     game.state.cardStates[id]!.combatRole = "defender";
+    recomputeMight(game, id, index);
   });
   game.state.combat = {
     battlefieldId,
@@ -118,13 +121,11 @@ export function beginCombatDamage(
   combat.attackerMight = totalCombatMight(
     game,
     combat.attackerUnitIds,
-    "attacker",
     index
   );
   combat.defenderMight = totalCombatMight(
     game,
     combat.defenderUnitIds,
-    "defender",
     index
   );
   combat.stage = "attackerAssignment";
@@ -291,6 +292,17 @@ function resolveCombat(
     state.combatRole = null;
     state.damage = 0;
   }
+  for (const id of [
+    ...combat.attackerUnitIds,
+    ...combat.defenderUnitIds,
+  ]) {
+    if (
+      game.state.cardStates[id] &&
+      definitionForInstance(id, index).card.classification.type === "Unit"
+    ) {
+      recomputeMight(game, id, index);
+    }
+  }
   game.state.pendingChoice = null;
   game.state.showdown = null;
   game.state.combat = null;
@@ -323,11 +335,17 @@ function validateDamageAssignments(
   const firstNonTank = assignments.findIndex(
     (entry) => !tankIds.includes(entry.targetUnitId)
   );
-  if (firstNonTank >= 0 && tankIds.some((id) =>
-    (assignments.find((entry) => entry.targetUnitId === id)?.amount ?? 0)
-      < lethalAmount(game, id)
-  )) {
-    throw new Error("Tank units must be assigned lethal damage first.");
+  if (firstNonTank >= 0) {
+    const tankAfterNonTank = assignments
+      .slice(firstNonTank + 1)
+      .some((entry) => tankIds.includes(entry.targetUnitId));
+    const incompleteTank = tankIds.some((id) =>
+      (assignments.find((entry) => entry.targetUnitId === id)?.amount ?? 0)
+        < lethalAmount(game, id)
+    );
+    if (tankAfterNonTank || incompleteTank) {
+      throw new Error("Tank units must be assigned lethal damage first.");
+    }
   }
   for (let indexPosition = 0; indexPosition < assignments.length - 1; indexPosition += 1) {
     const entry = assignments[indexPosition]!;
@@ -340,35 +358,19 @@ function validateDamageAssignments(
 function totalCombatMight(
   game: GameDocument,
   unitIds: string[],
-  role: "attacker" | "defender",
   index: RuntimeCardIndex
 ) {
   return unitIds.reduce((sum, id) => {
     const base = game.state.cardStates[id]?.computedMight
       ?? definitionForInstance(id, index).card.attributes.might
       ?? 0;
-    const keyword = role === "attacker" ? "keyword.assault" : "keyword.shield";
-    return sum + base + keywordAmount(id, keyword, index);
+    return sum + base;
   }, 0);
 }
 
 function lethalAmount(game: GameDocument, unitId: string) {
   const state = game.state.cardStates[unitId]!;
   return Math.max(1, (state.computedMight ?? 0) - state.damage);
-}
-
-function keywordAmount(
-  unitId: string,
-  behaviorId: string,
-  index: RuntimeCardIndex
-) {
-  return definitionForInstance(unitId, index).behaviorModel.clauses
-    .flatMap((clause) => clause.keywords)
-    .filter((binding) => binding.behaviorId === behaviorId)
-    .reduce((sum, binding) =>
-      sum + (typeof binding.parameters.amount === "number"
-        ? binding.parameters.amount
-        : 1), 0);
 }
 
 function hasKeyword(

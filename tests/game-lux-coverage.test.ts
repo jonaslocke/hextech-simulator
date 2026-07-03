@@ -9,7 +9,8 @@ import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
   buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot,
-  effectiveEnergyCost, gameplayActions, performGameplayAction,
+  combatChoiceTargets, createRuntimeCardIndex, effectiveEnergyCost,
+  gameplayActions, performGameplayAction,
   type DeckSnapshotDocument, type GameDocument
 } from "../src/server/game";
 
@@ -356,6 +357,73 @@ test("autopayment prioritizes Lux spell Energy before unrestricted rune Energy",
   assert.equal(
     orderRunes.filter((id) => next.state.cardStates[id]!.exhausted).length,
     2
+  );
+});
+
+test("uses real Lux Assault and Tank models during combat", async () => {
+  const template = await fixtureSnapshot();
+  const { game, decks } = runtimeFixture(template);
+  const daringPoro = instanceNamed(decks, "p1", "Daring Poro");
+  const attackerSupport = instanceNamed(decks, "p1", "Vanguard Sergeant");
+  const lecturingYordle = instanceNamed(decks, "p2", "Lecturing Yordle");
+  const defenderSupport = instanceNamed(decks, "p2", "Daring Poro");
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.selectedByPlayerId === "p2"
+  )!;
+
+  relocate(game, "p1", daringPoro, "base");
+  relocate(game, "p1", attackerSupport, "base");
+  relocateToBattlefield(game, "p2", lecturingYordle);
+  relocateToBattlefield(game, "p2", defenderSupport);
+  battlefield.controllerPlayerId = "p2";
+
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.id.split(":")[3] === "moveMany" &&
+      decodeURIComponent(action.id.split(":")[5] ?? "") ===
+        battlefield.battlefieldId &&
+      action.targets.some(
+        (target) =>
+          target.legalIds.includes(daringPoro) &&
+          target.legalIds.includes(attackerSupport)
+      )
+  )!;
+  let combat = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [daringPoro, attackerSupport],
+    decks,
+    now: "combat-move"
+  });
+  assert.equal(combat.state.cardStates[daringPoro]!.computedMight, 3);
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(combat, playerId, decks).find(
+      (action) => action.label === "Pass focus"
+    )!;
+    combat = performGameplayAction({
+      game: combat,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `combat-pass-${playerId}`
+    });
+  }
+
+  assert.equal(combat.state.pendingChoice?.type, "assignCombatDamage");
+  const targets = combatChoiceTargets(
+    combat,
+    createRuntimeCardIndex(decks)
+  );
+  assert.equal(
+    targets.find((target) => target.unitId === lecturingYordle)?.hasTank,
+    true
+  );
+  assert.equal(
+    targets.find((target) => target.unitId === defenderSupport)?.hasTank,
+    false
   );
 });
 
