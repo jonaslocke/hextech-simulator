@@ -10,6 +10,7 @@ import {
   performActionClient,
 } from "../api";
 import type { AcceptedMatch, SeatKey } from "../types";
+import { MatchResultDialog } from "./match-result-dialog";
 
 export function MatchSimulator() {
   const [match, setMatch] = useState<AcceptedMatch | null>(null);
@@ -303,6 +304,11 @@ export function MatchSimulator() {
             void performAction(input);
           }
         }}
+        projection={projection}
+      />
+      <MatchResultDialog
+        busy={busy}
+        onCreateMatch={() => void createMatch()}
         projection={projection}
       />
     </main>

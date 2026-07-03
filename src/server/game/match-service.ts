@@ -78,9 +78,12 @@ export async function performMatchAction(repositories: GameRepositories, input: 
   const next = transition
     ? transition.game
     : performSetupAction({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now });
-  const nextMatch = next.status === "in_progress"
-    ? { ...match, status: "in_progress" as const, updatedAt: now }
-    : match;
+  const nextMatch =
+    next.status === "complete"
+      ? { ...match, status: "complete" as const, updatedAt: now }
+      : next.status === "in_progress"
+        ? { ...match, status: "in_progress" as const, updatedAt: now }
+        : match;
   const transitionEvents = transition?.events ?? [{
     type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
     actorPlayerId: seat.playerId,
