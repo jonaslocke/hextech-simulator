@@ -74,6 +74,7 @@ type BattlefieldShowdownState = "neutral" | "open" | "deferred";
 type CardActionMenuItem = {
   accessibleLabel?: string;
   disabled?: boolean;
+  hoverBattlefieldId?: string | null;
   id: string;
   label: ReactNode;
   onSelect?: () => void;
@@ -188,6 +189,9 @@ export const GameBoard: FC<GameBoardProps> = ({
   >(new Set());
   const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
     useState<string | null>(null);
+  const [hoveredBattlefieldId, setHoveredBattlefieldId] = useState<
+    string | null
+  >(null);
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
@@ -423,7 +427,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     capturePendingAnimationSnapshot();
     submitProjectedAction(actionId);
   };
-  const closeCardActionMenu = () => setCardActionMenu(null);
+  const closeCardActionMenu = () => {
+    setCardActionMenu(null);
+    setHoveredBattlefieldId(null);
+  };
   const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
     if (isChainLockedOpen) {
       setOpenZone("chain");
@@ -437,9 +444,12 @@ export const GameBoard: FC<GameBoardProps> = ({
     items: CardActionMenuItem[],
   ) => {
     if (items.length === 0) {
-      setCardActionMenu(null);
+      closeCardActionMenu();
       return;
     }
+
+    setHoveredBattlefieldId(null);
+
     const menuWidth = 180;
     const menuHeight = Math.max(44, items.length * 36 + 12);
     const gutter = 8;
@@ -483,6 +493,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
+            hoverBattlefieldId: battlefieldIdFromMoveAction(mode),
             id: mode.id,
             label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
@@ -581,6 +592,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       event,
       actions.map((action) => ({
         disabled: !action.enabled,
+        hoverBattlefieldId: battlefieldIdFromMoveAction(action),
         id: action.id,
         label: action.enabled
           ? action.label
@@ -717,6 +729,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   useEffect(() => {
     setCardActionMenu(null);
+    setHoveredBattlefieldId(null);
     setHoveredTargetCardInstanceId(null);
     setPendingSubmittedTargetIds([]);
   }, [projection.stateVersion]);
@@ -805,6 +818,9 @@ export const GameBoard: FC<GameBoardProps> = ({
               battlefield={board.playerBattlefield}
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
+              isHighlighted={
+                hoveredBattlefieldId === board.playerBattlefield.id
+              }
               onCardPrimaryAction={handleBoardCardPrimaryAction}
               onCardPointerEnter={handleTargetPointerEnter}
               onCardPointerLeave={handleTargetPointerLeave}
@@ -815,6 +831,9 @@ export const GameBoard: FC<GameBoardProps> = ({
               battlefield={board.opponentBattlefield}
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
+              isHighlighted={
+                hoveredBattlefieldId === board.opponentBattlefield.id
+              }
               onCardPrimaryAction={handleBoardCardPrimaryAction}
               onCardPointerEnter={handleTargetPointerEnter}
               onCardPointerLeave={handleTargetPointerLeave}
@@ -973,6 +992,10 @@ export const GameBoard: FC<GameBoardProps> = ({
             items={cardActionMenu.items}
             left={cardActionMenu.left}
             onClose={closeCardActionMenu}
+            onItemPointerEnter={(item) =>
+              setHoveredBattlefieldId(item.hoverBattlefieldId ?? null)
+            }
+            onItemPointerLeave={() => setHoveredBattlefieldId(null)}
             top={cardActionMenu.top}
           />
         </>
@@ -1187,11 +1210,15 @@ function CardActionMenu({
   items,
   left,
   onClose,
+  onItemPointerEnter,
+  onItemPointerLeave,
   top,
 }: {
   items: CardActionMenuItem[];
   left: number;
   onClose: () => void;
+  onItemPointerEnter?: (item: CardActionMenuItem) => void;
+  onItemPointerLeave?: () => void;
   top: number;
 }) {
   return (
@@ -1210,6 +1237,12 @@ function CardActionMenu({
             onClose();
             item.onSelect?.();
           }}
+          onPointerEnter={() => {
+            if (!item.disabled) {
+              onItemPointerEnter?.(item);
+            }
+          }}
+          onPointerLeave={onItemPointerLeave}
           type="button"
         >
           {item.label}
@@ -1217,6 +1250,28 @@ function CardActionMenu({
       ))}
     </div>
   );
+}
+
+function battlefieldIdFromMoveAction(
+  action: Pick<GameProjection["actions"][number], "id">,
+) {
+  const [, , , kind, , encodedExtra] = action.id.split(":");
+
+  if (kind !== "move" && kind !== "moveMany") {
+    return null;
+  }
+
+  if (!encodedExtra) {
+    return null;
+  }
+
+  try {
+    const extra = decodeURIComponent(encodedExtra);
+
+    return extra === "base" ? null : extra;
+  } catch {
+    return null;
+  }
 }
 
 function runeActionMenuLabel(

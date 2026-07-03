@@ -2,7 +2,7 @@
 [x] kbd should be more distingushiable in choose units prompt. the same is true for showdown prompts. ![alt text](image-30.png)![alt text](image-31.png)
 [x] Choices prompt in top of runes, can get in the way of players choices, make it movable as tempzone. ![alt text](image-34.png)
 [x] Hovering cards are not showing the previews.
-[ ] BF's zone should have a hightlight state, that way moving unit can highlight BF's
+[x] BF's zone should have a hightlight state, that way moving unit can highlight BF's
 
 
 [x] Choose Order for trigger abilities, transform glass like and fix card orientation when showing BF's. ![alt text](image-33.png)
