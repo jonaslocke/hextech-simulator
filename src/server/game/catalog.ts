@@ -17,6 +17,10 @@ import { deriveCardCodeFromCard } from "../card-catalog/identity";
 import { parseDeckList } from "../deck";
 import { getRuntimeCoverageStatus } from "./runtime-coverage";
 import {
+  compileBehaviorModel,
+} from "./behavior-runtime";
+import { createPrimitiveHandlers } from "./primitive-handlers";
+import {
   deckSnapshotSchema,
   gameCardDefinitionSchema,
   type DeckSnapshot,
@@ -95,6 +99,22 @@ export function buildDeckSnapshot(
   if (issues.length > 0) throw new GameCatalogError(issues);
 
   const cardsByNameResolved = new Map(cards.map((definition) => [definition.card.name, definition]));
+  const handlers = createPrimitiveHandlers({
+    definitions: new Map(cards.map((definition) => [definition.cardCode, definition])),
+    instances: new Map(),
+  });
+  for (const definition of cards) {
+    try {
+      compileBehaviorModel(definition.behaviorModel, handlers);
+    } catch (error) {
+      issues.push(
+        `Runtime compilation failed for ${definition.cardCode}: ${
+          error instanceof Error ? error.message : "Unknown runtime error"
+        }`,
+      );
+    }
+  }
+  if (issues.length > 0) throw new GameCatalogError(issues);
   const digest = createHash("sha256")
     .update(JSON.stringify([...cards].sort((left, right) => left.cardCode.localeCompare(right.cardCode))))
     .digest("hex");
@@ -174,8 +194,11 @@ function validateBindings(
         issues.push(`Invalid canonical parameters for ${cardCode}:${binding.behaviorId}`);
       }
     }
-    if (!getRuntimeCoverageStatus(binding.behaviorId)) {
-      issues.push(`Missing game runtime coverage: ${binding.behaviorId}`);
+    const runtimeStatus = getRuntimeCoverageStatus(binding.behaviorId);
+    if (runtimeStatus !== "executable") {
+      issues.push(
+        `Behavior is not executable for ${cardCode}:${group}:${binding.behaviorId} (${runtimeStatus ?? "missing"})`,
+      );
     }
   }
 }

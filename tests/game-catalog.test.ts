@@ -55,7 +55,7 @@ test("rejects missing, stale, unsynchronized, and uncovered canonical cards", as
   binding.behaviorId = "action.future_behavior";
   assert.throws(
     () => buildDeckSnapshot(fixture.sourceText, uncovered, fixture.definitions),
-    /Missing game runtime coverage/
+    /Behavior is not executable/
   );
 });
 
