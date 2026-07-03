@@ -14,16 +14,16 @@
 - [x] 3. `feat(game-board): display effective victory score`
 - [x] 4. `feat(game): complete matches and present game results`
 - [x] 5. `refactor(game): add resumable effect selection`
-- [ ] 6. `refactor(game-board): render projected choices generically`
+- [x] 6. `refactor(game-board): render projected choices generically`
 - [ ] 7. `fix(game): require executable behavior snapshots`
 - [ ] 8. `test(game): certify generalized Lux runtime`
 - [ ] 9. `docs(game): record Lux engine rollout and rollback`
 
 ## Current checkpoint
 
-- Completed through: milestone 5
-- Last verification: focused behavior/trigger tests, `npm run typecheck`, `npm run lint`, `npm test`
-- Next milestone: remove the compatibility adapter and render projected choices generically.
+- Completed through: milestone 6
+- Last verification: focused trigger/board tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
+- Next milestone: enforce executable behavior coverage and compile deck behavior snapshots before match creation.
 
 ## Resume procedure
 

@@ -450,8 +450,18 @@ function resolveAll(initial: GameDocument, decks: DeckSnapshotDocument[]) {
   while (game.state.pendingChoice || game.state.chain) {
     if (game.state.pendingChoice) {
       const actor = game.state.pendingChoice.playerId;
-      const order = gameplayActions(game, actor, decks)[0]!;
-      game = performGameplayAction({ game, actorPlayerId: actor, actionId: order.id, selectedIds: [], decks, now: "r" });
+      const choice = gameplayActions(game, actor, decks)[0]!;
+      const requirement = choice.targets[0];
+      game = performGameplayAction({
+        game,
+        actorPlayerId: actor,
+        actionId: choice.id,
+        selectedIds: requirement
+          ? requirement.legalIds.slice(0, requirement.minimum)
+          : [],
+        decks,
+        now: "r",
+      });
       continue;
     }
     const actor = game.state.chain!.priorityPlayerId;

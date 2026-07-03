@@ -39,7 +39,7 @@ test("orders and resolves event-conditioned play triggers without card identity 
   assert.deepEqual(waitingProjection.pendingChoice.pendingChainItems, []);
   assert.deepEqual(waitingProjection.actions, []);
   const order = gameplayActions(game, "p1", decks)[0]!;
-  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [], decks, now: "b" });
+  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: order.id, selectedIds: [...game.state.pendingChoice.optionIds].reverse(), decks, now: "b" });
   game = resolveAllChainItems(game, decks);
   assert.equal(game.state.players.p1!.zones.hand.length, 1);
   assert.equal(game.state.cardStates.raven!.computedMight, 2);
@@ -74,7 +74,7 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
     decks
   });
   assert.equal(waitingProjection.actions.length, 0);
-  assert.equal(waitingProjection.pendingChoice?.type, "readyCards");
+  assert.equal(waitingProjection.pendingChoice?.type, "effectSelection");
   assert.equal(waitingProjection.pendingChoice?.playerId, "p1");
   const ready = gameplayActions(game, "p1", decks)[0]!;
   assert.equal(ready.label, "Choose 2 runes to ready");
@@ -149,11 +149,14 @@ test("each conquered Targon's Peak readies two independently chosen runes", () =
   });
   assert.equal(game.state.pendingChoice?.type, "orderTriggers");
   const order = gameplayActions(game, "p1", decks)[0]!;
+  if (game.state.pendingChoice?.type !== "orderTriggers") {
+    throw new Error("Expected trigger-order choice.");
+  }
   game = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: order.id,
-    selectedIds: [],
+    selectedIds: [...game.state.pendingChoice.optionIds].reverse(),
     decks,
     now: "order"
   });

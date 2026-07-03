@@ -69,8 +69,10 @@ export type BoardProjection = {
   } | {
     id: string;
     playerId: string;
-    type: "readyCards";
+    type: "effectSelection";
     prompt: string;
+    title: string;
+    waitingMessage: string;
     minimum: number;
     maximum: number;
   } | {

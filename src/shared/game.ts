@@ -40,6 +40,16 @@ export const projectedActionSchema = z.object({
         lethalAmount: z.number().int().positive(),
         hasTank: z.boolean()
       }))
+    }),
+    z.object({
+      kind: z.literal("effectSelection"),
+      choiceId: z.string().min(1),
+      prompt: z.string().min(1)
+    }),
+    z.object({
+      kind: z.literal("orderedOptions"),
+      choiceId: z.string().min(1),
+      optionIds: z.array(z.string().min(1))
     })
   ]).nullable().optional(),
   presentation: z.object({
@@ -198,10 +208,12 @@ export const gameProjectionSchema = z.object({
       pendingChainItems: z.array(projectedChainItemSchema)
     }),
     z.object({
-      type: z.literal("readyCards"),
+      type: z.literal("effectSelection"),
       id: z.string().min(1),
       playerId: z.string().min(1),
       prompt: z.string().min(1),
+      title: z.string().min(1),
+      waitingMessage: z.string().min(1),
       minimum: z.number().int().nonnegative(),
       maximum: z.number().int().nonnegative()
     }),

@@ -92,8 +92,8 @@ export function gameplayActions(
       actions.push(
         action(
           game,
-          "readyCards",
-          `Choose ${pendingChoice.maximum} runes to ready`,
+          "submitChoice",
+          pendingChoice.prompt,
           null,
           true,
           null,
@@ -107,28 +107,38 @@ export function gameplayActions(
               maximum: pendingChoice.maximum,
             },
           ],
+          {
+            kind: "effectSelection",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+          },
         ),
       );
       return actions;
     }
-    for (const order of permutations(pendingChoice.optionIds)) {
-      const labels = order.map(
-        (id) =>
-          pendingChoice.pendingItems.find((item) => item.id === id)?.label ??
-          id,
-      );
-      actions.push(
-        action(
-          game,
-          "orderTriggers",
-          `Resolve ${labels.join(" → ")}`,
-          null,
-          true,
-          null,
-          JSON.stringify(order),
-        ),
-      );
-    }
+    actions.push(
+      action(
+        game,
+        "submitChoice",
+        "Submit trigger order",
+        null,
+        true,
+        null,
+        undefined,
+        [{
+          kind: "card",
+          label: "trigger order",
+          legalIds: pendingChoice.optionIds,
+          minimum: pendingChoice.optionIds.length,
+          maximum: pendingChoice.optionIds.length,
+        }],
+        {
+          kind: "orderedOptions",
+          choiceId: pendingChoice.id,
+          optionIds: pendingChoice.optionIds,
+        },
+      ),
+    );
     return actions;
   }
   const canAct = game.state.chain
@@ -371,12 +381,18 @@ export function performGameplayAction(input: {
         input.decks,
       );
       break;
-    case "orderTriggers":
-      submitTriggerOrder(
-        game,
-        input.actorPlayerId,
-        JSON.parse(extra) as string[],
-      );
+    case "submitChoice":
+      if (game.state.pendingChoice?.type === "orderTriggers") {
+        submitTriggerOrder(game, input.actorPlayerId, input.selectedIds);
+      } else {
+        submitEffectSelection(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
+        finishEndTurnIfReady(game, index, input.decks);
+      }
       break;
     case "activate": {
       const [clauseId, behaviorId] = extra.split("|");
@@ -451,15 +467,6 @@ export function performGameplayAction(input: {
         index,
         input.decks,
       );
-      break;
-    case "readyCards":
-      submitEffectSelection(
-        game,
-        input.actorPlayerId,
-        input.selectedIds,
-        input.decks,
-      );
-      finishEndTurnIfReady(game, index, input.decks);
       break;
     case "pass":
       passPriority(game, input.actorPlayerId, index, handlers, input.decks);
@@ -866,7 +873,7 @@ function action(
   ];
   if (extra !== undefined) parts.push(encodeURIComponent(extra));
   const surface =
-    kind === "orderTriggers"
+    kind === "submitChoice"
       ? "choice-dialog"
       : source
         ? "card-menu"
@@ -883,7 +890,7 @@ function action(
       surface,
       style: kind === "endTurn" || kind === "pass" ? "secondary" : "primary",
       prompt:
-        kind === "orderTriggers"
+        kind === "submitChoice"
           ? "Choose the order for triggered abilities."
           : null,
     },
@@ -1303,13 +1310,4 @@ function draw(source: string[], destination: string[], count: number) {
 }
 function otherPlayer(game: GameDocument, playerId: string) {
   return game.state.setup.playerIds.find((id) => id !== playerId)!;
-}
-
-function permutations(values: string[]): string[][] {
-  if (values.length <= 1) return [[...values]];
-  return values.flatMap((value, index) =>
-    permutations([...values.slice(0, index), ...values.slice(index + 1)]).map(
-      (rest) => [value, ...rest],
-    ),
-  );
 }

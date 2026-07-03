@@ -161,20 +161,12 @@ export const GameBoard: FC<GameBoardProps> = ({
     choiceId: string;
     orderedIds: string[];
   }) => {
-    const action = sourceProjection.actions.find((candidate) => {
-      if (candidate.presentation.surface !== "choice-dialog") return false;
-      const encoded = candidate.id.split(":").at(-1);
-      if (!encoded) return false;
-      try {
-        return (
-          JSON.stringify(JSON.parse(decodeURIComponent(encoded))) ===
-          JSON.stringify(input.orderedIds)
-        );
-      } catch {
-        return false;
-      }
-    });
-    submitProjectedAction(action?.id);
+    const action = sourceProjection.actions.find(
+      (candidate) =>
+        candidate.choice?.kind === "orderedOptions" &&
+        candidate.choice.choiceId === input.choiceId,
+    );
+    submitProjectedAction(action?.id, input.orderedIds);
   };
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
   const [cardActionMenu, setCardActionMenu] =
@@ -254,8 +246,8 @@ export const GameBoard: FC<GameBoardProps> = ({
       !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
       action.choice?.kind !== "combatDamage",
   );
-  const readyCardsAction = sourceProjection.actions.find(
-    (action) => action.id.split(":")[3] === "readyCards",
+  const effectSelectionAction = sourceProjection.actions.find(
+    (action) => action.choice?.kind === "effectSelection",
   );
   const triggerOrderChoice =
     projection.pendingChoice?.type === "orderTriggers" &&
@@ -295,16 +287,11 @@ export const GameBoard: FC<GameBoardProps> = ({
       ? board.player.name
       : board.opponent.name
     : null;
-  const waitingReadyChoice =
-    sourceProjection.pendingChoice?.type === "readyCards" &&
+  const waitingEffectSelection =
+    sourceProjection.pendingChoice?.type === "effectSelection" &&
     sourceProjection.pendingChoice.playerId !== sourceProjection.viewerPlayerId
       ? sourceProjection.pendingChoice
       : null;
-  const waitingChoicePlayerName = waitingReadyChoice
-    ? waitingReadyChoice.playerId === board.player.playerId
-      ? board.player.name
-      : board.opponent.name
-    : null;
   const waitingCombatDamageChoice = assignCombatDamagePendingChoiceFromUnknown(
     sourceProjection.pendingChoice,
   );
@@ -332,7 +319,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       purpose:
         kind === "moveMany"
           ? "move"
-          : kind === "readyCards"
+          : action.choice?.kind === "effectSelection"
             ? "choice"
             : "play",
       selectedTargetIds: [],
@@ -780,16 +767,16 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [projection.stateVersion]);
 
   useEffect(() => {
-    if (!readyCardsAction) return;
-    const requirement = readyCardsAction.targets.find(
+    if (!effectSelectionAction) return;
+    const requirement = effectSelectionAction.targets.find(
       (target) => target.kind === "card",
     );
     if (!requirement) return;
     setTargetSelection((current) =>
-      current?.actionId === readyCardsAction.id
+      current?.actionId === effectSelectionAction.id
         ? current
         : {
-            actionId: readyCardsAction.id,
+            actionId: effectSelectionAction.id,
             legalTargetIds: requirement.legalIds,
             maxTargets: requirement.maximum,
             minTargets: requirement.minimum,
@@ -797,7 +784,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             selectedTargetIds: [],
           },
     );
-  }, [readyCardsAction]);
+  }, [effectSelectionAction]);
 
   useEffect(() => {
     if (!cardActionMenu) {
@@ -830,15 +817,10 @@ export const GameBoard: FC<GameBoardProps> = ({
         player={board.player}
         victoryScore={projection.victoryScore}
       />
-      {waitingReadyChoice && waitingChoicePlayerName && (
+      {waitingEffectSelection && (
         <PendingChoiceStatus
-          message={
-            <>
-              Waiting for {waitingChoicePlayerName} to choose{" "}
-              {waitingReadyChoice.maximum} runes to ready.
-            </>
-          }
-          title="End-of-turn choice"
+          message={waitingEffectSelection.waitingMessage}
+          title={waitingEffectSelection.title}
         />
       )}
       {waitingCombatDamageChoiceForOpponent &&
@@ -1026,7 +1008,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   sourceProjection.battlefields,
                 )
               : targetSelection.purpose === "choice"
-                ? readyCardsAction?.label
+                ? effectSelectionAction?.label
                 : undefined
           }
         />

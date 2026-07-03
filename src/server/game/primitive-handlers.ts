@@ -121,7 +121,7 @@ export function createPrimitiveHandlers(
             legalIds,
             minimum: required,
             maximum: required,
-            prompt: `Choose ${required} runes to ready.`,
+            prompt: `Choose ${required} runes to ready`,
           }
         : null;
     },
