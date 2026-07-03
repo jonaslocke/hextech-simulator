@@ -436,6 +436,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     event: MouseEvent<HTMLElement>,
     items: CardActionMenuItem[],
   ) => {
+    if (items.length === 0) {
+      setCardActionMenu(null);
+      return;
+    }
     const menuWidth = 180;
     const menuHeight = Math.max(44, items.length * 36 + 12);
     const gutter = 8;
@@ -712,6 +716,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [isChainLockedOpen, openZone]);
 
   useEffect(() => {
+    setCardActionMenu(null);
     setHoveredTargetCardInstanceId(null);
     setPendingSubmittedTargetIds([]);
   }, [projection.stateVersion]);
