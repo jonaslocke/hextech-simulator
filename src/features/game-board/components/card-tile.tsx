@@ -1,6 +1,7 @@
 "use client";
 
 import { FC, MouseEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import {
   CardRulesText,
@@ -292,7 +293,8 @@ export const CardTile: FC<CardTileProps> = ({
 
             const image = event.currentTarget;
             const nextOrientation =
-              image.naturalWidth > image.naturalHeight * LANDSCAPE_IMAGE_RATIO_THRESHOLD
+              image.naturalWidth >
+              image.naturalHeight * LANDSCAPE_IMAGE_RATIO_THRESHOLD
                 ? "landscape"
                 : "portrait";
 
@@ -329,43 +331,112 @@ export const CardTile: FC<CardTileProps> = ({
           </span>
         )}
       </motion.div>
-      {previewPosition && (
-        <div
-          className="z-[2147483647] fixed flex gap-3 bg-slate-950/95 shadow-[0_28px_80px_rgba(0,0,0,0.88)] drop-shadow-[0_18px_30px_rgba(0,0,0,0.75)] p-2 rounded-lg ring-1 ring-yellow-300/40 w-[min(35rem,calc(100vw-1.5rem))] max-h-[min(24rem,calc(100vh-1.5rem))] overflow-hidden text-slate-100 pointer-events-none"
-          style={{
-            left: previewPosition.left,
-            top: previewPosition.top,
-            zIndex: 2147483647,
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
-          <img
-            alt={name}
-            className={cn(
-              "block drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)] rounded-md object-contain shrink-0",
-              resolvedOrientation === "landscape" ? "w-80" : "w-55",
-            )}
-            src={img}
-          />
-          <CardSummary
-            domains={domains}
-            energy={energy}
-            might={might}
-            name={name}
-            ownerLabel={ownerLabel}
-            ownerSeat={ownerSeat}
-            power={power}
-            publicCode={publicCode}
-            rulesText={rulesText}
-            setLabel={setLabel}
-            supertype={supertype}
-            type={type}
-          />
-        </div>
-      )}
+      <CardHoverPreviewPortal
+        domains={domains}
+        energy={energy}
+        img={img}
+        might={might}
+        name={name}
+        ownerLabel={ownerLabel}
+        ownerSeat={ownerSeat}
+        power={power}
+        previewPosition={previewPosition}
+        publicCode={publicCode}
+        resolvedOrientation={resolvedOrientation}
+        rulesText={rulesText}
+        setLabel={setLabel}
+        supertype={supertype}
+        type={type}
+      />
     </div>
   );
 };
+
+function CardHoverPreviewPortal({
+  domains,
+  energy,
+  img,
+  might,
+  name,
+  ownerLabel,
+  ownerSeat,
+  power,
+  previewPosition,
+  publicCode,
+  resolvedOrientation,
+  rulesText,
+  setLabel,
+  supertype,
+  type,
+}: {
+  domains: string[];
+  energy?: number;
+  img: string;
+  might?: number;
+  name: string;
+  ownerLabel?: string;
+  ownerSeat?: "player" | "opponent";
+  power?: number;
+  previewPosition: { left: number; top: number } | null;
+  publicCode?: string;
+  resolvedOrientation: ResolvedCardTileOrientation;
+  rulesText?: string;
+  setLabel?: string;
+  supertype?: Card["supertype"];
+  type?: Card["type"];
+}) {
+  if (!previewPosition || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className={cn(
+        "z-[2147483647] fixed flex gap-3 p-2 rounded-xl overflow-hidden text-slate-100 pointer-events-none",
+        "w-[min(35rem,calc(100vw-1.5rem))] max-h-[min(24rem,calc(100vh-1.5rem))]",
+        "border border-cyan-100/15 bg-slate-950/74 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
+        "supports-backdrop-filter:bg-slate-950/58 supports-backdrop-filter:backdrop-blur-md",
+      )}
+      style={{
+        left: previewPosition.left,
+        top: previewPosition.top,
+        zIndex: 2147483647,
+      }}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(103,232,249,0.13),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.07),transparent_42%)] pointer-events-none"
+      />
+      <div className="relative bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_36px_rgba(0,0,0,0.42)] p-1.5 border border-white/10 rounded-lg shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
+        <img
+          alt={name}
+          className={cn(
+            "block drop-shadow-[0_16px_24px_rgba(0,0,0,0.72)] rounded-md object-contain",
+            resolvedOrientation === "landscape" ? "w-80" : "w-55",
+          )}
+          draggable={false}
+          src={img}
+        />
+      </div>
+      <CardSummary
+        domains={domains}
+        energy={energy}
+        might={might}
+        name={name}
+        ownerLabel={ownerLabel}
+        ownerSeat={ownerSeat}
+        power={power}
+        publicCode={publicCode}
+        rulesText={rulesText}
+        setLabel={setLabel}
+        supertype={supertype}
+        type={type}
+      />
+    </div>,
+    document.body,
+  );
+}
 
 function getCardTileDimensions(
   sizeConfig: (typeof CARD_TILE_SIZE_CONFIG)[CardTileSize],
@@ -428,14 +499,16 @@ function CardSummary({
     energy !== undefined || power !== undefined || might !== undefined;
 
   return (
-    <div className="flex flex-col flex-1 gap-2 pr-1 min-w-0 overflow-auto">
+    <div className="relative flex flex-col flex-1 gap-2 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] p-3 border border-white/10 rounded-lg min-w-0 overflow-auto">
       <div>
         <div className="flex justify-between items-start gap-2">
-          <div className="font-semibold text-base leading-tight">{name}</div>
+          <div className="drop-shadow-sm font-semibold text-slate-50 text-base leading-tight">
+            {name}
+          </div>
           {ownerLabel && ownerSeat && (
             <span
               className={cn(
-                "px-2 py-0.5 rounded font-semibold text-[10px] text-white uppercase tracking-wide shrink-0",
+                "shadow-sm px-2 py-0.5 border border-white/10 rounded-full font-semibold text-[10px] text-white uppercase tracking-wide shrink-0",
                 ownerSeat === "player"
                   ? "bg-player-accent"
                   : "bg-opponent-accent",
@@ -455,7 +528,7 @@ function CardSummary({
         <div className="flex flex-wrap gap-1.5">
           {domains.map((domain) => (
             <span
-              className="inline-flex items-center gap-1 bg-white/10 px-2 py-0.5 border border-white/10 rounded text-[11px] text-slate-200"
+              className="inline-flex items-center gap-1 bg-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] px-2 py-0.5 border border-white/10 rounded-full text-[11px] text-slate-200"
               key={domain}
             >
               <DomainIcon compact decorative domain={domain} />
@@ -477,7 +550,7 @@ function CardSummary({
           )}
         </div>
       )}
-      <div className="gap-1.5 grid bg-black/25 p-2 border border-white/10 rounded text-slate-100 text-sm">
+      <div className="gap-1.5 grid bg-slate-950/45 shadow-inner p-2 border border-white/10 rounded-md text-slate-100 text-sm">
         {rulesText?.trim() ? (
           <CardRulesText text={rulesText} />
         ) : (
@@ -485,7 +558,7 @@ function CardSummary({
         )}
       </div>
       {(setLabel || publicCode) && (
-        <div className="mt-auto text-[11px] text-slate-500">
+        <div className="mt-auto pt-2 border-white/10 border-t text-[11px] text-slate-500">
           {[setLabel, publicCode].filter(Boolean).join(" · ")}
         </div>
       )}
@@ -501,7 +574,7 @@ function SummaryStatChip({
   label: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 bg-yellow-300/10 px-2 py-0.5 border border-yellow-300/30 rounded text-[11px] text-yellow-100">
+    <span className="inline-flex items-center gap-1 bg-yellow-300/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] px-2 py-0.5 border border-yellow-300/25 rounded-full text-[11px] text-yellow-100">
       <span>{label}</span>
       {children}
     </span>
