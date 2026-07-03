@@ -13,8 +13,13 @@ import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
 
 const CARD_ASPECT_RATIO = 130 / 181;
+const LANDSCAPE_CARD_ASPECT_RATIO = 181 / 130;
+const LANDSCAPE_IMAGE_RATIO_THRESHOLD = 1.05;
 
 export type CardTileSize = "sm" | "md" | "lg" | "xl";
+export type CardTileOrientation = "auto" | "portrait" | "landscape";
+
+type ResolvedCardTileOrientation = Exclude<CardTileOrientation, "auto">;
 
 export const CARD_TILE_SIZE_CONFIG: Record<
   CardTileSize,
@@ -71,6 +76,7 @@ type CardTileProps = Card & {
   focusablePreview?: boolean;
   isHighlighted?: boolean;
   isTransferHidden?: boolean;
+  orientation?: CardTileOrientation;
   preserveOrientation?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
   onHighlightPointerEnter?: () => void;
@@ -100,6 +106,7 @@ export const CardTile: FC<CardTileProps> = ({
   onHighlightPointerEnter,
   onHighlightPointerLeave,
   onPrimaryAction,
+  orientation = "auto",
   ownerLabel,
   ownerSeat,
   power,
@@ -116,19 +123,36 @@ export const CardTile: FC<CardTileProps> = ({
     left: number;
     top: number;
   } | null>(null);
+  const [autoOrientation, setAutoOrientation] =
+    useState<ResolvedCardTileOrientation>(() =>
+      inferCardOrientation({ supertype, type }),
+    );
   const tileRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
+  const resolvedOrientation =
+    orientation === "auto" ? autoOrientation : orientation;
+  const dimensions = getCardTileDimensions(sizeConfig, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
 
   const footprintStyle = {
-    width: isRotatedExhausted ? sizeConfig.height : sizeConfig.width,
-    height: sizeConfig.height,
+    width: isRotatedExhausted ? dimensions.height : dimensions.width,
+    height: isRotatedExhausted
+      ? Math.max(dimensions.height, dimensions.width)
+      : dimensions.height,
     zIndex: previewPosition ? 2147483647 : undefined,
   };
 
   const motionOrigin = "50% 50%";
+
+  useEffect(() => {
+    if (orientation !== "auto") {
+      return;
+    }
+
+    setAutoOrientation(inferCardOrientation({ supertype, type }));
+  }, [img, orientation, supertype, type]);
 
   const clearPreview = () => {
     if (previewTimeoutRef.current) {
@@ -193,6 +217,7 @@ export const CardTile: FC<CardTileProps> = ({
       data-card-instance-id={
         enableZoneAnimation && instanceId ? instanceId : undefined
       }
+      data-card-orientation={resolvedOrientation}
       className={cn(
         "relative flex justify-center items-center overflow-visible shrink-0",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
@@ -243,7 +268,9 @@ export const CardTile: FC<CardTileProps> = ({
         initial={false}
         ref={bodyRef}
         style={{
+          height: dimensions.height,
           transformOrigin: motionOrigin,
+          width: dimensions.width,
           willChange: "transform",
         }}
         transition={CARD_ORIENTATION_TRANSITION}
@@ -252,13 +279,34 @@ export const CardTile: FC<CardTileProps> = ({
         <img
           alt={name}
           className={cn(
-            "block bg-slate-900 shadow-md border border-white/15 rounded-md object-cover aspect-130/181 transition",
-            sizeConfig.imageClassName,
+            "block bg-slate-900 shadow-md border border-white/15 rounded-md object-cover transition",
             "hover:border-yellow-300/70 hover:shadow-lg hover:shadow-black/40",
             isHighlighted &&
               "border-cyan-300 ring-2 ring-cyan-300 shadow-cyan-300/40 shadow-lg",
           )}
+          draggable={false}
+          onLoad={(event) => {
+            if (orientation !== "auto") {
+              return;
+            }
+
+            const image = event.currentTarget;
+            const nextOrientation =
+              image.naturalWidth > image.naturalHeight * LANDSCAPE_IMAGE_RATIO_THRESHOLD
+                ? "landscape"
+                : "portrait";
+
+            setAutoOrientation((currentOrientation) =>
+              currentOrientation === nextOrientation
+                ? currentOrientation
+                : nextOrientation,
+            );
+          }}
           src={img}
+          style={{
+            height: dimensions.height,
+            width: dimensions.width,
+          }}
         />
         {showMight && might !== undefined && (
           <span
@@ -293,7 +341,10 @@ export const CardTile: FC<CardTileProps> = ({
           {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
           <img
             alt={name}
-            className="block drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)] rounded-md w-55 object-contain shrink-0"
+            className={cn(
+              "block drop-shadow-[0_16px_24px_rgba(0,0,0,0.8)] rounded-md object-contain shrink-0",
+              resolvedOrientation === "landscape" ? "w-80" : "w-55",
+            )}
             src={img}
           />
           <CardSummary
@@ -315,6 +366,35 @@ export const CardTile: FC<CardTileProps> = ({
     </div>
   );
 };
+
+function getCardTileDimensions(
+  sizeConfig: (typeof CARD_TILE_SIZE_CONFIG)[CardTileSize],
+  orientation: ResolvedCardTileOrientation,
+) {
+  if (orientation === "landscape") {
+    return {
+      height: sizeConfig.height,
+      width: Math.round(sizeConfig.height * LANDSCAPE_CARD_ASPECT_RATIO),
+    };
+  }
+
+  return {
+    height: sizeConfig.height,
+    width: sizeConfig.width,
+  };
+}
+
+function inferCardOrientation({
+  supertype,
+  type,
+}: {
+  supertype?: Card["supertype"];
+  type?: Card["type"];
+}): ResolvedCardTileOrientation {
+  const typeLine = [supertype, type].filter(Boolean).join(" ").toLowerCase();
+
+  return typeLine.includes("battlefield") ? "landscape" : "portrait";
+}
 
 function CardSummary({
   domains,
