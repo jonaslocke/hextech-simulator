@@ -3,6 +3,7 @@ import type { DeckSnapshotDocument, GameEventDocument } from "./repositories";
 import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
+import { victoryRequirement } from "./victory";
 
 export function projectGame(input: {
   game: GameDocument; viewerPlayerId: string;
@@ -46,7 +47,9 @@ export function projectGame(input: {
     id: input.game.id, matchId: input.game.matchId, gameNumber: 1, stateVersion: input.game.stateVersion,
     status: input.game.status, viewerPlayerId: input.viewerPlayerId,
     activePlayerId: input.game.state.turn?.activePlayerId ?? null,
-    winnerPlayerId: input.game.winnerPlayerId, players,
+    winnerPlayerId: input.game.winnerPlayerId,
+    victoryScore: victoryRequirement(input.game, input.decks),
+    players,
     setup: {
       playerIds: input.game.state.setup.playerIds,
       startingPlayerChooserId: input.game.state.setup.startingPlayerChooserId,

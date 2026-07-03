@@ -2,19 +2,23 @@
 
 import { cn } from "@/shared/utils/cn";
 
-const SCORE_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-const CENTER_INDEX = 8;
-
 export function ScoreTrack({
   opponentScore,
   playerScore,
+  victoryScore,
 }: {
   opponentScore: number;
   playerScore: number;
+  victoryScore: number;
 }) {
+  const maximum = Math.max(victoryScore, opponentScore, playerScore);
+  const ascending = Array.from({ length: maximum + 1 }, (_, index) => index);
+  const scoreValues = [...ascending, ...ascending.slice(0, -1).reverse()];
+  const centerIndex = maximum;
+
   return (
     <div
-      aria-label={`Score track. Player ${playerScore}, opponent ${opponentScore}.`}
+      aria-label={`Score track. Player ${playerScore}, opponent ${opponentScore}. Victory Score ${victoryScore}.`}
       className={cn(
         "relative flex items-center gap-1 px-2 py-1 border border-white/10 rounded-full",
         "bg-slate-950/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.20)]",
@@ -26,10 +30,10 @@ export function ScoreTrack({
         aria-hidden="true"
         className="top-1/2 absolute inset-x-3 bg-white/10 h-px -translate-y-1/2 pointer-events-none"
       />
-      {SCORE_VALUES.map((value, index) => {
-        const isCenter = index === CENTER_INDEX;
-        const isPlayerSide = index <= CENTER_INDEX;
-        const isOpponentSide = index >= CENTER_INDEX;
+      {scoreValues.map((value, index) => {
+        const isCenter = index === centerIndex;
+        const isPlayerSide = index <= centerIndex;
+        const isOpponentSide = index >= centerIndex;
         const active =
           (isPlayerSide && value === playerScore) ||
           (isOpponentSide && value === opponentScore);
@@ -39,6 +43,7 @@ export function ScoreTrack({
             aria-current={active ? "step" : undefined}
             aria-label={getScoreLabel({
               active,
+              centerIndex,
               index,
               opponentScore,
               playerScore,
@@ -73,21 +78,23 @@ export function ScoreTrack({
 
 function getScoreLabel({
   active,
+  centerIndex,
   index,
   opponentScore,
   playerScore,
   value,
 }: {
   active: boolean;
+  centerIndex: number;
   index: number;
   opponentScore: number;
   playerScore: number;
   value: number;
 }) {
   const owner =
-    index < CENTER_INDEX
+    index < centerIndex
       ? "player"
-      : index > CENTER_INDEX
+      : index > centerIndex
         ? "opponent"
         : "shared center";
 
@@ -97,11 +104,11 @@ function getScoreLabel({
 
   const activeOwners = [];
 
-  if (index <= CENTER_INDEX && value === playerScore) {
+  if (index <= centerIndex && value === playerScore) {
     activeOwners.push("player");
   }
 
-  if (index >= CENTER_INDEX && value === opponentScore) {
+  if (index >= centerIndex && value === opponentScore) {
     activeOwners.push("opponent");
   }
 

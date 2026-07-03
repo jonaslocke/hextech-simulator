@@ -149,6 +149,7 @@ export const gameProjectionSchema = z.object({
   viewerPlayerId: z.string().min(1),
   activePlayerId: z.string().min(1).nullable(),
   winnerPlayerId: z.string().min(1).nullable(),
+  victoryScore: z.number().int().positive(),
   setup: z.object({
     playerIds: z.tuple([z.string().min(1), z.string().min(1)]),
     startingPlayerChooserId: z.string().min(1),

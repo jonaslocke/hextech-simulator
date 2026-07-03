@@ -825,7 +825,11 @@ export const GameBoard: FC<GameBoardProps> = ({
       className="relative flex flex-col h-screen overflow-hidden text-slate-100"
       onClickCapture={handleTargetClickCapture}
     >
-      <ScoreHeader opponent={board.opponent} player={board.player} />
+      <ScoreHeader
+        opponent={board.opponent}
+        player={board.player}
+        victoryScore={projection.victoryScore}
+      />
       {waitingReadyChoice && waitingChoicePlayerName && (
         <PendingChoiceStatus
           message={

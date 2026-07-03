@@ -11,7 +11,7 @@
 - [x] 0. `docs(game): add Lux engine generalization execution ledger`
 - [x] 1. `refactor(game): separate gameplay engine subsystems`
 - [x] 2. `refactor(game): centralize modifiers and victory scoring`
-- [ ] 3. `feat(game-board): display effective victory score`
+- [x] 3. `feat(game-board): display effective victory score`
 - [ ] 4. `feat(game): complete matches and present game results`
 - [ ] 5. `refactor(game): add resumable effect selection`
 - [ ] 6. `refactor(game-board): render projected choices generically`
@@ -21,9 +21,9 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 2
-- Last verification: focused game tests, `npm run typecheck`, `npm run lint`, `npm test`
-- Next milestone: project the effective Victory Score and render a dynamic score track.
+- Completed through: milestone 3
+- Last verification: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
+- Next milestone: complete the best-of-one match and present the final result.
 
 ## Resume procedure
 

@@ -48,6 +48,7 @@ export type BoardProjection = {
   stateVersion: number;
   viewerPlayerId: string;
   winnerPlayerId: string | null;
+  victoryScore: number;
   setup: GameProjection["setup"];
   turn: GameProjection["turn"];
   showdown: GameProjection["showdown"];
@@ -153,6 +154,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       stateVersion: projection.stateVersion,
       viewerPlayerId: projection.viewerPlayerId,
       winnerPlayerId: projection.winnerPlayerId,
+      victoryScore: projection.victoryScore,
       setup: projection.setup,
       turn: projection.turn,
       showdown: projection.showdown,

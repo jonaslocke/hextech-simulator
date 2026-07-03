@@ -67,7 +67,11 @@ const SeatName = ({
   );
 };
 
-export const ScoreHeader: FC<GameScore> = ({ opponent, player }) => {
+export const ScoreHeader: FC<GameScore & { victoryScore: number }> = ({
+  opponent,
+  player,
+  victoryScore,
+}) => {
   return (
     <header className="flex justify-center items-center p-2">
       <SeatName
@@ -76,7 +80,11 @@ export const ScoreHeader: FC<GameScore> = ({ opponent, player }) => {
         seat="player"
       />
       <div className="flex flex-1 justify-center">
-        <ScoreTrack playerScore={player.score} opponentScore={opponent.score} />
+        <ScoreTrack
+          playerScore={player.score}
+          opponentScore={opponent.score}
+          victoryScore={victoryScore}
+        />
       </div>
       <SeatName
         handCount={opponent.zones.hand.count}
