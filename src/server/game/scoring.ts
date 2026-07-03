@@ -13,6 +13,7 @@ export function applyHoldScoring(
   for (const battlefield of game.state.battlefields) {
     if (battlefield.controllerPlayerId === playerId) {
       scoreBattlefield(game, playerId, battlefield.battlefieldId, "hold", decks);
+      if (game.status === "complete") return;
     }
   }
 }
@@ -52,7 +53,7 @@ export function scoreBattlefield(
     },
     decks,
   );
-  if ((player.points ?? 0) >= requirement) {
+  if (!game.winnerPlayerId && (player.points ?? 0) >= requirement) {
     game.winnerPlayerId = playerId;
     game.status = "complete";
   }

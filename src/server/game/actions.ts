@@ -529,7 +529,7 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not controlled by the player.");
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition);
+  const energyCost = effectiveEnergyCost(game, playerId, definition, index);
   payCardCost(game, playerId, definition, energyCost, index);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
@@ -699,6 +699,7 @@ function passPriority(
                     game,
                     controller,
                     definition,
+                    index,
                   ),
                 },
               },
@@ -866,6 +867,7 @@ export function applyStartOfTurn(
   const player = game.state.players[turn.activePlayerId]!;
   player.scoredBattlefieldIdsThisTurn = [];
   if (decks.length) applyHoldScoring(game, turn.activePlayerId, decks);
+  if (game.status === "complete") return;
   const index =
     runtimeIndex ?? (decks.length ? createRuntimeCardIndex(decks) : null);
   const controlledBattlefieldUnits = game.state.battlefields
@@ -995,7 +997,7 @@ function addPlayableCardActions(
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
-    const cost = effectiveEnergyCost(game, playerId, definition);
+    const cost = effectiveEnergyCost(game, playerId, definition, index);
     const paymentPlan = buildPaymentPlan(
       game,
       playerId,

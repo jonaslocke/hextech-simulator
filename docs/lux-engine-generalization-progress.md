@@ -10,7 +10,7 @@
 
 - [x] 0. `docs(game): add Lux engine generalization execution ledger`
 - [x] 1. `refactor(game): separate gameplay engine subsystems`
-- [ ] 2. `refactor(game): centralize modifiers and victory scoring`
+- [x] 2. `refactor(game): centralize modifiers and victory scoring`
 - [ ] 3. `feat(game-board): display effective victory score`
 - [ ] 4. `feat(game): complete matches and present game results`
 - [ ] 5. `refactor(game): add resumable effect selection`
@@ -21,9 +21,9 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 1
-- Last verification: `npm run typecheck`, `npm run lint`, `npm test`
-- Next milestone: centralize numeric modifiers and victory scoring without card identity branches.
+- Completed through: milestone 2
+- Last verification: focused game tests, `npm run typecheck`, `npm run lint`, `npm test`
+- Next milestone: project the effective Victory Score and render a dynamic score track.
 
 ## Resume procedure
 

@@ -2,6 +2,10 @@ import type { BehaviorHandler, BehaviorHandlerRegistry } from "./behavior-runtim
 import type { DeckSnapshotDocument } from "./repositories";
 import type { BehaviorBinding, GameCardDefinition } from "./schemas";
 import type { CardInstance, GameDocument } from "./state";
+import {
+  effectiveNumericValue,
+  isContinuousDuration,
+} from "./numeric-modifiers";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -135,6 +139,9 @@ export function createPrimitiveHandlers(
   });
   handlers.set("modifier.modify_numeric_value", {
     execute(binding, context) {
+      if (isContinuousDuration(binding.parameters.duration)) {
+        return;
+      }
       const attribute = stringParam(binding, "attribute");
       const targets = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
@@ -196,23 +203,18 @@ export function createPrimitiveHandlers(
 export function effectiveEnergyCost(
   game: GameDocument,
   controllerPlayerId: string,
-  definition: GameCardDefinition
+  definition: GameCardDefinition,
+  index?: RuntimeCardIndex,
 ): number {
-  let value = definition.card.attributes.energy ?? 0;
-  for (const modifier of game.state.modifiers) {
-    if (modifier.attribute !== "energyCost" || !modifierIsActive(game, modifier.sourceCardInstanceId, modifier.duration)) continue;
-    if (modifier.controllerPlayerId && modifier.controllerPlayerId !== controllerPlayerId) continue;
-    if (
-      modifier.targetScope === "controller_spell" &&
-      definition.card.classification.type !== "Spell"
-    ) continue;
-    if (modifier.operation === "reduce") value -= modifier.amount;
-    if (modifier.operation === "increase") value += modifier.amount;
-    if (modifier.operation === "multiply") value *= modifier.amount;
-    if (modifier.operation === "set") value = modifier.amount;
-    if (modifier.minimum !== null) value = Math.max(value, modifier.minimum);
-  }
-  return Math.max(0, value);
+  return effectiveNumericValue({
+    attribute: "energyCost",
+    baseValue: definition.card.attributes.energy ?? 0,
+    cardType: definition.card.classification.type,
+    controllerPlayerId,
+    game,
+    index,
+    targetScope: "controller_spell",
+  });
 }
 
 export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {
@@ -242,25 +244,20 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
     maximum: typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
   };
 }
-function modifierIsActive(game: GameDocument, sourceId: string | null, duration: string) {
-  if (!sourceId) return true;
-  if (duration === "whileSourceAtBattlefield") return game.state.battlefields.some((battlefield) => battlefield.units.includes(sourceId));
-  if (duration === "whileSourceOnBoard") return game.state.battlefields.some((battlefield) => battlefield.cardInstanceId === sourceId || battlefield.units.includes(sourceId));
-  return true;
-}
 export function recomputeMight(
   game: GameDocument,
   id: string,
   index: RuntimeCardIndex,
 ) {
-  let value = definitionForInstance(id, index).card.attributes.might ?? 0;
-  for (const modifier of game.state.modifiers.filter((item) => item.attribute === "might" && item.targetCardInstanceId === id && modifierIsActive(game, item.sourceCardInstanceId, item.duration))) {
-    if (modifier.operation === "increase") value += modifier.amount;
-    if (modifier.operation === "reduce") value -= modifier.amount;
-    if (modifier.operation === "multiply") value *= modifier.amount;
-    if (modifier.operation === "set") value = modifier.amount;
-    if (modifier.minimum !== null) value = Math.max(value, modifier.minimum);
-  }
+  let value = effectiveNumericValue({
+    attribute: "might",
+    baseValue: definitionForInstance(id, index).card.attributes.might ?? 0,
+    controllerPlayerId: index.instances.get(id)?.ownerPlayerId,
+    game,
+    index,
+    targetCardInstanceId: id,
+    targetScope: "source",
+  });
   const combatRole = game.state.cardStates[id]?.combatRole;
   if (combatRole === "attacker") {
     value += keywordAmount(id, "keyword.assault", index);
