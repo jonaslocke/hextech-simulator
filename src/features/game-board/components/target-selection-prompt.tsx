@@ -1,8 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import {
+  PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/shared/components/button";
 import { Kbd } from "@/shared/components/kbd";
+import { cn } from "@/shared/utils/cn";
+
+type PanelPosition = {
+  x: number;
+  y: number;
+};
+
+type DragState = {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startX: number;
+  startY: number;
+};
+
+const VIEWPORT_PADDING = 8;
+const DEFAULT_PANEL_WIDTH = 544;
+const DEFAULT_PANEL_HEIGHT = 150;
 
 export function TargetSelectionPrompt({
   canSubmit,
@@ -12,6 +36,7 @@ export function TargetSelectionPrompt({
   minTargets,
   onCancel,
   onSubmit,
+  resetKey,
   selectedCount,
   title,
 }: {
@@ -22,15 +47,173 @@ export function TargetSelectionPrompt({
   minTargets: number;
   onCancel: () => void;
   onSubmit: () => void;
+  /**
+   * Optional escape hatch for consumers that keep this component mounted while
+   * toggling visibility. When the value changes, the panel returns to its
+   * default bottom-center position.
+   */
+  resetKey?: string | number;
   selectedCount: number;
   title?: string;
 }) {
+  const [position, setPosition] = useState<PanelPosition | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const dragStateRef = useRef<DragState | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
   const isOptional = minTargets === 0;
   const targetRequirementLabel = isOptional
     ? "Optional targets"
     : maxTargets === minTargets
       ? "Required targets"
       : "Choose targets";
+
+  const clampPanelPosition = useCallback((nextPosition: PanelPosition) => {
+    if (typeof window === "undefined") {
+      return nextPosition;
+    }
+
+    const panelRect = panelRef.current?.getBoundingClientRect();
+    const panelWidth = panelRect?.width ?? DEFAULT_PANEL_WIDTH;
+    const panelHeight = panelRect?.height ?? DEFAULT_PANEL_HEIGHT;
+    const maxX = Math.max(
+      VIEWPORT_PADDING,
+      window.innerWidth - panelWidth - VIEWPORT_PADDING,
+    );
+    const maxY = Math.max(
+      VIEWPORT_PADDING,
+      window.innerHeight - panelHeight - VIEWPORT_PADDING,
+    );
+
+    return {
+      x: clamp(nextPosition.x, VIEWPORT_PADDING, maxX),
+      y: clamp(nextPosition.y, VIEWPORT_PADDING, maxY),
+    };
+  }, []);
+
+  const startDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!panelRef.current || event.button !== 0) {
+        return;
+      }
+
+      const rect = panelRef.current.getBoundingClientRect();
+      const currentPosition = clampPanelPosition({
+        x: rect.left,
+        y: rect.top,
+      });
+
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+
+      dragStateRef.current = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: currentPosition.x,
+        startY: currentPosition.y,
+      };
+
+      setPosition(currentPosition);
+      setIsDragging(true);
+    },
+    [clampPanelPosition],
+  );
+
+  useEffect(() => {
+    if (resetKey === undefined) {
+      return;
+    }
+
+    setPosition(null);
+    setIsDragging(false);
+    dragStateRef.current = null;
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (!isDragging) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const dragState = dragStateRef.current;
+
+      if (!dragState || event.pointerId !== dragState.pointerId) {
+        return;
+      }
+
+      const nextPosition = {
+        x: dragState.startX + event.clientX - dragState.startClientX,
+        y: dragState.startY + event.clientY - dragState.startClientY,
+      };
+
+      setPosition(clampPanelPosition(nextPosition));
+    }
+
+    function stopDragging(event: PointerEvent) {
+      const dragState = dragStateRef.current;
+
+      if (dragState && event.pointerId !== dragState.pointerId) {
+        return;
+      }
+
+      dragStateRef.current = null;
+      setIsDragging(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+    window.addEventListener("pointercancel", stopDragging);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    };
+  }, [clampPanelPosition, isDragging]);
+
+  useEffect(() => {
+    if (!position) {
+      return;
+    }
+
+    function clampCurrentPosition() {
+      setPosition((currentPosition) =>
+        currentPosition ? clampPanelPosition(currentPosition) : currentPosition,
+      );
+    }
+
+    window.addEventListener("resize", clampCurrentPosition);
+
+    return () => {
+      window.removeEventListener("resize", clampCurrentPosition);
+    };
+  }, [clampPanelPosition, position]);
+
+  useEffect(() => {
+    if (!position || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const panel = panelRef.current;
+
+    if (!panel) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setPosition((currentPosition) =>
+        currentPosition ? clampPanelPosition(currentPosition) : currentPosition,
+      );
+    });
+
+    observer.observe(panel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [clampPanelPosition, position]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -64,9 +247,27 @@ export function TargetSelectionPrompt({
   }, [canSubmit, onCancel, onSubmit]);
 
   return (
-    <div className="bottom-24 left-1/2 z-2147483646 fixed w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 select-none">
+    <div
+      className={cn(
+        "z-2147483646 fixed w-[min(34rem,calc(100vw-2rem))] select-none",
+        position ? "left-0 top-0" : "bottom-24 left-1/2 -translate-x-1/2",
+      )}
+      ref={panelRef}
+      style={
+        position
+          ? { transform: `translate3d(${position.x}px, ${position.y}px, 0)` }
+          : undefined
+      }
+    >
       <section className="bg-slate-950/90 shadow-2xl shadow-black/80 backdrop-blur-md border border-cyan-300/25 rounded-xl ring-1 ring-cyan-300/10 overflow-hidden text-slate-100">
-        <div className="flex justify-between items-center gap-4 px-4 py-3 border-white/10 border-b">
+        <div
+          className={cn(
+            "flex justify-between items-center gap-4 px-4 py-3 border-white/10 border-b cursor-grab active:cursor-grabbing",
+            isDragging && "bg-white/4",
+          )}
+          onPointerDown={startDrag}
+          title="Drag to move"
+        >
           <div className="min-w-0">
             <div className="font-semibold text-sm leading-tight">
               {title ?? targetRequirementLabel}
@@ -125,8 +326,8 @@ function TargetCountBadge({
 
   return (
     <div
-      className={[
-        "shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold",
+      className={cn(
+        "px-2.5 py-1 border rounded-full font-semibold text-xs shrink-0",
         canSubmit
           ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
           : isBelowMinimum
@@ -134,7 +335,7 @@ function TargetCountBadge({
             : isComplete
               ? "border-white/15 bg-white/10 text-slate-300"
               : "border-white/15 bg-white/5 text-slate-400",
-      ].join(" ")}
+      )}
     >
       {selectedCount}/{maxTargets}
     </div>
@@ -152,10 +353,10 @@ function ShortcutHint({
 }) {
   return (
     <span
-      className={[
+      className={cn(
         "inline-flex items-center gap-1.5",
         disabled ? "opacity-40" : "opacity-100",
-      ].join(" ")}
+      )}
     >
       <Kbd variant="amber">{value}</Kbd>
       <span>{label}</span>
@@ -176,4 +377,8 @@ function isTypingTarget(target: EventTarget | null) {
     tagName === "select" ||
     target.isContentEditable
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
