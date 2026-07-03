@@ -97,7 +97,7 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   assert.equal(game.state.players.p1!.zones.hand.length, handBefore);
 });
 
-test("projects combined Add and requires pooled showdown resources for targeted Actions", async () => {
+test("projects combined Add and evaluates automatic showdown resources for targeted Actions", async () => {
   const template = await fixtureSnapshot();
   const runtime = [
     createRuntimeDeckSnapshot(template, "p1"),
@@ -157,7 +157,7 @@ test("projects combined Add and requires pooled showdown resources for targeted 
     (action) => action.sourceCardInstanceId === fallingComet,
   )!;
   assert.equal(cometAction.enabled, false);
-  assert.match(cometAction.disabledReason ?? "", /Requires 5 Energy/);
+  assert.equal(cometAction.disabledReason, "Card costs cannot be paid.");
   assert.deepEqual(cometAction.targets[0]?.legalIds, [enemy]);
 
   game.state.players.p1!.energy = 6;
@@ -167,18 +167,22 @@ test("projects combined Add and requires pooled showdown resources for targeted 
       ?.enabled,
     true,
   );
-  const disabledBlast = actions.find(
+  const payableBlast = actions.find(
     (action) => action.sourceCardInstanceId === blastOfPower,
   )!;
-  assert.equal(disabledBlast.enabled, false);
-  assert.match(disabledBlast.disabledReason ?? "", /1 Order Power/);
-
-  game.state.players.p1!.power.Order = 1;
-  actions = gameplayActions(game, "p1", decks);
+  assert.equal(payableBlast.enabled, true);
+  const paidGame = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: payableBlast.id,
+    selectedIds: [enemy],
+    decks,
+    now: "showdown-payment",
+  });
   assert.equal(
-    actions.find((action) => action.sourceCardInstanceId === blastOfPower)
-      ?.enabled,
+    paidGame.state.players.p1!.zones.runeDeck.includes(orderRune),
     true,
+    "Showdown payment should automatically recycle a matching Rune for Power",
   );
 });
 

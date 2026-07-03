@@ -529,7 +529,7 @@ function playCard(
     throw new Error("Unit play destination is not controlled by the player.");
   }
   const energyCost = effectiveEnergyCost(game, playerId, definition);
-  pay(game, playerId, definition, energyCost, index, !game.state.showdown);
+  pay(game, playerId, definition, energyCost, index);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
@@ -947,7 +947,6 @@ function buildPaymentPlan(
   definition: GameCardDefinition,
   energyCost: number,
   index: RuntimeCardIndex,
-  allowAutomaticSources = true,
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   let remainingEnergy = energyCost;
@@ -970,7 +969,7 @@ function buildPaymentPlan(
     remainingPower -= spend;
   }
   const powerRuneIds: string[] = [];
-  for (const id of allowAutomaticSources ? player.zones.base : []) {
+  for (const id of player.zones.base) {
     if (remainingPower === 0) break;
     if (!hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstance(id, index).card.classification
@@ -1005,7 +1004,7 @@ function buildPaymentPlan(
       generatedConditionalEnergy += unusedEnergy;
     else generatedPooledEnergy += unusedEnergy;
   };
-  for (const id of allowAutomaticSources ? player.zones.base : []) {
+  for (const id of player.zones.base) {
     const ability = exhaustForEnergyAbility(
       id,
       definition.card.classification.type,
@@ -1014,9 +1013,7 @@ function buildPaymentPlan(
     if (ability?.usage === "spellsOnly") consumeEnergySource(id);
   }
   powerRuneIds.forEach(consumeEnergySource);
-  (allowAutomaticSources ? player.zones.base : []).forEach(
-    consumeEnergySource,
-  );
+  player.zones.base.forEach(consumeEnergySource);
   if (remainingEnergy > 0) return null;
 
   return remainingPower === 0
@@ -1038,7 +1035,6 @@ function pay(
   definition: GameCardDefinition,
   energyCost: number,
   index: RuntimeCardIndex,
-  allowAutomaticSources = true,
 ) {
   const plan = buildPaymentPlan(
     game,
@@ -1046,7 +1042,6 @@ function pay(
     definition,
     energyCost,
     index,
-    allowAutomaticSources,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
   const player = game.state.players[playerId]!;
@@ -1170,15 +1165,12 @@ function addPlayableCardActions(
         targetRequirementsForClause(clause, context, handlers),
       );
     const cost = effectiveEnergyCost(game, playerId, definition);
-    const allowAutomaticSources =
-      timing !== "showdownOpen" && timing !== "showdownClosed";
     const paymentPlan = buildPaymentPlan(
       game,
       playerId,
       definition,
       cost,
       index,
-      allowAutomaticSources,
     );
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
     const enabled = paymentPlan !== null && hasLegalTargets;
@@ -1186,9 +1178,7 @@ function addPlayableCardActions(
       ? "No legal targets are available."
       : paymentPlan
         ? null
-        : allowAutomaticSources
-          ? "Card costs cannot be paid."
-          : showdownPaymentRequirement(definition, cost);
+        : "Card costs cannot be paid.";
     const unitDestinations =
       definition.card.classification.type === "Unit"
         ? [
@@ -1399,21 +1389,6 @@ export function isAbilityTimingAllowed(input: {
     return input.hasReactionTiming || hasPriorityAddOverride;
   }
   return true;
-}
-
-function showdownPaymentRequirement(
-  definition: GameCardDefinition,
-  energyCost: number,
-) {
-  const powerCost = definition.card.attributes.power ?? 0;
-  const domains = definition.card.classification.domain.filter(
-    (domain) => domain !== "Colorless",
-  );
-  const powerText =
-    powerCost > 0
-      ? ` and ${powerCost} ${domains.join("/")} Power`
-      : "";
-  return `Requires ${energyCost} Energy${powerText} in the pool during a showdown.`;
 }
 
 function executeActivatedAbility(

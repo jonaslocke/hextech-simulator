@@ -203,6 +203,12 @@ export const gameProjectionSchema = z.object({
       prompt: z.string().min(1),
       minimum: z.number().int().nonnegative(),
       maximum: z.number().int().nonnegative()
+    }),
+    z.object({
+      type: z.literal("assignCombatDamage"),
+      id: z.string().min(1),
+      playerId: z.string().min(1),
+      totalDamage: z.number().int().nonnegative()
     })
   ]).nullable(),
   players: z.array(projectedPlayerSchema).length(2),

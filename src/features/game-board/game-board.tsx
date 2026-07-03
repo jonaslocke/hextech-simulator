@@ -220,7 +220,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         projection.chain?.passedPlayerIds.includes(playerId),
     );
   const chainPassLabel = chainPassWillResolve
-    ? `Pass and resolve ${projection.chain?.items.at(-1)?.label ?? "item"}`
+    ? "Pass and Resolve"
     : "Pass Priority";
   const endTurnAction = sourceProjection.actions.find(
     (action) => action.label === "End turn",
@@ -513,7 +513,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     const enabledModes = modes.filter((candidate) => candidate.enabled);
 
     if (enabledModes.length > 1) {
-      setUnitPlayChoice({ card, modes });
+      setUnitPlayChoice({ card, modes: enabledModes });
       return;
     }
 
@@ -530,18 +530,17 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+    const modes = (
+      viewerState.availablePaymentModes[card.instanceId] ?? []
+    ).filter((mode) => mode.enabled);
 
     openCardActionMenu(
       event,
       modes.length > 0
         ? modes.map((mode) => ({
-            disabled: !mode.enabled,
             hoverBattlefieldId: battlefieldIdFromMoveAction(mode),
             id: mode.id,
-            label: mode.enabled
-              ? mode.label
-              : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
+            label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
           }))
         : [
@@ -843,12 +842,11 @@ export const GameBoard: FC<GameBoardProps> = ({
           <PendingChoiceStatus
             message={
               <>
-                Waiting for {waitingCombatDamagePlayerName} to assign{" "}
-                {waitingCombatDamageChoiceForOpponent.totalDamage} combat
+                Waiting for {waitingCombatDamagePlayerName} to assign combat
                 damage.
               </>
             }
-            title="Combat damage"
+            title="Combat Damage"
             tone="amber"
           />
         )}

@@ -72,6 +72,11 @@ export type BoardProjection = {
     prompt: string;
     minimum: number;
     maximum: number;
+  } | {
+    id: string;
+    playerId: string;
+    type: "assignCombatDamage";
+    totalDamage: number;
   };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{

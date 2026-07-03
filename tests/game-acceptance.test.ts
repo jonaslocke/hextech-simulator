@@ -156,11 +156,19 @@ test("plays approved Action and Reaction cards through showdown focus and priori
     units: []
   }];
   const mover = instanceNamed(decks, "p1", "Vanguard Sergeant");
+  const fallingComet = instanceNamed(decks, "p1", "Falling Comet");
   const stupefy = instanceNamed(decks, "p1", "Stupefy");
   relocate(game, "p1", mover, "base");
+  relocate(game, "p1", fallingComet, "hand");
   relocate(game, "p1", stupefy, "hand");
-  game.state.players.p1!.energy = 20;
-  game.state.players.p1!.power = { Mind: 20, Order: 20, Rainbow: 20 };
+  const p1Runes = decks
+    .find((deck) => deck.playerId === "p1")!
+    .instances.filter((instance) => instance.source === "runeDeck")
+    .map((instance) => instance.instanceId);
+  p1Runes.forEach((id) => relocate(game, "p1", id, "base"));
+  game.state.players.p1!.energy = 0;
+  game.state.players.p1!.conditionalEnergy = 0;
+  game.state.players.p1!.power = {};
 
   const move = gameplayActions(game, "p1", decks).find(
     (action) => action.sourceCardInstanceId === mover &&
@@ -175,9 +183,9 @@ test("plays approved Action and Reaction cards through showdown focus and priori
     now: "b"
   });
   const actionPlay = gameplayActions(game, "p1", decks).find(
-    (action) => action.sourceCardInstanceId === stupefy
+    (action) => action.sourceCardInstanceId === fallingComet
   );
-  assert.ok(actionPlay, "Reaction must also be legal in Showdown Open");
+  assert.ok(actionPlay?.enabled, "Action must be payable from ready Runes in Showdown Open");
   game = performGameplayAction({
     game,
     actorPlayerId: "p1",
@@ -186,6 +194,32 @@ test("plays approved Action and Reaction cards through showdown focus and priori
     decks,
     now: "c"
   });
+  assert.ok(
+    p1Runes.some((id) => game.state.cardStates[id]!.exhausted),
+    "Showdown Open payment should automatically exhaust Runes"
+  );
+  const reactionPlay = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === stupefy
+  );
+  assert.ok(
+    reactionPlay?.enabled,
+    "Reaction must be payable from ready Runes in Showdown Closed"
+  );
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: reactionPlay.id,
+    selectedIds: [mover],
+    decks,
+    now: "c-reaction"
+  });
+  assert.equal(
+    gameplayActions(game, "p1", decks).some(
+      (action) => action.sourceCardInstanceId === fallingComet
+    ),
+    false,
+    "Action cards must not be playable in Showdown Closed"
+  );
   assert.equal(game.state.chain?.priorityPlayerId, "p1");
   assert.deepEqual(
     gameplayActions(game, "p1", decks)
@@ -199,7 +233,8 @@ test("plays approved Action and Reaction cards through showdown focus and priori
     false
   );
   game = passUntilCurrentChainItemResolves(game, decks, "d");
-  assert.equal(game.state.showdown?.focusPlayerId, "p2");
+  assert.equal(game.state.chain?.items.at(-1)?.sourceCardInstanceId, fallingComet);
+  assert.equal(game.state.showdown?.focusPlayerId, "p1");
   assert.deepEqual(game.state.showdown?.passedPlayerIds, []);
 });
 

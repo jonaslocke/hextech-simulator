@@ -257,7 +257,7 @@ test("characterizes reusable post-showdown UI surfaces", async () => {
   );
 
   assert.match(board, /Add Energy and Power/);
-  assert.match(combatDialog, /Tank units are first/);
+  assert.match(combatDialog, /Tank first/);
   assert.match(combatDialog, /getNextRequiredPriorityOrder/);
   assert.match(pendingStatus, /export function PendingChoiceStatus/);
   assert.match(choiceDialog, /selectionMode: "ordered" \| "single"/);

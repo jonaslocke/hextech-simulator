@@ -87,6 +87,11 @@ export function projectGame(input: {
       prompt: `Choose ${input.game.state.pendingChoice.maximum} runes to ready.`,
       minimum: input.game.state.pendingChoice.minimum,
       maximum: input.game.state.pendingChoice.maximum
+    } : input.game.state.pendingChoice?.type === "assignCombatDamage" ? {
+      type: "assignCombatDamage",
+      id: input.game.state.pendingChoice.id,
+      playerId: input.game.state.pendingChoice.playerId,
+      totalDamage: input.game.state.pendingChoice.totalDamage
     } : null,
     combat: input.game.state.combat ? {
       battlefieldId: input.game.state.combat.battlefieldId,

@@ -4,6 +4,7 @@ import {
   gameplayActions,
   performGameplayAction,
   performGameplayTransition,
+  projectGame,
   type DeckSnapshotDocument,
   type BehaviorBinding,
   type GameDocument
@@ -39,6 +40,24 @@ test("requires lethal Tank assignment before non-Tank combat damage", () => {
   });
   let game = passShowdown(moveAttacker(initial, decks), decks);
   assert.equal(game.state.pendingChoice?.type, "assignCombatDamage");
+  const actorProjection = projectGame({
+    game,
+    viewerPlayerId: "p1",
+    decks
+  });
+  const waitingProjection = projectGame({
+    game,
+    viewerPlayerId: "p2",
+    decks
+  });
+  assert.deepEqual(actorProjection.pendingChoice, {
+    type: "assignCombatDamage",
+    id: game.state.pendingChoice?.id,
+    playerId: "p1",
+    totalDamage: 5
+  });
+  assert.deepEqual(waitingProjection.pendingChoice, actorProjection.pendingChoice);
+  assert.equal(waitingProjection.actions.length, 0);
   const assignment = gameplayActions(game, "p1", decks)[0]!;
   assert.equal(assignment.choice?.kind, "combatDamage");
   assert.throws(() => performGameplayAction({
