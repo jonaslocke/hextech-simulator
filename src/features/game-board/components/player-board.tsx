@@ -187,6 +187,7 @@ const RunesLine = ({
           cards={baseRunes}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          layout="scroll"
           onCardContextAction={onRuneContextAction}
           onCardPrimaryAction={onRunePrimaryAction}
           showMight={false}
@@ -456,7 +457,7 @@ function CardList({
   onCardPointerEnter?: (card: Card) => void;
   onCardPointerLeave?: (card: Card) => void;
   onClick?: () => void;
-  layout?: "row" | "wrap";
+  layout?: "row" | "scroll" | "wrap";
   showMight?: boolean;
 }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
@@ -571,6 +572,14 @@ function CardList({
         )}
         ref={wrapContainerRef}
       >
+        {content}
+      </div>
+    );
+  }
+
+  if (!onClick && layout === "scroll") {
+    return (
+      <div className="relative flex items-center gap-2 py-2 pr-1 w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden">
         {content}
       </div>
     );

@@ -263,6 +263,29 @@ test("characterizes reusable post-showdown UI surfaces", async () => {
   assert.match(choiceDialog, /selectionMode: "ordered" \| "single"/);
 });
 
+test("keeps large rune rows inside a horizontally scrollable zone", async () => {
+  const playerBoard = await readFile(
+    path.join(
+      process.cwd(),
+      "src",
+      "features",
+      "game-board",
+      "components",
+      "player-board.tsx"
+    ),
+    "utf8"
+  );
+
+  assert.match(
+    playerBoard,
+    /cards=\{baseRunes\}[\s\S]*?layout="scroll"/,
+  );
+  assert.match(
+    playerBoard,
+    /layout === "scroll"[\s\S]*?overflow-x-auto overflow-y-hidden/,
+  );
+});
+
 async function collect(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files: string[] = [];
