@@ -11,7 +11,7 @@ import {
   definitionForInstance
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
-import type { GameDocument } from "./state";
+import type { ChainItem, GameDocument } from "./state";
 
 export function dispatchBehaviorEvent(
   game: GameDocument,
@@ -33,63 +33,133 @@ export function dispatchBehaviorEvent(
   }
 }
 
-export function resolveDelayedEffects(
+export function queueDelayedEffects(
   game: GameDocument,
   point: string,
   decks: readonly DeckSnapshotDocument[],
   endingPlayerId: string
 ): boolean {
   const index = createRuntimeCardIndex(decks);
-  const handlers = createPrimitiveHandlers(index);
-  while (true) {
-    const effect = game.state.delayedEffects.find(
-      (candidate) => candidate.point === point
-    );
-    if (!effect) return true;
-    const definition = definitionForInstance(effect.sourceCardInstanceId, index);
-    const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses
-      .find((candidate) => candidate.id === effect.clauseId);
-    if (!clause) throw new Error(`Delayed behavior clause is unavailable: ${effect.clauseId}`);
-    const readyRunes = clause.orderedEffects.find(
-      (binding) =>
-        binding.behaviorId === "action.ready_cards" &&
-        binding.parameters.target === "runes"
-    );
-    if (readyRunes) {
-      const count = readyRunes.parameters.count;
-      if (typeof count !== "number") {
-        throw new Error("Ready cards count is unavailable.");
-      }
-      const legalCardIds = game.state.players[effect.controllerPlayerId]!.zones.base
-        .filter(
-          (cardId) =>
-            definitionForInstance(cardId, index).card.classification.type === "Rune" &&
-            game.state.cardStates[cardId]?.exhausted
-        );
-      const required = Math.min(count, legalCardIds.length);
-      if (required > 0) {
-        game.state.pendingChoice = {
-          id: `choice:${effect.id}`,
-          playerId: effect.controllerPlayerId,
-          type: "readyCards",
-          delayedEffectId: effect.id,
-          endingPlayerId,
-          legalCardIds,
-          minimum: required,
-          maximum: required
-        };
-        return false;
-      }
+  const due = game.state.delayedEffects.filter(
+    (effect) => effect.point === point
+  );
+  if (due.length === 0) return false;
+  const items = due.map((effect): ChainItem => ({
+    id: `delayed-trigger:${effect.id}`,
+    kind: "trigger",
+    label: definitionForInstance(effect.sourceCardInstanceId, index).card.name,
+    controllerPlayerId: effect.controllerPlayerId,
+    sourceCardInstanceId: effect.sourceCardInstanceId,
+    targetCardInstanceIds: [],
+    behaviorClauseId: effect.clauseId,
+    activatedBehaviorId: null,
+    behaviorEvent: {
+      type: "delayed.effect",
+      actorPlayerId: effect.controllerPlayerId,
+      subjectCardInstanceId: effect.sourceCardInstanceId,
+      values: { delayedEffectId: effect.id, endingPlayerId }
     }
-    executeBehaviorEffects(
-      clause,
-      createBehaviorContext(game, effect.controllerPlayerId, effect.sourceCardInstanceId, null, effect.selectedIds),
-      handlers
+  }));
+  const playerIds = game.state.setup.playerIds;
+  const startIndex = playerIds.indexOf(endingPlayerId);
+  const turnOrder = startIndex < 0
+    ? [...playerIds]
+    : [...playerIds.slice(startIndex), ...playerIds.slice(0, startIndex)];
+  let waitingForOrder = game.state.pendingChoice !== null;
+  for (const controllerPlayerId of turnOrder) {
+    const controlledItems = items.filter(
+      (item) => item.controllerPlayerId === controllerPlayerId
     );
-    game.state.delayedEffects = game.state.delayedEffects.filter(
-      (candidate) => candidate.id !== effect.id
-    );
+    if (controlledItems.length === 0) continue;
+    if (controlledItems.length > 1 || waitingForOrder) {
+      const choice = {
+        id: `choice:${game.stateVersion}:${controllerPlayerId}:delayed-triggers`,
+        playerId: controllerPlayerId,
+        type: "orderTriggers" as const,
+        optionIds: controlledItems.map((item) => item.id),
+        pendingItems: controlledItems
+      };
+      if (game.state.pendingChoice) {
+        game.state.queuedTriggerChoices.push(choice);
+      } else {
+        game.state.pendingChoice = choice;
+      }
+      waitingForOrder = true;
+      continue;
+    }
+    const chain = game.state.chain ?? {
+      items: [],
+      relevantPlayerIds: [...game.state.setup.playerIds],
+      priorityPlayerId: controllerPlayerId,
+      passedPlayerIds: []
+    };
+    chain.items.push(controlledItems[0]!);
+    game.state.chain = chain;
   }
+  if (game.state.chain?.items.length) {
+    game.state.chain.priorityPlayerId =
+      game.state.chain.items.at(-1)!.controllerPlayerId;
+    game.state.chain.passedPlayerIds = [];
+  }
+  return true;
+}
+
+export function beginDelayedEffectResolution(
+  game: GameDocument,
+  effectId: string,
+  decks: readonly DeckSnapshotDocument[],
+  endingPlayerId: string
+): boolean {
+  const index = createRuntimeCardIndex(decks);
+  const handlers = createPrimitiveHandlers(index);
+  const effect = game.state.delayedEffects.find(
+    (candidate) => candidate.id === effectId
+  );
+  if (!effect) throw new Error("Delayed effect is unavailable.");
+  const definition = definitionForInstance(effect.sourceCardInstanceId, index);
+  const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses
+    .find((candidate) => candidate.id === effect.clauseId);
+  if (!clause) throw new Error(`Delayed behavior clause is unavailable: ${effect.clauseId}`);
+  const readyRunes = clause.orderedEffects.find(
+    (binding) =>
+      binding.behaviorId === "action.ready_cards" &&
+      binding.parameters.target === "runes"
+  );
+  if (readyRunes) {
+    const count = readyRunes.parameters.count;
+    if (typeof count !== "number") {
+      throw new Error("Ready cards count is unavailable.");
+    }
+    const legalCardIds = game.state.players[effect.controllerPlayerId]!.zones.base
+      .filter(
+        (cardId) =>
+          definitionForInstance(cardId, index).card.classification.type === "Rune" &&
+          game.state.cardStates[cardId]?.exhausted
+      );
+    const required = Math.min(count, legalCardIds.length);
+    if (required > 0) {
+      game.state.pendingChoice = {
+        id: `choice:${effect.id}`,
+        playerId: effect.controllerPlayerId,
+        type: "readyCards",
+        delayedEffectId: effect.id,
+        endingPlayerId,
+        legalCardIds,
+        minimum: required,
+        maximum: required
+      };
+      return false;
+    }
+  }
+  executeBehaviorEffects(
+    clause,
+    createBehaviorContext(game, effect.controllerPlayerId, effect.sourceCardInstanceId, null, effect.selectedIds),
+    handlers
+  );
+  game.state.delayedEffects = game.state.delayedEffects.filter(
+    (candidate) => candidate.id !== effect.id
+  );
+  return true;
 }
 
 export function victoryRequirement(

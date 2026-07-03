@@ -197,7 +197,15 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
   chain.priorityPlayerId = playerId;
   chain.passedPlayerIds = [];
   game.state.chain = chain;
-  game.state.pendingChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  let nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  while (nextChoice?.optionIds.length === 1) {
+    const item = nextChoice.pendingItems[0]!;
+    chain.items.push(item);
+    chain.priorityPlayerId = item.controllerPlayerId;
+    chain.passedPlayerIds = [];
+    nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  }
+  game.state.pendingChoice = nextChoice;
 }
 
 export function createBehaviorContext(

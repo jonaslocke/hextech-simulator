@@ -30,7 +30,11 @@ import {
   submitCombatDamage,
   type DamageAssignment
 } from "./combat";
-import { dispatchBehaviorEvent, resolveDelayedEffects } from "./triggers";
+import {
+  beginDelayedEffectResolution,
+  dispatchBehaviorEvent,
+  queueDelayedEffects
+} from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
@@ -401,9 +405,25 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
     if (passed.length === game.state.chain.relevantPlayerIds.length) {
       const item = game.state.chain.items.pop();
       if (item?.sourceCardInstanceId) {
+        const controller = item.controllerPlayerId;
         const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
         const definition = definitionForInstance(item.sourceCardInstanceId, index);
-        if (item.kind === "activatedAbility" && item.activatedBehaviorId) {
+        if (item.behaviorEvent?.type === "delayed.effect") {
+          const delayedEffectId = item.behaviorEvent.values.delayedEffectId;
+          const endingPlayerId = item.behaviorEvent?.values.endingPlayerId;
+          if (
+            typeof delayedEffectId !== "string" ||
+            typeof endingPlayerId !== "string"
+          ) {
+            throw new Error("Delayed effect context is unavailable.");
+          }
+          beginDelayedEffectResolution(
+            game,
+            delayedEffectId,
+            decks,
+            endingPlayerId
+          );
+        } else if (item.kind === "activatedAbility" && item.activatedBehaviorId) {
           const clause = definition.behaviorModel.clauses.find(
             (candidate) => candidate.id === item.behaviorClauseId
           );
@@ -418,7 +438,7 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
             binding,
             createBehaviorContext(
               game,
-              owner,
+              controller,
               item.sourceCardInstanceId,
               null,
               item.targetCardInstanceIds
@@ -427,14 +447,14 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
           const clause = compiled.clauses.find((candidate) => candidate.id === item.behaviorClauseId);
-          if (clause) executeBehaviorClause({ clause, context: createBehaviorContext(game, owner, item.sourceCardInstanceId, item.behaviorEvent, item.targetCardInstanceIds), handlers });
+          if (clause) executeBehaviorClause({ clause, context: createBehaviorContext(game, controller, item.sourceCardInstanceId, item.behaviorEvent, item.targetCardInstanceIds), handlers });
         } else {
-          executeImmediateClauses(game, definition, owner, item.sourceCardInstanceId, item.targetCardInstanceIds, handlers);
+          executeImmediateClauses(game, definition, controller, item.sourceCardInstanceId, item.targetCardInstanceIds, handlers);
           if (definition.card.classification.type === "Spell") {
             game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
             dispatchBehaviorEvent(game, {
-              type: "card.played", actorPlayerId: owner, subjectCardInstanceId: item.sourceCardInstanceId,
-              values: { "eventSubject.effectiveEnergyCost": effectiveEnergyCost(game, owner, definition) }
+              type: "card.played", actorPlayerId: controller, subjectCardInstanceId: item.sourceCardInstanceId,
+              values: { "eventSubject.effectiveEnergyCost": effectiveEnergyCost(game, controller, definition) }
             }, decks);
           }
         }
@@ -457,6 +477,7 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
         }
       }
       cleanupBoard(game, index);
+      finishEndTurnIfReady(game, index, decks);
     } else {
       game.state.chain.passedPlayerIds = passed;
       game.state.chain.priorityPlayerId = nextRelevantPlayer(
@@ -496,8 +517,10 @@ function passPriority(game: GameDocument, actor: string, index: RuntimeCardIndex
 
 function endTurn(game: GameDocument, actor: string, index: RuntimeCardIndex, decks: readonly DeckSnapshotDocument[]) {
   if (game.state.turn?.activePlayerId !== actor) throw new Error("Only the active player can end the turn.");
-  if (!resolveDelayedEffects(game, "endOfThisTurn", decks, actor)) return;
-  completeEndTurn(game, actor, index, decks);
+  game.state.turn.phase = "end";
+  if (!queueDelayedEffects(game, "endOfThisTurn", decks, actor)) {
+    completeEndTurn(game, actor, index, decks);
+  }
 }
 
 function completeEndTurn(
@@ -552,15 +575,21 @@ function submitReadyCards(
   game.state.delayedEffects = game.state.delayedEffects.filter(
     (candidate) => candidate.id !== effect.id
   );
+  finishEndTurnIfReady(game, index, decks);
+}
+
+function finishEndTurnIfReady(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[]
+) {
+  const turn = game.state.turn;
   if (
-    resolveDelayedEffects(
-      game,
-      "endOfThisTurn",
-      decks,
-      pending.endingPlayerId
-    )
+    turn?.phase === "end" &&
+    !game.state.chain &&
+    !game.state.pendingChoice
   ) {
-    completeEndTurn(game, pending.endingPlayerId, index, decks);
+    completeEndTurn(game, turn.activePlayerId, index, decks);
   }
 }
 

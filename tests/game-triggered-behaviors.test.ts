@@ -49,6 +49,10 @@ test("executes synthetic hold and conquer events, delayed readiness, and victory
   assert.equal(game.state.delayedEffects.length, 1);
   const endTurn = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: endTurn.id, selectedIds: [], decks, now: "z" });
+  assert.equal(game.state.chain?.items.at(-1)?.label, "Peak");
+  assert.equal(game.state.chain?.items.at(-1)?.controllerPlayerId, "p1");
+  assert.equal(game.state.turn?.phase, "end");
+  game = resolveTopChainItem(game, decks);
   assert.equal(game.state.pendingChoice?.type, "readyCards");
   assert.equal(game.state.turn?.activePlayerId, "p1");
   const waitingProjection = projectGame({
@@ -81,11 +85,16 @@ test("each conquered Targon's Peak readies two independently chosen runes", () =
   const { game: initial, decks } = fixture();
   let game = initial;
   const extraInstances = [
-    instance("peak2", "p1", "PEAK"),
+    instance("peak2", "p2", "PEAK"),
     instance("rune5", "p1", "RUNE"),
     instance("rune6", "p1", "RUNE")
   ];
-  decks[0]!.instances.push(...extraInstances);
+  decks[0]!.instances.push(...extraInstances.filter(
+    (card) => card.ownerPlayerId === "p1"
+  ));
+  decks[1]!.instances.push(...extraInstances.filter(
+    (card) => card.ownerPlayerId === "p2"
+  ));
   game.state.battlefields.push({
     battlefieldId: "peak2",
     cardInstanceId: "peak2",
@@ -125,6 +134,21 @@ test("each conquered Targon's Peak readies two independently chosen runes", () =
     decks,
     now: "end"
   });
+  assert.equal(game.state.pendingChoice?.type, "orderTriggers");
+  const order = gameplayActions(game, "p1", decks)[0]!;
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: order.id,
+    selectedIds: [],
+    decks,
+    now: "order"
+  });
+  assert.equal(game.state.chain?.items.length, 2);
+  assert.ok(game.state.chain?.items.every(
+    (item) => item.controllerPlayerId === "p1"
+  ));
+  game = resolveTopChainItem(game, decks);
 
   const firstReady = gameplayActions(game, "p1", decks)[0]!;
   game = performGameplayAction({
@@ -135,9 +159,12 @@ test("each conquered Targon's Peak readies two independently chosen runes", () =
     decks,
     now: "ready-1"
   });
-  assert.equal(game.state.pendingChoice?.type, "readyCards");
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.chain?.items.length, 1);
   assert.equal(game.state.turn?.activePlayerId, "p1");
 
+  game = resolveTopChainItem(game, decks);
+  assert.equal(game.state.pendingChoice?.type, "readyCards");
   const secondReady = gameplayActions(game, "p1", decks)[0]!;
   assert.deepEqual(secondReady.targets[0]?.legalIds, ["rune5", "rune6"]);
   game = performGameplayAction({
@@ -174,6 +201,30 @@ function resolveAllChainItems(game: GameDocument, decks: DeckSnapshotDocument[])
     }
   }
   return current;
+}
+
+function resolveTopChainItem(
+  initial: GameDocument,
+  decks: DeckSnapshotDocument[]
+) {
+  let game = initial;
+  const itemCount = game.state.chain?.items.length;
+  if (!itemCount) throw new Error("Expected a chain item.");
+  while (game.state.chain?.items.length === itemCount) {
+    const actor = game.state.chain.priorityPlayerId;
+    const pass = gameplayActions(game, actor, decks).find(
+      (action) => action.label === "Pass priority"
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: actor,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: "resolve-delayed"
+    });
+  }
+  return game;
 }
 
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
