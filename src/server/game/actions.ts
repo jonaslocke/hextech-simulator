@@ -50,6 +50,9 @@ import {
   type GameTransition
 } from "./transitions";
 
+// Non-standard rules override. Disable to require normal Action/Reaction timing.
+const ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY = true;
+
 export function gameplayActions(
   game: GameDocument,
   actorPlayerId: string,
@@ -937,14 +940,25 @@ function addAbilityActions(
           ...compiled.playTimings,
           ...clause.timings
         ].map((candidate) => candidate.behaviorId);
+        const isAddAbility = isAddResourceAbility(ability.behaviorId);
+        const hasReactionTiming =
+          timingIds.includes("timing.reaction") ||
+          /\[Reaction\]/i.test(
+            `${clause.sourceText} ${clause.normalizedText}`
+          );
+        const hasPriorityAddOverride =
+          ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY &&
+          isAddAbility;
         if (
           timing === "showdownOpen" &&
           !timingIds.includes("timing.action") &&
-          !timingIds.includes("timing.reaction")
+          !hasReactionTiming &&
+          !hasPriorityAddOverride
         ) continue;
         if (
           (timing === "neutralClosed" || timing === "showdownClosed") &&
-          !timingIds.includes("timing.reaction")
+          !hasReactionTiming &&
+          !hasPriorityAddOverride
         ) continue;
         const enabled = ability.behaviorId === "ability.recycle_for_power" || !game.state.cardStates[sourceId]!.exhausted;
         const label = ability.behaviorId === "ability.recycle_for_power"
@@ -1010,8 +1024,7 @@ function executeActivatedAbility(
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
   const resolvesImmediately =
-    binding.behaviorId === "ability.exhaust_for_resource" ||
-    binding.behaviorId === "ability.recycle_for_power";
+    isAddResourceAbility(binding.behaviorId);
   if (resolvesImmediately) {
     handler.execute(
       binding,
@@ -1023,6 +1036,13 @@ function executeActivatedAbility(
         selectedIds
       )
     );
+    if (game.state.chain) {
+      game.state.chain.priorityPlayerId = actorPlayerId;
+      game.state.chain.passedPlayerIds = [];
+    }
+    if (game.state.showdown) {
+      game.state.showdown.passedPlayerIds = [];
+    }
     return;
   }
   const item = {
@@ -1046,6 +1066,11 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function isAddResourceAbility(behaviorId: string) {
+  return behaviorId === "ability.exhaust_for_resource" ||
+    behaviorId === "ability.recycle_for_power";
 }
 
 function executeImmediateClauses(

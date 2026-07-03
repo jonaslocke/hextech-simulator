@@ -43,6 +43,26 @@ test("plays a spell through priority resolution and advances the turn", () => {
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
   assert.equal(game.state.chain?.items.length, 1);
   assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  game.state.chain!.passedPlayerIds = ["p2"];
+  const addEnergy = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:rune" &&
+      action.label === "Add Energy"
+  );
+  assert.ok(addEnergy, "feature override must expose Add abilities during Priority");
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addEnergy.id,
+    selectedIds: [],
+    decks,
+    now: "bb"
+  });
+  assert.equal(game.state.players.p1!.energy, 1);
+  assert.equal(game.state.cardStates["p1:rune"]!.exhausted, true);
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  assert.deepEqual(game.state.chain?.passedPlayerIds, []);
   for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActions(game, playerId, decks)[0]!;
     game = performGameplayAction({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "c" });
