@@ -16,14 +16,14 @@
 - [x] 5. `refactor(game): add resumable effect selection`
 - [x] 6. `refactor(game-board): render projected choices generically`
 - [x] 7. `fix(game): require executable behavior snapshots`
-- [ ] 8. `test(game): certify generalized Lux runtime`
+- [x] 8. `test(game): certify generalized Lux runtime`
 - [ ] 9. `docs(game): record Lux engine rollout and rollback`
 
 ## Current checkpoint
 
-- Completed through: milestone 7
-- Last verification: focused catalog/Lux tests, `npm run typecheck`, `npm run lint`, `npm test`
-- Next milestone: add certification coverage and align implementation-status documentation.
+- Completed through: milestone 8
+- Last verification: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check`
+- Next milestone: record actual commit hashes and the final rollout/rollback procedure.
 
 ## Resume procedure
 

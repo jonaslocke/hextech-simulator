@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  dispatchBehaviorEvent, gameplayActions, performGameplayAction,
+  applyHoldScoring, dispatchBehaviorEvent, gameplayActions, performGameplayAction,
   projectGame, victoryRequirement, GAME__RUNTIME_COVERAGE,
+  scoreBattlefield, stateChangeEvents,
   type DeckSnapshotDocument, type GameDocument
 } from "../src/server/game";
 
@@ -205,6 +206,61 @@ test("classifies every initial runtime primitive without planned placeholders", 
   assert.equal(GAME__RUNTIME_COVERAGE["keyword.assault"], "executable");
   assert.equal(GAME__RUNTIME_COVERAGE["keyword.shield"], "executable");
   assert.equal(GAME__RUNTIME_COVERAGE["keyword.tank"], "executable");
+});
+
+test("completes victory through Hold and emits one winner transition", () => {
+  const { game, decks } = fixture();
+  game.state.battlefields = game.state.battlefields.filter(
+    (battlefield) => battlefield.cardInstanceId !== "climb",
+  );
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  game.state.players.p1!.points = 7;
+  const before = structuredClone(game);
+
+  applyHoldScoring(game, "p1", decks);
+
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
+  assert.equal(gameplayActions(game, "p1", decks).length, 0);
+  assert.deepEqual(
+    stateChangeEvents(before, game).map((event) => event.type),
+    ["player.scored", "game.won"],
+  );
+});
+
+test("requires every battlefield for a final-point Conquer", () => {
+  const { game, decks } = fixture();
+  game.state.battlefields = game.state.battlefields.filter(
+    (battlefield) => battlefield.cardInstanceId !== "climb",
+  );
+  game.state.players.p1!.points = 7;
+  const handBefore = game.state.players.p1!.zones.hand.length;
+
+  scoreBattlefield(game, "p1", "paper", "conquer", decks);
+
+  assert.equal(game.state.players.p1!.points, 7);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
+  assert.equal(game.winnerPlayerId, null);
+});
+
+test("combines active Victory Score modifiers without card identity logic", () => {
+  const { game, decks } = fixture();
+  const secondClimb = instance("climb2", "p2", "CLIMB");
+  decks[1]!.instances.push(secondClimb);
+  game.state.cardStates.climb2 = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.battlefields.push({
+    battlefieldId: "climb2",
+    cardInstanceId: "climb2",
+    selectedByPlayerId: "p2",
+    units: [],
+  });
+
+  assert.equal(victoryRequirement(game, decks), 10);
 });
 
 function resolveAllChainItems(game: GameDocument, decks: DeckSnapshotDocument[]) {

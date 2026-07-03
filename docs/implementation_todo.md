@@ -326,6 +326,15 @@ implemented, tested, and documented where relevant.
 
 ## 16. Deferred Socket Multiplayer
 
+## 17. Generalized Lux Runtime And Victory
+
+- [x] Separate cohesive gameplay subsystems without card identity branches.
+- [x] Evaluate Victory Score through the reusable numeric modifier pipeline.
+- [x] Complete games and best-of-one matches when a player wins.
+- [x] Project a dynamic Victory Score and display match results.
+- [x] Replace ready-rune-specific pending state with resumable effect choices.
+- [x] Require executable primitive coverage before creating a match snapshot.
+
 - [ ] Validate player token on `match:join`.
 - [x] Join socket to match room and player-specific viewer context.
 - [ ] Broadcast viewer-specific `match:state`.

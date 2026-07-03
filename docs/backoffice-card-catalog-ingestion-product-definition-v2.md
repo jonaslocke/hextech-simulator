@@ -1,5 +1,10 @@
 # Backoffice Card Catalog Ingestion and Behavior Validation
 
+> Historical boundary note: this document described the initial isolated
+> backoffice phase. The current game runtime now consumes approved canonical
+> behavior models in match snapshots. The isolation statements below describe
+> the original delivery constraint, not the current implementation status.
+
 ## 1. Product Summary
 
 The Backoffice Card Catalog Ingestion and Behavior Validation feature allows an administrator to upload Riftbound card set JSON files, review suggested canonical card groupings, validate cosmetic card variants, inspect generated behavior drafts, edit those drafts through structured controls or raw JSON, and persist approved catalog and behavior records to the database.

@@ -11,6 +11,7 @@ export * from "./behavior-runtime";
 export * from "./primitive-handlers";
 export * from "./triggers";
 export * from "./victory";
+export * from "./scoring";
 export * from "./board-rules";
 export * from "./combat";
 export * from "./timing";

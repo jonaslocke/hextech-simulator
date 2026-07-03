@@ -552,6 +552,12 @@ Ganking, and Vision remain separate boundaries.
 
 ## Card Runtime And Primitive Coverage
 
+Current implementation note: approved canonical behavior models are snapshotted
+into matches and executed by reusable runtime primitive handlers. The Lux deck
+is the current acceptance boundary, not a source of card-specific engine
+branches. Runtime choices use resumable effect frames, and playable snapshots
+reject behavior that is not explicitly executable.
+
 Card runtime must be data-driven from `data/sets/*.json`, but card text is not
 automatically executable just because the card exists in the catalog.
 

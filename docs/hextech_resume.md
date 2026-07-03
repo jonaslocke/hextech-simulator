@@ -43,6 +43,11 @@ In short, the project is building the backend foundation for digital Riftbound p
 
 ## Current Implementation Status
 
+The gameplay runtime now consumes approved, structured behavior models through
+reusable primitive handlers. Lux-vs-Lux is the certified playable scope, while
+victory, scoring, payments, modifiers, effects, and pending choices are modeled
+as reusable engine subsystems rather than Lux card implementations.
+
 The current codebase already implements a meaningful foundation, especially around match creation, deck validation, setup, zones, and visibility projection.
 
 ### Backend Stack
