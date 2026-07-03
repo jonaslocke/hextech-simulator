@@ -4,7 +4,7 @@ import {
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
-import { dispatchBehaviorEvent, victoryRequirement } from "./triggers";
+import { scoreBattlefield } from "./scoring";
 
 export function cleanupBoard(
   game: GameDocument,
@@ -70,55 +70,6 @@ export function resolveNonCombatShowdown(
   }
 }
 
-export function applyHoldScoring(
-  game: GameDocument,
-  playerId: string,
-  decks: readonly DeckSnapshotDocument[]
-): void {
-  const player = game.state.players[playerId]!;
-  player.scoredBattlefieldIdsThisTurn = [];
-  for (const battlefield of game.state.battlefields) {
-    if (battlefield.controllerPlayerId === playerId) {
-      scoreBattlefield(game, playerId, battlefield.battlefieldId, "hold", decks);
-    }
-  }
-}
-
-export function scoreBattlefield(
-  game: GameDocument,
-  playerId: string,
-  battlefieldId: string,
-  method: "conquer" | "hold",
-  decks: readonly DeckSnapshotDocument[]
-): void {
-  const player = game.state.players[playerId]!;
-  const scored = player.scoredBattlefieldIdsThisTurn ?? [];
-  if (scored.includes(battlefieldId)) return;
-  player.scoredBattlefieldIdsThisTurn = [...scored, battlefieldId];
-  const points = player.points ?? 0;
-  const requirement = victoryRequirement(game, decks);
-  const isFinalPoint = points === requirement - 1;
-  const hasScoredEveryBattlefield = game.state.battlefields.every((battlefield) =>
-    player.scoredBattlefieldIdsThisTurn!.includes(battlefield.battlefieldId)
-  );
-  if (isFinalPoint && method === "conquer" && !hasScoredEveryBattlefield) {
-    drawOne(game, playerId);
-  } else {
-    player.points = points + 1;
-  }
-  const battlefield = requireBattlefield(game, battlefieldId);
-  dispatchBehaviorEvent(game, {
-    type: method === "conquer" ? "battlefield.conquered" : "battlefield.held",
-    actorPlayerId: playerId,
-    subjectCardInstanceId: battlefield.cardInstanceId,
-    values: {}
-  }, decks);
-  if ((player.points ?? 0) >= requirement) {
-    game.winnerPlayerId = playerId;
-    game.status = "complete";
-  }
-}
-
 export function unitControllers(
   game: GameDocument,
   unitIds: readonly string[],
@@ -126,12 +77,6 @@ export function unitControllers(
 ): string[] {
   return [...new Set(unitIds.map((id) => index.instances.get(id)?.ownerPlayerId)
     .filter((id): id is string => Boolean(id && game.state.players[id])))];
-}
-
-function drawOne(game: GameDocument, playerId: string) {
-  const player = game.state.players[playerId]!;
-  const cardId = player.zones.mainDeck.shift();
-  if (cardId) player.zones.hand.push(cardId);
 }
 
 function requireBattlefield(game: GameDocument, battlefieldId: string) {

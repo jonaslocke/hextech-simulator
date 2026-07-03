@@ -9,7 +9,7 @@
 ## Milestones
 
 - [x] 0. `docs(game): add Lux engine generalization execution ledger`
-- [ ] 1. `refactor(game): separate gameplay engine subsystems`
+- [x] 1. `refactor(game): separate gameplay engine subsystems`
 - [ ] 2. `refactor(game): centralize modifiers and victory scoring`
 - [ ] 3. `feat(game-board): display effective victory score`
 - [ ] 4. `feat(game): complete matches and present game results`
@@ -21,9 +21,9 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 0
-- Last verification: `git diff --check`
-- Next milestone: separate gameplay engine subsystems without changing behavior, persisted schemas, projections, or action IDs.
+- Completed through: milestone 1
+- Last verification: `npm run typecheck`, `npm run lint`, `npm test`
+- Next milestone: centralize numeric modifiers and victory scoring without card identity branches.
 
 ## Resume procedure
 

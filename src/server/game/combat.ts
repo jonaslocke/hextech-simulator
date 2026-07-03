@@ -1,8 +1,8 @@
 import {
   cleanupBoard,
-  scoreBattlefield,
   unitControllers
 } from "./board-rules";
+import { scoreBattlefield } from "./scoring";
 import {
   definitionForInstance,
   recomputeMight,

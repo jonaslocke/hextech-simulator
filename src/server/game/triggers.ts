@@ -162,33 +162,6 @@ export function beginDelayedEffectResolution(
   return true;
 }
 
-export function victoryRequirement(
-  game: GameDocument,
-  decks: readonly DeckSnapshotDocument[],
-  baseRequirement = 8
-): number {
-  const index = createRuntimeCardIndex(decks);
-  let result = baseRequirement;
-  const battlefieldCards = game.state.battlefields.map((battlefield) => battlefield.cardInstanceId);
-  for (const sourceId of battlefieldCards) {
-    const model = definitionForInstance(sourceId, index).behaviorModel;
-    for (const binding of model.clauses.flatMap((clause) => clause.effects)) {
-      if (
-        binding.behaviorId === "modifier.modify_numeric_value" &&
-        binding.parameters.attribute === "victoryRequirement" &&
-        binding.parameters.duration === "whileSourceOnBoard" &&
-        typeof binding.parameters.amount === "number"
-      ) {
-        if (binding.parameters.operation === "increase") result += binding.parameters.amount;
-        if (binding.parameters.operation === "reduce") result -= binding.parameters.amount;
-        if (binding.parameters.operation === "set") result = binding.parameters.amount;
-        if (binding.parameters.operation === "multiply") result *= binding.parameters.amount;
-      }
-    }
-  }
-  return result;
-}
-
 function activeSourceIds(
   game: GameDocument,
   controllerPlayerId: string,
