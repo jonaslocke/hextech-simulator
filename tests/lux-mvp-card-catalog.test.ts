@@ -31,7 +31,7 @@ type ModelExpectation = {
 };
 
 const EXPECTED_MODELS: Record<string, ModelExpectation> = {
-  "OGS-021": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.effectiveEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["action.draw_cards", { player: "controller", count: 1 }, 1]] }] },
+  "OGS-021": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.printedEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["action.draw_cards", { player: "controller", count: 1 }, 1]] }] },
   "OGS-014": { clauses: [{ sequence: 0, abilities: [["ability.exhaust_for_resource", { resourceType: "energy", amountSource: "constant", amount: 2, usage: "spellsOnly" }, 0]] }] },
   "OGN-095": { playTimings: [["timing.reaction", {}, 0]], clauses: [{ sequence: 0, selectors: [["selector.unit", unitSelector("any", 1, 1, "board"), 1]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "reduce", operand: "constant", amount: 1, target: "unit", duration: "thisTurn", minimum: 1 }, 2]] }, { sequence: 1, effects: [["action.draw_cards", { player: "controller", count: 1 }, 0]] }] },
   "OGN-210": { clauses: [{ sequence: 0, keywords: [["keyword.assault", { amount: 1 }, 0]] }] },
@@ -42,7 +42,7 @@ const EXPECTED_MODELS: Record<string, ModelExpectation> = {
   "OGN-219": { clauses: [] },
   "OGN-085": actionUnitModel("battlefield", "action.deal_damage", { amount: 6, target: "unit" }),
   "OGS-012": actionUnitModel("battlefield", "action.kill_unit", { target: "unit" }),
-  "OGS-006": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.effectiveEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "source", duration: "thisTurn" }, 1]] }] },
+  "OGS-006": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.printedEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "source", duration: "thisTurn" }, 1]] }] },
   "OGN-105": { clauses: [{ sequence: 0, selectors: [["selector.unit", unitSelector("each", 0, 2, "board"), 0]], effects: [["action.deal_damage", { amount: 6, target: "unit" }, 1]] }] },
   "OGS-016": { clauses: [{ sequence: 0, effects: [["modifier.enter_ready", { target: "source" }, 0]] }] },
   "OGN-088": { clauses: [] },

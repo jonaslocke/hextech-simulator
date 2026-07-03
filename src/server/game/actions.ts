@@ -536,6 +536,16 @@ function playCard(
     throw new Error("Unit play destination is not controlled by the player.");
   }
   const energyCost = effectiveEnergyCost(game, playerId, definition, index);
+  const playEvent = {
+    type: "card.played",
+    actorPlayerId: playerId,
+    subjectCardInstanceId: cardId,
+    values: {
+      "eventSubject.printedEnergyCost":
+        definition.card.attributes.energy ?? 0,
+      "eventSubject.effectiveEnergyCost": energyCost,
+    },
+  };
   payCardCost(game, playerId, definition, energyCost, index);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
@@ -552,16 +562,7 @@ function playCard(
       selectedIds,
       handlers,
     );
-    dispatchBehaviorEvent(
-      game,
-      {
-        type: "card.played",
-        actorPlayerId: playerId,
-        subjectCardInstanceId: cardId,
-        values: { "eventSubject.effectiveEnergyCost": energyCost },
-      },
-      decks,
-    );
+    dispatchBehaviorEvent(game, playEvent, decks);
     cleanupBoard(game, index);
     if (game.state.showdown) {
       game.state.showdown.focusPlayerId = nextRelevantPlayer(
@@ -582,7 +583,7 @@ function playCard(
     targetCardInstanceIds: selectedIds,
     behaviorClauseId: null,
     activatedBehaviorId: null,
-    behaviorEvent: null,
+    behaviorEvent: playEvent,
   };
   if (game.state.chain) {
     game.state.chain.items.push(item);
@@ -696,19 +697,23 @@ function passPriority(
             );
             dispatchBehaviorEvent(
               game,
-              {
-                type: "card.played",
-                actorPlayerId: controller,
-                subjectCardInstanceId: item.sourceCardInstanceId,
-                values: {
-                  "eventSubject.effectiveEnergyCost": effectiveEnergyCost(
-                    game,
-                    controller,
-                    definition,
-                    index,
-                  ),
-                },
-              },
+              item.behaviorEvent?.type === "card.played"
+                ? item.behaviorEvent
+                : {
+                    type: "card.played",
+                    actorPlayerId: controller,
+                    subjectCardInstanceId: item.sourceCardInstanceId,
+                    values: {
+                      "eventSubject.printedEnergyCost":
+                        definition.card.attributes.energy ?? 0,
+                      "eventSubject.effectiveEnergyCost": effectiveEnergyCost(
+                        game,
+                        controller,
+                        definition,
+                        index,
+                      ),
+                    },
+                  },
               decks,
             );
           }

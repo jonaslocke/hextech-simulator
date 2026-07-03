@@ -131,6 +131,51 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   assert.equal(game.state.cardStates[raven]!.computedMight, ravenBefore + 1);
 
   ({ game, decks } = runtimeFixture(template));
+  const discountSource = instanceNamed(decks, "p1", "Eager Apprentice");
+  const luminosity = instanceNamed(
+    decks,
+    "p1",
+    "Lady of Luminosity - Starter",
+  );
+  const fallingComet = instanceNamed(decks, "p1", "Falling Comet");
+  const discountedTarget = instanceNamed(decks, "p2", "Vanguard Sergeant");
+  relocateToBattlefield(game, "p1", discountSource);
+  relocateLegend(game, "p1", luminosity);
+  relocate(game, "p1", fallingComet, "hand");
+  relocateToBattlefield(game, "p2", discountedTarget);
+  game.state.players.p1!.energy = 4;
+  const discountedDefinition = definitionNamed(decks, "Falling Comet");
+  assert.equal(discountedDefinition.card.attributes.energy, 5);
+  assert.equal(
+    effectiveEnergyCost(
+      game,
+      "p1",
+      discountedDefinition,
+      createRuntimeCardIndex(decks),
+    ),
+    4,
+  );
+  const discountedDeckBefore = game.state.players.p1!.zones.mainDeck.length;
+  const discountedPlay = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === fallingComet,
+  )!;
+  assert.equal(discountedPlay.enabled, true);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: discountedPlay.id,
+    selectedIds: [discountedTarget],
+    decks,
+    now: "discounted-spell",
+  });
+  game = resolveAll(game, decks);
+  assert.equal(
+    game.state.players.p1!.zones.mainDeck.length,
+    discountedDeckBefore - 1,
+    "Lux must trigger from printed cost even when Eager Apprentice reduces payment",
+  );
+
+  ({ game, decks } = runtimeFixture(template));
   const yordle = instanceNamed(decks, "p1", "Lecturing Yordle");
   relocate(game, "p1", yordle, "hand");
   const yordleDeckBefore = game.state.players.p1!.zones.mainDeck.length;

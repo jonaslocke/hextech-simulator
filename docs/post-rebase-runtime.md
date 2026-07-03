@@ -5,7 +5,7 @@ Baseline: `ca93632`
 ## Milestones
 
 - [x] 0. Record the defects, screenshots, and execution order.
-- [ ] 1. Make printed spell cost drive "costs N or more" play triggers while
+- [x] 1. Make printed spell cost drive "costs N or more" play triggers while
   payment continues to use the discounted cost.
 - [ ] 2. Keep the rune zone usable with more than seven runes.
 - [ ] 3. Close the chain overlay when its final item resolves.
@@ -19,7 +19,7 @@ typecheck, lint, and production-build gate. Resume by inspecting this document,
 
 ## Defects
 
-- [ ] Cost-discounted spells should still trigger Lux. Eager Apprentice reduces
+- [x] Cost-discounted spells should still trigger Lux. Eager Apprentice reduces
   the Energy paid for a spell by 1 while at a battlefield. Playing a spell with
   printed cost 5, such as Falling Comet, costs the player 4 but must still
   satisfy Lux's "costs 5 or more" trigger.
@@ -35,4 +35,4 @@ typecheck, lint, and production-build gate. Resume by inspecting this document,
 ## Verification record
 
 - Runtime reset required: no.
-- Current milestone: 1.
+- Current milestone: 2.

@@ -95,6 +95,7 @@ export const delayedTimingKinds = [
 ] as const;
 
 export const numericComparisonValueSources = [
+  "eventSubject.printedEnergyCost",
   "eventSubject.effectiveEnergyCost"
 ] as const;
 
@@ -790,7 +791,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     fixedRules: [
       "The comparison is evaluated after the clause trigger fires and before its effects resolve.",
       "A false comparison prevents the other behavior assignments in the same clause from resolving.",
-      "The event subject's effective Energy cost includes applicable cost modifiers recorded for the play event."
+      "Printed Energy cost is the card's Energy characteristic and is used by 'costs N or more' rules. The effective Energy cost source remains accepted for compatibility with existing behavior snapshots."
     ],
     engineSupport: requiresEngineSupport(
       "The catalog defines typed numeric clause guards; generalized runtime condition evaluation remains future engine work."

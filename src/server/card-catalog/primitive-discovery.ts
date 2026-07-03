@@ -345,7 +345,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
     return comparisonValue === null
       ? null
       : assignment(context, "condition.compare_numeric_value", "condition", {
-          valueSource: "eventSubject.effectiveEnergyCost",
+          valueSource: "eventSubject.printedEnergyCost",
           operator: "greaterThanOrEqual",
           comparisonValue
         }, "high");

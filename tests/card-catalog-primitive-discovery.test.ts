@@ -431,7 +431,7 @@ test("models a played spell Energy-cost threshold as a typed clause condition", 
   assert.deepEqual(
     findAssignment(discovery, "condition.compare_numeric_value")?.parameters,
     {
-      valueSource: "eventSubject.effectiveEnergyCost",
+      valueSource: "eventSubject.printedEnergyCost",
       operator: "greaterThanOrEqual",
       comparisonValue: 5
     }

@@ -60,7 +60,13 @@ export function createPrimitiveHandlers(
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
       const source = binding.parameters.valueSource;
-      const value = typeof source === "string" ? context.event?.values[source] : undefined;
+      const value =
+        source === "eventSubject.effectiveEnergyCost"
+          ? context.event?.values["eventSubject.printedEnergyCost"] ??
+            context.event?.values[source]
+          : typeof source === "string"
+            ? context.event?.values[source]
+            : undefined;
       const comparison = binding.parameters.comparisonValue;
       if (typeof value !== "number" || typeof comparison !== "number") return false;
       switch (binding.parameters.operator) {
