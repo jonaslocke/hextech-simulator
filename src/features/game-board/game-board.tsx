@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
@@ -42,6 +43,7 @@ import {
   type BoardProjection,
 } from "./board-view-model";
 import {
+  chainOverlayZone,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction,
@@ -200,6 +202,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     string[]
   >([]);
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
+  const wasChainLockedOpen = useRef(isChainLockedOpen);
   const canViewerPassChain =
     isChainLockedOpen &&
     sourceProjection.actions.some((action) => action.label === "Pass priority");
@@ -748,9 +751,14 @@ export const GameBoard: FC<GameBoardProps> = ({
   const handleRuneContextAction = openRuneActionMenu;
 
   useEffect(() => {
-    if (isChainLockedOpen) {
-      setOpenZone("chain");
-    }
+    setOpenZone((currentZone) =>
+      chainOverlayZone(
+        currentZone,
+        wasChainLockedOpen.current,
+        isChainLockedOpen,
+      ),
+    );
+    wasChainLockedOpen.current = isChainLockedOpen;
   }, [isChainLockedOpen]);
 
   useEffect(() => {

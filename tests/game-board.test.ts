@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   actionsForSource,
+  chainOverlayZone,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction
@@ -210,6 +211,17 @@ test("stages a single-unit move through the simultaneous move action", () => {
     }]),
     "Choose units to Contest The Papertree"
   );
+});
+
+test("closes the chain overlay only when the final resolving item leaves", () => {
+  assert.equal(chainOverlayZone(null, false, true), "chain");
+  assert.equal(chainOverlayZone("chain", true, false), null);
+  assert.equal(
+    chainOverlayZone("chain", false, false),
+    "chain",
+    "an empty chain may still be opened for inspection",
+  );
+  assert.equal(chainOverlayZone("log", true, false), "log");
 });
 
 test("game board contains no initial-deck or behavior identities", async () => {
