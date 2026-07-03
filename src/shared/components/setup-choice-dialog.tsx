@@ -168,52 +168,62 @@ export function SetupChoiceDialog({
         <section
           aria-modal="true"
           className={cx(
-            "grid max-h-[min(46rem,calc(100vh-2rem))] w-full gap-4 overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/80",
+            "relative grid max-h-[min(46rem,calc(100vh-2rem))] w-full gap-4 overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/82 p-4 text-slate-100 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
+            "supports-backdrop-filter:bg-slate-950/68 supports-backdrop-filter:backdrop-blur-md",
             usesCardPresentation ? getCardDialogMaxWidth(cardSize) : "max-w-xl",
           )}
           role="dialog"
         >
-          <header className="space-y-1">
-            <h2 className="font-semibold text-lg leading-tight">{title}</h2>
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.10),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_34%)] pointer-events-none"
+          />
+
+          <header className="relative space-y-1">
+            <h2 className="font-semibold text-slate-50 text-lg leading-tight">
+              {title}
+            </h2>
             {description && (
               <p className="max-w-2xl text-slate-400 text-sm">{description}</p>
             )}
           </header>
 
-          {usesCardPresentation ? (
-            <CardChoiceGrid
-              cardSize={cardSize}
-              maxSelected={maxSelected}
-              onOrderChange={setOrderedIds}
-              onSelect={selectOption}
-              options={
-                selectionMode === "ordered"
-                  ? sortOptions(options, orderedIds)
-                  : options
-              }
-              orderedIds={orderedIds}
-              selectedIds={currentSelectedIds}
-              selectionLimitReached={selectionLimitReached}
-              selectionMode={selectionMode}
-            />
-          ) : selectionMode === "ordered" ? (
-            <OrderedChoiceList
-              onOrderChange={setOrderedIds}
-              options={options}
-              orderedIds={orderedIds}
-            />
-          ) : (
-            <ChoiceList
-              maxSelected={maxSelected}
-              onSelect={selectOption}
-              options={options}
-              selectedIds={selectedIds}
-              selectionLimitReached={selectionLimitReached}
-              selectionMode={selectionMode}
-            />
-          )}
+          <div className="relative min-h-0">
+            {usesCardPresentation ? (
+              <CardChoiceGrid
+                cardSize={cardSize}
+                maxSelected={maxSelected}
+                onOrderChange={setOrderedIds}
+                onSelect={selectOption}
+                options={
+                  selectionMode === "ordered"
+                    ? sortOptions(options, orderedIds)
+                    : options
+                }
+                orderedIds={orderedIds}
+                selectedIds={currentSelectedIds}
+                selectionLimitReached={selectionLimitReached}
+                selectionMode={selectionMode}
+              />
+            ) : selectionMode === "ordered" ? (
+              <OrderedChoiceList
+                onOrderChange={setOrderedIds}
+                options={options}
+                orderedIds={orderedIds}
+              />
+            ) : (
+              <ChoiceList
+                maxSelected={maxSelected}
+                onSelect={selectOption}
+                options={options}
+                selectedIds={selectedIds}
+                selectionLimitReached={selectionLimitReached}
+                selectionMode={selectionMode}
+              />
+            )}
+          </div>
 
-          <footer className="flex justify-end items-center gap-2 pt-3 border-white/10 border-t">
+          <footer className="relative flex justify-end items-center gap-2 pt-3 border-white/10 border-t">
             <SelectionSummary
               maxSelected={maxSelected}
               selectedIds={currentSelectedIds}
@@ -267,6 +277,8 @@ function CardChoiceGrid({
   const gridColumnClass = getCardGridColumnClass(cardSize);
   const cardWidthClass = getCardChoiceWidthClass(cardSize);
   const imageHeightClass = getCardChoiceImageHeightClass(cardSize);
+  const shouldReserveLimitMessageSpace =
+    selectionMode === "multiple" && maxSelected !== undefined;
 
   return (
     <div
@@ -286,20 +298,18 @@ function CardChoiceGrid({
 
         return (
           <div
-            className={cx(
-              "min-w-0",
-              compactGrid ? "" : cardWidthClass,
-            )}
+            className={cx("min-w-0", compactGrid ? "" : cardWidthClass)}
             key={option.id}
           >
             <button
               aria-label={option.label}
               aria-pressed={selectionMode === "ordered" ? undefined : isSelected}
               className={cx(
-                "group relative block w-full overflow-visible rounded-lg border bg-white/[0.03] p-1.5 text-left shadow-lg shadow-black/30 outline-none transition",
-                "enabled:hover:border-cyan-300/55 enabled:hover:bg-cyan-300/[0.04] enabled:focus-visible:border-cyan-300 enabled:focus-visible:ring-2 enabled:focus-visible:ring-inset enabled:focus-visible:ring-cyan-300/60",
+                "group relative block w-full overflow-visible rounded-xl border bg-white/[0.045] p-1.5 text-left shadow-lg shadow-black/30 outline-none ring-1 ring-white/[0.035] transition",
+                "supports-backdrop-filter:bg-white/[0.035] supports-backdrop-filter:backdrop-blur-sm",
+                "enabled:hover:border-cyan-300/55 enabled:hover:bg-cyan-300/[0.055] enabled:focus-visible:border-cyan-300 enabled:focus-visible:ring-2 enabled:focus-visible:ring-inset enabled:focus-visible:ring-cyan-300/60",
                 isSelected
-                  ? "border-cyan-300 ring-2 ring-inset ring-cyan-300/65"
+                  ? "border-cyan-300 bg-cyan-300/[0.07] ring-2 ring-inset ring-cyan-300/65 shadow-cyan-300/10"
                   : "border-white/10",
                 disabled && "cursor-not-allowed opacity-40 grayscale",
               )}
@@ -313,13 +323,13 @@ function CardChoiceGrid({
                 <img
                   alt={option.label}
                   className={cx(
-                    "block w-full rounded-md object-contain shadow-xl shadow-black/60 transition group-hover:scale-[1.015] group-disabled:scale-100",
+                    "block w-full rounded-lg object-contain shadow-xl shadow-black/60 transition group-hover:scale-[1.015] group-disabled:scale-100",
                     imageHeightClass,
                   )}
                   src={option.imageUrl}
                 />
               ) : (
-                <span className="flex justify-center items-center bg-slate-900 p-3 border border-white/10 rounded-md aspect-[130/181] font-semibold text-slate-200 text-sm text-center">
+                <span className="flex justify-center items-center bg-slate-900/80 p-3 border border-white/10 rounded-lg aspect-[130/181] font-semibold text-slate-200 text-sm text-center">
                   {option.label}
                 </span>
               )}
@@ -336,22 +346,32 @@ function CardChoiceGrid({
                 <ReorderButton
                   disabled={selectedIndex <= 0}
                   label={`Move ${option.label} up`}
-                  onClick={() => onOrderChange(moveItem(orderedIds, selectedIndex, -1))}
+                  onClick={() =>
+                    onOrderChange(moveItem(orderedIds, selectedIndex, -1))
+                  }
                 >
                   Up
                 </ReorderButton>
                 <ReorderButton
                   disabled={selectedIndex === orderedIds.length - 1}
                   label={`Move ${option.label} down`}
-                  onClick={() => onOrderChange(moveItem(orderedIds, selectedIndex, 1))}
+                  onClick={() =>
+                    onOrderChange(moveItem(orderedIds, selectedIndex, 1))
+                  }
                 >
                   Down
                 </ReorderButton>
               </div>
             )}
 
-            {disabledByLimit && maxSelected !== undefined && (
-              <p className="mt-1 text-[11px] text-slate-500 text-center">
+            {shouldReserveLimitMessageSpace && (
+              <p
+                aria-hidden={!disabledByLimit}
+                className={cx(
+                  "mt-1 min-h-4 text-center text-[11px] leading-4 transition-opacity",
+                  disabledByLimit ? "text-slate-400 opacity-100" : "opacity-0",
+                )}
+              >
                 Select up to {maxSelected}.
               </p>
             )}
@@ -389,10 +409,10 @@ function ChoiceList({
           <button
             aria-pressed={isSelected}
             className={cx(
-              "flex min-h-16 items-center gap-3 rounded-md border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45",
+              "flex min-h-16 items-center gap-3 rounded-lg border bg-white/[0.045] p-2 text-left shadow-sm shadow-black/20 transition disabled:cursor-not-allowed disabled:opacity-45",
               isSelected
-                ? "border-cyan-300 bg-cyan-300/15"
-                : "border-white/10 bg-white/5 hover:border-cyan-300/40",
+                ? "border-cyan-300 bg-cyan-300/15 ring-1 ring-cyan-300/50"
+                : "border-white/10 hover:border-cyan-300/40 hover:bg-cyan-300/[0.04]",
             )}
             disabled={disabled}
             key={option.id}
@@ -435,10 +455,10 @@ function OrderedChoiceList({
 
         return (
           <li
-            className="flex items-center gap-3 bg-white/5 p-2 border border-white/10 rounded-md min-h-16"
+            className="flex items-center gap-3 bg-white/[0.045] shadow-black/20 shadow-sm p-2 border border-white/10 rounded-lg min-h-16"
             key={id}
           >
-            <span className="flex justify-center items-center bg-slate-800 rounded size-7 font-semibold text-slate-300 text-xs shrink-0">
+            <span className="flex justify-center items-center bg-slate-950/60 border border-white/10 rounded-md size-7 font-semibold text-slate-300 text-xs shrink-0">
               {index + 1}
             </span>
             <OptionImage option={option} />
@@ -516,7 +536,6 @@ function SelectionSummary({
   );
 }
 
-
 function getCardDialogMaxWidth(cardSize: SetupChoiceDialogCardSize) {
   switch (cardSize) {
     case "xl":
@@ -577,15 +596,16 @@ function ReorderButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       aria-label={label}
-      className="bg-slate-950/80 disabled:opacity-35 px-2 py-1 border border-white/10 enabled:hover:border-cyan-300/40 rounded text-[11px] text-slate-300 enabled:hover:text-white transition disabled:cursor-not-allowed"
+      className="bg-slate-950/45 disabled:opacity-35 px-2 border border-white/10 enabled:hover:border-cyan-300/40 h-8 text-[11px] text-slate-300 enabled:hover:text-white disabled:cursor-not-allowed"
       disabled={disabled}
       onClick={onClick}
       type="button"
+      variant="secondary"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

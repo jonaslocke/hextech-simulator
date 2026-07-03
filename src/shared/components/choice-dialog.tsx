@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { Button } from "./button";
 import { DialogPortal } from "./dialog-portal";
+import { cn } from "@/shared/utils/cn";
 
 export type ChoiceDialogOption = {
   description?: string;
   disabled?: boolean;
   id: string;
+  imageOrientation?: "auto" | "portrait" | "landscape";
   imageUrl?: string;
   label: string;
 };
@@ -31,7 +33,7 @@ export function ChoiceDialog({
   onConfirm,
   options,
   selectionMode,
-  title
+  title,
 }: ChoiceDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
@@ -55,18 +57,25 @@ export function ChoiceDialog({
 
   return (
     <DialogPortal>
-      <div className="fixed inset-0 z-[2147483646] flex items-center justify-center bg-black/55 p-4">
+      <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100">
         <section
           aria-modal="true"
-          className="grid max-h-[min(42rem,calc(100vh-2rem))] w-full max-w-xl gap-4 overflow-hidden rounded-lg border border-cyan-300/25 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-black/70"
+          className={cn(
+            "gap-4 grid rounded-xl w-full max-w-2xl max-h-[min(42rem,calc(100vh-2rem))] overflow-hidden",
+            "border border-cyan-300/25 bg-slate-950/82 p-4 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
+            "supports-backdrop-filter:bg-slate-950/68 supports-backdrop-filter:backdrop-blur-md",
+          )}
           role="dialog"
         >
-          <header>
-            <h2 className="text-lg font-semibold leading-tight">{title}</h2>
+          <header className="space-y-1">
+            <h2 className="font-semibold text-slate-50 text-lg leading-tight">
+              {title}
+            </h2>
             {description && (
-              <p className="mt-1 text-sm text-slate-400">{description}</p>
+              <p className="text-slate-400 text-sm leading-5">{description}</p>
             )}
           </header>
+
           {selectionMode === "single" ? (
             <SingleChoiceList
               onSelect={setSelectedId}
@@ -80,7 +89,8 @@ export function ChoiceDialog({
               orderedIds={orderedIds}
             />
           )}
-          <footer className="flex justify-end gap-2 border-t border-white/10 pt-3">
+
+          <footer className="flex justify-end gap-2 pt-3 border-white/10 border-t">
             {onCancel && (
               <Button onClick={onCancel} type="button" variant="secondary">
                 Cancel
@@ -104,24 +114,27 @@ export function ChoiceDialog({
 function SingleChoiceList({
   onSelect,
   options,
-  selectedId
+  selectedId,
 }: {
   onSelect: (id: string) => void;
   options: ChoiceDialogOption[];
   selectedId: string | null;
 }) {
   return (
-    <div className="grid max-h-[28rem] gap-2 overflow-auto pr-1">
+    <div className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
       {options.map((option) => {
         const isSelected = selectedId === option.id;
 
         return (
           <button
-            className={`flex min-h-16 items-center gap-3 rounded-md border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={cn(
+              "flex items-center gap-3 p-2 border rounded-lg min-h-16 text-left transition",
+              "bg-white/[0.055] shadow-sm shadow-black/20",
+              "disabled:cursor-not-allowed disabled:opacity-45",
               isSelected
-                ? "border-cyan-300 bg-cyan-300/15"
-                : "border-white/10 bg-white/5 hover:border-cyan-300/40"
-            }`}
+                ? "border-cyan-300/80 bg-cyan-300/12 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+                : "border-white/10 hover:border-cyan-300/45 hover:bg-cyan-300/[0.055]",
+            )}
             disabled={option.disabled}
             key={option.id}
             onClick={() => onSelect(option.id)}
@@ -139,7 +152,7 @@ function SingleChoiceList({
 function OrderedChoiceList({
   onOrderChange,
   options,
-  orderedIds
+  orderedIds,
 }: {
   onOrderChange: (ids: string[]) => void;
   options: ChoiceDialogOption[];
@@ -148,7 +161,7 @@ function OrderedChoiceList({
   const optionById = new Map(options.map((option) => [option.id, option]));
 
   return (
-    <ol className="grid max-h-[28rem] gap-2 overflow-auto pr-1">
+    <ol className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
       {orderedIds.map((id, index) => {
         const option = optionById.get(id);
 
@@ -158,15 +171,18 @@ function OrderedChoiceList({
 
         return (
           <li
-            className="flex min-h-16 items-center gap-3 rounded-md border border-white/10 bg-white/5 p-2"
+            className={cn(
+              "items-center gap-3 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] p-2 border rounded-lg min-h-20",
+              "border-white/10 bg-white/[0.055] shadow-sm shadow-black/25",
+            )}
             key={id}
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded bg-slate-800 text-xs font-semibold text-slate-300">
+            <span className="flex justify-center items-center bg-slate-800/80 shadow-black/20 shadow-inner border border-white/10 rounded-md size-8 font-mono font-semibold text-slate-200 text-xs shrink-0">
               {index + 1}
             </span>
             <OptionImage option={option} />
             <OptionText option={option} />
-            <div className="ml-auto flex gap-1">
+            <div className="flex gap-1.5 ml-auto">
               <ReorderButton
                 disabled={index === 0}
                 label="Move up"
@@ -190,28 +206,55 @@ function OrderedChoiceList({
 }
 
 function OptionImage({ option }: { option: ChoiceDialogOption }) {
+  const [detectedOrientation, setDetectedOrientation] = useState<
+    "portrait" | "landscape" | null
+  >(null);
+
   if (!option.imageUrl) {
     return null;
   }
 
+  const orientation =
+    option.imageOrientation && option.imageOrientation !== "auto"
+      ? option.imageOrientation
+      : detectedOrientation ?? "portrait";
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Choice options may use catalog or local card assets.
-    <img
-      alt=""
-      className="h-16 w-12 shrink-0 rounded border border-white/10 object-cover"
-      src={option.imageUrl}
-    />
+    <span
+      className={cn(
+        "flex justify-center items-center bg-black/25 shadow-black/30 shadow-md border border-white/10 rounded-md overflow-hidden shrink-0",
+        orientation === "landscape" ? "h-16 w-28" : "h-16 w-12",
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- Choice options may use catalog or local card assets. */}
+      <img
+        alt=""
+        className="block w-full h-full object-contain"
+        draggable={false}
+        onLoad={(event) => {
+          if (option.imageOrientation && option.imageOrientation !== "auto") {
+            return;
+          }
+
+          const image = event.currentTarget;
+          const isLandscape = image.naturalWidth > image.naturalHeight * 1.05;
+
+          setDetectedOrientation(isLandscape ? "landscape" : "portrait");
+        }}
+        src={option.imageUrl}
+      />
+    </span>
   );
 }
 
 function OptionText({ option }: { option: ChoiceDialogOption }) {
   return (
     <span className="min-w-0">
-      <span className="block truncate text-sm font-semibold text-slate-100">
+      <span className="block font-semibold text-slate-100 text-sm truncate">
         {option.label}
       </span>
       {option.description && (
-        <span className="mt-0.5 block text-xs text-slate-400">
+        <span className="block mt-0.5 text-slate-400 text-xs line-clamp-2 leading-5">
           {option.description}
         </span>
       )}
@@ -223,7 +266,7 @@ function ReorderButton({
   children,
   disabled,
   label,
-  onClick
+  onClick,
 }: {
   children: string;
   disabled: boolean;
@@ -231,15 +274,17 @@ function ReorderButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       aria-label={label}
-      className="rounded border border-white/10 px-2 py-1 text-[11px] text-slate-300 transition enabled:hover:border-cyan-300/40 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+      className="bg-white/5 hover:bg-cyan-300/10 disabled:opacity-35 px-2.5 border-white/10 hover:border-cyan-300/40 h-8 text-slate-200 text-xs"
       disabled={disabled}
       onClick={onClick}
+      size="sm"
       type="button"
+      variant="secondary"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
