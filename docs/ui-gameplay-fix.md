@@ -10,16 +10,6 @@
 
 ---
 
-## 2. Showdown prompt should distinguish combat and non-combat showdowns
-
-**Issue:** The current Showdown prompt does not clearly distinguish between the two showdown types. A combat showdown happens as part of Combat, while a non-combat showdown happens when units move to an empty battlefield and does not create Combat. The prompt wording should make this difference clear so the player understands what passing will resolve.
-
-**What should happen:** For combat showdowns, the prompt should use combat-specific wording such as **“Combat Showdown”** and **“Pass and resolve combat”**. For non-combat showdowns, it should use generic showdown wording such as **“Showdown”** and **“Pass and resolve showdown”**. If passing will not resolve the showdown yet, the CTA should remain **“Pass Focus”**.
-
-![Showdown pass and resolve combat UI](image-43.png)
-
----
-
 ## 3. Combat damage assignment needs waiting feedback for the non-actor player
 
 **Issue:** When one player is assigning combat damage, the opponent keeps seeing the board but does not receive clear feedback that the game is waiting for the other player. This makes the board feel frozen or unresponsive, even though the game is correctly waiting for a pending combat damage choice.
