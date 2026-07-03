@@ -38,6 +38,9 @@ the chain exists, and Focus advances only after the final chain item resolves.
 | Turn state | 508-510 | State is derived from the presence of a showdown and chain: Neutral/Showdown crossed with Open/Closed. |
 | Focus and Priority | 511-513 | Showdown stores Focus; chain stores Priority. Passing Priority retains Focus, but Focus cannot be passed while the chain makes the Showdown Closed. |
 | Add timing override | 509.1.a, 605.2-605.3 | Non-standard feature: while `ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY` is enabled, all Energy and Power Add abilities may be activated by the player with Priority. They still resolve immediately and reset consecutive Priority passes. Disable the constant to restore Reaction-only Closed-state timing. |
+| Final pass communication | 540.4, 543-544, 553.4 | A final Priority pass resolves only the latest Chain item. A final consecutive Focus pass ends the Showdown. UI labels must describe those outcomes separately. |
+| Unit play location | 559.2, 563.1.c | A Unit's location is chosen as part of playing it. Base and battlefields currently controlled by that player are legal destinations; the Unit enters exhausted. |
+| Combat keyword duration | 625.1.b, 719, 726-727 | Assault and Shield modify live Might for as long as combat roles remain. Tank changes assignment legality but does not modify Might. |
 | Cleanup timing | 518-526 | One stabilization service runs after moves, resolved chain items, showdowns, and combat. It schedules, but does not recursively overlap, encounters. |
 | Relevant players | 528-531, 550 | In current 1v1 combat, attacker and defender are relevant. In a non-combat showdown both players are relevant. |
 | Chain passes | 532-544 | Passes must be consecutive. Adding an item resets the pass sequence. Each item resolves LIFO after both relevant players pass. |
