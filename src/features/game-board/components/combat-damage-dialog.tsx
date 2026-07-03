@@ -109,7 +109,6 @@ export function CombatDamageDialog({
   );
 
   const assigned = allocations.reduce((sum, entry) => sum + entry.amount, 0);
-  const remaining = Math.max(0, choice.totalDamage - assigned);
   const validation = validateDamagePlan({
     allocations,
     assigned,
@@ -164,24 +163,57 @@ export function CombatDamageDialog({
     }
   };
 
+  const autoAssignDamage = () => {
+    let remainingDamage = choice.totalDamage;
+    const nextAmounts: Record<string, number> = {};
+    const nextAssignmentOrder: string[] = [];
+
+    for (const target of targets) {
+      if (remainingDamage <= 0) {
+        break;
+      }
+
+      const amount = Math.min(target.lethalAmount, remainingDamage);
+
+      if (amount <= 0) {
+        continue;
+      }
+
+      nextAmounts[target.unitId] = amount;
+      nextAssignmentOrder.push(target.unitId);
+      remainingDamage -= amount;
+    }
+
+    const lastAssignedUnitId = nextAssignmentOrder.at(-1);
+
+    if (remainingDamage > 0 && lastAssignedUnitId) {
+      nextAmounts[lastAssignedUnitId] =
+        (nextAmounts[lastAssignedUnitId] ?? 0) + remainingDamage;
+    }
+
+    setAmounts(nextAmounts);
+    setAssignmentOrder(nextAssignmentOrder);
+  };
+
   const resetAssignments = () => {
     setAmounts({});
     setAssignmentOrder([]);
   };
 
   return (
-    <div className="z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4">
+    <div className="z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4 select-none">
       <section
         aria-labelledby="combat-damage-title"
         aria-modal="true"
         className={cn(
-          "gap-4 grid bg-slate-950/80 shadow-2xl shadow-black/85 p-4 border border-amber-200/22 rounded-xl ring-1 ring-amber-300/10 w-full max-w-6xl overflow-hidden text-slate-100",
+          "gap-3 grid bg-slate-950/80 shadow-2xl shadow-black/85 p-3.5 border border-amber-200/22 rounded-xl ring-1 ring-amber-300/10 w-full overflow-hidden text-slate-100 select-none",
           "supports-backdrop-filter:bg-slate-950/64 supports-backdrop-filter:backdrop-blur-md",
-          "max-h-[min(46rem,calc(100vh-2rem))]",
+          "max-h-[min(42rem,calc(100vh-2rem))]",
+          getDialogMaxWidthClass(targets.length),
         )}
         role="dialog"
       >
-        <header className="flex md:flex-row flex-col md:justify-between md:items-end gap-3">
+        <header className="flex md:flex-row flex-col md:justify-between md:items-start gap-3">
           <div className="min-w-0">
             <p className="font-mono font-semibold text-[11px] text-amber-200/80 uppercase tracking-[0.22em]">
               Combat damage
@@ -190,27 +222,23 @@ export function CombatDamageDialog({
               className="mt-1 font-semibold text-slate-50 text-xl leading-tight"
               id="combat-damage-title"
             >
-              Assign {choice.totalDamage} damage
+              Assign damage
             </h2>
-            <p className="mt-1 max-w-3xl text-slate-400 text-sm leading-5">
-              Left click a unit to assign 1 damage. Right click to remove 1.
-              Assign lethal damage before moving to another unit.
-              {hasTankTargets ? " Tank units are first." : ""}
-              {hasBacklineTargets ? " Backline units are last." : ""}
+            <p className="mt-1 max-w-2xl text-slate-400 text-sm leading-5">
+              Left click +1. Right click -1. Assign lethal before moving to
+              another unit.
+              {hasTankTargets ? " Tank first." : ""}
+              {hasBacklineTargets ? " Backline last." : ""}
             </p>
           </div>
 
-          <DamageMeter
-            assigned={assigned}
-            remaining={remaining}
-            totalDamage={choice.totalDamage}
-          />
+          <DamageMeter assigned={assigned} totalDamage={choice.totalDamage} />
         </header>
 
         <div
           className={cn(
-            "place-items-center gap-x-4 gap-y-6 grid px-2 py-3 max-h-[min(31rem,calc(100vh-15rem))] overflow-auto [scrollbar-color:rgba(251,191,36,0.25)_transparent]",
-            getDamageGridClass(cardSize),
+            "flex flex-wrap justify-center content-start mx-auto px-4 py-3 max-w-full max-h-[min(30rem,calc(100vh-14rem))] overflow-x-hidden overflow-y-auto [scrollbar-color:rgba(251,191,36,0.25)_transparent]",
+            getDamageCardGapClass(targets.length),
           )}
         >
           {targets.map((target) => {
@@ -223,7 +251,7 @@ export function CombatDamageDialog({
               <DamageTargetCard
                 canAssign={canAssign}
                 canRemove={canRemove}
-                cardSize={"xl"}
+                cardSize={cardSize}
                 key={target.unitId}
                 onAssign={() => assignDamage(target.unitId)}
                 onRemove={(event) => {
@@ -238,20 +266,30 @@ export function CombatDamageDialog({
 
         <footer className="flex md:flex-row flex-col md:justify-between md:items-center gap-3 pt-3 border-white/10 border-t">
           <div aria-live="polite" className="min-h-5 text-sm">
-            <span
-              className={cn(
-                canSubmit
-                  ? "text-emerald-200"
-                  : assigned === choice.totalDamage
-                    ? "text-amber-200"
-                    : "text-slate-400",
-              )}
-            >
-              {validation.message}
-            </span>
+            {validation.message && (
+              <span
+                className={cn(
+                  canSubmit
+                    ? "text-emerald-200"
+                    : assigned === choice.totalDamage
+                      ? "text-amber-200"
+                      : "text-slate-400",
+                )}
+              >
+                {validation.message}
+              </span>
+            )}
           </div>
 
           <div className="flex justify-end items-center gap-2">
+            <Button
+              disabled={targets.length === 0 || choice.totalDamage <= 0}
+              onClick={autoAssignDamage}
+              type="button"
+              variant="secondary"
+            >
+              Auto assign
+            </Button>
             <Button
               disabled={assigned === 0}
               onClick={resetAssignments}
@@ -301,49 +339,56 @@ function DamageTargetCard({
     >
       <CardTile
         {...target.card}
-        damage={target.amount > 0 ? target.amount : target.card.damage}
         enableHoverPreview
         enableZoneAnimation={false}
         isHighlighted={target.amount > 0}
         onContextAction={onRemove}
         onPrimaryAction={canAssign ? onAssign : undefined}
         preserveOrientation
+        showMight={false}
         size={cardSize}
       />
 
+      <LethalBadge value={target.lethalAmount} />
+      <AssignedDamageBadge amount={target.amount} />
       <PriorityBadge priority={target.priority} />
-
-      {target.amount > 0 && (
-        <span
-          className={cn(
-            "-top-2 left-1/2 z-20 absolute shadow-black/40 shadow-lg px-2 py-0.5 border rounded-full font-semibold text-[11px] -translate-x-1/2 pointer-events-none",
-            target.isLethalAssigned
-              ? "border-emerald-200/45 bg-emerald-300/18 text-emerald-50"
-              : "border-amber-200/45 bg-amber-300/18 text-amber-50",
-          )}
-        >
-          {target.amount}/{target.lethalAmount}
-        </span>
-      )}
     </div>
+  );
+}
+
+function LethalBadge({ value }: { value: number }) {
+  return (
+    <span className="top-1 right-1 z-20 absolute flex justify-center items-center bg-white shadow-black/45 shadow-lg border border-slate-300/80 rounded-full size-6 font-black text-slate-950 text-xs pointer-events-none">
+      {value}
+    </span>
+  );
+}
+
+function AssignedDamageBadge({ amount }: { amount: number }) {
+  if (amount <= 0) {
+    return null;
+  }
+
+  return (
+    <span className="top-1/2 left-1 z-20 absolute flex justify-center items-center bg-red-500 shadow-black/45 shadow-lg border border-red-100/70 rounded-full size-7 font-black text-white text-sm -translate-y-1/2 pointer-events-none">
+      {amount}
+    </span>
   );
 }
 
 function DamageMeter({
   assigned,
-  remaining,
   totalDamage,
 }: {
   assigned: number;
-  remaining: number;
   totalDamage: number;
 }) {
   const percentage = totalDamage > 0 ? (assigned / totalDamage) * 100 : 0;
 
   return (
-    <div className="bg-slate-950/36 shadow-black/35 shadow-inner p-2 border border-white/10 rounded-lg min-w-[12rem]">
+    <div className="bg-slate-950/32 shadow-black/35 shadow-inner p-2 border border-white/10 rounded-lg min-w-[11rem]">
       <div className="flex justify-between items-center gap-3 text-xs">
-        <span className="text-slate-400">Assigned</span>
+        <span className="text-slate-400">Assigned damage</span>
         <span className="font-mono font-semibold text-amber-100">
           {assigned}/{totalDamage}
         </span>
@@ -353,9 +398,6 @@ function DamageMeter({
           className="bg-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.22)] rounded-full h-full transition-[width] duration-200 ease-out"
           style={{ width: `${clamp(percentage, 0, 100)}%` }}
         />
-      </div>
-      <div className="mt-1 text-[11px] text-slate-500 text-right">
-        {remaining} remaining
       </div>
     </div>
   );
@@ -371,11 +413,11 @@ function PriorityBadge({ priority }: { priority: DamagePriority }) {
   return (
     <span
       className={cn(
-        "-top-2 -left-2 z-20 absolute shadow-black/40 shadow-lg px-2 py-0.5 border rounded-full font-mono font-semibold text-[10px] uppercase tracking-[0.14em] pointer-events-none",
+        "bottom-1 left-1 z-20 absolute shadow-black/40 shadow-lg px-1.5 py-0.5 border rounded-full font-mono font-semibold text-[9px] uppercase tracking-[0.12em] pointer-events-none",
         priority === "tank" &&
-          "border-amber-200/45 bg-amber-300/18 text-amber-50",
+          "border-amber-200/45 bg-amber-300/20 text-amber-50",
         priority === "backline" &&
-          "border-violet-200/40 bg-violet-300/16 text-violet-50",
+          "border-violet-200/40 bg-violet-300/18 text-violet-50",
       )}
     >
       {label}
@@ -397,7 +439,7 @@ function validateDamagePlan({
   if (assigned < totalDamage) {
     return {
       isValid: false,
-      message: `${totalDamage - assigned} damage remaining.`,
+      message: "",
     };
   }
 
@@ -599,28 +641,43 @@ function getDamagePriorityLabel(priority: DamagePriority) {
 }
 
 function getDamageCardSize(targetCount: number): CardTileSize {
-  if (targetCount > 10) {
-    return "sm";
+  if (targetCount <= 4) {
+    return "xl";
   }
 
-  if (targetCount > 4) {
+  if (targetCount <= 10) {
+    return "lg";
+  }
+
+  if (targetCount <= 18) {
     return "md";
   }
 
-  return "lg";
+  return "sm";
 }
 
-function getDamageGridClass(cardSize: CardTileSize) {
-  switch (cardSize) {
-    case "sm":
-      return "grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))]";
-    case "md":
-      return "grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]";
-    case "lg":
-    case "xl":
-    default:
-      return "grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]";
+function getDialogMaxWidthClass(targetCount: number) {
+  if (targetCount <= 4) {
+    return "max-w-[min(44rem,calc(100vw-2rem))]";
   }
+
+  if (targetCount <= 8) {
+    return "max-w-[min(52rem,calc(100vw-2rem))]";
+  }
+
+  return "max-w-[min(58rem,calc(100vw-2rem))]";
+}
+
+function getDamageCardGapClass(targetCount: number) {
+  if (targetCount <= 4) {
+    return "gap-x-3.5 gap-y-4";
+  }
+
+  if (targetCount <= 8) {
+    return "gap-x-3.5 gap-y-4";
+  }
+
+  return "gap-x-3 gap-y-4";
 }
 
 function getDamageTargetTitle({

@@ -8,3 +8,8 @@
 [x] Tank Keyword is not working, units with tank should be assigned damage first. ![alt text](image-29.png)
 [x] units can be played to battlefields controlled by owner as well, currently is only possible to play units to base. ![alt text](image-32.png)
 [x] when a player is choosing the order of triggered abilities, the other player is frozen on pass focus showdown, it should show a message that opponent is choosing triggered order abilities. ![alt text](image-40.png) ![alt text](image-41.png)
+[ ] we do not need card name on the cta for resolving chain. ![alt text](image-42.png)
+[ ] showdown pass and resolve combat wording is right but the UI is ugly. ![alt text](image-43.png)
+[ ] Damage assiging needs visual feedback to non actor player. ![alt text](image-45.png) ![alt text](image-44.png)
+[ ] we do not need reason on the play context menu, Not Playable is good enough. ![alt text](image-47.png)
+[ ] Actions are not playable during showdown yet. ![alt text](image-46.png) ![alt text](image-48.png) ![alt text](image-49.png)
