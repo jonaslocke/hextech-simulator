@@ -10,7 +10,7 @@ Baseline: `ca93632`
 - [x] 2. Keep the rune zone usable with more than seven runes.
 - [x] 3. Close the chain overlay when its final item resolves.
 - [x] 4. Pause start-of-turn progression for Hold triggers before Channel.
-- [ ] 5. Run the complete regression gate and record the delivered commits.
+- [x] 5. Run the complete regression gate and record the delivered commits.
 
 Each implementation milestone receives one normal commit after its focused
 tests and the project typecheck pass. The final milestone runs the full test,
@@ -35,4 +35,24 @@ typecheck, lint, and production-build gate. Resume by inspecting this document,
 ## Verification record
 
 - Runtime reset required: no.
-- Current milestone: 5.
+- `npm test`: 123 passed, 0 failed.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+- Current milestone: none; all documented defects are complete.
+
+## Delivered commits
+
+| Milestone | Commit | Subject |
+| --- | --- | --- |
+| 0 | `b2d1f85fe9bf6286376ed62a2627bdb8ef5ce8d2` | `docs(game): plan post-rebase runtime fixes` |
+| 1 | `aa13ead4894de915f698763180849a1e740bf7ea` | `fix(game): use printed cost for spell play triggers` |
+| 2 | `924f2fb96ae9a4d5154a6357d13b1ea6699d57e8` | `fix(game-board): contain large rune rows` |
+| 3 | `3b3beb1d16de3b9c4525ea4576f9754a3e63f23f` | `fix(game-board): close resolved chain overlay` |
+| 4 | `a8301370535f2bce3e9c6ad36df69437458a973f` | `fix(game): resolve hold triggers before channel` |
+| 5 | See the commit with this exact subject | `test(game): certify post-rebase runtime fixes` |
+
+To roll back, revert a contiguous newest-first suffix with separate
+`git revert` commits. No runtime reset is required because these milestones do
+not change the persisted schema.
