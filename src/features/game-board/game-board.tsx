@@ -218,17 +218,17 @@ export const GameBoard: FC<GameBoardProps> = ({
     : passFocusAction
       ? "Pass Focus"
       : canViewerEndTurn
-      ? "Pass Turn"
-      : "Waiting for turn";
+        ? "Pass Turn"
+        : "Waiting for turn";
   const combatDamageAction = sourceProjection.actions.find(
     (action) => action.choice?.kind === "combatDamage",
   );
   const showdownPrompt = showdownPromptState(sourceProjection);
   const showdownBattlefieldName = showdownPrompt
-    ? sourceProjection.battlefields.find(
+    ? (sourceProjection.battlefields.find(
         (battlefield) =>
           battlefield.battlefieldId === showdownPrompt.battlefieldId,
-      )?.card.name ?? "Battlefield"
+      )?.card.name ?? "Battlefield")
     : null;
   const globalActions = sourceProjection.actions.filter(
     (action) =>
@@ -924,7 +924,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                 )
               : targetSelection.purpose === "choice"
                 ? readyCardsAction?.label
-              : undefined
+                : undefined
           }
         />
       )}
