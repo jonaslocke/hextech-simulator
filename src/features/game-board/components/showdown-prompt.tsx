@@ -84,7 +84,7 @@ export function ShowdownPrompt({
     <section
       aria-live="assertive"
       className={cn(
-        "top-11 left-1/2 z-[2147483644] fixed rounded-xl w-[min(34rem,calc(100vw-2rem))] overflow-hidden -translate-x-1/2 select-none",
+        "top-15 left-1/2 z-[2147483644] fixed rounded-xl w-[min(34rem,calc(100vw-2rem))] overflow-hidden -translate-x-1/2 select-none",
         "border border-amber-200/20 bg-slate-950/76 text-slate-100 shadow-2xl shadow-black/75 ring-1 ring-amber-300/10",
         "supports-backdrop-filter:bg-slate-950/60 supports-backdrop-filter:backdrop-blur-md",
       )}
