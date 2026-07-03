@@ -84,6 +84,11 @@ type CardActionMenuState = {
   left: number;
   top: number;
 } | null;
+type AssignCombatDamagePendingChoice = {
+  playerId: string;
+  totalDamage: number;
+  type: "assignCombatDamage";
+};
 
 const EMPTY_TARGET_IDS: string[] = [];
 
@@ -279,6 +284,18 @@ export const GameBoard: FC<GameBoardProps> = ({
       : null;
   const waitingChoicePlayerName = waitingReadyChoice
     ? waitingReadyChoice.playerId === board.player.playerId
+      ? board.player.name
+      : board.opponent.name
+    : null;
+  const waitingCombatDamageChoice = assignCombatDamagePendingChoiceFromUnknown(
+    sourceProjection.pendingChoice,
+  );
+  const waitingCombatDamageChoiceForOpponent =
+    waitingCombatDamageChoice?.playerId !== sourceProjection.viewerPlayerId
+      ? waitingCombatDamageChoice
+      : null;
+  const waitingCombatDamagePlayerName = waitingCombatDamageChoiceForOpponent
+    ? waitingCombatDamageChoiceForOpponent.playerId === board.player.playerId
       ? board.player.name
       : board.opponent.name
     : null;
@@ -783,10 +800,29 @@ export const GameBoard: FC<GameBoardProps> = ({
       <ScoreHeader opponent={board.opponent} player={board.player} />
       {waitingReadyChoice && waitingChoicePlayerName && (
         <PendingChoiceStatus
-          count={waitingReadyChoice.maximum}
-          playerName={waitingChoicePlayerName}
+          message={
+            <>
+              Waiting for {waitingChoicePlayerName} to choose{" "}
+              {waitingReadyChoice.maximum} runes to ready.
+            </>
+          }
+          title="End-of-turn choice"
         />
       )}
+      {waitingCombatDamageChoiceForOpponent &&
+        waitingCombatDamagePlayerName && (
+          <PendingChoiceStatus
+            message={
+              <>
+                Waiting for {waitingCombatDamagePlayerName} to assign{" "}
+                {waitingCombatDamageChoiceForOpponent.totalDamage} combat
+                damage.
+              </>
+            }
+            title="Combat damage"
+            tone="amber"
+          />
+        )}
       {showdownPrompt && showdownBattlefieldName && (
         <ShowdownPrompt
           battlefieldName={showdownBattlefieldName}
@@ -1003,6 +1039,30 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
+
+function assignCombatDamagePendingChoiceFromUnknown(
+  pendingChoice: unknown,
+): AssignCombatDamagePendingChoice | null {
+  if (!pendingChoice || typeof pendingChoice !== "object") {
+    return null;
+  }
+
+  const candidate = pendingChoice as Partial<AssignCombatDamagePendingChoice>;
+
+  if (
+    candidate.type !== "assignCombatDamage" ||
+    typeof candidate.playerId !== "string" ||
+    typeof candidate.totalDamage !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    playerId: candidate.playerId,
+    totalDamage: candidate.totalDamage,
+    type: "assignCombatDamage",
+  };
+}
 
 function createAnimationData(board: ReturnType<typeof createBoardModel>): {
   placements: CardZonePlacement[];

@@ -7,3 +7,4 @@
 [ ] Assault Keyword is not adding might to the attacking unit. ![alt text](image-28.png)
 [ ] Tank Keyword is not working, units with tank should be assigned damage first. ![alt text](image-29.png)
 [ ] units can be played to battlefields controlled by owner as well, currently is only possible to play units to base. ![alt text](image-32.png)
+[ ] when a player is choosing the order of triggered abilities, the other player is frozen on pass focus showdown, it should show a message that opponent is choosing triggered order abilities. ![alt text](image-40.png) ![alt text](image-41.png)
