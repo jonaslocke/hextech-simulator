@@ -1,28 +1,41 @@
-import { cn } from "@/shared/utils/cn"
+import { cn } from "@/shared/utils/cn";
 
-function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
+type KbdVariant = "default" | "amber";
+
+type KbdProps = React.ComponentProps<"kbd"> & {
+  variant?: KbdVariant;
+};
+
+const kbdVariantClassName: Record<KbdVariant, string> = {
+  default: "bg-muted text-muted-foreground",
+  amber:
+    "border border-amber-100/45 bg-amber-200/20 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-50 shadow-[0_0_12px_rgba(251,191,36,0.16)]",
+};
+
+function Kbd({ className, variant = "default", ...props }: KbdProps) {
   return (
     <kbd
       data-slot="kbd"
       className={cn(
-        "pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none",
+        "inline-flex justify-center items-center gap-1 px-1 rounded-sm w-fit min-w-5 h-5 font-sans font-medium text-xs pointer-events-none select-none",
         "[&_svg:not([class*='size-'])]:size-3",
-        "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10",
-        className
+        "in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background dark:in-data-[slot=tooltip-content]:bg-background/10",
+        kbdVariantClassName[variant],
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function KbdGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <kbd
+    <div
       data-slot="kbd-group"
       className={cn("inline-flex items-center gap-1", className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Kbd, KbdGroup }
+export { Kbd, KbdGroup };

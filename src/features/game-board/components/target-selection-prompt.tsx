@@ -157,7 +157,7 @@ function ShortcutHint({
         disabled ? "opacity-40" : "opacity-100",
       ].join(" ")}
     >
-      <Kbd>{value}</Kbd>
+      <Kbd variant="amber">{value}</Kbd>
       <span>{label}</span>
     </span>
   );

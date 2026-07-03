@@ -102,7 +102,7 @@ export function ShowdownPrompt({
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-slate-400 text-xs">
               <span>Press</span>
-              <Kbd>K</Kbd>
+              <Kbd variant="amber">K</Kbd>
             </span>
             <Button
               className="bg-amber-300 hover:bg-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.18)] border border-amber-100/35 text-slate-950"
