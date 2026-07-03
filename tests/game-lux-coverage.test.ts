@@ -97,11 +97,16 @@ test("executes Lux resource abilities, controller discounts, and play triggers",
   relocateToBattlefield(game, "p1", eager);
   game.state.modifiers.push({
     id: "eager", sourceCardInstanceId: eager, controllerPlayerId: "p1", targetCardInstanceId: null,
+    targetScope: "controller_spell",
     attribute: "energyCost", operation: "reduce", amount: 1, minimum: 1,
     duration: "whileSourceAtBattlefield", createdAtTurn: 1
   });
   assert.equal(effectiveEnergyCost(game, "p1", spellDefinition), Math.max(1, (spellDefinition.card.attributes.energy ?? 0) - 1));
   assert.equal(effectiveEnergyCost(game, "p2", spellDefinition), spellDefinition.card.attributes.energy);
+  assert.equal(
+    effectiveEnergyCost(game, "p1", definitionNamed(decks, "Daring Poro")),
+    definitionNamed(decks, "Daring Poro").card.attributes.energy
+  );
 
   ({ game, decks } = runtimeFixture(template));
   const lady = instanceNamed(decks, "p1", "Lady of Luminosity - Starter");
@@ -150,7 +155,7 @@ test("autopayment only uses Lux Crownguard's Energy for spells", async () => {
 
   const actions = gameplayActions(game, "p1", decks);
   assert.equal(
-    actions.some((action) => action.sourceCardInstanceId === unit),
+    actions.find((action) => action.sourceCardInstanceId === unit)?.enabled,
     false,
     "spell-only Energy sources must not make a Unit payable"
   );
@@ -183,7 +188,7 @@ test("does not project mandatory-target spells without enough legal targets", as
 
   const actions = gameplayActions(game, "p1", decks);
   assert.equal(
-    actions.some((action) => action.sourceCardInstanceId === stupefy),
+    actions.find((action) => action.sourceCardInstanceId === stupefy)?.enabled,
     false,
     "Stupefy requires one Unit target"
   );

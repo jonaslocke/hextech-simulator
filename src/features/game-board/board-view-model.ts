@@ -27,7 +27,15 @@ export type BoardPlayerProjection = {
     power: Record<string, number>;
   };
   availableAbilityIdsByCard: Record<string, string[]>;
-  availablePaymentModes: Record<string, Array<{ id: string; label: string }>>;
+  availablePaymentModes: Record<
+    string,
+    Array<{
+      disabledReason: string | null;
+      enabled: boolean;
+      id: string;
+      label: string;
+    }>
+  >;
   legalTargetsByCard: Record<string, { cardInstanceIds: string[]; battlefieldIds: string[]; playerIds: string[] }>;
   zones: Record<"legend" | "champion" | "mainDeck" | "runeDeck" | "hand" | "trash" | "banishment" | "base", BoardZoneProjection>;
 };
@@ -98,7 +106,12 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       visibility: zone.visibility
     }])) as BoardPlayerProjection["zones"];
     const availablePaymentModes = Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => [sourceId,
-      sourceActions.map((action) => ({ id: action.id, label: action.label }))
+      sourceActions.map((action) => ({
+        disabledReason: action.disabledReason,
+        enabled: action.enabled,
+        id: action.id,
+        label: action.label,
+      }))
     ]));
     const legalTargetsByCard = Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => {
       const requirements = sourceActions.flatMap((action) => action.targets);

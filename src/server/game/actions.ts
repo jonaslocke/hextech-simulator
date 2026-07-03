@@ -996,7 +996,9 @@ function buildPaymentPlan(
     if (ability?.usage === "spellsOnly") consumeEnergySource(id);
   }
   powerRuneIds.forEach(consumeEnergySource);
-  player.zones.base.forEach(consumeEnergySource);
+  (allowAutomaticSources ? player.zones.base : []).forEach(
+    consumeEnergySource,
+  );
   if (remainingEnergy > 0) return null;
 
   return remainingPower === 0
@@ -1143,33 +1145,40 @@ function addPlayableCardActions(
       !hasReaction
     )
       continue;
-    const cost = effectiveEnergyCost(game, playerId, definition);
-    if (
-      !buildPaymentPlan(
-        game,
-        playerId,
-        definition,
-        cost,
-        index,
-        timing !== "showdownOpen" && timing !== "showdownClosed",
-      )
-    )
-      continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     const targets = compiled.clauses
       .filter((clause) => clause.triggers.length === 0)
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
-    if (!canSatisfyTargetRequirements(targets)) continue;
+    const cost = effectiveEnergyCost(game, playerId, definition);
+    const allowAutomaticSources =
+      timing !== "showdownOpen" && timing !== "showdownClosed";
+    const paymentPlan = buildPaymentPlan(
+      game,
+      playerId,
+      definition,
+      cost,
+      index,
+      allowAutomaticSources,
+    );
+    const hasLegalTargets = canSatisfyTargetRequirements(targets);
+    const enabled = paymentPlan !== null && hasLegalTargets;
+    const disabledReason = !hasLegalTargets
+      ? "No legal targets are available."
+      : paymentPlan
+        ? null
+        : allowAutomaticSources
+          ? "Card costs cannot be paid."
+          : showdownPaymentRequirement(definition, cost);
     actions.push(
       action(
         game,
         "play",
         `Play ${definition.card.name}`,
         cardId,
-        true,
-        null,
+        enabled,
+        disabledReason,
         undefined,
         targets,
       ),
@@ -1220,7 +1229,11 @@ function addAbilityActions(
     const definition = definitionForInstance(sourceId, index);
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const activations = compiled.clauses.flatMap((clause) =>
-      clause.abilities.map((ability) => ({ ability, clauseId: clause.id })),
+      clause.abilities.map((ability) => ({
+        ability,
+        clause,
+        clauseId: clause.id,
+      })),
     );
     const powerDomain =
       definition.card.classification.domain.find(
@@ -1228,27 +1241,7 @@ function addAbilityActions(
       ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
-        const timingIds = [...compiled.playTimings, ...clause.timings].map(
-          (candidate) => candidate.behaviorId,
-        );
-        const isAddAbility = isAddResourceAbility(ability.behaviorId);
-        const hasReactionTiming =
-          timingIds.includes("timing.reaction") ||
-          /\[Reaction\]/i.test(`${clause.sourceText} ${clause.normalizedText}`);
-        const hasPriorityAddOverride =
-          ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY && isAddAbility;
-        if (
-          timing === "showdownOpen" &&
-          !timingIds.includes("timing.action") &&
-          !hasReactionTiming &&
-          !hasPriorityAddOverride
-        )
-          continue;
-        if (
-          (timing === "neutralClosed" || timing === "showdownClosed") &&
-          !hasReactionTiming &&
-          !hasPriorityAddOverride
-        )
+        if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
         const enabled =
           ability.behaviorId === "ability.recycle_for_power" ||
@@ -1280,7 +1273,22 @@ function addAbilityActions(
     const powerActivation = activations.find(
       ({ ability }) => ability.behaviorId === "ability.recycle_for_power",
     );
-    if (energyActivation && powerActivation && timing === "neutralOpen") {
+    if (
+      energyActivation &&
+      powerActivation &&
+      abilityAvailableAtTiming(
+        compiled,
+        energyActivation.clause,
+        energyActivation.ability,
+        timing,
+      ) &&
+      abilityAvailableAtTiming(
+        compiled,
+        powerActivation.clause,
+        powerActivation.ability,
+        timing,
+      )
+    ) {
       const enabled = !game.state.cardStates[sourceId]!.exhausted;
       actions.push(
         action(
@@ -1304,6 +1312,50 @@ function addAbilityActions(
       );
     }
   }
+}
+
+function abilityAvailableAtTiming(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  ability: ReturnType<typeof compileBehaviorModel>["clauses"][number]["abilities"][number],
+  timing: TurnTiming,
+) {
+  const timingIds = [...compiled.playTimings, ...clause.timings].map(
+    (candidate) => candidate.behaviorId,
+  );
+  const hasReactionTiming =
+    timingIds.includes("timing.reaction") ||
+    /\[Reaction\]/i.test(`${clause.sourceText} ${clause.normalizedText}`);
+  const hasPriorityAddOverride =
+    ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY &&
+    isAddResourceAbility(ability.behaviorId);
+
+  if (timing === "showdownOpen") {
+    return (
+      timingIds.includes("timing.action") ||
+      hasReactionTiming ||
+      hasPriorityAddOverride
+    );
+  }
+  if (timing === "neutralClosed" || timing === "showdownClosed") {
+    return hasReactionTiming || hasPriorityAddOverride;
+  }
+  return true;
+}
+
+function showdownPaymentRequirement(
+  definition: GameCardDefinition,
+  energyCost: number,
+) {
+  const powerCost = definition.card.attributes.power ?? 0;
+  const domains = definition.card.classification.domain.filter(
+    (domain) => domain !== "Colorless",
+  );
+  const powerText =
+    powerCost > 0
+      ? ` and ${powerCost} ${domains.join("/")} Power`
+      : "";
+  return `Requires ${energyCost} Energy${powerText} in the pool during a showdown.`;
 }
 
 function executeActivatedAbility(

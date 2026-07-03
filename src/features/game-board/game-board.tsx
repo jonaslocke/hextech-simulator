@@ -493,10 +493,12 @@ export const GameBoard: FC<GameBoardProps> = ({
 
     const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
 
+    const mode = modes.find((candidate) => candidate.enabled);
+
     submitPlayCard({
-      canPlay: modes.length > 0,
+      canPlay: Boolean(mode),
       cardInstanceId: card.instanceId,
-      selectedModeId: modes[0]?.id,
+      selectedModeId: mode?.id,
     });
   };
   const openPlayableCardMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
@@ -510,9 +512,12 @@ export const GameBoard: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
+            disabled: !mode.enabled,
             hoverBattlefieldId: battlefieldIdFromMoveAction(mode),
             id: mode.id,
-            label: mode.label,
+            label: mode.enabled
+              ? mode.label
+              : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
           }))
         : [

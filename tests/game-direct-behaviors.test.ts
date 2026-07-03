@@ -97,6 +97,91 @@ test("executes projected rune abilities and ordered targeted spell effects from 
   assert.equal(game.state.players.p1!.zones.hand.length, handBefore);
 });
 
+test("projects combined Add and requires pooled showdown resources for targeted Actions", async () => {
+  const template = await fixtureSnapshot();
+  const runtime = [
+    createRuntimeDeckSnapshot(template, "p1"),
+    createRuntimeDeckSnapshot(template, "p2"),
+  ] as const;
+  const decks: DeckSnapshotDocument[] = runtime.map((deck, index) => ({
+    id: `showdown-d${index}`,
+    createdAt: "a",
+    updatedAt: "a",
+    matchId: "showdown",
+    playerId: index ? "p2" : "p1",
+    snapshot: deck.template,
+    instances: deck.instances,
+  }));
+  const game = createInitialGame({
+    matchId: "showdown",
+    gameId: "showdown-game",
+    now: "2026-01-01T00:00:00.000Z",
+    rngSeed: "showdown-seed",
+    playerIds: ["p1", "p2"],
+    decks: [runtime[0], runtime[1]],
+  });
+  game.status = "in_progress";
+  game.state.setup.startingPlayerId = "p1";
+  game.state.turn = {
+    turnNumber: 1,
+    activePlayerId: "p1",
+    phase: "action",
+  };
+  const orderRune = instanceNamed(decks, "p1", "Order Rune");
+  const fallingComet = instanceNamed(decks, "p1", "Falling Comet");
+  const blastOfPower = instanceNamed(decks, "p1", "Blast of Power");
+  const enemy = instanceNamed(decks, "p2", "Vanguard Sergeant");
+  relocate(game, orderRune, "base");
+  relocate(game, fallingComet, "hand");
+  relocate(game, blastOfPower, "hand");
+  relocateToBattlefield(game, enemy, "p2");
+  const battlefield = game.state.battlefields[0]!;
+  game.state.showdown = {
+    kind: "nonCombat",
+    battlefieldId: battlefield.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+  game.state.players.p1!.energy = 0;
+  game.state.players.p1!.power = {};
+
+  let actions = gameplayActions(game, "p1", decks);
+  assert.deepEqual(
+    actions
+      .filter((action) => action.sourceCardInstanceId === orderRune)
+      .map((action) => action.label),
+    ["Add Energy", "Add Power [Order]", "Add Energy and Power"],
+  );
+  const cometAction = actions.find(
+    (action) => action.sourceCardInstanceId === fallingComet,
+  )!;
+  assert.equal(cometAction.enabled, false);
+  assert.match(cometAction.disabledReason ?? "", /Requires 5 Energy/);
+  assert.deepEqual(cometAction.targets[0]?.legalIds, [enemy]);
+
+  game.state.players.p1!.energy = 6;
+  actions = gameplayActions(game, "p1", decks);
+  assert.equal(
+    actions.find((action) => action.sourceCardInstanceId === fallingComet)
+      ?.enabled,
+    true,
+  );
+  const disabledBlast = actions.find(
+    (action) => action.sourceCardInstanceId === blastOfPower,
+  )!;
+  assert.equal(disabledBlast.enabled, false);
+  assert.match(disabledBlast.disabledReason ?? "", /1 Order Power/);
+
+  game.state.players.p1!.power.Order = 1;
+  actions = gameplayActions(game, "p1", decks);
+  assert.equal(
+    actions.find((action) => action.sourceCardInstanceId === blastOfPower)
+      ?.enabled,
+    true,
+  );
+});
+
 function instanceNamed(decks: DeckSnapshotDocument[], playerId: string, name: string) {
   const deck = decks.find((item) => item.playerId === playerId)!;
   const code = deck.snapshot.cards.find((item) => item.card.name === name)!.cardCode;

@@ -148,6 +148,7 @@ export function createPrimitiveHandlers(
           sourceCardInstanceId: context.sourceCardInstanceId,
           controllerPlayerId: context.controllerPlayerId,
           targetCardInstanceId: target,
+          targetScope: stringParam(binding, "target"),
           attribute,
           operation: stringParam(binding, "operation") as "increase" | "reduce" | "multiply" | "set",
           amount: numberParam(binding, "amount"),
@@ -197,6 +198,10 @@ export function effectiveEnergyCost(
   for (const modifier of game.state.modifiers) {
     if (modifier.attribute !== "energyCost" || !modifierIsActive(game, modifier.sourceCardInstanceId, modifier.duration)) continue;
     if (modifier.controllerPlayerId && modifier.controllerPlayerId !== controllerPlayerId) continue;
+    if (
+      modifier.targetScope === "controller_spell" &&
+      definition.card.classification.type !== "Spell"
+    ) continue;
     if (modifier.operation === "reduce") value -= modifier.amount;
     if (modifier.operation === "increase") value += modifier.amount;
     if (modifier.operation === "multiply") value *= modifier.amount;

@@ -151,6 +151,7 @@ export const gameStateSchema = z.object({
     id: z.string().min(1), sourceCardInstanceId: z.string().nullable(),
     controllerPlayerId: z.string().min(1).optional(),
     targetCardInstanceId: z.string().nullable(), attribute: z.string().min(1),
+    targetScope: z.string().min(1),
     operation: z.enum(["increase", "reduce", "multiply", "set"]),
     amount: z.number(), minimum: z.number().nullable(), duration: z.string().min(1),
     createdAtTurn: z.number().int().nonnegative()
