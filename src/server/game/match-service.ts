@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { GameProjection } from "../../shared/game";
-import { loadInitialDeckSnapshot } from "./catalog";
+import { loadDeckSnapshot, type DeckId } from "./catalog";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
 import { performSetupAction, setupActions } from "./setup";
 import {
@@ -18,12 +18,19 @@ import type { DamageAssignment } from "./combat";
 
 export async function createMatch(input: {
   db: Db; repositories: GameRepositories; now?: string; matchId?: string; rngSeed?: string;
+  playerDecks?: { player1: DeckId; player2: DeckId };
 }) {
   const now = input.now ?? new Date().toISOString();
   const matchId = input.matchId ?? createMatchId();
-  const template = await loadInitialDeckSnapshot(input.db);
+  const selectedDecks = input.playerDecks ?? {
+    player1: "lux" as const,
+    player2: "lux" as const,
+  };
+  const templates = await loadMatchDeckTemplates(input.db, selectedDecks);
   const players = ["player-1", "player-2"] as const;
-  const runtimeDecks = players.map((id) => createRuntimeDeckSnapshot(template, id)) as [DeckRuntimeSnapshot, DeckRuntimeSnapshot];
+  const runtimeDecks = players.map((id, index) =>
+    createRuntimeDeckSnapshot(templates[index]!, id),
+  ) as [DeckRuntimeSnapshot, DeckRuntimeSnapshot];
   const tokens = players.map(() => createPlayerToken());
   const deckDocuments = runtimeDecks.map((deck, index): DeckSnapshotDocument => ({
     id: `${matchId}:deck:${players[index]}`, createdAt: now, updatedAt: now,
@@ -38,11 +45,22 @@ export async function createMatch(input: {
   return {
     matchId, gameId: game.id,
     players: {
-      player1: { playerId: players[0], seat: "player-1" as const, deckId: "lux" as const, playerToken: tokens[0]!.token },
-      player2: { playerId: players[1], seat: "player-2" as const, deckId: "lux" as const, playerToken: tokens[1]!.token }
+      player1: { playerId: players[0], seat: "player-1" as const, deckId: selectedDecks.player1, playerToken: tokens[0]!.token },
+      player2: { playerId: players[1], seat: "player-2" as const, deckId: selectedDecks.player2, playerToken: tokens[1]!.token }
     },
     projections: Object.fromEntries(players.map((id) => [id, projectGame({ game, viewerPlayerId: id, decks: deckDocuments })]))
   };
+}
+
+export async function loadMatchDeckTemplates(
+  db: Db,
+  playerDecks: { player1: DeckId; player2: DeckId },
+  loader = loadDeckSnapshot,
+) {
+  return Promise.all([
+    loader(db, playerDecks.player1),
+    loader(db, playerDecks.player2),
+  ]);
 }
 
 export async function getViewerState(repositories: GameRepositories, matchId: string, playerToken: string): Promise<GameProjection> {

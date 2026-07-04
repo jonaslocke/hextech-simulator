@@ -30,6 +30,12 @@ import {
 export const INITIAL_DECK_ID = "lux" as const;
 export const INITIAL_DECK_PATH = path.join("data", "decks", "lux.dec.txt");
 export const INITIAL_DECK_UNIQUE_CARD_COUNT = 21;
+export const DECK_IDS = ["lux", "annie"] as const;
+export type DeckId = (typeof DECK_IDS)[number];
+export const DECK_PATHS: Record<DeckId, string> = {
+  lux: INITIAL_DECK_PATH,
+  annie: path.join("data", "decks", "annie.dec.txt"),
+};
 
 type CanonicalCardStoredDocument = CanonicalCardDocument & { _id: string };
 type BehaviorStoredDocument = BehaviorDefinitionDocument & { _id: string };
@@ -46,7 +52,17 @@ export async function loadInitialDeckSnapshot(
   db: Db,
   sourceText?: string
 ): Promise<DeckSnapshot> {
-  const text = sourceText ?? await readFile(path.join(process.cwd(), INITIAL_DECK_PATH), "utf8");
+  return loadDeckSnapshot(db, "lux", sourceText);
+}
+
+export async function loadDeckSnapshot(
+  db: Db,
+  deckId: DeckId,
+  sourceText?: string,
+): Promise<DeckSnapshot> {
+  const text =
+    sourceText ??
+    await readFile(path.join(process.cwd(), DECK_PATHS[deckId]), "utf8");
   const parsedDeck = parseDeckList(text);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
@@ -72,7 +88,7 @@ export function buildDeckSnapshot(
 
   if (expectedNames.length !== INITIAL_DECK_UNIQUE_CARD_COUNT) {
     issues.push(
-      `Initial deck must contain ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
+      `Deck must contain ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
     );
   }
 

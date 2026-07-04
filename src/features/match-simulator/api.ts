@@ -1,13 +1,23 @@
-import type { GameProjection } from "@/shared/game";
-import type { AcceptedMatch, ApiFailure } from "./types";
+import type { DeckId, GameProjection } from "@/shared/game";
+import type { AcceptedMatch, ApiFailure, DeckOption } from "./types";
 
-export async function createMatchClient(): Promise<AcceptedMatch | ApiFailure> {
+export async function createMatchClient(
+  playerDecks: Record<"player1" | "player2", DeckId>,
+): Promise<AcceptedMatch | ApiFailure> {
   const response = await fetch("/api/matches", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ playerDecks: { player1: "lux", player2: "lux" } })
+    body: JSON.stringify({ playerDecks })
   });
   return response.json() as Promise<AcceptedMatch | ApiFailure>;
+}
+
+export async function loadDeckOptionsClient(): Promise<{
+  deckOptions: DeckOption[];
+}> {
+  const response = await fetch("/api/matches");
+  if (!response.ok) throw new Error("Unable to load deck options.");
+  return response.json() as Promise<{ deckOptions: DeckOption[] }>;
 }
 
 export async function loadProjectionClient(matchId: string, playerToken: string): Promise<{ accepted: true; projection: GameProjection } | ApiFailure> {

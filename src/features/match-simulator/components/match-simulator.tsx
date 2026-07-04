@@ -6,10 +6,12 @@ import { SetupChoiceDialog } from "@/shared/components/setup-choice-dialog";
 import { useEffect, useState } from "react";
 import {
   createMatchClient,
+  loadDeckOptionsClient,
   loadProjectionClient,
   performActionClient,
 } from "../api";
-import type { AcceptedMatch, SeatKey } from "../types";
+import type { DeckId } from "@/shared/game";
+import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { MatchResultDialog } from "./match-result-dialog";
 
 export function MatchSimulator() {
@@ -17,11 +19,41 @@ export function MatchSimulator() {
   const [viewerSeat, setViewerSeat] = useState<SeatKey>("player1");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
+  const [playerDecks, setPlayerDecks] = useState<
+    Record<SeatKey, DeckId>
+  >({ player1: "lux", player2: "lux" });
   const viewer = match?.players[viewerSeat];
   const projection = viewer && match?.projections[viewer.playerId];
   const currentMatchId = match?.matchId;
   const viewerPlayerId = viewer?.playerId;
   const viewerToken = viewer?.playerToken;
+
+  useEffect(() => {
+    let active = true;
+    void loadDeckOptionsClient()
+      .then(({ deckOptions: options }) => {
+        if (!active) return;
+        setDeckOptions(options);
+        const fallback = options[0]?.id;
+        if (fallback) {
+          setPlayerDecks((current) => ({
+            player1: options.some((option) => option.id === current.player1)
+              ? current.player1
+              : fallback,
+            player2: options.some((option) => option.id === current.player2)
+              ? current.player2
+              : fallback,
+          }));
+        }
+      })
+      .catch(() => {
+        if (active) setError("Unable to load available decks.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentMatchId || !viewerPlayerId || !viewerToken) {
@@ -58,7 +90,7 @@ export function MatchSimulator() {
     setError(null);
 
     try {
-      const result = await createMatchClient();
+      const result = await createMatchClient(playerDecks);
 
       if (!result.accepted) {
         setError(result.error.message);
@@ -127,15 +159,28 @@ export function MatchSimulator() {
             Choose a deck for each player and start a Riftbound match.
           </p>
           <div className="gap-4 grid sm:grid-cols-2 mt-5">
-            {(["Player 1", "Player 2"] as const).map((label) => (
-              <label className="gap-2 grid text-sm" key={label}>
+            {([
+              ["player1", "Player 1"],
+              ["player2", "Player 2"],
+            ] as const).map(([seat, label]) => (
+              <label className="gap-2 grid text-sm" key={seat}>
                 <span className="text-slate-300">{label} deck</span>
                 <select
                   className="bg-slate-950 px-3 py-2 border border-white/10 rounded"
-                  disabled
-                  value="lux"
+                  disabled={busy || deckOptions.length === 0}
+                  onChange={(event) =>
+                    setPlayerDecks((current) => ({
+                      ...current,
+                      [seat]: event.target.value as DeckId,
+                    }))
+                  }
+                  value={playerDecks[seat]}
                 >
-                  <option value="lux">Lux</option>
+                  {deckOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             ))}
@@ -147,7 +192,7 @@ export function MatchSimulator() {
           )}
           <Button
             className="mt-5 w-full"
-            disabled={busy}
+            disabled={busy || deckOptions.length === 0}
             onClick={createMatch}
             type="button"
           >

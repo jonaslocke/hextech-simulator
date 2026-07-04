@@ -77,10 +77,13 @@ export const gameIntentRequestSchema = z.object({
   intent: gameActionIntentSchema
 });
 
+export const deckIdSchema = z.enum(["lux", "annie"]);
+export type DeckId = z.infer<typeof deckIdSchema>;
+
 export const createMatchRequestSchema = z.object({
   playerDecks: z.object({
-    player1: z.literal("lux"),
-    player2: z.literal("lux")
+    player1: deckIdSchema,
+    player2: deckIdSchema
   }),
   rngSeed: z.string().min(1).optional()
 });

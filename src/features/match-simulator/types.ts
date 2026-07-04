@@ -1,10 +1,10 @@
-import type { GameProjection } from "@/shared/game";
+import type { DeckId, GameProjection } from "@/shared/game";
 
 export type SeatKey = "player1" | "player2";
 export type CreatedPlayer = {
   playerId: string;
   seat: "player-1" | "player-2";
-  deckId: "lux";
+  deckId: DeckId;
   playerToken: string;
 };
 export type AcceptedMatch = {
@@ -15,3 +15,4 @@ export type AcceptedMatch = {
   projections: Record<string, GameProjection>;
 };
 export type ApiFailure = { accepted: false; error: { code: string; message: string } };
+export type DeckOption = { id: DeckId; label: string };

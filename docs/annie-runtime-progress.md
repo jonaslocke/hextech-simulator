@@ -21,16 +21,15 @@
 - [x] 7. `feat(game): enforce Deflect costs`
 - [x] 8. `feat(game): support card-driven unit destinations`
 - [x] 9. `feat(card-catalog): certify Annie publication`
-- [ ] 10. `feat(match): support Annie deck selection`
+- [x] 10. `feat(match): support Annie deck selection`
 - [ ] 11. `test(game): certify Annie runtime`
 
 ## Current checkpoint
 
-- Completed through: milestone 9
-- Verification: combined preview, approval, re-upload, and strict Annie
-  snapshot tests,
-  typecheck, lint, and `git diff --check` pass.
-- Next milestone: add per-seat deck selection and mixed matches.
+- Completed through: milestone 10
+- Verification: all four mixed deck combinations, strict catalog loading,
+  typecheck, lint, build, and `git diff --check` pass.
+- Next milestone: run final certification and record rollback boundaries.
 
 ## Resume procedure
 
