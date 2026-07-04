@@ -2,3 +2,7 @@
 [ ] Choose spell from trash should use a different UI. ![alt text](image-54.png)
 [ ] Dark child ability should happen at the same timing as targon's peak. ![alt text](image-55.png)
 [ ] the vision Keyword needs to show the top card and then the player chooses to keep it there or not. ![alt text](image-56.png)
+[ ] Firestorm card is not playable, on the card catalog the card is implemented like this: ![alt text](image-57.png). on the game this is what is being shown: ![alt text](image-58.png) ![alt text](image-59.png)
+[ ] choose a card from hand to discard is not possible right now. ![alt text](image-60.png)
+[ ] Mystic Poro do not trigger vision keyword on play. ![alt text](image-61.png)
+[ ] Annie, Fiery increase spell damage is not working. ![alt text](image-62.png)
