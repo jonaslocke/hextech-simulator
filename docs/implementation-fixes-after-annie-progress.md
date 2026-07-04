@@ -56,7 +56,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 - [x] 0. `docs(game): plan post-Annie gameplay fixes`
   - Record validation, rule references, milestones, and resume instructions.
-- [ ] 1. `fix(game): resolve automatic affected groups`
+- [x] 1. `fix(game): resolve automatic affected groups`
   - Fix Firestorm and Tibbers without card identity checks.
   - Project only required Battlefield choices and derive affected units.
 - [ ] 2. `feat(game-board): render zone-based effect choices`
@@ -79,9 +79,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 0
-- Verification: `git diff --check`
-- Next milestone: automatic affected groups for Firestorm and Tibbers.
+- Completed through: milestone 1
+- Verification: 137 tests passed; typecheck, lint, build, and
+  `git diff --check` passed.
+- Next milestone: source-zone effect choices for Trash and Hand.
 
 ## Important implementation notes
 
@@ -92,3 +93,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
   groups remain distinct concepts.
 - No script may directly mutate or approve canonical card records.
 - Every milestone updates this file and creates one normal commit.
+- Automatic zero-bound selectors are removed from player target requirements.
+  A paired explicit Battlefield selector is restricted to locations containing
+  at least one automatically affected card. This keeps existing approved
+  Firestorm and Tibbers bindings compatible.

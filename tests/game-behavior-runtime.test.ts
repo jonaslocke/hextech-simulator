@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   compileBehaviorModel, createBehaviorContext, executeBehaviorClause,
   queueTriggeredClauses, submitTriggerOrder,
+  targetRequirementsForClause,
   type BehaviorHandler, type BehaviorHandlerRegistry, type BehaviorModel,
   type GameDocument
 } from "../src/server/game";
@@ -106,6 +107,98 @@ test("drops targets that became unavailable while an effect was on the chain", (
     { executed: true, delayed: false },
   );
   assert.deepEqual(resolvedTargets, []);
+});
+
+test("projects explicit locations while deriving automatic affected groups", () => {
+  let automatic = false;
+  let selectedIds: string[] = [];
+  const handlers: BehaviorHandlerRegistry = new Map<string, BehaviorHandler>([
+    [
+      "selector.automatic",
+      {
+        targets: () => ({
+          kind: "card",
+          legalIds: ["enemy-a"],
+          minimum: 0,
+          maximum: 0,
+        }),
+      },
+    ],
+    [
+      "selector.battlefield",
+      {
+        targets: () => ({
+          kind: "battlefield",
+          legalIds: ["bf-a", "bf-b"],
+          minimum: 1,
+          maximum: 1,
+        }),
+      },
+    ],
+    [
+      "effect.damage",
+      {
+        execute: (_binding, context) => {
+          automatic = context.effectOutcomes.automaticTargets === true;
+          selectedIds = context.selectedIds;
+        },
+      },
+    ],
+  ]);
+  const behavior: BehaviorModel = {
+    playTimings: [],
+    clauses: [{
+      id: "group",
+      sequence: 0,
+      sourceText: "",
+      normalizedText: "",
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [
+        binding("selector.automatic", 0),
+        binding("selector.battlefield", 1),
+      ],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [binding("effect.damage", 2)],
+      keywords: [],
+    }],
+  };
+  const game = gameFixture();
+  game.state.battlefields = [
+    {
+      battlefieldId: "bf-a",
+      cardInstanceId: "battlefield-a",
+      selectedByPlayerId: "p1",
+      units: ["enemy-a"],
+    },
+    {
+      battlefieldId: "bf-b",
+      cardInstanceId: "battlefield-b",
+      selectedByPlayerId: "p2",
+      units: [],
+    },
+  ];
+  const clause = compileBehaviorModel(behavior, handlers).clauses[0]!;
+  const context = createBehaviorContext(
+    game,
+    "p1",
+    "source",
+    null,
+    ["bf-a"],
+  );
+
+  assert.deepEqual(targetRequirementsForClause(clause, context, handlers), [{
+    kind: "battlefield",
+    legalIds: ["bf-a"],
+    minimum: 1,
+    maximum: 1,
+  }]);
+  executeBehaviorClause({ clause, context, handlers });
+  assert.equal(automatic, true);
+  assert.deepEqual(selectedIds, ["bf-a"]);
 });
 
 function model(): BehaviorModel {

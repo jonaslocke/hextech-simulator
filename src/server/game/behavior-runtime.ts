@@ -76,10 +76,62 @@ export function targetRequirementsForClause(
   context: BehaviorExecutionContext,
   handlers: BehaviorHandlerRegistry
 ): ProjectedTargetRequirement[] {
-  return clause.selectors.map((binding) => {
+  return selectionRequirementsForClause(clause, context, handlers).map(
+    ({ requirement }) => requirement,
+  );
+}
+
+export function selectionRequirementsForClause(
+  clause: CompiledBehaviorClause,
+  context: BehaviorExecutionContext,
+  handlers: BehaviorHandlerRegistry,
+): Array<{
+  binding: BehaviorBinding;
+  requirement: ProjectedTargetRequirement;
+}> {
+  const requirements = clause.selectors.map((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
-    return handler.targets(binding, context);
+    return { binding, requirement: handler.targets(binding, context) };
+  });
+  const automaticCardIds = new Set(
+    requirements
+      .filter(
+        ({ requirement }) =>
+          requirement.kind === "card" && requirement.maximum === 0,
+      )
+      .flatMap(({ requirement }) => requirement.legalIds),
+  );
+  return requirements
+    .filter(({ requirement }) => requirement.maximum > 0)
+    .map(({ binding, requirement }) => ({
+      binding,
+      requirement:
+        requirement.kind === "battlefield" && automaticCardIds.size > 0
+          ? {
+              ...requirement,
+              legalIds: requirement.legalIds.filter((battlefieldId) =>
+                context.game.state.battlefields
+                  .find(
+                    (battlefield) =>
+                      battlefield.battlefieldId === battlefieldId,
+                  )
+                  ?.units.some((id) => automaticCardIds.has(id)),
+              ),
+            }
+          : requirement,
+    }));
+}
+
+export function clauseHasAutomaticAffectedGroup(
+  clause: CompiledBehaviorClause,
+  context: BehaviorExecutionContext,
+  handlers: BehaviorHandlerRegistry,
+): boolean {
+  return clause.selectors.some((binding) => {
+    const handler = requireHandler(binding, handlers);
+    if (!handler.targets) return false;
+    return handler.targets(binding, context).maximum === 0;
   });
 }
 
@@ -97,12 +149,7 @@ export function executeBehaviorClause(input: {
     return { executed: false, delayed: false };
   }
   const requirements = targetRequirementsForClause(clause, context, handlers);
-  if (
-    requirements.some(
-      (requirement) =>
-        requirement.maximum === 0 && requirement.legalIds.length > 0,
-    )
-  ) {
+  if (clauseHasAutomaticAffectedGroup(clause, context, handlers)) {
     context.effectOutcomes.automaticTargets = true;
   }
   if (input.allowUnavailableSelections) {
@@ -113,11 +160,13 @@ export function executeBehaviorClause(input: {
   } else {
     validateSelections(requirements, context.selectedIds);
   }
-  clause.selectors.forEach((binding, index) => {
+  selectionRequirementsForClause(clause, context, handlers).forEach(
+    ({ binding, requirement }) => {
     context.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
-    ] = selectedForRequirement(requirements[index]!, context.selectedIds);
-  });
+    ] = selectedForRequirement(requirement, context.selectedIds);
+    },
+  );
   const delayed = clause.timings.find((binding) => binding.behaviorId === "timing.delayed");
   if (delayed) {
     const point = delayed.parameters.point;

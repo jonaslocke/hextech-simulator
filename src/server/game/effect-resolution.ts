@@ -1,6 +1,8 @@
 import {
+  clauseHasAutomaticAffectedGroup,
   compileBehaviorModel,
   createBehaviorContext,
+  selectionRequirementsForClause,
 } from "./behavior-runtime";
 import {
   createPrimitiveHandlers,
@@ -85,22 +87,20 @@ export function resumeEffectResolution(
   if (!clause)
     throw new Error(`Behavior clause is unavailable: ${frame.clauseId}`);
 
-  for (const binding of clause.selectors) {
+  const selectorContext = createBehaviorContext(
+    game,
+    frame.controllerPlayerId,
+    frame.sourceCardInstanceId,
+    null,
+    [],
+  );
+  for (const { binding, requirement } of selectionRequirementsForClause(
+    clause,
+    selectorContext,
+    handlers,
+  )) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
-    const context = createBehaviorContext(
-      game,
-      frame.controllerPlayerId,
-      frame.sourceCardInstanceId,
-      null,
-      [],
-    );
-    const requirement = handlers.get(binding.behaviorId)?.targets?.(
-      binding,
-      context,
-    );
-    if (!requirement)
-      throw new Error(`Behavior selector cannot execute: ${binding.behaviorId}`);
     if (requirement.legalIds.length < requirement.minimum) {
       finishResolutionFrame(game, frame.id, frame.delayedEffectId);
       return true;
@@ -142,6 +142,9 @@ export function resumeEffectResolution(
         ...selectorSelections,
         ...(frame.selectionsByBinding[bindingKey] ?? []),
       ],
+      clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
+        ? { automaticTargets: true }
+        : {},
     );
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
