@@ -20,16 +20,17 @@
 - [x] 6. `feat(game): add private Vision resolution`
 - [x] 7. `feat(game): enforce Deflect costs`
 - [x] 8. `feat(game): support card-driven unit destinations`
-- [ ] 9. `feat(card-catalog): certify Annie publication`
+- [x] 9. `feat(card-catalog): certify Annie publication`
 - [ ] 10. `feat(match): support Annie deck selection`
 - [ ] 11. `test(game): certify Annie runtime`
 
 ## Current checkpoint
 
-- Completed through: milestone 8
-- Verification: unit destination, game flow, and Annie discovery tests,
+- Completed through: milestone 9
+- Verification: combined preview, approval, re-upload, and strict Annie
+  snapshot tests,
   typecheck, lint, and `git diff --check` pass.
-- Next milestone: certify the Annie publication and strict snapshot gate.
+- Next milestone: add per-seat deck selection and mixed matches.
 
 ## Resume procedure
 

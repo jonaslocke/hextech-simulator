@@ -3,12 +3,14 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import {
   buildCanonicalCardDocument,
+  buildBehaviorDefinitionDocument,
   buildCurrentBehaviorCatalog,
   hashCardRulesText,
   previewCardCatalogImport,
 } from "../src/server/card-catalog";
 import type { Card } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
+import { buildDeckSnapshot } from "../src/server/game";
 
 const EXPECTED_ANNIE_PRIMITIVES: Record<string, string[]> = {
   "Dark Child - Starter": ["action.ready_cards", "trigger.end_of_turn"],
@@ -111,4 +113,58 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
       ),
     );
   }
+
+  const approvedDocuments = preview.cards.map((card) => {
+    assert.ok(card.suggestion, `Missing publication model: ${card.name}`);
+    return buildCanonicalCardDocument(
+      {
+        cardCode: card.cardCode,
+        card: card.card,
+        sourceTextHash: card.sourceTextHash,
+        modelingStatus: "approved",
+        adminNotes: "Combined MVP publication certification",
+        clauses: card.suggestion.clauses.map((clause) => ({
+          id: clause.id,
+          sourceText: clause.sourceText,
+          normalizedText: clause.normalizedText,
+          unsupportedReason: clause.unsupportedReason,
+          assignments: clause.assignments.map(({ assignment }) => assignment),
+        })),
+      },
+      behaviorCatalog,
+      "created",
+      "updated",
+    );
+  });
+  const annieDeckText = await readFile("data/decks/annie.dec.txt", "utf8");
+  const snapshot = buildDeckSnapshot(
+    annieDeckText,
+    approvedDocuments,
+    behaviorCatalog.map((entry) =>
+      buildBehaviorDefinitionDocument(entry, "updated"),
+    ),
+  );
+  assert.equal(snapshot.cards.length, 21);
+  assert.equal(snapshot.entries.length, parseDeckList(annieDeckText).entries.length);
+
+  const reupload = await previewCardCatalogImport({
+    sourceLabel: "data/catalog/mvp.json",
+    rawJson,
+    behaviorCatalog,
+    existingCardLookup: async () =>
+      new Map(
+        approvedDocuments.map((document) => [
+          document.cardCode,
+          {
+            cardCode: document.cardCode,
+            modelingStatus: document.modelingStatus,
+            runtimeSupportStatus: document.runtimeSupportStatus,
+            sourceTextHash: document.sourceTextHash,
+            updatedAt: document.updatedAt,
+          },
+        ]),
+      ),
+  });
+  assert.equal(reupload.summary.alreadyPersistedCardCount, 39);
+  assert.equal(reupload.summary.newCardCount, 0);
 });
