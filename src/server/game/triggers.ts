@@ -43,7 +43,9 @@ export function queueDelayedEffects(
     (effect) => effect.point === point
   );
   if (due.length === 0) return false;
-  const items = due.map((effect): ChainItem => ({
+  const items = [
+    ...takeQueuedTriggerItems(game),
+    ...due.map((effect): ChainItem => ({
     id: `delayed-trigger:${effect.id}`,
     kind: "trigger",
     label: definitionForInstance(effect.sourceCardInstanceId, index).card.name,
@@ -59,9 +61,35 @@ export function queueDelayedEffects(
       subjectCardInstanceId: effect.sourceCardInstanceId,
       values: { delayedEffectId: effect.id, endingPlayerId }
     }
-  }));
+    })),
+  ];
+  queueSimultaneousTriggerItems(game, items, endingPlayerId);
+  return true;
+}
+
+function takeQueuedTriggerItems(game: GameDocument): ChainItem[] {
+  const items = [
+    ...(game.state.chain?.items ?? []),
+    ...(game.state.pendingChoice?.type === "orderTriggers"
+      ? game.state.pendingChoice.pendingItems
+      : []),
+    ...game.state.queuedTriggerChoices.flatMap((choice) => choice.pendingItems),
+  ];
+  game.state.chain = null;
+  if (game.state.pendingChoice?.type === "orderTriggers") {
+    game.state.pendingChoice = null;
+  }
+  game.state.queuedTriggerChoices = [];
+  return items;
+}
+
+function queueSimultaneousTriggerItems(
+  game: GameDocument,
+  items: ChainItem[],
+  startingPlayerId: string,
+) {
   const playerIds = game.state.setup.playerIds;
-  const startIndex = playerIds.indexOf(endingPlayerId);
+  const startIndex = playerIds.indexOf(startingPlayerId);
   const turnOrder = startIndex < 0
     ? [...playerIds]
     : [...playerIds.slice(startIndex), ...playerIds.slice(0, startIndex)];
@@ -101,7 +129,6 @@ export function queueDelayedEffects(
       game.state.chain.items.at(-1)!.controllerPlayerId;
     game.state.chain.passedPlayerIds = [];
   }
-  return true;
 }
 
 export function beginDelayedEffectResolution(

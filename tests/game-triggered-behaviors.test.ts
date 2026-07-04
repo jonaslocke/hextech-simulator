@@ -164,6 +164,58 @@ test("resolves end-of-turn triggers exactly once before advancing", () => {
   assert.equal(next.state.chain, null);
 });
 
+test("batches normal and delayed end-of-turn triggers before creating a Chain", () => {
+  const { game, decks } = fixture();
+  const dark = card("DARK", "Dark", "Legend", [clause("dark", {
+    triggers: [binding("trigger.end_of_turn", 0, { player: "controller" })],
+    effects: [
+      binding("action.ready_cards", 1, {
+        player: "controller",
+        target: "runes",
+        count: 2,
+      }),
+    ],
+  })]);
+  decks.forEach((deck) => deck.snapshot.cards.push(dark));
+  decks[0]!.instances.push(instance("dark", "p1", "DARK"));
+  game.state.players.p1!.zones.legend = "dark";
+  game.state.cardStates.dark = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.delayedEffects.push({
+    id: "peak-at-end",
+    point: "endOfThisTurn",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "peak",
+    clauseId: "peak",
+    selectedIds: [],
+  });
+
+  const end = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "End turn",
+  )!;
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: end.id,
+    selectedIds: [],
+    decks,
+    now: "batch-end-triggers",
+  });
+
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.pendingChoice?.type, "orderTriggers");
+  if (next.state.pendingChoice?.type !== "orderTriggers") {
+    throw new Error("Expected one end-of-turn ordering choice.");
+  }
+  assert.deepEqual(
+    next.state.pendingChoice.pendingItems.map((item) => item.label).sort(),
+    ["Dark", "Peak"],
+  );
+});
+
 test("moves trigger private discard before draw", () => {
   const { game, decks } = fixture();
   const merchant = card("MERCHANT", "Merchant", "Unit", [clause("merchant", {

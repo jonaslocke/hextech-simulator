@@ -851,6 +851,7 @@ function continueEndTurn(
   if (!turn || turn.activePlayerId !== actor || turn.phase !== "end") return;
   if (!turn.endTriggersQueued) {
     turn.endTriggersQueued = true;
+    turn.endDelayedEffectsQueued = true;
     dispatchBehaviorEvent(
       game,
       {
@@ -861,10 +862,6 @@ function continueEndTurn(
       },
       decks,
     );
-    if (game.state.chain || game.state.pendingChoice) return;
-  }
-  if (!turn.endDelayedEffectsQueued) {
-    turn.endDelayedEffectsQueued = true;
     queueDelayedEffects(game, "endOfThisTurn", decks, actor);
     if (game.state.chain || game.state.pendingChoice) return;
   }
