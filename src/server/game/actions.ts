@@ -1316,6 +1316,7 @@ function executeImmediateClauses(
   targetObjectVersions?: Record<string, number>,
 ) {
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
+  const effectOutcomes: Record<string, boolean | number | string | string[]> = {};
   for (const clause of compiled.clauses.filter(
     (item) => item.triggers.length === 0 && item.abilities.length === 0,
   )) {
@@ -1337,6 +1338,7 @@ function executeImmediateClauses(
         sourceId,
         null,
         clauseSelections,
+        effectOutcomes,
       ),
       handlers,
       allowUnavailableSelections: targetObjectVersions !== undefined,

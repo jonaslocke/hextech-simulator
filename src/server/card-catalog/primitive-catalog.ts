@@ -466,6 +466,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("area", "area", "The board area containing legal unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
+      ,optional("automatic", "boolean", "Whether the affected units are derived automatically.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a unit"]

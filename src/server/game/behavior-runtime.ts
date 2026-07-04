@@ -16,6 +16,7 @@ export type BehaviorExecutionContext = {
   event: BehaviorEvent | null;
   selectedIds: string[];
   selectedBySelector: Record<string, string[]>;
+  effectOutcomes: Record<string, boolean | number | string | string[]>;
 };
 
 export type BehaviorHandler = {
@@ -96,6 +97,14 @@ export function executeBehaviorClause(input: {
     return { executed: false, delayed: false };
   }
   const requirements = targetRequirementsForClause(clause, context, handlers);
+  if (
+    requirements.some(
+      (requirement) =>
+        requirement.maximum === 0 && requirement.legalIds.length > 0,
+    )
+  ) {
+    context.effectOutcomes.automaticTargets = true;
+  }
   if (input.allowUnavailableSelections) {
     const legal = new Set(
       requirements.flatMap((requirement) => requirement.legalIds),
@@ -233,9 +242,10 @@ export function createBehaviorContext(
   controllerPlayerId: string,
   sourceCardInstanceId: string,
   event: BehaviorEvent | null,
-  selectedIds: string[]
+  selectedIds: string[],
+  effectOutcomes: Record<string, boolean | number | string | string[]> = {},
 ): BehaviorExecutionContext {
-  return { game, controllerPlayerId, sourceCardInstanceId, event, selectedIds, selectedBySelector: {} };
+  return { game, controllerPlayerId, sourceCardInstanceId, event, selectedIds, selectedBySelector: {}, effectOutcomes };
 }
 
 function matches(binding: BehaviorBinding, context: BehaviorExecutionContext, handlers: BehaviorHandlerRegistry): boolean {

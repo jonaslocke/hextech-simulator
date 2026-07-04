@@ -14,6 +14,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "trigger.on_move": "executable",
   "trigger.end_of_turn": "executable",
   "condition.compare_numeric_value": "executable",
+  "condition.effect_killed_target": "executable",
   "selector.unit": "executable",
   "selector.friendly_unit": "executable",
   "selector.enemy_unit": "executable",

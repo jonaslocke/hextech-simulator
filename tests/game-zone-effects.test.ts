@@ -30,6 +30,33 @@ test("returns selected trash cards and moves battlefield units generically", () 
   assert.equal(game.state.cardStates.unit!.exhausted, true);
 });
 
+test("applies controller Bonus Damage and records whether it killed", () => {
+  const game = fixture();
+  const index = cardIndex();
+  game.state.modifiers.push({
+    id: "bonus",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p1",
+    targetCardInstanceId: null,
+    targetScope: "controller_effect",
+    attribute: "damage",
+    operation: "increase",
+    amount: 1,
+    minimum: null,
+    duration: "whileSourceOnBoard",
+    createdAtTurn: 1,
+  });
+  const context = createBehaviorContext(game, "p1", "source", null, ["unit"]);
+
+  createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(
+    binding("action.deal_damage", { amount: 1, target: "unit" }),
+    context,
+  );
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("unit"));
+  assert.equal(context.effectOutcomes.lastDamageKilled, true);
+});
+
 function binding(
   behaviorId: string,
   parameters: Record<string, string | number>,

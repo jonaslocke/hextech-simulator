@@ -1,4 +1,8 @@
-import type { BehaviorHandler, BehaviorHandlerRegistry } from "./behavior-runtime";
+import type {
+  BehaviorExecutionContext,
+  BehaviorHandler,
+  BehaviorHandlerRegistry,
+} from "./behavior-runtime";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { BehaviorBinding, GameCardDefinition } from "./schemas";
 import type { CardInstance, GameDocument } from "./state";
@@ -89,6 +93,10 @@ export function createPrimitiveHandlers(
         default: return false;
       }
     }
+  });
+  handlers.set("condition.effect_killed_target", {
+    matches: (_binding, context) =>
+      context.effectOutcomes.lastDamageKilled === true,
   });
 
   handlers.set("selector.unit", {
@@ -232,13 +240,29 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.deal_damage", {
     execute(binding, context) {
-      const amount = numberParam(binding, "amount");
-      for (const id of context.selectedIds) {
+      const amount = effectiveNumericValue({
+        attribute: "damage",
+        baseValue: numberParam(binding, "amount"),
+        controllerPlayerId: context.controllerPlayerId,
+        game: context.game,
+        index,
+        targetScope: "controller_effect",
+      });
+      const ids = damageTargets(binding, context, index);
+      let killed = false;
+      for (const id of ids) {
         const state = context.game.state.cardStates[id];
         if (!state) throw new Error(`Damage target is unavailable: ${id}`);
         state.damage += amount;
       }
-      cleanupLethalDamage(context.game, context.selectedIds, index);
+      cleanupLethalDamage(context.game, ids, index);
+      for (const id of ids) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (owner && context.game.state.players[owner]!.zones.trash.includes(id)) {
+          killed = true;
+        }
+      }
+      context.effectOutcomes.lastDamageKilled = killed;
     }
   });
   handlers.set("action.kill_unit", {
@@ -397,12 +421,41 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
           binding.parameters.maximumMight,
     )
     .filter(predicate);
+  const automatic =
+    binding.parameters.scope === "each" ||
+    binding.parameters.automatic === true;
   return {
     kind: "card" as const,
     legalIds,
-    minimum: typeof binding.parameters.minimumCount === "number" ? binding.parameters.minimumCount : 1,
-    maximum: typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
+    minimum: automatic ? 0 : typeof binding.parameters.minimumCount === "number" ? binding.parameters.minimumCount : 1,
+    maximum: automatic ? 0 : typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
   };
+}
+
+function damageTargets(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  if (binding.parameters.target === "enemy_unit") {
+    const battlefieldIds = new Set(context.selectedIds);
+    return context.game.state.battlefields
+      .filter((battlefield) => battlefieldIds.has(battlefield.battlefieldId))
+      .flatMap((battlefield) => battlefield.units)
+      .filter(
+        (id) =>
+          index.instances.get(id)?.ownerPlayerId !== context.controllerPlayerId,
+      );
+  }
+  if (
+    binding.parameters.target === "unit" &&
+    context.effectOutcomes.automaticTargets === true
+  ) {
+    return context.game.state.battlefields.flatMap(
+      (battlefield) => battlefield.units,
+    );
+  }
+  return context.selectedIds.filter((id) => context.game.state.cardStates[id]);
 }
 
 export function incrementObjectVersion(game: GameDocument, id: string) {

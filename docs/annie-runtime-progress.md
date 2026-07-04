@@ -16,7 +16,7 @@
 - [x] 2. `refactor(game): add stable zone-aware targets`
 - [x] 3. `feat(game): execute return and movement effects`
 - [x] 4. `feat(game): resolve lifecycle triggers`
-- [ ] 5. `refactor(game): centralize damage effects`
+- [x] 5. `refactor(game): centralize damage effects`
 - [ ] 6. `feat(game): add private Vision resolution`
 - [ ] 7. `feat(game): enforce Deflect costs`
 - [ ] 8. `feat(game): support card-driven unit destinations`
@@ -26,10 +26,10 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 4
-- Verification: lifecycle, trigger, and flow tests, typecheck, lint, and
-  `git diff --check` pass.
-- Next milestone: centralize non-combat damage and effect outcomes.
+- Completed through: milestone 5
+- Verification: damage, direct behavior, and combat regression tests,
+  typecheck, lint, and `git diff --check` pass.
+- Next milestone: implement private Vision choices and Burn Out.
 
 ## Resume procedure
 
