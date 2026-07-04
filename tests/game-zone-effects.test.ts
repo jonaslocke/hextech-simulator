@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   createBehaviorContext,
+  buildPaymentPlan,
   createPrimitiveHandlers,
   type BehaviorBinding,
   type GameDocument,
   type RuntimeCardIndex,
+  targetDeflectCost,
 } from "../src/server/game";
 
 test("returns selected trash cards and moves battlefield units generically", () => {
@@ -55,6 +57,44 @@ test("applies controller Bonus Damage and records whether it killed", () => {
 
   assert.ok(game.state.players.p2!.zones.trash.includes("unit"));
   assert.equal(context.effectOutcomes.lastDamageKilled, true);
+});
+
+test("derives Deflect as an atomic any-domain Power cost", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const targetDefinition = index.definitions.get("UNIT")!;
+  targetDefinition.behaviorModel.clauses.push({
+    id: "deflect", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.deflect", { amount: 1 })],
+  });
+  game.state.players.p1!.power = { Fury: 1 };
+  const cost = targetDeflectCost("p1", ["unit"], index);
+
+  assert.equal(cost, 1);
+  assert.ok(
+    buildPaymentPlan(
+      game,
+      "p1",
+      index.definitions.get("SPELL")!,
+      0,
+      index,
+      cost,
+    ),
+  );
+  game.state.players.p1!.power = {};
+  assert.equal(
+    buildPaymentPlan(
+      game,
+      "p1",
+      index.definitions.get("SPELL")!,
+      0,
+      index,
+      cost,
+    ),
+    null,
+  );
 });
 
 function binding(

@@ -47,7 +47,11 @@ import {
   stateChangeEvents,
   type GameTransition,
 } from "./transitions";
-import { buildPaymentPlan, payCardCost } from "./payment";
+import {
+  buildPaymentPlan,
+  payCardCost,
+  targetDeflectCost,
+} from "./payment";
 import {
   beginEffectResolution,
   submitEffectSelection,
@@ -560,7 +564,14 @@ function playCard(
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
-  payCardCost(game, playerId, definition, energyCost, index);
+  payCardCost(
+    game,
+    playerId,
+    definition,
+    energyCost,
+    index,
+    targetDeflectCost(playerId, selectedIds, index),
+  );
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
@@ -1005,7 +1016,7 @@ function addPlayableCardActions(
     )
       continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
-    const targets = compiled.clauses
+    const projectedTargets = compiled.clauses
       .filter((clause) => clause.triggers.length === 0)
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
@@ -1018,6 +1029,22 @@ function addPlayableCardActions(
       cost,
       index,
     );
+    const targets = projectedTargets.map((requirement) => ({
+      ...requirement,
+      legalIds: requirement.legalIds.filter(
+        (id) => {
+          const deflectCost = targetDeflectCost(playerId, [id], index);
+          return deflectCost === 0 || buildPaymentPlan(
+            game,
+            playerId,
+            definition,
+            cost,
+            index,
+            deflectCost,
+          ) !== null;
+        },
+      ),
+    }));
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
     const enabled = paymentPlan !== null && hasLegalTargets;
     const disabledReason = !hasLegalTargets

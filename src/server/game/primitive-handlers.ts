@@ -38,7 +38,7 @@ export function createPrimitiveHandlers(
   const passive: BehaviorHandler = {};
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
-    "keyword.tank", "keyword.shield", "keyword.vision"
+    "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect"
   ]) handlers.set(id, passive);
   handlers.set("trigger.on_play", {
     matches(binding, context) {

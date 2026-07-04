@@ -36,7 +36,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "trigger.defend": "executable",
   "keyword.assault": "executable",
   "keyword.shield": "executable",
-  "keyword.tank": "executable"
+  "keyword.tank": "executable",
+  "keyword.deflect": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 
 export function getRuntimeCoverageStatus(

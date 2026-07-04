@@ -939,6 +939,10 @@ function readTurnPlayer(rulesText: string): string {
 }
 
 function readUnitScope(rulesText: string): string {
+  if (/\beach of up to\b/.test(rulesText)) {
+    return "any";
+  }
+
   if (rulesText.includes("each") || rulesText.includes("all")) {
     return "each";
   }

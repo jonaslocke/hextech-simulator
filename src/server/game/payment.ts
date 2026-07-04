@@ -21,6 +21,7 @@ export function buildPaymentPlan(
   definition: GameCardDefinition,
   energyCost: number,
   index: RuntimeCardIndex,
+  additionalAnyPower = 0,
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   let remainingEnergy = energyCost;
@@ -53,6 +54,31 @@ export function buildPaymentPlan(
     remainingPower -= 1;
   }
   if (remainingPower > 0) return null;
+  let remainingAnyPower = additionalAnyPower;
+  const poolDomains = Object.keys(player.power).sort((left, right) => {
+    if (left === "Rainbow") return 1;
+    if (right === "Rainbow") return -1;
+    return left.localeCompare(right);
+  });
+  for (const domain of poolDomains) {
+    const available =
+      (player.power[domain] ?? 0) - (powerFromPool[domain] ?? 0);
+    const spend = Math.min(available, remainingAnyPower);
+    if (spend > 0) {
+      powerFromPool[domain] = (powerFromPool[domain] ?? 0) + spend;
+      remainingAnyPower -= spend;
+    }
+  }
+  for (const id of player.zones.base) {
+    if (remainingAnyPower === 0) break;
+    if (
+      powerRuneIds.includes(id) ||
+      !hasAbility(id, "ability.recycle_for_power", index)
+    ) continue;
+    powerRuneIds.push(id);
+    remainingAnyPower -= 1;
+  }
+  if (remainingAnyPower > 0) return null;
 
   const energySourceIds: string[] = [];
   let generatedConditionalEnergy = 0;
@@ -107,6 +133,7 @@ export function payCardCost(
   definition: GameCardDefinition,
   energyCost: number,
   index: RuntimeCardIndex,
+  additionalAnyPower = 0,
 ) {
   const plan = buildPaymentPlan(
     game,
@@ -114,6 +141,7 @@ export function payCardCost(
     definition,
     energyCost,
     index,
+    additionalAnyPower,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
   const player = game.state.players[playerId]!;
@@ -137,6 +165,29 @@ export function payCardCost(
       state.exhausted = false;
     }
   }
+}
+
+export function targetDeflectCost(
+  playerId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  return selectedIds.reduce((total, id) => {
+    const instance = index.instances.get(id);
+    if (!instance || instance.ownerPlayerId === playerId) return total;
+    const amount = definitionForInstance(id, index).behaviorModel.clauses
+      .flatMap((clause) => clause.keywords)
+      .filter((binding) => binding.behaviorId === "keyword.deflect")
+      .reduce(
+        (sum, binding) =>
+          sum +
+          (typeof binding.parameters.amount === "number"
+            ? binding.parameters.amount
+            : 1),
+        0,
+      );
+    return total + amount;
+  }, 0);
 }
 
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {
