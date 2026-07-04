@@ -248,7 +248,7 @@ export function MatchSimulator() {
 
   return (
     <main className="relative bg-slate-950 min-h-screen tabletop-background">
-      <div className="top-2 left-14 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
+      <div className="top-12 left-14 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
         <span className="text-slate-400">Viewer</span>
         <Button
           onClick={() => setViewerSeat("player1")}
