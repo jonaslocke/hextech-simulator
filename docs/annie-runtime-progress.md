@@ -13,7 +13,7 @@
 
 - [x] 0. `docs(game): plan Annie catalog rollout`
 - [x] 1. `test(card-catalog): define Annie behavior suggestions`
-- [ ] 2. `refactor(game): add stable zone-aware targets`
+- [x] 2. `refactor(game): add stable zone-aware targets`
 - [ ] 3. `feat(game): execute return and movement effects`
 - [ ] 4. `feat(game): resolve lifecycle triggers`
 - [ ] 5. `refactor(game): centralize damage effects`
@@ -26,13 +26,10 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 1
-- Verification: combined upload preview reports 39 cards, 21 existing Lux
-  records, 18 new Annie records, and zero unsupported, ambiguous, or
-  missing-parameter clauses; focused catalog tests, typecheck, lint, and
+- Completed through: milestone 2
+- Verification: behavior runtime and targeting tests, typecheck, lint, and
   `git diff --check` pass.
-- Next milestone: add stable target identity and generalized zone-aware
-  selectors.
+- Next milestone: implement generalized return-to-hand and effect movement.
 
 ## Resume procedure
 

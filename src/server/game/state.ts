@@ -64,6 +64,7 @@ export const cardStateSchema = z.object({
   exhausted: z.boolean(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
+  objectVersion: z.number().int().nonnegative().optional(),
   combatRole: z.enum(["attacker", "defender"]).nullable().optional()
 });
 
@@ -74,6 +75,7 @@ export const chainItemSchema = z.object({
   controllerPlayerId: z.string(),
   sourceCardInstanceId: z.string().nullable(),
   targetCardInstanceIds: z.array(z.string()),
+  targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
   behaviorEvent: z.object({
@@ -259,7 +261,8 @@ export function createInitialGame(input: {
   }));
   const cardStates = Object.fromEntries(input.decks.flatMap((deck) =>
     deck.instances.map((instance) => [instance.instanceId, {
-      exhausted: false, damage: 0, computedMight: cardByCode(deck, instance.cardCode).card.attributes.might
+      exhausted: false, damage: 0, computedMight: cardByCode(deck, instance.cardCode).card.attributes.might,
+      objectVersion: 0
     }])
   ));
   return gameDocumentSchema.parse({

@@ -86,6 +86,7 @@ export function executeBehaviorClause(input: {
   clause: CompiledBehaviorClause;
   context: BehaviorExecutionContext;
   handlers: BehaviorHandlerRegistry;
+  allowUnavailableSelections?: boolean;
 }): { executed: boolean; delayed: boolean } {
   const { clause, context, handlers } = input;
   if (!clause.triggers.every((binding) => matches(binding, context, handlers))) {
@@ -95,7 +96,14 @@ export function executeBehaviorClause(input: {
     return { executed: false, delayed: false };
   }
   const requirements = targetRequirementsForClause(clause, context, handlers);
-  validateSelections(requirements, context.selectedIds);
+  if (input.allowUnavailableSelections) {
+    const legal = new Set(
+      requirements.flatMap((requirement) => requirement.legalIds),
+    );
+    context.selectedIds = context.selectedIds.filter((id) => legal.has(id));
+  } else {
+    validateSelections(requirements, context.selectedIds);
+  }
   clause.selectors.forEach((binding, index) => {
     context.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
@@ -154,6 +162,7 @@ export function queueTriggeredClauses(input: {
       controllerPlayerId: input.controllerPlayerId,
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
+      targetObjectVersions: {},
       behaviorClauseId: clause.id,
       activatedBehaviorId: null,
       behaviorEvent: input.event

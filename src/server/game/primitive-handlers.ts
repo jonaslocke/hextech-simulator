@@ -90,6 +90,57 @@ export function createPrimitiveHandlers(
       return selectorTargets(binding, context.game, index, (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId);
     }
   });
+  handlers.set("selector.enemy_unit", {
+    targets(binding, context) {
+      return selectorTargets(
+        binding,
+        context.game,
+        index,
+        (id) =>
+          index.instances.get(id)?.ownerPlayerId !==
+          context.controllerPlayerId,
+      );
+    },
+  });
+  handlers.set("selector.card", {
+    targets(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const zone = stringParam(binding, "zone");
+      const zoneValue =
+        player.zones[zone as keyof typeof player.zones];
+      const ids = Array.isArray(zoneValue)
+        ? zoneValue
+        : zoneValue
+          ? [zoneValue]
+          : [];
+      const cardType = stringParam(binding, "cardType");
+      return {
+        kind: "card" as const,
+        label: `${cardType === "any" ? "card" : cardType.toLowerCase()} from ${zone}`,
+        legalIds: ids.filter(
+          (id) =>
+            cardType === "any" ||
+            definitionForInstance(id, index).card.classification.type ===
+              cardType,
+        ),
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
+    },
+  });
+  handlers.set("selector.battlefield", {
+    targets(binding, context) {
+      return {
+        kind: "battlefield" as const,
+        label: "battlefield",
+        legalIds: context.game.state.battlefields.map(
+          (battlefield) => battlefield.battlefieldId,
+        ),
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
+    },
+  });
   handlers.set("action.draw_cards", {
     execute(binding, context) {
       const playerId = binding.parameters.player === "eachPlayer" ? null : context.controllerPlayerId;
@@ -262,6 +313,12 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
       : [...baseUnits, ...battlefieldUnits];
   const legalIds = candidates
     .filter((id) => definitionForInstance(id, index).card.classification.type === "Unit")
+    .filter(
+      (id) =>
+        typeof binding.parameters.maximumMight !== "number" ||
+        (game.state.cardStates[id]?.computedMight ?? 0) <=
+          binding.parameters.maximumMight,
+    )
     .filter(predicate);
   return {
     kind: "card" as const,
@@ -269,6 +326,11 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
     minimum: typeof binding.parameters.minimumCount === "number" ? binding.parameters.minimumCount : 1,
     maximum: typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
   };
+}
+
+export function incrementObjectVersion(game: GameDocument, id: string) {
+  const state = game.state.cardStates[id];
+  if (state) state.objectVersion = (state.objectVersion ?? 0) + 1;
 }
 export function recomputeMight(
   game: GameDocument,
@@ -351,6 +413,7 @@ function resetStateAfterLeavingBoard(
 ) {
   const state = game.state.cardStates[id];
   if (!state) return;
+  incrementObjectVersion(game, id);
   state.damage = 0;
   state.exhausted = false;
   state.combatRole = null;

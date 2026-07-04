@@ -581,6 +581,7 @@ function playCard(
     controllerPlayerId: playerId,
     sourceCardInstanceId: cardId,
     targetCardInstanceIds: selectedIds,
+    targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
     behaviorClauseId: null,
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
@@ -690,6 +691,7 @@ function passPriority(
             item.sourceCardInstanceId,
             item.targetCardInstanceIds,
             handlers,
+            item.targetObjectVersions,
           );
           if (definition.card.classification.type === "Spell") {
             game.state.players[owner]!.zones.trash.push(
@@ -1197,6 +1199,7 @@ function executeActivatedAbility(
     controllerPlayerId: actorPlayerId,
     sourceCardInstanceId: sourceId,
     targetCardInstanceIds: selectedIds,
+    targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
     behaviorClauseId: clauseId,
     activatedBehaviorId: behaviorId,
     behaviorEvent: null,
@@ -1228,12 +1231,22 @@ function executeImmediateClauses(
   sourceId: string,
   selectedIds: string[],
   handlers: ReturnType<typeof createPrimitiveHandlers>,
+  targetObjectVersions?: Record<string, number>,
 ) {
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
   for (const clause of compiled.clauses.filter(
     (item) => item.triggers.length === 0 && item.abilities.length === 0,
   )) {
-    const clauseSelections = clause.selectors.length ? selectedIds : [];
+    const availableSelections = targetObjectVersions
+      ? selectedIds.filter(
+          (id) =>
+            (game.state.cardStates[id]?.objectVersion ?? 0) ===
+            targetObjectVersions[id],
+        )
+      : selectedIds;
+    const clauseSelections = clause.selectors.length
+      ? availableSelections
+      : [];
     executeBehaviorClause({
       clause,
       context: createBehaviorContext(
@@ -1244,8 +1257,21 @@ function executeImmediateClauses(
         clauseSelections,
       ),
       handlers,
+      allowUnavailableSelections: targetObjectVersions !== undefined,
     });
   }
+}
+
+function captureTargetObjectVersions(
+  game: GameDocument,
+  selectedIds: readonly string[],
+) {
+  return Object.fromEntries(
+    selectedIds.map((id) => [
+      id,
+      game.state.cardStates[id]?.objectVersion ?? 0,
+    ]),
+  );
 }
 
 function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {

@@ -50,6 +50,7 @@ export function queueDelayedEffects(
     controllerPlayerId: effect.controllerPlayerId,
     sourceCardInstanceId: effect.sourceCardInstanceId,
     targetCardInstanceIds: [],
+    targetObjectVersions: {},
     behaviorClauseId: effect.clauseId,
     activatedBehaviorId: null,
     behaviorEvent: {

@@ -65,6 +65,49 @@ test("rejects unknown handlers and duplicate canonical ordering", () => {
   assert.throws(() => compileBehaviorModel(duplicate, complete), /Duplicate behavior order/);
 });
 
+test("drops targets that became unavailable while an effect was on the chain", () => {
+  let resolvedTargets: string[] = [];
+  const handlers: BehaviorHandlerRegistry = new Map<string, BehaviorHandler>([
+    ["trigger.event", { matches: () => true }],
+    ["condition.allowed", { matches: () => true }],
+    [
+      "selector.cards",
+      {
+        targets: () => ({
+          kind: "card",
+          legalIds: ["still-legal"],
+          minimum: 1,
+          maximum: 1,
+        }),
+      },
+    ],
+    [
+      "effect.first",
+      { execute: (_binding, context) => { resolvedTargets = context.selectedIds; } },
+    ],
+    ["effect.second", { execute() {} }],
+  ]);
+  const compiled = compileBehaviorModel(model(), handlers);
+  const context = createBehaviorContext(
+    gameFixture(),
+    "p1",
+    "source",
+    { type: "event", actorPlayerId: "p1", subjectCardInstanceId: null, values: { allowed: true } },
+    ["left-and-returned"],
+  );
+
+  assert.deepEqual(
+    executeBehaviorClause({
+      clause: compiled.clauses[0]!,
+      context,
+      handlers,
+      allowUnavailableSelections: true,
+    }),
+    { executed: true, delayed: false },
+  );
+  assert.deepEqual(resolvedTargets, []);
+});
+
 function model(): BehaviorModel {
   return { playTimings: [], clauses: [{
     id: "clause", sequence: 0, sourceText: "", normalizedText: "",
