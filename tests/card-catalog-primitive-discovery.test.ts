@@ -133,7 +133,7 @@ test("discovers selector constraints for target legality from card text", () => 
     scope: "any",
   });
   assert.deepEqual(findAssignment(singularity, "selector.unit")?.parameters, {
-    scope: "each",
+    scope: "any",
     minimumCount: 0,
     maximumCount: 2,
     area: "board",

@@ -43,7 +43,7 @@ const EXPECTED_MODELS: Record<string, ModelExpectation> = {
   "OGN-085": actionUnitModel("battlefield", "action.deal_damage", { amount: 6, target: "unit" }),
   "OGS-012": actionUnitModel("battlefield", "action.kill_unit", { target: "unit" }),
   "OGS-006": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.printedEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "source", duration: "thisTurn" }, 1]] }] },
-  "OGN-105": { clauses: [{ sequence: 0, selectors: [["selector.unit", unitSelector("each", 0, 2, "board"), 0]], effects: [["action.deal_damage", { amount: 6, target: "unit" }, 1]] }] },
+  "OGN-105": { clauses: [{ sequence: 0, selectors: [["selector.unit", unitSelector("any", 0, 2, "board"), 0]], effects: [["action.deal_damage", { amount: 6, target: "unit" }, 1]] }] },
   "OGS-016": { clauses: [{ sequence: 0, effects: [["modifier.enter_ready", { target: "source" }, 0]] }] },
   "OGN-088": { clauses: [] },
   "OGS-022": actionUnitModel("board", "action.deal_damage", { amount: 8, target: "unit" }),

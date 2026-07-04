@@ -216,7 +216,16 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["minimumCount", "maximumCount"], (context) =>
     /\benemy units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.enemy_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another"), automatic: context.rulesText.includes("all enemy units") }, "high")
+      ? assignment(context, "selector.enemy_unit", "selector", {
+          ...readUnitCountBounds(context.rulesText),
+          area: readUnitTargetArea(context.rulesText),
+          locationRelation: readUnitLocationRelation(context.rulesText),
+          controller: "opponent",
+          excludesSource: context.rulesText.includes("another"),
+          ...(context.rulesText.includes("all enemy units")
+            ? { automatic: true }
+            : {}),
+        }, "high")
       : null
   ),
   primitive("selector.card", "selector", "Select card", "Behavior selects a card from a non-board zone.", ["zone", "cardType", "owner", "minimumCount", "maximumCount"], (context) =>

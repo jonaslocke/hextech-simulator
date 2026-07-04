@@ -22,14 +22,17 @@
 - [x] 8. `feat(game): support card-driven unit destinations`
 - [x] 9. `feat(card-catalog): certify Annie publication`
 - [x] 10. `feat(match): support Annie deck selection`
-- [ ] 11. `test(game): certify Annie runtime`
+- [x] 11. `test(game): certify Annie runtime`
 
 ## Current checkpoint
 
-- Completed through: milestone 10
-- Verification: all four mixed deck combinations, strict catalog loading,
-  typecheck, lint, build, and `git diff --check` pass.
-- Next milestone: run final certification and record rollback boundaries.
+- Completed through: milestone 11
+- Verification: `catalog:check-mvp` passed; 135 tests passed; typecheck, lint,
+  build, and `git diff --check` passed.
+- Runtime reset performed: no.
+- Admin publication performed: no.
+- Next milestone: none. Follow the rollout procedure in
+  `docs/annie-runtime-rollback-plan.md`.
 
 ## Resume procedure
 
