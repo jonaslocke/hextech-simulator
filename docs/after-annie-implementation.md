@@ -6,3 +6,4 @@
 [ ] choose a card from hand to discard is not possible right now. ![alt text](image-60.png)
 [ ] Mystic Poro do not trigger vision keyword on play. ![alt text](image-61.png)
 [ ] Annie, Fiery increase spell damage is not working. ![alt text](image-62.png)
+[ ] Tibbers trigger ability is not working as it should, its asking for select targets, where no targets should be selected. ![alt text](image-63.png)
