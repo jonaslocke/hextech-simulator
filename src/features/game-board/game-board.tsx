@@ -256,7 +256,15 @@ export const GameBoard: FC<GameBoardProps> = ({
     sourceProjection.pendingChoice?.type === "effectSelection" &&
     sourceProjection.pendingChoice.playerId ===
       sourceProjection.viewerPlayerId &&
-    sourceProjection.pendingChoice.sourceZone
+    sourceProjection.pendingChoice.sourceZone &&
+    sourceProjection.pendingChoice.presentation === "cardSelection"
+      ? sourceProjection.pendingChoice
+      : null;
+  const visionEffectSelection =
+    sourceProjection.pendingChoice?.type === "effectSelection" &&
+    sourceProjection.pendingChoice.playerId ===
+      sourceProjection.viewerPlayerId &&
+    sourceProjection.pendingChoice.presentation === "vision"
       ? sourceProjection.pendingChoice
       : null;
   const zoneEffectSelectionOptions = zoneEffectSelection
@@ -800,7 +808,11 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [projection.stateVersion]);
 
   useEffect(() => {
-    if (!effectSelectionAction || zoneEffectSelection) return;
+    if (
+      !effectSelectionAction ||
+      zoneEffectSelection ||
+      visionEffectSelection
+    ) return;
     const requirement = effectSelectionAction.targets.find(
       (target) => target.kind === "card",
     );
@@ -817,11 +829,13 @@ export const GameBoard: FC<GameBoardProps> = ({
             selectedTargetIds: [],
           },
     );
-  }, [effectSelectionAction, zoneEffectSelection]);
+  }, [effectSelectionAction, visionEffectSelection, zoneEffectSelection]);
 
   useEffect(() => {
-    if (zoneEffectSelection) setTargetSelection(null);
-  }, [zoneEffectSelection]);
+    if (zoneEffectSelection || visionEffectSelection) {
+      setTargetSelection(null);
+    }
+  }, [visionEffectSelection, zoneEffectSelection]);
 
   useEffect(() => {
     if (!cardActionMenu) {
@@ -1085,6 +1099,34 @@ export const GameBoard: FC<GameBoardProps> = ({
               ? "Discard from Hand"
               : "Choose from Trash"
           }
+        />
+      )}
+      {visionEffectSelection && effectSelectionAction && (
+        <ChoiceDialog
+          confirmLabel="Confirm"
+          description="Look at the top card of your Main Deck, then choose whether to recycle it."
+          isOpen
+          onConfirm={([optionId]) =>
+            submitProjectedAction(
+              effectSelectionAction.id,
+              optionId === "keep-on-top" ? [] : optionId ? [optionId] : [],
+            )
+          }
+          options={[
+            {
+              description: "Leave this card on top of your Main Deck.",
+              id: "keep-on-top",
+              label: "Keep on top",
+            },
+            ...visionEffectSelection.revealedCards.map((card) => ({
+              description: card.rulesText || "Move it to the bottom of the deck.",
+              id: card.instanceId,
+              imageUrl: card.imageUrl ?? undefined,
+              label: `Recycle ${card.name}`,
+            })),
+          ]}
+          selectionMode="single"
+          title="Vision"
         />
       )}
       {unitPlayChoice && (

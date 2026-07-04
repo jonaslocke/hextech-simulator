@@ -94,6 +94,12 @@ export function projectGame(input: {
           ? input.game.state.pendingChoice.prompt
           : `Waiting for the other player to complete: ${input.game.state.pendingChoice.prompt}`,
       sourceZone: input.game.state.pendingChoice.sourceZone,
+      presentation: input.game.state.pendingChoice.presentation,
+      revealedCards:
+        input.game.state.pendingChoice.playerId === input.viewerPlayerId &&
+        input.game.state.pendingChoice.presentation === "vision"
+          ? input.game.state.pendingChoice.legalCardIds.map(view)
+          : [],
       minimum: input.game.state.pendingChoice.minimum,
       maximum: input.game.state.pendingChoice.maximum
     } : input.game.state.pendingChoice?.type === "assignCombatDamage" ? {

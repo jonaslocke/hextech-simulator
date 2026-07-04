@@ -49,6 +49,12 @@ export function createPrimitiveHandlers(
     matches(binding, context) {
       if (context.event?.type !== "card.played" || context.event.actorPlayerId !== context.controllerPlayerId) return false;
       if (binding.parameters.subject === "source") return context.event.subjectCardInstanceId === context.sourceCardInstanceId;
+      if (binding.parameters.subject === "card") {
+        return (
+          context.event.subjectCardInstanceId ===
+          context.sourceCardInstanceId
+        );
+      }
       if (binding.parameters.subject === "spell" && context.event.subjectCardInstanceId) {
         return definitionForInstance(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
       }
@@ -192,6 +198,8 @@ export function createPrimitiveHandlers(
             minimum: 0,
             maximum: 1,
             prompt: "Recycle the top card?",
+            sourceZone: "mainDeck",
+            presentation: "vision",
           }
         : null;
     },

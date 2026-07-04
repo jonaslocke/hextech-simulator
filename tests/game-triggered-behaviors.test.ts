@@ -212,6 +212,76 @@ test("moves trigger private discard before draw", () => {
   assert.equal(next.state.players.p1!.zones.hand.length, handBefore);
 });
 
+test("resolves persisted Vision triggers as a private recycle choice", () => {
+  const { game, decks } = fixture();
+  const vision = card("VISION", "Vision Unit", "Unit", [clause("vision", {
+    triggers: [
+      binding("trigger.on_play", 0, {
+        actor: "controller",
+        subject: "card",
+      }),
+    ],
+    effects: [binding("action.vision", 1)],
+  })], 2);
+  decks.forEach((deck) => deck.snapshot.cards.push(vision));
+  decks[0]!.instances.push(instance("vision", "p1", "VISION"));
+  game.state.players.p1!.zones.base.push("vision");
+  game.state.cardStates.vision = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 2,
+  };
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "vision",
+    values: {},
+  }, decks);
+  let next = resolveTopChainItem(game, decks);
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  if (next.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected a Vision choice.");
+  }
+  assert.equal(next.state.pendingChoice.presentation, "vision");
+  assert.equal(next.state.pendingChoice.sourceZone, "mainDeck");
+
+  const controllerProjection = projectGame({
+    game: next,
+    viewerPlayerId: "p1",
+    decks,
+  });
+  const opponentProjection = projectGame({
+    game: next,
+    viewerPlayerId: "p2",
+    decks,
+  });
+  assert.equal(
+    controllerProjection.pendingChoice?.type === "effectSelection"
+      ? controllerProjection.pendingChoice.revealedCards[0]?.instanceId
+      : null,
+    "draw1",
+  );
+  assert.deepEqual(
+    opponentProjection.pendingChoice?.type === "effectSelection"
+      ? opponentProjection.pendingChoice.revealedCards
+      : null,
+    [],
+  );
+
+  const keep = gameplayActions(next, "p1", decks)[0]!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: keep.id,
+    selectedIds: [],
+    decks,
+    now: "keep-vision-card",
+  });
+  assert.equal(next.state.players.p1!.zones.mainDeck[0], "draw1");
+  assert.equal(next.state.pendingChoice, null);
+});
+
 test("each conquered Targon's Peak readies two independently chosen runes", () => {
   const { game: initial, decks } = fixture();
   let game = initial;

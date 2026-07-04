@@ -33,6 +33,7 @@ export type BehaviorHandler = {
     maximum: number;
     prompt: string;
     sourceZone?: "hand" | "trash" | "mainDeck";
+    presentation?: "cardSelection" | "vision";
   } | null;
 };
 

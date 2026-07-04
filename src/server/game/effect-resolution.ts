@@ -117,6 +117,7 @@ export function resumeEffectResolution(
       optionKind:
         requirement.kind === "battlefield" ? "battlefield" : "card",
       sourceZone: requirement.sourceZone ?? null,
+      presentation: "cardSelection",
       legalCardIds: requirement.legalIds,
       minimum: requirement.minimum,
       maximum: requirement.maximum,
@@ -161,6 +162,7 @@ export function resumeEffectResolution(
         prompt: requirement.prompt,
         optionKind: "card",
         sourceZone: requirement.sourceZone ?? null,
+        presentation: requirement.presentation ?? "cardSelection",
         legalCardIds: requirement.legalIds,
         minimum: requirement.minimum,
         maximum: requirement.maximum,

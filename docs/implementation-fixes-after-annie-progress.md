@@ -62,7 +62,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - [x] 2. `feat(game-board): render zone-based effect choices`
   - Project source-zone metadata.
   - Add usable Trash and Hand card pickers for effect selections.
-- [ ] 3. `fix(game): resolve Vision as a private choice`
+- [x] 3. `fix(game): resolve Vision as a private choice`
   - Register persisted Vision play triggers.
   - Reveal only to the controller and render Recycle/Keep on top.
 - [ ] 4. `fix(game): batch simultaneous end-of-turn triggers`
@@ -79,10 +79,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 2
-- Verification: 138 tests passed; typecheck, lint, build, and
+- Completed through: milestone 3
+- Verification: 139 tests passed; typecheck, lint, build, and
   `git diff --check` passed.
-- Next milestone: private Vision trigger and choice flow.
+- Next milestone: simultaneous end-of-turn trigger batching.
 
 ## Important implementation notes
 
@@ -100,3 +100,6 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - Effect choices now carry viewer-safe `sourceZone` metadata. Hand and Trash
   choices use a card dialog populated from the projected zone instead of board
   click targeting.
+- Vision uses an explicit private presentation. Only the controller receives
+  the revealed top card, and persisted `subject: "card"` play triggers are
+  interpreted as the source permanent entering the Board.

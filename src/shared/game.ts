@@ -219,6 +219,8 @@ export const gameProjectionSchema = z.object({
       title: z.string().min(1),
       waitingMessage: z.string().min(1),
       sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
+      presentation: z.enum(["cardSelection", "vision"]),
+      revealedCards: z.array(projectedCardViewSchema),
       minimum: z.number().int().nonnegative(),
       maximum: z.number().int().nonnegative()
     }),

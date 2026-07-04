@@ -74,6 +74,8 @@ export type BoardProjection = {
     title: string;
     waitingMessage: string;
     sourceZone: "hand" | "trash" | "mainDeck" | null;
+    presentation: "cardSelection" | "vision";
+    revealedCards: ProjectedCardView[];
     minimum: number;
     maximum: number;
   } | {
@@ -193,7 +195,10 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...(projection.chain?.items.flatMap((item) => item.card ? [item.card] : []) ?? []),
     ...(projection.pendingChoice?.type === "orderTriggers"
       ? projection.pendingChoice.pendingChainItems.flatMap((item) => item.card ? [item.card] : [])
-      : [])
+      : []),
+    ...(projection.pendingChoice?.type === "effectSelection"
+      ? projection.pendingChoice.revealedCards
+      : []),
   ];
   return [...new Map(cards.map((card) => [card.instanceId, card])).values()];
 }

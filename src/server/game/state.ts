@@ -113,6 +113,7 @@ const effectSelectionChoiceSchema = z.object({
   prompt: z.string().min(1),
   optionKind: z.enum(["card", "battlefield"]).default("card"),
   sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable().default(null),
+  presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative()
