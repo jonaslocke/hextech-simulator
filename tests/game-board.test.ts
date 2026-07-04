@@ -231,7 +231,8 @@ test("game board contains no initial-deck or behavior identities", async () => {
   const forbidden = [
     "Lux,", "Stupefy", "Back to Back", "Falling Comet", "Blast of Power",
     "Singularity", "Final Spark", "behaviorId", "getTargetConfig",
-    "lux-crownguard"
+    "lux-crownguard", "Annie,", "Dark Child", "Firestorm", "Tibbers",
+    "Mystic Poro", "Pouty Poro", "Traveling Merchant"
   ];
   assert.deepEqual(forbidden.filter((value) => source.includes(value)), []);
 });

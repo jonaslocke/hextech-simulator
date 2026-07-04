@@ -123,6 +123,112 @@ test("automatically pays card costs with behavior-backed rune abilities", () => 
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
 });
 
+test("projects Deflect before payment and requires its Power in the Rune Pool", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "SPELL",
+  )!;
+  spell.behaviorModel.clauses.push({
+    id: "target-unit",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [{
+      behaviorId: "selector.unit",
+      parameters: {
+        area: "board",
+        scope: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+      },
+      confidence: "high",
+      order: 0,
+    }],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  });
+  const unit = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "UNIT",
+  )!;
+  unit.behaviorModel.clauses.push({
+    id: "deflect",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [{
+      behaviorId: "keyword.deflect",
+      parameters: { amount: 1 },
+      confidence: "high",
+      order: 0,
+    }],
+  });
+  decks[1]!.instances.push({
+    instanceId: "p2:deflect",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.battlefields[0]!.units.push("p2:deflect");
+  game.state.cardStates["p2:deflect"] = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 1,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  assert.ok(play.targets[0]!.legalIds.includes("p2:deflect"));
+  assert.deepEqual(play.costPreview, {
+    energy: 0,
+    basePower: 0,
+    availableAnyPower: 0,
+    targetAdditionalPower: [{ targetId: "p2:deflect", amount: 1 }],
+  });
+  assert.throws(
+    () =>
+      performGameplayAction({
+        game,
+        actorPlayerId: "p1",
+        actionId: play.id,
+        selectedIds: ["p2:deflect"],
+        decks,
+        now: "deflect-without-pool",
+      }),
+    /costs cannot be paid/i,
+  );
+
+  game.state.players.p1!.power.Mind = 1;
+  const payablePlay = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  assert.equal(payablePlay.costPreview?.availableAnyPower, 1);
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: payablePlay.id,
+    selectedIds: ["p2:deflect"],
+    decks,
+    now: "deflect-paid",
+  });
+  assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
+});
+
 test("plays Units to Base or a controlled battlefield and rejects forged destinations", () => {
   const { game, decks } = fixture();
   game.state.battlefields[0]!.controllerPlayerId = "p1";

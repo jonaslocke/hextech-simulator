@@ -74,15 +74,40 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - [x] 6. `feat(game-board): preview Deflect additional costs`
   - Require Deflect Power in the Rune Pool.
   - Project cost/source details and warn before committing target selection.
-- [ ] 7. `test(game): certify post-Annie gameplay fixes`
+- [x] 7. `test(game): certify post-Annie gameplay fixes`
   - Add cross-feature regressions, run the complete gate, and record results.
 
 ## Current checkpoint
 
-- Completed through: milestone 6
-- Verification: 140 tests passed; typecheck, lint, build, and
-  `git diff --check` passed.
-- Next milestone: final cross-feature certification and documentation.
+- Completed through: milestone 7 (all milestones)
+- Verification: `catalog:check-mvp` passed; 141 tests passed; typecheck, lint,
+  build, and `git diff --check` passed.
+- Next milestone: none.
+
+## Commit record
+
+- Milestone 0: `5c60856` — `docs(game): plan post-Annie gameplay fixes`
+- Milestone 1: `4ededff` — `fix(game): resolve automatic affected groups`
+- Milestone 2: `7a2c65b` — `feat(game-board): render zone-based effect choices`
+- Milestone 3: `359e057` — `fix(game): resolve Vision as a private choice`
+- Milestone 4: `c290e63` — `fix(game): batch simultaneous end-of-turn triggers`
+- Milestone 5: `5aa38dc` — `fix(game): apply controlled bonus damage`
+- Milestone 6: `416d8a0` — `feat(game-board): preview Deflect additional costs`
+- Milestone 7: `test(game): certify post-Annie gameplay fixes`
+  (this document identifies its own commit by subject because its hash does not
+  exist until after the commit is created)
+
+## Final certification
+
+- The combined Lux and Annie upload artifact is reproducible.
+- All 39 catalog cards remain covered by the strict snapshot and primitive
+  validation tests.
+- The nine validated defect families have engine or projection regression
+  coverage.
+- Deflect has an end-to-end projected-cost and atomic-payment regression.
+- The board architecture check rejects both Lux and Annie card identities.
+- No runtime reset was required because no persisted state or catalog schema
+  changed.
 
 ## Important implementation notes
 
