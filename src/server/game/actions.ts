@@ -114,6 +114,7 @@ export function gameplayActions(
             {
               kind: pendingChoice.optionKind,
               label: "runes to ready",
+              sourceZone: pendingChoice.sourceZone ?? undefined,
               legalIds: pendingChoice.legalCardIds,
               minimum: pendingChoice.minimum,
               maximum: pendingChoice.maximum,

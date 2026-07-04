@@ -32,6 +32,7 @@ export type BehaviorHandler = {
     minimum: number;
     maximum: number;
     prompt: string;
+    sourceZone?: "hand" | "trash" | "mainDeck";
   } | null;
 };
 

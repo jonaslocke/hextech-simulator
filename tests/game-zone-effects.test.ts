@@ -140,6 +140,25 @@ test("keeps legacy bounded each-unit selectors interactive", () => {
   assert.deepEqual(requirement.legalIds, ["unit"]);
 });
 
+test("describes non-board selector source zones", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const requirement = createPrimitiveHandlers(index)
+    .get("selector.card")!
+    .targets!(
+      binding("selector.card", {
+        zone: "trash",
+        cardType: "Spell",
+        minimumCount: 1,
+        maximumCount: 1,
+      }),
+      createBehaviorContext(game, "p1", "source", null, []),
+    );
+
+  assert.equal(requirement.sourceZone, "trash");
+  assert.deepEqual(requirement.legalIds, ["spell"]);
+});
+
 function binding(
   behaviorId: string,
   parameters: Record<string, string | number>,

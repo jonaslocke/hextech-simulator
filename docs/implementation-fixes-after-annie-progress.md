@@ -59,7 +59,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - [x] 1. `fix(game): resolve automatic affected groups`
   - Fix Firestorm and Tibbers without card identity checks.
   - Project only required Battlefield choices and derive affected units.
-- [ ] 2. `feat(game-board): render zone-based effect choices`
+- [x] 2. `feat(game-board): render zone-based effect choices`
   - Project source-zone metadata.
   - Add usable Trash and Hand card pickers for effect selections.
 - [ ] 3. `fix(game): resolve Vision as a private choice`
@@ -79,10 +79,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 1
-- Verification: 137 tests passed; typecheck, lint, build, and
+- Completed through: milestone 2
+- Verification: 138 tests passed; typecheck, lint, build, and
   `git diff --check` passed.
-- Next milestone: source-zone effect choices for Trash and Hand.
+- Next milestone: private Vision trigger and choice flow.
 
 ## Important implementation notes
 
@@ -97,3 +97,6 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
   A paired explicit Battlefield selector is restricted to locations containing
   at least one automatically affected card. This keeps existing approved
   Firestorm and Tibbers bindings compatible.
+- Effect choices now carry viewer-safe `sourceZone` metadata. Hand and Trash
+  choices use a card dialog populated from the projected zone instead of board
+  click targeting.

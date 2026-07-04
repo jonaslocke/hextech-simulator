@@ -142,6 +142,10 @@ export function createPrimitiveHandlers(
       return {
         kind: "card" as const,
         label: `${cardType === "any" ? "card" : cardType.toLowerCase()} from ${zone}`,
+        sourceZone:
+          zone === "hand" || zone === "trash" || zone === "mainDeck"
+            ? zone
+            : undefined,
         legalIds: ids.filter(
           (id) =>
             cardType === "any" ||
@@ -212,6 +216,7 @@ export function createPrimitiveHandlers(
             minimum: count,
             maximum: count,
             prompt: `Choose ${count} card${count === 1 ? "" : "s"} to discard`,
+            sourceZone: "hand",
           }
         : null;
     },

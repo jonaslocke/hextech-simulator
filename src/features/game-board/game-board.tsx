@@ -252,6 +252,31 @@ export const GameBoard: FC<GameBoardProps> = ({
   const effectSelectionAction = sourceProjection.actions.find(
     (action) => action.choice?.kind === "effectSelection",
   );
+  const zoneEffectSelection =
+    sourceProjection.pendingChoice?.type === "effectSelection" &&
+    sourceProjection.pendingChoice.playerId ===
+      sourceProjection.viewerPlayerId &&
+    sourceProjection.pendingChoice.sourceZone
+      ? sourceProjection.pendingChoice
+      : null;
+  const zoneEffectSelectionOptions = zoneEffectSelection
+    ? effectSelectionAction?.targets
+        .flatMap((target) => target.legalIds)
+        .flatMap((id) => {
+          const card = sourceProjection.players
+            .flatMap((player) => player.zones)
+            .flatMap((zone) => zone.cards)
+            .find((candidate) => candidate.instanceId === id);
+          return card
+            ? [{
+                description: card.rulesText || card.type,
+                id,
+                imageUrl: card.imageUrl ?? undefined,
+                label: card.name,
+              }]
+            : [];
+        }) ?? []
+    : [];
   const triggerOrderChoice =
     projection.pendingChoice?.type === "orderTriggers" &&
     projection.pendingChoice.playerId === projection.viewerPlayerId
@@ -775,7 +800,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [projection.stateVersion]);
 
   useEffect(() => {
-    if (!effectSelectionAction) return;
+    if (!effectSelectionAction || zoneEffectSelection) return;
     const requirement = effectSelectionAction.targets.find(
       (target) => target.kind === "card",
     );
@@ -792,7 +817,11 @@ export const GameBoard: FC<GameBoardProps> = ({
             selectedTargetIds: [],
           },
     );
-  }, [effectSelectionAction]);
+  }, [effectSelectionAction, zoneEffectSelection]);
+
+  useEffect(() => {
+    if (zoneEffectSelection) setTargetSelection(null);
+  }, [zoneEffectSelection]);
 
   useEffect(() => {
     if (!cardActionMenu) {
@@ -1035,6 +1064,27 @@ export const GameBoard: FC<GameBoardProps> = ({
           options={pendingChoiceOptions}
           selectionMode="ordered"
           title={triggerOrderChoice.prompt}
+        />
+      )}
+      {zoneEffectSelection && effectSelectionAction && (
+        <ChoiceDialog
+          confirmLabel={
+            zoneEffectSelection.sourceZone === "hand"
+              ? "Discard selected card"
+              : "Choose card"
+          }
+          description={zoneEffectSelection.prompt}
+          isOpen
+          onConfirm={(selectedIds) =>
+            submitProjectedAction(effectSelectionAction.id, selectedIds)
+          }
+          options={zoneEffectSelectionOptions}
+          selectionMode="single"
+          title={
+            zoneEffectSelection.sourceZone === "hand"
+              ? "Discard from Hand"
+              : "Choose from Trash"
+          }
         />
       )}
       {unitPlayChoice && (

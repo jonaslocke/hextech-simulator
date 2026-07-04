@@ -17,6 +17,7 @@ export const runeResourceTypes = ["energy", "power"] as const;
 export const projectedTargetRequirementSchema = z.object({
   kind: z.enum(["card", "battlefield", "player"]),
   label: z.string().min(1).optional(),
+  sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
   legalIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative()
@@ -217,6 +218,7 @@ export const gameProjectionSchema = z.object({
       prompt: z.string().min(1),
       title: z.string().min(1),
       waitingMessage: z.string().min(1),
+      sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
       minimum: z.number().int().nonnegative(),
       maximum: z.number().int().nonnegative()
     }),

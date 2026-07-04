@@ -189,6 +189,18 @@ test("moves trigger private discard before draw", () => {
   next = resolveTopChainItem(next, decks);
   const discard = gameplayActions(next, "p1", decks)[0]!;
   assert.equal(discard.label, "Choose 1 card to discard");
+  assert.equal(discard.targets[0]?.sourceZone, "hand");
+  const discardProjection = projectGame({
+    game: next,
+    viewerPlayerId: "p1",
+    decks,
+  });
+  assert.equal(
+    discardProjection.pendingChoice?.type === "effectSelection"
+      ? discardProjection.pendingChoice.sourceZone
+      : null,
+    "hand",
+  );
   next = performGameplayAction({
     game: next,
     actorPlayerId: "p1",

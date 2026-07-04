@@ -73,6 +73,7 @@ export type BoardProjection = {
     prompt: string;
     title: string;
     waitingMessage: string;
+    sourceZone: "hand" | "trash" | "mainDeck" | null;
     minimum: number;
     maximum: number;
   } | {
