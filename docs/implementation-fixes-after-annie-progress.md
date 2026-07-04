@@ -71,7 +71,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - [x] 5. `fix(game): apply controlled bonus damage`
   - Apply continuous Bonus Damage once per eligible spell/ability damage
     instruction, including automatic groups.
-- [ ] 6. `feat(game-board): preview Deflect additional costs`
+- [x] 6. `feat(game-board): preview Deflect additional costs`
   - Require Deflect Power in the Rune Pool.
   - Project cost/source details and warn before committing target selection.
 - [ ] 7. `test(game): certify post-Annie gameplay fixes`
@@ -79,10 +79,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 5
+- Completed through: milestone 6
 - Verification: 140 tests passed; typecheck, lint, build, and
   `git diff --check` passed.
-- Next milestone: Deflect cost preview and Rune Pool enforcement.
+- Next milestone: final cross-feature certification and documentation.
 
 ## Important implementation notes
 
@@ -108,3 +108,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - `whileSourceOnBoard` now includes sources in Base as well as battlefields and
   Legends. Bonus Damage is applied to the instruction amount before applying it
   to single or automatic-group targets; combat damage remains unaffected.
+- Deflect targets remain legal before payment. Projected play actions expose
+  the base cost, target-derived additional Power, its sources, and the pooled
+  Power available after the base cost. The client keeps the play uncommitted
+  until confirmation and rebinds the staged action after manual Add actions.
+- Deflect's any-domain Power must already be in the Rune Pool. Normal printed
+  card costs retain their existing automatic payment behavior; Base runes are
+  no longer silently recycled to satisfy the target-derived Deflect surcharge.

@@ -32,6 +32,15 @@ export const projectedActionSchema = z.object({
   enabled: z.boolean(),
   disabledReason: z.string().min(1).nullable(),
   targets: z.array(projectedTargetRequirementSchema),
+  costPreview: z.object({
+    energy: z.number().int().nonnegative(),
+    basePower: z.number().int().nonnegative(),
+    availableAnyPower: z.number().int().nonnegative(),
+    targetAdditionalPower: z.array(z.object({
+      targetId: z.string().min(1),
+      amount: z.number().int().positive()
+    }))
+  }).nullable().optional(),
   choice: z.discriminatedUnion("kind", [
     z.object({
       kind: z.literal("combatDamage"),

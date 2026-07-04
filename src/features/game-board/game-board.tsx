@@ -416,6 +416,27 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
   );
   const viewerState = projection.players[projection.viewerPlayerId];
+  const targetSelectionAction = targetSelection
+    ? sourceProjection.actions.find(
+        (action) => action.id === targetSelection.actionId,
+      ) ??
+      sourceProjection.actions.find((action) =>
+        actionIdsHaveSameIdentity(action.id, targetSelection.actionId),
+      )
+    : undefined;
+  const selectedDeflectSources =
+    targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
+      targetSelection?.selectedTargetIds.includes(source.targetId),
+    ) ?? [];
+  const selectedDeflectPower = selectedDeflectSources.reduce(
+    (total, source) => total + source.amount,
+    0,
+  );
+  const missingDeflectPower = Math.max(
+    0,
+    selectedDeflectPower -
+      (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
+  );
   const legalTargetIds = targetSelection?.legalTargetIds ?? EMPTY_TARGET_IDS;
   const displayedHighlightedCardInstanceIds = useMemo(() => {
     const next = new Set(highlightedCardInstanceIds);
@@ -696,7 +717,11 @@ export const GameBoard: FC<GameBoardProps> = ({
     if (
       nextSelection.purpose === "play" &&
       nextSelection.minTargets === nextSelection.maxTargets &&
-      selectedTargetIds.length === nextSelection.maxTargets
+      selectedTargetIds.length === nextSelection.maxTargets &&
+      additionalPowerForTargets(
+        targetSelectionAction,
+        selectedTargetIds,
+      ) === 0
     ) {
       submitTargetedPlay(nextSelection);
     }
@@ -749,7 +774,23 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    submitProjectedAction(selection.actionId, selection.selectedTargetIds);
+    const selectedAdditionalPower = additionalPowerForTargets(
+      targetSelectionAction,
+      selection.selectedTargetIds,
+    );
+    const missingAdditionalPower = Math.max(
+      0,
+      selectedAdditionalPower -
+        (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
+    );
+    if (missingAdditionalPower > 0) {
+      return;
+    }
+
+    submitProjectedAction(
+      targetSelectionAction?.id ?? selection.actionId,
+      selection.selectedTargetIds,
+    );
     setPendingSubmittedTargetIds(selection.selectedTargetIds);
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
@@ -1029,7 +1070,23 @@ export const GameBoard: FC<GameBoardProps> = ({
         <TargetSelectionPrompt
           canSubmit={
             targetSelection.selectedTargetIds.length >=
-            targetSelection.minTargets
+              targetSelection.minTargets && missingDeflectPower === 0
+          }
+          costPreview={
+            targetSelectionAction?.costPreview
+              ? {
+                  additionalPower: selectedDeflectPower,
+                  availableAnyPower:
+                    targetSelectionAction.costPreview.availableAnyPower,
+                  basePower: targetSelectionAction.costPreview.basePower,
+                  energy: targetSelectionAction.costPreview.energy,
+                  sourceNames: selectedDeflectSources.map(
+                    (source) =>
+                      cardsByInstanceId[source.targetId]?.name ??
+                      "Unknown permanent",
+                  ),
+                }
+              : undefined
           }
           maxTargets={targetSelection.maxTargets}
           minTargets={targetSelection.minTargets}
@@ -1214,6 +1271,27 @@ function assignCombatDamagePendingChoiceFromUnknown(
     totalDamage: candidate.totalDamage,
     type: "assignCombatDamage",
   };
+}
+
+function actionIdsHaveSameIdentity(left: string, right: string) {
+  const leftParts = left.split(":");
+  const rightParts = right.split(":");
+  return (
+    leftParts.length >= 5 &&
+    rightParts.length >= 5 &&
+    leftParts.slice(2).join(":") === rightParts.slice(2).join(":")
+  );
+}
+
+function additionalPowerForTargets(
+  action: GameProjection["actions"][number] | undefined,
+  targetIds: readonly string[],
+) {
+  return (
+    action?.costPreview?.targetAdditionalPower
+      .filter((source) => targetIds.includes(source.targetId))
+      .reduce((total, source) => total + source.amount, 0) ?? 0
+  );
 }
 
 function createAnimationData(board: ReturnType<typeof createBoardModel>): {

@@ -69,15 +69,6 @@ export function buildPaymentPlan(
       remainingAnyPower -= spend;
     }
   }
-  for (const id of player.zones.base) {
-    if (remainingAnyPower === 0) break;
-    if (
-      powerRuneIds.includes(id) ||
-      !hasAbility(id, "ability.recycle_for_power", index)
-    ) continue;
-    powerRuneIds.push(id);
-    remainingAnyPower -= 1;
-  }
   if (remainingAnyPower > 0) return null;
 
   const energySourceIds: string[] = [];
@@ -165,6 +156,23 @@ export function payCardCost(
       state.exhausted = false;
     }
   }
+}
+
+export function availableAnyPowerAfterBaseCost(
+  game: GameDocument,
+  playerId: string,
+  plan: PaymentPlan,
+) {
+  const player = game.state.players[playerId]!;
+  const pooledPower = Object.values(player.power).reduce(
+    (total, amount) => total + amount,
+    0,
+  );
+  const basePowerFromPool = Object.values(plan.powerFromPool).reduce(
+    (total, amount) => total + amount,
+    0,
+  );
+  return Math.max(0, pooledPower - basePowerFromPool);
 }
 
 export function targetDeflectCost(

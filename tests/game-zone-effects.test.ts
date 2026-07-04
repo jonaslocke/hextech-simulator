@@ -108,6 +108,32 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
     ),
   );
   game.state.players.p1!.power = {};
+  const runeDefinition = structuredClone(index.definitions.get("UNIT")!);
+  runeDefinition.cardCode = "RUNE";
+  runeDefinition.behaviorModel.clauses.push({
+    id: "recycle", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [
+      binding("ability.recycle_for_power", {
+        amount: 1,
+        resourceType: "power",
+      }),
+    ],
+    triggers: [], conditions: [], selectors: [], choices: [], costs: [],
+    timings: [], effects: [], keywords: [],
+  });
+  index.definitions.set("RUNE", runeDefinition);
+  index.instances.set("rune", {
+    instanceId: "rune",
+    ownerPlayerId: "p1",
+    source: "runeDeck",
+    cardCode: "RUNE",
+  });
+  game.state.players.p1!.zones.base.push("rune");
+  game.state.cardStates.rune = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
   assert.equal(
     buildPaymentPlan(
       game,
@@ -118,6 +144,7 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
       cost,
     ),
     null,
+    "Deflect cannot auto-recycle a rune that was not manually added to the pool",
   );
 });
 

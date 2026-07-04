@@ -49,6 +49,7 @@ import {
   type GameTransition,
 } from "./transitions";
 import {
+  availableAnyPowerAfterBaseCost,
   buildPaymentPlan,
   payCardCost,
   targetDeflectCost,
@@ -912,6 +913,7 @@ function action(
   extra?: string,
   targets: ProjectedAction["targets"] = [],
   choice?: ProjectedAction["choice"],
+  costPreview?: ProjectedAction["costPreview"],
 ): ProjectedAction {
   const parts = [
     "game",
@@ -934,6 +936,7 @@ function action(
     enabled,
     disabledReason,
     targets,
+    costPreview,
     choice,
     presentation: {
       surface,
@@ -1039,22 +1042,7 @@ function addPlayableCardActions(
       cost,
       index,
     );
-    const targets = projectedTargets.map((requirement) => ({
-      ...requirement,
-      legalIds: requirement.legalIds.filter(
-        (id) => {
-          const deflectCost = targetDeflectCost(playerId, [id], index);
-          return deflectCost === 0 || buildPaymentPlan(
-            game,
-            playerId,
-            definition,
-            cost,
-            index,
-            deflectCost,
-          ) !== null;
-        },
-      ),
-    }));
+    const targets = projectedTargets;
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
     const enabled = paymentPlan !== null && hasLegalTargets;
     const disabledReason = !hasLegalTargets
@@ -1062,6 +1050,27 @@ function addPlayableCardActions(
       : paymentPlan
         ? null
         : "Card costs cannot be paid.";
+    const targetAdditionalPower = targets
+      .flatMap((requirement) => requirement.legalIds)
+      .filter((id, position, ids) => ids.indexOf(id) === position)
+      .map((targetId) => ({
+        targetId,
+        amount: targetDeflectCost(playerId, [targetId], index),
+      }))
+      .filter((entry) => entry.amount > 0);
+    const costPreview =
+      paymentPlan && targetAdditionalPower.length > 0
+        ? {
+            energy: cost,
+            basePower: definition.card.attributes.power ?? 0,
+            availableAnyPower: availableAnyPowerAfterBaseCost(
+              game,
+              playerId,
+              paymentPlan,
+            ),
+            targetAdditionalPower,
+          }
+        : undefined;
     const unitDestinations =
       definition.card.classification.type === "Unit"
         ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
@@ -1090,6 +1099,8 @@ function addPlayableCardActions(
           disabledReason,
           destination.id,
           targets,
+          undefined,
+          costPreview,
         ),
       );
     }

@@ -32,6 +32,7 @@ export function TargetSelectionPrompt({
   canSubmit,
   cancelLabel = "Cancel",
   confirmLabel = "Play",
+  costPreview,
   maxTargets,
   minTargets,
   onCancel,
@@ -43,6 +44,13 @@ export function TargetSelectionPrompt({
   canSubmit: boolean;
   cancelLabel?: string;
   confirmLabel?: string;
+  costPreview?: {
+    additionalPower: number;
+    availableAnyPower: number;
+    basePower: number;
+    energy: number;
+    sourceNames: string[];
+  };
   maxTargets: number;
   minTargets: number;
   onCancel: () => void;
@@ -285,6 +293,34 @@ export function TargetSelectionPrompt({
             selectedCount={selectedCount}
           />
         </div>
+
+        {costPreview && costPreview.additionalPower > 0 && (
+          <div className="bg-amber-400/10 px-4 py-3 border-amber-300/25 border-b text-amber-50 text-xs">
+            <div className="font-semibold">
+              Deflect increases this cost by +{costPreview.additionalPower}{" "}
+              Power.
+            </div>
+            <div className="mt-1 text-amber-100/80">
+              Base cost: {costPreview.energy} Energy
+              {costPreview.basePower > 0
+                ? ` + ${costPreview.basePower} Power`
+                : ""}
+              {" · "}New cost: {costPreview.energy} Energy +{" "}
+              {costPreview.basePower + costPreview.additionalPower} Power
+            </div>
+            {costPreview.sourceNames.length > 0 && (
+              <div className="mt-1 text-amber-100/80">
+                Deflect sources: {costPreview.sourceNames.join(", ")}
+              </div>
+            )}
+            {costPreview.availableAnyPower < costPreview.additionalPower && (
+              <div className="mt-2 font-medium">
+                Add {costPreview.additionalPower - costPreview.availableAnyPower}{" "}
+                more Power to your Rune Pool before confirming.
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-between items-center gap-3 px-4 py-3">
           <div className="flex items-center gap-2 text-slate-500 text-xs">
