@@ -7,6 +7,8 @@
     "dev": "next dev",
     "next:dev": "next dev",
     "build": "next build",
+    "catalog:build-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts",
+    "catalog:check-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts --check",
     "catalog:clear-validations": "node --env-file=.env --import tsx scripts/clear-card-behavior-validations.ts --confirm",
     "catalog:reset-canonical-cards": "node --env-file=.env --import tsx scripts/reset-canonical-card-catalog.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
