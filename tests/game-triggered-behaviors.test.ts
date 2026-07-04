@@ -129,6 +129,77 @@ test("resolves Beginning Hold triggers before Channel and Draw", () => {
   assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
 });
 
+test("resolves end-of-turn triggers exactly once before advancing", () => {
+  const { game, decks } = fixture();
+  const dark = card("DARK", "Dark", "Legend", [clause("dark", {
+    triggers: [binding("trigger.end_of_turn", 0, { player: "controller" })],
+    effects: [binding("action.ready_cards", 1, { player: "controller", target: "runes", count: 2 })],
+  })]);
+  decks.forEach((deck) => deck.snapshot.cards.push(dark));
+  decks[0]!.instances.push(instance("dark", "p1", "DARK"));
+  game.state.players.p1!.zones.legend = "dark";
+  game.state.cardStates.dark = { exhausted: false, damage: 0, computedMight: null };
+
+  const end = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "End turn",
+  )!;
+  let next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: end.id, selectedIds: [], decks, now: "end",
+  });
+  assert.equal(next.state.turn?.phase, "end");
+  assert.equal(next.state.turn?.endTriggersQueued, true);
+  assert.equal(next.state.chain?.items.at(-1)?.label, "Dark");
+
+  next = resolveTopChainItem(next, decks);
+  const ready = gameplayActions(next, "p1", decks)[0]!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: ready.id,
+    selectedIds: ready.targets[0]!.legalIds.slice(0, 2),
+    decks,
+    now: "ready",
+  });
+  assert.equal(next.state.turn?.activePlayerId, "p2");
+  assert.equal(next.state.chain, null);
+});
+
+test("moves trigger private discard before draw", () => {
+  const { game, decks } = fixture();
+  const merchant = card("MERCHANT", "Merchant", "Unit", [clause("merchant", {
+    triggers: [binding("trigger.on_move", 0, { subject: "source" })],
+    effects: [
+      binding("action.discard_cards", 1, { player: "controller", count: 1 }),
+      binding("action.draw_cards", 2, { player: "controller", count: 1 }),
+    ],
+  })], 2);
+  decks.forEach((deck) => deck.snapshot.cards.push(merchant));
+  decks[0]!.instances.push(instance("merchant", "p1", "MERCHANT"));
+  game.state.players.p1!.zones.base.push("merchant");
+  game.state.players.p1!.zones.hand.push("spell");
+  game.state.cardStates.merchant = { exhausted: false, damage: 0, computedMight: 2 };
+  const handBefore = game.state.players.p1!.zones.hand.length;
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "merchant" && action.label.startsWith("Move to"),
+  )!;
+  let next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "move",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.label, "Merchant");
+  next = resolveTopChainItem(next, decks);
+  const discard = gameplayActions(next, "p1", decks)[0]!;
+  assert.equal(discard.label, "Choose 1 card to discard");
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: discard.id,
+    selectedIds: [discard.targets[0]!.legalIds[0]!],
+    decks,
+    now: "discard",
+  });
+  assert.equal(next.state.players.p1!.zones.hand.length, handBefore);
+});
+
 test("each conquered Targon's Peak readies two independently chosen runes", () => {
   const { game: initial, decks } = fixture();
   let game = initial;

@@ -15,7 +15,7 @@
 - [x] 1. `test(card-catalog): define Annie behavior suggestions`
 - [x] 2. `refactor(game): add stable zone-aware targets`
 - [x] 3. `feat(game): execute return and movement effects`
-- [ ] 4. `feat(game): resolve lifecycle triggers`
+- [x] 4. `feat(game): resolve lifecycle triggers`
 - [ ] 5. `refactor(game): centralize damage effects`
 - [ ] 6. `feat(game): add private Vision resolution`
 - [ ] 7. `feat(game): enforce Deflect costs`
@@ -26,10 +26,10 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 3
-- Verification: focused zone-effect and behavior-runtime tests, typecheck,
-  lint, and `git diff --check` pass.
-- Next milestone: add lifecycle events and sequential discard/draw effects.
+- Completed through: milestone 4
+- Verification: lifecycle, trigger, and flow tests, typecheck, lint, and
+  `git diff --check` pass.
+- Next milestone: centralize non-combat damage and effect outcomes.
 
 ## Resume procedure
 

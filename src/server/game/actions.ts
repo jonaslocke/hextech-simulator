@@ -394,6 +394,7 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+        drainQueuedBehaviorEvents(game, input.decks);
         finishTurnProgressionIfReady(game, index, input.decks);
       }
       break;
@@ -439,6 +440,16 @@ export function performGameplayAction(input: {
         player.zones.base.push(cardId);
         game.state.cardStates[cardId]!.exhausted = true;
         cleanupBoard(game, index);
+        dispatchBehaviorEvent(
+          game,
+          {
+            type: "unit.moved",
+            actorPlayerId: input.actorPlayerId,
+            subjectCardInstanceId: cardId,
+            values: { destination: "base" },
+          },
+          input.decks,
+        );
         break;
       }
       moveUnitsToBattlefield(
@@ -758,6 +769,7 @@ function passPriority(
         }
       }
       cleanupBoard(game, index);
+      drainQueuedBehaviorEvents(game, decks);
       finishTurnProgressionIfReady(game, index, decks);
     } else {
       game.state.chain.passedPlayerIds = passed;
@@ -802,9 +814,37 @@ function endTurn(
   if (game.state.turn?.activePlayerId !== actor)
     throw new Error("Only the active player can end the turn.");
   game.state.turn.phase = "end";
-  if (!queueDelayedEffects(game, "endOfThisTurn", decks, actor)) {
-    completeEndTurn(game, actor, index, decks);
+  continueEndTurn(game, actor, index, decks);
+}
+
+function continueEndTurn(
+  game: GameDocument,
+  actor: string,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const turn = game.state.turn;
+  if (!turn || turn.activePlayerId !== actor || turn.phase !== "end") return;
+  if (!turn.endTriggersQueued) {
+    turn.endTriggersQueued = true;
+    dispatchBehaviorEvent(
+      game,
+      {
+        type: "turn.ended",
+        actorPlayerId: actor,
+        subjectCardInstanceId: null,
+        values: {},
+      },
+      decks,
+    );
+    if (game.state.chain || game.state.pendingChoice) return;
   }
+  if (!turn.endDelayedEffectsQueued) {
+    turn.endDelayedEffectsQueued = true;
+    queueDelayedEffects(game, "endOfThisTurn", decks, actor);
+    if (game.state.chain || game.state.pendingChoice) return;
+  }
+  completeEndTurn(game, actor, index, decks);
 }
 
 function completeEndTurn(
@@ -835,7 +875,7 @@ function finishTurnProgressionIfReady(
   const turn = game.state.turn;
   if (!turn || game.state.chain || game.state.pendingChoice) return;
   if (turn.phase === "end") {
-    completeEndTurn(game, turn.activePlayerId, index, decks);
+    continueEndTurn(game, turn.activePlayerId, index, decks);
   } else if (isStartOfTurnPhase(turn.phase)) {
     applyStartOfTurn(game, decks, index);
   }
@@ -911,6 +951,29 @@ function moveUnitsToBattlefield(
     openNonCombatShowdown(game, battlefieldId, actorPlayerId);
   } else {
     battlefield.contestedByPlayerId = null;
+  }
+  for (const cardId of cardIds) {
+    dispatchBehaviorEvent(
+      game,
+      {
+        type: "unit.moved",
+        actorPlayerId,
+        subjectCardInstanceId: cardId,
+        values: { destination: battlefieldId },
+      },
+      decks,
+    );
+  }
+}
+
+function drainQueuedBehaviorEvents(
+  game: GameDocument,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const events = game.state.queuedBehaviorEvents ?? [];
+  game.state.queuedBehaviorEvents = [];
+  for (const event of events) {
+    dispatchBehaviorEvent(game, event, decks);
   }
 }
 

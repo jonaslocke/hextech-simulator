@@ -57,7 +57,9 @@ export const setupStateSchema = z.object({
 export const turnStateSchema = z.object({
   turnNumber: z.number().int().positive(),
   activePlayerId: z.string().min(1),
-  phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"])
+  phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
+  endTriggersQueued: z.boolean().optional(),
+  endDelayedEffectsQueued: z.boolean().optional()
 });
 
 export const cardStateSchema = z.object({
@@ -181,7 +183,13 @@ export const gameStateSchema = z.object({
     combatDamageChoiceSchema,
     effectSelectionChoiceSchema
   ]).nullable(),
-  queuedTriggerChoices: z.array(triggerOrderChoiceSchema)
+  queuedTriggerChoices: z.array(triggerOrderChoiceSchema),
+  queuedBehaviorEvents: z.array(z.object({
+    type: z.string(),
+    actorPlayerId: z.string().nullable(),
+    subjectCardInstanceId: z.string().nullable(),
+    values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  })).optional()
 });
 
 export const gameDocumentSchema = z.object({

@@ -47,6 +47,17 @@ export function createPrimitiveHandlers(
   });
   handlers.set("trigger.conquer_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.conquered" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
   handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.on_move", {
+    matches: (_binding, context) =>
+      context.event?.type === "unit.moved" &&
+      context.event.subjectCardInstanceId === context.sourceCardInstanceId
+  });
+  handlers.set("trigger.end_of_turn", {
+    matches: (binding, context) =>
+      context.event?.type === "turn.ended" &&
+      (binding.parameters.player !== "controller" ||
+        context.event.actorPlayerId === context.controllerPlayerId)
+  });
   handlers.set("trigger.attack", {
     matches: (_binding, context) =>
       context.event?.type === "unit.attacks" &&
@@ -149,6 +160,32 @@ export function createPrimitiveHandlers(
       for (const id of ids) draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
     }
   });
+  handlers.set("action.discard_cards", {
+    choice(binding, context) {
+      const hand =
+        context.game.state.players[context.controllerPlayerId]!.zones.hand;
+      const count = Math.min(numberParam(binding, "count"), hand.length);
+      return count > 0
+        ? {
+            legalIds: [...hand],
+            minimum: count,
+            maximum: count,
+            prompt: `Choose ${count} card${count === 1 ? "" : "s"} to discard`,
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const player =
+        context.game.state.players[context.controllerPlayerId]!;
+      const count = Math.min(numberParam(binding, "count"), player.zones.hand.length);
+      const selected = context.selectedIds.slice(0, count);
+      player.zones.hand = player.zones.hand.filter(
+        (id) => !selected.includes(id),
+      );
+      player.zones.trash.push(...selected);
+      selected.forEach((id) => incrementObjectVersion(context.game, id));
+    },
+  });
   handlers.set("action.channel_runes", {
     execute(binding, context) {
       const count = numberParam(binding, "count");
@@ -239,6 +276,13 @@ export function createPrimitiveHandlers(
           );
         }
         context.game.state.players[owner]!.zones.base.push(id);
+        const events = (context.game.state.queuedBehaviorEvents ??= []);
+        events.push({
+          type: "unit.moved",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: { destination: "base" },
+        });
       }
     },
   });
