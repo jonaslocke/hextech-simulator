@@ -166,6 +166,49 @@ test("plays Units to Base or a controlled battlefield and rejects forged destina
   assert.equal(next.state.cardStates["p1:unit"]!.exhausted, true);
 });
 
+test("plays a permitted Unit directly to an open battlefield", () => {
+  const { game, decks } = fixture();
+  const definition = decks[0]!.snapshot.cards.find(
+    (card) => card.cardCode === "UNIT",
+  )!;
+  definition.behaviorModel.clauses.push({
+    id: "open-battlefield",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [{
+      behaviorId: "modifier.play_unit_destination",
+      parameters: { destination: "openBattlefield" },
+      confidence: "high",
+      order: 0,
+    }],
+    keywords: [],
+  });
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Unit to Arena",
+  );
+  assert.ok(play);
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "open-battlefield-play",
+  });
+
+  assert.ok(next.state.battlefields[0]!.units.includes("p1:unit"));
+  assert.equal(next.state.battlefields[0]!.controllerPlayerId, "p1");
+});
+
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const cards = [
     definition("RUNE", "Rune", "Rune", 0, 0),

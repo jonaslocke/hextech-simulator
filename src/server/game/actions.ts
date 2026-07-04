@@ -56,6 +56,11 @@ import {
   beginEffectResolution,
   submitEffectSelection,
 } from "./effect-resolution";
+import {
+  establishUnitDestinationControl,
+  isLegalUnitDestination,
+  legalUnitDestinationIds,
+} from "./unit-destinations";
 import { applyStartOfTurn, isStartOfTurnPhase } from "./turns";
 
 // Non-standard rules override. Disable to require normal Action/Reaction timing.
@@ -541,17 +546,14 @@ function playCard(
   const isUnit = definition.card.classification.type === "Unit";
   const destinationBattlefield = isUnit && destinationId !== "base"
     ? game.state.battlefields.find(
-        (battlefield) =>
-          battlefield.battlefieldId === destinationId &&
-          battlefield.controllerPlayerId === playerId,
+        (battlefield) => battlefield.battlefieldId === destinationId,
       )
     : null;
   if (
     isUnit &&
-    destinationId !== "base" &&
-    !destinationBattlefield
+    !isLegalUnitDestination(game, playerId, definition, destinationId)
   ) {
-    throw new Error("Unit play destination is not controlled by the player.");
+    throw new Error("Unit play destination is not legal for this card.");
   }
   const energyCost = effectiveEnergyCost(game, playerId, definition, index);
   const playEvent = {
@@ -578,6 +580,7 @@ function playCard(
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
+    establishUnitDestinationControl(game, playerId, destinationId);
     game.state.cardStates[cardId]!.exhausted = true;
     executeImmediateClauses(
       game,
@@ -1054,21 +1057,18 @@ function addPlayableCardActions(
         : "Card costs cannot be paid.";
     const unitDestinations =
       definition.card.classification.type === "Unit"
-        ? [
-            { id: "base", name: "Base" },
-            ...game.state.battlefields
-              .filter(
-                (battlefield) =>
-                  battlefield.controllerPlayerId === playerId,
-              )
-              .map((battlefield) => ({
-                id: battlefield.battlefieldId,
-                name: definitionForInstance(
-                  battlefield.cardInstanceId,
-                  index,
-                ).card.name,
-              })),
-          ]
+        ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
+            id,
+            name:
+              id === "base"
+                ? "Base"
+                : definitionForInstance(
+                    game.state.battlefields.find(
+                      (battlefield) => battlefield.battlefieldId === id,
+                    )!.cardInstanceId,
+                    index,
+                  ).card.name,
+          }))
         : null;
     for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
       actions.push(

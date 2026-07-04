@@ -4,6 +4,8 @@ import {
   createBehaviorContext,
   buildPaymentPlan,
   createPrimitiveHandlers,
+  establishUnitDestinationControl,
+  legalUnitDestinationIds,
   type BehaviorBinding,
   type GameDocument,
   type RuntimeCardIndex,
@@ -95,6 +97,33 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
     ),
     null,
   );
+});
+
+test("adds open battlefields only through a card destination permission", () => {
+  const game = fixture();
+  const definition = cardIndex().definitions.get("UNIT")!;
+  game.state.battlefields[0]!.controllerPlayerId = null;
+  game.state.battlefields[0]!.units = [];
+
+  assert.deepEqual(legalUnitDestinationIds(game, "p1", definition), ["base"]);
+
+  definition.behaviorModel.clauses.push({
+    id: "destination", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], keywords: [],
+    effects: [
+      binding("modifier.play_unit_destination", {
+        destination: "openBattlefield",
+      }),
+    ],
+  });
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", definition),
+    ["base", "bf"],
+  );
+
+  establishUnitDestinationControl(game, "p1", "bf");
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
 });
 
 function binding(

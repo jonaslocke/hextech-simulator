@@ -31,6 +31,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.return_to_hand": "executable",
   "action.move_unit": "executable",
   "modifier.modify_numeric_value": "executable",
+  "modifier.play_unit_destination": "executable",
   "modifier.enter_ready": "executable",
   "trigger.attack": "executable",
   "trigger.defend": "executable",

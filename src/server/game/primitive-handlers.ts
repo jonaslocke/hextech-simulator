@@ -38,8 +38,13 @@ export function createPrimitiveHandlers(
   const passive: BehaviorHandler = {};
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
-    "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect"
+    "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
   ]) handlers.set(id, passive);
+  handlers.set("modifier.play_unit_destination", {
+    execute() {
+      // The permission is consumed by the unit destination policy.
+    },
+  });
   handlers.set("trigger.on_play", {
     matches(binding, context) {
       if (context.event?.type !== "card.played" || context.event.actorPlayerId !== context.controllerPlayerId) return false;

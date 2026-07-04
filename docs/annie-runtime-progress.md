@@ -19,17 +19,17 @@
 - [x] 5. `refactor(game): centralize damage effects`
 - [x] 6. `feat(game): add private Vision resolution`
 - [x] 7. `feat(game): enforce Deflect costs`
-- [ ] 8. `feat(game): support card-driven unit destinations`
+- [x] 8. `feat(game): support card-driven unit destinations`
 - [ ] 9. `feat(card-catalog): certify Annie publication`
 - [ ] 10. `feat(match): support Annie deck selection`
 - [ ] 11. `test(game): certify Annie runtime`
 
 ## Current checkpoint
 
-- Completed through: milestone 7
-- Verification: Deflect payment, Lux targeting, and Annie discovery tests,
+- Completed through: milestone 8
+- Verification: unit destination, game flow, and Annie discovery tests,
   typecheck, lint, and `git diff --check` pass.
-- Next milestone: add card-driven open-battlefield destinations.
+- Next milestone: certify the Annie publication and strict snapshot gate.
 
 ## Resume procedure
 
