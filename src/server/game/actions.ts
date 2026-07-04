@@ -18,6 +18,7 @@ import {
   cleanupBoard,
   markBattlefieldContested,
   openNonCombatShowdown,
+  openPendingNonCombatShowdown,
   resolveNonCombatShowdown,
   unitControllers,
 } from "./board-rules";
@@ -57,7 +58,6 @@ import {
   submitEffectSelection,
 } from "./effect-resolution";
 import {
-  establishUnitDestinationControl,
   isLegalUnitDestination,
   legalUnitDestinationIds,
 } from "./unit-destinations";
@@ -404,6 +404,7 @@ export function performGameplayAction(input: {
           input.decks,
         );
         drainQueuedBehaviorEvents(game, input.decks);
+        openPendingNonCombatShowdown(game, index);
         finishTurnProgressionIfReady(game, index, input.decks);
       }
       break;
@@ -544,6 +545,7 @@ function playCard(
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
   const isUnit = definition.card.classification.type === "Unit";
+  const showdownAtPlayStart = game.state.showdown;
   const destinationBattlefield = isUnit && destinationId !== "base"
     ? game.state.battlefields.find(
         (battlefield) => battlefield.battlefieldId === destinationId,
@@ -580,7 +582,12 @@ function playCard(
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
-    establishUnitDestinationControl(game, playerId, destinationId);
+    if (
+      destinationBattlefield &&
+      destinationBattlefield.controllerPlayerId == null
+    ) {
+      markBattlefieldContested(game, destinationId, playerId);
+    }
     game.state.cardStates[cardId]!.exhausted = true;
     executeImmediateClauses(
       game,
@@ -592,7 +599,8 @@ function playCard(
     );
     dispatchBehaviorEvent(game, playEvent, decks);
     cleanupBoard(game, index);
-    if (game.state.showdown) {
+    openPendingNonCombatShowdown(game, index);
+    if (showdownAtPlayStart && game.state.showdown) {
       game.state.showdown.focusPlayerId = nextRelevantPlayer(
         game,
         playerId,
@@ -784,6 +792,7 @@ function passPriority(
       }
       cleanupBoard(game, index);
       drainQueuedBehaviorEvents(game, decks);
+      openPendingNonCombatShowdown(game, index);
       finishTurnProgressionIfReady(game, index, decks);
     } else {
       game.state.chain.passedPlayerIds = passed;

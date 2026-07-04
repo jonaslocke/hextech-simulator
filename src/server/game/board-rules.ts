@@ -51,6 +51,33 @@ export function openNonCombatShowdown(
   };
 }
 
+export function openPendingNonCombatShowdown(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+): boolean {
+  if (
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.showdown ||
+    game.state.combat
+  ) {
+    return false;
+  }
+  const battlefield = game.state.battlefields.find((candidate) => {
+    const actor = candidate.contestedByPlayerId;
+    if (!actor || candidate.controllerPlayerId != null) return false;
+    const controllers = unitControllers(game, candidate.units, index);
+    return controllers.length === 1 && controllers[0] === actor;
+  });
+  if (!battlefield?.contestedByPlayerId) return false;
+  openNonCombatShowdown(
+    game,
+    battlefield.battlefieldId,
+    battlefield.contestedByPlayerId,
+  );
+  return true;
+}
+
 export function resolveNonCombatShowdown(
   game: GameDocument,
   battlefieldId: string,

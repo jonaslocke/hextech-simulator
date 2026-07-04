@@ -37,22 +37,6 @@ export function isLegalUnitDestination(
   );
 }
 
-export function establishUnitDestinationControl(
-  game: GameDocument,
-  playerId: string,
-  destinationId: string,
-): void {
-  if (destinationId === "base") return;
-  const battlefield = game.state.battlefields.find(
-    (candidate) => candidate.battlefieldId === destinationId,
-  );
-  if (!battlefield) throw new Error("Battlefield is unavailable.");
-  if (battlefield.controllerPlayerId == null) {
-    battlefield.controllerPlayerId = playerId;
-    battlefield.contestedByPlayerId = null;
-  }
-}
-
 function permitsOpenBattlefield(definition: GameCardDefinition): boolean {
   return definition.behaviorModel.clauses.some((clause) =>
     clause.effects.some(

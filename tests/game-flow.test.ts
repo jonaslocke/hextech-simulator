@@ -166,7 +166,7 @@ test("plays Units to Base or a controlled battlefield and rejects forged destina
   assert.equal(next.state.cardStates["p1:unit"]!.exhausted, true);
 });
 
-test("plays a permitted Unit directly to an open battlefield", () => {
+test("playing a permitted Unit to an open battlefield starts a Showdown before Conquer", () => {
   const { game, decks } = fixture();
   const definition = decks[0]!.snapshot.cards.find(
     (card) => card.cardCode === "UNIT",
@@ -196,7 +196,7 @@ test("plays a permitted Unit directly to an open battlefield", () => {
     (action) => action.label === "Play Unit to Arena",
   );
   assert.ok(play);
-  const next = performGameplayAction({
+  let next = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: play.id,
@@ -206,7 +206,43 @@ test("plays a permitted Unit directly to an open battlefield", () => {
   });
 
   assert.ok(next.state.battlefields[0]!.units.includes("p1:unit"));
+  assert.equal(next.state.battlefields[0]!.controllerPlayerId ?? null, null);
+  assert.equal(next.state.battlefields[0]!.contestedByPlayerId, "p1");
+  assert.equal(next.state.showdown?.kind, "nonCombat");
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+  assert.equal(next.state.players.p1!.points ?? 0, 0);
+
+  const firstPass = gameplayActions(next, "p1", decks).find(
+    (action) => action.label === "Pass focus",
+  );
+  assert.ok(firstPass);
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: firstPass.id,
+    selectedIds: [],
+    decks,
+    now: "first-pass",
+  });
+  assert.equal(next.state.showdown?.focusPlayerId, "p2");
+  assert.equal(next.state.players.p1!.points ?? 0, 0);
+
+  const secondPass = gameplayActions(next, "p2", decks).find(
+    (action) => action.label === "Pass focus",
+  );
+  assert.ok(secondPass);
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p2",
+    actionId: secondPass.id,
+    selectedIds: [],
+    decks,
+    now: "second-pass",
+  });
+  assert.equal(next.state.showdown, null);
   assert.equal(next.state.battlefields[0]!.controllerPlayerId, "p1");
+  assert.equal(next.state.battlefields[0]!.contestedByPlayerId, null);
+  assert.equal(next.state.players.p1!.points, 1);
 });
 
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {

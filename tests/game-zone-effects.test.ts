@@ -4,7 +4,6 @@ import {
   createBehaviorContext,
   buildPaymentPlan,
   createPrimitiveHandlers,
-  establishUnitDestinationControl,
   legalUnitDestinationIds,
   type BehaviorBinding,
   type GameDocument,
@@ -121,9 +120,6 @@ test("adds open battlefields only through a card destination permission", () => 
     legalUnitDestinationIds(game, "p1", definition),
     ["base", "bf"],
   );
-
-  establishUnitDestinationControl(game, "p1", "bf");
-  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
 });
 
 test("keeps legacy bounded each-unit selectors interactive", () => {
