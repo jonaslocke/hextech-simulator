@@ -68,7 +68,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 - [x] 4. `fix(game): batch simultaneous end-of-turn triggers`
   - Collect end triggers and delayed end-of-turn effects into one ordering
     window and Chain.
-- [ ] 5. `fix(game): apply controlled bonus damage`
+- [x] 5. `fix(game): apply controlled bonus damage`
   - Apply continuous Bonus Damage once per eligible spell/ability damage
     instruction, including automatic groups.
 - [ ] 6. `feat(game-board): preview Deflect additional costs`
@@ -79,10 +79,10 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 4
+- Completed through: milestone 5
 - Verification: 140 tests passed; typecheck, lint, build, and
   `git diff --check` passed.
-- Next milestone: controlled Bonus Damage.
+- Next milestone: Deflect cost preview and Rune Pool enforcement.
 
 ## Important implementation notes
 
@@ -105,3 +105,6 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
   interpreted as the source permanent entering the Board.
 - End-of-turn event triggers and due delayed effects are collected into one
   simultaneous trigger batch before any ordering prompt or Chain is created.
+- `whileSourceOnBoard` now includes sources in Base as well as battlefields and
+  Legends. Bonus Damage is applied to the instruction amount before applying it
+  to single or automatic-group targets; combat damage remains unaffected.

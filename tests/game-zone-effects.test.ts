@@ -36,19 +36,42 @@ test("returns selected trash cards and moves battlefield units generically", () 
 test("applies controller Bonus Damage and records whether it killed", () => {
   const game = fixture();
   const index = cardIndex();
-  game.state.modifiers.push({
-    id: "bonus",
-    sourceCardInstanceId: null,
-    controllerPlayerId: "p1",
-    targetCardInstanceId: null,
-    targetScope: "controller_effect",
-    attribute: "damage",
-    operation: "increase",
-    amount: 1,
-    minimum: null,
-    duration: "whileSourceOnBoard",
-    createdAtTurn: 1,
+  const bonusDefinition = structuredClone(index.definitions.get("UNIT")!);
+  bonusDefinition.cardCode = "BONUS";
+  bonusDefinition.behaviorModel.clauses.push({
+    id: "bonus-damage",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.modify_numeric_value", {
+      attribute: "damage",
+      operation: "increase",
+      amount: 1,
+      target: "controller_effect",
+      duration: "whileSourceOnBoard",
+    })],
+    keywords: [],
   });
+  index.definitions.set("BONUS", bonusDefinition);
+  index.instances.set("bonus", {
+    instanceId: "bonus",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "BONUS",
+  });
+  game.state.players.p1!.zones.base.push("bonus");
+  game.state.cardStates.bonus = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 2,
+  };
   const context = createBehaviorContext(game, "p1", "source", null, ["unit"]);
 
   createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(

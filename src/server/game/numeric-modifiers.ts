@@ -114,10 +114,19 @@ function sourceIsActive(
       battlefield.units.includes(sourceId),
     );
   }
-  return game.state.battlefields.some(
-    (battlefield) =>
-      battlefield.cardInstanceId === sourceId ||
-      battlefield.units.includes(sourceId),
+  return (
+    game.state.setup.playerIds.some((playerId) => {
+      const player = game.state.players[playerId]!;
+      return (
+        player.zones.legend === sourceId ||
+        player.zones.base.includes(sourceId)
+      );
+    }) ||
+    game.state.battlefields.some(
+      (battlefield) =>
+        battlefield.cardInstanceId === sourceId ||
+        battlefield.units.includes(sourceId),
+    )
   );
 }
 
