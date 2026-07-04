@@ -151,6 +151,7 @@ export const unitLocationRelations = [
 export const targetReferenceKinds = [
   "card",
   "controller_spell",
+  "controller_effect",
   "enemy_unit",
   "equipment",
   "event_subject",
@@ -198,6 +199,7 @@ export const numericValueKinds = [
   "powerCost",
   "victoryRequirement",
   "resourceAmount"
+  ,"damage"
 ] as const;
 
 export const numericModifierOperations = [
@@ -460,6 +462,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("scope", "string", "Whether the unit scope is any, each, friendly, or enemy.", unitScopeKinds),
       optional("minimumCount", "number", "The minimum number of units in the selection."),
       optional("maximumCount", "number", "The maximum number of units in the selection."),
+      optional("maximumMight", "number", "The maximum computed Might allowed for a selected unit."),
       required("area", "area", "The board area containing legal unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
@@ -498,6 +501,31 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
+  }),
+  "selector.card": primitiveSeed({
+    id: "selector.card",
+    family: "selector",
+    name: "Select card",
+    description: "Selects cards from a specified owner zone.",
+    parameters: [
+      required("zone", "zone", "The zone containing legal cards."),
+      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit"]),
+      required("owner", "player", "The required owner relationship."),
+      required("minimumCount", "number", "The minimum selection count."),
+      required("maximumCount", "number", "The maximum selection count.")
+    ],
+    engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
+  }),
+  "selector.battlefield": primitiveSeed({
+    id: "selector.battlefield",
+    family: "selector",
+    name: "Select battlefield",
+    description: "Selects a battlefield for a location-scoped effect.",
+    parameters: [
+      required("minimumCount", "number", "The minimum selection count."),
+      required("maximumCount", "number", "The maximum selection count.")
+    ],
+    engineSupport: requiresEngineSupport("Battlefield effect selection requires runtime projection support.")
   }),
   "selector.token": primitiveSeed({
     id: "selector.token",
@@ -761,6 +789,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Changes which cards can be chosen or targeted.",
     engineSupport: requiresEngineSupport("Targeting restrictions are recurring in the corpus and need generalized legality hooks.")
   }),
+  "modifier.play_unit_destination": primitiveSeed({
+    id: "modifier.play_unit_destination",
+    family: "modifier",
+    name: "Play unit destination",
+    description: "Adds a card-driven legal destination for playing a unit.",
+    parameters: [
+      required("destination", "string", "The additional destination kind.", ["openBattlefield"])
+    ],
+    engineSupport: requiresEngineSupport("Unit destination permissions require a generalized legality policy.")
+  }),
   "condition.if": primitiveSeed({
     id: "condition.if",
     family: "condition",
@@ -796,6 +834,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: requiresEngineSupport(
       "The catalog defines typed numeric clause guards; generalized runtime condition evaluation remains future engine work."
     )
+  }),
+  "condition.effect_killed_target": primitiveSeed({
+    id: "condition.effect_killed_target",
+    family: "condition",
+    name: "Effect killed target",
+    description: "Checks whether a related damage effect killed its target.",
+    parameters: [
+      required("effectRelation", "string", "The related effect result.", ["previousClause"])
+    ],
+    engineSupport: requiresEngineSupport("Effect outcomes must be retained by the resolution frame.")
   }),
   "condition.while": primitiveSeed({
     id: "condition.while",
@@ -838,6 +886,23 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Lets a player decide whether to apply an optional behavior.",
     parameters: [required("player", "player", "The player who may choose to apply the behavior.")],
     engineSupport: requiresEngineSupport("Optional effect support requires player prompts and declined-choice logging.")
+  }),
+  "keyword.vision": primitiveSeed({
+    id: "keyword.vision",
+    family: "keyword",
+    name: "Vision",
+    description: "Looks at the top Main Deck card on play and may recycle it.",
+    engineSupport: requiresEngineSupport("Vision requires a private optional effect selection.")
+  }),
+  "keyword.deflect": primitiveSeed({
+    id: "keyword.deflect",
+    family: "keyword",
+    name: "Deflect",
+    description: "Adds an any-domain Power cost when an opponent chooses this object.",
+    parameters: [
+      required("amount", "number", "The Deflect value.")
+    ],
+    engineSupport: requiresEngineSupport("Deflect requires target-derived additional payment.")
   }),
   "cost.pay": primitiveSeed({
     id: "cost.pay",

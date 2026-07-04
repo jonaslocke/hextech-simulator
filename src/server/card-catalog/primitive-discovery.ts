@@ -155,7 +155,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("timing.delayed", "timing", "Delayed timing", "Behavior resolves at a later turn boundary.", ["point"], (context) =>
-    /\bat the end of (this|your|an opponent's) turn\b/.test(context.rulesText)
+    /\bat the end of (this|your|an opponent's) turn\b/.test(context.rulesText) &&
+    !/^at the end of\b/.test(context.rulesText)
       ? assignment(context, "timing.delayed", "timing", { point: readDelayedTiming(context.rulesText) }, "high")
       : null
   ),
@@ -165,7 +166,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("trigger.on_move", "trigger", "On move trigger", "Behavior triggers when a unit moves.", ["subject"], (context) =>
-    /\bwhen (i move|.+ moves?)\b/.test(context.rulesText)
+    /\bwhen (?:i|this unit|a unit|an? friendly unit|an? enemy unit) moves?\b/.test(context.rulesText)
       ? assignment(context, "trigger.on_move", "trigger", { subject: readTriggerSubject(context.rulesText) }, "medium")
       : null
   ),
@@ -202,8 +203,9 @@ const primitiveDetectors: PrimitiveDetector[] = [
   ),
   primitive("selector.unit", "selector", "Select unit", "Behavior requires or affects a unit.", ["scope", "minimumCount", "maximumCount"], (context) =>
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText) &&
-    !/\b(?:friendly|enemy) units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another") }, "medium")
+    !/\b(?:friendly|enemy) units?\b/.test(context.rulesText) &&
+    !/\bunit from your trash\b/.test(context.rulesText)
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another"), maximumMight: readMaximumMight(context.rulesText) }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
@@ -216,19 +218,38 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "selector.enemy_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "opponent", excludesSource: context.rulesText.includes("another") }, "high")
       : null
   ),
+  primitive("selector.card", "selector", "Select card", "Behavior selects a card from a non-board zone.", ["zone", "cardType", "owner", "minimumCount", "maximumCount"], (context) =>
+    /\b(?:spell|unit|card) from your trash\b/.test(context.rulesText)
+      ? assignment(context, "selector.card", "selector", {
+          zone: "trash",
+          cardType: context.rulesText.includes("spell") ? "Spell" : context.rulesText.includes("unit") ? "Unit" : "any",
+          owner: "controller",
+          minimumCount: 1,
+          maximumCount: 1
+        }, "high")
+      : null
+  ),
+  primitive("selector.battlefield", "selector", "Select battlefield", "Behavior selects a battlefield.", ["minimumCount", "maximumCount"], (context) =>
+    /\ball enemy units at a battlefield\b/.test(context.rulesText)
+      ? assignment(context, "selector.battlefield", "selector", {
+          minimumCount: 1,
+          maximumCount: 1
+        }, "high")
+      : null
+  ),
   primitive("selector.token", "selector", "Select token", "Behavior applies to a known token kind.", ["tokenName", "controller"], (context) =>
     /\byour gold\b/.test(context.rulesText)
       ? assignment(context, "selector.token", "selector", { tokenName: "Gold gear", controller: "controller" }, "high")
       : null
   ),
-  primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
-    /\bdraw\b/.test(context.rulesText)
-      ? assignment(context, "action.draw_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
-      : null
-  ),
   primitive("action.discard_cards", "action", "Discard cards", "Move cards from hand to trash.", ["player", "count"], (context) =>
     /\bdiscard\b/.test(context.rulesText)
       ? assignment(context, "action.discard_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "discard") ?? 1 }, "high")
+      : null
+  ),
+  primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
+    /\bdraw\b/.test(context.rulesText)
+      ? assignment(context, "action.draw_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
       : null
   ),
   primitive("action.move_unit", "action", "Move unit", "Move a unit between zones or battlefields.", ["destination", "count"], (context) =>
@@ -260,7 +281,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.deal_damage", "action", "Deal damage", "Apply damage to one or more targets.", ["amount", "target"], (context) =>
-    /\bdeal\b/.test(context.rulesText)
+    /\bdeal\b/.test(context.rulesText) && !/\bbonus damage\b/.test(context.rulesText)
       ? assignment(context, "action.deal_damage", "action", { amount: readNumberAfter(context.rulesText, "deal"), target: readGenericTarget(context.rulesText) }, "high")
       : null
   ),
@@ -277,6 +298,11 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("action.return_to_hand", "action", "Return to hand", "Move a card to its owner's hand.", ["target"], (context) =>
     /\breturn\b.*\bhand\b/.test(context.rulesText)
       ? assignment(context, "action.return_to_hand", "action", { target: readGenericTarget(context.rulesText) }, "high")
+      : null
+  ),
+  primitive("modifier.play_unit_destination", "modifier", "Play unit destination", "Adds a card-driven legal play destination.", ["destination"], (context) =>
+    /\bplay me to an open battlefield\b/.test(context.rulesText)
+      ? assignment(context, "modifier.play_unit_destination", "modifier", { destination: "openBattlefield" }, "high")
       : null
   ),
   primitive("action.recycle_cards", "action", "Recycle cards", "Move cards to bottom of a deck.", ["target", "count"], (context) =>
@@ -351,7 +377,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
         }, "high");
   }),
   primitive("condition.if", "condition", "If condition", "Behavior applies only if a condition is true.", [], (context) =>
-    /\bif\b/.test(context.rulesText) ? assignment(context, "condition.if", "condition", {}, "medium") : null
+    /\bif\b/.test(context.rulesText) && !/\bif this kills it\b/.test(context.rulesText)
+      ? assignment(context, "condition.if", "condition", {}, "medium")
+      : null
+  ),
+  primitive("condition.effect_killed_target", "condition", "Effect killed target", "Checks whether an earlier damage effect killed its target.", ["effectRelation"], (context) =>
+    /\bif this kills it\b/.test(context.rulesText)
+      ? assignment(context, "condition.effect_killed_target", "condition", { effectRelation: "previousClause" }, "high")
+      : null
   ),
   primitive("condition.while", "condition", "While condition", "Behavior applies while a condition is true.", [], (context) =>
     /\bwhile\b/.test(context.rulesText) && !isSourceAtBattlefieldDuration(context.rulesText)
@@ -374,7 +407,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("choice.optional", "choice", "Optional choice", "Player may choose whether to apply a behavior.", ["player"], (context) =>
-    /\byou may\b|\bi may\b|\beach player may\b/.test(context.rulesText)
+    (/\byou may\b|\bi may\b|\beach player may\b/.test(context.rulesText)) &&
+    !/\bplay me to an open battlefield\b/.test(context.rulesText)
       ? assignment(context, "choice.optional", "choice", { player: readPlayer(context.rulesText) }, "medium")
       : null
   ),
@@ -673,11 +707,28 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
   const tankAssignments = /\[Tank\]/i.test(context.normalizedText)
     ? [assignment(context, "keyword.tank", "keyword", {}, "high")]
     : [];
+  const visionAssignments = /\[Vision\]/i.test(context.normalizedText)
+    ? [assignment(context, "keyword.vision", "keyword", {}, "high")]
+    : [];
+  const deflectAssignments = /\[Deflect(?:\s+(\d+))?\]/i.exec(
+    context.normalizedText,
+  );
+  const deflect = deflectAssignments
+    ? [
+        assignment(
+          context,
+          "keyword.deflect",
+          "keyword",
+          { amount: deflectAssignments[1] ? Number(deflectAssignments[1]) : 1 },
+          "high",
+        ),
+      ]
+    : [];
   const genericAssignments = [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
     .map((match) => match[1]!.trim())
     .filter(
       (keyword) =>
-        !["Action", "Reaction", "Hidden", "Add", "Tank"].includes(keyword) &&
+        !["Action", "Reaction", "Hidden", "Add", "Tank", "Vision", "Deflect"].includes(keyword) &&
         !/^Assault(?:\s+\d+)?$/i.test(keyword)
     )
     .map((keyword) => {
@@ -707,6 +758,8 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
     ...hiddenAssignments,
     ...assaultAssignments,
     ...tankAssignments,
+    ...visionAssignments,
+    ...deflect,
     ...genericAssignments
   ];
 }
@@ -719,7 +772,7 @@ function createClauseContext(
   sourceText: string,
   inheritedTiming: "action" | "reaction" | null
 ): ClauseContext {
-  const normalizedText = normalizeText(sourceText);
+  const normalizedText = normalizeText(sourceText).replace(/(\]|\))_/g, "$1");
   const lowerText = normalizedText.toLowerCase();
 
   return {
@@ -732,14 +785,12 @@ function createClauseContext(
 }
 
 function splitRulesTextIntoClauses(text: string): string[] {
-  const clauses = text
-    .replace(/\r/g, "")
-    .split(/\n+|(?<=\.)\s+|(?<=\])\s*(?=\[)/)
+  const clauses = splitAtTopLevelBoundaries(text.replace(/\r/g, ""))
     .map((clause) => normalizeText(clause).replace(/\.$/, ""))
     .filter((clause) => clause.length > 0);
 
   return clauses.reduce<string[]>((merged, clause) => {
-    if (/^(Use only\b|\(Abilities that add resources)/i.test(clause)) {
+    if (/^(Use only\b|\()/i.test(clause)) {
       const previousIndex = merged.length - 1;
 
       if (previousIndex >= 0) {
@@ -751,6 +802,30 @@ function splitRulesTextIntoClauses(text: string): string[] {
     merged.push(clause);
     return merged;
   }, []);
+}
+
+function splitAtTopLevelBoundaries(text: string): string[] {
+  const clauses: string[] = [];
+  let current = "";
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (character === "(") depth += 1;
+    if (character === ")") depth = Math.max(0, depth - 1);
+    current += character;
+    const next = text[index + 1] ?? "";
+    const endsSentence =
+      depth === 0 &&
+      ((character === "." && /\s/.test(next)) ||
+        character === "\n" ||
+        (character === "]" && next === "["));
+    if (endsSentence) {
+      clauses.push(current);
+      current = "";
+    }
+  }
+  if (current.trim()) clauses.push(current);
+  return clauses;
 }
 
 function normalizeText(text: string): string {
@@ -858,7 +933,7 @@ function readTurnPlayer(rulesText: string): string {
 }
 
 function readUnitScope(rulesText: string): string {
-  if (rulesText.includes("each")) {
+  if (rulesText.includes("each") || rulesText.includes("all")) {
     return "each";
   }
 
@@ -886,7 +961,7 @@ function readPlayer(rulesText: string): string {
 }
 
 function readMoveDestination(rulesText: string): string | null {
-  if (rulesText.includes("to base")) {
+  if (/\bto (?:its|their|your|the controller's)?\s*base\b/.test(rulesText)) {
     return "base";
   }
 
@@ -922,6 +997,10 @@ function readGenericTarget(rulesText: string): string {
     return "unit";
   }
 
+  if (rulesText.includes("spell") || rulesText.includes("card")) {
+    return "card";
+  }
+
   if (rulesText.includes("rune")) {
     return "rune";
   }
@@ -931,6 +1010,11 @@ function readGenericTarget(rulesText: string): string {
   }
 
   return "unspecified";
+}
+
+function readMaximumMight(rulesText: string): number | null {
+  const match = rulesText.match(/\bwith\s+(\d+)\s+:rb_might:\s+or less\b/);
+  return match ? Number(match[1]) : null;
 }
 
 function readNumberAfter(rulesText: string, word: string): number | null {
@@ -1142,7 +1226,8 @@ function isNonCostNumericModifier(rulesText: string): boolean {
     /\bmight becomes\b/.test(rulesText) ||
     /\bbase might bonus\b/.test(rulesText) ||
     /\bpoints needed to win\b/.test(rulesText) ||
-    /\[add\]\s+an additional\b|:rb_add:\s+an additional\b/.test(rulesText)
+    /\[add\]\s+an additional\b|:rb_add:\s+an additional\b/.test(rulesText) ||
+    /\bspells and abilities deal \d+ bonus damage\b/.test(rulesText)
   );
 }
 
@@ -1171,6 +1256,9 @@ function isPowerCostModifier(rulesText: string): boolean {
 }
 
 function readNonCostNumericAttribute(rulesText: string): string {
+  if (rulesText.includes("bonus damage")) {
+    return "damage";
+  }
   if (rulesText.includes("points needed to win")) {
     return "victoryRequirement";
   }
@@ -1275,6 +1363,10 @@ function readNumericAmount(
     return readFirstNumber(rulesText);
   }
 
+  if (attribute === "damage") {
+    return readFirstNumber(rulesText);
+  }
+
   const mightAmount = readMightAmount(rulesText);
   return mightAmount === null ? null : Math.abs(mightAmount);
 }
@@ -1286,6 +1378,10 @@ function readNumericTarget(rulesText: string, attribute: string): string {
 
   if (attribute === "resourceAmount") {
     return "event_subject";
+  }
+
+  if (attribute === "damage") {
+    return "controller_effect";
   }
 
   if (attribute === "mightBonus") {
@@ -1343,7 +1439,11 @@ function readDuration(rulesText: string, attribute: string): string | null {
     return "whileSourceAtBattlefield";
   }
 
-  if (attribute === "victoryRequirement" || rulesText.includes("while")) {
+  if (
+    attribute === "victoryRequirement" ||
+    attribute === "damage" ||
+    rulesText.includes("while")
+  ) {
     return "whileSourceOnBoard";
   }
 

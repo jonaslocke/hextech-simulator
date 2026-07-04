@@ -12,7 +12,7 @@
 ## Milestones
 
 - [x] 0. `docs(game): plan Annie catalog rollout`
-- [ ] 1. `test(card-catalog): define Annie behavior suggestions`
+- [x] 1. `test(card-catalog): define Annie behavior suggestions`
 - [ ] 2. `refactor(game): add stable zone-aware targets`
 - [ ] 3. `feat(game): execute return and movement effects`
 - [ ] 4. `feat(game): resolve lifecycle triggers`
@@ -26,11 +26,13 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 0
-- Verification: `npm run catalog:build-mvp`, `npm run catalog:check-mvp`,
-  focused MVP catalog test, and `git diff --check`.
-- Next milestone: define exact preview and publication contracts for every
-  Annie card.
+- Completed through: milestone 1
+- Verification: combined upload preview reports 39 cards, 21 existing Lux
+  records, 18 new Annie records, and zero unsupported, ambiguous, or
+  missing-parameter clauses; focused catalog tests, typecheck, lint, and
+  `git diff --check` pass.
+- Next milestone: add stable target identity and generalized zone-aware
+  selectors.
 
 ## Resume procedure
 
@@ -42,4 +44,3 @@ Get-Content docs/annie-runtime-progress.md
 
 If the worktree is dirty, inspect and continue the interrupted milestone.
 Never discard, reset, amend, squash, or combine milestone work automatically.
-
