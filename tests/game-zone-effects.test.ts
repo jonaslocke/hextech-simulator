@@ -126,6 +126,24 @@ test("adds open battlefields only through a card destination permission", () => 
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
 });
 
+test("keeps legacy bounded each-unit selectors interactive", () => {
+  const game = fixture();
+  const handlers = createPrimitiveHandlers(cardIndex());
+  const requirement = handlers.get("selector.unit")!.targets!(
+    binding("selector.unit", {
+      scope: "each",
+      minimumCount: 0,
+      maximumCount: 2,
+      area: "board",
+    }),
+    createBehaviorContext(game, "p1", "source", null, []),
+  );
+
+  assert.equal(requirement.minimum, 0);
+  assert.equal(requirement.maximum, 2);
+  assert.deepEqual(requirement.legalIds, ["unit"]);
+});
+
 function binding(
   behaviorId: string,
   parameters: Record<string, string | number>,

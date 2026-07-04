@@ -455,8 +455,9 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
     )
     .filter(predicate);
   const automatic =
-    binding.parameters.scope === "each" ||
-    binding.parameters.automatic === true;
+    binding.parameters.automatic === true ||
+    (binding.parameters.scope === "each" &&
+      typeof binding.parameters.maximumCount !== "number");
   return {
     kind: "card" as const,
     legalIds,
