@@ -209,6 +209,39 @@ export function createPrimitiveHandlers(
       context.selectedIds.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
   });
+  handlers.set("action.return_to_hand", {
+    execute(_binding, context) {
+      for (const id of context.selectedIds) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        removeFromAllLocations(context.game, id);
+        context.game.state.players[owner]!.zones.hand.push(id);
+        resetStateAfterLeavingBoard(context.game, id, index);
+      }
+    },
+  });
+  handlers.set("action.move_unit", {
+    execute(binding, context) {
+      if (binding.parameters.destination !== "base") {
+        throw new Error("Unsupported unit movement destination.");
+      }
+      for (const id of context.selectedIds) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        for (const player of Object.values(context.game.state.players)) {
+          player.zones.base = player.zones.base.filter(
+            (candidate) => candidate !== id,
+          );
+        }
+        for (const battlefield of context.game.state.battlefields) {
+          battlefield.units = battlefield.units.filter(
+            (candidate) => candidate !== id,
+          );
+        }
+        context.game.state.players[owner]!.zones.base.push(id);
+      }
+    },
+  });
   handlers.set("modifier.enter_ready", {
     execute(_binding, context) {
       context.game.state.cardStates[context.sourceCardInstanceId]!.exhausted = false;
@@ -405,6 +438,29 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
   });
   zones.trash.push(id);
   resetStateAfterLeavingBoard(game, id, index);
+}
+function removeFromAllLocations(game: GameDocument, id: string) {
+  for (const player of Object.values(game.state.players)) {
+    for (const zone of [
+      "mainDeck",
+      "runeDeck",
+      "hand",
+      "trash",
+      "banishment",
+      "base",
+    ] as const) {
+      player.zones[zone] = player.zones[zone].filter(
+        (candidate) => candidate !== id,
+      );
+    }
+    if (player.zones.legend === id) player.zones.legend = null;
+    if (player.zones.champion === id) player.zones.champion = null;
+  }
+  for (const battlefield of game.state.battlefields) {
+    battlefield.units = battlefield.units.filter(
+      (candidate) => candidate !== id,
+    );
+  }
 }
 function resetStateAfterLeavingBoard(
   game: GameDocument,

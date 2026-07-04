@@ -109,6 +109,7 @@ const effectSelectionChoiceSchema = z.object({
   resolutionId: z.string().min(1),
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
+  optionKind: z.enum(["card", "battlefield"]).default("card"),
   legalCardIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative()
@@ -172,6 +173,7 @@ export const gameStateSchema = z.object({
     nextEffectIndex: z.number().int().nonnegative(),
     delayedEffectId: z.string().min(1).nullable(),
     endingPlayerId: z.string().min(1).nullable(),
+    initialSelectedIds: z.array(z.string()).default([]),
     selectionsByBinding: z.record(z.array(z.string()))
   })),
   pendingChoice: z.discriminatedUnion("type", [

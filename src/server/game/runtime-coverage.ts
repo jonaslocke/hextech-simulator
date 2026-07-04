@@ -22,6 +22,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.channel_runes": "executable",
   "action.deal_damage": "executable",
   "action.kill_unit": "executable",
+  "action.return_to_hand": "executable",
+  "action.move_unit": "executable",
   "modifier.modify_numeric_value": "executable",
   "modifier.enter_ready": "executable",
   "trigger.attack": "executable",

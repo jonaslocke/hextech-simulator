@@ -48,7 +48,10 @@ import {
   type GameTransition,
 } from "./transitions";
 import { buildPaymentPlan, payCardCost } from "./payment";
-import { submitEffectSelection } from "./effect-resolution";
+import {
+  beginEffectResolution,
+  submitEffectSelection,
+} from "./effect-resolution";
 import { applyStartOfTurn, isStartOfTurnPhase } from "./turns";
 
 // Non-standard rules override. Disable to require normal Action/Reaction timing.
@@ -100,7 +103,7 @@ export function gameplayActions(
           undefined,
           [
             {
-              kind: "card",
+              kind: pendingChoice.optionKind,
               label: "runes to ready",
               legalIds: pendingChoice.legalCardIds,
               minimum: pendingChoice.minimum,
@@ -671,18 +674,34 @@ function passPriority(
           const clause = compiled.clauses.find(
             (candidate) => candidate.id === item.behaviorClauseId,
           );
-          if (clause)
-            executeBehaviorClause({
-              clause,
-              context: createBehaviorContext(
+          if (clause) {
+            if (
+              clause.timings.some(
+                (timing) => timing.behaviorId === "timing.delayed",
+              )
+            ) {
+              executeBehaviorClause({
+                clause,
+                context: createBehaviorContext(
+                  game,
+                  controller,
+                  item.sourceCardInstanceId,
+                  item.behaviorEvent,
+                  item.targetCardInstanceIds,
+                ),
+                handlers,
+              });
+            } else {
+              beginEffectResolution({
                 game,
-                controller,
-                item.sourceCardInstanceId,
-                item.behaviorEvent,
-                item.targetCardInstanceIds,
-              ),
-              handlers,
-            });
+                controllerPlayerId: controller,
+                sourceCardInstanceId: item.sourceCardInstanceId,
+                clauseId: clause.id,
+                selectedIds: item.targetCardInstanceIds,
+                decks,
+              });
+            }
+          }
         } else {
           executeImmediateClauses(
             game,

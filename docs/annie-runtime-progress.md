@@ -14,7 +14,7 @@
 - [x] 0. `docs(game): plan Annie catalog rollout`
 - [x] 1. `test(card-catalog): define Annie behavior suggestions`
 - [x] 2. `refactor(game): add stable zone-aware targets`
-- [ ] 3. `feat(game): execute return and movement effects`
+- [x] 3. `feat(game): execute return and movement effects`
 - [ ] 4. `feat(game): resolve lifecycle triggers`
 - [ ] 5. `refactor(game): centralize damage effects`
 - [ ] 6. `feat(game): add private Vision resolution`
@@ -26,10 +26,10 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 2
-- Verification: behavior runtime and targeting tests, typecheck, lint, and
-  `git diff --check` pass.
-- Next milestone: implement generalized return-to-hand and effect movement.
+- Completed through: milestone 3
+- Verification: focused zone-effect and behavior-runtime tests, typecheck,
+  lint, and `git diff --check` pass.
+- Next milestone: add lifecycle events and sequential discard/draw effects.
 
 ## Resume procedure
 

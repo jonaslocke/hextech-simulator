@@ -17,6 +17,7 @@ export function beginEffectResolution(input: {
   clauseId: string;
   delayedEffectId?: string;
   endingPlayerId?: string;
+  selectedIds?: string[];
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
   const id = `resolution:${input.game.stateVersion}:${input.sourceCardInstanceId}:${input.clauseId}:${input.game.state.effectResolutions.length}`;
@@ -28,6 +29,7 @@ export function beginEffectResolution(input: {
     nextEffectIndex: 0,
     delayedEffectId: input.delayedEffectId ?? null,
     endingPlayerId: input.endingPlayerId ?? null,
+    initialSelectedIds: input.selectedIds ?? [],
     selectionsByBinding: {},
   });
   return resumeEffectResolution(input.game, id, input.decks);
@@ -83,15 +85,63 @@ export function resumeEffectResolution(
   if (!clause)
     throw new Error(`Behavior clause is unavailable: ${frame.clauseId}`);
 
-  while (frame.nextEffectIndex < clause.orderedEffects.length) {
-    const binding = clause.orderedEffects[frame.nextEffectIndex]!;
-    const bindingKey = `${clause.id}:effects:${binding.order}`;
+  for (const binding of clause.selectors) {
+    const bindingKey = `${clause.id}:selectors:${binding.order}`;
+    if (frame.selectionsByBinding[bindingKey]) continue;
     const context = createBehaviorContext(
       game,
       frame.controllerPlayerId,
       frame.sourceCardInstanceId,
       null,
-      frame.selectionsByBinding[bindingKey] ?? [],
+      [],
+    );
+    const requirement = handlers.get(binding.behaviorId)?.targets?.(
+      binding,
+      context,
+    );
+    if (!requirement)
+      throw new Error(`Behavior selector cannot execute: ${binding.behaviorId}`);
+    if (requirement.legalIds.length < requirement.minimum) {
+      finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+      return true;
+    }
+    game.state.pendingChoice = {
+      id: `choice:${frame.id}:${binding.order}`,
+      playerId: frame.controllerPlayerId,
+      type: "effectSelection",
+      resolutionId: frame.id,
+      bindingKey,
+      prompt: requirement.label
+        ? `Choose ${requirement.label}`
+        : "Choose effect target",
+      optionKind:
+        requirement.kind === "battlefield" ? "battlefield" : "card",
+      legalCardIds: requirement.legalIds,
+      minimum: requirement.minimum,
+      maximum: requirement.maximum,
+    };
+    return false;
+  }
+
+  while (frame.nextEffectIndex < clause.orderedEffects.length) {
+    const binding = clause.orderedEffects[frame.nextEffectIndex]!;
+    const bindingKey = `${clause.id}:effects:${binding.order}`;
+    const selectorSelections = clause.selectors.flatMap(
+      (selector) =>
+        frame.selectionsByBinding[
+          `${clause.id}:selectors:${selector.order}`
+        ] ?? [],
+    );
+    const context = createBehaviorContext(
+      game,
+      frame.controllerPlayerId,
+      frame.sourceCardInstanceId,
+      null,
+      [
+        ...frame.initialSelectedIds,
+        ...selectorSelections,
+        ...(frame.selectionsByBinding[bindingKey] ?? []),
+      ],
     );
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
@@ -105,6 +155,7 @@ export function resumeEffectResolution(
         resolutionId: frame.id,
         bindingKey,
         prompt: requirement.prompt,
+        optionKind: "card",
         legalCardIds: requirement.legalIds,
         minimum: requirement.minimum,
         maximum: requirement.maximum,
@@ -115,13 +166,21 @@ export function resumeEffectResolution(
     frame.nextEffectIndex += 1;
   }
 
+  finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+  return true;
+}
+
+function finishResolutionFrame(
+  game: GameDocument,
+  frameId: string,
+  delayedEffectId: string | null,
+) {
   game.state.effectResolutions = game.state.effectResolutions.filter(
-    (candidate) => candidate.id !== frame.id,
+    (candidate) => candidate.id !== frameId,
   );
-  if (frame.delayedEffectId) {
+  if (delayedEffectId) {
     game.state.delayedEffects = game.state.delayedEffects.filter(
-      (candidate) => candidate.id !== frame.delayedEffectId,
+      (candidate) => candidate.id !== delayedEffectId,
     );
   }
-  return true;
 }
