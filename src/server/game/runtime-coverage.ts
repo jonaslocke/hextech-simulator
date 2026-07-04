@@ -21,6 +21,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "selector.card": "executable",
   "selector.battlefield": "executable",
   "action.draw_cards": "executable",
+  "action.vision": "executable",
+  "keyword.vision": "executable",
   "action.discard_cards": "executable",
   "action.ready_cards": "executable",
   "action.channel_runes": "executable",

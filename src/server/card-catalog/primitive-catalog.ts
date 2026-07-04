@@ -687,6 +687,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Lets a player look at hidden cards.",
     parameters: [optional("count", "number", "The number of cards looked at.")]
   }),
+  "action.vision": primitiveSeed({
+    id: "action.vision",
+    family: "action",
+    name: "Resolve Vision",
+    description: "Privately looks at the top Main Deck card and may recycle it.",
+    engineSupport: supported("Implemented through generic private effect selection.")
+  }),
   "action.reveal": primitiveSeed({
     id: "action.reveal",
     family: "action",

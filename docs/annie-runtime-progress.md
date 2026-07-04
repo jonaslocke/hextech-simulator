@@ -17,7 +17,7 @@
 - [x] 3. `feat(game): execute return and movement effects`
 - [x] 4. `feat(game): resolve lifecycle triggers`
 - [x] 5. `refactor(game): centralize damage effects`
-- [ ] 6. `feat(game): add private Vision resolution`
+- [x] 6. `feat(game): add private Vision resolution`
 - [ ] 7. `feat(game): enforce Deflect costs`
 - [ ] 8. `feat(game): support card-driven unit destinations`
 - [ ] 9. `feat(card-catalog): certify Annie publication`
@@ -26,10 +26,10 @@
 
 ## Current checkpoint
 
-- Completed through: milestone 5
+- Completed through: milestone 6
 - Verification: damage, direct behavior, and combat regression tests,
   typecheck, lint, and `git diff --check` pass.
-- Next milestone: implement private Vision choices and Burn Out.
+- Next milestone: enforce target-derived Deflect costs.
 
 ## Resume procedure
 

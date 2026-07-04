@@ -161,7 +161,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("trigger.on_play", "trigger", "On play trigger", "Behavior triggers when a card is played.", ["actor", "subject"], (context) =>
-    /\bwhen (you play|a player plays|an opponent plays|i'm played|you play me|i enter)\b/.test(context.rulesText)
+    (/\bwhen (you play|a player plays|an opponent plays|i'm played|you play me|i enter)\b/.test(context.rulesText) ||
+      /\[vision\]/.test(context.lowerText))
       ? assignment(context, "trigger.on_play", "trigger", { actor: readEventActor(context.rulesText), subject: readPlayEventSubject(context.rulesText) }, "high")
       : null
   ),
@@ -313,6 +314,11 @@ const primitiveDetectors: PrimitiveDetector[] = [
   primitive("action.look", "action", "Look at cards", "Look at hidden cards without revealing them to all players.", ["count"], (context) =>
     /\blook at\b/.test(context.rulesText)
       ? assignment(context, "action.look", "action", { count: readFirstNumber(context.rulesText) }, "medium")
+      : null
+  ),
+  primitive("action.vision", "action", "Resolve Vision", "Privately looks at the top Main Deck card and may recycle it.", [], (context) =>
+    /\[vision\]/.test(context.lowerText)
+      ? assignment(context, "action.vision", "action", {}, "high")
       : null
   ),
   primitive("action.reveal", "action", "Reveal cards", "Reveal hidden cards.", ["count"], (context) =>

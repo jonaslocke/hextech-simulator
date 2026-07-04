@@ -6,6 +6,7 @@ import type {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { BehaviorBinding, GameCardDefinition } from "./schemas";
 import type { CardInstance, GameDocument } from "./state";
+import { createHash } from "node:crypto";
 import {
   effectiveNumericValue,
   isContinuousDuration,
@@ -37,7 +38,7 @@ export function createPrimitiveHandlers(
   const passive: BehaviorHandler = {};
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
-    "keyword.tank", "keyword.shield"
+    "keyword.tank", "keyword.shield", "keyword.vision"
   ]) handlers.set(id, passive);
   handlers.set("trigger.on_play", {
     matches(binding, context) {
@@ -165,8 +166,35 @@ export function createPrimitiveHandlers(
       const playerId = binding.parameters.player === "eachPlayer" ? null : context.controllerPlayerId;
       const count = numberParam(binding, "count");
       const ids = playerId ? [playerId] : [...context.game.state.setup.playerIds];
-      for (const id of ids) draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
+      for (const id of ids) {
+        ensureMainDeck(context.game, id, index);
+        draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
+      }
     }
+  });
+  handlers.set("action.vision", {
+    choice(_binding, context) {
+      ensureMainDeck(context.game, context.controllerPlayerId, index);
+      const top =
+        context.game.state.players[context.controllerPlayerId]!.zones.mainDeck[0];
+      return top
+        ? {
+            legalIds: [top],
+            minimum: 0,
+            maximum: 1,
+            prompt: "Recycle the top card?",
+          }
+        : null;
+    },
+    execute(_binding, context) {
+      const deck =
+        context.game.state.players[context.controllerPlayerId]!.zones.mainDeck;
+      const selected = context.selectedIds[0];
+      if (selected && deck[0] === selected) {
+        deck.shift();
+        deck.push(selected);
+      }
+    },
   });
   handlers.set("action.discard_cards", {
     choice(binding, context) {
@@ -588,3 +616,37 @@ function stringParam(binding: BehaviorBinding, key: string) {
   return value;
 }
 function draw(source: string[], destination: string[], count: number) { destination.push(...source.splice(0, Math.min(count, source.length))); }
+
+function ensureMainDeck(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  if (player.zones.mainDeck.length > 0) return;
+  player.zones.mainDeck = [...player.zones.trash].sort((left, right) =>
+    createHash("sha256")
+      .update(`${game.id}:${game.stateVersion}:${left}`)
+      .digest("hex")
+      .localeCompare(
+        createHash("sha256")
+          .update(`${game.id}:${game.stateVersion}:${right}`)
+          .digest("hex"),
+      ),
+  );
+  player.zones.trash = [];
+  const opponentId = game.state.setup.playerIds.find((id) => id !== playerId)!;
+  const opponent = game.state.players[opponentId]!;
+  opponent.points = (opponent.points ?? 0) + 1;
+  const requirement = effectiveNumericValue({
+    attribute: "victoryRequirement",
+    baseValue: 8,
+    game,
+    index,
+    targetScope: "game",
+  });
+  if ((opponent.points ?? 0) >= requirement) {
+    game.winnerPlayerId = opponentId;
+    game.status = "complete";
+  }
+}

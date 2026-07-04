@@ -19,7 +19,7 @@ const EXPECTED_ANNIE_PRIMITIVES: Record<string, string[]> = {
   Flash: ["action.move_unit", "selector.friendly_unit", "timing.reaction"],
   Incinerate: ["action.deal_damage", "selector.unit", "timing.action"],
   "Morbid Return": ["action.return_to_hand", "selector.card", "timing.action"],
-  "Mystic Poro": ["keyword.vision"],
+  "Mystic Poro": ["action.vision", "keyword.vision", "trigger.on_play"],
   "Pouty Poro": ["keyword.deflect"],
   "Traveling Merchant": ["action.discard_cards", "action.draw_cards", "trigger.on_move"],
   "Sneaky Deckhand": ["modifier.play_unit_destination"],
@@ -38,7 +38,7 @@ const EXPECTED_ANNIE_PRIMITIVES: Record<string, string[]> = {
     "trigger.on_play",
   ],
   Firestorm: ["action.deal_damage", "selector.battlefield", "selector.enemy_unit"],
-  "Sai Scout": ["keyword.vision", "modifier.play_unit_destination"],
+  "Sai Scout": ["action.vision", "keyword.vision", "modifier.play_unit_destination", "trigger.on_play"],
   Tibbers: ["action.deal_damage", "selector.unit", "trigger.on_play"],
 };
 
