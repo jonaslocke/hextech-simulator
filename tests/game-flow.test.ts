@@ -229,6 +229,106 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
 });
 
+test("plays battlefield-scoped group damage with only the location selected", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "SPELL",
+  )!;
+  spell.behaviorModel.clauses.push({
+    id: "battlefield-group",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [
+      {
+        behaviorId: "selector.enemy_unit",
+        parameters: {
+          area: "battlefield",
+          scope: "each",
+          locationRelation: "any",
+        },
+        confidence: "high",
+        order: 0,
+      },
+      {
+        behaviorId: "selector.battlefield",
+        parameters: { minimumCount: 1, maximumCount: 1 },
+        confidence: "high",
+        order: 1,
+      },
+    ],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [{
+      behaviorId: "action.deal_damage",
+      parameters: { amount: 3, target: "enemy_unit" },
+      confidence: "high",
+      order: 2,
+    }],
+    keywords: [],
+  });
+  const unit = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "UNIT",
+  )!;
+  unit.card.attributes.might = 5;
+  decks[1]!.instances.push({
+    instanceId: "p2:group-target",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.base =
+    game.state.players.p1!.zones.base.filter((id) => id !== "p1:mover");
+  game.state.battlefields[0]!.units = ["p1:mover", "p2:group-target"];
+  game.state.cardStates["p1:mover"]!.computedMight = 5;
+  game.state.cardStates["p2:group-target"] = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 5,
+  };
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+
+  assert.deepEqual(play.targets, [{
+    kind: "battlefield",
+    label: "battlefield",
+    legalIds: ["p1:bf"],
+    minimum: 1,
+    maximum: 1,
+  }]);
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: ["p1:bf"],
+    decks,
+    now: "play-battlefield-group",
+  });
+  while (next.state.chain) {
+    const actorPlayerId = next.state.chain.priorityPlayerId;
+    const pass = gameplayActions(next, actorPlayerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: "resolve-battlefield-group",
+    });
+  }
+
+  assert.equal(next.state.cardStates["p2:group-target"]!.damage, 3);
+  assert.equal(next.state.cardStates["p1:mover"]!.damage, 0);
+});
+
 test("plays Units to Base or a controlled battlefield and rejects forged destinations", () => {
   const { game, decks } = fixture();
   game.state.battlefields[0]!.controllerPlayerId = "p1";

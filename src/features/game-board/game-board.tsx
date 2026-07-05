@@ -185,6 +185,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     minTargets: number;
     purpose: "choice" | "move" | "play";
     selectedTargetIds: string[];
+    targetKind: "battlefield" | "card";
   } | null>(null);
   const [unitPlayChoice, setUnitPlayChoice] = useState<{
     card: Card;
@@ -359,6 +360,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             ? "choice"
             : "play",
       selectedTargetIds: [],
+      targetKind: "card",
     });
   };
   const chainControllerDetails = (controllerPlayerId: string) => {
@@ -614,7 +616,8 @@ export const GameBoard: FC<GameBoardProps> = ({
     );
     const actionToSubmit = stagedMoveAction ?? projectedAction;
     const requirement = actionToSubmit.targets.find(
-      (target) => target.kind === "card",
+      (target) =>
+        target.kind === "card" || target.kind === "battlefield",
     );
 
     if (requirement && requirement.maximum > 0) {
@@ -625,6 +628,8 @@ export const GameBoard: FC<GameBoardProps> = ({
         minTargets: requirement.minimum,
         purpose: stagedMoveAction ? "move" : "play",
         selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
+        targetKind:
+          requirement.kind === "battlefield" ? "battlefield" : "card",
       });
       return;
     }
@@ -868,6 +873,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             minTargets: requirement.minimum,
             purpose: "choice",
             selectedTargetIds: [],
+            targetKind: "card",
           },
     );
   }, [effectSelectionAction, visionEffectSelection, zoneEffectSelection]);
@@ -1066,7 +1072,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
       />
-      {targetSelection && (
+      {targetSelection?.targetKind === "card" && (
         <TargetSelectionPrompt
           canSubmit={
             targetSelection.selectedTargetIds.length >=
@@ -1119,6 +1125,35 @@ export const GameBoard: FC<GameBoardProps> = ({
                 ? effectSelectionAction?.label
                 : undefined
           }
+        />
+      )}
+      {targetSelection?.targetKind === "battlefield" && (
+        <ChoiceDialog
+          confirmLabel="Choose battlefield"
+          description="Choose the battlefield affected by this action."
+          isOpen
+          onCancel={() => setTargetSelection(null)}
+          onConfirm={(selectedIds) =>
+            submitTargetedPlay({
+              ...targetSelection,
+              selectedTargetIds: selectedIds,
+            })
+          }
+          options={sourceProjection.battlefields
+            .filter((battlefield) =>
+              targetSelection.legalTargetIds.includes(
+                battlefield.battlefieldId,
+              ),
+            )
+            .map((battlefield) => ({
+              description: battlefield.card.rulesText || "Battlefield",
+              id: battlefield.battlefieldId,
+              imageOrientation: "landscape" as const,
+              imageUrl: battlefield.card.imageUrl ?? undefined,
+              label: battlefield.card.name,
+            }))}
+          selectionMode="single"
+          title="Choose a Battlefield"
         />
       )}
       {triggerOrderChoice && (

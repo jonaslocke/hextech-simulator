@@ -66,7 +66,7 @@ discard, reset, amend, squash, or combine milestone work.
 - [x] 3. `test(game): cover unordered trash selections`
   - Verify every eligible source-zone card is returned independent of order.
   - Retain the existing projected source-zone choice UI.
-- [ ] 4. `fix(game): validate battlefield-scoped group effects`
+- [x] 4. `fix(game): validate battlefield-scoped group effects`
   - Validate Firestorm using its selected Battlefield only.
   - Derive affected enemy units at resolution.
 - [ ] 5. `test(game): certify Annie follow-up fixes`
@@ -74,10 +74,10 @@ discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 3
-- Last verification: 143 tests passed; typecheck, lint, and scoped
+- Completed through: milestone 4
+- Last verification: 144 tests passed; typecheck, lint, build, and scoped
   `git diff --check` passed.
-- Next milestone: validate battlefield-scoped automatic groups.
+- Next milestone: final cross-feature certification.
 
 ## Important implementation notes
 
@@ -101,5 +101,11 @@ discard, reset, amend, squash, or combine milestone work.
   filters each card by type; projection and the source-zone dialog preserve all
   legal IDs. A mixed Trash regression now proves that multiple non-top Units
   remain eligible while a Spell in the same Trash is excluded.
+- Firestorm's server projection already contained only its legal Battlefield
+  requirement, with enemy units represented as an automatic affected group.
+  The board client previously staged only card-kind requirements and therefore
+  submitted no Battlefield ID. Target staging and its choice dialog now consume
+  projected Battlefield requirements generically. An end-to-end regression
+  selects one location and verifies damage affects only enemy units there.
 - Existing games should remain schema-compatible unless implementation proves
   otherwise. Stop and revise this ledger before any persisted schema change.
