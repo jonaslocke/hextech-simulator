@@ -59,10 +59,10 @@ discard, reset, amend, squash, or combine milestone work.
   - Keep move-trigger Chains in Neutral Closed.
   - Open pending combat/non-combat Showdowns only after trigger stabilization.
   - Preserve normal rule-552 Focus passing for Chains opened inside Showdowns.
-- [ ] 2. `fix(game): apply bonus damage to triggered effects`
-  - Carry generic damage-source context through effect frames.
-  - Apply controller Bonus Damage to spell and ability damage, including
-    automatic groups, without card identities.
+- [x] 2. `test(game): cover bonus damage on triggered effects`
+  - Verify controller Bonus Damage applies to trigger-resolved automatic groups.
+  - Do not alter the already-shared numeric damage pipeline without a failing
+    production case.
 - [ ] 3. `fix(game-board): expose all eligible trash choices`
   - Project every eligible source-zone card.
   - Render/select any eligible Unit in unordered Trash.
@@ -74,10 +74,10 @@ discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 1
-- Last verification: 142 tests passed; typecheck, lint, and scoped
+- Completed through: milestone 2
+- Last verification: 143 tests passed; typecheck, lint, and scoped
   `git diff --check` passed.
-- Next milestone: apply Bonus Damage to triggered ability damage.
+- Next milestone: expose every eligible card in unordered Trash choices.
 
 ## Important implementation notes
 
@@ -91,5 +91,10 @@ discard, reset, amend, squash, or combine milestone work.
   its trigger Chain and pending choices are empty. The attacker consequently
   gains initial Focus under rules 549 and 625 rather than having it passed
   under rule 552.
+- The reported triggered Bonus Damage failure is not reproducible in the
+  current source revision. Triggered effect frames retain their controller,
+  `action.deal_damage` evaluates `controller_effect` modifiers once per damage
+  instruction, and automatic groups receive that modified amount per unit. An
+  exact trigger-resolved multi-unit regression now protects this behavior.
 - Existing games should remain schema-compatible unless implementation proves
   otherwise. Stop and revise this ledger before any persisted schema change.

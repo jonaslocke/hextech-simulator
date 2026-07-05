@@ -397,6 +397,91 @@ test("resolves persisted Vision triggers as a private recycle choice", () => {
   assert.equal(next.state.pendingChoice, null);
 });
 
+test("applies controller Bonus Damage to automatic triggered ability damage", () => {
+  const { game, decks } = fixture();
+  const bonusSource = card("BONUS", "Bonus Source", "Unit", [
+    clause("bonus", {
+      effects: [
+        binding("modifier.modify_numeric_value", 0, {
+          attribute: "damage",
+          operation: "increase",
+          operand: "constant",
+          amount: 1,
+          target: "controller_effect",
+          duration: "whileSourceOnBoard",
+        }),
+      ],
+    }),
+  ], 4);
+  const triggeredDamage = card("TRIGGERED_DAMAGE", "Triggered Damage", "Unit", [
+    clause("triggered-damage", {
+      triggers: [
+        binding("trigger.on_play", 0, {
+          actor: "controller",
+          subject: "source",
+        }),
+      ],
+      selectors: [
+        binding("selector.unit", 1, {
+          scope: "each",
+          area: "battlefield",
+          locationRelation: "any",
+          excludesSource: "false",
+        }),
+      ],
+      effects: [
+        binding("action.deal_damage", 2, { amount: 3, target: "unit" }),
+      ],
+    }),
+  ], 7);
+  decks.forEach((deck) =>
+    deck.snapshot.cards.push(bonusSource, triggeredDamage),
+  );
+  decks[0]!.instances.push(
+    instance("bonus-source", "p1", "BONUS"),
+    instance("triggered-damage", "p1", "TRIGGERED_DAMAGE"),
+  );
+  decks[1]!.instances.push(
+    instance("target-a", "p2", "TRIGGERED_DAMAGE"),
+    instance("target-b", "p2", "TRIGGERED_DAMAGE"),
+  );
+  game.state.players.p1!.zones.base.push("bonus-source");
+  game.state.players.p1!.zones.hand.push("triggered-damage");
+  game.state.battlefields[0]!.units = ["target-a", "target-b"];
+  for (const [id, might] of [
+    ["bonus-source", 4],
+    ["triggered-damage", 7],
+    ["target-a", 7],
+    ["target-b", 7],
+  ] as const) {
+    game.state.cardStates[id] = {
+      exhausted: id !== "bonus-source",
+      damage: 0,
+      computedMight: might,
+    };
+  }
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "triggered-damage" &&
+      action.label.endsWith("to Base"),
+  )!;
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-triggered-damage",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.label, "Triggered Damage");
+
+  next = resolveAllChainItems(next, decks);
+
+  assert.equal(next.state.cardStates["target-a"]!.damage, 4);
+  assert.equal(next.state.cardStates["target-b"]!.damage, 4);
+});
+
 test("each conquered Targon's Peak readies two independently chosen runes", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
@@ -651,8 +736,8 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
 }
 
 function binding(behaviorId: string, order: number, parameters: Record<string, string | number> = {}) { return { behaviorId, order, parameters, confidence: "high" as const }; }
-function clause(id: string, groups: Partial<Record<"triggers" | "conditions" | "timings" | "effects", ReturnType<typeof binding>[]>>) {
-  return { id, sequence: 0, sourceText: "", normalizedText: "", abilities: [], triggers: groups.triggers ?? [], conditions: groups.conditions ?? [], selectors: [], choices: [], costs: [], timings: groups.timings ?? [], effects: groups.effects ?? [], keywords: [] };
+function clause(id: string, groups: Partial<Record<"triggers" | "conditions" | "selectors" | "timings" | "effects", ReturnType<typeof binding>[]>>) {
+  return { id, sequence: 0, sourceText: "", normalizedText: "", abilities: [], triggers: groups.triggers ?? [], conditions: groups.conditions ?? [], selectors: groups.selectors ?? [], choices: [], costs: [], timings: groups.timings ?? [], effects: groups.effects ?? [], keywords: [] };
 }
 function card(code: string, name: string, type: "Legend" | "Unit" | "Battlefield" | "Spell" | "Rune", clauses: ReturnType<typeof clause>[], might: number | null = null) {
   return { cardCode: code, sourceTextHash: "h", behaviorModel: { playTimings: [], clauses }, card: { id: code, name, public_code: `${code}/1`, attributes: { energy: 0, might, power: 0 }, classification: { type, supertype: type === "Rune" ? "Basic" as const : null, domain: ["Mind"] }, text: { plain: "" }, set: { set_id: "T", label: "Test" }, media: {}, tags: [], metadata: {} } };
