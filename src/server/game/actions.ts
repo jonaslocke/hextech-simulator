@@ -17,7 +17,6 @@ import {
 import {
   cleanupBoard,
   markBattlefieldContested,
-  openNonCombatShowdown,
   openPendingNonCombatShowdown,
   resolveNonCombatShowdown,
   unitControllers,
@@ -406,7 +405,7 @@ export function performGameplayAction(input: {
           input.decks,
         );
         drainQueuedBehaviorEvents(game, input.decks);
-        openPendingNonCombatShowdown(game, index);
+        openPendingShowdown(game, index, input.decks);
         finishTurnProgressionIfReady(game, index, input.decks);
       }
       break;
@@ -601,7 +600,7 @@ function playCard(
     );
     dispatchBehaviorEvent(game, playEvent, decks);
     cleanupBoard(game, index);
-    openPendingNonCombatShowdown(game, index);
+    openPendingShowdown(game, index, decks);
     if (showdownAtPlayStart && game.state.showdown) {
       game.state.showdown.focusPlayerId = nextRelevantPlayer(
         game,
@@ -794,7 +793,7 @@ function passPriority(
       }
       cleanupBoard(game, index);
       drainQueuedBehaviorEvents(game, decks);
-      openPendingNonCombatShowdown(game, index);
+      openPendingShowdown(game, index, decks);
       finishTurnProgressionIfReady(game, index, decks);
     } else {
       game.state.chain.passedPlayerIds = passed;
@@ -968,14 +967,6 @@ function moveUnitsToBattlefield(
   }
   markBattlefieldContested(game, battlefieldId, actorPlayerId);
   cleanupBoard(game, index);
-  const controllers = unitControllers(game, battlefield.units, index);
-  if (controllers.length === 2) {
-    startCombat(game, battlefieldId, actorPlayerId, index, decks);
-  } else if (battlefield.controllerPlayerId !== actorPlayerId) {
-    openNonCombatShowdown(game, battlefieldId, actorPlayerId);
-  } else {
-    battlefield.contestedByPlayerId = null;
-  }
   for (const cardId of cardIds) {
     dispatchBehaviorEvent(
       game,
@@ -988,6 +979,39 @@ function moveUnitsToBattlefield(
       decks,
     );
   }
+  openPendingShowdown(game, index, decks);
+}
+
+function openPendingShowdown(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  if (
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.showdown ||
+    game.state.combat
+  ) {
+    return false;
+  }
+  const pendingCombat = game.state.battlefields.find((battlefield) => {
+    const actorPlayerId = battlefield.contestedByPlayerId;
+    return (
+      actorPlayerId != null &&
+      unitControllers(game, battlefield.units, index).length === 2
+    );
+  });
+  if (pendingCombat?.contestedByPlayerId) {
+    return startCombat(
+      game,
+      pendingCombat.battlefieldId,
+      pendingCombat.contestedByPlayerId,
+      index,
+      decks,
+    );
+  }
+  return openPendingNonCombatShowdown(game, index);
 }
 
 function drainQueuedBehaviorEvents(

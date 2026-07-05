@@ -55,7 +55,7 @@ discard, reset, amend, squash, or combine milestone work.
 
 - [x] 0. `docs(game): plan Annie follow-up fixes`
   - Record validation, the rules correction, milestones, and resume procedure.
-- [ ] 1. `fix(game): defer move showdowns until triggers resolve`
+- [x] 1. `fix(game): defer move showdowns until triggers resolve`
   - Keep move-trigger Chains in Neutral Closed.
   - Open pending combat/non-combat Showdowns only after trigger stabilization.
   - Preserve normal rule-552 Focus passing for Chains opened inside Showdowns.
@@ -74,9 +74,10 @@ discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 0 documentation prepared
-- Last verification: pending `git diff --check`
-- Next milestone: defer move-trigger Showdowns until their Chain resolves.
+- Completed through: milestone 1
+- Last verification: 142 tests passed; typecheck, lint, and scoped
+  `git diff --check` passed.
+- Next milestone: apply Bonus Damage to triggered ability damage.
 
 ## Important implementation notes
 
@@ -85,6 +86,10 @@ discard, reset, amend, squash, or combine milestone work.
   separate runtime concepts.
 - The move's `contestedByPlayerId` and Battlefield state can preserve the
   pending parent flow without introducing card-specific trigger metadata.
+- Movement now dispatches `unit.moved` before opening a pending Showdown.
+  Generic stabilization opens either Combat or a non-combat Showdown only when
+  its trigger Chain and pending choices are empty. The attacker consequently
+  gains initial Focus under rules 549 and 625 rather than having it passed
+  under rule 552.
 - Existing games should remain schema-compatible unless implementation proves
   otherwise. Stop and revise this ledger before any persisted schema change.
-

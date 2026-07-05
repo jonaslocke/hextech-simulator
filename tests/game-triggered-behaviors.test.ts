@@ -264,6 +264,69 @@ test("moves trigger private discard before draw", () => {
   assert.equal(next.state.players.p1!.zones.hand.length, handBefore);
 });
 
+test("resolves move triggers before opening combat with attacker Focus", () => {
+  const { game, decks } = fixture();
+  const merchant = card("MERCHANT", "Merchant", "Unit", [clause("merchant", {
+    triggers: [binding("trigger.on_move", 0, { subject: "source" })],
+    effects: [
+      binding("action.discard_cards", 1, { player: "controller", count: 1 }),
+      binding("action.draw_cards", 2, { player: "controller", count: 1 }),
+    ],
+  })], 2);
+  decks.forEach((deck) => deck.snapshot.cards.push(merchant));
+  decks[0]!.instances.push(instance("merchant", "p1", "MERCHANT"));
+  decks[1]!.instances.push(instance("defender", "p2", "MERCHANT"));
+  game.state.players.p1!.zones.base.push("merchant");
+  game.state.players.p1!.zones.hand.push("spell");
+  game.state.battlefields[0]!.controllerPlayerId = "p2";
+  game.state.battlefields[0]!.units = ["defender"];
+  game.state.cardStates.merchant = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 2,
+  };
+  game.state.cardStates.defender = {
+    exhausted: true,
+    damage: 0,
+    computedMight: 2,
+  };
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "merchant" &&
+      action.label === "Move to Paper",
+  )!;
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [],
+    decks,
+    now: "move-before-combat",
+  });
+
+  assert.equal(next.state.showdown, null);
+  assert.equal(next.state.combat, null);
+  assert.equal(next.state.chain?.items.at(-1)?.label, "Merchant");
+
+  next = resolveTopChainItem(next, decks);
+  const discard = gameplayActions(next, "p1", decks)[0]!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: discard.id,
+    selectedIds: [discard.targets[0]!.legalIds[0]!],
+    decks,
+    now: "finish-move-trigger",
+  });
+
+  assert.equal(next.state.showdown?.kind, "combat");
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+  assert.deepEqual(next.state.showdown?.passedPlayerIds, []);
+  assert.equal(next.state.combat?.attackerPlayerId, "p1");
+  assert.equal(next.state.combat?.defenderPlayerId, "p2");
+});
+
 test("resolves persisted Vision triggers as a private recycle choice", () => {
   const { game, decks } = fixture();
   const vision = card("VISION", "Vision Unit", "Unit", [clause("vision", {
