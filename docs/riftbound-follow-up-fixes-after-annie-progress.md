@@ -69,15 +69,43 @@ discard, reset, amend, squash, or combine milestone work.
 - [x] 4. `fix(game): validate battlefield-scoped group effects`
   - Validate Firestorm using its selected Battlefield only.
   - Derive affected enemy units at resolution.
-- [ ] 5. `test(game): certify Annie follow-up fixes`
+- [x] 5. `test(game): certify Annie follow-up fixes`
   - Add cross-feature regressions, run the complete gate, and record hashes.
 
 ## Current checkpoint
 
-- Completed through: milestone 4
-- Last verification: 144 tests passed; typecheck, lint, build, and scoped
-  `git diff --check` passed.
-- Next milestone: final cross-feature certification.
+- Completed through: milestone 5 (all milestones)
+- Last verification: `catalog:check-mvp`, 144 tests, typecheck, lint, build,
+  and `git diff --check` passed.
+- Next milestone: none.
+
+## Commit record
+
+- Milestone 0: `cb7772f` — `docs(game): plan Annie follow-up fixes`
+- Milestone 1: `15bd779` —
+  `fix(game): defer move showdowns until triggers resolve`
+- Milestone 2: `a80874c` —
+  `test(game): cover bonus damage on triggered effects`
+- Milestone 3: `5d09148` —
+  `test(game): cover unordered trash selections`
+- Milestone 4: `9be4e4d` —
+  `fix(game): validate battlefield-scoped group effects`
+- Milestone 5: `test(game): certify Annie follow-up fixes`
+  (this document identifies its own commit by subject because its hash does not
+  exist until after the commit is created)
+
+## Final certification
+
+- Move triggers resolve in Neutral Closed before pending Combat or non-combat
+  Showdowns open.
+- The player applying Contested gains initial Showdown Focus.
+- A Chain opened inside an existing Showdown still passes Focus under rule 552.
+- Triggered automatic-group damage receives controller Bonus Damage per unit.
+- Unordered Trash selectors expose every eligible Unit.
+- Battlefield-scoped automatic groups submit only their selected location and
+  derive affected units at resolution.
+- No persisted runtime or catalog schema changed, so no runtime reset is
+  required.
 
 ## Important implementation notes
 

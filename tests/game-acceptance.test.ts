@@ -236,6 +236,13 @@ test("plays approved Action and Reaction cards through showdown focus and priori
   assert.equal(game.state.chain?.items.at(-1)?.sourceCardInstanceId, fallingComet);
   assert.equal(game.state.showdown?.focusPlayerId, "p1");
   assert.deepEqual(game.state.showdown?.passedPlayerIds, []);
+  game = passUntilCurrentChainItemResolves(game, decks, "e");
+  assert.equal(game.state.chain, null);
+  assert.equal(
+    game.state.showdown?.focusPlayerId,
+    "p2",
+    "rule 552 still passes Focus after a Chain opened inside a Showdown",
+  );
 });
 
 function assertPrivateProjection(
