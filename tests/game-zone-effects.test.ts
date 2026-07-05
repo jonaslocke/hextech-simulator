@@ -190,15 +190,32 @@ test("keeps legacy bounded each-unit selectors interactive", () => {
   assert.deepEqual(requirement.legalIds, ["unit"]);
 });
 
-test("describes non-board selector source zones", () => {
+test("selects every eligible card from unordered non-board zones", () => {
   const game = fixture();
   const index = cardIndex();
+  for (const id of ["trash-unit-a", "trash-unit-b"]) {
+    index.instances.set(id, {
+      instanceId: id,
+      ownerPlayerId: "p1",
+      source: "mainDeck",
+      cardCode: "UNIT",
+    });
+    game.state.cardStates[id] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: 2,
+    };
+  }
+  game.state.players.p1!.zones.trash.push(
+    "trash-unit-a",
+    "trash-unit-b",
+  );
   const requirement = createPrimitiveHandlers(index)
     .get("selector.card")!
     .targets!(
       binding("selector.card", {
         zone: "trash",
-        cardType: "Spell",
+        cardType: "Unit",
         minimumCount: 1,
         maximumCount: 1,
       }),
@@ -206,7 +223,7 @@ test("describes non-board selector source zones", () => {
     );
 
   assert.equal(requirement.sourceZone, "trash");
-  assert.deepEqual(requirement.legalIds, ["spell"]);
+  assert.deepEqual(requirement.legalIds, ["trash-unit-a", "trash-unit-b"]);
 });
 
 function binding(

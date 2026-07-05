@@ -63,9 +63,9 @@ discard, reset, amend, squash, or combine milestone work.
   - Verify controller Bonus Damage applies to trigger-resolved automatic groups.
   - Do not alter the already-shared numeric damage pipeline without a failing
     production case.
-- [ ] 3. `fix(game-board): expose all eligible trash choices`
-  - Project every eligible source-zone card.
-  - Render/select any eligible Unit in unordered Trash.
+- [x] 3. `test(game): cover unordered trash selections`
+  - Verify every eligible source-zone card is returned independent of order.
+  - Retain the existing projected source-zone choice UI.
 - [ ] 4. `fix(game): validate battlefield-scoped group effects`
   - Validate Firestorm using its selected Battlefield only.
   - Derive affected enemy units at resolution.
@@ -74,10 +74,10 @@ discard, reset, amend, squash, or combine milestone work.
 
 ## Current checkpoint
 
-- Completed through: milestone 2
+- Completed through: milestone 3
 - Last verification: 143 tests passed; typecheck, lint, and scoped
   `git diff --check` passed.
-- Next milestone: expose every eligible card in unordered Trash choices.
+- Next milestone: validate battlefield-scoped automatic groups.
 
 ## Important implementation notes
 
@@ -96,5 +96,10 @@ discard, reset, amend, squash, or combine milestone work.
   `action.deal_damage` evaluates `controller_effect` modifiers once per damage
   instruction, and automatic groups receive that modified amount per unit. An
   exact trigger-resolved multi-unit regression now protects this behavior.
+- The reported top-only Trash failure is also not reproducible in the current
+  source revision. `selector.card` enumerates the complete logical zone and
+  filters each card by type; projection and the source-zone dialog preserve all
+  legal IDs. A mixed Trash regression now proves that multiple non-top Units
+  remain eligible while a Spell in the same Trash is excluded.
 - Existing games should remain schema-compatible unless implementation proves
   otherwise. Stop and revise this ledger before any persisted schema change.
