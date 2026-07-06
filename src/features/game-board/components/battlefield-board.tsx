@@ -1,6 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
+import { motion } from "motion/react";
 import { FC, MouseEvent, useEffect, useRef, useState } from "react";
 import { cn } from "@/shared/utils/cn";
 import { BattlefieldData } from "../types";
@@ -24,6 +25,23 @@ type Props = {
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
+const BATTLEFIELD_WIDTH_BY_SHOWDOWN_STATE = {
+  neutral: "50%",
+  open: "60%",
+  deferred: "40%",
+} as const;
+const BATTLEFIELD_SIZE_TRANSITION = {
+  type: "spring",
+  stiffness: 260,
+  damping: 30,
+  mass: 0.75,
+} as const;
+const BATTLEFIELD_ROW_LAYOUT_TRANSITION = {
+  type: "spring",
+  stiffness: 300,
+  damping: 34,
+  mass: 0.65,
+} as const;
 
 export const BattlefieldBoard: FC<Props> = ({
   battlefield: {
@@ -85,22 +103,26 @@ export const BattlefieldBoard: FC<Props> = ({
   }, [isBattlefieldCardOpen]);
 
   return (
-    <div
+    <motion.div
       aria-selected={isHighlighted}
       data-highlighted={isHighlighted ? "true" : undefined}
+      animate={{
+        width: BATTLEFIELD_WIDTH_BY_SHOWDOWN_STATE[showdownState],
+      }}
       data-owner={owner}
+      data-showdown-state={showdownState}
+      initial={false}
+      layout="position"
       ref={rootRef}
+      transition={BATTLEFIELD_SIZE_TRANSITION}
       className={cn(
-        "isolate relative grid grid-rows-[minmax(0,1fr)_34px] rounded-lg overflow-hidden",
+        "isolate relative grid grid-rows-[minmax(0,1fr)_34px] rounded-lg min-w-0 overflow-hidden",
         "border bg-slate-950/10 transition-[border-color,background-color,box-shadow] duration-300 ease-out",
         "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025),0_14px_32px_rgba(0,0,0,0.18)]",
         "supports-backdrop-filter:bg-slate-950/6 supports-backdrop-filter:backdrop-blur-[1px]",
         isHighlighted
           ? "border-cyan-200/70 bg-cyan-300/6 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18),0_14px_32px_rgba(0,0,0,0.18)]"
           : "border-cyan-100/14",
-        showdownState === "neutral" && "w-1/2",
-        showdownState === "open" && "w-3/5",
-        showdownState === "deferred" && "w-2/5",
       )}
     >
       <div
@@ -211,7 +233,7 @@ export const BattlefieldBoard: FC<Props> = ({
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -238,12 +260,14 @@ function BattlefieldUnitRow({
   zoneAnimationId: string;
 }) {
   return (
-    <div
+    <motion.div
       className={cn(
         "flex flex-wrap gap-2 min-h-0 overflow-auto [scrollbar-color:rgba(103,232,249,0.25)_transparent]",
         className,
       )}
       data-zone-animation-id={zoneAnimationId}
+      layout
+      transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
       {cards.map((unit, index) => (
         <CardTile
@@ -273,6 +297,6 @@ function BattlefieldUnitRow({
           {...unit}
         />
       ))}
-    </div>
+    </motion.div>
   );
 }

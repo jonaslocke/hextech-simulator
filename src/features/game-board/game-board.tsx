@@ -7,6 +7,7 @@ import {
 } from "@/features/card-presentation";
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { GameProjection } from "@/shared/game";
+import { LayoutGroup } from "motion/react";
 import {
   FC,
   MouseEvent,
@@ -330,12 +331,12 @@ export const GameBoard: FC<GameBoardProps> = ({
   );
   const viewerState = projection.players[projection.viewerPlayerId];
   const targetSelectionAction = targetSelection
-    ? sourceProjection.actions.find(
+    ? (sourceProjection.actions.find(
         (action) => action.id === targetSelection.actionId,
       ) ??
       sourceProjection.actions.find((action) =>
         actionIdsHaveSameIdentity(action.id, targetSelection.actionId),
-      )
+      ))
     : undefined;
   const selectedDeflectSources =
     targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
@@ -527,8 +528,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     );
     const actionToSubmit = stagedMoveAction ?? projectedAction;
     const requirement = actionToSubmit.targets.find(
-      (target) =>
-        target.kind === "card" || target.kind === "battlefield",
+      (target) => target.kind === "card" || target.kind === "battlefield",
     );
 
     if (requirement && requirement.maximum > 0) {
@@ -539,8 +539,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         minTargets: requirement.minimum,
         purpose: stagedMoveAction ? "move" : "play",
         selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
-        targetKind:
-          requirement.kind === "battlefield" ? "battlefield" : "card",
+        targetKind: requirement.kind === "battlefield" ? "battlefield" : "card",
       });
       return;
     }
@@ -634,10 +633,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       nextSelection.purpose === "play" &&
       nextSelection.minTargets === nextSelection.maxTargets &&
       selectedTargetIds.length === nextSelection.maxTargets &&
-      additionalPowerForTargets(
-        targetSelectionAction,
-        selectedTargetIds,
-      ) === 0
+      additionalPowerForTargets(targetSelectionAction, selectedTargetIds) === 0
     ) {
       submitTargetedPlay(nextSelection);
     }
@@ -774,7 +770,8 @@ export const GameBoard: FC<GameBoardProps> = ({
       !effectSelectionAction ||
       (playerDecision?.kind === "cardSelection" &&
         playerDecision.actionId === effectSelectionAction.id)
-    ) return;
+    )
+      return;
     const requirement = effectSelectionAction.targets.find(
       (target) => target.kind === "card",
     );
@@ -884,34 +881,36 @@ export const GameBoard: FC<GameBoardProps> = ({
             isActivePlayer={isOpponentActive}
             isMirrored
           />
-          <div className="flex gap-2">
-            <BattlefieldBoard
-              battlefield={board.playerBattlefield}
-              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-              hiddenCardInstanceIds={activeTransferCardIds}
-              isHighlighted={
-                hoveredBattlefieldId === board.playerBattlefield.id
-              }
-              onCardPrimaryAction={handleBoardCardPrimaryAction}
-              onCardPointerEnter={handleTargetPointerEnter}
-              onCardPointerLeave={handleTargetPointerLeave}
-              owner="player"
-              showdownState={board.playerBattlefieldShowdownState}
-            />
-            <BattlefieldBoard
-              battlefield={board.opponentBattlefield}
-              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-              hiddenCardInstanceIds={activeTransferCardIds}
-              isHighlighted={
-                hoveredBattlefieldId === board.opponentBattlefield.id
-              }
-              onCardPrimaryAction={handleBoardCardPrimaryAction}
-              onCardPointerEnter={handleTargetPointerEnter}
-              onCardPointerLeave={handleTargetPointerLeave}
-              owner="opponent"
-              showdownState={board.opponentBattlefieldShowdownState}
-            />
-          </div>
+          <LayoutGroup id="battlefield-showdown-layout">
+            <div className="flex gap-2 min-h-0">
+              <BattlefieldBoard
+                battlefield={board.playerBattlefield}
+                highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
+                hiddenCardInstanceIds={activeTransferCardIds}
+                isHighlighted={
+                  hoveredBattlefieldId === board.playerBattlefield.id
+                }
+                onCardPrimaryAction={handleBoardCardPrimaryAction}
+                onCardPointerEnter={handleTargetPointerEnter}
+                onCardPointerLeave={handleTargetPointerLeave}
+                owner="player"
+                showdownState={board.playerBattlefieldShowdownState}
+              />
+              <BattlefieldBoard
+                battlefield={board.opponentBattlefield}
+                highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
+                hiddenCardInstanceIds={activeTransferCardIds}
+                isHighlighted={
+                  hoveredBattlefieldId === board.opponentBattlefield.id
+                }
+                onCardPrimaryAction={handleBoardCardPrimaryAction}
+                onCardPointerEnter={handleTargetPointerEnter}
+                onCardPointerLeave={handleTargetPointerLeave}
+                owner="opponent"
+                showdownState={board.opponentBattlefieldShowdownState}
+              />
+            </div>
+          </LayoutGroup>
           <PlayerBoard
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
@@ -934,9 +933,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           onPassTurn={passFocusAction ? onPass : onEndTurn}
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn || isSubmittingAction}
-          passTurnLabel={
-            isSubmittingAction ? "Submitting…" : passTurnLabel
-          }
+          passTurnLabel={isSubmittingAction ? "Submitting…" : passTurnLabel}
           setOpenZone={setOpenZoneRespectingChain}
         />
       </section>
@@ -988,7 +985,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             canSubmit={
               !isSubmittingAction &&
               targetSelection.selectedTargetIds.length >=
-                targetSelection.minTargets && missingDeflectPower === 0
+                targetSelection.minTargets &&
+              missingDeflectPower === 0
             }
             costPreview={
               targetSelectionAction?.costPreview

@@ -1,15 +1,12 @@
 "use client";
 
 import { Button } from "@/shared/components/button";
-import { Copy, Link2, Users } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, Copy, Link2, Users } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { DeckId } from "@/shared/game";
 import { loadOnlineDeckOptions } from "../api";
-import {
-  getOnlineSessionId,
-  saveOnlinePlayerCredentials,
-} from "../session";
+import { getOnlineSessionId, saveOnlinePlayerCredentials } from "../session";
 import type {
   DeckOption,
   OnlinePlayerCredentials,
@@ -20,6 +17,10 @@ type LobbyMode = "choose" | "create" | "join";
 
 export function OnlineMatchmakingLobby() {
   const socketRef = useRef<Socket | null>(null);
+  const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
   const [mode, setMode] = useState<LobbyMode>("choose");
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
   const [deckId, setDeckId] = useState<DeckId | null>(null);
@@ -28,6 +29,7 @@ export function OnlineMatchmakingLobby() {
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedRoomCode, setCopiedRoomCode] = useState<string | null>(null);
 
   useEffect(() => {
     void loadOnlineDeckOptions()
@@ -45,24 +47,31 @@ export function OnlineMatchmakingLobby() {
 
     const socket = io();
     socketRef.current = socket;
+
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => {
       setConnected(false);
       setBusy(false);
+      setCopiedRoomCode(null);
       setError("Connection lost. Return to the lobby and try again.");
     });
+
     socket.on("server:room:created", handleRoomAccepted);
     socket.on("server:room:joined", handleRoomAccepted);
+
     socket.on("server:room:stateChanged", (nextRoom: OnlineRoomView) => {
       setRoom(nextRoom);
       setBusy(false);
     });
+
     socket.on("server:room:closed", () => {
       setRoom(null);
       setBusy(false);
       setMode("choose");
+      setCopiedRoomCode(null);
       setError("The room was closed.");
     });
+
     socket.on(
       "server:player:disconnected",
       ({ room: nextRoom }: { room: OnlineRoomView }) => {
@@ -74,6 +83,7 @@ export function OnlineMatchmakingLobby() {
         );
       },
     );
+
     socket.on(
       "server:room:error",
       (roomError: { code: string; message: string }) => {
@@ -81,6 +91,7 @@ export function OnlineMatchmakingLobby() {
         setError(roomError.message);
       },
     );
+
     socket.on(
       "server:room:gameCreated",
       (credentials: OnlinePlayerCredentials) => {
@@ -90,15 +101,24 @@ export function OnlineMatchmakingLobby() {
     );
 
     return () => {
+      clearCopyFeedbackTimeout();
       socket.disconnect();
       socketRef.current = null;
     };
   }, []);
 
+  function clearCopyFeedbackTimeout() {
+    if (copyFeedbackTimeoutRef.current) {
+      clearTimeout(copyFeedbackTimeoutRef.current);
+      copyFeedbackTimeoutRef.current = null;
+    }
+  }
+
   function handleRoomAccepted(nextRoom: OnlineRoomView) {
     setRoom(nextRoom);
     setBusy(false);
     setError(null);
+    setCopiedRoomCode(null);
   }
 
   function submitRoom() {
@@ -109,7 +129,10 @@ export function OnlineMatchmakingLobby() {
 
     setBusy(true);
     setError(null);
+    setCopiedRoomCode(null);
+
     const identity = { deckId, onlineSessionId: getOnlineSessionId() };
+
     if (mode === "create") {
       socketRef.current.emit("client:room:create", identity);
     } else {
@@ -127,6 +150,9 @@ export function OnlineMatchmakingLobby() {
         onlineSessionId: getOnlineSessionId(),
       });
     }
+
+    clearCopyFeedbackTimeout();
+    setCopiedRoomCode(null);
     setRoom(null);
     setMode("choose");
   }
@@ -134,14 +160,26 @@ export function OnlineMatchmakingLobby() {
   async function copyRoomCode(code: string) {
     try {
       await copyText(code);
+
+      clearCopyFeedbackTimeout();
+      setCopiedRoomCode(code);
       setError(null);
+
+      copyFeedbackTimeoutRef.current = setTimeout(() => {
+        setCopiedRoomCode(null);
+        copyFeedbackTimeoutRef.current = null;
+      }, 1800);
     } catch {
+      clearCopyFeedbackTimeout();
+      setCopiedRoomCode(null);
       setError("Unable to copy the room code. Select and copy it manually.");
     }
   }
 
   if (room) {
     const waiting = !room.seats.player2.connected;
+    const isRoomCodeCopied = copiedRoomCode === room.code;
+
     return (
       <LobbyShell>
         <div className="text-center">
@@ -157,29 +195,68 @@ export function OnlineMatchmakingLobby() {
               : "Both players are connected. The game is being persisted."}
           </p>
         </div>
+
         <button
-          className="flex justify-between items-center bg-slate-950 mt-6 px-4 py-3 border border-cyan-300/30 rounded-lg w-full"
+          aria-label={
+            isRoomCodeCopied
+              ? `Room code ${room.code} copied`
+              : `Copy room code ${room.code}`
+          }
+          className={[
+            "flex justify-between items-center mt-6 px-4 py-3 border rounded-lg w-full transition",
+            "bg-slate-950 hover:bg-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+            isRoomCodeCopied
+              ? "border-emerald-300/60 shadow-[0_0_24px_rgba(110,231,183,0.12)] focus-visible:outline-emerald-300"
+              : "border-cyan-300/30 hover:border-cyan-300/55 focus-visible:outline-cyan-300",
+          ].join(" ")}
           onClick={() => void copyRoomCode(room.code)}
           type="button"
         >
-          <span className="font-mono font-bold text-cyan-100 text-2xl tracking-[0.25em]">
-            {room.code}
+          <span className="gap-1 grid text-left">
+            <span className="font-mono font-bold text-cyan-100 text-2xl tracking-[0.25em]">
+              {room.code}
+            </span>
+            <span
+              aria-live="polite"
+              className={
+                isRoomCodeCopied
+                  ? "font-medium text-emerald-300 text-xs"
+                  : "text-slate-500 text-xs"
+              }
+            >
+              {isRoomCodeCopied
+                ? "Copied to clipboard"
+                : "Click to copy room code"}
+            </span>
           </span>
-          <Copy aria-hidden className="size-4 text-cyan-300" />
+
+          <span
+            className={[
+              "grid place-items-center border rounded-full size-8 transition",
+              isRoomCodeCopied
+                ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-300"
+                : "border-cyan-300/20 bg-cyan-300/5 text-cyan-300",
+            ].join(" ")}
+          >
+            {isRoomCodeCopied ? (
+              <Check aria-hidden className="size-4" />
+            ) : (
+              <Copy aria-hidden className="size-4" />
+            )}
+          </span>
         </button>
+
         <div className="gap-3 grid mt-5">
-          <SeatRow
-            deckId={room.seats.player1.deckId}
-            label="Player 1"
-            ready
-          />
+          <SeatRow deckId={room.seats.player1.deckId} label="Player 1" ready />
           <SeatRow
             deckId={room.seats.player2.deckId}
             label="Player 2"
             ready={room.seats.player2.connected}
           />
         </div>
+
         {error && <ErrorMessage message={error} />}
+
         <Button
           className="mt-5 w-full"
           onClick={leaveRoom}
@@ -234,6 +311,7 @@ export function OnlineMatchmakingLobby() {
               ))}
             </select>
           </label>
+
           {mode === "join" && (
             <label className="gap-2 grid mt-4 text-sm">
               <span className="text-slate-300">Room code</span>
@@ -241,12 +319,15 @@ export function OnlineMatchmakingLobby() {
                 autoComplete="off"
                 className="bg-slate-950 px-3 py-2 border border-white/10 rounded font-mono uppercase tracking-[0.15em]"
                 maxLength={12}
-                onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  setRoomCode(event.target.value.toUpperCase())
+                }
                 placeholder="ABC123"
                 value={roomCode}
               />
             </label>
           )}
+
           <div className="gap-3 grid sm:grid-cols-2 mt-5">
             <Button
               disabled={
@@ -275,12 +356,13 @@ export function OnlineMatchmakingLobby() {
           </div>
         </>
       )}
+
       {error && <ErrorMessage message={error} />}
     </LobbyShell>
   );
 }
 
-function LobbyShell({ children }: { children: React.ReactNode }) {
+function LobbyShell({ children }: { children: ReactNode }) {
   return (
     <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
       <section className="bg-slate-900 shadow-2xl p-6 border border-cyan-300/20 rounded-xl w-full max-w-xl">
