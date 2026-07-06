@@ -2,7 +2,6 @@
 
 import { Button } from "@/shared/components/button";
 import { Copy, Link2, Users } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { DeckId } from "@/shared/game";
@@ -277,9 +276,6 @@ export function OnlineMatchmakingLobby() {
         </>
       )}
       {error && <ErrorMessage message={error} />}
-      <Link className="block mt-5 text-slate-400 hover:text-slate-200 text-sm" href="/">
-        Use local simulator instead
-      </Link>
     </LobbyShell>
   );
 }

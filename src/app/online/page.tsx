@@ -1,6 +1,5 @@
-import { OnlineMatchmakingLobby } from "@/features/online-matchmaking";
+import { redirect } from "next/navigation";
 
 export default function OnlineMatchmakingPage() {
-  return <OnlineMatchmakingLobby />;
+  redirect("/");
 }
-

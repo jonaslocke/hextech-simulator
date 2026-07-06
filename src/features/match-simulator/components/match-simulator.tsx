@@ -2,7 +2,6 @@
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   createMatchClient,
@@ -227,12 +226,6 @@ export function MatchSimulator({
           >
             {busy ? "Creating…" : "Create match"}
           </Button>
-          <Link
-            className="block mt-4 text-cyan-300 hover:text-cyan-200 text-sm text-center"
-            href="/online"
-          >
-            Play online instead
-          </Link>
         </section>
       </main>
     );
@@ -407,7 +400,7 @@ export function MatchSimulator({
         busy={busy}
         onCreateMatch={() => {
           if (onlineMatch) {
-            window.location.assign("/online");
+            window.location.assign("/");
           } else {
             void createMatch();
           }

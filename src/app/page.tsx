@@ -1,5 +1,5 @@
-import { MatchSimulator } from "@/features/match-simulator";
+import { OnlineMatchmakingLobby } from "@/features/online-matchmaking";
 
 export default function Home() {
-  return <MatchSimulator />;
+  return <OnlineMatchmakingLobby />;
 }

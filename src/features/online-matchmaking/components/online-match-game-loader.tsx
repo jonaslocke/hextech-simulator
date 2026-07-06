@@ -32,7 +32,7 @@ function MatchStatus({ message }: { message: string }) {
     <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
       <section className="bg-slate-900 p-6 border border-white/10 rounded-xl text-center">
         <p>{message}</p>
-        <Link className="inline-block mt-4 text-cyan-300" href="/online">
+        <Link className="inline-block mt-4 text-cyan-300" href="/">
           Return to online matchmaking
         </Link>
       </section>
