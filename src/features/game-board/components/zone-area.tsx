@@ -7,6 +7,7 @@ interface Props extends PropsWithChildren {
   contentClassName?: string;
   density?: "compact" | "default" | "roomy";
   isCentered?: boolean;
+  isDestinationHighlighted?: boolean;
   isHighlighted?: boolean;
   /**
    * Backwards-compatible typo kept so existing consumers do not break.
@@ -32,6 +33,7 @@ export const ZoneArea: FC<Props> = ({
   contentClassName,
   density = "default",
   isCentered = false,
+  isDestinationHighlighted = false,
   isHighlighted,
   isHightlighted,
   totalCardsCount,
@@ -44,6 +46,9 @@ export const ZoneArea: FC<Props> = ({
   return (
     <div
       data-zone-animation-id={animationZoneId}
+      data-destination-highlighted={
+        isDestinationHighlighted ? "true" : undefined
+      }
       className={cn(
         "relative flex items-center border rounded-md min-h-0 overflow-visible select-none",
         "bg-slate-950/20 supports-backdrop-filter:bg-slate-950/10 supports-backdrop-filter:backdrop-blur-[2px]",
@@ -51,6 +56,8 @@ export const ZoneArea: FC<Props> = ({
         highlighted
           ? "border-cyan-200/35 bg-cyan-300/5 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.10),0_0_18px_rgba(34,211,238,0.10)]"
           : "border-cyan-100/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]",
+        isDestinationHighlighted &&
+          "border-cyan-200/70 bg-cyan-300/6 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18)]",
         className,
       )}
     >
@@ -60,7 +67,7 @@ export const ZoneArea: FC<Props> = ({
           "absolute inset-0 rounded-[inherit] pointer-events-none",
           "bg-cyan-300/5 opacity-0 blur-[1px]",
           "transition-opacity duration-700 ease-out",
-          highlighted && "opacity-100",
+          (highlighted || isDestinationHighlighted) && "opacity-100",
         )}
       />
 
@@ -71,6 +78,7 @@ export const ZoneArea: FC<Props> = ({
           "ring-1 ring-inset ring-cyan-200/0",
           "transition-[--tw-ring-color] duration-700 ease-out",
           highlighted && "ring-cyan-200/20",
+          isDestinationHighlighted && "ring-cyan-200/40",
         )}
       />
 
@@ -78,7 +86,9 @@ export const ZoneArea: FC<Props> = ({
         <div
           className={cn(
             "top-1 right-1 z-10 absolute font-mono text-[10px] transition-colors duration-700 ease-out pointer-events-none",
-            highlighted ? "text-cyan-100/75" : "text-white/60",
+            highlighted || isDestinationHighlighted
+              ? "text-cyan-100/75"
+              : "text-white/60",
           )}
         >
           {`${totalCardsCount?.ready}/${totalCardsCount?.total}`}

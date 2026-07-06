@@ -13,6 +13,10 @@ test("generates and validates generic turn, resource, movement, and priority act
   assert.equal(game.state.players.p1?.energy, 1);
 
   const move = gameplayActions(game, "p1", decks).find((action) => action.label.startsWith("Move to"))!;
+  assert.deepEqual(move.presentation.boardLocation, {
+    kind: "battlefield",
+    battlefieldId: game.state.battlefields[0]!.battlefieldId,
+  });
   game = performGameplayAction({ game, actorPlayerId: "p1", actionId: move.id, selectedIds: [], decks, now: "d" });
   assert.ok(game.state.showdown);
   assert.equal(game.state.battlefields[0]!.contestedByPlayerId, "p1");
@@ -339,6 +343,13 @@ test("plays Units to Base or a controlled battlefield and rejects forged destina
   assert.deepEqual(
     actions.map((action) => action.label),
     ["Play Unit to Base", "Play Unit to Arena"]
+  );
+  assert.deepEqual(
+    actions.map((action) => action.presentation.boardLocation),
+    [
+      { kind: "base" },
+      { kind: "battlefield", battlefieldId: "p1:bf" },
+    ],
   );
 
   const battlefieldPlay = actions.find(

@@ -30,6 +30,7 @@ export type BoardPlayerProjection = {
   availablePaymentModes: Record<
     string,
     Array<{
+      boardLocation: ProjectedAction["presentation"]["boardLocation"];
       disabledReason: string | null;
       enabled: boolean;
       id: string;
@@ -118,6 +119,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
     }])) as BoardPlayerProjection["zones"];
     const availablePaymentModes = Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => [sourceId,
       sourceActions.map((action) => ({
+        boardLocation: action.presentation.boardLocation ?? null,
         disabledReason: action.disabledReason,
         enabled: action.enabled,
         id: action.id,

@@ -946,6 +946,12 @@ function action(
         kind === "submitChoice"
           ? "Choose the order for triggered abilities."
           : null,
+      boardLocation:
+        (kind === "play" || kind === "move" || kind === "moveMany") && extra
+          ? extra === "base"
+            ? { kind: "base" as const }
+            : { kind: "battlefield" as const, battlefieldId: extra }
+          : null,
     },
   };
 }

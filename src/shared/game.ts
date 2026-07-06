@@ -65,7 +65,16 @@ export const projectedActionSchema = z.object({
   presentation: z.object({
     surface: z.enum(["setup-dialog", "card-menu", "action-rail", "choice-dialog"]),
     style: z.enum(["primary", "secondary", "danger"]),
-    prompt: z.string().min(1).nullable()
+    prompt: z.string().min(1).nullable(),
+    boardLocation: z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("base")
+      }),
+      z.object({
+        kind: z.literal("battlefield"),
+        battlefieldId: z.string().min(1)
+      })
+    ]).nullable().optional()
   })
 });
 

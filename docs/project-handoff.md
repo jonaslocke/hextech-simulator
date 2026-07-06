@@ -11,10 +11,11 @@ The server owns canonical game state, legal actions, hidden information, game
 transitions, and persisted events. The client receives a viewer-specific
 projection and submits player intents rather than mutating game state directly.
 
-The application currently has two main product areas:
+The application currently has three main product areas:
 
 1. A local two-player match simulator using the Lux and Annie decks.
-2. An admin card-catalog workflow for importing card data, reviewing suggested
+2. An online matchmaking flow for connecting independent players into a shared persisted match.
+3. An admin card-catalog workflow for importing card data, reviewing suggested
    behavior models, and publishing approved canonical cards.
 
 Important domain concepts include:
@@ -125,7 +126,8 @@ skills/         Repository-specific implementation instructions
 
 ### Application routes
 
-- `src/app/page.tsx` renders the match simulator.
+- `src/app/page.tsx` renders the online matchmaking experience.
+- `src/app/local/page.tsx` renders the local match simulator.
 - `src/app/admin/card-catalog/page.tsx` renders the catalog admin.
 - `src/app/api/matches/route.ts` lists playable decks and creates matches.
 - `src/app/api/matches/[matchId]/route.ts` returns a viewer projection.
@@ -137,7 +139,8 @@ skills/         Repository-specific implementation instructions
 
 - `src/features/game-board`: board rendering, interaction state, decisions,
   prompts, card movement, and projection adaptation.
-- `src/features/match-simulator`: match creation, seat switching, API calls,
+- `src/features/online-matchmaking`: deck selection, room creation/joining, socket client, and matchmaking UI.
+- `src/features/match-simulator`: local match creation, seat switching, API calls,
   and result presentation.
 - `src/features/card-catalog`: admin import, review, editing, and publication
   UI.
@@ -152,6 +155,7 @@ skills/         Repository-specific implementation instructions
   preview, and canonical publication.
 - `src/server/catalog`: source card schemas and local card data.
 - `src/server/deck`: deck parsing and validation.
+- `src/server/online-matchmaking`: room registry, socket handlers, presence, and matchmaking services.
 - `src/server/db`: MongoDB connection and repositories.
 
 Shared transport schemas and DTO types live in `src/shared/game.ts`.
@@ -247,6 +251,7 @@ For gameplay behavior, use this authority order:
 - Radix UI and shadcn-style shared components
 - Lucide icons
 - Motion for card and zone animations
+- Socket.IO for realtime matchmaking and presence
 - MongoDB native driver
 - Zod schemas and payload validation
 - React hooks and local component state
@@ -265,7 +270,7 @@ No deployment-platform configuration is present.
 
 ## 6. Architecture and Data Flow
 
-The gameplay request flow is:
+The gameplay request flow remains unchanged for both local and online play:
 
 ```text
 React UI
@@ -279,6 +284,19 @@ React UI
     -> viewer-safe GameProjection
   -> board view-model adaptation
   -> GameBoard and PlayerDecisionHost
+```
+
+The online matchmaking flow is:
+
+```text
+React UI
+  -> Socket.IO
+    -> room lifecycle
+    -> existing Match Service
+      -> persisted match
+    -> gameCreated(gameId)
+  -> navigate to match
+  -> existing gameplay HTTP flow
 ```
 
 Key responsibilities:
@@ -302,7 +320,20 @@ state. It does not own rules state.
 
 ## 7. Current Feature Capabilities
 
-### Match simulator
+### Online matchmaking
+
+Users can:
+
+- Load playable decks from `GET /api/matches`.
+- Select any supported deck.
+- Create a room.
+- Join a room using a room code.
+- Start a persisted match when the second player joins.
+- Play from independent browser sessions.
+
+Rooms are in-memory matchmaking objects and are not persisted.
+
+### Local match simulator
 
 Users can:
 
@@ -312,8 +343,7 @@ Users can:
 - Submit projected actions.
 - See the winner when a game completes.
 
-The simulator does not provide independent sessions, matchmaking, automatic
-realtime refresh, reconnect handling, or best-of-three progression.
+The local simulator continues to support seat switching for development and testing. Independent multiplayer is provided by the Online Matchmaking feature.
 
 ### Setup
 
@@ -466,8 +496,7 @@ Future work must not:
   requests require additional protection.
 - Both player tokens are returned to the creating browser.
 - Admin publication routes are unauthenticated.
-- The second viewer does not receive automatic updates after the other player
-  acts.
+- Reconnect is not yet supported for online matchmaking.
 - The event log is persisted and displayed, but there is no complete replay
   reconstruction feature.
 - There are no automated browser interaction or visual regression tests.
@@ -478,8 +507,7 @@ Future work must not:
 
 Questions to answer before major product work:
 
-- Is the next target still a local two-seat simulator or independent
-  multiplayer clients?
+- Authentication model for online matchmaking.
 - Should setup, Battlefield choices, and Unit destinations all move through
   `PlayerDecisionHost`?
 - Is best-of-three progression required next?

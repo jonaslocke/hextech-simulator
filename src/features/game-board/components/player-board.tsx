@@ -19,6 +19,7 @@ import { Card, PlayerData, ZoneData } from "../types";
 type BaseLineProps = {
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
+  isBaseHighlighted?: boolean;
   player: PlayerData;
   isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
   onChampionContextAction?: (
@@ -40,6 +41,7 @@ type BaseLineProps = {
 type Props = {
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
+  isBaseHighlighted?: boolean;
   isMirrored?: boolean;
   onChampionContextAction?: (
     card: Card,
@@ -66,6 +68,7 @@ type Props = {
 const BaseLine = ({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
+  isBaseHighlighted,
   player,
   isHightlighted,
   onChampionContextAction,
@@ -116,7 +119,8 @@ const BaseLine = ({
       </ZoneArea>
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
-        isHightlighted={isHightlighted}
+        isDestinationHighlighted={isBaseHighlighted}
+        isHightlighted={isBaseHighlighted || isHightlighted}
       >
         <CardList
           cards={baseUnits}
@@ -150,6 +154,7 @@ interface RunesProps extends BaseLineProps {
 const RunesLine = ({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
+  isBaseHighlighted,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -180,7 +185,8 @@ const RunesLine = ({
       </ZoneArea>
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
-        isHightlighted={isHightlighted}
+        isDestinationHighlighted={isBaseHighlighted}
+        isHightlighted={isBaseHighlighted || isHightlighted}
         totalCardsCount={runeCounts}
       >
         <CardList
@@ -253,6 +259,7 @@ function countRuneReadiness(cards: Card[]) {
 export const PlayerBoard: FC<Props> = ({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
+  isBaseHighlighted,
   isMirrored,
   onChampionContextAction,
   onChampionPrimaryAction,
@@ -272,6 +279,7 @@ export const PlayerBoard: FC<Props> = ({
         <RunesLine
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          isBaseHighlighted={isBaseHighlighted}
           onOpenBanish={onOpenBanish}
           onOpenTrash={onOpenTrash}
           player={player}
@@ -280,6 +288,7 @@ export const PlayerBoard: FC<Props> = ({
         <BaseLine
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          isBaseHighlighted={isBaseHighlighted}
           onBoardCardPrimaryAction={onBoardCardPrimaryAction}
           onBoardCardPointerEnter={onBoardCardPointerEnter}
           onBoardCardPointerLeave={onBoardCardPointerLeave}
@@ -294,6 +303,7 @@ export const PlayerBoard: FC<Props> = ({
       <BaseLine
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
+        isBaseHighlighted={isBaseHighlighted}
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
         onBoardCardPrimaryAction={onBoardCardPrimaryAction}
@@ -305,6 +315,7 @@ export const PlayerBoard: FC<Props> = ({
       <RunesLine
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
+        isBaseHighlighted={isBaseHighlighted}
         onRuneContextAction={onRuneContextAction}
         onRunePrimaryAction={onRunePrimaryAction}
         onOpenBanish={onOpenBanish}

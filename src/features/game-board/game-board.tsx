@@ -76,10 +76,12 @@ type GameBoardProps = {
 };
 
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
+type BoardLocation =
+  NonNullable<GameProjection["actions"][number]["presentation"]["boardLocation"]>;
 type CardActionMenuItem = {
   accessibleLabel?: string;
+  boardLocation?: BoardLocation | null;
   disabled?: boolean;
-  hoverBattlefieldId?: string | null;
   id: string;
   label: ReactNode;
   onSelect?: () => void;
@@ -184,9 +186,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   >(new Set());
   const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
     useState<string | null>(null);
-  const [hoveredBattlefieldId, setHoveredBattlefieldId] = useState<
-    string | null
-  >(null);
+  const [hoveredBoardLocation, setHoveredBoardLocation] =
+    useState<BoardLocation | null>(null);
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
@@ -422,7 +423,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   };
   const closeCardActionMenu = () => {
     setCardActionMenu(null);
-    setHoveredBattlefieldId(null);
+    setHoveredBoardLocation(null);
   };
   const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
     if (isChainLockedOpen) {
@@ -441,7 +442,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    setHoveredBattlefieldId(null);
+    setHoveredBoardLocation(null);
 
     const menuWidth = 180;
     const menuHeight = Math.max(44, items.length * 36 + 12);
@@ -496,7 +497,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       event,
       modes.length > 0
         ? modes.map((mode) => ({
-            hoverBattlefieldId: battlefieldIdFromMoveAction(mode),
+            boardLocation: mode.boardLocation,
             id: mode.id,
             label: mode.label,
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),
@@ -595,8 +596,8 @@ export const GameBoard: FC<GameBoardProps> = ({
     openCardActionMenu(
       event,
       actions.map((action) => ({
+        boardLocation: action.presentation.boardLocation,
         disabled: !action.enabled,
-        hoverBattlefieldId: battlefieldIdFromMoveAction(action),
         id: action.id,
         label: action.enabled
           ? action.label
@@ -760,7 +761,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   useEffect(() => {
     setCardActionMenu(null);
-    setHoveredBattlefieldId(null);
+    setHoveredBoardLocation(null);
     setHoveredTargetCardInstanceId(null);
     setPendingSubmittedTargetIds([]);
   }, [projection.stateVersion]);
@@ -888,7 +889,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                 highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
                 hiddenCardInstanceIds={activeTransferCardIds}
                 isHighlighted={
-                  hoveredBattlefieldId === board.playerBattlefield.id
+                  hoveredBoardLocation?.kind === "battlefield" &&
+                  hoveredBoardLocation.battlefieldId ===
+                    board.playerBattlefield.id
                 }
                 onCardPrimaryAction={handleBoardCardPrimaryAction}
                 onCardPointerEnter={handleTargetPointerEnter}
@@ -901,7 +904,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                 highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
                 hiddenCardInstanceIds={activeTransferCardIds}
                 isHighlighted={
-                  hoveredBattlefieldId === board.opponentBattlefield.id
+                  hoveredBoardLocation?.kind === "battlefield" &&
+                  hoveredBoardLocation.battlefieldId ===
+                    board.opponentBattlefield.id
                 }
                 onCardPrimaryAction={handleBoardCardPrimaryAction}
                 onCardPointerEnter={handleTargetPointerEnter}
@@ -914,6 +919,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           <PlayerBoard
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
+            isBaseHighlighted={hoveredBoardLocation?.kind === "base"}
             onOpenBanish={() => setOpenZoneRespectingChain("banish")}
             onOpenTrash={() => setOpenZoneRespectingChain("playerTrash")}
             onChampionContextAction={handleChampionCardAction}
@@ -1111,10 +1117,10 @@ export const GameBoard: FC<GameBoardProps> = ({
             items={cardActionMenu.items}
             left={cardActionMenu.left}
             onClose={closeCardActionMenu}
-            onItemPointerEnter={(item) =>
-              setHoveredBattlefieldId(item.hoverBattlefieldId ?? null)
+            onItemHighlight={(item) =>
+              setHoveredBoardLocation(item.boardLocation ?? null)
             }
-            onItemPointerLeave={() => setHoveredBattlefieldId(null)}
+            onItemHighlightEnd={() => setHoveredBoardLocation(null)}
             top={cardActionMenu.top}
           />
         </>
@@ -1385,15 +1391,15 @@ function CardActionMenu({
   items,
   left,
   onClose,
-  onItemPointerEnter,
-  onItemPointerLeave,
+  onItemHighlight,
+  onItemHighlightEnd,
   top,
 }: {
   items: CardActionMenuItem[];
   left: number;
   onClose: () => void;
-  onItemPointerEnter?: (item: CardActionMenuItem) => void;
-  onItemPointerLeave?: () => void;
+  onItemHighlight?: (item: CardActionMenuItem) => void;
+  onItemHighlightEnd?: () => void;
   top: number;
 }) {
   return (
@@ -1412,12 +1418,22 @@ function CardActionMenu({
             onClose();
             item.onSelect?.();
           }}
-          onPointerEnter={() => {
+          onBlur={onItemHighlightEnd}
+          onFocus={() => {
             if (!item.disabled) {
-              onItemPointerEnter?.(item);
+              onItemHighlight?.(item);
             }
           }}
-          onPointerLeave={onItemPointerLeave}
+          onPointerEnter={() => {
+            if (!item.disabled) {
+              onItemHighlight?.(item);
+            }
+          }}
+          onPointerLeave={(event) => {
+            if (document.activeElement !== event.currentTarget) {
+              onItemHighlightEnd?.();
+            }
+          }}
           type="button"
         >
           {item.label}
@@ -1425,28 +1441,6 @@ function CardActionMenu({
       ))}
     </div>
   );
-}
-
-function battlefieldIdFromMoveAction(
-  action: Pick<GameProjection["actions"][number], "id">,
-) {
-  const [, , , kind, , encodedExtra] = action.id.split(":");
-
-  if (kind !== "move" && kind !== "moveMany") {
-    return null;
-  }
-
-  if (!encodedExtra) {
-    return null;
-  }
-
-  try {
-    const extra = decodeURIComponent(encodedExtra);
-
-    return extra === "base" ? null : extra;
-  } catch {
-    return null;
-  }
 }
 
 function runeActionMenuLabel(
