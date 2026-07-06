@@ -9,6 +9,7 @@ if (!process.argv.includes("--confirm")) {
 const seeds = await Promise.all([
   loadSeed("lux", "Lux", "data/decks/lux.dec.txt"),
   loadSeed("annie", "Annie", "data/decks/annie.dec.txt"),
+  loadSeed("master-yi", "Master Yi", "data/decks/masteryi.dec.txt"),
 ]);
 const client = await getMongoClient();
 
@@ -26,7 +27,7 @@ try {
 }
 
 async function loadSeed(
-  id: "lux" | "annie",
+  id: "lux" | "annie" | "master-yi",
   label: string,
   filePath: string,
 ) {

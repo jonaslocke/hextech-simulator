@@ -1,5 +1,6 @@
 import {
   cleanupLethalDamage,
+  recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
@@ -10,6 +11,7 @@ export function cleanupBoard(
   game: GameDocument,
   index: RuntimeCardIndex
 ): void {
+  recomputeAllMight(game, index);
   cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
@@ -43,6 +45,8 @@ export function cleanupBoard(
 export function clearMarkedDamage(game: GameDocument): void {
   for (const state of Object.values(game.state.cardStates)) {
     state.damage = 0;
+    state.lethalSuppressedDamage = null;
+    state.lethalSuppressedMight = null;
   }
 }
 

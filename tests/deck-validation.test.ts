@@ -9,7 +9,7 @@ async function loadDeck(filename: string) {
   return readFile(path.join(process.cwd(), "data", "decks", filename), "utf8");
 }
 
-test("validates Annie and Lux starter fixture decks", async () => {
+test("validates all playable starter fixture decks", async () => {
   const catalog = await loadCardCatalog();
   const annie = validateDeckList(await loadDeck("annie.dec.txt"), catalog, {
     ownerId: "annie"
@@ -17,9 +17,15 @@ test("validates Annie and Lux starter fixture decks", async () => {
   const lux = validateDeckList(await loadDeck("lux.dec.txt"), catalog, {
     ownerId: "lux"
   });
+  const masterYi = validateDeckList(
+    await loadDeck("masteryi.dec.txt"),
+    catalog,
+    { ownerId: "master-yi" },
+  );
 
   assert.equal(annie.ok, true, JSON.stringify(annie.issues, null, 2));
   assert.equal(lux.ok, true, JSON.stringify(lux.issues, null, 2));
+  assert.equal(masterYi.ok, true, JSON.stringify(masterYi.issues, null, 2));
 
   if (annie.ok) {
     assert.equal(annie.snapshot.legend.name, "Dark Child - Starter");
@@ -31,6 +37,11 @@ test("validates Annie and Lux starter fixture decks", async () => {
     assert.equal(lux.snapshot.legend.name, "Lady of Luminosity - Starter");
     assert.equal(lux.snapshot.champion.name, "Lux, Crownguard");
     assert.equal(lux.snapshot.instances.length, 56);
+  }
+  if (masterYi.ok) {
+    assert.equal(masterYi.snapshot.legend.name, "Wuju Bladesman - Starter");
+    assert.equal(masterYi.snapshot.champion.name, "Yi, Honed");
+    assert.equal(masterYi.snapshot.instances.length, 56);
   }
 });
 

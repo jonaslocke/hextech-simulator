@@ -17,6 +17,8 @@ export const runeResourceTypes = ["energy", "power"] as const;
 export const projectedTargetRequirementSchema = z.object({
   kind: z.enum(["card", "battlefield", "player"]),
   label: z.string().min(1).optional(),
+  selectionKey: z.string().min(1).optional(),
+  selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
   sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
   legalIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
@@ -96,7 +98,7 @@ export const gameIntentRequestSchema = z.object({
   intent: gameActionIntentSchema
 });
 
-export const deckIdSchema = z.enum(["lux", "annie"]);
+export const deckIdSchema = z.enum(["lux", "annie", "master-yi"]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
 export const createMatchRequestSchema = z.object({

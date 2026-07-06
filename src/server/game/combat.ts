@@ -49,11 +49,9 @@ export function startCombat(
   );
   attackerUnitIds.forEach((id) => {
     game.state.cardStates[id]!.combatRole = "attacker";
-    recomputeMight(game, id, index);
   });
   defenderUnitIds.forEach((id) => {
     game.state.cardStates[id]!.combatRole = "defender";
-    recomputeMight(game, id, index);
   });
   game.state.combat = {
     battlefieldId,
@@ -67,6 +65,9 @@ export function startCombat(
     attackerAssignments: [],
     defenderAssignments: []
   };
+  [...attackerUnitIds, ...defenderUnitIds].forEach((id) =>
+    recomputeMight(game, id, index),
+  );
   game.state.showdown = {
     kind: "combat",
     battlefieldId,

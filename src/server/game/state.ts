@@ -67,7 +67,9 @@ export const cardStateSchema = z.object({
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
   objectVersion: z.number().int().nonnegative().optional(),
-  combatRole: z.enum(["attacker", "defender"]).nullable().optional()
+  combatRole: z.enum(["attacker", "defender"]).nullable().optional(),
+  lethalSuppressedDamage: z.number().int().nonnegative().nullable().optional(),
+  lethalSuppressedMight: z.number().int().nonnegative().nullable().optional()
 });
 
 export const chainItemSchema = z.object({
@@ -173,6 +175,15 @@ export const gameStateSchema = z.object({
     amount: z.number(), minimum: z.number().nullable(), duration: z.string().min(1),
     createdAtTurn: z.number().int().nonnegative()
   })),
+  ongoingEffects: z.array(z.object({
+    id: z.string().min(1),
+    behaviorId: z.string().min(1),
+    controllerPlayerId: z.string().min(1),
+    sourceCardInstanceId: z.string().min(1),
+    targetCardInstanceIds: z.array(z.string()),
+    duration: z.string().min(1),
+    createdAtTurn: z.number().int().nonnegative()
+  })).default([]),
   delayedEffects: z.array(z.object({
     id: z.string().min(1), point: z.string().min(1), controllerPlayerId: z.string().min(1),
     sourceCardInstanceId: z.string().min(1), clauseId: z.string().min(1),
@@ -300,7 +311,7 @@ export function createInitialGame(input: {
         mulligans: Object.fromEntries(input.playerIds.map((id) => [id, { status: "unlocked", selectedCardInstanceIds: [] }]))
       },
       players, battlefields: [], cardStates, turn: null, chain: null, showdown: null, combat: null,
-      modifiers: [], delayedEffects: [], effectResolutions: [],
+      modifiers: [], ongoingEffects: [], delayedEffects: [], effectResolutions: [],
       pendingChoice: null, queuedTriggerChoices: []
     }
   });

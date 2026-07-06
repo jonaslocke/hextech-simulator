@@ -162,13 +162,20 @@ export function executeBehaviorClause(input: {
   } else {
     validateSelections(requirements, context.selectedIds);
   }
-  selectionRequirementsForClause(clause, context, handlers).forEach(
-    ({ binding, requirement }) => {
+  clause.selectors.forEach((binding) => {
+    const handler = requireHandler(binding, handlers);
+    if (!handler.targets) return;
+    const requirement = handler.targets(binding, context);
+    const selected = requirement.maximum === 0
+      ? requirement.legalIds
+      : selectedForRequirement(requirement, context.selectedIds);
     context.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
-    ] = selectedForRequirement(requirement, context.selectedIds);
-    },
-  );
+    ] = selected;
+    if (typeof binding.parameters.selectionKey === "string") {
+      context.selectedBySelector[binding.parameters.selectionKey] = selected;
+    }
+  });
   const delayed = clause.timings.find((binding) => binding.behaviorId === "timing.delayed");
   if (delayed) {
     const point = delayed.parameters.point;

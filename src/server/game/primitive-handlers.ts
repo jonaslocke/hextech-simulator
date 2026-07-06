@@ -11,6 +11,7 @@ import {
   effectiveNumericValue,
   isContinuousDuration,
 } from "./numeric-modifiers";
+import { numericConditionMatches } from "./numeric-condition";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -39,6 +40,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
+    "keyword.ganking", "cost.exhaust_selected_unit",
   ]) handlers.set(id, passive);
   handlers.set("modifier.play_unit_destination", {
     execute() {
@@ -86,24 +88,13 @@ export function createPrimitiveHandlers(
   });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
-      const source = binding.parameters.valueSource;
-      const value =
-        source === "eventSubject.effectiveEnergyCost"
-          ? context.event?.values["eventSubject.printedEnergyCost"] ??
-            context.event?.values[source]
-          : typeof source === "string"
-            ? context.event?.values[source]
-            : undefined;
-      const comparison = binding.parameters.comparisonValue;
-      if (typeof value !== "number" || typeof comparison !== "number") return false;
-      switch (binding.parameters.operator) {
-        case "greaterThanOrEqual": return value >= comparison;
-        case "greaterThan": return value > comparison;
-        case "equal": return value === comparison;
-        case "lessThanOrEqual": return value <= comparison;
-        case "lessThan": return value < comparison;
-        default: return false;
-      }
+      return numericConditionMatches({
+        binding,
+        controllerPlayerId: context.controllerPlayerId,
+        eventValues: context.event?.values,
+        game: context.game,
+        index,
+      });
     }
   });
   handlers.set("condition.effect_killed_target", {
@@ -113,12 +104,12 @@ export function createPrimitiveHandlers(
 
   handlers.set("selector.unit", {
     targets(binding, context) {
-      return selectorTargets(binding, context.game, index, () => true);
+      return selectorTargets(binding, context.game, index, () => true, context.selectedIds);
     }
   });
   handlers.set("selector.friendly_unit", {
     targets(binding, context) {
-      return selectorTargets(binding, context.game, index, (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId);
+      return selectorTargets(binding, context.game, index, (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId, context.selectedIds);
     }
   });
   handlers.set("selector.enemy_unit", {
@@ -130,6 +121,7 @@ export function createPrimitiveHandlers(
         (id) =>
           index.instances.get(id)?.ownerPlayerId !==
           context.controllerPlayerId,
+        context.selectedIds,
       );
     },
   });
@@ -186,6 +178,40 @@ export function createPrimitiveHandlers(
         draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
       }
     }
+  });
+  handlers.set("action.draw_by_optional_cost", {
+    execute(binding, context) {
+      const selected = selectionFor(binding, context);
+      const count = numberParam(
+        binding,
+        selected.length > 0 ? "paidCount" : "unpaidCount",
+      );
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      ensureMainDeck(context.game, context.controllerPlayerId, index);
+      draw(player.zones.mainDeck, player.zones.hand, count);
+    },
+  });
+  handlers.set("action.channel_or_draw", {
+    execute(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const count = numberParam(binding, "channelCount");
+      const moved = player.zones.runeDeck.splice(0, count);
+      player.zones.base.push(...moved);
+      if (binding.parameters.entryState === "exhausted") {
+        moved.forEach((id) => {
+          context.game.state.cardStates[id]!.exhausted = true;
+        });
+      }
+      if (moved.length === 0) {
+        ensureMainDeck(context.game, context.controllerPlayerId, index);
+        draw(
+          player.zones.mainDeck,
+          player.zones.hand,
+          numberParam(binding, "fallbackDrawCount"),
+        );
+      }
+      recomputeAllMight(context.game, index);
+    },
   });
   handlers.set("action.vision", {
     choice(_binding, context) {
@@ -250,6 +276,7 @@ export function createPrimitiveHandlers(
         player.zones.base.push(...moved);
         if (binding.parameters.entryState === "exhausted") moved.forEach((cardId) => { context.game.state.cardStates[cardId]!.exhausted = true; });
       }
+      recomputeAllMight(context.game, index);
     }
   });
   handlers.set("action.ready_cards", {
@@ -311,6 +338,27 @@ export function createPrimitiveHandlers(
       context.effectOutcomes.lastDamageKilled = killed;
     }
   });
+  handlers.set("action.fight", {
+    execute(binding, context) {
+      const first = context.selectedBySelector[
+        stringParam(binding, "firstUnitSelectionKey")
+      ]?.[0];
+      const second = context.selectedBySelector[
+        stringParam(binding, "secondUnitSelectionKey")
+      ]?.[0];
+      const firstState = first ? context.game.state.cardStates[first] : null;
+      const secondState = second ? context.game.state.cardStates[second] : null;
+      const firstMight = firstState?.computedMight ?? 0;
+      const secondMight = secondState?.computedMight ?? 0;
+      if (firstState && secondMight > 0) firstState.damage += secondMight;
+      if (secondState && firstMight > 0) secondState.damage += firstMight;
+      cleanupLethalDamage(
+        context.game,
+        [first, second].filter((id): id is string => Boolean(id)),
+        index,
+      );
+    },
+  });
   handlers.set("action.kill_unit", {
     execute(_binding, context) {
       context.selectedIds.forEach((id) => moveUnitToTrash(context.game, id, index));
@@ -357,8 +405,20 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("modifier.enter_ready", {
-    execute(_binding, context) {
-      context.game.state.cardStates[context.sourceCardInstanceId]!.exhausted = false;
+    execute(binding, context) {
+      if (binding.parameters.target === "controller_units") {
+        context.game.state.ongoingEffects.push({
+          id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+          behaviorId: binding.behaviorId,
+          controllerPlayerId: context.controllerPlayerId,
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          targetCardInstanceIds: [],
+          duration: stringParam(binding, "duration"),
+          createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+        });
+      } else {
+        context.game.state.cardStates[context.sourceCardInstanceId]!.exhausted = false;
+      }
     }
   });
   handlers.set("modifier.modify_numeric_value", {
@@ -367,11 +427,25 @@ export function createPrimitiveHandlers(
         return;
       }
       const attribute = stringParam(binding, "attribute");
+      const routedTargets = selectionFor(binding, context);
       const targets = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
         : binding.parameters.target === "game" || binding.parameters.target === "controller_spell"
           ? [null]
-          : context.selectedIds;
+          : routedTargets.length > 0 ? routedTargets : context.selectedIds;
+      if (
+        binding.parameters.condition === "onlyFriendlyUnitAtLocation" &&
+        targets.some((target) =>
+          target ? !isOnlyFriendlyUnitAtLocation(
+            context.game,
+            target,
+            context.controllerPlayerId,
+            index,
+          ) : false,
+        )
+      ) {
+        return;
+      }
       const mightTargets: string[] = [];
       for (const target of targets) {
         const modifier = {
@@ -417,9 +491,23 @@ export function createPrimitiveHandlers(
         context.sourceCardInstanceId,
         index,
       );
+      recomputeAllMight(context.game, index);
       const domain = definitionForInstance(context.sourceCardInstanceId, index).card.classification.domain[0] ?? "Rainbow";
       player.power[domain] = (player.power[domain] ?? 0) + 1;
     }
+  });
+  handlers.set("replacement.recall_on_next_death", {
+    execute(binding, context) {
+      context.game.state.ongoingEffects.push({
+        id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+        behaviorId: binding.behaviorId,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        targetCardInstanceIds: selectionFor(binding, context),
+        duration: stringParam(binding, "duration"),
+        createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+      });
+    },
   });
   return handlers;
 }
@@ -444,16 +532,45 @@ export function effectiveEnergyCost(
 export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {
   const affected = game.state.modifiers.filter((item) => item.duration === "thisTurn" && item.targetCardInstanceId).map((item) => item.targetCardInstanceId!);
   game.state.modifiers = game.state.modifiers.filter((item) => item.duration !== "thisTurn");
+  game.state.ongoingEffects = game.state.ongoingEffects.filter(
+    (item) => item.duration !== "thisTurn",
+  );
   affected.forEach((id) => recomputeMight(game, id, index));
   cleanupLethalDamage(game, [...new Set(affected)], index);
 }
 
-function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: RuntimeCardIndex, predicate: (id: string) => boolean) {
+export function recomputeAllMight(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+) {
+  for (const id of Object.keys(game.state.cardStates)) {
+    if (
+      index.instances.get(id) &&
+      definitionForInstance(id, index).card.classification.type === "Unit"
+    ) {
+      recomputeMight(game, id, index);
+    }
+  }
+}
+
+function selectorTargets(
+  binding: BehaviorBinding,
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  predicate: (id: string) => boolean,
+  lockedSelectedIds: readonly string[] = [],
+) {
   const baseUnits = game.state.setup.playerIds.flatMap(
     (playerId) => game.state.players[playerId]?.zones.base ?? []
   );
   const battlefieldUnits = game.state.battlefields.flatMap((battlefield) => battlefield.units);
-  const candidates = binding.parameters.area === "battlefield"
+  const candidates = binding.parameters.area === "combat"
+    ? game.state.combat
+      ? game.state.battlefields.find(
+          (item) => item.battlefieldId === game.state.combat!.battlefieldId,
+        )?.units ?? []
+      : []
+    : binding.parameters.area === "battlefield"
     ? battlefieldUnits
     : binding.parameters.area === "base"
       ? baseUnits
@@ -466,6 +583,12 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
         (game.state.cardStates[id]?.computedMight ?? 0) <=
           binding.parameters.maximumMight,
     )
+    .filter(
+      (id) =>
+        binding.parameters.readyOnly !== true ||
+        !game.state.cardStates[id]?.exhausted ||
+        lockedSelectedIds.includes(id),
+    )
     .filter(predicate);
   const automatic =
     binding.parameters.automatic === true ||
@@ -473,6 +596,15 @@ function selectorTargets(binding: BehaviorBinding, game: GameDocument, index: Ru
       typeof binding.parameters.maximumCount !== "number");
   return {
     kind: "card" as const,
+    ...(typeof binding.parameters.selectionKey === "string"
+      ? { selectionKey: binding.parameters.selectionKey }
+      : {}),
+    ...(binding.parameters.selectionPurpose === "optionalCost"
+      ? {
+          selectionPurpose: "optionalCost" as const,
+          label: "ready friendly unit to exhaust (optional)",
+        }
+      : {}),
     legalIds,
     minimum: automatic ? 0 : typeof binding.parameters.minimumCount === "number" ? binding.parameters.minimumCount : 1,
     maximum: automatic ? 0 : typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
@@ -484,6 +616,8 @@ function damageTargets(
   context: BehaviorExecutionContext,
   index: RuntimeCardIndex,
 ) {
+  const routed = selectionFor(binding, context);
+  if (routed.length > 0) return routed;
   if (binding.parameters.target === "enemy_unit") {
     const battlefieldIds = new Set(context.selectedIds);
     return context.game.state.battlefields
@@ -503,6 +637,16 @@ function damageTargets(
     );
   }
   return context.selectedIds.filter((id) => context.game.state.cardStates[id]);
+}
+
+function selectionFor(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const key = binding.parameters.selectionKey;
+  return typeof key === "string"
+    ? context.selectedBySelector[key] ?? []
+    : [];
 }
 
 export function incrementObjectVersion(game: GameDocument, id: string) {
@@ -556,12 +700,38 @@ export function keywordAmount(
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
     const state = game.state.cardStates[id];
-    if (state && state.damage > 0 && state.damage >= (state.computedMight ?? definitionForInstance(id, index).card.attributes.might ?? Infinity)) {
+    const might =
+      state?.computedMight ??
+      definitionForInstance(id, index).card.attributes.might ??
+      Infinity;
+    const unchangedSuppressedDeath =
+      state?.lethalSuppressedDamage === state?.damage &&
+      state?.lethalSuppressedMight === might;
+    if (state && !unchangedSuppressedDeath && state.damage > 0 && state.damage >= might) {
       moveUnitToTrash(game, id, index);
     }
   }
 }
 export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
+  const replacementIndex = game.state.ongoingEffects.findIndex(
+    (effect) =>
+      effect.behaviorId === "replacement.recall_on_next_death" &&
+      effect.targetCardInstanceIds.includes(id),
+  );
+  if (replacementIndex >= 0) {
+    game.state.ongoingEffects.splice(replacementIndex, 1);
+    const owner = index.instances.get(id)?.ownerPlayerId;
+    if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
+    removeFromAllLocations(game, id);
+    game.state.players[owner]!.zones.base.push(id);
+    const state = game.state.cardStates[id]!;
+    state.exhausted = true;
+    state.combatRole = null;
+    recomputeMight(game, id, index);
+    state.lethalSuppressedDamage = state.damage;
+    state.lethalSuppressedMight = state.computedMight;
+    return;
+  }
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
   const zones = game.state.players[owner]!.zones;
@@ -617,12 +787,33 @@ function resetStateAfterLeavingBoard(
   state.damage = 0;
   state.exhausted = false;
   state.combatRole = null;
+  state.lethalSuppressedDamage = null;
+  state.lethalSuppressedMight = null;
   if (
     index &&
     definitionForInstance(id, index).card.classification.type === "Unit"
   ) {
     recomputeMight(game, id, index);
   }
+}
+
+function isOnlyFriendlyUnitAtLocation(
+  game: GameDocument,
+  targetId: string,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const battlefield = game.state.battlefields.find((item) =>
+    item.units.includes(targetId),
+  );
+  const ids = battlefield
+    ? battlefield.units
+    : game.state.players[playerId]!.zones.base;
+  return ids.filter(
+    (id) =>
+      index.instances.get(id)?.ownerPlayerId === playerId &&
+      definitionForInstance(id, index).card.classification.type === "Unit",
+  ).length === 1;
 }
 function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];

@@ -9,7 +9,7 @@ import {
 } from "../src/server/game";
 import type { DeckSnapshot } from "../src/server/game/schemas";
 
-test("accepts and independently loads every Lux and Annie seat combination", async () => {
+test("accepts and independently loads every playable deck combination", async () => {
   for (const player1 of DECK_IDS) {
     for (const player2 of DECK_IDS) {
       const parsed = createMatchRequestSchema.parse({

@@ -27,6 +27,9 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.ready_cards": "executable",
   "action.channel_runes": "executable",
   "action.deal_damage": "executable",
+  "action.draw_by_optional_cost": "executable",
+  "action.channel_or_draw": "executable",
+  "action.fight": "executable",
   "action.kill_unit": "executable",
   "action.return_to_hand": "executable",
   "action.move_unit": "executable",
@@ -39,6 +42,9 @@ export const GAME__RUNTIME_COVERAGE = {
   "keyword.shield": "executable",
   "keyword.tank": "executable",
   "keyword.deflect": "executable",
+  "keyword.ganking": "executable",
+  "cost.exhaust_selected_unit": "executable",
+  "replacement.recall_on_next_death": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 
 export function getRuntimeCoverageStatus(

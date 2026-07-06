@@ -74,9 +74,9 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
     existingCardLookup: async () => persistedLux,
   });
 
-  assert.equal(preview.summary.uploadedCardCount, 39);
+  assert.equal(preview.summary.uploadedCardCount, 57);
   assert.equal(preview.summary.alreadyPersistedCardCount, 21);
-  assert.equal(preview.summary.newCardCount, 18);
+  assert.equal(preview.summary.newCardCount, 36);
   assert.equal(preview.summary.unsupportedCardCount, 0);
   assert.equal(preview.summary.ambiguousCardCount, 0);
   assert.equal(preview.summary.missingRequiredParameterCount, 0);
@@ -165,6 +165,6 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
         ]),
       ),
   });
-  assert.equal(reupload.summary.alreadyPersistedCardCount, 39);
+  assert.equal(reupload.summary.alreadyPersistedCardCount, 57);
   assert.equal(reupload.summary.newCardCount, 0);
 });

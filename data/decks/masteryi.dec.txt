@@ -1,8 +1,8 @@
 Legend:
-1 Master Yi, Wuju Bladesman
+1 Wuju Bladesman - Starter
 
 Champion:
-1 Master Yi, Honed
+1 Yi, Honed
 
 Runes:
 6 Calm Rune
@@ -13,7 +13,7 @@ Battlefields:
 1 The Papertree
 1 Targon's Peak
 
-Main Deck:
+MainDeck:
 3 En Garde
 3 Cannon Barrage
 2 Confront
@@ -22,10 +22,10 @@ Main Deck:
 3 Stalwart Poro
 3 Wielder of Water
 2 Highlander
-2 Master Yi, Meditative
+2 Yi, Meditative
 3 Playful Phantom
 3 Gentlemen's Duel
 3 Zephyr Sage
-1 Master Yi, Honed
+1 Yi, Honed
 3 Stormclaw Ursine
 2 Mountain Drake

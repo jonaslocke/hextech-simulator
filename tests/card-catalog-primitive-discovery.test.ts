@@ -159,7 +159,7 @@ test("builds typed card behavior suggestions with parameter validation", () => {
         assignment.assignment.primitiveId === "modifier.modify_numeric_value"
     );
 
-  assert.equal(suggestion.supportStatus, "requires_engine_support");
+  assert.equal(suggestion.supportStatus, "supported");
   assert.equal(suggestion.missingRequiredParameterCount, 0);
   assert.equal(suggestion.unsupportedClauseCount, 0);
   assert.equal(modifier?.parameterValidation.complete, true);
@@ -526,6 +526,13 @@ test("models the remaining Lux MVP battlefield, keyword, and entry behaviors", (
       text: "[Assault] (+1 :rb_might: while I'm an attacker.)"
     })
   );
+  const shieldBearer = discoverCardPrimitives(
+    createTestCard({
+      name: "Shield Bearer",
+      publicCode: "TST-001/001",
+      text: "[Shield 3] (+3 :rb_might: while I'm a defender.)"
+    })
+  );
   const lecturingYordle = discoverCardPrimitives(
     createTestCard({
       name: "Lecturing Yordle",
@@ -548,6 +555,9 @@ test("models the remaining Lux MVP battlefield, keyword, and entry behaviors", (
   });
   assert.deepEqual(findAssignment(daringPoro, "keyword.assault")?.parameters, {
     amount: 1
+  });
+  assert.deepEqual(findAssignment(shieldBearer, "keyword.shield")?.parameters, {
+    amount: 3
   });
   assert.deepEqual(findAssignment(lecturingYordle, "keyword.tank")?.parameters, {});
   assert.deepEqual(findAssignment(attendant, "modifier.enter_ready")?.parameters, {
@@ -838,7 +848,7 @@ test("discovers separate intrinsic Basic Rune resource abilities", () => {
   });
   assert.equal(report.summary.cardsWithRulesText, 0);
   assert.equal(report.summary.suggestedCardCount, 1);
-  assert.equal(report.cards[0]?.supportStatus, "requires_engine_support");
+  assert.equal(report.cards[0]?.supportStatus, "supported");
 });
 
 test("reuses exhaust-for-resource behavior for Lux and variable converters", () => {

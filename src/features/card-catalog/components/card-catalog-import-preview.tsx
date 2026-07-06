@@ -58,6 +58,8 @@ type EditableClause = CardCatalogApprovalRequest["clauses"][number];
 type EditableAssignment = EditableClause["assignments"][number];
 type ModelingStatus = "approved" | "rejected";
 
+const UNSET_PARAMETER_VALUE = "__unset_parameter_value__";
+
 const SUPPORT_STYLES: Record<string, string> = {
   supported: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
   partially_supported: "border-sky-400/30 bg-sky-400/10 text-sky-100",
@@ -932,10 +934,15 @@ function PrimitiveEditor({
                         clauseId,
                         assignmentIndex,
                         parameterName,
-                        value
+                        value === UNSET_PARAMETER_VALUE ? "" : value
                       )
                     }
-                    value={fieldValue || undefined}
+                    value={
+                      fieldValue ||
+                      (parameterDefinition?.required
+                        ? undefined
+                        : UNSET_PARAMETER_VALUE)
+                    }
                   >
                     <SelectTrigger
                       aria-label={parameterName}
@@ -944,6 +951,11 @@ function PrimitiveEditor({
                       <SelectValue placeholder={`Select ${parameterName}`} />
                     </SelectTrigger>
                     <SelectContent>
+                      {!parameterDefinition?.required && (
+                        <SelectItem value={UNSET_PARAMETER_VALUE}>
+                          Not set
+                        </SelectItem>
+                      )}
                       {parameterOptions.map((option) => (
                         <SelectItem key={option} value={option}>
                           {option}
@@ -1095,15 +1107,12 @@ function updateAssignmentParameter({
               index === assignmentIndex
                 ? {
                     ...assignment,
-                    parameters: {
-                      ...assignment.parameters,
-                      [parameterName]: parseParameterValue({
-                        primitiveCatalogById,
-                        assignment,
-                        parameterName,
-                        value
-                      })
-                    }
+                    parameters: updateParameters({
+                      assignment,
+                      parameterName,
+                      primitiveCatalogById,
+                      value
+                    })
                   }
                 : assignment
             )
@@ -1111,6 +1120,34 @@ function updateAssignmentParameter({
         : clause
     )
   };
+}
+
+function updateParameters({
+  assignment,
+  parameterName,
+  primitiveCatalogById,
+  value
+}: {
+  assignment: EditableAssignment;
+  parameterName: string;
+  primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
+  value: string;
+}): EditableAssignment["parameters"] {
+  const parameters = { ...assignment.parameters };
+
+  if (value.trim() === "") {
+    delete parameters[parameterName];
+    return parameters;
+  }
+
+  parameters[parameterName] = parseParameterValue({
+    primitiveCatalogById,
+    assignment,
+    parameterName,
+    value
+  });
+
+  return parameters;
 }
 
 function parseParameterValue({

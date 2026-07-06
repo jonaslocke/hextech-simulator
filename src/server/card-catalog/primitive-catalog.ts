@@ -4,6 +4,7 @@ import type {
   PrimitiveFamily
 } from "./primitive-discovery";
 import { gameZoneKinds, runeResourceTypes } from "@/shared/game";
+import { getRuntimeCoverageStatus } from "@/server/game/runtime-coverage";
 
 export type PrimitiveParameterType =
   | "string"
@@ -96,7 +97,8 @@ export const delayedTimingKinds = [
 
 export const numericComparisonValueSources = [
   "eventSubject.printedEnergyCost",
-  "eventSubject.effectiveEnergyCost"
+  "eventSubject.effectiveEnergyCost",
+  "controller.boardRuneCount"
 ] as const;
 
 export const numericComparisonOperators = [
@@ -140,18 +142,20 @@ export type GameEventKind = (typeof gameEventKinds)[number];
 
 export const unitScopeKinds = ["any", "each", "friendly", "enemy"] as const;
 
-export const unitTargetAreas = ["board", "base", "battlefield"] as const;
+export const unitTargetAreas = ["board", "base", "battlefield", "combat"] as const;
 
 export const unitLocationRelations = [
   "any",
   "sourceLocation",
-  "sharedLocation"
+  "sharedLocation",
+  "currentCombat"
 ] as const;
 
 export const targetReferenceKinds = [
   "card",
   "controller_spell",
   "controller_effect",
+  "controller_units",
   "enemy_unit",
   "equipment",
   "event_subject",
@@ -321,6 +325,22 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "Assault requires generalized attacker-state modifiers during showdowns."
     )
   }),
+  "keyword.shield": primitiveSeed({
+    id: "keyword.shield",
+    family: "keyword",
+    name: "Shield",
+    description: "Increases this unit's Might while it is a defender.",
+    parameters: [
+      required("amount", "number", "The Might gained while the source is a defender.")
+    ],
+    fixedRules: [
+      "Shield applies only while the source is a defender.",
+      "An unnumbered Shield keyword has an amount of 1."
+    ],
+    engineSupport: requiresEngineSupport(
+      "Shield requires generalized defender-state modifiers during showdowns."
+    )
+  }),
   "keyword.tank": primitiveSeed({
     id: "keyword.tank",
     family: "keyword",
@@ -467,6 +487,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
       ,optional("automatic", "boolean", "Whether the affected units are derived automatically.")
+      ,optional("readyOnly", "boolean", "Whether only ready units are legal.")
+      ,optional("selectionKey", "string", "Stable key used to route this selection.")
+      ,optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a unit"]
@@ -482,7 +505,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("area", "area", "The board area containing legal friendly unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
-      optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
+      optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
+      optional("automatic", "boolean", "Whether affected units are derived automatically."),
+      optional("readyOnly", "boolean", "Whether only ready units are legal."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
@@ -498,7 +525,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("area", "area", "The board area containing legal enemy unit targets."),
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("controller", "player", "The required controller relationship."),
-      optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
+      optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
+      optional("automatic", "boolean", "Whether affected units are derived automatically."),
+      optional("selectionKey", "string", "Stable key used to route this selection.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
@@ -638,10 +667,51 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         "unitTarget",
         "The unit receiving damage.",
         unitTargetReferenceKinds
-      )
+      ),
+      optional("selectionKey", "string", "Selector key supplying affected units.")
     ],
     emitsEvents: ["unit.damaged"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
+  }),
+  "action.draw_by_optional_cost": primitiveSeed({
+    id: "action.draw_by_optional_cost",
+    family: "action",
+    name: "Draw by optional cost",
+    description: "Draws one of two amounts depending on whether an optional cost selection was paid.",
+    parameters: [
+      required("selectionKey", "string", "Optional-cost selector key."),
+      required("paidCount", "number", "Cards drawn when paid."),
+      required("unpaidCount", "number", "Cards drawn when declined.")
+    ],
+    engineSupport: supported("Resolved from the locked optional-cost selection.")
+  }),
+  "action.channel_or_draw": primitiveSeed({
+    id: "action.channel_or_draw",
+    family: "action",
+    name: "Channel or draw",
+    description: "Channels runes and draws only when none can be channeled.",
+    parameters: [
+      required("channelCount", "number", "Runes to channel."),
+      required("entryState", "string", "Rune entry state.", runeEntryStates),
+      required("fallbackDrawCount", "number", "Fallback cards drawn.")
+    ],
+    engineSupport: supported("The runtime records whether channeling completed.")
+  }),
+  "action.fight": primitiveSeed({
+    id: "action.fight",
+    family: "action",
+    name: "Fight",
+    description: "Two selected units simultaneously deal damage equal to their current Might to each other.",
+    parameters: [
+      required("firstUnitSelectionKey", "string", "Selector key for the first fighting unit."),
+      required("secondUnitSelectionKey", "string", "Selector key for the second fighting unit.")
+    ],
+    fixedRules: [
+      "Each fighting unit uses its current Might after applicable modifiers.",
+      "Both units mark their damage simultaneously.",
+      "Lethal processing occurs only after both units have marked damage."
+    ],
+    engineSupport: supported("Both damage amounts are snapshotted and marked before lethal processing.")
   }),
   "action.kill_unit": primitiveSeed({
     id: "action.kill_unit",
@@ -764,6 +834,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ),
       optional("amount", "number", "The constant operand when operand is constant."),
       required("target", "target", "The object or game value being modified."),
+      optional("selectionKey", "string", "Selector key supplying affected units."),
+      optional("condition", "string", "Runtime predicate guarding the modifier.", [
+        "friendlyDefendsAlone",
+        "sourceCombatsAlone",
+        "onlyFriendlyUnitAtLocation"
+      ]),
       optional(
         "duration",
         "duration",
@@ -787,7 +863,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "modifier",
     name: "Enter ready",
     description: "Makes a card enter ready instead of exhausted.",
-    parameters: [required("target", "target", "The card that enters ready.")],
+    parameters: [
+      required("target", "target", "The card that enters ready."),
+      optional("duration", "duration", "How long the entry permission lasts.")
+    ],
     engineSupport: partiallySupported("Entry-state changes are recurring in the corpus; target/source variants require additional validation.")
   }),
   "modifier.targeting_restriction": primitiveSeed({
@@ -835,12 +914,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("comparisonValue", "number", "The constant value used by the comparison.")
     ],
     fixedRules: [
-      "The comparison is evaluated after the clause trigger fires and before its effects resolve.",
+      "The comparison is evaluated whenever its clause is evaluated, including while a continuous modifier is active.",
       "A false comparison prevents the other behavior assignments in the same clause from resolving.",
-      "Printed Energy cost is the card's Energy characteristic and is used by 'costs N or more' rules. The effective Energy cost source remains accepted for compatibility with existing behavior snapshots."
+      "Printed Energy cost is the card's Energy characteristic and is used by 'costs N or more' rules. The effective Energy cost source remains accepted for compatibility with existing behavior snapshots.",
+      "Controller Board Rune count includes Rune cards that the controller has channeled to their Base."
     ],
     engineSupport: requiresEngineSupport(
-      "The catalog defines typed numeric clause guards; generalized runtime condition evaluation remains future engine work."
+      "The runtime evaluates typed numeric clause guards for event values and continuous Board Rune counts."
     )
   }),
   "condition.effect_killed_target": primitiveSeed({
@@ -912,6 +992,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: requiresEngineSupport("Deflect requires target-derived additional payment.")
   }),
+  "keyword.ganking": primitiveSeed({
+    id: "keyword.ganking",
+    family: "keyword",
+    name: "Ganking",
+    description: "Allows a Standard Move between battlefields.",
+    parameters: [optional("keyword", "string", "Printed keyword name.")],
+    engineSupport: supported("Movement projection and execution honor battlefield origins.")
+  }),
   "cost.pay": primitiveSeed({
     id: "cost.pay",
     family: "cost",
@@ -929,6 +1017,29 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Exhaust source cost",
     description: "Exhausts the source as a cost.",
     engineSupport: partiallySupported("Source exhaustion is foundational, but activation context needs per-card validation.")
+  }),
+  "cost.exhaust_selected_unit": primitiveSeed({
+    id: "cost.exhaust_selected_unit",
+    family: "cost",
+    name: "Exhaust selected unit",
+    description: "Exhausts a selected ready unit as a non-standard play cost.",
+    parameters: [
+      required("selectionKey", "string", "Cost selector key."),
+      optional("optional", "boolean", "Whether the cost may be declined.")
+    ],
+    engineSupport: supported("Paid during the card-play process before resolution.")
+  }),
+  "replacement.recall_on_next_death": primitiveSeed({
+    id: "replacement.recall_on_next_death",
+    family: "replacement",
+    name: "Recall on next death",
+    description: "Replaces the selected unit's next death this turn with an exhausted recall.",
+    parameters: [
+      required("selectionKey", "string", "Protected-unit selector key."),
+      required("duration", "duration", "Replacement duration."),
+      optional("exhausted", "boolean", "Whether the recalled unit becomes exhausted.")
+    ],
+    engineSupport: supported("Stored as a consumable ongoing replacement effect.")
   }),
   "replacement.instead": primitiveSeed({
     id: "replacement.instead",
@@ -955,9 +1066,13 @@ export function buildPrimitiveCatalog(
   return ids.map((id) => {
     const discovered = discoveredById.get(id);
     const seed = CATALOG_SEEDS[id] ?? buildFallbackSeed(discovered, id);
+    const runtimeStatus = getRuntimeCoverageStatus(id);
 
     return {
       ...seed,
+      ...(runtimeStatus === "executable"
+        ? { engineSupport: supported("Executable in the gameplay runtime.") }
+        : {}),
       examples:
         discovered?.examples.map((example) => ({
           cardCode: example.cardCode,
@@ -973,8 +1088,14 @@ export function getPrimitiveCatalogEntry(
   primitiveId: string,
   family: PrimitiveFamily
 ): PrimitiveCatalogEntry {
+  const seed =
+    CATALOG_SEEDS[primitiveId] ??
+    buildFallbackSeed(undefined, primitiveId, family);
   return {
-    ...(CATALOG_SEEDS[primitiveId] ?? buildFallbackSeed(undefined, primitiveId, family)),
+    ...seed,
+    ...(getRuntimeCoverageStatus(primitiveId) === "executable"
+      ? { engineSupport: supported("Executable in the gameplay runtime.") }
+      : {}),
     examples: []
   };
 }

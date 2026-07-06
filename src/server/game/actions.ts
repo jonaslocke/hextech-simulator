@@ -246,6 +246,22 @@ export function gameplayActions(
       actions.push(
         action(game, "move", "Move to Base", cardId, true, null, "base"),
       );
+      if (hasBehavior(definitionForInstance(cardId, index), "keyword.ganking")) {
+        for (const destination of orderedBattlefields) {
+          if (destination.battlefieldId === battlefield.battlefieldId) continue;
+          actions.push(
+            action(
+              game,
+              "move",
+              `Gank ${definitionForInstance(destination.cardInstanceId, index).card.name}`,
+              cardId,
+              true,
+              null,
+              destination.battlefieldId,
+            ),
+          );
+        }
+      }
     }
   }
   const readyBaseUnits = player.zones.base.filter((cardId) => {
@@ -256,7 +272,17 @@ export function gameplayActions(
     );
   });
   for (const battlefield of orderedBattlefields) {
-    if (readyBaseUnits.length < 1) continue;
+    const readyGankingUnits = game.state.battlefields
+      .filter((origin) => origin.battlefieldId !== battlefield.battlefieldId)
+      .flatMap((origin) => origin.units)
+      .filter(
+        (id) =>
+          index.instances.get(id)?.ownerPlayerId === actorPlayerId &&
+          !game.state.cardStates[id]?.exhausted &&
+          hasBehavior(definitionForInstance(id, index), "keyword.ganking"),
+      );
+    const movableUnits = [...readyBaseUnits, ...readyGankingUnits];
+    if (movableUnits.length < 1) continue;
     actions.push(
       action(
         game,
@@ -270,9 +296,9 @@ export function gameplayActions(
           {
             kind: "card",
             label: "units to move",
-            legalIds: readyBaseUnits,
+            legalIds: movableUnits,
             minimum: 1,
-            maximum: readyBaseUnits.length,
+            maximum: movableUnits.length,
           },
         ],
       ),
@@ -596,6 +622,7 @@ function playCard(
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
+  payOptionalPlayCosts(game, definition, selectedIds, index);
   payCardCost(
     game,
     playerId,
@@ -625,6 +652,15 @@ function playCard(
       selectedIds,
       handlers,
     );
+    if (
+      game.state.ongoingEffects.some(
+        (effect) =>
+          effect.behaviorId === "modifier.enter_ready" &&
+          effect.controllerPlayerId === playerId,
+      )
+    ) {
+      game.state.cardStates[cardId]!.exhausted = false;
+    }
     dispatchBehaviorEvent(game, playEvent, decks);
     cleanupBoard(game, index);
     openPendingShowdown(game, index, decks);
@@ -1012,6 +1048,9 @@ function moveUnitsToBattlefield(
   const player = game.state.players[actorPlayerId]!;
   for (const cardId of cardIds) {
     player.zones.base = player.zones.base.filter((id) => id !== cardId);
+    for (const origin of game.state.battlefields) {
+      origin.units = origin.units.filter((id) => id !== cardId);
+    }
     battlefield.units.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
   }
@@ -1487,6 +1526,36 @@ function captureTargetObjectVersions(
       id,
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
+  );
+}
+
+function payOptionalPlayCosts(
+  game: GameDocument,
+  definition: GameCardDefinition,
+  selectedIds: string[],
+  index: RuntimeCardIndex,
+) {
+  const hasExhaustCost = definition.behaviorModel.clauses.some((clause) =>
+    clause.costs.some(
+      (cost) => cost.behaviorId === "cost.exhaust_selected_unit",
+    ),
+  );
+  if (!hasExhaustCost || selectedIds.length === 0) return;
+  const selected = selectedIds.find(
+    (id) =>
+      definitionForInstance(id, index).card.classification.type === "Unit" &&
+      !game.state.cardStates[id]?.exhausted,
+  );
+  if (selected) game.state.cardStates[selected]!.exhausted = true;
+}
+
+function hasBehavior(definition: GameCardDefinition, behaviorId: string) {
+  return definition.behaviorModel.clauses.some((clause) =>
+    [
+      ...clause.keywords,
+      ...clause.effects,
+      ...clause.abilities,
+    ].some((binding) => binding.behaviorId === behaviorId),
   );
 }
 

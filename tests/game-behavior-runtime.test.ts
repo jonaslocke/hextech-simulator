@@ -219,7 +219,7 @@ function gameFixture(): GameDocument {
     state: {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
       players: {}, battlefields: [], cardStates: {}, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },
-      chain: null, showdown: null, combat: null, modifiers: [], delayedEffects: [],
+      chain: null, showdown: null, combat: null, modifiers: [], ongoingEffects: [], delayedEffects: [],
       effectResolutions: [], pendingChoice: null,
       queuedTriggerChoices: []
     }

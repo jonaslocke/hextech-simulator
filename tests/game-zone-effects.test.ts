@@ -292,7 +292,7 @@ function fixture(): GameDocument {
         unit: { exhausted: true, damage: 0, computedMight: 2, objectVersion: 0 },
       },
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },
-      chain: null, showdown: null, combat: null, modifiers: [], delayedEffects: [],
+      chain: null, showdown: null, combat: null, modifiers: [], ongoingEffects: [], delayedEffects: [],
       effectResolutions: [], pendingChoice: null, queuedTriggerChoices: [],
     },
   };

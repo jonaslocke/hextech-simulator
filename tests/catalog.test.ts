@@ -10,7 +10,7 @@ import {
 test("loads local Riftbound card catalog", async () => {
   const catalog = await loadCardCatalog();
 
-  assert.equal(catalog.cards.length, 39);
+  assert.equal(catalog.cards.length, 57);
   assert.equal(requireCardByName(catalog, "Dark Child - Starter").classification.type, "Legend");
   assert.equal(requireCardByName(catalog, "Lady of Luminosity - Starter").classification.type, "Legend");
   assert.equal(requireCardByName(catalog, "Annie, Stubborn").classification.supertype, "Champion");
@@ -27,7 +27,7 @@ test("creates and persists catalog version metadata", async () => {
 
   assert.equal(document.id, catalog.versionHash);
   assert.equal(document.versionHash, catalog.versionHash);
-  assert.equal(document.cardCount, 39);
+  assert.equal(document.cardCount, 57);
   assert.deepEqual(document.setFiles, ["fixed-mvp-cards.generated.ts"]);
   assert.equal(document.createdAt, now.toISOString());
 

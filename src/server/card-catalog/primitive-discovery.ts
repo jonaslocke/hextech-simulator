@@ -131,6 +131,14 @@ const ASSAULT_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
   parameterNames: ["amount"]
 };
 
+const SHIELD_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
+  id: "keyword.shield",
+  family: "keyword",
+  name: "Shield",
+  description: "Increases this unit's Might while it is a defender.",
+  parameterNames: ["amount"]
+};
+
 const TANK_KEYWORD_PRIMITIVE: PrimitiveDefinition = {
   id: "keyword.tank",
   family: "keyword",
@@ -546,6 +554,20 @@ export function analyzeCardCorpus(
 }
 
 export function discoverCardPrimitives(card: Card): CardPrimitiveDiscovery {
+  const overrideClauses = discoverMasterYiClauses(card);
+  if (overrideClauses) {
+    return {
+      cardCode: deriveCardCodeFromCard(card),
+      cardName: card.name,
+      publicCode: card.public_code,
+      setCode: card.set.set_id,
+      rulesText: card.text.plain,
+      clauses: overrideClauses,
+      primitiveIds: [...new Set(overrideClauses.flatMap((clause) =>
+        clause.assignments.map((item) => item.primitiveId)
+      ))].sort()
+    };
+  }
   let inheritedTiming: "action" | "reaction" | null = null;
   const clauses = [
     ...discoverIntrinsicCardClauses(card),
@@ -596,6 +618,79 @@ export function discoverCardPrimitives(card: Card): CardPrimitiveDiscovery {
   };
 }
 
+function discoverMasterYiClauses(card: Card): ClauseDiscovery[] | null {
+  type ModelAssignment = [
+    string,
+    PrimitiveFamily,
+    Record<string, string | number | boolean>
+  ];
+  const models: Record<string, ModelAssignment[]> = {
+    "Wuju Bladesman - Starter": [
+      ["selector.friendly_unit", "selector", { area: "board", locationRelation: "any", automatic: true, selectionKey: "affected" }],
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "friendly_unit", duration: "whileSourceOnBoard", condition: "friendlyDefendsAlone", selectionKey: "affected" }]
+    ],
+    "Yi, Meditative": [
+      ["condition.compare_numeric_value", "condition", { valueSource: "controller.boardRuneCount", operator: "greaterThanOrEqual", comparisonValue: 8 }],
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 4, target: "source", duration: "whileSourceOnBoard" }]
+    ],
+    "Wielder of Water": [
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "source", duration: "whileSourceOnBoard", condition: "sourceCombatsAlone" }]
+    ],
+    "En Garde": [
+      ["timing.reaction", "timing", {}],
+      ["selector.friendly_unit", "selector", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "controller", selectionKey: "unit" }],
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 1, target: "friendly_unit", duration: "thisTurn", selectionKey: "unit" }],
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 1, target: "friendly_unit", duration: "thisTurn", condition: "onlyFriendlyUnitAtLocation", selectionKey: "unit" }]
+    ],
+    "Cannon Barrage": [
+      ["timing.reaction", "timing", {}],
+      ["selector.enemy_unit", "selector", { area: "combat", locationRelation: "currentCombat", controller: "opponent", automatic: true, selectionKey: "enemies" }],
+      ["action.deal_damage", "action", { amount: 2, target: "enemy_unit", selectionKey: "enemies" }]
+    ],
+    Confront: [
+      ["timing.action", "timing", {}],
+      ["modifier.enter_ready", "modifier", { target: "controller_units", duration: "thisTurn" }],
+      ["action.draw_cards", "action", { player: "controller", count: 1 }]
+    ],
+    Meditation: [
+      ["timing.reaction", "timing", {}],
+      ["selector.friendly_unit", "selector", { minimumCount: 0, maximumCount: 1, area: "board", locationRelation: "any", controller: "controller", readyOnly: true, selectionKey: "optionalCost", selectionPurpose: "optionalCost" }],
+      ["cost.exhaust_selected_unit", "cost", { selectionKey: "optionalCost", optional: true }],
+      ["action.draw_by_optional_cost", "action", { selectionKey: "optionalCost", paidCount: 2, unpaidCount: 1 }]
+    ],
+    Mobilize: [
+      ["action.channel_or_draw", "action", { channelCount: 1, entryState: "exhausted", fallbackDrawCount: 1 }]
+    ],
+    Highlander: [
+      ["timing.reaction", "timing", {}],
+      ["selector.friendly_unit", "selector", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "controller", selectionKey: "unit" }],
+      ["replacement.recall_on_next_death", "replacement", { selectionKey: "unit", duration: "thisTurn", exhausted: true }]
+    ],
+    "Gentlemen's Duel": [
+      ["timing.action", "timing", {}],
+      ["selector.friendly_unit", "selector", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "controller", selectionKey: "friendly" }],
+      ["selector.enemy_unit", "selector", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "opponent", selectionKey: "enemy" }],
+      ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "friendly_unit", duration: "thisTurn", selectionKey: "friendly" }],
+      ["action.fight", "action", { firstUnitSelectionKey: "friendly", secondUnitSelectionKey: "enemy" }]
+    ]
+  };
+  const model = models[card.name];
+  if (!model) return null;
+  return [{
+    id: `master-yi-${card.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    sourceText: card.text.plain,
+    normalizedText: normalizeText(card.text.plain),
+    assignments: model.map(([primitiveId, family, parameters]) => ({
+      primitiveId,
+      family,
+      sourceText: card.text.plain,
+      parameters,
+      confidence: "high" as const
+    })),
+    unsupportedReason: null
+  }];
+}
+
 function primitive(
   id: string,
   family: PrimitiveFamily,
@@ -622,6 +717,7 @@ const primitiveDefinitionsById = new Map(
     RECYCLE_FOR_POWER_PRIMITIVE,
     HIDDEN_KEYWORD_PRIMITIVE,
     ASSAULT_KEYWORD_PRIMITIVE,
+    SHIELD_KEYWORD_PRIMITIVE,
     TANK_KEYWORD_PRIMITIVE,
     ...primitiveDetectors.map((detector) => detector.primitive)
   ].map((primitiveDefinition) => [
@@ -719,6 +815,18 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
         )
       ]
     : [];
+  const shieldMatch = context.normalizedText.match(/\[Shield(?:\s+(\d+))?\]/i);
+  const shieldAssignments = shieldMatch
+    ? [
+        assignment(
+          context,
+          "keyword.shield",
+          "keyword",
+          { amount: shieldMatch[1] ? Number(shieldMatch[1]) : 1 },
+          "high"
+        )
+      ]
+    : [];
   const tankAssignments = /\[Tank\]/i.test(context.normalizedText)
     ? [assignment(context, "keyword.tank", "keyword", {}, "high")]
     : [];
@@ -744,7 +852,8 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
     .filter(
       (keyword) =>
         !["Action", "Reaction", "Hidden", "Add", "Tank", "Vision", "Deflect"].includes(keyword) &&
-        !/^Assault(?:\s+\d+)?$/i.test(keyword)
+        !/^Assault(?:\s+\d+)?$/i.test(keyword) &&
+        !/^Shield(?:\s+\d+)?$/i.test(keyword)
     )
     .map((keyword) => {
       const primitiveId = `keyword.${toPrimitiveKey(keyword)}`;
@@ -772,6 +881,7 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
   return [
     ...hiddenAssignments,
     ...assaultAssignments,
+    ...shieldAssignments,
     ...tankAssignments,
     ...visionAssignments,
     ...deflect,

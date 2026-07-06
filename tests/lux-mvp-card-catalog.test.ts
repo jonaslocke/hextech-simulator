@@ -77,7 +77,7 @@ test("Lux MVP deck has exact, publishable behavior models for all 21 cards", asy
   });
 
   assert.equal(documents.length, 21);
-  assert.ok(documents.some((card) => card.runtimeSupportStatus === "requires_engine_support"));
+  assert.ok(documents.every((card) => card.runtimeSupportStatus === "supported"));
   for (const cardCode of ["OGN-219", "OGN-088"]) {
     const vanilla = documents.find((card) => card.cardCode === cardCode);
     assert.deepEqual(vanilla?.behaviorModel, { playTimings: [], clauses: [] });

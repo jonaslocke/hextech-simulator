@@ -21,7 +21,7 @@ test("builds an approved canonical card with a structured behavior model", () =>
   assert.equal(document.id, "OGN-095");
   assert.equal(document.card.name, "Stupefy");
   assert.equal(document.modelingStatus, "approved");
-  assert.equal(document.runtimeSupportStatus, "requires_engine_support");
+  assert.equal(document.runtimeSupportStatus, "supported");
   assert.equal(document.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
   assert.equal(
     document.behaviorModel.clauses[0]?.effects.find(
@@ -42,7 +42,7 @@ test("rejects non-approved canonical publication", () => {
   );
 });
 
-test("publishes runtime-pending and vanilla behavior models", () => {
+test("publishes executable and vanilla behavior models", () => {
   const runtimePending = buildCanonicalCardDocument(
     createPublicationInput(),
     buildPrimitiveCatalog(),
@@ -71,7 +71,7 @@ test("publishes runtime-pending and vanilla behavior models", () => {
   );
 
   assert.equal(runtimePending.modelingStatus, "approved");
-  assert.equal(runtimePending.runtimeSupportStatus, "requires_engine_support");
+  assert.equal(runtimePending.runtimeSupportStatus, "supported");
   assert.equal(vanilla.modelingStatus, "approved");
   assert.equal(vanilla.runtimeSupportStatus, "supported");
   assert.deepEqual(vanilla.behaviorModel, { playTimings: [], clauses: [] });

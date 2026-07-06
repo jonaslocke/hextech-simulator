@@ -138,18 +138,18 @@ test("locks Assault and Shield modifiers into combat Might totals", () => {
     attackerMight: 2,
     attackerAssault: 2,
     defenders: [
-      { id: "shield", might: 2, shield: 1 },
+      { id: "shield", might: 2, shield: 3 },
       { id: "support", might: 2 }
     ]
   });
   const showdown = moveAttacker(initial, decks);
   assert.equal(showdown.state.cardStates.attacker!.computedMight, 4);
-  assert.equal(showdown.state.cardStates.shield!.computedMight, 3);
+  assert.equal(showdown.state.cardStates.shield!.computedMight, 5);
   assert.equal(showdown.state.cardStates.support!.computedMight, 2);
 
   const game = passShowdown(showdown, decks);
   assert.equal(game.state.combat?.attackerMight, 4);
-  assert.equal(game.state.combat?.defenderMight, 5);
+  assert.equal(game.state.combat?.defenderMight, 7);
   assert.equal(game.state.pendingChoice?.type, "assignCombatDamage");
 });
 
@@ -449,6 +449,7 @@ function combatFixture(input: {
       showdown: null,
       combat: null,
       modifiers: [],
+      ongoingEffects: [],
       delayedEffects: [],
       effectResolutions: [],
       pendingChoice: null,
