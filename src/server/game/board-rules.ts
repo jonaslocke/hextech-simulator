@@ -26,6 +26,12 @@ export function cleanupBoard(
   }
 }
 
+export function clearMarkedDamage(game: GameDocument): void {
+  for (const state of Object.values(game.state.cardStates)) {
+    state.damage = 0;
+  }
+}
+
 export function markBattlefieldContested(
   game: GameDocument,
   battlefieldId: string,

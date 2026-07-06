@@ -1,4 +1,5 @@
 import {
+  clearMarkedDamage,
   cleanupBoard,
   unitControllers
 } from "./board-rules";
@@ -290,8 +291,8 @@ function resolveCombat(
   battlefield.contestedByPlayerId = null;
   for (const state of Object.values(game.state.cardStates)) {
     state.combatRole = null;
-    state.damage = 0;
   }
+  clearMarkedDamage(game);
   for (const id of [
     ...combat.attackerUnitIds,
     ...combat.defenderUnitIds,

@@ -185,6 +185,46 @@ test("leaves an empty battlefield when equal units kill each other", () => {
   assert.ok(game.state.players.p2!.zones.trash.includes("defender"));
 });
 
+test("clears surviving damage before temporary Might expires at end of turn", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: []
+  });
+  initial.state.cardStates.attacker!.damage = 2;
+  initial.state.cardStates.attacker!.computedMight = 4;
+  initial.state.modifiers.push({
+    id: "temporary-might",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p1",
+    targetCardInstanceId: "attacker",
+    targetScope: "unit",
+    attribute: "might",
+    operation: "increase",
+    amount: 2,
+    minimum: null,
+    duration: "thisTurn",
+    createdAtTurn: 1
+  });
+
+  const endTurn = gameplayActions(initial, "p1", decks).find(
+    (action) => action.label === "End turn"
+  )!;
+  const game = performGameplayAction({
+    game: initial,
+    actorPlayerId: "p1",
+    actionId: endTurn.id,
+    selectedIds: [],
+    decks,
+    now: "end-turn-expiration"
+  });
+
+  assert.ok(game.state.players.p1!.zones.base.includes("attacker"));
+  assert.ok(!game.state.players.p1!.zones.trash.includes("attacker"));
+  assert.equal(game.state.cardStates.attacker!.damage, 0);
+  assert.equal(game.state.cardStates.attacker!.computedMight, 2);
+  assert.equal(game.state.modifiers.length, 0);
+});
+
 function moveAttacker(
   initial: GameDocument,
   decks: DeckSnapshotDocument[]

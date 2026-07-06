@@ -15,6 +15,7 @@ import {
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import {
+  clearMarkedDamage,
   cleanupBoard,
   markBattlefieldContested,
   openPendingNonCombatShowdown,
@@ -879,6 +880,7 @@ function completeEndTurn(
     throw new Error("The ending turn is no longer active.");
   }
   const next = otherPlayer(game, actor);
+  clearMarkedDamage(game);
   cleanupTurnModifiers(game, index);
   game.state.turn = {
     turnNumber: turn.turnNumber + 1,

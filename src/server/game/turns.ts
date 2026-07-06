@@ -42,9 +42,6 @@ export function applyStartOfTurn(
         candidate.power = {};
         candidate.conditionalEnergy = 0;
       }
-      for (const state of Object.values(game.state.cardStates)) {
-        state.damage = 0;
-      }
       player.scoredBattlefieldIdsThisTurn = [];
       const controlledBattlefieldUnits = game.state.battlefields
         .flatMap((battlefield) => battlefield.units)
