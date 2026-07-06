@@ -92,6 +92,82 @@ export function simultaneousMoveAction(
   ) ?? null;
 }
 
+export type CombinedTargetRequirement = {
+  legalIds: string[];
+  maximum: number;
+  minimum: number;
+  requirements: ProjectedAction["targets"];
+};
+
+export function combineTargetRequirements(
+  action: ProjectedAction,
+  kind: ProjectedAction["targets"][number]["kind"],
+): CombinedTargetRequirement | null {
+  const requirements = action.targets.filter(
+    (requirement) => requirement.kind === kind,
+  );
+  if (requirements.length === 0) return null;
+
+  return {
+    legalIds: [
+      ...new Set(requirements.flatMap((requirement) => requirement.legalIds)),
+    ],
+    maximum: requirements.reduce(
+      (total, requirement) => total + requirement.maximum,
+      0,
+    ),
+    minimum: requirements.reduce(
+      (total, requirement) => total + requirement.minimum,
+      0,
+    ),
+    requirements,
+  };
+}
+
+export function targetSelectionIsLegal(
+  requirement: CombinedTargetRequirement,
+  selectedIds: readonly string[],
+): boolean {
+  return (
+    selectedIds.length >= requirement.minimum &&
+    selectedIds.length <= requirement.maximum &&
+    new Set(selectedIds).size === selectedIds.length &&
+    selectedIds.every((id) => requirement.legalIds.includes(id)) &&
+    requirement.requirements.every((individual) => {
+      const selectedCount = selectedIds.filter((id) =>
+        individual.legalIds.includes(id),
+      ).length;
+      return (
+        selectedCount >= individual.minimum &&
+        selectedCount <= individual.maximum
+      );
+    })
+  );
+}
+
+export function targetSelectionCanAdd(
+  requirement: CombinedTargetRequirement,
+  selectedIds: readonly string[],
+  candidateId: string,
+): boolean {
+  if (
+    selectedIds.includes(candidateId) ||
+    !requirement.legalIds.includes(candidateId)
+  ) {
+    return false;
+  }
+
+  const proposedIds = [...selectedIds, candidateId];
+  return (
+    proposedIds.length <= requirement.maximum &&
+    requirement.requirements.every(
+      (individual) =>
+        proposedIds.filter((id) => individual.legalIds.includes(id)).length <=
+        individual.maximum,
+    )
+  );
+}
+
 export function moveSelectionTitle(
   action: ProjectedAction | undefined,
   battlefields: readonly {

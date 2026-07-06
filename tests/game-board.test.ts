@@ -5,9 +5,12 @@ import { test } from "node:test";
 import {
   actionsForSource,
   chainOverlayOpen,
+  combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
-  simultaneousMoveAction
+  simultaneousMoveAction,
+  targetSelectionCanAdd,
+  targetSelectionIsLegal
 } from "../src/features/game-board/model";
 import { responsiveCardHeight } from "../src/features/game-board/card-sizing";
 import type { ProjectedAction } from "../src/shared/game";
@@ -21,6 +24,64 @@ test("groups opaque projected actions without card-specific rules", () => {
   assert.deepEqual(actionsForSource(actions, "card-a"), [actions[0]]);
   assert.deepEqual(actionsForSource(actions, "card-b"), [actions[1]]);
   assert.deepEqual(actionsForSource(actions, null), [actions[2]]);
+});
+
+test("combines and validates selector-bound targets for one action", () => {
+  const action: ProjectedAction = {
+    id: "state:1:play:duel",
+    label: "Play Gentlemen's Duel",
+    sourceCardInstanceId: "duel",
+    enabled: true,
+    disabledReason: null,
+    targets: [
+      {
+        kind: "card",
+        legalIds: ["friendly-a", "friendly-b"],
+        minimum: 1,
+        maximum: 1,
+        selectionKey: "friendly",
+      },
+      {
+        kind: "card",
+        legalIds: ["enemy-a", "enemy-b"],
+        minimum: 1,
+        maximum: 1,
+        selectionKey: "enemy",
+      },
+    ],
+    presentation: {
+      surface: "card-menu",
+      style: "primary",
+      prompt: null,
+    },
+  };
+  const requirement = combineTargetRequirements(action, "card");
+
+  assert.ok(requirement);
+  assert.equal(requirement.minimum, 2);
+  assert.equal(requirement.maximum, 2);
+  assert.deepEqual(requirement.legalIds, [
+    "friendly-a",
+    "friendly-b",
+    "enemy-a",
+    "enemy-b",
+  ]);
+  assert.equal(
+    targetSelectionCanAdd(requirement, ["friendly-a"], "enemy-a"),
+    true,
+  );
+  assert.equal(
+    targetSelectionCanAdd(requirement, ["friendly-a"], "friendly-b"),
+    false,
+  );
+  assert.equal(
+    targetSelectionIsLegal(requirement, ["friendly-a", "enemy-a"]),
+    true,
+  );
+  assert.equal(
+    targetSelectionIsLegal(requirement, ["friendly-a", "friendly-b"]),
+    false,
+  );
 });
 
 test("derives active and waiting showdown prompts from Focus", () => {

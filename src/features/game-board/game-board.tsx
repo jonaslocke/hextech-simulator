@@ -45,9 +45,13 @@ import {
 } from "./board-view-model";
 import {
   chainOverlayOpen,
+  combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction,
+  targetSelectionCanAdd,
+  targetSelectionIsLegal,
+  type CombinedTargetRequirement,
 } from "./model";
 import {
   BattlefieldData,
@@ -176,6 +180,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     maxTargets: number;
     minTargets: number;
     purpose: "choice" | "move" | "play";
+    requirement: CombinedTargetRequirement;
     selectedTargetIds: string[];
     targetKind: "battlefield" | "card";
   } | null>(null);
@@ -257,7 +262,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     scores,
   });
   const beginGlobalAction = (action: GameProjection["actions"][number]) => {
-    const requirement = action.targets.find((target) => target.kind === "card");
+    const requirement = combineTargetRequirements(action, "card");
     if (!requirement) {
       submitProjectedAction(action.id);
       return;
@@ -274,6 +279,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           : action.choice?.kind === "effectSelection"
             ? "choice"
             : "play",
+      requirement,
       selectedTargetIds: [],
       targetKind: "card",
     });
@@ -522,9 +528,12 @@ export const GameBoard: FC<GameBoardProps> = ({
       card.instanceId,
     );
     const actionToSubmit = stagedMoveAction ?? projectedAction;
-    const requirement = actionToSubmit.targets.find(
-      (target) => target.kind === "card" || target.kind === "battlefield",
-    );
+    const targetKind = actionToSubmit.targets.some(
+      (target) => target.kind === "card",
+    )
+      ? "card"
+      : "battlefield";
+    const requirement = combineTargetRequirements(actionToSubmit, targetKind);
 
     if (requirement && requirement.maximum > 0) {
       setTargetSelection({
@@ -533,8 +542,9 @@ export const GameBoard: FC<GameBoardProps> = ({
         maxTargets: requirement.maximum,
         minTargets: requirement.minimum,
         purpose: stagedMoveAction ? "move" : "play",
+        requirement,
         selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
-        targetKind: requirement.kind === "battlefield" ? "battlefield" : "card",
+        targetKind,
       });
       return;
     }
@@ -609,14 +619,21 @@ export const GameBoard: FC<GameBoardProps> = ({
       return;
     }
 
-    const selectedTargetIds = targetSelection.selectedTargetIds.includes(
-      cardInstanceId,
-    )
+    const isSelected =
+      targetSelection.selectedTargetIds.includes(cardInstanceId);
+    if (
+      !isSelected &&
+      !targetSelectionCanAdd(
+        targetSelection.requirement,
+        targetSelection.selectedTargetIds,
+        cardInstanceId,
+      )
+    ) {
+      return;
+    }
+    const selectedTargetIds = isSelected
       ? targetSelection.selectedTargetIds.filter((id) => id !== cardInstanceId)
-      : [...targetSelection.selectedTargetIds, cardInstanceId].slice(
-          0,
-          targetSelection.maxTargets,
-        );
+      : [...targetSelection.selectedTargetIds, cardInstanceId];
     const nextSelection = {
       ...targetSelection,
       selectedTargetIds,
@@ -628,6 +645,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       nextSelection.purpose === "play" &&
       nextSelection.minTargets === nextSelection.maxTargets &&
       selectedTargetIds.length === nextSelection.maxTargets &&
+      targetSelectionIsLegal(nextSelection.requirement, selectedTargetIds) &&
       additionalPowerForTargets(targetSelectionAction, selectedTargetIds) === 0
     ) {
       submitTargetedPlay(nextSelection);
@@ -679,7 +697,12 @@ export const GameBoard: FC<GameBoardProps> = ({
       return false;
     }
 
-    if (selection.selectedTargetIds.length < selection.minTargets) {
+    if (
+      !targetSelectionIsLegal(
+        selection.requirement,
+        selection.selectedTargetIds,
+      )
+    ) {
       return false;
     }
 
@@ -767,8 +790,9 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerDecision.actionId === effectSelectionAction.id)
     )
       return;
-    const requirement = effectSelectionAction.targets.find(
-      (target) => target.kind === "card",
+    const requirement = combineTargetRequirements(
+      effectSelectionAction,
+      "card",
     );
     if (!requirement) return;
     setTargetSelection((current) =>
@@ -780,6 +804,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             maxTargets: requirement.maximum,
             minTargets: requirement.minimum,
             purpose: "choice",
+            requirement,
             selectedTargetIds: [],
             targetKind: "card",
           },
@@ -998,8 +1023,10 @@ export const GameBoard: FC<GameBoardProps> = ({
           <TargetSelectionPrompt
             canSubmit={
               !isSubmittingAction &&
-              targetSelection.selectedTargetIds.length >=
-                targetSelection.minTargets &&
+              targetSelectionIsLegal(
+                targetSelection.requirement,
+                targetSelection.selectedTargetIds,
+              ) &&
               missingDeflectPower === 0
             }
             costPreview={
