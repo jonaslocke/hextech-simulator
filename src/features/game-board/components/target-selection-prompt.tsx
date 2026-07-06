@@ -33,6 +33,7 @@ export function TargetSelectionPrompt({
   cancelLabel = "Cancel",
   confirmLabel = "Play",
   costPreview,
+  isSubmitting = false,
   maxTargets,
   minTargets,
   onCancel,
@@ -51,6 +52,7 @@ export function TargetSelectionPrompt({
     energy: number;
     sourceNames: string[];
   };
+  isSubmitting?: boolean;
   maxTargets: number;
   minTargets: number;
   onCancel: () => void;
@@ -336,8 +338,12 @@ export function TargetSelectionPrompt({
             <Button onClick={onCancel} type="button" variant="secondary">
               {cancelLabel}
             </Button>
-            <Button disabled={!canSubmit} onClick={onSubmit} type="button">
-              {confirmLabel}
+            <Button
+              disabled={!canSubmit || isSubmitting}
+              onClick={onSubmit}
+              type="button"
+            >
+              {isSubmitting ? "Submitting…" : confirmLabel}
             </Button>
           </div>
         </div>

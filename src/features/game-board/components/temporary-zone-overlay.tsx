@@ -44,6 +44,7 @@ export function TemporaryZoneOverlay({
   chainCards,
   chainPassLabel = "Pass priority",
   isCloseDisabled = false,
+  isSubmittingAction = false,
   logEntries,
   onChainItemPointerEnter,
   onChainItemPointerLeave,
@@ -59,6 +60,7 @@ export function TemporaryZoneOverlay({
   chainCards: ChainCardEntry[];
   chainPassLabel?: string;
   isCloseDisabled?: boolean;
+  isSubmittingAction?: boolean;
   logEntries: GameLogEntry[];
   onChainItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
   onChainItemPointerLeave?: () => void;
@@ -232,6 +234,7 @@ export function TemporaryZoneOverlay({
     openZone === "chain" &&
     chainCards.length > 0 &&
     canPassChain &&
+    !isSubmittingAction &&
     Boolean(onPassChain);
   const canCloseWithShortcut = Boolean(openZone) && !isCloseDisabled;
 
@@ -373,12 +376,16 @@ export function TemporaryZoneOverlay({
             {chainCards.length > 0 && (
               <Button
                 className="bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 w-full font-semibold text-slate-950 text-sm disabled:cursor-not-allowed"
-                disabled={!canUsePassShortcut}
+                disabled={!canPassChain || isSubmittingAction}
                 onClick={onPassChain}
                 type="button"
               >
                 <span>
-                  {canPassChain ? chainPassLabel : "Waiting for priority"}
+                  {isSubmittingAction
+                    ? "Submitting…"
+                    : canPassChain
+                      ? chainPassLabel
+                      : "Waiting for priority"}
                 </span>
                 {canUsePassShortcut && (
                   <span className="inline-flex items-center gap-1 ml-2 font-medium text-slate-950/75 text-xs">

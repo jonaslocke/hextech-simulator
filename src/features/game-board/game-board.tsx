@@ -63,11 +63,12 @@ type ProjectedBattlefield = BoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
 type ProjectedZone = BoardZoneProjection;
 type GameBoardProps = {
+  isSubmittingAction?: boolean;
   onPerformAction: (input: {
     actionId: string;
     selectedIds: string[];
     allocations?: Array<{ targetUnitId: string; amount: number }>;
-  }) => void;
+  }) => Promise<boolean>;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
@@ -93,6 +94,7 @@ type PaymentMode =
 const EMPTY_TARGET_IDS: string[] = [];
 
 export const GameBoard: FC<GameBoardProps> = ({
+  isSubmittingAction = false,
   onPerformAction,
   playerNames = {},
   projection: sourceProjection,
@@ -112,8 +114,9 @@ export const GameBoard: FC<GameBoardProps> = ({
       actionId: string | undefined,
       selectedIds: string[] = [],
       allocations?: Array<{ targetUnitId: string; amount: number }>,
-    ) => {
-      if (actionId) onPerformAction({ actionId, selectedIds, allocations });
+    ): Promise<boolean> => {
+      if (!actionId) return Promise.resolve(false);
+      return onPerformAction({ actionId, selectedIds, allocations });
     },
     [onPerformAction],
   );
@@ -678,13 +681,15 @@ export const GameBoard: FC<GameBoardProps> = ({
 
     setHoveredTargetCardInstanceId(null);
   };
-  const submitTargetedPlay = (selection = targetSelection) => {
+  const submitTargetedPlay = async (
+    selection = targetSelection,
+  ): Promise<boolean> => {
     if (!selection) {
-      return;
+      return false;
     }
 
     if (selection.selectedTargetIds.length < selection.minTargets) {
-      return;
+      return false;
     }
 
     const selectedAdditionalPower = additionalPowerForTargets(
@@ -697,16 +702,19 @@ export const GameBoard: FC<GameBoardProps> = ({
         (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
     );
     if (missingAdditionalPower > 0) {
-      return;
+      return false;
     }
 
-    submitProjectedAction(
+    const accepted = await submitProjectedAction(
       targetSelectionAction?.id ?? selection.actionId,
       selection.selectedTargetIds,
     );
+    if (!accepted) return false;
+
     setPendingSubmittedTargetIds(selection.selectedTargetIds);
     setHoveredTargetCardInstanceId(null);
     setTargetSelection(null);
+    return true;
   };
   const openRuneActionMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
     if (!card.instanceId) {
@@ -830,16 +838,18 @@ export const GameBoard: FC<GameBoardProps> = ({
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
+        isSubmitting={isSubmittingAction}
         onCancel={() => setTargetSelection(null)}
-        onIntent={(intent) => {
-          submitProjectedAction(
+        onIntent={async (intent) => {
+          const accepted = await submitProjectedAction(
             intent.actionId,
             intent.selectedIds ?? [],
             intent.allocations,
           );
-          if (targetSelection?.actionId === intent.actionId) {
+          if (accepted && targetSelection?.actionId === intent.actionId) {
             setTargetSelection(null);
           }
+          return accepted;
         }}
       />
       {showdownPrompt &&
@@ -855,6 +865,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             isClosed={showdownPrompt.isClosed}
             isCombat={showdownPrompt.kind === "combat"}
             isFinalFocusPass={showdownPrompt.isFinalFocusPass}
+            isSubmitting={isSubmittingAction}
             onPassFocus={showdownPrompt.canPassFocus ? onPass : undefined}
             priorityPlayerId={showdownPrompt.priorityPlayerId}
           />
@@ -922,8 +933,10 @@ export const GameBoard: FC<GameBoardProps> = ({
           isChainLockedOpen={isChainLockedOpen}
           onPassTurn={passFocusAction ? onPass : onEndTurn}
           openZone={openZone}
-          passTurnDisabled={!canViewerEndTurn}
-          passTurnLabel={passTurnLabel}
+          passTurnDisabled={!canViewerEndTurn || isSubmittingAction}
+          passTurnLabel={
+            isSubmittingAction ? "Submitting…" : passTurnLabel
+          }
           setOpenZone={setOpenZoneRespectingChain}
         />
       </section>
@@ -944,8 +957,9 @@ export const GameBoard: FC<GameBoardProps> = ({
       <TemporaryZoneOverlay
         canPassChain={canViewerPassChain}
         chainCards={chainCards}
-        chainPassLabel={chainPassLabel}
+        chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
         isCloseDisabled={isChainLockedOpen}
+        isSubmittingAction={isSubmittingAction}
         logEntries={logEntries}
         onClose={() => setOpenZoneRespectingChain(null)}
         onChainItemPointerEnter={(targetCardInstanceIds) =>
@@ -972,6 +986,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         !targetSelectionUsesCardPrompt && (
           <TargetSelectionPrompt
             canSubmit={
+              !isSubmittingAction &&
               targetSelection.selectedTargetIds.length >=
                 targetSelection.minTargets && missingDeflectPower === 0
             }
@@ -993,6 +1008,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             }
             maxTargets={targetSelection.maxTargets}
             minTargets={targetSelection.minTargets}
+            isSubmitting={isSubmittingAction}
             onCancel={() => setTargetSelection(null)}
             onSubmit={() => submitTargetedPlay()}
             selectedCount={targetSelection.selectedTargetIds.length}
@@ -1029,6 +1045,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           confirmLabel="Choose battlefield"
           description="Choose the battlefield affected by this action."
           isOpen
+          isSubmitting={isSubmittingAction}
           onCancel={() => setTargetSelection(null)}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({
@@ -1058,6 +1075,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           confirmLabel="Play unit"
           description="Units may be played to your Base or a battlefield you control."
           isOpen
+          isSubmitting={isSubmittingAction}
           onCancel={() => setUnitPlayChoice(null)}
           onConfirm={([actionId]) => {
             const card = unitPlayChoice.card;

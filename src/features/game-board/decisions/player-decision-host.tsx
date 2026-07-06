@@ -18,13 +18,15 @@ import type {
 export function PlayerDecisionHost({
   cardsByInstanceId,
   decision,
+  isSubmitting,
   onCancel,
   onIntent,
 }: {
   cardsByInstanceId: Record<string, BoardCatalogCard>;
   decision: PlayerDecisionRequest | null;
+  isSubmitting: boolean;
   onCancel?: () => void;
-  onIntent: (intent: PlayerDecisionIntent) => void;
+  onIntent: (intent: PlayerDecisionIntent) => Promise<boolean>;
 }) {
   if (!decision) {
     return null;
@@ -39,6 +41,7 @@ export function PlayerDecisionHost({
           description={decision.description}
           decisionKey={decision.decisionKey}
           isOpen
+          isSubmitting={isSubmitting}
           maxSelected={decision.maxSelected}
           minSelected={decision.minSelected}
           onCancel={decision.canCancel ? onCancel : undefined}
@@ -55,6 +58,7 @@ export function PlayerDecisionHost({
       return (
         <OptionDecisionPrompt
           decision={decision}
+          isSubmitting={isSubmitting}
           onCancel={onCancel}
           onSubmit={(selectedIds) =>
             onIntent(createSelectionIntent(decision.actionId, selectedIds))
@@ -65,6 +69,7 @@ export function PlayerDecisionHost({
       return (
         <OrderedDecisionPrompt
           decision={decision}
+          isSubmitting={isSubmitting}
           onSubmit={(orderedIds) =>
             onIntent(createSelectionIntent(decision.actionId, orderedIds))
           }
@@ -75,6 +80,7 @@ export function PlayerDecisionHost({
         <CombatDamagePrompt
           cardsByInstanceId={cardsByInstanceId}
           decision={decision}
+          isSubmitting={isSubmitting}
           onSubmit={(allocations) =>
             onIntent(
               createCombatDamageIntent(decision.actionId, allocations),

@@ -19,6 +19,7 @@ export type ChoiceDialogProps = {
   decisionKey?: string;
   description?: string;
   isOpen: boolean;
+  isSubmitting?: boolean;
   onCancel?: () => void;
   onConfirm: (selectedIds: string[]) => void;
   options: ChoiceDialogOption[];
@@ -31,6 +32,7 @@ export function ChoiceDialog({
   decisionKey,
   description,
   isOpen,
+  isSubmitting = false,
   onCancel,
   onConfirm,
   options,
@@ -109,12 +111,14 @@ export function ChoiceDialog({
               </Button>
             )}
             <Button
-              disabled={!canConfirm}
+              disabled={!canConfirm || isSubmitting}
               onClick={() => onConfirm(selectedIds)}
               type="button"
             >
-              {confirmLabel ??
-                (selectionMode === "ordered" ? "Submit order" : "Confirm")}
+              {isSubmitting
+                ? "Submitting…"
+                : confirmLabel ??
+                  (selectionMode === "ordered" ? "Submit order" : "Confirm")}
             </Button>
           </footer>
         </section>

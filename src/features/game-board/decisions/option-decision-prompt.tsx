@@ -5,10 +5,12 @@ import type { OptionDecisionRequest } from "./player-decision-types";
 
 export function OptionDecisionPrompt({
   decision,
+  isSubmitting,
   onCancel,
   onSubmit,
 }: {
   decision: OptionDecisionRequest;
+  isSubmitting: boolean;
   onCancel?: () => void;
   onSubmit: (selectedIds: string[]) => void;
 }) {
@@ -18,6 +20,7 @@ export function OptionDecisionPrompt({
       decisionKey={decision.decisionKey}
       description={decision.description}
       isOpen
+      isSubmitting={isSubmitting}
       onCancel={decision.canCancel ? onCancel : undefined}
       onConfirm={onSubmit}
       options={decision.options}

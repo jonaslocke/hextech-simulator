@@ -43,10 +43,12 @@ type DamagePlanValidation = {
 export function CombatDamageDialog({
   choice,
   cardsByInstanceId,
+  isSubmitting = false,
   onSubmit,
 }: {
   choice: CombatDamageChoice;
   cardsByInstanceId: Record<string, BoardCatalogCard>;
+  isSubmitting?: boolean;
   onSubmit: (allocations: DamageAllocation[]) => void;
 }) {
   const [amounts, setAmounts] = useState<Record<string, number>>({});
@@ -299,11 +301,11 @@ export function CombatDamageDialog({
               Reset
             </Button>
             <Button
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSubmitting}
               onClick={() => onSubmit(allocations)}
               type="button"
             >
-              Resolve damage
+              {isSubmitting ? "Submitting…" : "Resolve damage"}
             </Button>
           </div>
         </footer>

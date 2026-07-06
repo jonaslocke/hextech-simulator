@@ -2,7 +2,7 @@
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createMatchClient,
   loadDeckOptionsClient,
@@ -12,6 +12,7 @@ import {
 import type { DeckId } from "@/shared/game";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { MatchResultDialog } from "./match-result-dialog";
+import { ActionSubmissionGuard } from "../action-submission-guard";
 
 type OnlinePlayerCredentials = {
   matchId: string;
@@ -32,6 +33,7 @@ export function MatchSimulator({
   const [viewerSeat, setViewerSeat] = useState<SeatKey>(onlineSeat);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const actionSubmissionGuardRef = useRef(new ActionSubmissionGuard());
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
   const [playerDecks, setPlayerDecks] = useState<
     Record<SeatKey, DeckId>
@@ -41,6 +43,21 @@ export function MatchSimulator({
   const currentMatchId = match?.matchId;
   const viewerPlayerId = viewer?.playerId;
   const viewerToken = viewer?.playerToken;
+  const projectionIdentity = projection
+    ? `${projection.viewerPlayerId}:${projection.stateVersion}`
+    : null;
+  const previousProjectionIdentityRef = useRef(projectionIdentity);
+
+  useEffect(() => {
+    if (
+      previousProjectionIdentityRef.current !== null &&
+      previousProjectionIdentityRef.current !== projectionIdentity
+    ) {
+      actionSubmissionGuardRef.current.reset();
+      setBusy(false);
+    }
+    previousProjectionIdentityRef.current = projectionIdentity;
+  }, [projectionIdentity]);
 
   useEffect(() => {
     if (onlineMatch) return;
@@ -137,10 +154,13 @@ export function MatchSimulator({
     actionId: string;
     selectedIds: string[];
     allocations?: Array<{ targetUnitId: string; amount: number }>;
-  }) {
+  }): Promise<boolean> {
     if (!match || !viewer || !projection) {
-      return;
+      return false;
     }
+
+    const submissionId = actionSubmissionGuardRef.current.begin();
+    if (submissionId === null) return false;
 
     setBusy(true);
     setError(null);
@@ -155,6 +175,7 @@ export function MatchSimulator({
 
       if (!result.accepted) {
         setError(result.error.message);
+        return false;
       } else {
         setMatch((current) =>
           current
@@ -167,11 +188,15 @@ export function MatchSimulator({
               }
             : current,
         );
+        return true;
       }
     } catch {
       setError("The action request failed.");
+      return false;
     } finally {
-      setBusy(false);
+      if (actionSubmissionGuardRef.current.finish(submissionId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -285,6 +310,7 @@ export function MatchSimulator({
         ) : (
           <>
             <Button
+              disabled={busy}
               onClick={() => setViewerSeat("player1")}
               size="sm"
               type="button"
@@ -293,6 +319,7 @@ export function MatchSimulator({
               Player 1
             </Button>
             <Button
+              disabled={busy}
               onClick={() => setViewerSeat("player2")}
               size="sm"
               type="button"
@@ -330,6 +357,7 @@ export function MatchSimulator({
           .map((action) => action.id)
           .sort()
           .join(",")}`}
+        isSubmitting={busy}
         isOpen={battlefieldOptions.length > 0}
         onConfirm={([actionId]) => {
           if (actionId) {
@@ -346,6 +374,7 @@ export function MatchSimulator({
         confirmLabel="Choose starting player"
         decisionKey={`setup:starting-player:${projection.viewerPlayerId}:${startingPlayerAction?.id ?? "closed"}`}
         description="The selected player will take the first turn of this game."
+        isSubmitting={busy}
         isOpen={Boolean(startingPlayerAction)}
         onConfirm={([playerId]) => {
           if (playerId && startingPlayerAction) {
@@ -371,6 +400,7 @@ export function MatchSimulator({
           .sort()
           .join(",")}`}
         isOpen={Boolean(mulliganAction)}
+        isSubmitting={busy}
         maxSelected={2}
         minSelected={0}
         onConfirm={(selectedIds) => {
@@ -389,11 +419,8 @@ export function MatchSimulator({
       )}
 
       <GameBoard
-        onPerformAction={(input) => {
-          if (!busy) {
-            void performAction(input);
-          }
-        }}
+        isSubmittingAction={busy}
+        onPerformAction={performAction}
         projection={projection}
       />
       <MatchResultDialog

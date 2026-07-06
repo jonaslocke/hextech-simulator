@@ -7,10 +7,12 @@ import type { CombatDamageDecisionRequest } from "./player-decision-types";
 export function CombatDamagePrompt({
   cardsByInstanceId,
   decision,
+  isSubmitting,
   onSubmit,
 }: {
   cardsByInstanceId: Record<string, BoardCatalogCard>;
   decision: CombatDamageDecisionRequest;
+  isSubmitting: boolean;
   onSubmit: (
     allocations: Array<{ targetUnitId: string; amount: number }>,
   ) => void;
@@ -19,6 +21,7 @@ export function CombatDamagePrompt({
     <CombatDamageDialog
       cardsByInstanceId={cardsByInstanceId}
       choice={decision.choice}
+      isSubmitting={isSubmitting}
       onSubmit={onSubmit}
     />
   );

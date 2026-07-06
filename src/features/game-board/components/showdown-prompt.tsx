@@ -16,6 +16,7 @@ export function ShowdownPrompt({
   isClosed,
   isCombat,
   isFinalFocusPass,
+  isSubmitting = false,
   onPassFocus,
   priorityPlayerId,
 }: {
@@ -28,13 +29,15 @@ export function ShowdownPrompt({
   isClosed: boolean;
   isCombat: boolean;
   isFinalFocusPass: boolean;
+  isSubmitting?: boolean;
   onPassFocus?: () => void;
   priorityPlayerId: string | null;
 }) {
-  const canPassFocus = hasFocus && Boolean(onPassFocus);
+  const showsPassFocus = hasFocus && Boolean(onPassFocus);
+  const canPassFocus = showsPassFocus && !isSubmitting;
   const promptTitle = isCombat ? "Combat showdown" : "Showdown";
   const passFocusLabel = getPassFocusLabel({ isCombat, isFinalFocusPass });
-  const isResolvingPass = canPassFocus && isFinalFocusPass;
+  const isResolvingPass = showsPassFocus && isFinalFocusPass;
   const statusMessage = getShowdownMessage({
     focusPlayerId,
     hasFocus,
@@ -131,7 +134,7 @@ export function ShowdownPrompt({
           </div>
         </div>
 
-        {canPassFocus && (
+        {showsPassFocus && (
           <div className="flex justify-end items-center gap-2 pt-3 sm:pl-13 border-white/10 border-t">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-slate-400 text-xs">
               <span>Press</span>
@@ -147,10 +150,11 @@ export function ShowdownPrompt({
                     : "border-cyan-100/35 bg-cyan-300/14 text-cyan-50 hover:bg-cyan-300/24"
                   : "border-amber-100/35 bg-amber-300 text-slate-950 hover:bg-amber-200",
               )}
+              disabled={isSubmitting}
               onClick={onPassFocus}
               type="button"
             >
-              {passFocusLabel}
+              {isSubmitting ? "Submitting…" : passFocusLabel}
             </Button>
           </div>
         )}

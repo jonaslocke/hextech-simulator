@@ -30,6 +30,7 @@ export type CardSelectionPromptProps = {
   description?: string;
   initialSelectedIds?: string[];
   isOpen: boolean;
+  isSubmitting?: boolean;
   maxSelected?: number;
   minSelected?: number;
   onCancel?: () => void;
@@ -49,6 +50,7 @@ export function CardSelectionPrompt({
   description,
   initialSelectedIds,
   isOpen,
+  isSubmitting = false,
   maxSelected,
   minSelected,
   onCancel,
@@ -161,7 +163,7 @@ export function CardSelectionPrompt({
 
   const selectOption = useCallback(
     (option: CardSelectionPromptOption) => {
-      if (option.disabled || selectionMode === "ordered") {
+      if (option.disabled || isSubmitting || selectionMode === "ordered") {
         return;
       }
 
@@ -188,7 +190,7 @@ export function CardSelectionPrompt({
         return [...currentIds, option.id];
       });
     },
-    [confirmOnSelect, maxSelected, onConfirm, selectionMode],
+    [confirmOnSelect, isSubmitting, maxSelected, onConfirm, selectionMode],
   );
 
   if (!isOpen) {
@@ -268,15 +270,17 @@ export function CardSelectionPrompt({
               </Button>
             )}
             <Button
-              disabled={!canConfirm}
+              disabled={!canConfirm || isSubmitting}
               onClick={() => onConfirm(currentSelectedIds)}
               type="button"
             >
-              {resolveConfirmLabel({
-                confirmLabel,
-                selectedIds: currentSelectedIds,
-                selectionMode,
-              })}
+              {isSubmitting
+                ? "Submitting…"
+                : resolveConfirmLabel({
+                    confirmLabel,
+                    selectedIds: currentSelectedIds,
+                    selectionMode,
+                  })}
             </Button>
           </footer>
         </section>
