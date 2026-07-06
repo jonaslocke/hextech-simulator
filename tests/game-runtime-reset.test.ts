@@ -17,7 +17,8 @@ test("runtime reset is confirmation-gated and excludes catalog collections", asy
   for (const forbidden of [
     "canonicalCards",
     "behaviorDefinitions",
-    "cardBehaviorValidations"
+    "cardBehaviorValidations",
+    "deckDefinitions"
   ]) {
     assert.equal(source.includes(`"${forbidden}"`), false);
   }

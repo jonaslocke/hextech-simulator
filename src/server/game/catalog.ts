@@ -1,17 +1,14 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import type { Db } from "mongodb";
 import {
-  BEHAVIORS_COLLECTION,
   CANONICAL_CARDS_COLLECTION,
   hashCardRulesText,
   loadBehaviorDefinitions,
   validatePrimitiveAssignmentParameters,
-  type BehaviorDefinitionDocument,
   type CanonicalBehaviorBinding,
   type CanonicalBehaviorClause,
-  type CanonicalCardDocument
+  type CanonicalCardDocument,
+  type PrimitiveCatalogEntry,
 } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
 import { parseDeckList } from "../deck";
@@ -27,18 +24,10 @@ import {
   type GameCardDefinition
 } from "./schemas";
 
-export const INITIAL_DECK_ID = "lux" as const;
-export const INITIAL_DECK_PATH = path.join("data", "decks", "lux.dec.txt");
 export const INITIAL_DECK_UNIQUE_CARD_COUNT = 21;
-export const DECK_IDS = ["lux", "annie"] as const;
-export type DeckId = (typeof DECK_IDS)[number];
-export const DECK_PATHS: Record<DeckId, string> = {
-  lux: INITIAL_DECK_PATH,
-  annie: path.join("data", "decks", "annie.dec.txt"),
-};
 
 type CanonicalCardStoredDocument = CanonicalCardDocument & { _id: string };
-type BehaviorStoredDocument = BehaviorDefinitionDocument & { _id: string };
+type RuntimeBehaviorDefinition = Omit<PrimitiveCatalogEntry, "examples">;
 
 export class GameCatalogError extends Error {
   readonly code = "game_catalog_unavailable";
@@ -48,37 +37,25 @@ export class GameCatalogError extends Error {
   }
 }
 
-export async function loadInitialDeckSnapshot(
+export async function buildDeckSnapshotFromSource(
   db: Db,
-  sourceText?: string
+  sourceText: string,
 ): Promise<DeckSnapshot> {
-  return loadDeckSnapshot(db, "lux", sourceText);
-}
-
-export async function loadDeckSnapshot(
-  db: Db,
-  deckId: DeckId,
-  sourceText?: string,
-): Promise<DeckSnapshot> {
-  const text =
-    sourceText ??
-    await readFile(path.join(process.cwd(), DECK_PATHS[deckId]), "utf8");
-  const parsedDeck = parseDeckList(text);
+  const parsedDeck = parseDeckList(sourceText);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
     db.collection<CanonicalCardStoredDocument>(CANONICAL_CARDS_COLLECTION)
       .find({ "card.name": { $in: names } }).toArray(),
-    db.collection<BehaviorStoredDocument>(BEHAVIORS_COLLECTION).find({}).toArray(),
-    loadBehaviorDefinitions(db)
+    loadBehaviorDefinitions(db),
   ]);
 
-  return buildDeckSnapshot(text, storedCards, behaviorDefinitions);
+  return buildDeckSnapshot(sourceText, storedCards, behaviorDefinitions);
 }
 
 export function buildDeckSnapshot(
   sourceText: string,
   canonicalCards: readonly CanonicalCardDocument[],
-  behaviorDefinitions: readonly BehaviorDefinitionDocument[]
+  behaviorDefinitions: readonly RuntimeBehaviorDefinition[],
 ): DeckSnapshot {
   const parsedDeck = parseDeckList(sourceText);
   const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
@@ -149,7 +126,7 @@ export function buildDeckSnapshot(
 
 function validateCanonicalDocument(
   document: CanonicalCardDocument,
-  definitionsById: ReadonlyMap<string, BehaviorDefinitionDocument>,
+  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
   issues: string[]
 ): void {
   if (document.modelingStatus !== "approved") {
@@ -175,7 +152,7 @@ function validateCanonicalDocument(
 function validateClause(
   cardCode: string,
   clause: CanonicalBehaviorClause,
-  definitionsById: ReadonlyMap<string, BehaviorDefinitionDocument>,
+  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
   issues: string[]
 ): void {
   for (const [group, bindings] of Object.entries(clause)) {
@@ -188,7 +165,7 @@ function validateBindings(
   cardCode: string,
   group: string,
   bindings: readonly CanonicalBehaviorBinding[],
-  definitionsById: ReadonlyMap<string, BehaviorDefinitionDocument>,
+  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
   issues: string[]
 ): void {
   const orders = new Set<number>();

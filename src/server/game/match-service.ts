@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { GameProjection } from "../../shared/game";
-import { loadDeckSnapshot, type DeckId } from "./catalog";
+import type { DeckId } from "@/shared/game";
+import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
 import { performSetupAction, setupActions } from "./setup";
 import {

@@ -4,27 +4,32 @@ import { getMongoDatabase } from "@/server/db";
 import {
   createGameRepositories,
   createMatch,
-  DECK_IDS,
-  loadDeckSnapshot,
 } from "@/server/game";
+import {
+  DeckCatalogUnavailableError,
+  getPlayableDeckOptions,
+} from "@/server/services/deck-catalog-service";
 
 export async function GET() {
-  const db = await getMongoDatabase();
-  const availability = await Promise.all(
-    DECK_IDS.map(async (id) => {
-      try {
-        await loadDeckSnapshot(db, id);
-        return { id, label: id === "lux" ? "Lux" : "Annie" };
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return NextResponse.json({
-    deckOptions: availability.filter(
-      (option): option is NonNullable<typeof option> => option !== null,
-    ),
-  });
+  try {
+    const db = await getMongoDatabase();
+    return NextResponse.json({
+      deckOptions: await getPlayableDeckOptions(db),
+    });
+  } catch (error) {
+    if (error instanceof DeckCatalogUnavailableError) {
+      return NextResponse.json(
+        {
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {

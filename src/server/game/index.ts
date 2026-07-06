@@ -1,4 +1,5 @@
 export * from "./catalog";
+export * from "./deck-definition";
 export * from "./repositories";
 export * from "./runtime-coverage";
 export * from "./schemas";
