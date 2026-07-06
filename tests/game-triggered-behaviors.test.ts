@@ -47,6 +47,71 @@ test("orders and resolves event-conditioned play triggers without card identity 
   assert.equal(game.state.cardStates.raven!.computedMight, 2);
 });
 
+test("chooses triggered ability targets before adding the ability to the chain", () => {
+  const { game, decks } = targetedAbilityFixture("triggered");
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "spell",
+    values: { "eventSubject.effectiveEnergyCost": 1 },
+  }, decks);
+
+  assert.equal(game.state.chain, null);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(game.state.pendingChoice?.chainItem?.kind, "trigger");
+  const chooseTarget = gameplayActions(game, "p1", decks)[0]!;
+  assert.deepEqual(chooseTarget.targets[0]?.legalIds, ["enemy"]);
+
+  const targeted = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: chooseTarget.id,
+    selectedIds: ["enemy"],
+    decks,
+    now: "trigger-target",
+  });
+
+  assert.deepEqual(
+    targeted.state.chain?.items.at(-1)?.targetCardInstanceIds,
+    ["enemy"],
+  );
+  assert.equal(targeted.state.pendingChoice, null);
+  assert.equal(targeted.state.cardStates.enemy!.damage, 0);
+
+  const resolved = resolveAllChainItems(targeted, decks);
+  assert.ok(resolved.state.players.p2!.zones.trash.includes("enemy"));
+  assert.equal(resolved.state.pendingChoice, null);
+});
+
+test("projects and locks activated ability targets before chain resolution", () => {
+  const { game, decks } = targetedAbilityFixture("activated");
+  const ability = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "raven",
+  )!;
+
+  assert.deepEqual(ability.targets[0]?.legalIds, ["enemy"]);
+  const targeted = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: ability.id,
+    selectedIds: ["enemy"],
+    decks,
+    now: "ability-target",
+  });
+
+  assert.equal(targeted.state.chain?.items.at(-1)?.kind, "activatedAbility");
+  assert.deepEqual(
+    targeted.state.chain?.items.at(-1)?.targetCardInstanceIds,
+    ["enemy"],
+  );
+  assert.equal(targeted.state.cardStates.enemy!.damage, 0);
+
+  const resolved = resolveAllChainItems(targeted, decks);
+  assert.ok(resolved.state.players.p2!.zones.trash.includes("enemy"));
+  assert.equal(resolved.state.pendingChoice, null);
+});
+
 test("executes synthetic hold and conquer events, delayed readiness, and victory modifiers", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
@@ -733,6 +798,58 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
     }
   };
   return { game, decks };
+}
+
+function targetedAbilityFixture(kind: "activated" | "triggered") {
+  const result = fixture();
+  const { game, decks } = result;
+  game.state.players.p1!.zones.legend = null;
+  const raven = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "RAVEN",
+  )!;
+  raven.behaviorModel.clauses[0] = clause("targeted", {
+    triggers:
+      kind === "triggered"
+        ? [
+            binding("trigger.on_play", 0, {
+              actor: "controller",
+              subject: "spell",
+            }),
+          ]
+        : [],
+    selectors: [
+      binding("selector.enemy_unit", 1, {
+        area: "base",
+        minimumCount: 1,
+        maximumCount: 1,
+      }),
+    ],
+    effects:
+      kind === "triggered"
+        ? [
+            binding("action.deal_damage", 2, {
+              amount: 1,
+              target: "unit",
+            }),
+          ]
+        : [],
+  });
+  if (kind === "activated") {
+    raven.behaviorModel.clauses[0]!.abilities = [
+      binding("action.deal_damage", 0, {
+        amount: 1,
+        target: "unit",
+      }),
+    ];
+  }
+  decks[1]!.instances.push(instance("enemy", "p2", "RAVEN"));
+  game.state.players.p2!.zones.base.push("enemy");
+  game.state.cardStates.enemy = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+  return result;
 }
 
 function binding(behaviorId: string, order: number, parameters: Record<string, string | number> = {}) { return { behaviorId, order, parameters, confidence: "high" as const }; }

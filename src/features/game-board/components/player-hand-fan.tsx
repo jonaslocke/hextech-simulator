@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { motion } from "motion/react";
+import { responsiveCardHeight } from "../card-sizing";
 import { Card } from "../types";
 import { CardTile } from "./card-tile";
 
@@ -31,17 +32,7 @@ type PlayerHandFanProps = {
 const MAX_HAND_WIDTH = 1080;
 const DEFAULT_HAND_WIDTH = 1024;
 const HAND_CARD_SIZE = "lg" as const;
-
-const HAND_CARD_DIMENSIONS_BY_SIZE = {
-  sm: { width: 69, height: 96 },
-  md: { width: 86, height: 120 },
-  lg: { width: 103, height: 144 },
-  xl: { width: 126, height: 176 },
-} as const;
-
-const ESTIMATED_CARD_WIDTH = HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].width;
-const ESTIMATED_CARD_HEIGHT =
-  HAND_CARD_DIMENSIONS_BY_SIZE[HAND_CARD_SIZE].height;
+const CARD_ASPECT_RATIO = 130 / 181;
 const HIT_AREA_TOP_PADDING = 18;
 const MENU_INTERACTION_FREEZE_MS = 650;
 
@@ -54,6 +45,9 @@ export function PlayerHandFan({
 }: PlayerHandFanProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [handWidth, setHandWidth] = useState(DEFAULT_HAND_WIDTH);
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window === "undefined" ? 1440 : window.innerHeight,
+  );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selectionFreezeUntilRef = useRef(0);
@@ -70,6 +64,12 @@ export function PlayerHandFan({
     () => Date.now() < selectionFreezeUntilRef.current,
     [],
   );
+
+  useEffect(() => {
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => window.removeEventListener("resize", updateViewportHeight);
+  }, []);
 
   useEffect(() => {
     setActiveIndex((currentIndex) => {
@@ -107,14 +107,15 @@ export function PlayerHandFan({
     };
   }, []);
 
-  const layout = useMemo(
-    () =>
-      createHandLayout({
-        containerWidth: handWidth,
-        total: cards.length,
-      }),
-    [cards.length, handWidth],
-  );
+  const layout = useMemo(() => {
+    const cardHeight = responsiveCardHeight(HAND_CARD_SIZE, viewportHeight);
+    return createHandLayout({
+      cardHeight,
+      cardWidth: cardHeight * CARD_ASPECT_RATIO,
+      containerWidth: handWidth,
+      total: cards.length,
+    });
+  }, [cards.length, handWidth, viewportHeight]);
 
   const cardTransition = {
     type: "spring" as const,
@@ -514,15 +515,19 @@ function getNeighborPush({
 }
 
 function createHandLayout({
+  cardHeight,
+  cardWidth,
   containerWidth,
   total,
 }: {
+  cardHeight: number;
+  cardWidth: number;
   containerWidth: number;
   total: number;
 }): HandLayout {
   const safeWidth = clamp(containerWidth, 360, MAX_HAND_WIDTH);
   const gapCount = Math.max(total - 1, 1);
-  const usableWidth = Math.max(safeWidth - ESTIMATED_CARD_WIDTH * 1.75, 0);
+  const usableWidth = Math.max(safeWidth - cardWidth * 1.75, 0);
 
   const crowded = total > 12;
   const large = total > 8;
@@ -535,7 +540,7 @@ function createHandLayout({
 
   const middle = Math.max((total - 1) / 2, 1);
   const maxEdgeRotation = total <= 2 ? 4 : clamp(21 - total * 0.45, 12, 18);
-  const edgeHitPadding = clamp(ESTIMATED_CARD_WIDTH * 0.46, 38, 50);
+  const edgeHitPadding = clamp(cardWidth * 0.46, 32, 50);
 
   return {
     activeLift: large ? 10 : 20,
@@ -544,7 +549,7 @@ function createHandLayout({
     edgeDrop: clamp(26 - total * 0.55, 15, 22),
     edgeHitPadding,
     hitAreaHeight:
-      ESTIMATED_CARD_HEIGHT + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
+      cardHeight + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
     interactionWidth:
       total <= 1
         ? edgeHitPadding * 2

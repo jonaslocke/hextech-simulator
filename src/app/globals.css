@@ -64,3 +64,11 @@ select {
   background-position: center;
   background-repeat: no-repeat;
 }
+
+.game-board {
+  --card-sm-height: clamp(76px, 6.67vh, 96px);
+  --card-md-height: clamp(88px, 8.34vh, 120px);
+  --card-lg-height: clamp(108px, 10vh, 144px);
+  --card-xl-height: clamp(132px, 12.23vh, 176px);
+  --board-zone-width: clamp(104px, 9.03vh, 130px);
+}

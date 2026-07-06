@@ -25,7 +25,6 @@ type ResolvedCardTileOrientation = Exclude<CardTileOrientation, "auto">;
 export const CARD_TILE_SIZE_CONFIG: Record<
   CardTileSize,
   {
-    imageClassName: string;
     width: number;
     height: number;
     mightBadgeClassName: string;
@@ -33,28 +32,24 @@ export const CARD_TILE_SIZE_CONFIG: Record<
   }
 > = {
   sm: {
-    imageClassName: "h-24",
     width: Math.round(96 * CARD_ASPECT_RATIO),
     height: 96,
     mightBadgeClassName: "-right-1 -top-1 h-4 min-w-4 px-1 text-[10px]",
     damageBadgeClassName: "-left-1.5 h-5 min-w-5 px-1 text-[10px]",
   },
   md: {
-    imageClassName: "h-30",
     width: Math.round(120 * CARD_ASPECT_RATIO),
     height: 120,
     mightBadgeClassName: "-right-1 -top-1 h-5 min-w-5 px-1 text-xs",
     damageBadgeClassName: "-left-2 h-6 min-w-6 px-1 text-xs",
   },
   lg: {
-    imageClassName: "h-36",
     width: Math.round(144 * CARD_ASPECT_RATIO),
     height: 144,
     mightBadgeClassName: "-right-1.5 -top-1.5 h-6 min-w-6 px-1.5 text-sm",
     damageBadgeClassName: "-left-2 h-7 min-w-7 px-1.5 text-sm",
   },
   xl: {
-    imageClassName: "h-44",
     width: Math.round(176 * CARD_ASPECT_RATIO),
     height: 176,
     mightBadgeClassName: "-right-2 -top-2 h-7 min-w-7 px-1.5 text-sm",
@@ -134,13 +129,15 @@ export const CardTile: FC<CardTileProps> = ({
   const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
   const resolvedOrientation =
     orientation === "auto" ? autoOrientation : orientation;
-  const dimensions = getCardTileDimensions(sizeConfig, resolvedOrientation);
+  const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
     height: isRotatedExhausted
-      ? Math.max(dimensions.height, dimensions.width)
+      ? resolvedOrientation === "landscape"
+        ? dimensions.width
+        : dimensions.height
       : dimensions.height,
     zIndex: previewPosition ? 2147483647 : undefined,
   };
@@ -439,19 +436,20 @@ function CardHoverPreviewPortal({
 }
 
 function getCardTileDimensions(
-  sizeConfig: (typeof CARD_TILE_SIZE_CONFIG)[CardTileSize],
+  size: CardTileSize,
   orientation: ResolvedCardTileOrientation,
 ) {
+  const height = `var(--card-${size}-height, ${CARD_TILE_SIZE_CONFIG[size].height}px)`;
   if (orientation === "landscape") {
     return {
-      height: sizeConfig.height,
-      width: Math.round(sizeConfig.height * LANDSCAPE_CARD_ASPECT_RATIO),
+      height,
+      width: `calc(${height} * ${LANDSCAPE_CARD_ASPECT_RATIO})`,
     };
   }
 
   return {
-    height: sizeConfig.height,
-    width: sizeConfig.width,
+    height,
+    width: `calc(${height} * ${CARD_ASPECT_RATIO})`,
   };
 }
 

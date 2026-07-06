@@ -43,6 +43,7 @@ export function TemporaryZoneOverlay({
   canPassChain = false,
   chainCards,
   chainPassLabel = "Pass priority",
+  enableCloseShortcut = true,
   isCloseDisabled = false,
   isSubmittingAction = false,
   logEntries,
@@ -55,10 +56,12 @@ export function TemporaryZoneOverlay({
   opponentTrash,
   playerBanishment,
   playerTrash,
+  placement = "primary",
 }: {
   canPassChain?: boolean;
   chainCards: ChainCardEntry[];
   chainPassLabel?: string;
+  enableCloseShortcut?: boolean;
   isCloseDisabled?: boolean;
   isSubmittingAction?: boolean;
   logEntries: GameLogEntry[];
@@ -71,6 +74,7 @@ export function TemporaryZoneOverlay({
   opponentTrash: ZoneData;
   playerBanishment: ZoneData;
   playerTrash: ZoneData;
+  placement?: "primary" | "secondary";
 }) {
   const [position, setPosition] = useState<OverlayPosition | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -236,7 +240,8 @@ export function TemporaryZoneOverlay({
     canPassChain &&
     !isSubmittingAction &&
     Boolean(onPassChain);
-  const canCloseWithShortcut = Boolean(openZone) && !isCloseDisabled;
+  const canCloseWithShortcut =
+    Boolean(openZone) && !isCloseDisabled && enableCloseShortcut;
 
   useEffect(() => {
     if (!canCloseWithShortcut) {
@@ -295,7 +300,11 @@ export function TemporaryZoneOverlay({
         aria-label={title}
         className={cn(
           "fixed bg-slate-950/55 supports-backdrop-filter:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl outline-none ring-1 ring-cyan-300/10 w-84 text-slate-100 pointer-events-auto select-none",
-          position ? "left-0 top-0" : "right-16 top-20",
+          position
+            ? "left-0 top-0"
+            : placement === "secondary"
+              ? "right-[min(26rem,calc(100vw-22rem))] top-20"
+              : "right-16 top-20",
         )}
         ref={panelRef}
         role="dialog"

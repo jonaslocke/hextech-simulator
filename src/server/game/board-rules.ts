@@ -13,13 +13,27 @@ export function cleanupBoard(
   cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
-    if (controllers.length === 0 && !battlefield.contestedByPlayerId) {
+    if (controllers.length === 0) {
       battlefield.controllerPlayerId = null;
+      battlefield.contestedByPlayerId = null;
+      continue;
+    }
+    if (
+      battlefield.controllerPlayerId &&
+      !controllers.includes(battlefield.controllerPlayerId)
+    ) {
+      battlefield.controllerPlayerId = null;
+    }
+    if (
+      battlefield.contestedByPlayerId &&
+      !controllers.includes(battlefield.contestedByPlayerId)
+    ) {
+      battlefield.contestedByPlayerId = null;
     }
     if (
       controllers.length === 1 &&
       battlefield.controllerPlayerId === controllers[0] &&
-      battlefield.contestedByPlayerId === controllers[0]
+      battlefield.contestedByPlayerId
     ) {
       battlefield.contestedByPlayerId = null;
     }

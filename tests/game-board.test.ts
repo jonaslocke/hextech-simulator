@@ -4,11 +4,12 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   actionsForSource,
-  chainOverlayZone,
+  chainOverlayOpen,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction
 } from "../src/features/game-board/model";
+import { responsiveCardHeight } from "../src/features/game-board/card-sizing";
 import type { ProjectedAction } from "../src/shared/game";
 
 test("groups opaque projected actions without card-specific rules", () => {
@@ -214,14 +215,21 @@ test("stages a single-unit move through the simultaneous move action", () => {
 });
 
 test("closes the chain overlay only when the final resolving item leaves", () => {
-  assert.equal(chainOverlayZone(null, false, true), "chain");
-  assert.equal(chainOverlayZone("chain", true, false), null);
+  assert.equal(chainOverlayOpen(false, false, true), true);
+  assert.equal(chainOverlayOpen(true, true, false), false);
   assert.equal(
-    chainOverlayZone("chain", false, false),
-    "chain",
+    chainOverlayOpen(true, false, false),
+    true,
     "an empty chain may still be opened for inspection",
   );
-  assert.equal(chainOverlayZone("log", true, false), "log");
+});
+
+test("card sizing scales from viewport height within stable thresholds", () => {
+  assert.equal(responsiveCardHeight("md", 1440), 120);
+  assert.equal(responsiveCardHeight("md", 982), 88);
+  assert.equal(responsiveCardHeight("md", 768), 88);
+  assert.equal(responsiveCardHeight("lg", 1440), 144);
+  assert.equal(responsiveCardHeight("lg", 982), 108);
 });
 
 test("game board contains no initial-deck or behavior identities", async () => {

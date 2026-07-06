@@ -44,7 +44,7 @@ import {
   type BoardProjection,
 } from "./board-view-model";
 import {
-  chainOverlayZone,
+  chainOverlayOpen,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction,
@@ -160,7 +160,9 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [sourceActions, sourceProjection.actions, submitProjectedAction],
   );
-  const [openZone, setOpenZone] = useState<TemporaryZone>(null);
+  const [openZone, setOpenZone] =
+    useState<Exclude<TemporaryZone, "chain">>(null);
+  const [isChainOverlayOpen, setIsChainOverlayOpen] = useState(false);
   const [cardActionMenu, setCardActionMenu] =
     useState<CardActionMenuState>(null);
   const [activeTransferCardIds, setActiveTransferCardIds] = useState<
@@ -424,14 +426,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   const closeCardActionMenu = () => {
     setCardActionMenu(null);
     setHoveredBoardLocation(null);
-  };
-  const setOpenZoneRespectingChain = (zone: TemporaryZone) => {
-    if (isChainLockedOpen) {
-      setOpenZone("chain");
-      return;
-    }
-
-    setOpenZone(zone);
   };
   const openCardActionMenu = (
     event: MouseEvent<HTMLElement>,
@@ -743,9 +737,9 @@ export const GameBoard: FC<GameBoardProps> = ({
   const handleRuneContextAction = openRuneActionMenu;
 
   useEffect(() => {
-    setOpenZone((currentZone) =>
-      chainOverlayZone(
-        currentZone,
+    setIsChainOverlayOpen((isOpen) =>
+      chainOverlayOpen(
+        isOpen,
         wasChainLockedOpen.current,
         isChainLockedOpen,
       ),
@@ -754,10 +748,10 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [isChainLockedOpen]);
 
   useEffect(() => {
-    if (!isChainLockedOpen || openZone !== "chain") {
+    if (!isChainLockedOpen || !isChainOverlayOpen) {
       setHighlightedCardInstanceIds(new Set());
     }
-  }, [isChainLockedOpen, openZone]);
+  }, [isChainLockedOpen, isChainOverlayOpen]);
 
   useEffect(() => {
     setCardActionMenu(null);
@@ -825,7 +819,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   return (
     <main
-      className="relative flex flex-col h-screen overflow-hidden text-slate-100"
+      className="game-board relative flex flex-col h-screen overflow-hidden text-slate-100"
       onClickCapture={handleTargetClickCapture}
     >
       <ScoreHeader
@@ -876,8 +870,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
             onBoardCardPointerEnter={handleTargetPointerEnter}
             onBoardCardPointerLeave={handleTargetPointerLeave}
-            onOpenBanish={() => setOpenZoneRespectingChain("banish")}
-            onOpenTrash={() => setOpenZoneRespectingChain("opponentTrash")}
+            onOpenBanish={() => setOpenZone("banish")}
+            onOpenTrash={() => setOpenZone("opponentTrash")}
             player={board.opponent}
             isActivePlayer={isOpponentActive}
             isMirrored
@@ -920,8 +914,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
             hiddenCardInstanceIds={activeTransferCardIds}
             isBaseHighlighted={hoveredBoardLocation?.kind === "base"}
-            onOpenBanish={() => setOpenZoneRespectingChain("banish")}
-            onOpenTrash={() => setOpenZoneRespectingChain("playerTrash")}
+            onOpenBanish={() => setOpenZone("banish")}
+            onOpenTrash={() => setOpenZone("playerTrash")}
             onChampionContextAction={handleChampionCardAction}
             onChampionPrimaryAction={handleChampionCardAction}
             onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
@@ -935,12 +929,14 @@ export const GameBoard: FC<GameBoardProps> = ({
           <RunePoolBar runePool={viewerState?.runePool} />
         </div>
         <ActionRail
+          isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
+          onChainOpenChange={setIsChainOverlayOpen}
           onPassTurn={passFocusAction ? onPass : onEndTurn}
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn || isSubmittingAction}
           passTurnLabel={isSubmittingAction ? "Submitting…" : passTurnLabel}
-          setOpenZone={setOpenZoneRespectingChain}
+          setOpenZone={setOpenZone}
         />
       </section>
       {globalActions.length > 0 && (
@@ -964,15 +960,27 @@ export const GameBoard: FC<GameBoardProps> = ({
         isCloseDisabled={isChainLockedOpen}
         isSubmittingAction={isSubmittingAction}
         logEntries={logEntries}
-        onClose={() => setOpenZoneRespectingChain(null)}
+        onClose={() => setIsChainOverlayOpen(false)}
         onChainItemPointerEnter={(targetCardInstanceIds) =>
           setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
         }
         onChainItemPointerLeave={() => setHighlightedCardInstanceIds(new Set())}
         onPassChain={onPass}
+        openZone={isChainOverlayOpen ? "chain" : null}
+        opponentBanishment={board.opponent.zones.banishment}
+        opponentTrash={board.opponent.zones.trash}
+        playerBanishment={board.player.zones.banishment}
+        playerTrash={board.player.zones.trash}
+      />
+      <TemporaryZoneOverlay
+        chainCards={chainCards}
+        enableCloseShortcut
+        logEntries={logEntries}
+        onClose={() => setOpenZone(null)}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
         opponentTrash={board.opponent.zones.trash}
+        placement={isChainOverlayOpen ? "secondary" : "primary"}
         playerBanishment={board.player.zones.banishment}
         playerTrash={board.player.zones.trash}
       />

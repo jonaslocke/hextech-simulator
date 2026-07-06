@@ -32,7 +32,9 @@ import {
 import {
   beginDelayedEffectResolution,
   dispatchBehaviorEvent,
+  queueChainItemsForTargets,
   queueDelayedEffects,
+  submitChainTargetSelection,
 } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
@@ -114,7 +116,7 @@ export function gameplayActions(
           [
             {
               kind: pendingChoice.optionKind,
-              label: "runes to ready",
+              label: pendingChoice.prompt,
               sourceZone: pendingChoice.sourceZone ?? undefined,
               legalIds: pendingChoice.legalCardIds,
               minimum: pendingChoice.minimum,
@@ -397,7 +399,30 @@ export function performGameplayAction(input: {
       break;
     case "submitChoice":
       if (game.state.pendingChoice?.type === "orderTriggers") {
+        const orderedIds = [...input.selectedIds];
         submitTriggerOrder(game, input.actorPlayerId, input.selectedIds);
+        const orderedItems = game.state.chain?.items.filter((item) =>
+          orderedIds.includes(item.id),
+        ) ?? [];
+        if (orderedItems.length > 0 && game.state.chain) {
+          game.state.chain.items = game.state.chain.items.filter(
+            (item) => !orderedIds.includes(item.id),
+          );
+          if (game.state.chain.items.length === 0) {
+            game.state.chain = null;
+          }
+          queueChainItemsForTargets(game, orderedItems, input.decks);
+        }
+      } else if (
+        game.state.pendingChoice?.type === "effectSelection" &&
+        game.state.pendingChoice.chainItem
+      ) {
+        submitChainTargetSelection(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
       } else {
         submitEffectSelection(
           game,
@@ -405,6 +430,7 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+        queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         openPendingShowdown(game, index, input.decks);
         finishTurnProgressionIfReady(game, index, input.decks);
@@ -679,14 +705,17 @@ function passPriority(
           item.kind === "activatedAbility" &&
           item.activatedBehaviorId
         ) {
-          const clause = definition.behaviorModel.clauses.find(
+          const clause = compileBehaviorModel(
+            definition.behaviorModel,
+            handlers,
+          ).clauses.find(
             (candidate) => candidate.id === item.behaviorClauseId,
           );
           const binding = clause?.abilities.find(
             (candidate) => candidate.behaviorId === item.activatedBehaviorId,
           );
           const handler = binding ? handlers.get(binding.behaviorId) : null;
-          if (!binding || !handler?.execute) {
+          if (!clause || !binding || !handler?.execute) {
             throw new Error(
               "Activated ability is unavailable during resolution.",
             );
@@ -698,7 +727,13 @@ function passPriority(
               controller,
               item.sourceCardInstanceId,
               null,
-              item.targetCardInstanceIds,
+              validLockedTargets(
+                game,
+                clause,
+                item,
+                controller,
+                handlers,
+              ),
             ),
           );
         } else if (item.behaviorClauseId) {
@@ -732,7 +767,14 @@ function passPriority(
                 controllerPlayerId: controller,
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
-                selectedIds: item.targetCardInstanceIds,
+                selectedIds: validLockedTargets(
+                  game,
+                  clause,
+                  item,
+                  controller,
+                  handlers,
+                ),
+                targetsLocked: true,
                 decks,
               });
             }
@@ -1196,15 +1238,23 @@ function addAbilityActions(
       for (const ability of clause.abilities) {
         if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
-        const enabled =
+        const targets = targetRequirementsForClause(
+          clause,
+          createBehaviorContext(game, playerId, sourceId, null, []),
+          handlers,
+        );
+        const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
+        const enabled = sourceReady && canSatisfyTargetRequirements(targets);
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
-            : ability.parameters.usage === "spellsOnly"
-              ? "Add spell Energy"
-              : "Add Energy";
+            : ability.behaviorId === "ability.exhaust_for_resource"
+              ? ability.parameters.usage === "spellsOnly"
+                ? "Add spell Energy"
+                : "Add Energy"
+              : `${definition.card.name} ability`;
         actions.push(
           action(
             game,
@@ -1212,8 +1262,13 @@ function addAbilityActions(
             label,
             sourceId,
             enabled,
-            enabled ? null : "Source is exhausted.",
+            enabled
+              ? null
+              : sourceReady
+                ? "No legal targets are available."
+                : "Source is exhausted.",
             `${clause.id}|${ability.behaviorId}`,
+            targets,
           ),
         );
       }
@@ -1435,6 +1490,34 @@ function captureTargetObjectVersions(
   );
 }
 
+function validLockedTargets(
+  game: GameDocument,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  item: NonNullable<GameDocument["state"]["chain"]>["items"][number],
+  controllerPlayerId: string,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const currentlyLegal = new Set(
+    targetRequirementsForClause(
+      clause,
+      createBehaviorContext(
+        game,
+        controllerPlayerId,
+        item.sourceCardInstanceId!,
+        item.behaviorEvent,
+        [],
+      ),
+      handlers,
+    ).flatMap((requirement) => requirement.legalIds),
+  );
+  return item.targetCardInstanceIds.filter(
+    (id) =>
+      currentlyLegal.has(id) &&
+      (game.state.cardStates[id]?.objectVersion ?? 0) ===
+        item.targetObjectVersions[id],
+  );
+}
+
 function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
   if (action.targets.length === 0) {
     if (selectedIds.length)
@@ -1454,7 +1537,16 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     selectedIds.length < minimum ||
     selectedIds.length > maximum ||
     selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length
+    new Set(selectedIds).size !== selectedIds.length ||
+    action.targets.some((target) => {
+      const selectedForTarget = selectedIds.filter((id) =>
+        target.legalIds.includes(id),
+      ).length;
+      return (
+        selectedForTarget < target.minimum ||
+        selectedForTarget > target.maximum
+      );
+    })
   ) {
     throw new Error("Selected targets are not legal for this action.");
   }

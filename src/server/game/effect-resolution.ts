@@ -20,6 +20,7 @@ export function beginEffectResolution(input: {
   delayedEffectId?: string;
   endingPlayerId?: string;
   selectedIds?: string[];
+  targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
   const id = `resolution:${input.game.stateVersion}:${input.sourceCardInstanceId}:${input.clauseId}:${input.game.state.effectResolutions.length}`;
@@ -32,6 +33,7 @@ export function beginEffectResolution(input: {
     delayedEffectId: input.delayedEffectId ?? null,
     endingPlayerId: input.endingPlayerId ?? null,
     initialSelectedIds: input.selectedIds ?? [],
+    targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
   });
   return resumeEffectResolution(input.game, id, input.decks);
@@ -50,6 +52,9 @@ export function submitEffectSelection(
     pending.playerId !== playerId
   ) {
     throw new Error("Effect selection is not available.");
+  }
+  if (!pending.resolutionId) {
+    throw new Error("Effect resolution is unavailable.");
   }
   if (
     selectedIds.length < pending.minimum ||
@@ -101,6 +106,17 @@ export function resumeEffectResolution(
   )) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
+    if (frame.targetsLocked) {
+      const lockedSelections = frame.initialSelectedIds
+        .filter((id) => requirement.legalIds.includes(id))
+        .slice(0, requirement.maximum);
+      if (lockedSelections.length < requirement.minimum) {
+        finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+        return true;
+      }
+      frame.selectionsByBinding[bindingKey] = lockedSelections;
+      continue;
+    }
     if (requirement.legalIds.length < requirement.minimum) {
       finishResolutionFrame(game, frame.id, frame.delayedEffectId);
       return true;

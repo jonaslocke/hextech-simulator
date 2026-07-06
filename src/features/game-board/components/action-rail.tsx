@@ -6,19 +6,23 @@ import { TemporaryZone } from "../types";
 import { ActionButton } from "./action-button";
 
 export function ActionRail({
+  isChainOpen = false,
   isChainLockedOpen = false,
+  onChainOpenChange,
   onPassTurn,
   openZone,
   passTurnDisabled = false,
   passTurnLabel = "Pass Turn",
   setOpenZone,
 }: {
+  isChainOpen?: boolean;
   isChainLockedOpen?: boolean;
+  onChainOpenChange: (isOpen: boolean) => void;
   onPassTurn?: () => void;
-  openZone: TemporaryZone;
+  openZone: Exclude<TemporaryZone, "chain">;
   passTurnDisabled?: boolean;
   passTurnLabel?: string;
-  setOpenZone: (zone: TemporaryZone) => void;
+  setOpenZone: (zone: Exclude<TemporaryZone, "chain">) => void;
 }) {
   const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled;
 
@@ -70,12 +74,10 @@ export function ActionRail({
       />
       <div className="z-10 relative flex flex-col items-center gap-3">
         <ActionButton
-          active={openZone === "chain"}
+          active={isChainOpen}
           label={isChainLockedOpen ? "Chain is resolving" : "Chain"}
           onClick={() =>
-            setOpenZone(
-              openZone === "chain" && !isChainLockedOpen ? null : "chain",
-            )
+            onChainOpenChange(isChainLockedOpen ? true : !isChainOpen)
           }
         >
           <Layers3 className="size-5" />

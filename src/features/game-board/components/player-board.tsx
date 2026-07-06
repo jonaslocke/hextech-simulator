@@ -87,8 +87,10 @@ const BaseLine = ({
     <div
       className={cn(
         "gap-2 grid min-h-0",
-        hasChampionZone && "grid-cols-[130px_130px_minmax(0,1fr)_130px]",
-        !hasChampionZone && "grid-cols-[130px_minmax(0,1fr)_130px]",
+        hasChampionZone &&
+          "grid-cols-[var(--board-zone-width)_var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
+        !hasChampionZone &&
+          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
       )}
     >
       {hasChampionZone && (
@@ -172,8 +174,10 @@ const RunesLine = ({
     <div
       className={cn(
         "gap-2 grid min-h-0",
-        hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px_64px]",
-        !hasBanishment && "grid-cols-[130px_minmax(0,1fr)_130px]",
+        hasBanishment &&
+          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)_64px]",
+        !hasBanishment &&
+          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
       )}
     >
       <ZoneArea

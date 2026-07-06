@@ -4,16 +4,14 @@ import type {
   ProjectedCardView,
   ProjectedZone
 } from "@/shared/game";
-import type { TemporaryZone } from "./types";
-
-export function chainOverlayZone(
-  openZone: TemporaryZone,
+export function chainOverlayOpen(
+  isOpen: boolean,
   wasChainLockedOpen: boolean,
   isChainLockedOpen: boolean,
-): TemporaryZone {
-  if (isChainLockedOpen) return "chain";
-  if (wasChainLockedOpen && openZone === "chain") return null;
-  return openZone;
+): boolean {
+  if (isChainLockedOpen) return true;
+  if (wasChainLockedOpen) return false;
+  return isOpen;
 }
 
 export function actionsForSource(

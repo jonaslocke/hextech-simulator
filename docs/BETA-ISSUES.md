@@ -19,10 +19,10 @@ This document tracks gameplay and UI issues found during beta testing. It is int
 
 | ID         | Title                                                                | Type                               | Priority | Status           |
 | ---------- | -------------------------------------------------------------------- | ---------------------------------- | -------- | ---------------- |
-| `BETA-001` | Battlefield remains contested after the last relevant unit dies      | Rules / Engine bug                 | High     | New              |
-| `BETA-002` | Chain panel prevents opening Trash at the same time                  | UI / Interaction bug               | Medium   | New              |
-| `BETA-003` | Card sizes are too large on some monitors                            | UI / Responsive layout             | Medium   | New              |
-| `BETA-004` | Ability choices do not follow the same timing model as spell choices | Rules / Engine / Corpus validation | High     | Needs validation |
+| `BETA-001` | Battlefield remains contested after the last relevant unit dies      | Rules / Engine bug                 | High     | Needs verification |
+| `BETA-002` | Chain panel prevents opening Trash at the same time                  | UI / Interaction bug               | Medium   | Needs verification |
+| `BETA-003` | Card sizes are too large on some monitors                            | UI / Responsive layout             | Medium   | Needs verification |
+| `BETA-004` | Ability choices do not follow the same timing model as spell choices | Rules / Engine / Corpus validation | High     | Needs verification |
 
 ---
 

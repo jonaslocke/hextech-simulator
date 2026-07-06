@@ -183,6 +183,69 @@ test("keeps initiated battlefield card targets out of card selection prompts", (
   assert.equal(decision, null);
 });
 
+test("keeps pending board-visible effect selections out of the dialog", () => {
+  const rune = card("rune-1", "Rune");
+  const projection = projectionWith({
+    actions: [
+      effectSelectionAction("ready-choice", "Choose 2 runes to ready", [
+        rune.instanceId,
+      ]),
+    ],
+    pendingChoice: effectSelectionChoice({
+      id: "ready-choice",
+      maximum: 1,
+      minimum: 1,
+      prompt: "Choose 2 runes to ready",
+      sourceZone: null,
+    }),
+  });
+  const base = projection.players[0]!.zones.find(
+    (zone) => zone.kind === "base",
+  )!;
+  base.cards = [rune];
+  base.count = 1;
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision, null);
+});
+
+test("maps pending non-board effect selections to the dialog", () => {
+  const trashCard = card("trash-card", "Unit");
+  const projection = projectionWith({
+    actions: [
+      effectSelectionAction("trash-choice", "Choose a unit from trash", [
+        trashCard.instanceId,
+      ], "trash"),
+    ],
+    pendingChoice: effectSelectionChoice({
+      id: "trash-choice",
+      maximum: 1,
+      minimum: 1,
+      prompt: "Choose a unit from trash",
+      sourceZone: "trash",
+    }),
+  });
+  const trash = projection.players[0]!.zones.find(
+    (zone) => zone.kind === "trash",
+  )!;
+  trash.cards = [trashCard];
+  trash.count = 1;
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.equal(decision.title, "Choose from Trash");
+  assert.deepEqual(decision.cards.map((item) => item.id), ["trash-card"]);
+});
+
 function projectionWith(
   overrides: Pick<GameProjection, "actions" | "pendingChoice">,
 ): GameProjection {
@@ -222,6 +285,59 @@ function projectionWith(
     victoryScore: 8,
     viewerPlayerId: "player-1",
     winnerPlayerId: null,
+  };
+}
+
+function effectSelectionAction(
+  choiceId: string,
+  prompt: string,
+  legalIds: string[],
+  sourceZone?: "hand" | "trash" | "mainDeck",
+): GameProjection["actions"][number] {
+  return {
+    choice: {
+      choiceId,
+      kind: "effectSelection",
+      prompt,
+    },
+    disabledReason: null,
+    enabled: true,
+    id: `${choiceId}-action`,
+    label: prompt,
+    presentation: {
+      prompt: null,
+      style: "primary",
+      surface: "choice-dialog",
+    },
+    sourceCardInstanceId: null,
+    targets: [{
+      kind: "card",
+      legalIds,
+      maximum: 1,
+      minimum: 1,
+      sourceZone,
+    }],
+  };
+}
+
+function effectSelectionChoice(input: {
+  id: string;
+  maximum: number;
+  minimum: number;
+  prompt: string;
+  sourceZone: "hand" | "trash" | "mainDeck" | null;
+}): Extract<
+  NonNullable<GameProjection["pendingChoice"]>,
+  { type: "effectSelection" }
+> {
+  return {
+    ...input,
+    playerId: "player-1",
+    presentation: "cardSelection",
+    revealedCards: [],
+    title: "Card selection",
+    type: "effectSelection",
+    waitingMessage: `Waiting for ${input.prompt}.`,
   };
 }
 

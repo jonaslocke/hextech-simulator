@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  cleanupBoard,
+  createRuntimeCardIndex,
   gameplayActions,
   performGameplayAction,
   performGameplayTransition,
@@ -183,6 +185,41 @@ test("leaves an empty battlefield when equal units kill each other", () => {
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, null);
   assert.ok(game.state.players.p1!.zones.trash.includes("attacker"));
   assert.ok(game.state.players.p2!.zones.trash.includes("defender"));
+});
+
+test("cleanup clears stale battlefield control and contest after units die", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }]
+  });
+  const battlefield = game.state.battlefields[0]!;
+  battlefield.units.push("attacker");
+  battlefield.contestedByPlayerId = "p1";
+  game.state.cardStates.attacker!.damage = 2;
+  game.state.cardStates.defender!.damage = 2;
+
+  cleanupBoard(game, createRuntimeCardIndex(decks));
+
+  assert.deepEqual(battlefield.units, []);
+  assert.equal(battlefield.controllerPlayerId, null);
+  assert.equal(battlefield.contestedByPlayerId, null);
+});
+
+test("cleanup clears a dead challenger's contest while preserving the controller", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }]
+  });
+  const battlefield = game.state.battlefields[0]!;
+  battlefield.units.push("attacker");
+  battlefield.contestedByPlayerId = "p1";
+  game.state.cardStates.attacker!.damage = 2;
+
+  cleanupBoard(game, createRuntimeCardIndex(decks));
+
+  assert.deepEqual(battlefield.units, ["defender"]);
+  assert.equal(battlefield.controllerPlayerId, "p2");
+  assert.equal(battlefield.contestedByPlayerId, null);
 });
 
 test("clears surviving damage before temporary Might expires at end of turn", () => {

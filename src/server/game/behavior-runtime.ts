@@ -1,6 +1,6 @@
 import type { ProjectedTargetRequirement } from "../../shared/game";
 import type { BehaviorBinding, BehaviorClause, BehaviorModel } from "./schemas";
-import type { GameDocument } from "./state";
+import type { ChainItem, GameDocument } from "./state";
 
 export type BehaviorEvent = {
   type: string;
@@ -209,6 +209,7 @@ export function queueTriggeredClauses(input: {
   sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel }>;
   event: BehaviorEvent;
   handlers: BehaviorHandlerRegistry;
+  enqueueItems?: (items: ChainItem[]) => void;
 }): void {
   const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
     if (clause.triggers.length === 0) return [];
@@ -251,6 +252,10 @@ export function queueTriggeredClauses(input: {
     priorityPlayerId: input.controllerPlayerId,
     passedPlayerIds: []
   };
+  if (input.enqueueItems) {
+    input.enqueueItems(items);
+    return;
+  }
   chain.items.push(...items);
   input.game.state.chain = chain;
 }

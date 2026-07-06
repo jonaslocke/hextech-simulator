@@ -108,7 +108,7 @@ const effectSelectionChoiceSchema = z.object({
   id: z.string().min(1),
   playerId: z.string().min(1),
   type: z.literal("effectSelection"),
-  resolutionId: z.string().min(1),
+  resolutionId: z.string().min(1).nullable(),
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
   optionKind: z.enum(["card", "battlefield"]).default("card"),
@@ -116,7 +116,16 @@ const effectSelectionChoiceSchema = z.object({
   presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
-  maximum: z.number().int().nonnegative()
+  maximum: z.number().int().nonnegative(),
+  chainItem: chainItemSchema.nullable().optional(),
+  targetRequirements: z.array(z.object({
+    kind: z.enum(["card", "battlefield", "player"]),
+    label: z.string().min(1).optional(),
+    sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+    legalIds: z.array(z.string().min(1)),
+    minimum: z.number().int().nonnegative(),
+    maximum: z.number().int().nonnegative()
+  })).optional()
 });
 
 const damageAssignmentSchema = z.object({
@@ -178,6 +187,7 @@ export const gameStateSchema = z.object({
     delayedEffectId: z.string().min(1).nullable(),
     endingPlayerId: z.string().min(1).nullable(),
     initialSelectedIds: z.array(z.string()).default([]),
+    targetsLocked: z.boolean().optional(),
     selectionsByBinding: z.record(z.array(z.string()))
   })),
   pendingChoice: z.discriminatedUnion("type", [
@@ -186,6 +196,7 @@ export const gameStateSchema = z.object({
     effectSelectionChoiceSchema
   ]).nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema),
+  queuedChainItems: z.array(chainItemSchema).optional(),
   queuedBehaviorEvents: z.array(z.object({
     type: z.string(),
     actorPlayerId: z.string().nullable(),
