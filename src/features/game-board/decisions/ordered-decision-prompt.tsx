@@ -13,6 +13,7 @@ export function OrderedDecisionPrompt({
   return (
     <ChoiceDialog
       confirmLabel={decision.confirmLabel}
+      decisionKey={decision.decisionKey}
       description={decision.description}
       isOpen
       onConfirm={onSubmit}

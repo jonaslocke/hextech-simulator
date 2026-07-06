@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
 
@@ -26,6 +26,7 @@ export type CardSelectionPromptProps = {
   confirmLabel?: ConfirmLabelResolver;
   cardSize?: CardSelectionPromptCardSize;
   confirmOnSelect?: boolean;
+  decisionKey?: string;
   description?: string;
   initialSelectedIds?: string[];
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function CardSelectionPrompt({
   cardSize = "md",
   confirmLabel,
   confirmOnSelect = false,
+  decisionKey,
   description,
   initialSelectedIds,
   isOpen,
@@ -74,39 +76,65 @@ export function CardSelectionPrompt({
     () => JSON.parse(initialSelectionKey) as string[],
     [initialSelectionKey],
   );
+  const selectionDecisionKey =
+    decisionKey ??
+    createSelectionDecisionKey({
+      enabledOptionIds,
+      initialSelectionKey,
+      maxSelected,
+      minSelected,
+      selectionMode,
+      title,
+    });
+  const resetInputRef = useRef({
+    enabledOptionIds,
+    maxSelected,
+    normalizedInitialSelectedIds,
+    selectionMode,
+  });
+  resetInputRef.current = {
+    enabledOptionIds,
+    maxSelected,
+    normalizedInitialSelectedIds,
+    selectionMode,
+  };
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    const validInitialIds = normalizedInitialSelectedIds.filter((id) =>
-      enabledOptionIds.includes(id),
+    const {
+      enabledOptionIds: currentEnabledOptionIds,
+      maxSelected: currentMaxSelected,
+      normalizedInitialSelectedIds: currentInitialSelectedIds,
+      selectionMode: currentSelectionMode,
+    } = resetInputRef.current;
+    const validInitialIds = currentInitialSelectedIds.filter((id) =>
+      currentEnabledOptionIds.includes(id),
     );
 
-    if (selectionMode === "ordered") {
-      setOrderedIds(validInitialIds.length > 0 ? validInitialIds : enabledOptionIds);
+    if (currentSelectionMode === "ordered") {
+      setOrderedIds(
+        validInitialIds.length > 0 ? validInitialIds : currentEnabledOptionIds,
+      );
       setSelectedIds([]);
       return;
     }
 
     setOrderedIds([]);
 
-    if (selectionMode === "single") {
+    if (currentSelectionMode === "single") {
       setSelectedIds(validInitialIds[0] ? [validInitialIds[0]] : []);
       return;
     }
 
     setSelectedIds(
-      maxSelected ? validInitialIds.slice(0, maxSelected) : validInitialIds,
+      currentMaxSelected
+        ? validInitialIds.slice(0, currentMaxSelected)
+        : validInitialIds,
     );
-  }, [
-    enabledOptionIds,
-    isOpen,
-    maxSelected,
-    normalizedInitialSelectedIds,
-    selectionMode,
-  ]);
+  }, [isOpen, selectionDecisionKey]);
 
   const usesCardPresentation =
     presentation === "cards" ||
@@ -255,6 +283,29 @@ export function CardSelectionPrompt({
       </div>
     </DialogPortal>
   );
+}
+
+function createSelectionDecisionKey(input: {
+  enabledOptionIds: string[];
+  initialSelectionKey: string;
+  maxSelected?: number;
+  minSelected?: number;
+  selectionMode: CardSelectionPromptSelectionMode;
+  title: string;
+}): string {
+  const optionIds =
+    input.selectionMode === "ordered"
+      ? input.enabledOptionIds
+      : [...input.enabledOptionIds].sort();
+
+  return JSON.stringify([
+    input.title,
+    input.selectionMode,
+    input.minSelected,
+    input.maxSelected,
+    optionIds,
+    input.initialSelectionKey,
+  ]);
 }
 
 function CardChoiceGrid({

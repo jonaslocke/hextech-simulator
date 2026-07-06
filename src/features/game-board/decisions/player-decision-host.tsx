@@ -37,6 +37,7 @@ export function PlayerDecisionHost({
           cancelLabel={decision.cancelLabel}
           confirmLabel={decision.confirmLabel}
           description={decision.description}
+          decisionKey={decision.decisionKey}
           isOpen
           maxSelected={decision.maxSelected}
           minSelected={decision.minSelected}

@@ -62,6 +62,31 @@ test("maps Vision to card selection and keeps the top card with an empty selecti
   if (decision?.kind !== "cardSelection") return;
   assert.deepEqual(decision.cards.map((item) => item.id), ["revealed-card"]);
   assert.equal(decision.minSelected, 0);
+  const refreshedDecision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: structuredClone(projection),
+  });
+  assert.equal(refreshedDecision?.kind, "cardSelection");
+  if (refreshedDecision?.kind === "cardSelection") {
+    assert.equal(refreshedDecision.decisionKey, decision.decisionKey);
+  }
+
+  const nextProjection = structuredClone(projection);
+  if (nextProjection.pendingChoice?.type === "effectSelection") {
+    nextProjection.pendingChoice.id = "next-vision-choice";
+  }
+  const nextActionChoice = nextProjection.actions[0]?.choice;
+  if (nextActionChoice?.kind === "effectSelection") {
+    nextActionChoice.choiceId = "next-vision-choice";
+  }
+  const nextDecision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: nextProjection,
+  });
+  assert.equal(nextDecision?.kind, "cardSelection");
+  if (nextDecision?.kind === "cardSelection") {
+    assert.notEqual(nextDecision.decisionKey, decision.decisionKey);
+  }
   assert.equal(typeof decision.confirmLabel, "function");
   if (typeof decision.confirmLabel === "function") {
     assert.equal(decision.confirmLabel([]), "Keep on top");

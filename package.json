@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx server.ts --dev",
     "next:dev": "next dev",
     "build": "next build",
     "catalog:build-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts",
@@ -13,7 +13,7 @@
     "catalog:reset-canonical-cards": "node --env-file=.env --import tsx scripts/reset-canonical-card-catalog.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "game:reset-runtime": "node --env-file=.env --import tsx scripts/reset-game-runtime.ts --confirm",
-    "start": "next start",
+    "start": "tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"tests/**/*.test.ts\""
@@ -33,6 +33,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "seedrandom": "^3.0.5",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^4.0.0",
     "zod": "^3.24.1"

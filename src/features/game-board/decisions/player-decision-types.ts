@@ -26,6 +26,7 @@ export type CombatDamageChoice = Extract<
 
 export type CardSelectionDecisionRequest = {
   kind: "cardSelection";
+  decisionKey: string;
   actionId: string;
   title: string;
   description?: string;
@@ -40,6 +41,7 @@ export type CardSelectionDecisionRequest = {
 
 export type OptionDecisionRequest = {
   kind: "optionDecision";
+  decisionKey: string;
   actionId: string;
   title: string;
   description?: string;
@@ -50,6 +52,7 @@ export type OptionDecisionRequest = {
 
 export type OrderedDecisionRequest = {
   kind: "orderedDecision";
+  decisionKey: string;
   actionId: string;
   title: string;
   description?: string;

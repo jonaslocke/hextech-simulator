@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { DialogPortal } from "./dialog-portal";
 import { cn } from "@/shared/utils/cn";
@@ -16,6 +16,7 @@ export type ChoiceDialogOption = {
 
 export type ChoiceDialogProps = {
   confirmLabel?: string;
+  decisionKey?: string;
   description?: string;
   isOpen: boolean;
   onCancel?: () => void;
@@ -27,6 +28,7 @@ export type ChoiceDialogProps = {
 
 export function ChoiceDialog({
   confirmLabel,
+  decisionKey,
   description,
   isOpen,
   onCancel,
@@ -37,11 +39,21 @@ export function ChoiceDialog({
 }: ChoiceDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const optionIds = options.map((option) => option.id);
+  const choiceDecisionKey =
+    decisionKey ??
+    JSON.stringify([
+      title,
+      selectionMode,
+      selectionMode === "ordered" ? optionIds : [...optionIds].sort(),
+    ]);
+  const optionIdsRef = useRef(optionIds);
+  optionIdsRef.current = optionIds;
 
   useEffect(() => {
     setSelectedId(null);
-    setOrderedIds(options.map((option) => option.id));
-  }, [options]);
+    setOrderedIds(optionIdsRef.current);
+  }, [choiceDecisionKey, isOpen]);
 
   if (!isOpen) {
     return null;

@@ -2,6 +2,7 @@
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   createMatchClient,
@@ -13,9 +14,23 @@ import type { DeckId } from "@/shared/game";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { MatchResultDialog } from "./match-result-dialog";
 
-export function MatchSimulator() {
-  const [match, setMatch] = useState<AcceptedMatch | null>(null);
-  const [viewerSeat, setViewerSeat] = useState<SeatKey>("player1");
+type OnlinePlayerCredentials = {
+  matchId: string;
+  gameId: string;
+  player: AcceptedMatch["players"]["player1"];
+};
+
+export function MatchSimulator({
+  onlineMatch,
+}: {
+  onlineMatch?: OnlinePlayerCredentials;
+}) {
+  const onlineSeat: SeatKey =
+    onlineMatch?.player.seat === "player-2" ? "player2" : "player1";
+  const [match, setMatch] = useState<AcceptedMatch | null>(() =>
+    onlineMatch ? createOnlineAcceptedMatch(onlineMatch) : null,
+  );
+  const [viewerSeat, setViewerSeat] = useState<SeatKey>(onlineSeat);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
@@ -29,6 +44,7 @@ export function MatchSimulator() {
   const viewerToken = viewer?.playerToken;
 
   useEffect(() => {
+    if (onlineMatch) return;
     let active = true;
     void loadDeckOptionsClient()
       .then(({ deckOptions: options }) => {
@@ -52,7 +68,7 @@ export function MatchSimulator() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [onlineMatch]);
 
   useEffect(() => {
     if (!currentMatchId || !viewerPlayerId || !viewerToken) {
@@ -67,15 +83,7 @@ export function MatchSimulator() {
       }
 
       setMatch((current) =>
-        current
-          ? {
-              ...current,
-              projections: {
-                ...current.projections,
-                [viewerPlayerId]: result.projection,
-              },
-            }
-          : current,
+        updateProjection(current, viewerPlayerId, result.projection),
       );
     });
 
@@ -83,6 +91,28 @@ export function MatchSimulator() {
       active = false;
     };
   }, [currentMatchId, viewerPlayerId, viewerToken]);
+
+  useEffect(() => {
+    if (!onlineMatch || !currentMatchId || !viewerPlayerId || !viewerToken) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void loadProjectionClient(currentMatchId, viewerToken).then((result) => {
+        if (!result.accepted) return;
+        setMatch((current) =>
+          updateProjection(current, viewerPlayerId, result.projection),
+        );
+      });
+    }, 1500);
+
+    return () => window.clearInterval(interval);
+  }, [
+    currentMatchId,
+    onlineMatch,
+    viewerPlayerId,
+    viewerToken,
+  ]);
 
   async function createMatch() {
     setBusy(true);
@@ -197,6 +227,12 @@ export function MatchSimulator() {
           >
             {busy ? "Creating…" : "Create match"}
           </Button>
+          <Link
+            className="block mt-4 text-cyan-300 hover:text-cyan-200 text-sm text-center"
+            href="/online"
+          >
+            Play online instead
+          </Link>
         </section>
       </main>
     );
@@ -247,24 +283,32 @@ export function MatchSimulator() {
 
   return (
     <main className="relative bg-slate-950 min-h-screen tabletop-background">
-      <div className="top-12 left-14 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
+      <div className="right-2 bottom-3 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
         <span className="text-slate-400">Viewer</span>
-        <Button
-          onClick={() => setViewerSeat("player1")}
-          size="sm"
-          type="button"
-          variant={viewerSeat === "player1" ? "default" : "secondary"}
-        >
-          Player 1
-        </Button>
-        <Button
-          onClick={() => setViewerSeat("player2")}
-          size="sm"
-          type="button"
-          variant={viewerSeat === "player2" ? "default" : "secondary"}
-        >
-          Player 2
-        </Button>
+        {onlineMatch ? (
+          <span className="font-medium text-cyan-200">
+            {viewerSeat === "player1" ? "Player 1" : "Player 2"}
+          </span>
+        ) : (
+          <>
+            <Button
+              onClick={() => setViewerSeat("player1")}
+              size="sm"
+              type="button"
+              variant={viewerSeat === "player1" ? "default" : "secondary"}
+            >
+              Player 1
+            </Button>
+            <Button
+              onClick={() => setViewerSeat("player2")}
+              size="sm"
+              type="button"
+              variant={viewerSeat === "player2" ? "default" : "secondary"}
+            >
+              Player 2
+            </Button>
+          </>
+        )}
         <span className="text-slate-400">
           Match {match.matchId} - State {projection.stateVersion}
         </span>
@@ -289,6 +333,10 @@ export function MatchSimulator() {
               } starts this game. This battlefield will be revealed after both players lock their choices.`
             : "Turn order will be determined after both players lock their battlefield choices."
         }
+        decisionKey={`setup:battlefield:${projection.viewerPlayerId}:${battlefieldActions
+          .map((action) => action.id)
+          .sort()
+          .join(",")}`}
         isOpen={battlefieldOptions.length > 0}
         onConfirm={([actionId]) => {
           if (actionId) {
@@ -303,6 +351,7 @@ export function MatchSimulator() {
 
       <CardSelectionPrompt
         confirmLabel="Choose starting player"
+        decisionKey={`setup:starting-player:${projection.viewerPlayerId}:${startingPlayerAction?.id ?? "closed"}`}
         description="The selected player will take the first turn of this game."
         isOpen={Boolean(startingPlayerAction)}
         onConfirm={([playerId]) => {
@@ -324,6 +373,10 @@ export function MatchSimulator() {
           selectedIds.length ? "Mulligan selected" : "Keep opening hand"
         }
         description="Keep your hand or replace up to two cards."
+        decisionKey={`setup:mulligan:${projection.viewerPlayerId}:${mulliganAction?.id ?? "closed"}:${mulliganOptions
+          .map((option) => option.id)
+          .sort()
+          .join(",")}`}
         isOpen={Boolean(mulliganAction)}
         maxSelected={2}
         minSelected={0}
@@ -352,11 +405,65 @@ export function MatchSimulator() {
       />
       <MatchResultDialog
         busy={busy}
-        onCreateMatch={() => void createMatch()}
+        onCreateMatch={() => {
+          if (onlineMatch) {
+            window.location.assign("/online");
+          } else {
+            void createMatch();
+          }
+        }}
         projection={projection}
       />
     </main>
   );
+}
+
+function createOnlineAcceptedMatch(
+  credentials: OnlinePlayerCredentials,
+): AcceptedMatch {
+  const player1 = credentials.player.seat === "player-1"
+    ? credentials.player
+    : {
+        playerId: "player-1",
+        seat: "player-1" as const,
+        deckId: credentials.player.deckId,
+        playerToken: "",
+      };
+  const player2 = credentials.player.seat === "player-2"
+    ? credentials.player
+    : {
+        playerId: "player-2",
+        seat: "player-2" as const,
+        deckId: credentials.player.deckId,
+        playerToken: "",
+      };
+
+  return {
+    accepted: true,
+    matchId: credentials.matchId,
+    gameId: credentials.gameId,
+    players: { player1, player2 },
+    projections: {},
+  };
+}
+
+function updateProjection(
+  match: AcceptedMatch | null,
+  playerId: string,
+  projection: NonNullable<AcceptedMatch["projections"][string]>,
+): AcceptedMatch | null {
+  if (!match) return match;
+
+  const current = match.projections[playerId];
+  if (current && current.stateVersion > projection.stateVersion) return match;
+
+  return {
+    ...match,
+    projections: {
+      ...match.projections,
+      [playerId]: projection,
+    },
+  };
 }
 
 function SetupWaitingOverlay({ detail }: { detail: string }) {

@@ -15,6 +15,7 @@ export function OptionDecisionPrompt({
   return (
     <ChoiceDialog
       confirmLabel={decision.confirmLabel}
+      decisionKey={decision.decisionKey}
       description={decision.description}
       isOpen
       onCancel={decision.canCancel ? onCancel : undefined}

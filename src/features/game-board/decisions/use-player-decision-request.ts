@@ -84,6 +84,17 @@ export function buildPlayerDecisionRequest({
           actionId: action.id,
           cards: pendingChoice.revealedCards.map(toDecisionCard),
           confirmLabel: visionConfirmLabel,
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.maximum,
+            minimum: pendingChoice.minimum,
+            selectableIds: pendingChoice.revealedCards.map(
+              (card) => card.instanceId,
+            ),
+            source: pendingChoice.presentation,
+          }),
           description:
             "Choose cards to recycle. Unselected cards stay on top.",
           kind: "cardSelection",
@@ -118,6 +129,15 @@ export function buildPlayerDecisionRequest({
             pendingChoice.sourceZone === "hand"
               ? "Discard selected card"
               : "Choose card",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.maximum,
+            minimum: pendingChoice.minimum,
+            selectableIds: legalIds,
+            source: pendingChoice.sourceZone,
+          }),
           description: pendingChoice.prompt,
           kind: "cardSelection",
           maxSelected: pendingChoice.maximum,
@@ -149,6 +169,15 @@ export function buildPlayerDecisionRequest({
         return {
           actionId: action.id,
           confirmLabel: "Submit order",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.optionIds.length,
+            minimum: pendingChoice.optionIds.length,
+            selectableIds: pendingChoice.optionIds,
+            source: "trigger-order",
+          }),
           description:
             "Move triggered effects into the order they should resolve.",
           kind: "orderedDecision",
@@ -288,6 +317,15 @@ function mapActiveNonBoardCardDecision({
       );
     }),
     confirmLabel: "Choose card",
+    decisionKey: createDecisionKey({
+      actorPlayerId: sourceProjection.viewerPlayerId,
+      decisionId: action.id,
+      kind: "activeTargetSelection",
+      maximum: activeTargetSelection.maxTargets,
+      minimum: activeTargetSelection.minTargets,
+      selectableIds: activeTargetSelection.legalTargetIds,
+      source: activeTargetSelection.targetKind,
+    }),
     description: `Choose ${requirement?.label ?? "card"}`,
     kind: "cardSelection",
     maxSelected: activeTargetSelection.maxTargets,
@@ -399,6 +437,26 @@ function visionConfirmLabel(selectedIds: string[]) {
   return selectedIds.length === 1
     ? "Recycle selected card"
     : `Recycle ${selectedIds.length} cards`;
+}
+
+function createDecisionKey(input: {
+  actorPlayerId: string;
+  decisionId: string;
+  kind: string;
+  maximum: number;
+  minimum: number;
+  selectableIds: string[];
+  source: string | null;
+}) {
+  return JSON.stringify([
+    input.kind,
+    input.decisionId,
+    input.actorPlayerId,
+    input.source,
+    [...input.selectableIds].sort(),
+    input.minimum,
+    input.maximum,
+  ]);
 }
 
 function formatChainItemKind(kind: string) {
