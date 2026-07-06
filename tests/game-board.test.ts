@@ -237,45 +237,6 @@ test("game board contains no initial-deck or behavior identities", async () => {
   assert.deepEqual(forbidden.filter((value) => source.includes(value)), []);
 });
 
-test("characterizes reusable post-showdown UI surfaces", async () => {
-  const board = await readFile(
-    path.join(process.cwd(), "src", "features", "game-board", "game-board.tsx"),
-    "utf8"
-  );
-  const combatDialog = await readFile(
-    path.join(
-      process.cwd(),
-      "src",
-      "features",
-      "game-board",
-      "components",
-      "combat-damage-dialog.tsx"
-    ),
-    "utf8"
-  );
-  const pendingStatus = await readFile(
-    path.join(
-      process.cwd(),
-      "src",
-      "features",
-      "game-board",
-      "components",
-      "pending-choice-status.tsx"
-    ),
-    "utf8"
-  );
-  const choiceDialog = await readFile(
-    path.join(process.cwd(), "src", "shared", "components", "choice-dialog.tsx"),
-    "utf8"
-  );
-
-  assert.match(board, /Add Energy and Power/);
-  assert.match(combatDialog, /Tank first/);
-  assert.match(combatDialog, /getNextRequiredPriorityOrder/);
-  assert.match(pendingStatus, /export function PendingChoiceStatus/);
-  assert.match(choiceDialog, /selectionMode: "ordered" \| "single"/);
-});
-
 test("keeps large rune rows inside a horizontally scrollable zone", async () => {
   const playerBoard = await readFile(
     path.join(

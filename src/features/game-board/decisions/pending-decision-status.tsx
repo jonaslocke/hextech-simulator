@@ -4,16 +4,16 @@ import { Hourglass } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/utils/cn";
 
-type PendingChoiceStatusTone = "cyan" | "amber";
+type PendingDecisionStatusTone = "cyan" | "amber";
 
-export function PendingChoiceStatus({
+export function PendingDecisionStatus({
   message,
   title,
   tone = "cyan",
 }: {
   message: ReactNode;
   title: string;
-  tone?: PendingChoiceStatusTone;
+  tone?: PendingDecisionStatusTone;
 }) {
   return (
     <section

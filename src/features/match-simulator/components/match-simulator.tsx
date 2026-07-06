@@ -1,8 +1,7 @@
 "use client";
 
-import { GameBoard } from "@/features/game-board";
+import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
-import { SetupChoiceDialog } from "@/shared/components/setup-choice-dialog";
 import { useEffect, useState } from "react";
 import {
   createMatchClient,
@@ -277,7 +276,7 @@ export function MatchSimulator() {
         </div>
       )}
 
-      <SetupChoiceDialog
+      <CardSelectionPrompt
         cardSize="xl"
         confirmLabel="Lock battlefield"
         description={
@@ -302,7 +301,7 @@ export function MatchSimulator() {
         title="Choose Battlefield"
       />
 
-      <SetupChoiceDialog
+      <CardSelectionPrompt
         confirmLabel="Choose starting player"
         description="The selected player will take the first turn of this game."
         isOpen={Boolean(startingPlayerAction)}
@@ -320,7 +319,7 @@ export function MatchSimulator() {
         title="Choose Starting Player"
       />
 
-      <SetupChoiceDialog
+      <CardSelectionPrompt
         confirmLabel={(selectedIds) =>
           selectedIds.length ? "Mulligan selected" : "Keep opening hand"
         }

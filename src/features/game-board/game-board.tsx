@@ -20,7 +20,6 @@ import {
 import cardBackImage from "../../../assets/cardback.jpg";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
-import { PendingChoiceStatus } from "./components/pending-choice-status";
 import {
   CardZoneAnimationSnapshot,
   CardZonePlacement,
@@ -32,9 +31,10 @@ import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
-import { CombatDamageDialog } from "./components/combat-damage-dialog";
 import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
+import { PlayerDecisionHost } from "./decisions/player-decision-host";
+import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
 import {
   adaptProjectionToBoard,
   type BoardCatalogCard,
@@ -87,11 +87,6 @@ type CardActionMenuState = {
   left: number;
   top: number;
 } | null;
-type AssignCombatDamagePendingChoice = {
-  playerId: string;
-  totalDamage: number;
-  type: "assignCombatDamage";
-};
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
 
@@ -159,17 +154,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [sourceActions, sourceProjection.actions, submitProjectedAction],
   );
-  const onSubmitChoice = (input: {
-    choiceId: string;
-    orderedIds: string[];
-  }) => {
-    const action = sourceProjection.actions.find(
-      (candidate) =>
-        candidate.choice?.kind === "orderedOptions" &&
-        candidate.choice.choiceId === input.choiceId,
-    );
-    submitProjectedAction(action?.id, input.orderedIds);
-  };
   const [openZone, setOpenZone] = useState<TemporaryZone>(null);
   const [cardActionMenu, setCardActionMenu] =
     useState<CardActionMenuState>(null);
@@ -232,9 +216,6 @@ export const GameBoard: FC<GameBoardProps> = ({
       : canViewerEndTurn
         ? "Pass Turn"
         : "Waiting for turn";
-  const combatDamageAction = sourceProjection.actions.find(
-    (action) => action.choice?.kind === "combatDamage",
-  );
   const showdownPrompt = showdownPromptState(sourceProjection);
   const showdownBattlefieldName = showdownPrompt
     ? (sourceProjection.battlefields.find(
@@ -253,94 +234,21 @@ export const GameBoard: FC<GameBoardProps> = ({
   const effectSelectionAction = sourceProjection.actions.find(
     (action) => action.choice?.kind === "effectSelection",
   );
-  const zoneEffectSelection =
-    sourceProjection.pendingChoice?.type === "effectSelection" &&
-    sourceProjection.pendingChoice.playerId ===
-      sourceProjection.viewerPlayerId &&
-    sourceProjection.pendingChoice.sourceZone &&
-    sourceProjection.pendingChoice.presentation === "cardSelection"
-      ? sourceProjection.pendingChoice
-      : null;
-  const visionEffectSelection =
-    sourceProjection.pendingChoice?.type === "effectSelection" &&
-    sourceProjection.pendingChoice.playerId ===
-      sourceProjection.viewerPlayerId &&
-    sourceProjection.pendingChoice.presentation === "vision"
-      ? sourceProjection.pendingChoice
-      : null;
-  const zoneEffectSelectionOptions = zoneEffectSelection
-    ? effectSelectionAction?.targets
-        .flatMap((target) => target.legalIds)
-        .flatMap((id) => {
-          const card = sourceProjection.players
-            .flatMap((player) => player.zones)
-            .flatMap((zone) => zone.cards)
-            .find((candidate) => candidate.instanceId === id);
-          return card
-            ? [{
-                description: card.rulesText || card.type,
-                id,
-                imageUrl: card.imageUrl ?? undefined,
-                label: card.name,
-              }]
-            : [];
-        }) ?? []
-    : [];
-  const triggerOrderChoice =
-    projection.pendingChoice?.type === "orderTriggers" &&
-    projection.pendingChoice.playerId === projection.viewerPlayerId
-      ? projection.pendingChoice
-      : null;
-  const waitingTriggerOrderChoice =
-    projection.pendingChoice?.type === "orderTriggers" &&
-    projection.pendingChoice.playerId !== projection.viewerPlayerId
-      ? projection.pendingChoice
-      : null;
-  const pendingChoiceOptions =
-    triggerOrderChoice?.optionIds.map((id) => {
-      const item = triggerOrderChoice.pendingChainItems.find(
-        (candidate) => candidate.id === id,
-      );
-      const cardInstanceId = item?.cardInstanceId ?? item?.sourceCardInstanceId;
-
-      return {
-        description: item ? formatChainItemKind(item.kind) : undefined,
-        id,
-        imageUrl: cardInstanceId
-          ? (cardsByInstanceId[cardInstanceId]?.media.image_url ??
-            cardBackImage.src)
-          : undefined,
-        label: item?.label ?? id,
-      };
-    }) ?? [];
+  const playerDecision = usePlayerDecisionRequest({
+    activeTargetSelection: targetSelection,
+    cardsByInstanceId,
+    playerNames,
+    sourceProjection,
+  });
+  const targetSelectionUsesCardPrompt =
+    playerDecision?.kind === "cardSelection" &&
+    targetSelection?.actionId === playerDecision.actionId;
   const board = createBoardModel({
     cardsByInstanceId,
     playerNames,
     projection,
     scores,
   });
-  const waitingTriggerOrderPlayerName = waitingTriggerOrderChoice
-    ? waitingTriggerOrderChoice.playerId === board.player.playerId
-      ? board.player.name
-      : board.opponent.name
-    : null;
-  const waitingEffectSelection =
-    sourceProjection.pendingChoice?.type === "effectSelection" &&
-    sourceProjection.pendingChoice.playerId !== sourceProjection.viewerPlayerId
-      ? sourceProjection.pendingChoice
-      : null;
-  const waitingCombatDamageChoice = assignCombatDamagePendingChoiceFromUnknown(
-    sourceProjection.pendingChoice,
-  );
-  const waitingCombatDamageChoiceForOpponent =
-    waitingCombatDamageChoice?.playerId !== sourceProjection.viewerPlayerId
-      ? waitingCombatDamageChoice
-      : null;
-  const waitingCombatDamagePlayerName = waitingCombatDamageChoiceForOpponent
-    ? waitingCombatDamageChoiceForOpponent.playerId === board.player.playerId
-      ? board.player.name
-      : board.opponent.name
-    : null;
   const beginGlobalAction = (action: GameProjection["actions"][number]) => {
     const requirement = action.targets.find((target) => target.kind === "card");
     if (!requirement) {
@@ -856,8 +764,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   useEffect(() => {
     if (
       !effectSelectionAction ||
-      zoneEffectSelection ||
-      visionEffectSelection
+      (playerDecision?.kind === "cardSelection" &&
+        playerDecision.actionId === effectSelectionAction.id)
     ) return;
     const requirement = effectSelectionAction.targets.find(
       (target) => target.kind === "card",
@@ -876,13 +784,17 @@ export const GameBoard: FC<GameBoardProps> = ({
             targetKind: "card",
           },
     );
-  }, [effectSelectionAction, visionEffectSelection, zoneEffectSelection]);
+  }, [effectSelectionAction, playerDecision]);
 
   useEffect(() => {
-    if (zoneEffectSelection || visionEffectSelection) {
+    if (
+      playerDecision?.kind === "cardSelection" &&
+      targetSelection &&
+      playerDecision.actionId !== targetSelection.actionId
+    ) {
       setTargetSelection(null);
     }
-  }, [visionEffectSelection, zoneEffectSelection]);
+  }, [playerDecision, targetSelection]);
 
   useEffect(() => {
     if (!cardActionMenu) {
@@ -915,37 +827,21 @@ export const GameBoard: FC<GameBoardProps> = ({
         player={board.player}
         victoryScore={projection.victoryScore}
       />
-      {waitingEffectSelection && (
-        <PendingChoiceStatus
-          message={waitingEffectSelection.waitingMessage}
-          title={waitingEffectSelection.title}
-        />
-      )}
-      {waitingCombatDamageChoiceForOpponent &&
-        waitingCombatDamagePlayerName && (
-          <PendingChoiceStatus
-            message={
-              <>
-                Waiting for {waitingCombatDamagePlayerName} to assign combat
-                damage.
-              </>
-            }
-            title="Combat Damage"
-            tone="amber"
-          />
-        )}
-      {waitingTriggerOrderChoice && waitingTriggerOrderPlayerName && (
-        <PendingChoiceStatus
-          message={
-            <>
-              Waiting for {waitingTriggerOrderPlayerName} to choose the order of
-              triggered abilities.
-            </>
+      <PlayerDecisionHost
+        cardsByInstanceId={cardsByInstanceId}
+        decision={playerDecision}
+        onCancel={() => setTargetSelection(null)}
+        onIntent={(intent) => {
+          submitProjectedAction(
+            intent.actionId,
+            intent.selectedIds ?? [],
+            intent.allocations,
+          );
+          if (targetSelection?.actionId === intent.actionId) {
+            setTargetSelection(null);
           }
-          title="Triggered abilities"
-          tone="amber"
-        />
-      )}
+        }}
+      />
       {showdownPrompt &&
         showdownBattlefieldName &&
         !sourceProjection.pendingChoice && (
@@ -1072,61 +968,62 @@ export const GameBoard: FC<GameBoardProps> = ({
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
       />
-      {targetSelection?.targetKind === "card" && (
-        <TargetSelectionPrompt
-          canSubmit={
-            targetSelection.selectedTargetIds.length >=
-              targetSelection.minTargets && missingDeflectPower === 0
-          }
-          costPreview={
-            targetSelectionAction?.costPreview
-              ? {
-                  additionalPower: selectedDeflectPower,
-                  availableAnyPower:
-                    targetSelectionAction.costPreview.availableAnyPower,
-                  basePower: targetSelectionAction.costPreview.basePower,
-                  energy: targetSelectionAction.costPreview.energy,
-                  sourceNames: selectedDeflectSources.map(
-                    (source) =>
-                      cardsByInstanceId[source.targetId]?.name ??
-                      "Unknown permanent",
-                  ),
-                }
-              : undefined
-          }
-          maxTargets={targetSelection.maxTargets}
-          minTargets={targetSelection.minTargets}
-          onCancel={() => setTargetSelection(null)}
-          onSubmit={() => submitTargetedPlay()}
-          selectedCount={targetSelection.selectedTargetIds.length}
-          cancelLabel={
-            targetSelection.purpose === "move"
-              ? "Cancel move"
-              : targetSelection.purpose === "choice"
-                ? "Close"
-                : "Cancel"
-          }
-          confirmLabel={
-            targetSelection.purpose === "move"
-              ? "Confirm move"
-              : targetSelection.purpose === "choice"
-                ? "Confirm"
-                : "Play"
-          }
-          title={
-            targetSelection.purpose === "move"
-              ? moveSelectionTitle(
-                  sourceProjection.actions.find(
-                    (action) => action.id === targetSelection.actionId,
-                  ),
-                  sourceProjection.battlefields,
-                )
-              : targetSelection.purpose === "choice"
-                ? effectSelectionAction?.label
+      {targetSelection?.targetKind === "card" &&
+        !targetSelectionUsesCardPrompt && (
+          <TargetSelectionPrompt
+            canSubmit={
+              targetSelection.selectedTargetIds.length >=
+                targetSelection.minTargets && missingDeflectPower === 0
+            }
+            costPreview={
+              targetSelectionAction?.costPreview
+                ? {
+                    additionalPower: selectedDeflectPower,
+                    availableAnyPower:
+                      targetSelectionAction.costPreview.availableAnyPower,
+                    basePower: targetSelectionAction.costPreview.basePower,
+                    energy: targetSelectionAction.costPreview.energy,
+                    sourceNames: selectedDeflectSources.map(
+                      (source) =>
+                        cardsByInstanceId[source.targetId]?.name ??
+                        "Unknown permanent",
+                    ),
+                  }
                 : undefined
-          }
-        />
-      )}
+            }
+            maxTargets={targetSelection.maxTargets}
+            minTargets={targetSelection.minTargets}
+            onCancel={() => setTargetSelection(null)}
+            onSubmit={() => submitTargetedPlay()}
+            selectedCount={targetSelection.selectedTargetIds.length}
+            cancelLabel={
+              targetSelection.purpose === "move"
+                ? "Cancel move"
+                : targetSelection.purpose === "choice"
+                  ? "Close"
+                  : "Cancel"
+            }
+            confirmLabel={
+              targetSelection.purpose === "move"
+                ? "Confirm move"
+                : targetSelection.purpose === "choice"
+                  ? "Confirm"
+                  : "Play"
+            }
+            title={
+              targetSelection.purpose === "move"
+                ? moveSelectionTitle(
+                    sourceProjection.actions.find(
+                      (action) => action.id === targetSelection.actionId,
+                    ),
+                    sourceProjection.battlefields,
+                  )
+                : targetSelection.purpose === "choice"
+                  ? effectSelectionAction?.label
+                  : undefined
+            }
+          />
+        )}
       {targetSelection?.targetKind === "battlefield" && (
         <ChoiceDialog
           confirmLabel="Choose battlefield"
@@ -1156,71 +1053,6 @@ export const GameBoard: FC<GameBoardProps> = ({
           title="Choose a Battlefield"
         />
       )}
-      {triggerOrderChoice && (
-        <ChoiceDialog
-          confirmLabel="Submit order"
-          description="Move triggered effects into the order they should resolve."
-          isOpen
-          onConfirm={(orderedIds) =>
-            onSubmitChoice?.({
-              choiceId: triggerOrderChoice.id,
-              orderedIds,
-            })
-          }
-          options={pendingChoiceOptions}
-          selectionMode="ordered"
-          title={triggerOrderChoice.prompt}
-        />
-      )}
-      {zoneEffectSelection && effectSelectionAction && (
-        <ChoiceDialog
-          confirmLabel={
-            zoneEffectSelection.sourceZone === "hand"
-              ? "Discard selected card"
-              : "Choose card"
-          }
-          description={zoneEffectSelection.prompt}
-          isOpen
-          onConfirm={(selectedIds) =>
-            submitProjectedAction(effectSelectionAction.id, selectedIds)
-          }
-          options={zoneEffectSelectionOptions}
-          selectionMode="single"
-          title={
-            zoneEffectSelection.sourceZone === "hand"
-              ? "Discard from Hand"
-              : "Choose from Trash"
-          }
-        />
-      )}
-      {visionEffectSelection && effectSelectionAction && (
-        <ChoiceDialog
-          confirmLabel="Confirm"
-          description="Look at the top card of your Main Deck, then choose whether to recycle it."
-          isOpen
-          onConfirm={([optionId]) =>
-            submitProjectedAction(
-              effectSelectionAction.id,
-              optionId === "keep-on-top" ? [] : optionId ? [optionId] : [],
-            )
-          }
-          options={[
-            {
-              description: "Leave this card on top of your Main Deck.",
-              id: "keep-on-top",
-              label: "Keep on top",
-            },
-            ...visionEffectSelection.revealedCards.map((card) => ({
-              description: card.rulesText || "Move it to the bottom of the deck.",
-              id: card.instanceId,
-              imageUrl: card.imageUrl ?? undefined,
-              label: `Recycle ${card.name}`,
-            })),
-          ]}
-          selectionMode="single"
-          title="Vision"
-        />
-      )}
       {unitPlayChoice && (
         <ChoiceDialog
           confirmLabel="Play unit"
@@ -1241,15 +1073,6 @@ export const GameBoard: FC<GameBoardProps> = ({
           }))}
           selectionMode="single"
           title={`Choose where to play ${unitPlayChoice.card.name}`}
-        />
-      )}
-      {combatDamageAction?.choice?.kind === "combatDamage" && (
-        <CombatDamageDialog
-          cardsByInstanceId={cardsByInstanceId}
-          choice={combatDamageAction.choice}
-          onSubmit={(allocations) =>
-            submitProjectedAction(combatDamageAction.id, [], allocations)
-          }
         />
       )}
       <CardZoneTransferOverlay
@@ -1283,30 +1106,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
-
-function assignCombatDamagePendingChoiceFromUnknown(
-  pendingChoice: unknown,
-): AssignCombatDamagePendingChoice | null {
-  if (!pendingChoice || typeof pendingChoice !== "object") {
-    return null;
-  }
-
-  const candidate = pendingChoice as Partial<AssignCombatDamagePendingChoice>;
-
-  if (
-    candidate.type !== "assignCombatDamage" ||
-    typeof candidate.playerId !== "string" ||
-    typeof candidate.totalDamage !== "number"
-  ) {
-    return null;
-  }
-
-  return {
-    playerId: candidate.playerId,
-    totalDamage: candidate.totalDamage,
-    type: "assignCombatDamage",
-  };
-}
 
 function actionIdsHaveSameIdentity(left: string, right: string) {
   const leftParts = left.split(":");
@@ -1564,21 +1363,6 @@ function powerDomainOrder(domain: string) {
   return order.indexOf(formatDomain(domain)) === -1
     ? order.length
     : order.indexOf(formatDomain(domain));
-}
-
-function formatChainItemKind(kind: string) {
-  switch (kind) {
-    case "ability":
-      return "Ability";
-    case "spell":
-      return "Spell";
-    case "trigger":
-      return "Triggered ability";
-    case "unit":
-      return "Unit";
-    default:
-      return undefined;
-  }
 }
 
 function CardActionMenu({

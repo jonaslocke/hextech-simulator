@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "./button";
-import { DialogPortal } from "./dialog-portal";
+import { Button } from "@/shared/components/button";
+import { DialogPortal } from "@/shared/components/dialog-portal";
 
-export type SetupChoiceDialogOption = {
+export type CardSelectionPromptOption = {
   description?: string;
   disabled?: boolean;
   id: string;
@@ -12,15 +12,19 @@ export type SetupChoiceDialogOption = {
   label: string;
 };
 
-export type SetupChoiceDialogPresentation = "auto" | "cards" | "list";
-export type SetupChoiceDialogSelectionMode = "multiple" | "ordered" | "single";
-export type SetupChoiceDialogCardSize = "md" | "lg" | "xl";
+export type CardSelectionPromptPresentation = "auto" | "cards" | "list";
+export type CardSelectionPromptSelectionMode =
+  | "multiple"
+  | "ordered"
+  | "single";
+export type CardSelectionPromptCardSize = "md" | "lg" | "xl";
 
 type ConfirmLabelResolver = string | ((selectedIds: string[]) => string);
 
-export type SetupChoiceDialogProps = {
+export type CardSelectionPromptProps = {
+  cancelLabel?: string;
   confirmLabel?: ConfirmLabelResolver;
-  cardSize?: SetupChoiceDialogCardSize;
+  cardSize?: CardSelectionPromptCardSize;
   confirmOnSelect?: boolean;
   description?: string;
   initialSelectedIds?: string[];
@@ -29,13 +33,14 @@ export type SetupChoiceDialogProps = {
   minSelected?: number;
   onCancel?: () => void;
   onConfirm: (selectedIds: string[]) => void;
-  options: SetupChoiceDialogOption[];
-  presentation?: SetupChoiceDialogPresentation;
-  selectionMode?: SetupChoiceDialogSelectionMode;
+  options: CardSelectionPromptOption[];
+  presentation?: CardSelectionPromptPresentation;
+  selectionMode?: CardSelectionPromptSelectionMode;
   title: string;
 };
 
-export function SetupChoiceDialog({
+export function CardSelectionPrompt({
+  cancelLabel = "Cancel",
   cardSize = "md",
   confirmLabel,
   confirmOnSelect = false,
@@ -50,7 +55,7 @@ export function SetupChoiceDialog({
   presentation = "auto",
   selectionMode = "single",
   title,
-}: SetupChoiceDialogProps) {
+}: CardSelectionPromptProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
 
@@ -127,7 +132,7 @@ export function SetupChoiceDialog({
     selectedIds.length >= maxSelected;
 
   const selectOption = useCallback(
-    (option: SetupChoiceDialogOption) => {
+    (option: CardSelectionPromptOption) => {
       if (option.disabled || selectionMode === "ordered") {
         return;
       }
@@ -231,7 +236,7 @@ export function SetupChoiceDialog({
             />
             {onCancel && (
               <Button onClick={onCancel} type="button" variant="secondary">
-                Cancel
+                {cancelLabel}
               </Button>
             )}
             <Button
@@ -263,15 +268,15 @@ function CardChoiceGrid({
   selectionLimitReached,
   selectionMode,
 }: {
-  cardSize: SetupChoiceDialogCardSize;
+  cardSize: CardSelectionPromptCardSize;
   maxSelected?: number;
   onOrderChange: (ids: string[]) => void;
-  onSelect: (option: SetupChoiceDialogOption) => void;
-  options: SetupChoiceDialogOption[];
+  onSelect: (option: CardSelectionPromptOption) => void;
+  options: CardSelectionPromptOption[];
   orderedIds: string[];
   selectedIds: string[];
   selectionLimitReached: boolean;
-  selectionMode: SetupChoiceDialogSelectionMode;
+  selectionMode: CardSelectionPromptSelectionMode;
 }) {
   const compactGrid = options.length > 3;
   const gridColumnClass = getCardGridColumnClass(cardSize);
@@ -391,11 +396,11 @@ function ChoiceList({
   selectionMode,
 }: {
   maxSelected?: number;
-  onSelect: (option: SetupChoiceDialogOption) => void;
-  options: SetupChoiceDialogOption[];
+  onSelect: (option: CardSelectionPromptOption) => void;
+  options: CardSelectionPromptOption[];
   selectedIds: string[];
   selectionLimitReached: boolean;
-  selectionMode: Exclude<SetupChoiceDialogSelectionMode, "ordered">;
+  selectionMode: Exclude<CardSelectionPromptSelectionMode, "ordered">;
 }) {
   return (
     <div className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
@@ -439,7 +444,7 @@ function OrderedChoiceList({
   orderedIds,
 }: {
   onOrderChange: (ids: string[]) => void;
-  options: SetupChoiceDialogOption[];
+  options: CardSelectionPromptOption[];
   orderedIds: string[];
 }) {
   const optionById = new Map(options.map((option) => [option.id, option]));
@@ -486,7 +491,7 @@ function OrderedChoiceList({
   );
 }
 
-function OptionImage({ option }: { option: SetupChoiceDialogOption }) {
+function OptionImage({ option }: { option: CardSelectionPromptOption }) {
   if (!option.imageUrl) {
     return null;
   }
@@ -501,7 +506,7 @@ function OptionImage({ option }: { option: SetupChoiceDialogOption }) {
   );
 }
 
-function OptionText({ option }: { option: SetupChoiceDialogOption }) {
+function OptionText({ option }: { option: CardSelectionPromptOption }) {
   return (
     <span className="min-w-0">
       <span className="block font-semibold text-slate-100 text-sm truncate">
@@ -523,7 +528,7 @@ function SelectionSummary({
 }: {
   maxSelected?: number;
   selectedIds: string[];
-  selectionMode: SetupChoiceDialogSelectionMode;
+  selectionMode: CardSelectionPromptSelectionMode;
 }) {
   if (selectionMode !== "multiple" || maxSelected === undefined) {
     return null;
@@ -536,7 +541,7 @@ function SelectionSummary({
   );
 }
 
-function getCardDialogMaxWidth(cardSize: SetupChoiceDialogCardSize) {
+function getCardDialogMaxWidth(cardSize: CardSelectionPromptCardSize) {
   switch (cardSize) {
     case "xl":
       return "max-w-7xl";
@@ -548,7 +553,7 @@ function getCardDialogMaxWidth(cardSize: SetupChoiceDialogCardSize) {
   }
 }
 
-function getCardGridColumnClass(cardSize: SetupChoiceDialogCardSize) {
+function getCardGridColumnClass(cardSize: CardSelectionPromptCardSize) {
   switch (cardSize) {
     case "xl":
       return "grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]";
@@ -560,7 +565,7 @@ function getCardGridColumnClass(cardSize: SetupChoiceDialogCardSize) {
   }
 }
 
-function getCardChoiceWidthClass(cardSize: SetupChoiceDialogCardSize) {
+function getCardChoiceWidthClass(cardSize: CardSelectionPromptCardSize) {
   switch (cardSize) {
     case "xl":
       return "w-[min(23rem,calc(100vw-3rem))]";
@@ -572,7 +577,7 @@ function getCardChoiceWidthClass(cardSize: SetupChoiceDialogCardSize) {
   }
 }
 
-function getCardChoiceImageHeightClass(cardSize: SetupChoiceDialogCardSize) {
+function getCardChoiceImageHeightClass(cardSize: CardSelectionPromptCardSize) {
   switch (cardSize) {
     case "xl":
       return "max-h-[min(34rem,62vh)]";
@@ -616,7 +621,7 @@ function resolveConfirmLabel({
 }: {
   confirmLabel?: ConfirmLabelResolver;
   selectedIds: string[];
-  selectionMode: SetupChoiceDialogSelectionMode;
+  selectionMode: CardSelectionPromptSelectionMode;
 }) {
   if (typeof confirmLabel === "function") {
     return confirmLabel(selectedIds);
@@ -637,12 +642,15 @@ function resolveConfirmLabel({
   return "Confirm";
 }
 
-function sortOptions(options: SetupChoiceDialogOption[], orderedIds: string[]) {
+function sortOptions(
+  options: CardSelectionPromptOption[],
+  orderedIds: string[],
+) {
   const optionById = new Map(options.map((option) => [option.id, option]));
 
   return orderedIds
     .map((id) => optionById.get(id))
-    .filter((option): option is SetupChoiceDialogOption => Boolean(option));
+    .filter((option): option is CardSelectionPromptOption => Boolean(option));
 }
 
 function moveItem(items: string[], index: number, direction: -1 | 1) {
