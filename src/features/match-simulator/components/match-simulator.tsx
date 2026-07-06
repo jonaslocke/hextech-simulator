@@ -13,6 +13,7 @@ import type { DeckId } from "@/shared/game";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { MatchResultDialog } from "./match-result-dialog";
 import { ActionSubmissionGuard } from "../action-submission-guard";
+import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 
 type OnlinePlayerCredentials = {
   matchId: string;
@@ -256,9 +257,12 @@ export function MatchSimulator({
     );
   }
 
-  const battlefieldActions = projection.actions.filter(
-    (action) => action.presentation.surface === "setup-dialog",
-  );
+  const battlefieldSelection = buildBattlefieldSelectionModel({
+    actions: projection.actions,
+    battlefieldPool: projection.setup.battlefieldPool,
+    matchId: match.matchId,
+    viewerPlayerId: projection.viewerPlayerId,
+  });
   const startingPlayerAction = projection.actions.find((action) =>
     action.targets.some((target) => target.kind === "player"),
   );
@@ -269,18 +273,6 @@ export function MatchSimulator({
     projection.players
       .find((player) => player.playerId === projection.viewerPlayerId)
       ?.zones.find((zone) => zone.kind === "hand")?.cards ?? [];
-
-  const battlefieldOptions = battlefieldActions.map((action) => {
-    const card = projection.setup.battlefieldPool.find(
-      (candidate) => candidate.instanceId === action.sourceCardInstanceId,
-    );
-
-    return {
-      id: action.id,
-      imageUrl: card?.imageUrl ?? undefined,
-      label: card?.name ?? action.label,
-    };
-  });
 
   const startingPlayerOptions =
     startingPlayerAction?.targets[0]?.legalIds.map((playerId) => ({
@@ -353,18 +345,18 @@ export function MatchSimulator({
               } starts this game. This battlefield will be revealed after both players lock their choices.`
             : "Turn order will be determined after both players lock their battlefield choices."
         }
-        decisionKey={`setup:battlefield:${projection.viewerPlayerId}:${battlefieldActions
-          .map((action) => action.id)
-          .sort()
-          .join(",")}`}
+        decisionKey={battlefieldSelection.decisionKey}
         isSubmitting={busy}
-        isOpen={battlefieldOptions.length > 0}
-        onConfirm={([actionId]) => {
-          if (actionId) {
-            void performAction({ actionId, selectedIds: [] });
+        isOpen={battlefieldSelection.options.length > 0}
+        onConfirm={([battlefieldId]) => {
+          const action = battlefieldId
+            ? battlefieldSelection.actionByBattlefieldId.get(battlefieldId)
+            : undefined;
+          if (action) {
+            void performAction({ actionId: action.id, selectedIds: [] });
           }
         }}
-        options={battlefieldOptions}
+        options={battlefieldSelection.options}
         presentation="cards"
         selectionMode="single"
         title="Choose Battlefield"
