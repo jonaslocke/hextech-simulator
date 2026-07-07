@@ -88,10 +88,10 @@ docs/full-ingestion-decks/<SET_CODE>/
 Expected set folders:
 
 ```text
-docs/full-ingestion-decks/OGN/
-docs/full-ingestion-decks/SFD/
-docs/full-ingestion-decks/UNL/
-docs/full-ingestion-decks/VEN/
+data/decks/full-ingestion-decks/OGN/
+data/decks/full-ingestion-decks/SFD/
+data/decks/full-ingestion-decks/UNL/
+data/decks/full-ingestion-decks/VEN/
 ```
 
 The user will decide the decklists later. Codex must not invent or select those
