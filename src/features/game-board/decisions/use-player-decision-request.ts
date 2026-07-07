@@ -443,19 +443,19 @@ function createDecisionKey(input: {
   actorPlayerId: string;
   decisionId: string;
   kind: string;
-  maximum: number;
-  minimum: number;
-  selectableIds: string[];
+  maximum?: number;
+  minimum?: number;
+  selectableIds?: string[];
   source: string | null;
 }) {
+  // This key identifies the logical decision draft only. Do not include legal
+  // option ids or min/max constraints here: those can change after a projection
+  // refresh while the player is still making the same decision.
   return JSON.stringify([
     input.kind,
     input.decisionId,
     input.actorPlayerId,
     input.source,
-    [...input.selectableIds].sort(),
-    input.minimum,
-    input.maximum,
   ]);
 }
 

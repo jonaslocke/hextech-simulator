@@ -204,7 +204,7 @@ export function OnlineMatchmakingLobby() {
           }
           className={[
             "flex justify-between items-center mt-6 px-4 py-3 border rounded-lg w-full transition",
-            "bg-slate-950 hover:bg-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+            "bg-slate-950 hover:bg-slate-900 focus-visible:outline focus-visible:outline-offset-2",
             isRoomCodeCopied
               ? "border-emerald-300/60 shadow-[0_0_24px_rgba(110,231,183,0.12)] focus-visible:outline-emerald-300"
               : "border-cyan-300/30 hover:border-cyan-300/55 focus-visible:outline-cyan-300",

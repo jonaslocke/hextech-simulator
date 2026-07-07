@@ -40,6 +40,7 @@ export function PlayerDecisionHost({
           confirmLabel={decision.confirmLabel}
           description={decision.description}
           decisionKey={decision.decisionKey}
+          draftKey={decision.decisionKey}
           isOpen
           isSubmitting={isSubmitting}
           maxSelected={decision.maxSelected}
