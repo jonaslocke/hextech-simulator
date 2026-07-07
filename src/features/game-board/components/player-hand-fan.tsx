@@ -383,7 +383,7 @@ export function PlayerHandFan({
                   id={getCardDomId(playerId, card, index)}
                   aria-label={card.name}
                   aria-selected={selected}
-                  className="bottom-0 left-1/2 absolute -translate-x-1/2"
+                  className="bottom-0 left-1/2 absolute -translate-x-1/2 pointer-events-auto"
                   key={card.instanceId ?? `${card.name}-${index}`}
                   role="option"
                   style={{ zIndex: motionStyle.zIndex }}
@@ -405,7 +405,7 @@ export function PlayerHandFan({
                     transition={cardTransition}
                   >
                     <CardTile
-                      enableHoverPreview={false}
+                      enableHoverPreview
                       focusablePreview={false}
                       isTransferHidden={
                         card.instanceId
@@ -548,8 +548,7 @@ function createHandLayout({
     centerLift: large ? 10 : 12,
     edgeDrop: clamp(26 - total * 0.55, 15, 22),
     edgeHitPadding,
-    hitAreaHeight:
-      cardHeight + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
+    hitAreaHeight: cardHeight + (large ? 10 : 20) + HIT_AREA_TOP_PADDING,
     interactionWidth:
       total <= 1
         ? edgeHitPadding * 2
