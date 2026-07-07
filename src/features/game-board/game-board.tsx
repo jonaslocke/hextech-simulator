@@ -33,6 +33,7 @@ import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { ShowdownPrompt } from "./components/showdown-prompt";
+import { ChainOverlay } from "./components/chain-overlay";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
@@ -200,9 +201,14 @@ export const GameBoard: FC<GameBoardProps> = ({
   >([]);
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
   const wasChainLockedOpen = useRef(isChainLockedOpen);
-  const canViewerPassChain =
-    isChainLockedOpen &&
-    sourceProjection.actions.some((action) => action.label === "Pass priority");
+  const passPriorityAction = sourceProjection.actions.find(
+    (action) => action.label === "Pass priority",
+  );
+  const canViewerPassChain = isChainLockedOpen && Boolean(passPriorityAction);
+  const onPassPriority = useCallback(
+    () => submitProjectedAction(passPriorityAction?.id),
+    [passPriorityAction?.id, submitProjectedAction],
+  );
   const chainPassWillResolve =
     canViewerPassChain &&
     projection.chain !== null &&
@@ -978,27 +984,22 @@ export const GameBoard: FC<GameBoardProps> = ({
           ))}
         </div>
       )}
-      <TemporaryZoneOverlay
-        canPassChain={canViewerPassChain}
+      <ChainOverlay
+        canPassPriority={canViewerPassChain}
         chainCards={chainCards}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
         isCloseDisabled={isChainLockedOpen}
+        isOpen={isChainOverlayOpen}
         isSubmittingAction={isSubmittingAction}
-        logEntries={logEntries}
         onClose={() => setIsChainOverlayOpen(false)}
-        onChainItemPointerEnter={(targetCardInstanceIds) =>
+        onItemPointerEnter={(targetCardInstanceIds) =>
           setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
         }
-        onChainItemPointerLeave={() => setHighlightedCardInstanceIds(new Set())}
-        onPassChain={onPass}
-        openZone={isChainOverlayOpen ? "chain" : null}
-        opponentBanishment={board.opponent.zones.banishment}
-        opponentTrash={board.opponent.zones.trash}
-        playerBanishment={board.player.zones.banishment}
-        playerTrash={board.player.zones.trash}
+        onItemPointerLeave={() => setHighlightedCardInstanceIds(new Set())}
+        onPassPriority={onPassPriority}
+        priorityWindowKey={`${projection.stateVersion}:${passPriorityAction?.id ?? "none"}`}
       />
       <TemporaryZoneOverlay
-        chainCards={chainCards}
         enableCloseShortcut
         logEntries={logEntries}
         onClose={() => setOpenZone(null)}
