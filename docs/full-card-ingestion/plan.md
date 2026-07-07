@@ -1,5 +1,7 @@
 # Riftbound Full Card Ingestion Plan
 
+Snapshot date: 2026-07-07
+
 ## 1. Purpose
 
 Plan the next card-ingestion work for Hextech Simulator in a controlled,
@@ -109,6 +111,11 @@ data/sets
 Codex must not assume set JSON files live under `docs/` or any generated catalog
 folder. Generated artifacts may be produced by the implementation, but the set
 JSON source of truth for ingestion is `data/sets`.
+
+This plan lives in the repository as `docs/full-card-ingestion/plan.md`. If Codex
+needs to create any companion files, work notes, tracking ledgers, or generated
+planning artifacts for this ingestion program, those files must be created under
+`docs/full-card-ingestion/`.
 
 ### 2.6 Rules authority
 
