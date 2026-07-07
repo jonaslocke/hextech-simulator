@@ -54,7 +54,7 @@ export function MatchResultDialog({
         >
           <div
             aria-hidden="true"
-            className="top-0 absolute inset-x-0 bg-gradient-to-r from-transparent via-cyan-200/60 to-transparent h-px pointer-events-none"
+            className="top-0 absolute inset-x-0 bg-linear-to-r from-transparent via-cyan-200/60 to-transparent h-px pointer-events-none"
           />
           <div
             aria-hidden="true"
@@ -102,7 +102,7 @@ export function MatchResultDialog({
             </div>
           </header>
 
-          <div className="relative items-stretch gap-2 grid grid-cols-[1fr_auto_1fr] bg-white/[0.045] shadow-black/25 shadow-inner p-2 border border-white/10 rounded-xl">
+          <div className="relative items-stretch gap-2 grid grid-cols-[1fr_auto_1fr] bg-white/4.5 shadow-black/25 shadow-inner p-2 border border-white/10 rounded-xl">
             <ScorePanel
               label="Winner"
               points={winner?.points ?? 0}
@@ -160,7 +160,7 @@ function ScorePanel({
         "flex flex-col justify-center items-center px-3 border rounded-lg min-h-20",
         tone === "winner"
           ? "border-cyan-200/20 bg-cyan-300/10"
-          : "border-white/10 bg-white/[0.04]",
+          : "border-white/10 bg-white/4",
       )}
     >
       <p

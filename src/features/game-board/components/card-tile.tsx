@@ -404,7 +404,7 @@ function CardHoverPreviewPortal({
         aria-hidden="true"
         className="absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(103,232,249,0.13),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.07),transparent_42%)] pointer-events-none"
       />
-      <div className="relative bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_36px_rgba(0,0,0,0.42)] p-1.5 border border-white/10 rounded-lg shrink-0">
+      <div className="relative bg-white/4.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_36px_rgba(0,0,0,0.42)] p-1.5 border border-white/10 rounded-lg shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element -- Card art comes from the catalog and local card back asset. */}
         <img
           alt={name}
