@@ -118,3 +118,95 @@ This suggests the effect is not necessarily missing from the behavior model. Ins
 - If the controller drops below 8 runes, Yi immediately returns to `4` Might.
 - The result is consistent in the board badge, card preview, combat calculation, and any legal-action calculation that depends on Might.
 - This works whether Yi is in base or at a battlefield.
+
+### 5. Triggered ability Chain priority starts with the wrong player
+
+**Card involved:** Lady of Luminosity - Starter
+
+**Scenario:**
+
+1. There is at least one unit at a battlefield, but no showdown is happening.
+2. Lux player casts a spell that costs 5 or more.
+3. Lady of Luminosity - Starter triggers from that spell.
+4. Opponent reacts to the spell.
+5. Both players pass priority until the reaction resolves.
+6. The Chain reaches Lady of Luminosity’s triggered ability.
+
+**Expected behavior:**
+When Lady of Luminosity’s triggered ability is the next item on the Chain, the Lux player should receive priority first, because the Lux player controls the next / most recent Chain item.
+
+After the Lux player passes, priority should move to the opponent.
+
+**Current behavior:**
+The opponent receives priority first while Lady of Luminosity’s triggered ability is the next Chain item.
+
+In the screenshot, Lady of Luminosity is controlled by the Lux player, but the opponent side has the active `Pass and Resolve` button while the Lux player side is waiting.
+
+**Rules basis:**
+
+- Lady of Luminosity triggers when its controller plays a spell that costs 5 or more.
+- Triggered abilities are added to the Chain after the triggering card resolves or while the Chain is progressing.
+- After resolving a Chain item, the player who controls the most recent item on the Chain becomes the Active Player.
+- In a Closed State, the player who controls the next item on the Chain receives priority.
+
+**Why this is wrong:**
+The implementation appears to continue priority from the previous passer / next relevant player instead of resetting priority to the controller of the next Chain item after a triggered ability is added.
+
+**Please check:**
+
+- The path that adds `card.played` triggered abilities after a spell resolves.
+- The path that creates a new Chain when the resolved spell was the only remaining Chain item.
+- Whether `priorityPlayerId` is set before or after queued triggered abilities are drained.
+- Whether new triggered Chain items inherit priority from the previous player instead of using the triggered ability controller.
+- Whether `priorityPlayerId` should always be reset to `chain.items.at(-1).controllerPlayerId` after triggered abilities are added to the Chain.
+- Whether the projection is showing stale priority even if server state is correct.
+
+**Acceptance criteria:**
+
+- When Lady of Luminosity’s triggered ability is next on the Chain, the Lux player receives priority first.
+- The opponent receives priority only after the Lux player passes.
+- This works whether the trigger is added to an existing Chain or creates a new Chain after the original spell resolves.
+- This works outside showdown and inside showdown, without breaking Focus rules.
+
+### 6. Chain spell hover does not highlight Firestorm’s chosen battlefield target
+
+**Card involved:** Firestorm  
+**Area:** Chain UI / target highlight feedback  
+**Not related to:** Master Yi deck implementation
+
+**Scenario:**
+
+1. Player casts Firestorm.
+2. Player chooses a battlefield as the spell target.
+3. Firestorm is added to the Chain.
+4. A player hovers Firestorm in the Chain panel.
+
+**Expected behavior:**
+When hovering Firestorm on the Chain, the UI should highlight the battlefield chosen for Firestorm.
+
+Since Firestorm’s effect is `Deal 3 to all enemy units at a battlefield`, the chosen battlefield should remain visible as the spell’s target while the spell is on the Chain. This helps both players understand what the Chain item will affect before choosing whether to react or pass priority.
+
+Ideally, the UI can also highlight the enemy units currently at that battlefield as affected objects, but the minimum expected behavior is highlighting the selected battlefield.
+
+**Current behavior:**
+Hovering Firestorm in the Chain does not highlight anything. Players cannot visually tell which battlefield was chosen after the spell is placed on the Chain.
+
+**Why this matters:**
+Chain hover feedback is used to support priority decisions. If the Chain item does not expose or render its selected target, players must rely on memory instead of the board UI.
+
+**Please check:**
+
+- Whether Firestorm’s chosen `battlefieldId` is persisted on the Chain item.
+- Whether the Chain projection includes chosen targets for spells that are waiting to resolve.
+- Whether the Chain hover UI only supports card/unit targets and not battlefield/location targets.
+- Whether battlefield target highlighting is implemented for target-selection mode but not reused for Chain hover mode.
+- Whether derived affected objects, such as enemy units at the chosen battlefield, can be highlighted separately from the actual selected battlefield target.
+- Whether highlight cleanup works when hover ends or when the Chain item resolves.
+
+**Acceptance criteria:**
+
+- After Firestorm is played and placed on the Chain, hovering it highlights the chosen battlefield.
+- The highlight is visible to both players.
+- The highlight remains accurate while the spell is on the Chain.
+- The highlight is removed when the hover ends or when Firestorm resolves/leaves the Chain.
+- This works for battlefield/location targets generally, not only Firestorm.
