@@ -8,19 +8,25 @@ import {
 
 const PLAYER_1 = {
   deckId: "lux" as const,
-  onlineSessionId: "session-1",
+  onlineSessionId: "11111111-1111-4111-8111-111111111111",
   socketId: "socket-1",
+  displayName: "Player 1",
 };
+
 const PLAYER_2 = {
   deckId: "annie" as const,
-  onlineSessionId: "session-2",
+  onlineSessionId: "22222222-2222-4222-8222-222222222222",
   socketId: "socket-2",
+  displayName: "Player 2",
 };
 
 test("creates a shareable room and assigns independent seats", () => {
   const service = createService();
   const created = service.create(PLAYER_1);
-  const joined = service.join({ ...PLAYER_2, code: created.code.toLowerCase() });
+  const joined = service.join({
+    ...PLAYER_2,
+    code: created.code.toLowerCase(),
+  });
 
   assert.match(created.code, /^[A-Z2-9]{6}$/);
   assert.equal(joined.seat1.seat, "player1");
@@ -41,6 +47,7 @@ test("rejects additional players and joining a started room", () => {
         deckId: "lux",
         onlineSessionId: "session-3",
         socketId: "socket-3",
+        displayName: "Player 3",
       }),
     (error) => error instanceof OnlineRoomError && error.code === "room_full",
   );
@@ -53,6 +60,7 @@ test("rejects additional players and joining a started room", () => {
         deckId: "lux",
         onlineSessionId: "session-4",
         socketId: "socket-4",
+        displayName: "Player-4",
       }),
     (error) =>
       error instanceof OnlineRoomError && error.code === "room_started",
