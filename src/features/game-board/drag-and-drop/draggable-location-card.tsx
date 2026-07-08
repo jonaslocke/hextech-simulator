@@ -16,25 +16,17 @@ export function DraggableLocationCard({
   children,
   sourceLocation,
 }: DraggableLocationCardProps) {
-  const { attributes, isDragging, listeners, setNodeRef, transform } =
-    useDraggable({
-      id: locationDragCardId(cardInstanceId),
-      data: {
-        type: "location-card",
-        sourceCardInstanceId: cardInstanceId,
-        sourceLocation,
-      },
-    });
+  const { attributes, isDragging, listeners, setNodeRef } = useDraggable({
+    id: locationDragCardId(cardInstanceId),
+    data: {
+      type: "location-card",
+      sourceCardInstanceId: cardInstanceId,
+      sourceLocation,
+    },
+  });
 
   const style: CSSProperties = {
-    opacity: isDragging ? 0.55 : undefined,
-    position: "relative",
-    transform: transform
-      ? `translate3d(${Math.round(transform.x)}px, ${Math.round(
-          transform.y,
-        )}px, 0)`
-      : undefined,
-    zIndex: isDragging ? 2147483646 : undefined,
+    opacity: isDragging ? 0.35 : undefined,
   };
 
   return (

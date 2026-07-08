@@ -2,6 +2,7 @@
 
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   pointerWithin,
   useSensor,
@@ -12,12 +13,37 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import type { PropsWithChildren } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
+import {
+  isLocationDragData,
+  type LocationDragData,
+} from "./location-drag-actions";
 
 export const LOCATION_DRAG_HOLD_DELAY_MS = 180;
 export const LOCATION_DRAG_HOLD_TOLERANCE_PX = 6;
 
+type LocationDragState = {
+  isLocationDragActive: boolean;
+};
+
+const LocationDragStateContext = createContext<LocationDragState>({
+  isLocationDragActive: false,
+});
+
+export function useLocationDragState() {
+  return useContext(LocationDragStateContext);
+}
+
 type LocationDragProviderProps = PropsWithChildren<{
+  activeDragData?: LocationDragData | null;
+  dragOverlay?: ReactNode;
+  onActiveDragDataChange?: (data: LocationDragData | null) => void;
   onDragCancel?: (event: DragCancelEvent) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragMove?: (event: DragMoveEvent) => void;
@@ -26,7 +52,10 @@ type LocationDragProviderProps = PropsWithChildren<{
 }>;
 
 export function LocationDragProvider({
+  activeDragData = null,
   children,
+  dragOverlay = null,
+  onActiveDragDataChange,
   onDragCancel,
   onDragEnd,
   onDragMove,
@@ -42,17 +71,47 @@ export function LocationDragProvider({
     }),
   );
 
+  const dragState = useMemo(
+    () => ({
+      isLocationDragActive: Boolean(activeDragData),
+    }),
+    [activeDragData],
+  );
+
   return (
-    <DndContext
-      collisionDetection={pointerWithin}
-      onDragCancel={onDragCancel}
-      onDragEnd={onDragEnd}
-      onDragMove={onDragMove}
-      onDragOver={onDragOver}
-      onDragStart={onDragStart}
-      sensors={sensors}
-    >
-      {children}
-    </DndContext>
+    <LocationDragStateContext.Provider value={dragState}>
+      <DndContext
+        autoScroll={false}
+        collisionDetection={pointerWithin}
+        onDragCancel={(event) => {
+          onDragCancel?.(event);
+          onActiveDragDataChange?.(null);
+        }}
+        onDragEnd={(event) => {
+          onDragEnd?.(event);
+          onActiveDragDataChange?.(null);
+        }}
+        onDragMove={onDragMove}
+        onDragOver={onDragOver}
+        onDragStart={(event) => {
+          const dragData = event.active.data.current;
+
+          if (isLocationDragData(dragData)) {
+            onActiveDragDataChange?.(dragData);
+          } else {
+            onActiveDragDataChange?.(null);
+          }
+
+          onDragStart?.(event);
+        }}
+        sensors={sensors}
+      >
+        {children}
+
+        <DragOverlay adjustScale={false} dropAnimation={null}>
+          {activeDragData ? dragOverlay : null}
+        </DragOverlay>
+      </DndContext>
+    </LocationDragStateContext.Provider>
   );
 }

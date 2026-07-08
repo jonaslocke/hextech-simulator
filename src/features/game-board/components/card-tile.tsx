@@ -12,6 +12,7 @@ import {
 } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
+import { useLocationDragState } from "../drag-and-drop/location-drag-provider";
 
 const CARD_ASPECT_RATIO = 130 / 181;
 const LANDSCAPE_CARD_ASPECT_RATIO = 181 / 130;
@@ -131,6 +132,8 @@ export const CardTile: FC<CardTileProps> = ({
     orientation === "auto" ? autoOrientation : orientation;
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
+  const { isLocationDragActive } = useLocationDragState();
+  const canShowHoverPreview = enableHoverPreview && !isLocationDragActive;
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
@@ -162,7 +165,7 @@ export const CardTile: FC<CardTileProps> = ({
   };
 
   const schedulePreview = () => {
-    if (!enableHoverPreview || !bodyRef.current) {
+    if (!canShowHoverPreview || !bodyRef.current) {
       return;
     }
 
@@ -200,6 +203,19 @@ export const CardTile: FC<CardTileProps> = ({
       setPreviewPosition({ left, top });
     }, 2000);
   };
+
+  useEffect(() => {
+    if (!isLocationDragActive) {
+      return;
+    }
+
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+
+    setPreviewPosition(null);
+  }, [isLocationDragActive]);
 
   useEffect(
     () => () => {
@@ -254,7 +270,7 @@ export const CardTile: FC<CardTileProps> = ({
       }}
       ref={tileRef}
       style={footprintStyle}
-      tabIndex={enableHoverPreview && focusablePreview ? 0 : undefined}
+      tabIndex={canShowHoverPreview && focusablePreview ? 0 : undefined}
     >
       <motion.div
         animate={{

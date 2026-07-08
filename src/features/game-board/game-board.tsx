@@ -45,7 +45,6 @@ import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
-import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import {
   chainOverlayOpen,
   combineTargetRequirements,
@@ -65,6 +64,9 @@ import {
   ZoneData,
   ZoneKind,
 } from "./types";
+import { CardTile } from "./components/card-tile";
+import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
+import type { LocationDragData } from "./drag-and-drop/location-drag-actions";
 
 type ProjectedBattlefield = BoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
@@ -202,6 +204,9 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
+  const [activeLocationDrag, setActiveLocationDrag] =
+    useState<LocationDragData | null>(null);
+
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
   const wasChainLockedOpen = useRef(isChainLockedOpen);
   const passPriorityAction = sourceProjection.actions.find(
@@ -278,6 +283,25 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const activeLocationDragCard = activeLocationDrag
+    ? (buildCard(
+        activeLocationDrag.sourceCardInstanceId,
+        cardsByInstanceId,
+        projection.cardStates,
+      )[0] ?? null)
+    : null;
+
+  const activeLocationDragOverlay = activeLocationDragCard ? (
+    <div className="bg-cyan-300/10 opacity-95 shadow-[0_0_24px_rgba(103,232,249,0.45)] drop-shadow-2xl p-1 border-2 border-cyan-300/90 rounded-xl pointer-events-none">
+      <CardTile
+        {...activeLocationDragCard}
+        enableHoverPreview={false}
+        enableZoneAnimation={false}
+        focusablePreview={false}
+      />
+    </div>
+  ) : null;
+
   const beginGlobalAction = (action: GameProjection["actions"][number]) => {
     const requirement = combineTargetRequirements(action, "card");
     if (!requirement) {
@@ -901,7 +925,11 @@ export const GameBoard: FC<GameBoardProps> = ({
           />
         )}
       <section className="flex flex-1 min-h-0 overflow-hidden">
-        <LocationDragProvider>
+        <LocationDragProvider
+          activeDragData={activeLocationDrag}
+          dragOverlay={activeLocationDragOverlay}
+          onActiveDragDataChange={setActiveLocationDrag}
+        >
           <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
             <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
