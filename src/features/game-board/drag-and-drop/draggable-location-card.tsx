@@ -26,7 +26,8 @@ export function DraggableLocationCard({
   });
 
   const style: CSSProperties = {
-    opacity: isDragging ? 0.35 : undefined,
+    filter: isDragging ? "grayscale(1) saturate(0.15)" : undefined,
+    opacity: isDragging ? 0.28 : undefined,
   };
 
   return (

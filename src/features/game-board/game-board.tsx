@@ -292,7 +292,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     : null;
 
   const activeLocationDragOverlay = activeLocationDragCard ? (
-    <div className="bg-cyan-300/10 opacity-95 shadow-[0_0_24px_rgba(103,232,249,0.45)] drop-shadow-2xl p-1 border-2 border-cyan-300/90 rounded-xl pointer-events-none">
+    <div className="inline-flex opacity-95 shadow-[0_0_24px_rgba(103,232,249,0.45)] drop-shadow-2xl rounded-lg outline-2 outline-cyan-300/90 outline-offset-2 pointer-events-none">
       <CardTile
         {...activeLocationDragCard}
         enableHoverPreview={false}
