@@ -23,6 +23,7 @@ export class OnlineRoomService {
     deckId: DeckId;
     onlineSessionId: string;
     socketId: string;
+    displayName: string;
   }): OnlineRoom {
     return this.registry.create({
       status: "waiting-for-opponent",
@@ -35,17 +36,24 @@ export class OnlineRoomService {
     deckId: DeckId;
     onlineSessionId: string;
     socketId: string;
+    displayName: string;
   }): OnlineRoom {
     const room = this.getRequired(input.code);
 
     if (room.status === "game-created") {
-      throw new OnlineRoomError("room_started", "This room has already started.");
+      throw new OnlineRoomError(
+        "room_started",
+        "This room has already started.",
+      );
     }
     if (room.status === "closed") {
       throw new OnlineRoomError("room_closed", "This room is closed.");
     }
     if (room.seat2) {
-      throw new OnlineRoomError("room_full", "This room already has two players.");
+      throw new OnlineRoomError(
+        "room_full",
+        "This room already has two players.",
+      );
     }
 
     const next = {
@@ -121,9 +129,17 @@ export class OnlineRoomService {
       code: room.code,
       status: room.status,
       seats: {
-        player1: { connected: true, deckId: room.seat1.deckId },
+        player1: {
+          connected: true,
+          deckId: room.seat1.deckId,
+          displayName: room.seat1.displayName,
+        },
         player2: room.seat2
-          ? { connected: true, deckId: room.seat2.deckId }
+          ? {
+              connected: true,
+              deckId: room.seat2.deckId,
+              displayName: room.seat2.displayName,
+            }
           : { connected: false },
       },
       gameId: room.gameId,
@@ -145,6 +161,7 @@ function createSeat(
     deckId: DeckId;
     onlineSessionId: string;
     socketId: string;
+    displayName: string;
   },
 ): OnlineRoomSeat {
   return { seat, ...input };
@@ -160,4 +177,3 @@ function findOwnedSeat(
       seat.socketId === input.socketId,
   );
 }
-

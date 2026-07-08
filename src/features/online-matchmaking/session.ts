@@ -1,6 +1,7 @@
 import type { OnlinePlayerCredentials } from "./types";
 
 const ONLINE_SESSION_ID_KEY = "online-matchmaking:session-id";
+const ONLINE_PLAYER_NAME_KEY = "online-matchmaking:player-name";
 
 export function getOnlineSessionId(): string {
   const current = window.sessionStorage.getItem(ONLINE_SESSION_ID_KEY);
@@ -62,4 +63,16 @@ function createSessionId(): string {
     hex.slice(8, 10).join(""),
     hex.slice(10, 16).join(""),
   ].join("-");
+}
+
+export function loadOnlinePlayerName(): string {
+  return window.localStorage.getItem(ONLINE_PLAYER_NAME_KEY) ?? "";
+}
+
+export function saveOnlinePlayerName(name: string): void {
+  window.localStorage.setItem(ONLINE_PLAYER_NAME_KEY, name);
+}
+
+export function normalizeOnlinePlayerName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").slice(0, 32);
 }

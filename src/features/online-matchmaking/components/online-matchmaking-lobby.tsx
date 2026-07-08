@@ -1,12 +1,21 @@
 "use client";
 
+//TODO refactor this to use shadcn
+
 import { Button } from "@/shared/components/button";
+import { Input } from "@/shared/components/input";
 import { Check, Copy, Link2, Users } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { DeckId } from "@/shared/game";
 import { loadOnlineDeckOptions } from "../api";
-import { getOnlineSessionId, saveOnlinePlayerCredentials } from "../session";
+import {
+  getOnlineSessionId,
+  loadOnlinePlayerName,
+  normalizeOnlinePlayerName,
+  saveOnlinePlayerName,
+  saveOnlinePlayerCredentials,
+} from "../session";
 import type {
   DeckOption,
   OnlinePlayerCredentials,
@@ -30,8 +39,10 @@ export function OnlineMatchmakingLobby() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedRoomCode, setCopiedRoomCode] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState("");
 
   useEffect(() => {
+    setPlayerName(loadOnlinePlayerName());
     void loadOnlineDeckOptions()
       .then((options) => {
         setDeckOptions(options);
@@ -131,7 +142,20 @@ export function OnlineMatchmakingLobby() {
     setError(null);
     setCopiedRoomCode(null);
 
-    const identity = { deckId, onlineSessionId: getOnlineSessionId() };
+    const displayName = normalizeOnlinePlayerName(playerName);
+
+    if (!displayName) {
+      setError("Enter your player name.");
+      return;
+    }
+
+    saveOnlinePlayerName(displayName);
+
+    const identity = {
+      deckId,
+      displayName,
+      onlineSessionId: getOnlineSessionId(),
+    };
 
     if (mode === "create") {
       socketRef.current.emit("client:room:create", identity);
@@ -174,6 +198,11 @@ export function OnlineMatchmakingLobby() {
       setCopiedRoomCode(null);
       setError("Unable to copy the room code. Select and copy it manually.");
     }
+  }
+
+  function updatePlayerName(value: string) {
+    setPlayerName(value);
+    saveOnlinePlayerName(value);
   }
 
   if (room) {
@@ -247,10 +276,15 @@ export function OnlineMatchmakingLobby() {
         </button>
 
         <div className="gap-3 grid mt-5">
-          <SeatRow deckId={room.seats.player1.deckId} label="Player 1" ready />
+          <SeatRow
+            deckId={room.seats.player1.deckId}
+            label={room.seats.player1.displayName || "Player 1"}
+            ready
+          />
+
           <SeatRow
             deckId={room.seats.player2.deckId}
-            label="Player 2"
+            label={room.seats.player2.displayName || "Player 2"}
             ready={room.seats.player2.connected}
           />
         </div>
@@ -297,6 +331,19 @@ export function OnlineMatchmakingLobby() {
       ) : (
         <>
           <label className="gap-2 grid mt-6 text-sm">
+            <label className="gap-2 grid mt-6 text-sm">
+              <span className="text-slate-300">Your name</span>
+              <Input
+                autoComplete="name"
+                disabled={busy}
+                maxLength={32}
+                onChange={(event) =>
+                  updatePlayerName(event.currentTarget.value)
+                }
+                placeholder="Enter your name"
+                value={playerName}
+              />
+            </label>
             <span className="text-slate-300">Your deck</span>
             <select
               className="bg-slate-950 px-3 py-2 border border-white/10 rounded"
@@ -334,6 +381,7 @@ export function OnlineMatchmakingLobby() {
                 busy ||
                 !connected ||
                 !deckId ||
+                !normalizeOnlinePlayerName(playerName) ||
                 (mode === "join" && !roomCode.trim())
               }
               onClick={submitRoom}

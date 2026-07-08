@@ -114,6 +114,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     [sourceProjection],
   );
   const { cardsByInstanceId, projection } = adapted;
+
   const logEntries = sourceProjection.logEntries.map((entry, index) => ({
     ...entry,
     sequence: index + 1,
@@ -1643,7 +1644,7 @@ function buildPlayerData({
 
   return {
     playerId: player.playerId,
-    name: playerNames[player.playerId] ?? player.playerId,
+    name: playerNames[player.playerId] ?? player.displayName ?? player.playerId,
     score: scores[player.playerId] ?? player.points,
     zones: {
       banishment: buildZone(

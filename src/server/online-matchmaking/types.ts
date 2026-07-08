@@ -8,6 +8,7 @@ export type OnlineRoomStatus =
 export type OnlineRoomSeat = {
   seat: "player1" | "player2";
   deckId: DeckId;
+  displayName: string;
   onlineSessionId: string;
   socketId: string;
 };
@@ -24,9 +25,8 @@ export type PublicOnlineRoom = {
   code: string;
   status: OnlineRoomStatus;
   seats: {
-    player1: { connected: boolean; deckId: DeckId };
-    player2: { connected: boolean; deckId?: DeckId };
+    player1: { connected: boolean; deckId: DeckId; displayName: string };
+    player2: { connected: boolean; deckId?: DeckId; displayName?: string };
   };
   gameId?: string;
 };
-

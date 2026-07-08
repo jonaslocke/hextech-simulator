@@ -55,6 +55,10 @@ export function registerOnlineMatchmakingHandlers(
             player1: room.seat1.deckId,
             player2: room.seat2!.deckId,
           },
+          playerNames: {
+            player1: room.seat1.displayName,
+            player2: room.seat2!.displayName,
+          },
         });
         const startedRoom = service.markGameCreated(room.code, match.gameId);
         io.to(room.code).emit(

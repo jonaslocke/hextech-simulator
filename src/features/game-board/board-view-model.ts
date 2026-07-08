@@ -1,7 +1,15 @@
-import type { GameProjection, ProjectedAction, ProjectedCardView } from "@/shared/game";
+import type {
+  GameProjection,
+  ProjectedAction,
+  ProjectedCardView,
+} from "@/shared/game";
 
 export type BoardCatalogCard = {
-  attributes: { energy: number | undefined; might: number | undefined; power: number | undefined };
+  attributes: {
+    energy: number | undefined;
+    might: number | undefined;
+    power: number | undefined;
+  };
   classification: { domain: string[]; supertype: string | null; type: string };
   media: { image_url: string | null };
   metadata: Record<string, never>;
@@ -19,6 +27,7 @@ export type BoardZoneProjection = {
 
 export type BoardPlayerProjection = {
   playerId: string;
+  displayName: string;
   isViewer: boolean;
   points: number;
   runePool: {
@@ -37,8 +46,21 @@ export type BoardPlayerProjection = {
       label: string;
     }>
   >;
-  legalTargetsByCard: Record<string, { cardInstanceIds: string[]; battlefieldIds: string[]; playerIds: string[] }>;
-  zones: Record<"legend" | "champion" | "mainDeck" | "runeDeck" | "hand" | "trash" | "banishment" | "base", BoardZoneProjection>;
+  legalTargetsByCard: Record<
+    string,
+    { cardInstanceIds: string[]; battlefieldIds: string[]; playerIds: string[] }
+  >;
+  zones: Record<
+    | "legend"
+    | "champion"
+    | "mainDeck"
+    | "runeDeck"
+    | "hand"
+    | "trash"
+    | "banishment"
+    | "base",
+    BoardZoneProjection
+  >;
 };
 
 export type BoardProjection = {
@@ -55,36 +77,48 @@ export type BoardProjection = {
   showdown: GameProjection["showdown"];
   combat: GameProjection["combat"];
   chain: null | {
-    items: Array<GameProjection["chain"] extends infer T ? T extends { items: infer I } ? I extends Array<infer Item> ? Item & { cardInstanceId: string | null } : never : never : never>;
+    items: Array<
+      GameProjection["chain"] extends infer T
+        ? T extends { items: infer I }
+          ? I extends Array<infer Item>
+            ? Item & { cardInstanceId: string | null }
+            : never
+          : never
+        : never
+    >;
     relevantPlayerIds: string[];
     priorityPlayerId: string;
     passedPlayerIds: string[];
   };
-  pendingChoice: null | {
-    id: string;
-    playerId: string;
-    type: "orderTriggers";
-    prompt: string;
-    optionIds: string[];
-    pendingChainItems: NonNullable<BoardProjection["chain"]>["items"];
-  } | {
-    id: string;
-    playerId: string;
-    type: "effectSelection";
-    prompt: string;
-    title: string;
-    waitingMessage: string;
-    sourceZone: "hand" | "trash" | "mainDeck" | null;
-    presentation: "cardSelection" | "vision";
-    revealedCards: ProjectedCardView[];
-    minimum: number;
-    maximum: number;
-  } | {
-    id: string;
-    playerId: string;
-    type: "assignCombatDamage";
-    totalDamage: number;
-  };
+  pendingChoice:
+    | null
+    | {
+        id: string;
+        playerId: string;
+        type: "orderTriggers";
+        prompt: string;
+        optionIds: string[];
+        pendingChainItems: NonNullable<BoardProjection["chain"]>["items"];
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "effectSelection";
+        prompt: string;
+        title: string;
+        waitingMessage: string;
+        sourceZone: "hand" | "trash" | "mainDeck" | null;
+        presentation: "cardSelection" | "vision";
+        revealedCards: ProjectedCardView[];
+        minimum: number;
+        maximum: number;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "assignCombatDamage";
+        totalDamage: number;
+      };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{
     battlefieldId: string;
@@ -95,7 +129,10 @@ export type BoardProjection = {
     units: string[];
     facedownSlot: null;
   }>;
-  cardStates: Record<string, { exhausted: boolean; damage: number; computedMight?: number }>;
+  cardStates: Record<
+    string,
+    { exhausted: boolean; damage: number; computedMight?: number }
+  >;
 };
 
 export function adaptProjectionToBoard(projection: GameProjection): {
@@ -103,54 +140,106 @@ export function adaptProjectionToBoard(projection: GameProjection): {
   projection: BoardProjection;
 } {
   const visibleCards = allVisibleCards(projection);
-  const cardsByInstanceId = Object.fromEntries(visibleCards.map((card) => [card.instanceId, toCatalogCard(card)]));
-  const cardStates = Object.fromEntries(visibleCards.map((card) => [card.instanceId, {
-    exhausted: card.exhausted,
-    damage: card.damage,
-    ...(card.computedMight === null ? {} : { computedMight: card.computedMight })
-  }]));
-  const players: Record<string, BoardPlayerProjection> = Object.fromEntries(projection.players.map((player) => {
-    const actions = projection.actions.filter((action) => action.sourceCardInstanceId !== null);
-    const bySource = groupActionsBySource(actions);
-    const zones = Object.fromEntries(player.zones.map((zone) => [zone.kind, {
-      cardInstanceIds: zone.cards.map((card) => card.instanceId),
-      count: zone.count,
-      visibility: zone.visibility
-    }])) as BoardPlayerProjection["zones"];
-    const availablePaymentModes = Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => [sourceId,
-      sourceActions.map((action) => ({
-        boardLocation: action.presentation.boardLocation ?? null,
-        disabledReason: action.disabledReason,
-        enabled: action.enabled,
-        id: action.id,
-        label: action.label,
-      }))
-    ]));
-    const legalTargetsByCard = Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => {
-      const requirements = sourceActions.flatMap((action) => action.targets);
-      return [sourceId, {
-        cardInstanceIds: requirements.filter((item) => item.kind === "card").flatMap((item) => item.legalIds),
-        battlefieldIds: requirements.filter((item) => item.kind === "battlefield").flatMap((item) => item.legalIds),
-        playerIds: requirements.filter((item) => item.kind === "player").flatMap((item) => item.legalIds)
-      }];
-    }));
-    return [player.playerId, {
-      playerId: player.playerId,
-      isViewer: player.isViewer,
-      points: player.points,
-      runePool: {
-        conditionalEnergy: player.conditionalEnergy > 0
-          ? { spell: { amount: player.conditionalEnergy, restriction: "spell" as const } }
-          : {} as Record<string, { amount: number; restriction: "spell" }>,
-        energy: player.energy,
-        power: player.power
+  const cardsByInstanceId = Object.fromEntries(
+    visibleCards.map((card) => [card.instanceId, toCatalogCard(card)]),
+  );
+  const cardStates = Object.fromEntries(
+    visibleCards.map((card) => [
+      card.instanceId,
+      {
+        exhausted: card.exhausted,
+        damage: card.damage,
+        ...(card.computedMight === null
+          ? {}
+          : { computedMight: card.computedMight }),
       },
-      availableAbilityIdsByCard: Object.fromEntries(Object.entries(bySource).map(([sourceId, sourceActions]) => [sourceId, sourceActions.map((action) => action.id)])),
-      availablePaymentModes,
-      legalTargetsByCard,
-      zones
-    } satisfies BoardPlayerProjection];
-  }));
+    ]),
+  );
+  const players: Record<string, BoardPlayerProjection> = Object.fromEntries(
+    projection.players.map((player) => {
+      const actions = projection.actions.filter(
+        (action) => action.sourceCardInstanceId !== null,
+      );
+      const bySource = groupActionsBySource(actions);
+      const zones = Object.fromEntries(
+        player.zones.map((zone) => [
+          zone.kind,
+          {
+            cardInstanceIds: zone.cards.map((card) => card.instanceId),
+            count: zone.count,
+            visibility: zone.visibility,
+          },
+        ]),
+      ) as BoardPlayerProjection["zones"];
+      const availablePaymentModes = Object.fromEntries(
+        Object.entries(bySource).map(([sourceId, sourceActions]) => [
+          sourceId,
+          sourceActions.map((action) => ({
+            boardLocation: action.presentation.boardLocation ?? null,
+            disabledReason: action.disabledReason,
+            enabled: action.enabled,
+            id: action.id,
+            label: action.label,
+          })),
+        ]),
+      );
+      const legalTargetsByCard = Object.fromEntries(
+        Object.entries(bySource).map(([sourceId, sourceActions]) => {
+          const requirements = sourceActions.flatMap(
+            (action) => action.targets,
+          );
+          return [
+            sourceId,
+            {
+              cardInstanceIds: requirements
+                .filter((item) => item.kind === "card")
+                .flatMap((item) => item.legalIds),
+              battlefieldIds: requirements
+                .filter((item) => item.kind === "battlefield")
+                .flatMap((item) => item.legalIds),
+              playerIds: requirements
+                .filter((item) => item.kind === "player")
+                .flatMap((item) => item.legalIds),
+            },
+          ];
+        }),
+      );
+      return [
+        player.playerId,
+        {
+          playerId: player.playerId,
+          displayName: player.displayName ?? player.playerId,
+          isViewer: player.isViewer,
+          points: player.points,
+          runePool: {
+            conditionalEnergy:
+              player.conditionalEnergy > 0
+                ? {
+                    spell: {
+                      amount: player.conditionalEnergy,
+                      restriction: "spell" as const,
+                    },
+                  }
+                : ({} as Record<
+                    string,
+                    { amount: number; restriction: "spell" }
+                  >),
+            energy: player.energy,
+            power: player.power,
+          },
+          availableAbilityIdsByCard: Object.fromEntries(
+            Object.entries(bySource).map(([sourceId, sourceActions]) => [
+              sourceId,
+              sourceActions.map((action) => action.id),
+            ]),
+          ),
+          availablePaymentModes,
+          legalTargetsByCard,
+          zones,
+        } satisfies BoardPlayerProjection,
+      ];
+    }),
+  );
   return {
     cardsByInstanceId,
     projection: {
@@ -166,15 +255,33 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       turn: projection.turn,
       showdown: projection.showdown,
       combat: projection.combat,
-      chain: projection.chain ? {
-        ...projection.chain,
-        items: projection.chain.items.map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
-      } : null,
-      pendingChoice: projection.pendingChoice?.type === "orderTriggers" ? {
-        ...projection.pendingChoice,
-        pendingChainItems: projection.pendingChoice.pendingChainItems
-          .map((item) => ({ ...item, cardInstanceId: item.kind === "spell" || item.kind === "unit" ? item.sourceCardInstanceId : null }))
-      } : projection.pendingChoice,
+      chain: projection.chain
+        ? {
+            ...projection.chain,
+            items: projection.chain.items.map((item) => ({
+              ...item,
+              cardInstanceId:
+                item.kind === "spell" || item.kind === "unit"
+                  ? item.sourceCardInstanceId
+                  : null,
+            })),
+          }
+        : null,
+      pendingChoice:
+        projection.pendingChoice?.type === "orderTriggers"
+          ? {
+              ...projection.pendingChoice,
+              pendingChainItems: projection.pendingChoice.pendingChainItems.map(
+                (item) => ({
+                  ...item,
+                  cardInstanceId:
+                    item.kind === "spell" || item.kind === "unit"
+                      ? item.sourceCardInstanceId
+                      : null,
+                }),
+              ),
+            }
+          : projection.pendingChoice,
       players,
       battlefields: projection.battlefields.map((battlefield) => ({
         battlefieldId: battlefield.battlefieldId,
@@ -183,20 +290,30 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
-        facedownSlot: null
+        facedownSlot: null,
       })),
-      cardStates
-    }
+      cardStates,
+    },
   };
 }
 
 function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
   const cards = [
-    ...projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards)),
-    ...projection.battlefields.flatMap((battlefield) => [battlefield.card, ...battlefield.units, ...(battlefield.facedownCard ? [battlefield.facedownCard] : [])]),
-    ...(projection.chain?.items.flatMap((item) => item.card ? [item.card] : []) ?? []),
+    ...projection.players.flatMap((player) =>
+      player.zones.flatMap((zone) => zone.cards),
+    ),
+    ...projection.battlefields.flatMap((battlefield) => [
+      battlefield.card,
+      ...battlefield.units,
+      ...(battlefield.facedownCard ? [battlefield.facedownCard] : []),
+    ]),
+    ...(projection.chain?.items.flatMap((item) =>
+      item.card ? [item.card] : [],
+    ) ?? []),
     ...(projection.pendingChoice?.type === "orderTriggers"
-      ? projection.pendingChoice.pendingChainItems.flatMap((item) => item.card ? [item.card] : [])
+      ? projection.pendingChoice.pendingChainItems.flatMap((item) =>
+          item.card ? [item.card] : [],
+        )
       : []),
     ...(projection.pendingChoice?.type === "effectSelection"
       ? projection.pendingChoice.revealedCards
@@ -210,19 +327,25 @@ function toCatalogCard(card: ProjectedCardView): BoardCatalogCard {
     attributes: {
       energy: card.energy ?? undefined,
       might: card.might ?? undefined,
-      power: card.power ?? undefined
+      power: card.power ?? undefined,
     },
-    classification: { domain: card.domains, supertype: card.supertype, type: card.type },
+    classification: {
+      domain: card.domains,
+      supertype: card.supertype,
+      type: card.type,
+    },
     media: { image_url: card.imageUrl },
     metadata: {},
     name: card.name,
     public_code: card.publicCode,
     set: { label: "" },
-    text: { plain: card.rulesText }
+    text: { plain: card.rulesText },
   };
 }
 
-function groupActionsBySource(actions: ProjectedAction[]): Record<string, ProjectedAction[]> {
+function groupActionsBySource(
+  actions: ProjectedAction[],
+): Record<string, ProjectedAction[]> {
   const grouped: Record<string, ProjectedAction[]> = {};
   for (const action of actions) {
     if (!action.sourceCardInstanceId) continue;

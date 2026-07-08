@@ -89,6 +89,7 @@ export const ScoreHeader: FC<GameScore & { victoryScore: number }> = ({
   player,
   victoryScore,
 }) => {
+  console.log({ player });
   return (
     <header className="flex justify-center items-center p-2">
       <SeatName

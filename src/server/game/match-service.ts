@@ -4,22 +4,31 @@ import type { DeckId } from "@/shared/game";
 import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
 import { performSetupAction, setupActions } from "./setup";
-import {
-  gameplayActions,
-  performGameplayTransition
-} from "./actions";
+import { gameplayActions, performGameplayTransition } from "./actions";
 import { projectGame } from "./projection";
 import {
-  createInitialGame, createMatchId, createPlayerToken,
-  createRuntimeDeckSnapshot, verifyPlayerToken,
-  type DeckRuntimeSnapshot, type MatchDocument
+  createInitialGame,
+  createMatchId,
+  createPlayerToken,
+  createRuntimeDeckSnapshot,
+  verifyPlayerToken,
+  type DeckRuntimeSnapshot,
+  type MatchDocument,
 } from "./state";
 import type { Db } from "mongodb";
 import type { DamageAssignment } from "./combat";
 
 export async function createMatch(input: {
-  db: Db; repositories: GameRepositories; now?: string; matchId?: string; rngSeed?: string;
+  db: Db;
+  repositories: GameRepositories;
+  now?: string;
+  matchId?: string;
+  rngSeed?: string;
   playerDecks?: { player1: DeckId; player2: DeckId };
+  playerNames?: {
+    player1?: string;
+    player2?: string;
+  };
 }) {
   const now = input.now ?? new Date().toISOString();
   const matchId = input.matchId ?? createMatchId();
@@ -27,29 +36,96 @@ export async function createMatch(input: {
     player1: "lux" as const,
     player2: "lux" as const,
   };
+  const selectedPlayerNames = {
+    player1: normalizePlayerDisplayName(input.playerNames?.player1, "Player 1"),
+    player2: normalizePlayerDisplayName(input.playerNames?.player2, "Player 2"),
+  };
   const templates = await loadMatchDeckTemplates(input.db, selectedDecks);
   const players = ["player-1", "player-2"] as const;
   const runtimeDecks = players.map((id, index) =>
     createRuntimeDeckSnapshot(templates[index]!, id),
   ) as [DeckRuntimeSnapshot, DeckRuntimeSnapshot];
   const tokens = players.map(() => createPlayerToken());
-  const deckDocuments = runtimeDecks.map((deck, index): DeckSnapshotDocument => ({
-    id: `${matchId}:deck:${players[index]}`, createdAt: now, updatedAt: now,
-    matchId, playerId: players[index]!, snapshot: deck.template, instances: deck.instances
-  }));
-  const game = createInitialGame({ matchId, now, rngSeed: input.rngSeed ?? matchId, playerIds: [...players], decks: runtimeDecks });
+  const deckDocuments = runtimeDecks.map(
+    (deck, index): DeckSnapshotDocument => ({
+      id: `${matchId}:deck:${players[index]}`,
+      createdAt: now,
+      updatedAt: now,
+      matchId,
+      playerId: players[index]!,
+      snapshot: deck.template,
+      instances: deck.instances,
+    }),
+  );
+  const game = createInitialGame({
+    matchId,
+    now,
+    rngSeed: input.rngSeed ?? matchId,
+    playerIds: [...players],
+    decks: runtimeDecks,
+  });
   const match: MatchDocument = {
-    id: matchId, createdAt: now, updatedAt: now, status: "setup_pending", currentGameId: game.id,
-    seats: players.map((playerId, index) => ({ playerId, seat: index === 0 ? "player-1" : "player-2", tokenHash: tokens[index]!.tokenHash, deckSnapshotId: deckDocuments[index]!.id })) as MatchDocument["seats"]
+    id: matchId,
+    createdAt: now,
+    updatedAt: now,
+    status: "setup_pending",
+    currentGameId: game.id,
+    seats: [
+      {
+        playerId: players[0]!,
+        seat: "player-1",
+        tokenHash: tokens[0]!.tokenHash,
+        deckSnapshotId: deckDocuments[0]!.id,
+        displayName: selectedPlayerNames.player1,
+      },
+      {
+        playerId: players[1]!,
+        seat: "player-2",
+        tokenHash: tokens[1]!.tokenHash,
+        deckSnapshotId: deckDocuments[1]!.id,
+        displayName: selectedPlayerNames.player2,
+      },
+    ],
   };
-  await Promise.all([...deckDocuments.map((document) => input.repositories.deckSnapshots.insert(document)), input.repositories.games.insert(game), input.repositories.matches.insert(match)]);
+  const playerNamesById = {
+    [players[0]]: selectedPlayerNames.player1,
+    [players[1]]: selectedPlayerNames.player2,
+  };
+  await Promise.all([
+    ...deckDocuments.map((document) =>
+      input.repositories.deckSnapshots.insert(document),
+    ),
+    input.repositories.games.insert(game),
+    input.repositories.matches.insert(match),
+  ]);
   return {
-    matchId, gameId: game.id,
+    matchId,
+    gameId: game.id,
     players: {
-      player1: { playerId: players[0], seat: "player-1" as const, deckId: selectedDecks.player1, playerToken: tokens[0]!.token },
-      player2: { playerId: players[1], seat: "player-2" as const, deckId: selectedDecks.player2, playerToken: tokens[1]!.token }
+      player1: {
+        playerId: players[0],
+        seat: "player-1" as const,
+        deckId: selectedDecks.player1,
+        playerToken: tokens[0]!.token,
+      },
+      player2: {
+        playerId: players[1],
+        seat: "player-2" as const,
+        deckId: selectedDecks.player2,
+        playerToken: tokens[1]!.token,
+      },
     },
-    projections: Object.fromEntries(players.map((id) => [id, projectGame({ game, viewerPlayerId: id, decks: deckDocuments })]))
+    projections: Object.fromEntries(
+      players.map((id) => [
+        id,
+        projectGame({
+          game,
+          viewerPlayerId: id,
+          decks: deckDocuments,
+          playerNames: playerNamesById,
+        }),
+      ]),
+    ),
   };
 }
 
@@ -64,85 +140,166 @@ export async function loadMatchDeckTemplates(
   ]);
 }
 
-export async function getViewerState(repositories: GameRepositories, matchId: string, playerToken: string): Promise<GameProjection> {
-  const { match, game, seat, decks } = await loadContext(repositories, matchId, playerToken);
+export async function getViewerState(
+  repositories: GameRepositories,
+  matchId: string,
+  playerToken: string,
+): Promise<GameProjection> {
+  const { match, game, seat, decks } = await loadContext(
+    repositories,
+    matchId,
+    playerToken,
+  );
   const events = await repositories.gameEvents.findByGameId(game.id);
   void match;
-  return projectGame({ game, viewerPlayerId: seat.playerId, decks, events });
+  return projectGame({
+    game,
+    viewerPlayerId: seat.playerId,
+    decks,
+    events,
+    playerNames: playerNamesFromMatch(match),
+  });
 }
 
-export async function performMatchAction(repositories: GameRepositories, input: {
-  matchId: string; playerToken: string; stateVersion: number; actionId: string;
-  selectedIds: string[]; allocations?: DamageAssignment[]; now?: string;
-}) {
-  const { match, game, seat, decks } = await loadContext(repositories, input.matchId, input.playerToken);
-  if (game.stateVersion !== input.stateVersion) throw new Error("Game state version is stale.");
-  const deckRuntime = Object.fromEntries(decks.map((deck) => [deck.playerId, { template: deck.snapshot, instances: deck.instances }]));
+export async function performMatchAction(
+  repositories: GameRepositories,
+  input: {
+    matchId: string;
+    playerToken: string;
+    stateVersion: number;
+    actionId: string;
+    selectedIds: string[];
+    allocations?: DamageAssignment[];
+    now?: string;
+  },
+) {
+  const { match, game, seat, decks } = await loadContext(
+    repositories,
+    input.matchId,
+    input.playerToken,
+  );
+  if (game.stateVersion !== input.stateVersion)
+    throw new Error("Game state version is stale.");
+  const deckRuntime = Object.fromEntries(
+    decks.map((deck) => [
+      deck.playerId,
+      { template: deck.snapshot, instances: deck.instances },
+    ]),
+  );
   const now = input.now ?? new Date().toISOString();
-  const acceptedAction = (game.status === "setup_pending"
-    ? setupActions(game, seat.playerId)
-    : gameplayActions(game, seat.playerId, decks))
-    .find((action) => action.id === input.actionId);
-  const transition = game.status === "setup_pending"
-    ? null
-    : performGameplayTransition({
-      game,
-      actorPlayerId: seat.playerId,
-      actionId: input.actionId,
-      selectedIds: input.selectedIds,
-      allocations: input.allocations,
-      decks,
-      now
-    });
+  const acceptedAction = (
+    game.status === "setup_pending"
+      ? setupActions(game, seat.playerId)
+      : gameplayActions(game, seat.playerId, decks)
+  ).find((action) => action.id === input.actionId);
+  const transition =
+    game.status === "setup_pending"
+      ? null
+      : performGameplayTransition({
+          game,
+          actorPlayerId: seat.playerId,
+          actionId: input.actionId,
+          selectedIds: input.selectedIds,
+          allocations: input.allocations,
+          decks,
+          now,
+        });
   const next = transition
     ? transition.game
-    : performSetupAction({ game, actorPlayerId: seat.playerId, actionId: input.actionId, selectedIds: input.selectedIds, decksByPlayerId: deckRuntime, now });
+    : performSetupAction({
+        game,
+        actorPlayerId: seat.playerId,
+        actionId: input.actionId,
+        selectedIds: input.selectedIds,
+        decksByPlayerId: deckRuntime,
+        now,
+      });
   const nextMatch =
     next.status === "complete"
       ? { ...match, status: "complete" as const, updatedAt: now }
       : next.status === "in_progress"
         ? { ...match, status: "in_progress" as const, updatedAt: now }
         : match;
-  const transitionEvents = transition?.events ?? [{
-    type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
-    actorPlayerId: seat.playerId,
-    message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`,
-    payload: { actionId: input.actionId }
-  }];
+  const transitionEvents = transition?.events ?? [
+    {
+      type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
+      actorPlayerId: seat.playerId,
+      message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`,
+      payload: { actionId: input.actionId },
+    },
+  ];
   await Promise.all([
     repositories.games.upsert(next),
     repositories.matches.upsert(nextMatch),
-    ...transitionEvents.map((event, eventIndex) => repositories.gameEvents.insert({
-      id: `${next.id}:event:${next.stateVersion}:${eventIndex}`,
-      createdAt: now,
-      updatedAt: now,
-      matchId: match.id,
-      gameId: next.id,
-      sequence: next.stateVersion * 100 + eventIndex,
-      actionVersion: next.stateVersion,
-      eventIndex,
-      actorPlayerId: event.actorPlayerId,
-      type: event.type,
-      message: event.message,
-      payload: event.payload
-    }))
+    ...transitionEvents.map((event, eventIndex) =>
+      repositories.gameEvents.insert({
+        id: `${next.id}:event:${next.stateVersion}:${eventIndex}`,
+        createdAt: now,
+        updatedAt: now,
+        matchId: match.id,
+        gameId: next.id,
+        sequence: next.stateVersion * 100 + eventIndex,
+        actionVersion: next.stateVersion,
+        eventIndex,
+        actorPlayerId: event.actorPlayerId,
+        type: event.type,
+        message: event.message,
+        payload: event.payload,
+      }),
+    ),
   ]);
   const events = await repositories.gameEvents.findByGameId(next.id);
-  return projectGame({ game: next, viewerPlayerId: seat.playerId, decks, events });
+  return projectGame({
+    game: next,
+    viewerPlayerId: seat.playerId,
+    decks,
+    events,
+    playerNames: playerNamesFromMatch(nextMatch),
+  });
 }
 
-async function loadContext(repositories: GameRepositories, matchId: string, token: string) {
+async function loadContext(
+  repositories: GameRepositories,
+  matchId: string,
+  token: string,
+) {
   const match = await repositories.matches.findById(matchId);
   if (!match) throw new Error("Match was not found.");
-  const seat = match.seats.find((candidate) => verifyPlayerToken(token, candidate.tokenHash));
+  const seat = match.seats.find((candidate) =>
+    verifyPlayerToken(token, candidate.tokenHash),
+  );
   if (!seat) throw new Error("Player token is invalid for this match.");
   const game = await repositories.games.findById(match.currentGameId);
   if (!game) throw new Error("Game was not found.");
-  const decks = (await Promise.all(match.seats.map((item) => repositories.deckSnapshots.findById(item.deckSnapshotId)))).filter((item): item is DeckSnapshotDocument => item !== null);
+  const decks = (
+    await Promise.all(
+      match.seats.map((item) =>
+        repositories.deckSnapshots.findById(item.deckSnapshotId),
+      ),
+    )
+  ).filter((item): item is DeckSnapshotDocument => item !== null);
   if (decks.length !== 2) throw new Error("Deck snapshots are unavailable.");
   return { match, seat, game, decks };
 }
 
 export function deckSnapshotIdHash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizePlayerDisplayName(
+  value: string | undefined,
+  fallback: string,
+) {
+  const normalized = value?.trim().replace(/\s+/g, " ").slice(0, 32);
+
+  return normalized || fallback;
+}
+
+function playerNamesFromMatch(match: MatchDocument): Record<string, string> {
+  return Object.fromEntries(
+    match.seats.map((seat) => [
+      seat.playerId,
+      seat.displayName || seat.playerId,
+    ]),
+  );
 }
