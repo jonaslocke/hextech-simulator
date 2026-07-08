@@ -60,7 +60,10 @@ test("maps Vision to card selection and keeps the top card with an empty selecti
 
   assert.equal(decision?.kind, "cardSelection");
   if (decision?.kind !== "cardSelection") return;
-  assert.deepEqual(decision.cards.map((item) => item.id), ["revealed-card"]);
+  assert.deepEqual(
+    decision.cards.map((item) => item.id),
+    ["revealed-card"],
+  );
   assert.equal(decision.minSelected, 0);
   const refreshedDecision = buildPlayerDecisionRequest({
     cardsByInstanceId: {},
@@ -141,7 +144,10 @@ test("maps an initiated non-board card target to a card selection decision", () 
   if (decision?.kind !== "cardSelection") return;
   assert.equal(decision.title, "Choose from Trash");
   assert.equal(decision.description, "Choose unit from trash");
-  assert.deepEqual(decision.cards.map((item) => item.id), ["trash-unit"]);
+  assert.deepEqual(
+    decision.cards.map((item) => item.id),
+    ["trash-unit"],
+  );
   assert.equal(decision.actionId, "return-action");
 });
 
@@ -217,9 +223,12 @@ test("maps pending non-board effect selections to the dialog", () => {
   const trashCard = card("trash-card", "Unit");
   const projection = projectionWith({
     actions: [
-      effectSelectionAction("trash-choice", "Choose a unit from trash", [
-        trashCard.instanceId,
-      ], "trash"),
+      effectSelectionAction(
+        "trash-choice",
+        "Choose a unit from trash",
+        [trashCard.instanceId],
+        "trash",
+      ),
     ],
     pendingChoice: effectSelectionChoice({
       id: "trash-choice",
@@ -243,7 +252,10 @@ test("maps pending non-board effect selections to the dialog", () => {
   assert.equal(decision?.kind, "cardSelection");
   if (decision?.kind !== "cardSelection") return;
   assert.equal(decision.title, "Choose from Trash");
-  assert.deepEqual(decision.cards.map((item) => item.id), ["trash-card"]);
+  assert.deepEqual(
+    decision.cards.map((item) => item.id),
+    ["trash-card"],
+  );
 });
 
 function projectionWith(
@@ -260,10 +272,7 @@ function projectionWith(
     logEntries: [],
     matchId: "match-1",
     pendingChoice: overrides.pendingChoice,
-    players: [
-      player("player-1", true),
-      player("player-2", false),
-    ],
+    players: [player("player-1", true), player("player-2", false)],
     setup: {
       battlefieldChoices: {},
       battlefieldPool: [],
@@ -310,13 +319,15 @@ function effectSelectionAction(
       surface: "choice-dialog",
     },
     sourceCardInstanceId: null,
-    targets: [{
-      kind: "card",
-      legalIds,
-      maximum: 1,
-      minimum: 1,
-      sourceZone,
-    }],
+    targets: [
+      {
+        kind: "card",
+        legalIds,
+        maximum: 1,
+        minimum: 1,
+        sourceZone,
+      },
+    ],
   };
 }
 
@@ -341,12 +352,16 @@ function effectSelectionChoice(input: {
   };
 }
 
-function player(playerId: string, isViewer: boolean): GameProjection["players"][number] {
+function player(
+  playerId: string,
+  isViewer: boolean,
+): GameProjection["players"][number] {
   return {
     conditionalEnergy: 0,
     energy: 0,
     isViewer,
     playerId,
+    displayName: playerId,
     points: 0,
     power: {},
     zones: [
@@ -367,10 +382,7 @@ function player(playerId: string, isViewer: boolean): GameProjection["players"][
   };
 }
 
-function card(
-  instanceId: string,
-  type: string = "Spell",
-): ProjectedCardView {
+function card(instanceId: string, type: string = "Spell"): ProjectedCardView {
   return {
     computedMight: null,
     damage: 0,
