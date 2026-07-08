@@ -7,6 +7,7 @@ import {
 } from "@/features/card-presentation";
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { GameProjection } from "@/shared/game";
+import { cn } from "@/shared/utils/cn";
 import { LayoutGroup } from "motion/react";
 import {
   FC,
@@ -19,6 +20,13 @@ import {
   useState,
 } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
+import {
+  adaptProjectionToBoard,
+  type BoardCatalogCard,
+  type BoardPlayerProjection,
+  type BoardProjection,
+  type BoardZoneProjection,
+} from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import {
@@ -28,22 +36,16 @@ import {
   ZoneAnimationCount,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
+import { ChainOverlay } from "./components/chain-overlay";
 import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
-import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { ShowdownPrompt } from "./components/showdown-prompt";
-import { ChainOverlay } from "./components/chain-overlay";
+import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
-import {
-  adaptProjectionToBoard,
-  type BoardCatalogCard,
-  type BoardPlayerProjection,
-  type BoardZoneProjection,
-  type BoardProjection,
-} from "./board-view-model";
+import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import {
   chainOverlayOpen,
   combineTargetRequirements,
@@ -63,7 +65,6 @@ import {
   ZoneData,
   ZoneKind,
 } from "./types";
-import { cn } from "@/shared/utils/cn";
 
 type ProjectedBattlefield = BoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
@@ -900,71 +901,77 @@ export const GameBoard: FC<GameBoardProps> = ({
           />
         )}
       <section className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
-          <PlayerBoard
-            highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-            hiddenCardInstanceIds={activeTransferCardIds}
-            onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
-            onBoardCardPointerEnter={handleTargetPointerEnter}
-            onBoardCardPointerLeave={handleTargetPointerLeave}
-            onOpenBanish={() => setOpenZone("banish")}
-            onOpenTrash={() => setOpenZone("opponentTrash")}
-            player={board.opponent}
-            isActivePlayer={isOpponentActive}
-            isMirrored
-          />
-          <LayoutGroup id="battlefield-showdown-layout">
-            <div className="flex gap-2 min-h-0">
-              <BattlefieldBoard
-                battlefield={board.playerBattlefield}
-                highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-                hiddenCardInstanceIds={activeTransferCardIds}
-                isHighlighted={
-                  hoveredBoardLocation?.kind === "battlefield" &&
-                  hoveredBoardLocation.battlefieldId ===
-                    board.playerBattlefield.id
-                }
-                onCardPrimaryAction={handleBoardCardPrimaryAction}
-                onCardPointerEnter={handleTargetPointerEnter}
-                onCardPointerLeave={handleTargetPointerLeave}
-                owner="player"
-                showdownState={board.playerBattlefieldShowdownState}
-              />
-              <BattlefieldBoard
-                battlefield={board.opponentBattlefield}
-                highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-                hiddenCardInstanceIds={activeTransferCardIds}
-                isHighlighted={
-                  hoveredBoardLocation?.kind === "battlefield" &&
-                  hoveredBoardLocation.battlefieldId ===
-                    board.opponentBattlefield.id
-                }
-                onCardPrimaryAction={handleBoardCardPrimaryAction}
-                onCardPointerEnter={handleTargetPointerEnter}
-                onCardPointerLeave={handleTargetPointerLeave}
-                owner="opponent"
-                showdownState={board.opponentBattlefieldShowdownState}
-              />
-            </div>
-          </LayoutGroup>
-          <PlayerBoard
-            highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-            hiddenCardInstanceIds={activeTransferCardIds}
-            isBaseHighlighted={hoveredBoardLocation?.kind === "base"}
-            onOpenBanish={() => setOpenZone("banish")}
-            onOpenTrash={() => setOpenZone("playerTrash")}
-            onChampionContextAction={handleChampionCardAction}
-            onChampionPrimaryAction={handleChampionCardAction}
-            onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
-            onBoardCardPointerEnter={handleTargetPointerEnter}
-            onBoardCardPointerLeave={handleTargetPointerLeave}
-            onRuneContextAction={handleRuneContextAction}
-            onRunePrimaryAction={handleRunePrimaryAction}
-            player={board.player}
-            isActivePlayer={isPlayerActive}
-          />
-          <RunePoolBar runePool={viewerState?.runePool} />
-        </div>
+        <LocationDragProvider>
+          <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
+            <PlayerBoard
+              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
+              hiddenCardInstanceIds={activeTransferCardIds}
+              onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
+              onBoardCardPointerEnter={handleTargetPointerEnter}
+              onBoardCardPointerLeave={handleTargetPointerLeave}
+              onOpenBanish={() => setOpenZone("banish")}
+              onOpenTrash={() => setOpenZone("opponentTrash")}
+              player={board.opponent}
+              isActivePlayer={isOpponentActive}
+              isMirrored
+            />
+            <LayoutGroup id="battlefield-showdown-layout">
+              <div className="flex gap-2 min-h-0">
+                <BattlefieldBoard
+                  battlefield={board.playerBattlefield}
+                  highlightedCardInstanceIds={
+                    displayedHighlightedCardInstanceIds
+                  }
+                  hiddenCardInstanceIds={activeTransferCardIds}
+                  isHighlighted={
+                    hoveredBoardLocation?.kind === "battlefield" &&
+                    hoveredBoardLocation.battlefieldId ===
+                      board.playerBattlefield.id
+                  }
+                  onCardPrimaryAction={handleBoardCardPrimaryAction}
+                  onCardPointerEnter={handleTargetPointerEnter}
+                  onCardPointerLeave={handleTargetPointerLeave}
+                  owner="player"
+                  showdownState={board.playerBattlefieldShowdownState}
+                />
+                <BattlefieldBoard
+                  battlefield={board.opponentBattlefield}
+                  highlightedCardInstanceIds={
+                    displayedHighlightedCardInstanceIds
+                  }
+                  hiddenCardInstanceIds={activeTransferCardIds}
+                  isHighlighted={
+                    hoveredBoardLocation?.kind === "battlefield" &&
+                    hoveredBoardLocation.battlefieldId ===
+                      board.opponentBattlefield.id
+                  }
+                  onCardPrimaryAction={handleBoardCardPrimaryAction}
+                  onCardPointerEnter={handleTargetPointerEnter}
+                  onCardPointerLeave={handleTargetPointerLeave}
+                  owner="opponent"
+                  showdownState={board.opponentBattlefieldShowdownState}
+                />
+              </div>
+            </LayoutGroup>
+            <PlayerBoard
+              highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
+              hiddenCardInstanceIds={activeTransferCardIds}
+              isBaseHighlighted={hoveredBoardLocation?.kind === "base"}
+              onOpenBanish={() => setOpenZone("banish")}
+              onOpenTrash={() => setOpenZone("playerTrash")}
+              onChampionContextAction={handleChampionCardAction}
+              onChampionPrimaryAction={handleChampionCardAction}
+              onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
+              onBoardCardPointerEnter={handleTargetPointerEnter}
+              onBoardCardPointerLeave={handleTargetPointerLeave}
+              onRuneContextAction={handleRuneContextAction}
+              onRunePrimaryAction={handleRunePrimaryAction}
+              player={board.player}
+              isActivePlayer={isPlayerActive}
+            />
+            <RunePoolBar runePool={viewerState?.runePool} />
+          </div>
+        </LocationDragProvider>
         <ActionRail
           concedeDisabled={isSubmittingAction}
           isChainOpen={isChainOverlayOpen}

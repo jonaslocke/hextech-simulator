@@ -74,3 +74,47 @@ After implementing the Master Yi deck, I found three issues that need investigat
 - Whether the Showdown locks combat totals before Stupefy is applied.
 - Whether the UI projection is reading a stale or pre-modifier Might value.
 - Whether modifier ordering/minimum handling is incorrectly ignoring the `-1` modifier.
+
+### 4. Yi, Meditative 8+ rune Might bonus is not recalculated immediately
+
+**Card involved:** Yi, Meditative
+
+**Current behavior:** Yi, Meditative does not immediately receive its `+4 Might` bonus when its controller reaches `8+` runes on the board/base.
+
+In state `86`, Player 2 has `9/9` runes on board, but Yi, Meditative is still displayed as `4` Might.
+
+Later, in state `91`, after the board changed and there were fewer units on the battlefield, Yi, Meditative correctly displays as `8` Might.
+
+This suggests the effect is not necessarily missing from the behavior model. Instead, the conditional Might modifier appears to be stale and only recalculated after some later unrelated board-state update.
+
+**Expected behavior:** Yi, Meditative should immediately show and calculate as `8` Might as soon as its controller has 8 or more runes on board.
+
+**Expected Might calculation:**
+
+- Yi, Meditative base Might: `4`
+- Yi, Meditative condition: `+4` while controller has `8+` runes
+- Expected current Might with 9 runes: `8`
+
+**Observed behavior:**
+
+- State `86`: Player 2 has `9/9` runes, but Yi shows `4` Might.
+- State `91`: Player 2 still has `9/9` runes, and Yi now shows `8` Might.
+- The change from `4` to `8` happened later, after other board changes, not immediately when the rune threshold was already satisfied.
+
+**Please check:**
+
+- Whether conditional Might modifiers are recomputed when rune count changes.
+- Whether board rune count changes invalidate any cached/computed Might values.
+- Whether Yi’s condition is only recomputed when units move, enter, leave, or when combat state changes.
+- Whether the projection is memoizing `currentMight` without including the player’s rune count as a dependency.
+- Whether the condition is checking the correct player: Yi’s controller, not the active player, viewer, or opponent.
+- Whether the card preview and the board badge use the same computed Might source.
+- Whether there is a difference between printed/base Might and projected/current Might in the UI.
+
+**Acceptance criteria:**
+
+- With 0–7 runes on board, Yi, Meditative shows `4` Might.
+- As soon as the controller reaches 8+ runes, Yi immediately shows `8` Might without requiring any unrelated board change.
+- If the controller drops below 8 runes, Yi immediately returns to `4` Might.
+- The result is consistent in the board badge, card preview, combat calculation, and any legal-action calculation that depends on Might.
+- This works whether Yi is in base or at a battlefield.
