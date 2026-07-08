@@ -1,5 +1,11 @@
 import { cn } from "@/shared/utils/cn";
 import { FC, PropsWithChildren } from "react";
+import { boardLocationDropFeedbackClassName } from "../drag-and-drop/drop-feedback";
+import type {
+  BoardDropLocation,
+  BoardLocationDropStatus,
+} from "../drag-and-drop/location-drag-actions";
+import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 
 interface Props extends PropsWithChildren {
   animationZoneId?: string;
@@ -18,6 +24,9 @@ interface Props extends PropsWithChildren {
     ready: number;
     total: number;
   };
+  dropLocation?: BoardDropLocation;
+  dropStatus?: BoardLocationDropStatus;
+  isDropEnabled?: boolean;
 }
 
 const densityClassNames = {
@@ -37,17 +46,32 @@ export const ZoneArea: FC<Props> = ({
   isHighlighted,
   isHightlighted,
   totalCardsCount,
+  dropLocation,
+  dropStatus,
+  isDropEnabled,
 }) => {
   const highlighted = Boolean(isHighlighted ?? isHightlighted);
   const hasTotalCardsCount = !totalCardsCount
     ? false
     : Object.values(totalCardsCount).reduce((acc, cur) => acc + cur, 0) > 0;
 
+  const { setNodeRef } = useBoardLocationDroppable({
+    disabled: !isDropEnabled || !dropLocation,
+    location: dropLocation ?? { kind: "base" },
+  });
+
+  const dropFeedbackClassName = boardLocationDropFeedbackClassName(dropStatus);
+  const isDropHighlighted =
+    dropStatus === "legal" || dropStatus === "legal-over";
+
+  const isVisuallyDestinationHighlighted =
+    isDestinationHighlighted || isDropHighlighted;
+
   return (
     <div
       data-zone-animation-id={animationZoneId}
       data-destination-highlighted={
-        isDestinationHighlighted ? "true" : undefined
+        isVisuallyDestinationHighlighted ? "true" : undefined
       }
       className={cn(
         "relative flex items-center border rounded-md min-h-0 overflow-visible select-none",
@@ -56,10 +80,13 @@ export const ZoneArea: FC<Props> = ({
         highlighted
           ? "border-cyan-200/35 bg-cyan-300/5 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.10),0_0_18px_rgba(34,211,238,0.10)]"
           : "border-cyan-100/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]",
-        isDestinationHighlighted &&
+        isVisuallyDestinationHighlighted &&
           "border-cyan-200/70 bg-cyan-300/6 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18)]",
+        dropFeedbackClassName,
         className,
       )}
+      ref={dropLocation ? setNodeRef : undefined}
+      data-drop-status={dropStatus}
     >
       <div
         aria-hidden="true"
@@ -67,7 +94,7 @@ export const ZoneArea: FC<Props> = ({
           "absolute inset-0 rounded-[inherit] pointer-events-none",
           "bg-cyan-300/5 opacity-0 blur-[1px]",
           "transition-opacity duration-700 ease-out",
-          (highlighted || isDestinationHighlighted) && "opacity-100",
+          (highlighted || isVisuallyDestinationHighlighted) && "opacity-100",
         )}
       />
 
@@ -78,7 +105,7 @@ export const ZoneArea: FC<Props> = ({
           "ring-1 ring-inset ring-cyan-200/0",
           "transition-[--tw-ring-color] duration-700 ease-out",
           highlighted && "ring-cyan-200/20",
-          isDestinationHighlighted && "ring-cyan-200/40",
+          isVisuallyDestinationHighlighted && "ring-cyan-200/40",
         )}
       />
 
@@ -86,7 +113,7 @@ export const ZoneArea: FC<Props> = ({
         <div
           className={cn(
             "top-1 right-1 z-10 absolute font-mono text-[10px] transition-colors duration-700 ease-out pointer-events-none",
-            highlighted || isDestinationHighlighted
+            highlighted || isVisuallyDestinationHighlighted
               ? "text-cyan-100/75"
               : "text-white/60",
           )}

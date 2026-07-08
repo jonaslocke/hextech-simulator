@@ -22,6 +22,17 @@ export type LocationDragData = {
   sourceLocation: BoardDragSourceLocation;
 };
 
+export type BoardDropLocationData = {
+  location: BoardDropLocation;
+  type: "board-drop-location";
+};
+
+export type BoardLocationDropStatus =
+  | "idle"
+  | "legal"
+  | "legal-over"
+  | "invalid-over";
+
 const LOCATION_DRAG_CARD_ID_PREFIX = "location-drag-card";
 const LOCATION_DRAG_ACTION_KINDS = new Set<string>(["move", "play"]);
 const BOARD_DROP_ID_PREFIX = "board-drop";
@@ -190,4 +201,81 @@ export function findLocationDragActionForDrop(input: {
       sameBoardLocation(candidate.destination, input.destination),
     )?.action ?? null
   );
+}
+
+export function isBoardDropLocation(
+  value: unknown,
+): value is BoardDropLocation {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<BoardDropLocation>;
+
+  if (candidate.kind === "base") {
+    return true;
+  }
+
+  return (
+    candidate.kind === "battlefield" &&
+    typeof candidate.battlefieldId === "string" &&
+    Boolean(candidate.battlefieldId)
+  );
+}
+
+export function isBoardDropLocationData(
+  value: unknown,
+): value is BoardDropLocationData {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<BoardDropLocationData>;
+
+  return (
+    candidate.type === "board-drop-location" &&
+    isBoardDropLocation(candidate.location)
+  );
+}
+
+export function isLegalBoardDropLocation(
+  location: BoardDropLocation,
+  legalLocations: readonly BoardDropLocation[],
+) {
+  return legalLocations.some((legalLocation) =>
+    sameBoardLocation(legalLocation, location),
+  );
+}
+
+export function boardLocationDropStatus(input: {
+  active: boolean;
+  hoveredLocation: BoardDropLocation | null;
+  legalLocations: readonly BoardDropLocation[];
+  location: BoardDropLocation;
+}): BoardLocationDropStatus {
+  if (!input.active) {
+    return "idle";
+  }
+
+  const isHovered = input.hoveredLocation
+    ? sameBoardLocation(input.hoveredLocation, input.location)
+    : false;
+  const isLegal = isLegalBoardDropLocation(
+    input.location,
+    input.legalLocations,
+  );
+
+  if (isLegal && isHovered) {
+    return "legal-over";
+  }
+
+  if (isLegal) {
+    return "legal";
+  }
+
+  if (isHovered) {
+    return "invalid-over";
+  }
+
+  return "idle";
 }

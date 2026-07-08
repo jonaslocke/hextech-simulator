@@ -2,13 +2,23 @@
 
 import { Info } from "lucide-react";
 import { motion } from "motion/react";
-import { FC, MouseEvent, useEffect, useRef, useState } from "react";
+import {
+  FC,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/shared/utils/cn";
 import { BattlefieldData } from "../types";
 import type { Card } from "../types";
 import { CardTile } from "./card-tile";
 import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
 import type { BoardDragSourceLocation } from "../drag-and-drop/location-drag-actions";
+import { boardLocationDropFeedbackClassName } from "../drag-and-drop/drop-feedback";
+import type { BoardLocationDropStatus } from "../drag-and-drop/location-drag-actions";
+import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 
 type Props = {
   battlefield: BattlefieldData;
@@ -24,6 +34,8 @@ type Props = {
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred";
   enablePlayerUnitLocationDrag?: boolean;
+  dropStatus?: BoardLocationDropStatus;
+  isLocationDropEnabled?: boolean;
 };
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
@@ -57,6 +69,8 @@ export const BattlefieldBoard: FC<Props> = ({
     playerUnits,
     img,
   },
+  dropStatus = "idle",
+  isLocationDropEnabled = false,
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isHighlighted = false,
@@ -69,6 +83,26 @@ export const BattlefieldBoard: FC<Props> = ({
 }) => {
   const [isBattlefieldCardOpen, setIsBattlefieldCardOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const { setNodeRef } = useBoardLocationDroppable({
+    disabled: !isLocationDropEnabled,
+    location: {
+      kind: "battlefield",
+      battlefieldId: id,
+    },
+  });
+
+  const setBattlefieldRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef],
+  );
+
+  const dropFeedbackClassName = boardLocationDropFeedbackClassName(dropStatus);
+  const isDropHighlighted =
+    dropStatus === "legal" || dropStatus === "legal-over";
 
   const playerTotalMight = playerUnits.reduce(
     (acc, cur) => acc + (cur.might ?? 0),
@@ -108,25 +142,27 @@ export const BattlefieldBoard: FC<Props> = ({
 
   return (
     <motion.div
-      aria-selected={isHighlighted}
-      data-highlighted={isHighlighted ? "true" : undefined}
+      aria-selected={isHighlighted || isDropHighlighted}
+      data-highlighted={isHighlighted || isDropHighlighted ? "true" : undefined}
       animate={{
         width: BATTLEFIELD_WIDTH_BY_SHOWDOWN_STATE[showdownState],
       }}
       data-owner={owner}
       data-showdown-state={showdownState}
+      data-drop-status={dropStatus}
       initial={false}
       layout="position"
-      ref={rootRef}
+      ref={setBattlefieldRootRef}
       transition={BATTLEFIELD_SIZE_TRANSITION}
       className={cn(
         "isolate relative grid grid-rows-[minmax(0,1fr)_34px] rounded-lg min-w-0 overflow-hidden",
         "border bg-slate-950/10 transition-[border-color,background-color,box-shadow] duration-300 ease-out",
         "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025),0_14px_32px_rgba(0,0,0,0.18)]",
         "supports-backdrop-filter:bg-slate-950/6 supports-backdrop-filter:backdrop-blur-[1px]",
-        isHighlighted
+        isHighlighted || isDropHighlighted
           ? "border-cyan-200/70 bg-cyan-300/6 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18),0_14px_32px_rgba(0,0,0,0.18)]"
           : "border-cyan-100/14",
+        dropFeedbackClassName,
       )}
     >
       <div
@@ -151,7 +187,7 @@ export const BattlefieldBoard: FC<Props> = ({
         className={cn(
           "z-10 absolute inset-0 opacity-0 rounded-[inherit] transition-opacity duration-300 ease-out pointer-events-none",
           "bg-[radial-gradient(circle_at_center,rgba(103,232,249,0.16),transparent_58%)]",
-          isHighlighted && "opacity-100",
+          (isHighlighted || isDropHighlighted) && "opacity-100",
         )}
       />
       <div
@@ -159,7 +195,7 @@ export const BattlefieldBoard: FC<Props> = ({
         className={cn(
           "z-10 absolute inset-0 opacity-0 rounded-[inherit] transition-opacity duration-300 ease-out pointer-events-none",
           "shadow-[inset_0_0_0_1px_rgba(165,243,252,0.26),inset_0_0_28px_rgba(34,211,238,0.12)]",
-          isHighlighted && "opacity-100",
+          (isHighlighted || isDropHighlighted) && "opacity-100",
         )}
       />
 

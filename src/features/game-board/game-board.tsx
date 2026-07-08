@@ -66,7 +66,13 @@ import {
 } from "./types";
 import { CardTile } from "./components/card-tile";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
-import type { LocationDragData } from "./drag-and-drop/location-drag-actions";
+import {
+  boardLocationDropStatus,
+  isBoardDropLocationData,
+  legalDropLocationsForCard,
+  type BoardDropLocation,
+  type LocationDragData,
+} from "./drag-and-drop/location-drag-actions";
 
 type ProjectedBattlefield = BoardProjection["battlefields"][number];
 type ProjectedPlayerState = BoardPlayerProjection;
@@ -206,6 +212,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   >([]);
   const [activeLocationDrag, setActiveLocationDrag] =
     useState<LocationDragData | null>(null);
+  const [hoveredLocationDrop, setHoveredLocationDrop] =
+    useState<BoardDropLocation | null>(null);
 
   const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
   const wasChainLockedOpen = useRef(isChainLockedOpen);
@@ -291,8 +299,32 @@ export const GameBoard: FC<GameBoardProps> = ({
       )[0] ?? null)
     : null;
 
+  const activeLocationDragLegalDrops = activeLocationDrag
+    ? legalDropLocationsForCard({
+        actions: sourceProjection.actions,
+        sourceCardInstanceId: activeLocationDrag.sourceCardInstanceId,
+        sourceLocation: activeLocationDrag.sourceLocation,
+      })
+    : [];
+
+  const isLocationDropEnabled = Boolean(activeLocationDrag);
+
+  const getLocationDropStatus = (location: BoardDropLocation) =>
+    boardLocationDropStatus({
+      active: isLocationDropEnabled,
+      hoveredLocation: hoveredLocationDrop,
+      legalLocations: activeLocationDragLegalDrops,
+      location,
+    });
+
   const activeLocationDragOverlay = activeLocationDragCard ? (
-    <div className="inline-flex opacity-95 shadow-[0_0_24px_rgba(103,232,249,0.45)] drop-shadow-2xl rounded-lg outline-2 outline-cyan-300/90 outline-offset-2 pointer-events-none">
+    <div
+      className="inline-flex opacity-95 pointer-events-none"
+      style={{
+        filter:
+          "drop-shadow(0 0 1px rgba(103,232,249,0.95)) drop-shadow(0 0 8px rgba(103,232,249,0.75)) drop-shadow(0 0 22px rgba(103,232,249,0.35))",
+      }}
+    >
       <CardTile
         {...activeLocationDragCard}
         enableHoverPreview={false}
@@ -928,7 +960,22 @@ export const GameBoard: FC<GameBoardProps> = ({
         <LocationDragProvider
           activeDragData={activeLocationDrag}
           dragOverlay={activeLocationDragOverlay}
-          onActiveDragDataChange={setActiveLocationDrag}
+          onActiveDragDataChange={(data) => {
+            setActiveLocationDrag(data);
+
+            if (!data) {
+              setHoveredLocationDrop(null);
+            }
+          }}
+          onDragCancel={() => setHoveredLocationDrop(null)}
+          onDragEnd={() => setHoveredLocationDrop(null)}
+          onDragOver={(event) => {
+            const overData = event.over?.data.current;
+
+            setHoveredLocationDrop(
+              isBoardDropLocationData(overData) ? overData.location : null,
+            );
+          }}
         >
           <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
             <PlayerBoard
@@ -962,6 +1009,11 @@ export const GameBoard: FC<GameBoardProps> = ({
                   owner="player"
                   showdownState={board.playerBattlefieldShowdownState}
                   enablePlayerUnitLocationDrag
+                  dropStatus={getLocationDropStatus({
+                    kind: "battlefield",
+                    battlefieldId: board.playerBattlefield.id,
+                  })}
+                  isLocationDropEnabled={isLocationDropEnabled}
                 />
                 <BattlefieldBoard
                   battlefield={board.opponentBattlefield}
@@ -980,6 +1032,11 @@ export const GameBoard: FC<GameBoardProps> = ({
                   owner="opponent"
                   showdownState={board.opponentBattlefieldShowdownState}
                   enablePlayerUnitLocationDrag
+                  dropStatus={getLocationDropStatus({
+                    kind: "battlefield",
+                    battlefieldId: board.opponentBattlefield.id,
+                  })}
+                  isLocationDropEnabled={isLocationDropEnabled}
                 />
               </div>
             </LayoutGroup>
@@ -999,6 +1056,8 @@ export const GameBoard: FC<GameBoardProps> = ({
               player={board.player}
               isActivePlayer={isPlayerActive}
               enableLocationDrag
+              baseDropStatus={getLocationDropStatus({ kind: "base" })}
+              isLocationDropEnabled={isLocationDropEnabled}
             />
             <RunePoolBar runePool={viewerState?.runePool} />
           </div>

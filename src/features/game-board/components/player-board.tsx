@@ -13,7 +13,10 @@ import {
 } from "react";
 import cardBackImage from "../../../../assets/cardback.jpg";
 import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
-import type { BoardDragSourceLocation } from "../drag-and-drop/location-drag-actions";
+import type {
+  BoardDragSourceLocation,
+  BoardLocationDropStatus,
+} from "../drag-and-drop/location-drag-actions";
 import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
@@ -39,6 +42,8 @@ type BaseLineProps = {
   ) => void;
   onBoardCardPointerEnter?: (card: Card) => void;
   onBoardCardPointerLeave?: (card: Card) => void;
+  baseDropStatus?: BoardLocationDropStatus;
+  isLocationDropEnabled?: boolean;
 };
 
 type Props = {
@@ -67,6 +72,8 @@ type Props = {
   onOpenTrash?: () => void;
   player: PlayerData;
   isActivePlayer: boolean;
+  baseDropStatus?: BoardLocationDropStatus;
+  isLocationDropEnabled?: boolean;
 };
 
 const BaseLine = ({
@@ -81,6 +88,8 @@ const BaseLine = ({
   onBoardCardPrimaryAction,
   onBoardCardPointerEnter,
   onBoardCardPointerLeave,
+  baseDropStatus = "idle",
+  isLocationDropEnabled = false,
 }: BaseLineProps) => {
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
@@ -129,7 +138,10 @@ const BaseLine = ({
       </ZoneArea>
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
+        dropLocation={{ kind: "base" }}
+        dropStatus={baseDropStatus}
         isDestinationHighlighted={isBaseHighlighted}
+        isDropEnabled={isLocationDropEnabled}
         isHightlighted={isBaseHighlighted || isHightlighted}
       >
         <CardList
@@ -286,6 +298,8 @@ export const PlayerBoard: FC<Props> = ({
   onOpenTrash,
   player,
   isActivePlayer,
+  baseDropStatus = "idle",
+  isLocationDropEnabled = false,
 }) => {
   if (isMirrored) {
     return (
@@ -300,9 +314,12 @@ export const PlayerBoard: FC<Props> = ({
           isHightlighted={isActivePlayer}
         />
         <BaseLine
+          enableLocationDrag={enableLocationDrag}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           isBaseHighlighted={isBaseHighlighted}
+          onChampionContextAction={onChampionContextAction}
+          onChampionPrimaryAction={onChampionPrimaryAction}
           onBoardCardPrimaryAction={onBoardCardPrimaryAction}
           onBoardCardPointerEnter={onBoardCardPointerEnter}
           onBoardCardPointerLeave={onBoardCardPointerLeave}
@@ -315,10 +332,12 @@ export const PlayerBoard: FC<Props> = ({
   return (
     <>
       <BaseLine
+        baseDropStatus={baseDropStatus}
         enableLocationDrag={enableLocationDrag}
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         isBaseHighlighted={isBaseHighlighted}
+        isLocationDropEnabled={isLocationDropEnabled}
         onChampionContextAction={onChampionContextAction}
         onChampionPrimaryAction={onChampionPrimaryAction}
         onBoardCardPrimaryAction={onBoardCardPrimaryAction}
