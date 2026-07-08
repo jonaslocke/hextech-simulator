@@ -27,6 +27,9 @@ export function MatchResultDialog({
     (player) => player.playerId !== projection.winnerPlayerId,
   );
 
+  const winnerName = getPlayerDisplayName(winner, "Winner");
+  const loserName = getPlayerDisplayName(loser, "Loser");
+
   const resultLabel = viewerWon ? "Victory" : "Defeat";
   const resultDescription = viewerWon
     ? "You reached the Victory Score first."
@@ -105,6 +108,7 @@ export function MatchResultDialog({
           <div className="relative items-stretch gap-2 grid grid-cols-[1fr_auto_1fr] bg-white/4.5 shadow-black/25 shadow-inner p-2 border border-white/10 rounded-xl">
             <ScorePanel
               label="Winner"
+              name={winnerName}
               points={winner?.points ?? 0}
               tone="winner"
             />
@@ -120,14 +124,15 @@ export function MatchResultDialog({
 
             <ScorePanel
               label="Loser"
+              name={loserName}
               points={loser?.points ?? 0}
               tone="loser"
             />
           </div>
 
           <div className="relative bg-slate-900/50 px-3 py-2 border border-white/10 rounded-xl text-slate-400 text-xs">
-            <span className="text-slate-300">{projection.winnerPlayerId}</span>{" "}
-            reached the Victory Score.
+            <span className="text-slate-300">{winnerName}</span> reached the
+            Victory Score.
           </div>
 
           <Button
@@ -147,10 +152,12 @@ export function MatchResultDialog({
 
 function ScorePanel({
   label,
+  name,
   points,
   tone,
 }: {
   label: string;
+  name: string;
   points: number;
   tone: "winner" | "loser";
 }) {
@@ -171,6 +178,17 @@ function ScorePanel({
       >
         {label}
       </p>
+
+      <p
+        className={cn(
+          "mt-1 max-w-24 font-semibold text-sm truncate",
+          tone === "winner" ? "text-cyan-100" : "text-slate-300",
+        )}
+        title={name}
+      >
+        {name}
+      </p>
+
       <p
         className={cn(
           "mt-1 font-semibold tabular-nums text-2xl",
@@ -181,4 +199,23 @@ function ScorePanel({
       </p>
     </div>
   );
+}
+
+function getPlayerDisplayName(
+  player: GameProjection["players"][number] | undefined,
+  fallback: string,
+) {
+  if (!player) {
+    return fallback;
+  }
+
+  if ("displayName" in player && typeof player.displayName === "string") {
+    const displayName = player.displayName.trim();
+
+    if (displayName) {
+      return displayName;
+    }
+  }
+
+  return player.playerId;
 }
