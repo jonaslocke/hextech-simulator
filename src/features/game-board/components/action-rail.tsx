@@ -118,34 +118,33 @@ export function ActionRail({
           className="absolute inset-0 bg-linear-to-b from-white/3 via-transparent to-black/10 pointer-events-none"
         />
 
-        <div className="z-10 relative flex flex-col items-center gap-3">
-          <ActionButton
-            active={isChainOpen}
-            label={isChainLockedOpen ? "Chain is resolving" : "Chain"}
-            onClick={() =>
-              onChainOpenChange(isChainLockedOpen ? true : !isChainOpen)
-            }
-          >
-            <Layers3 className="size-5" />
-          </ActionButton>
-
-          <ActionButton
-            active={openZone === "log"}
-            label="Game Log"
-            onClick={() => setOpenZone(openZone === "log" ? null : "log")}
-          >
-            <History className="size-5" />
-          </ActionButton>
-
-          <ActionButton
-            active={false}
-            disabled={!canPassTurn}
-            label={`${passTurnLabel} · Space`}
-            onClick={onPassTurn ?? (() => undefined)}
-          >
-            <SkipForward className="size-5" />
-          </ActionButton>
-
+        <div className="z-10 relative flex flex-col py-10 h-full">
+          <div className="flex flex-col flex-1 justify-center gap-3">
+            <ActionButton
+              active={isChainOpen}
+              label={isChainLockedOpen ? "Chain is resolving" : "Chain"}
+              onClick={() =>
+                onChainOpenChange(isChainLockedOpen ? true : !isChainOpen)
+              }
+            >
+              <Layers3 className="size-5" />
+            </ActionButton>
+            <ActionButton
+              active={openZone === "log"}
+              label="Game Log"
+              onClick={() => setOpenZone(openZone === "log" ? null : "log")}
+            >
+              <History className="size-5" />
+            </ActionButton>
+            <ActionButton
+              active={false}
+              disabled={!canPassTurn}
+              label={`${passTurnLabel} · Space`}
+              onClick={onPassTurn ?? (() => undefined)}
+            >
+              <SkipForward className="size-5" />
+            </ActionButton>
+          </div>
           {onConcede && (
             <ActionButton
               active={false}
