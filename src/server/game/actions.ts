@@ -79,10 +79,12 @@ export function gameplayActions(
   const handlers = createPrimitiveHandlers(index);
   const player = game.state.players[actorPlayerId];
   if (!player) return [];
-  const actions: ProjectedAction[] = [];
+  const actions: ProjectedAction[] = [
+    action(game, "concede", "Concede Game", null),
+  ];
   if (game.state.pendingChoice) {
     const pendingChoice = game.state.pendingChoice;
-    if (pendingChoice.playerId !== actorPlayerId) return [];
+    if (pendingChoice.playerId !== actorPlayerId) return actions;
     if (pendingChoice.type === "assignCombatDamage") {
       actions.push(
         action(
@@ -141,13 +143,15 @@ export function gameplayActions(
         true,
         null,
         undefined,
-        [{
-          kind: "card",
-          label: "trigger order",
-          legalIds: pendingChoice.optionIds,
-          minimum: pendingChoice.optionIds.length,
-          maximum: pendingChoice.optionIds.length,
-        }],
+        [
+          {
+            kind: "card",
+            label: "trigger order",
+            legalIds: pendingChoice.optionIds,
+            minimum: pendingChoice.optionIds.length,
+            maximum: pendingChoice.optionIds.length,
+          },
+        ],
         {
           kind: "orderedOptions",
           choiceId: pendingChoice.id,
@@ -246,7 +250,9 @@ export function gameplayActions(
       actions.push(
         action(game, "move", "Move to Base", cardId, true, null, "base"),
       );
-      if (hasBehavior(definitionForInstance(cardId, index), "keyword.ganking")) {
+      if (
+        hasBehavior(definitionForInstance(cardId, index), "keyword.ganking")
+      ) {
         for (const destination of orderedBattlefields) {
           if (destination.battlefieldId === battlefield.battlefieldId) continue;
           actions.push(
@@ -427,9 +433,10 @@ export function performGameplayAction(input: {
       if (game.state.pendingChoice?.type === "orderTriggers") {
         const orderedIds = [...input.selectedIds];
         submitTriggerOrder(game, input.actorPlayerId, input.selectedIds);
-        const orderedItems = game.state.chain?.items.filter((item) =>
-          orderedIds.includes(item.id),
-        ) ?? [];
+        const orderedItems =
+          game.state.chain?.items.filter((item) =>
+            orderedIds.includes(item.id),
+          ) ?? [];
         if (orderedItems.length > 0 && game.state.chain) {
           game.state.chain.items = game.state.chain.items.filter(
             (item) => !orderedIds.includes(item.id),
@@ -552,6 +559,19 @@ export function performGameplayAction(input: {
     case "endTurn":
       endTurn(game, input.actorPlayerId, index, input.decks);
       break;
+    case "concede": {
+      const opponentPlayerId = otherPlayer(game, input.actorPlayerId);
+
+      game.winnerPlayerId = opponentPlayerId;
+      game.status = "complete";
+
+      game.state.pendingChoice = null;
+      game.state.chain = null;
+      game.state.showdown = null;
+      game.state.combat = null;
+
+      break;
+    }
     default:
       throw new Error("Action kind is not implemented.");
   }
@@ -600,11 +620,12 @@ function playCard(
   const definition = definitionForInstance(cardId, index);
   const isUnit = definition.card.classification.type === "Unit";
   const showdownAtPlayStart = game.state.showdown;
-  const destinationBattlefield = isUnit && destinationId !== "base"
-    ? game.state.battlefields.find(
-        (battlefield) => battlefield.battlefieldId === destinationId,
-      )
-    : null;
+  const destinationBattlefield =
+    isUnit && destinationId !== "base"
+      ? game.state.battlefields.find(
+          (battlefield) => battlefield.battlefieldId === destinationId,
+        )
+      : null;
   if (
     isUnit &&
     !isLegalUnitDestination(game, playerId, definition, destinationId)
@@ -617,8 +638,7 @@ function playCard(
     actorPlayerId: playerId,
     subjectCardInstanceId: cardId,
     values: {
-      "eventSubject.printedEnergyCost":
-        definition.card.attributes.energy ?? 0,
+      "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0,
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
@@ -744,9 +764,7 @@ function passPriority(
           const clause = compileBehaviorModel(
             definition.behaviorModel,
             handlers,
-          ).clauses.find(
-            (candidate) => candidate.id === item.behaviorClauseId,
-          );
+          ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
           const binding = clause?.abilities.find(
             (candidate) => candidate.behaviorId === item.activatedBehaviorId,
           );
@@ -763,13 +781,7 @@ function passPriority(
               controller,
               item.sourceCardInstanceId,
               null,
-              validLockedTargets(
-                game,
-                clause,
-                item,
-                controller,
-                handlers,
-              ),
+              validLockedTargets(game, clause, item, controller, handlers),
             ),
           );
         } else if (item.behaviorClauseId) {
@@ -1019,7 +1031,12 @@ function action(
     choice,
     presentation: {
       surface,
-      style: kind === "endTurn" || kind === "pass" ? "secondary" : "primary",
+      style:
+        kind === "concede"
+          ? "danger"
+          : kind === "endTurn" || kind === "pass"
+            ? "secondary"
+            : "primary",
       prompt:
         kind === "submitChoice"
           ? "Choose the order for triggered abilities."
@@ -1199,7 +1216,9 @@ function addPlayableCardActions(
                   ).card.name,
           }))
         : null;
-    for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
+    for (const destination of unitDestinations ?? [
+      { id: undefined, name: "" },
+    ]) {
       actions.push(
         action(
           game,
@@ -1364,7 +1383,9 @@ function addAbilityActions(
 function abilityAvailableAtTiming(
   compiled: ReturnType<typeof compileBehaviorModel>,
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
-  ability: ReturnType<typeof compileBehaviorModel>["clauses"][number]["abilities"][number],
+  ability: ReturnType<
+    typeof compileBehaviorModel
+  >["clauses"][number]["abilities"][number],
   timing: TurnTiming,
 ) {
   const timingIds = [...compiled.playTimings, ...clause.timings].map(
@@ -1377,8 +1398,7 @@ function abilityAvailableAtTiming(
     hasActionTiming: timingIds.includes("timing.action"),
     hasReactionTiming,
     isAddAbility: isAddResourceAbility(ability.behaviorId),
-    allowPriorityAddOverride:
-      ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY,
+    allowPriorityAddOverride: ALLOW_ADD_ABILITIES_WHEN_PLAYER_HAS_PRIORITY,
     timing,
   });
 }
@@ -1394,15 +1414,10 @@ export function isAbilityTimingAllowed(input: {
     input.allowPriorityAddOverride && input.isAddAbility;
   if (input.timing === "showdownOpen") {
     return (
-      input.hasActionTiming ||
-      input.hasReactionTiming ||
-      hasPriorityAddOverride
+      input.hasActionTiming || input.hasReactionTiming || hasPriorityAddOverride
     );
   }
-  if (
-    input.timing === "neutralClosed" ||
-    input.timing === "showdownClosed"
-  ) {
+  if (input.timing === "neutralClosed" || input.timing === "showdownClosed") {
     return input.hasReactionTiming || hasPriorityAddOverride;
   }
   return true;
@@ -1487,7 +1502,8 @@ function executeImmediateClauses(
   targetObjectVersions?: Record<string, number>,
 ) {
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
-  const effectOutcomes: Record<string, boolean | number | string | string[]> = {};
+  const effectOutcomes: Record<string, boolean | number | string | string[]> =
+    {};
   for (const clause of compiled.clauses.filter(
     (item) => item.triggers.length === 0 && item.abilities.length === 0,
   )) {
@@ -1498,9 +1514,7 @@ function executeImmediateClauses(
             targetObjectVersions[id],
         )
       : selectedIds;
-    const clauseSelections = clause.selectors.length
-      ? availableSelections
-      : [];
+    const clauseSelections = clause.selectors.length ? availableSelections : [];
     executeBehaviorClause({
       clause,
       context: createBehaviorContext(
@@ -1551,11 +1565,9 @@ function payOptionalPlayCosts(
 
 function hasBehavior(definition: GameCardDefinition, behaviorId: string) {
   return definition.behaviorModel.clauses.some((clause) =>
-    [
-      ...clause.keywords,
-      ...clause.effects,
-      ...clause.abilities,
-    ].some((binding) => binding.behaviorId === behaviorId),
+    [...clause.keywords, ...clause.effects, ...clause.abilities].some(
+      (binding) => binding.behaviorId === behaviorId,
+    ),
   );
 }
 
@@ -1612,8 +1624,7 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
         target.legalIds.includes(id),
       ).length;
       return (
-        selectedForTarget < target.minimum ||
-        selectedForTarget > target.maximum
+        selectedForTarget < target.minimum || selectedForTarget > target.maximum
       );
     })
   ) {

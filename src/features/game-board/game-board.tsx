@@ -81,8 +81,9 @@ type GameBoardProps = {
 };
 
 type BattlefieldShowdownState = "neutral" | "open" | "deferred";
-type BoardLocation =
-  NonNullable<GameProjection["actions"][number]["presentation"]["boardLocation"]>;
+type BoardLocation = NonNullable<
+  GameProjection["actions"][number]["presentation"]["boardLocation"]
+>;
 type CardActionMenuItem = {
   accessibleLabel?: string;
   boardLocation?: BoardLocation | null;
@@ -226,6 +227,14 @@ export const GameBoard: FC<GameBoardProps> = ({
   const passFocusAction = sourceProjection.actions.find(
     (action) => action.label === "Pass focus",
   );
+  const concedeAction = sourceProjection.actions.find(
+    (action) => action.id.split(":")[3] === "concede",
+  );
+
+  const onConcede = useCallback(
+    () => submitProjectedAction(concedeAction?.id),
+    [concedeAction?.id, submitProjectedAction],
+  );
   const canViewerEndTurn = Boolean(endTurnAction || passFocusAction);
   const passTurnLabel = isChainLockedOpen
     ? "Resolve chain first"
@@ -246,6 +255,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       action.sourceCardInstanceId === null &&
       action.presentation.surface === "action-rail" &&
       action.id.split(":")[3] !== "moveMany" &&
+      action.id.split(":")[3] !== "concede" &&
       !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
       action.choice?.kind !== "combatDamage",
   );
@@ -767,11 +777,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   useEffect(() => {
     setIsChainOverlayOpen((isOpen) =>
-      chainOverlayOpen(
-        isOpen,
-        wasChainLockedOpen.current,
-        isChainLockedOpen,
-      ),
+      chainOverlayOpen(isOpen, wasChainLockedOpen.current, isChainLockedOpen),
     );
     wasChainLockedOpen.current = isChainLockedOpen;
   }, [isChainLockedOpen]);
@@ -850,7 +856,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   return (
     <main
-      className="game-board relative flex flex-col h-screen overflow-hidden text-slate-100"
+      className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"
       onClickCapture={handleTargetClickCapture}
     >
       <ScoreHeader
@@ -960,9 +966,11 @@ export const GameBoard: FC<GameBoardProps> = ({
           <RunePoolBar runePool={viewerState?.runePool} />
         </div>
         <ActionRail
+          concedeDisabled={isSubmittingAction}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
           onChainOpenChange={setIsChainOverlayOpen}
+          onConcede={concedeAction ? onConcede : undefined}
           onPassTurn={passFocusAction ? onPass : onEndTurn}
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn || isSubmittingAction}

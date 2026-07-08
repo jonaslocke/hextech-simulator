@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { History, Layers3, SkipForward } from "lucide-react";
+import { Flag, History, Layers3, SkipForward } from "lucide-react";
 import { TemporaryZone } from "../types";
 import { ActionButton } from "./action-button";
 
@@ -14,6 +14,8 @@ export function ActionRail({
   passTurnDisabled = false,
   passTurnLabel = "Pass Turn",
   setOpenZone,
+  concedeDisabled = false,
+  onConcede,
 }: {
   isChainOpen?: boolean;
   isChainLockedOpen?: boolean;
@@ -23,6 +25,8 @@ export function ActionRail({
   passTurnDisabled?: boolean;
   passTurnLabel?: string;
   setOpenZone: (zone: Exclude<TemporaryZone, "chain">) => void;
+  concedeDisabled?: boolean;
+  onConcede?: () => void;
 }) {
   const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled;
 
@@ -97,6 +101,17 @@ export function ActionRail({
         >
           <SkipForward className="size-5" />
         </ActionButton>
+        {onConcede && (
+          <ActionButton
+            active={false}
+            disabled={concedeDisabled}
+            label="Concede Game"
+            onClick={onConcede}
+            variant="concede"
+          >
+            <Flag className="size-5" />
+          </ActionButton>
+        )}
       </div>
     </aside>
   );
