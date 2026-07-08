@@ -7,6 +7,8 @@ import { cn } from "@/shared/utils/cn";
 import { BattlefieldData } from "../types";
 import type { Card } from "../types";
 import { CardTile } from "./card-tile";
+import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
+import type { BoardDragSourceLocation } from "../drag-and-drop/location-drag-actions";
 
 type Props = {
   battlefield: BattlefieldData;
@@ -21,6 +23,7 @@ type Props = {
   onCardPointerLeave?: (card: Card) => void;
   owner: "player" | "opponent";
   showdownState?: "neutral" | "open" | "deferred";
+  enablePlayerUnitLocationDrag?: boolean;
 };
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
@@ -62,6 +65,7 @@ export const BattlefieldBoard: FC<Props> = ({
   onCardPrimaryAction,
   owner,
   showdownState = "neutral",
+  enablePlayerUnitLocationDrag = false,
 }) => {
   const [isBattlefieldCardOpen, setIsBattlefieldCardOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -168,7 +172,7 @@ export const BattlefieldBoard: FC<Props> = ({
             type="button"
             aria-expanded={isBattlefieldCardOpen}
             aria-label={`Show ${name} battlefield card`}
-            className="flex justify-center items-center hover:bg-white/10 border-white/12 border-l focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-300 size-5 text-white/70 hover:text-white transition"
+            className="flex justify-center items-center hover:bg-white/10 border-white/12 border-l focus-visible:outline focus-visible:outline-yellow-300 size-5 text-white/70 hover:text-white transition"
             onClick={() => setIsBattlefieldCardOpen((isOpen) => !isOpen)}
           >
             <Info aria-hidden="true" className="size-3" />
@@ -217,6 +221,11 @@ export const BattlefieldBoard: FC<Props> = ({
         <BattlefieldUnitRow
           cards={playerUnits}
           className="pt-2"
+          dragSourceLocation={
+            enablePlayerUnitLocationDrag
+              ? { kind: "battlefield", battlefieldId: id }
+              : undefined
+          }
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -226,7 +235,7 @@ export const BattlefieldBoard: FC<Props> = ({
         />
       </div>
 
-      <div className="relative h-[34px] overflow-visible">
+      <div className="relative h-8.5 overflow-visible">
         <div className="bottom-0 absolute inset-x-0 flex justify-center items-center bg-slate-950/26 supports-backdrop-filter:bg-slate-950/16 hover:bg-slate-950/48 shadow-[0_-10px_22px_rgba(0,0,0,0.16)] supports-backdrop-filter:backdrop-blur-sm px-3 border-white/8 border-t h-full hover:min-h-14 text-[10px] text-slate-100/88 hover:text-white hover:text-sm text-center transition-[background-color,min-height,font-size,color] duration-300 ease-out">
           <p className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] line-clamp-2 leading-snug">
             {description}
@@ -240,6 +249,7 @@ export const BattlefieldBoard: FC<Props> = ({
 function BattlefieldUnitRow({
   cards,
   className,
+  dragSourceLocation,
   hiddenCardInstanceIds,
   highlightedCardInstanceIds,
   onCardPointerEnter,
@@ -249,6 +259,7 @@ function BattlefieldUnitRow({
 }: {
   cards: Card[];
   className?: string;
+  dragSourceLocation?: BoardDragSourceLocation;
   hiddenCardInstanceIds?: Set<string>;
   highlightedCardInstanceIds?: Set<string>;
   onCardPrimaryAction?: (
@@ -269,34 +280,50 @@ function BattlefieldUnitRow({
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
-      {cards.map((unit, index) => (
-        <CardTile
-          enableHoverPreview
-          isHighlighted={
-            unit.instanceId
-              ? highlightedCardInstanceIds?.has(unit.instanceId)
-              : false
-          }
-          isTransferHidden={
-            unit.instanceId
-              ? hiddenCardInstanceIds?.has(unit.instanceId)
-              : false
-          }
-          key={unit.instanceId ?? `${unit.name}-${index}`}
-          onPrimaryAction={
-            onCardPrimaryAction
-              ? (event) => onCardPrimaryAction(unit, event)
-              : undefined
-          }
-          onHighlightPointerEnter={
-            onCardPointerEnter ? () => onCardPointerEnter(unit) : undefined
-          }
-          onHighlightPointerLeave={
-            onCardPointerLeave ? () => onCardPointerLeave(unit) : undefined
-          }
-          {...unit}
-        />
-      ))}
+      {cards.map((unit, index) => {
+        const key = unit.instanceId ?? `${unit.name}-${index}`;
+        const tile = (
+          <CardTile
+            enableHoverPreview
+            isHighlighted={
+              unit.instanceId
+                ? highlightedCardInstanceIds?.has(unit.instanceId)
+                : false
+            }
+            isTransferHidden={
+              unit.instanceId
+                ? hiddenCardInstanceIds?.has(unit.instanceId)
+                : false
+            }
+            onPrimaryAction={
+              onCardPrimaryAction
+                ? (event) => onCardPrimaryAction(unit, event)
+                : undefined
+            }
+            onHighlightPointerEnter={
+              onCardPointerEnter ? () => onCardPointerEnter(unit) : undefined
+            }
+            onHighlightPointerLeave={
+              onCardPointerLeave ? () => onCardPointerLeave(unit) : undefined
+            }
+            {...unit}
+          />
+        );
+
+        if (!dragSourceLocation || !unit.instanceId) {
+          return <div key={key}>{tile}</div>;
+        }
+
+        return (
+          <DraggableLocationCard
+            cardInstanceId={unit.instanceId}
+            key={key}
+            sourceLocation={dragSourceLocation}
+          >
+            {tile}
+          </DraggableLocationCard>
+        );
+      })}
     </motion.div>
   );
 }

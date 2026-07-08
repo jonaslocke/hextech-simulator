@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/shared/components/button";
+import { cn } from "@/shared/utils/cn";
+import { ArchiveX, Trash2 } from "lucide-react";
 import {
   ComponentProps,
   FC,
@@ -9,14 +12,14 @@ import {
   useState,
 } from "react";
 import cardBackImage from "../../../../assets/cardback.jpg";
-import { cn } from "@/shared/utils/cn";
+import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
+import type { BoardDragSourceLocation } from "../drag-and-drop/location-drag-actions";
+import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
-import { ArchiveX, Trash2 } from "lucide-react";
-import { Button } from "@/shared/components/button";
-import { Card, PlayerData, ZoneData } from "../types";
 
 type BaseLineProps = {
+  enableLocationDrag?: boolean;
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   isBaseHighlighted?: boolean;
@@ -39,6 +42,7 @@ type BaseLineProps = {
 };
 
 type Props = {
+  enableLocationDrag?: boolean;
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   isBaseHighlighted?: boolean;
@@ -66,6 +70,7 @@ type Props = {
 };
 
 const BaseLine = ({
+  enableLocationDrag = false,
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isBaseHighlighted,
@@ -100,6 +105,9 @@ const BaseLine = ({
           isHightlighted={isHightlighted}
         >
           <ZoneCards
+            dragSourceLocation={
+              enableLocationDrag ? { kind: "champion" } : undefined
+            }
             highlightedCardInstanceIds={highlightedCardInstanceIds}
             hiddenCardInstanceIds={hiddenCardInstanceIds}
             onCardContextAction={onChampionContextAction}
@@ -126,6 +134,7 @@ const BaseLine = ({
       >
         <CardList
           cards={baseUnits}
+          dragSourceLocation={enableLocationDrag ? { kind: "base" } : undefined}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           layout="wrap"
@@ -261,6 +270,7 @@ function countRuneReadiness(cards: Card[]) {
 }
 
 export const PlayerBoard: FC<Props> = ({
+  enableLocationDrag = false,
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isBaseHighlighted,
@@ -305,6 +315,7 @@ export const PlayerBoard: FC<Props> = ({
   return (
     <>
       <BaseLine
+        enableLocationDrag={enableLocationDrag}
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         isBaseHighlighted={isBaseHighlighted}
@@ -332,6 +343,7 @@ export const PlayerBoard: FC<Props> = ({
 };
 
 function ZoneCards({
+  dragSourceLocation,
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardContextAction,
@@ -343,6 +355,7 @@ function ZoneCards({
   showMight = false,
   zone,
 }: {
+  dragSourceLocation?: BoardDragSourceLocation;
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
@@ -362,6 +375,7 @@ function ZoneCards({
       <CardList
         cards={zone.cards}
         count={showCount ? zone.count : undefined}
+        dragSourceLocation={dragSourceLocation}
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         onCardContextAction={onCardContextAction}
@@ -396,7 +410,7 @@ function TrashZone({
 
   if (zone.cards.length > 0) {
     return (
-      <div className="flex items-center justify-center gap-2 max-w-full">
+      <div className="flex justify-center items-center gap-2 max-w-full">
         {latestCard && (
           <button
             aria-label={`Open trash, ${zone.count} cards`}
@@ -450,6 +464,7 @@ function TrashZone({
 function CardList({
   cards,
   count,
+  dragSourceLocation,
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   onCardContextAction,
@@ -462,6 +477,7 @@ function CardList({
 }: {
   cards: Card[];
   count?: number;
+  dragSourceLocation?: BoardDragSourceLocation;
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
@@ -532,40 +548,56 @@ function CardList({
 
   const content = (
     <>
-      {cards.map((card, index) => (
-        <CardTile
-          enableHoverPreview={!onClick}
-          isHighlighted={
-            card.instanceId
-              ? highlightedCardInstanceIds?.has(card.instanceId)
-              : false
-          }
-          isTransferHidden={
-            card.instanceId
-              ? hiddenCardInstanceIds?.has(card.instanceId)
-              : false
-          }
-          key={card.instanceId ?? `${card.name}-${index}`}
-          onContextAction={
-            onCardContextAction
-              ? (event) => onCardContextAction(card, event)
-              : undefined
-          }
-          onPrimaryAction={
-            onCardPrimaryAction
-              ? (event) => onCardPrimaryAction(card, event)
-              : undefined
-          }
-          onHighlightPointerEnter={
-            onCardPointerEnter ? () => onCardPointerEnter(card) : undefined
-          }
-          onHighlightPointerLeave={
-            onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
-          }
-          showMight={showMight}
-          {...card}
-        />
-      ))}
+      {cards.map((card, index) => {
+        const key = card.instanceId ?? `${card.name}-${index}`;
+        const tile = (
+          <CardTile
+            enableHoverPreview={!onClick}
+            isHighlighted={
+              card.instanceId
+                ? highlightedCardInstanceIds?.has(card.instanceId)
+                : false
+            }
+            isTransferHidden={
+              card.instanceId
+                ? hiddenCardInstanceIds?.has(card.instanceId)
+                : false
+            }
+            onContextAction={
+              onCardContextAction
+                ? (event) => onCardContextAction(card, event)
+                : undefined
+            }
+            onPrimaryAction={
+              onCardPrimaryAction
+                ? (event) => onCardPrimaryAction(card, event)
+                : undefined
+            }
+            onHighlightPointerEnter={
+              onCardPointerEnter ? () => onCardPointerEnter(card) : undefined
+            }
+            onHighlightPointerLeave={
+              onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
+            }
+            showMight={showMight}
+            {...card}
+          />
+        );
+
+        if (!dragSourceLocation || !card.instanceId) {
+          return <div key={key}>{tile}</div>;
+        }
+
+        return (
+          <DraggableLocationCard
+            cardInstanceId={card.instanceId}
+            key={key}
+            sourceLocation={dragSourceLocation}
+          >
+            {tile}
+          </DraggableLocationCard>
+        );
+      })}
       {count !== undefined && count > 0 && (
         <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
           {count}

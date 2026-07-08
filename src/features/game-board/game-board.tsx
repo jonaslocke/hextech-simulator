@@ -933,6 +933,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerLeave={handleTargetPointerLeave}
                   owner="player"
                   showdownState={board.playerBattlefieldShowdownState}
+                  enablePlayerUnitLocationDrag
                 />
                 <BattlefieldBoard
                   battlefield={board.opponentBattlefield}
@@ -950,6 +951,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerLeave={handleTargetPointerLeave}
                   owner="opponent"
                   showdownState={board.opponentBattlefieldShowdownState}
+                  enablePlayerUnitLocationDrag
                 />
               </div>
             </LayoutGroup>
@@ -968,6 +970,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               onRunePrimaryAction={handleRunePrimaryAction}
               player={board.player}
               isActivePlayer={isPlayerActive}
+              enableLocationDrag
             />
             <RunePoolBar runePool={viewerState?.runePool} />
           </div>

@@ -16,6 +16,13 @@ export type LocationDragActionCandidate = {
   sourceLocation: BoardDragSourceLocation;
 };
 
+export type LocationDragData = {
+  type: "location-card";
+  sourceCardInstanceId: string;
+  sourceLocation: BoardDragSourceLocation;
+};
+
+const LOCATION_DRAG_CARD_ID_PREFIX = "location-drag-card";
 const LOCATION_DRAG_ACTION_KINDS = new Set<string>(["move", "play"]);
 const BOARD_DROP_ID_PREFIX = "board-drop";
 
@@ -80,6 +87,36 @@ export function boardDropLocationFromId(id: string): BoardDropLocation | null {
   }
 
   return null;
+}
+
+export function locationDragCardId(cardInstanceId: string) {
+  return `${LOCATION_DRAG_CARD_ID_PREFIX}:${encodeURIComponent(cardInstanceId)}`;
+}
+
+export function cardInstanceIdFromLocationDragCardId(id: string) {
+  const [prefix, encodedCardInstanceId] = id.split(":");
+
+  if (prefix !== LOCATION_DRAG_CARD_ID_PREFIX || !encodedCardInstanceId) {
+    return null;
+  }
+
+  return decodeURIComponent(encodedCardInstanceId);
+}
+
+export function isLocationDragData(value: unknown): value is LocationDragData {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<LocationDragData>;
+
+  return (
+    candidate.type === "location-card" &&
+    typeof candidate.sourceCardInstanceId === "string" &&
+    Boolean(candidate.sourceCardInstanceId) &&
+    Boolean(candidate.sourceLocation) &&
+    typeof candidate.sourceLocation === "object"
+  );
 }
 
 export function sourceAllowsLocationDragActionKind(
