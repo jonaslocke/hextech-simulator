@@ -231,10 +231,9 @@ export const GameBoard: FC<GameBoardProps> = ({
     (action) => action.id.split(":")[3] === "concede",
   );
 
-  const onConcede = useCallback(
-    () => submitProjectedAction(concedeAction?.id),
-    [concedeAction?.id, submitProjectedAction],
-  );
+  const onConcede = useCallback(async () => {
+    await submitProjectedAction(concedeAction?.id);
+  }, [concedeAction?.id, submitProjectedAction]);
   const canViewerEndTurn = Boolean(endTurnAction || passFocusAction);
   const passTurnLabel = isChainLockedOpen
     ? "Resolve chain first"
