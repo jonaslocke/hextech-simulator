@@ -5,35 +5,36 @@ import type { GameProjection } from "@/shared/game";
 import { LayoutGroup } from "motion/react";
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
-import { adaptProjectionToBoard } from "./board-view-model";
-import { buildCard, createBoardModel } from "./board-model";
 import { areSetsEqual, createAnimationData } from "./board-animation-model";
+import { buildCard, createBoardModel } from "./board-model";
+import { adaptProjectionToBoard } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
+import { CardActionMenu } from "./components/card-action-menu";
 import {
   CardZoneAnimationSnapshot,
   CardZoneTransferOverlay,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
-import { CardActionMenu } from "./components/card-action-menu";
 import { ChainOverlay } from "./components/chain-overlay";
 import { PlayerBoard } from "./components/player-board";
-import { RunePoolBar } from "./components/rune-pool-bar";
 import { PlayerHandFan } from "./components/player-hand-fan";
+import { RunePoolBar } from "./components/rune-pool-bar";
 import { ScoreHeader } from "./components/score-header";
 import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
+import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
+import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
-import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
-import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import {
   useGameBoardActions,
   type GameBoardUnitPlayChoice,
 } from "./interactions/use-game-board-actions";
+import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
 import {
   combineTargetRequirements,
   moveSelectionTitle,
@@ -41,7 +42,6 @@ import {
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
-import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -134,20 +134,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     actions: sourceProjection.actions,
     highlightedCardInstanceIds,
     submitProjectedAction,
-  });
-  const {
-    activeLocationDrag,
-    activeLocationDragOverlay,
-    getLocationDropStatus,
-    handleLocationDragCancel,
-    handleLocationDragDataChange,
-    handleLocationDragEnd,
-    handleLocationDragOver,
-    isLocationDropEnabled,
-  } = useBoardLocationDragState({
-    actions: sourceProjection.actions,
-    cardStates: projection.cardStates,
-    cardsByInstanceId,
   });
 
   const showdownPrompt = showdownPromptState(sourceProjection);
@@ -268,6 +254,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     onPass,
     passFocusAction,
     passTurnLabel,
+    submitLocationDragMoveAction,
   } = useGameBoardActions({
     actions: sourceProjection.actions,
     capturePendingAnimationSnapshot,
@@ -280,6 +267,22 @@ export const GameBoard: FC<GameBoardProps> = ({
     submitProjectedAction,
     targetSelection,
     viewerState,
+  });
+
+  const {
+    activeLocationDrag,
+    activeLocationDragOverlay,
+    getLocationDropStatus,
+    handleLocationDragCancel,
+    handleLocationDragDataChange,
+    handleLocationDragEnd,
+    handleLocationDragOver,
+    isLocationDropEnabled,
+  } = useBoardLocationDragState({
+    actions: sourceProjection.actions,
+    cardStates: projection.cardStates,
+    cardsByInstanceId,
+    onAcceptedMoveDrop: submitLocationDragMoveAction,
   });
 
   useEffect(() => {

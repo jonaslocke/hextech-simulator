@@ -404,6 +404,29 @@ export function useGameBoardActions({
         ? "Pass Turn"
         : "Waiting for turn";
 
+  const submitLocationDragMoveAction = useCallback(
+    (action: GameProjection["actions"][number]) => {
+      if (targetSelection) {
+        return Promise.resolve(false);
+      }
+
+      if (!action.enabled || action.id.split(":")[3] !== "move") {
+        return Promise.resolve(false);
+      }
+
+      closeCardActionMenu();
+      capturePendingAnimationSnapshot();
+
+      return submitProjectedAction(action.id);
+    },
+    [
+      capturePendingAnimationSnapshot,
+      closeCardActionMenu,
+      submitProjectedAction,
+      targetSelection,
+    ],
+  );
+
   return {
     beginGlobalAction,
     beginPlayOrTargetSelection,
@@ -421,6 +444,7 @@ export function useGameBoardActions({
     onPass,
     passFocusAction,
     passTurnLabel,
+    submitLocationDragMoveAction,
   };
 }
 

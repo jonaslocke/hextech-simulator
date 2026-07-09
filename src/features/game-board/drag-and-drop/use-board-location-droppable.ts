@@ -9,9 +9,11 @@ import {
 
 export function useBoardLocationDroppable({
   disabled,
+  droppableId,
   location,
 }: {
   disabled: boolean;
+  droppableId?: string;
   location: BoardDropLocation;
 }) {
   return useDroppable({
@@ -20,6 +22,6 @@ export function useBoardLocationDroppable({
       type: "board-drop-location",
     } satisfies BoardDropLocationData,
     disabled,
-    id: boardDropLocationId(location),
+    id: droppableId ?? boardDropLocationId(location),
   });
 }

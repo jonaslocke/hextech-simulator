@@ -1,11 +1,7 @@
 import { cn } from "@/shared/utils/cn";
 import { cva, type VariantProps } from "class-variance-authority";
-import { FC, PropsWithChildren } from "react";
-import type {
-  BoardDropLocation,
-  BoardLocationDropStatus,
-} from "../drag-and-drop/location-drag-actions";
-import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
+import { forwardRef, type PropsWithChildren } from "react";
+import type { BoardLocationDropStatus } from "../drag-and-drop/location-drag-actions";
 
 const zoneAreaRoot = cva(
   [
@@ -16,30 +12,17 @@ const zoneAreaRoot = cva(
   {
     variants: {
       visualState: {
-        idle: [
-          "border-cyan-100/12",
-          "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]",
-        ],
-        highlighted: [
-          "border-cyan-200/35 bg-cyan-300/5",
-          "shadow-[inset_0_0_0_1px_rgba(103,232,249,0.10),0_0_18px_rgba(34,211,238,0.10)]",
-        ],
-        destination: [
-          "border-cyan-200/70 bg-cyan-300/6",
-          "shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18)]",
-        ],
-        legalDrop: [
-          "border-cyan-200/70 bg-cyan-300/6 ring-1 ring-cyan-300/55",
-          "shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18),0_0_18px_rgba(103,232,249,0.12)]",
-        ],
-        legalDropOver: [
-          "border-emerald-200/80 bg-emerald-300/[0.08] ring-2 ring-emerald-300/90",
-          "shadow-[inset_0_0_0_1px_rgba(110,231,183,0.28),0_0_24px_rgba(110,231,183,0.28)]",
-        ],
-        invalidDropOver: [
-          "border-rose-300/70 bg-rose-500/[0.06] ring-2 ring-rose-300/70",
-          "shadow-[0_0_18px_rgba(251,113,133,0.16)]",
-        ],
+        idle: "border-cyan-100/12 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]",
+        highlighted:
+          "border-cyan-200/35 bg-cyan-300/5 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.10),0_0_18px_rgba(34,211,238,0.10)]",
+        destination:
+          "border-cyan-200/70 bg-cyan-300/6 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18)]",
+        legalDrop:
+          "border-cyan-200/70 bg-cyan-300/6 ring-1 ring-cyan-300/55 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.24),0_0_28px_rgba(34,211,238,0.18),0_0_18px_rgba(103,232,249,0.12)]",
+        legalDropOver:
+          "border-emerald-200/80 bg-emerald-300/[0.08] ring-2 ring-emerald-300/90 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.28),0_0_24px_rgba(110,231,183,0.28)]",
+        invalidDropOver:
+          "border-rose-300/70 bg-rose-500/[0.06] ring-2 ring-rose-300/70 shadow-[0_0_18px_rgba(251,113,133,0.16)]",
       },
     },
     defaultVariants: {
@@ -70,8 +53,7 @@ const zoneAreaGlow = cva(
 const zoneAreaRing = cva(
   [
     "absolute inset-0 rounded-[inherit] pointer-events-none",
-    "ring-1 ring-inset",
-    "transition-[--tw-ring-color] duration-700 ease-out",
+    "ring-1 ring-inset transition-[--tw-ring-color] duration-700 ease-out",
   ],
   {
     variants: {
@@ -138,6 +120,7 @@ interface Props extends PropsWithChildren {
   className?: string;
   contentClassName?: string;
   density?: "compact" | "default" | "roomy";
+  dropStatus?: BoardLocationDropStatus;
   isCentered?: boolean;
   isDestinationHighlighted?: boolean;
   isHighlighted?: boolean;
@@ -150,9 +133,6 @@ interface Props extends PropsWithChildren {
     ready: number;
     total: number;
   };
-  dropLocation?: BoardDropLocation;
-  dropStatus?: BoardLocationDropStatus;
-  isDropEnabled?: boolean;
 }
 
 function resolveZoneAreaVisualState({
@@ -199,21 +179,22 @@ function isEmphasizedVisualState(visualState: ZoneAreaVisualState) {
   return visualState !== "idle";
 }
 
-export const ZoneArea: FC<Props> = ({
-  animationZoneId,
-  children,
-  className,
-  contentClassName,
-  density = "default",
-  isCentered = false,
-  isDestinationHighlighted = false,
-  isHighlighted,
-  isHightlighted,
-  totalCardsCount,
-  dropLocation,
-  dropStatus = "idle",
-  isDropEnabled = false,
-}) => {
+export const ZoneArea = forwardRef<HTMLDivElement, Props>(function ZoneArea(
+  {
+    animationZoneId,
+    children,
+    className,
+    contentClassName,
+    density = "default",
+    dropStatus = "idle",
+    isCentered = false,
+    isDestinationHighlighted = false,
+    isHighlighted,
+    isHightlighted,
+    totalCardsCount,
+  },
+  ref,
+) {
   const highlighted = Boolean(isHighlighted ?? isHightlighted);
   const visualState = resolveZoneAreaVisualState({
     dropStatus,
@@ -225,11 +206,6 @@ export const ZoneArea: FC<Props> = ({
     ? false
     : Object.values(totalCardsCount).reduce((acc, cur) => acc + cur, 0) > 0;
 
-  const { setNodeRef } = useBoardLocationDroppable({
-    disabled: !isDropEnabled || !dropLocation,
-    location: dropLocation ?? { kind: "base" },
-  });
-
   return (
     <div
       data-destination-highlighted={
@@ -238,7 +214,7 @@ export const ZoneArea: FC<Props> = ({
       data-drop-status={dropStatus}
       data-zone-animation-id={animationZoneId}
       data-zone-visual-state={visualState}
-      ref={dropLocation ? setNodeRef : undefined}
+      ref={ref}
       className={cn(zoneAreaRoot({ visualState }), className)}
     >
       <div
@@ -278,4 +254,4 @@ export const ZoneArea: FC<Props> = ({
       </div>
     </div>
   );
-};
+});

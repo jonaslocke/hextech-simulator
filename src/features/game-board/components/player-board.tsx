@@ -17,6 +17,7 @@ import type {
   BoardDragSourceLocation,
   BoardLocationDropStatus,
 } from "../drag-and-drop/location-drag-actions";
+import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { ZoneArea } from "./zone-area";
@@ -96,6 +97,11 @@ const BaseLine = ({
   );
   const hasChampionZone =
     player.zones.champion.cards.length > 0 || player.zones.champion.count > 0;
+  const baseUnitsDroppable = useBoardLocationDroppable({
+    disabled: !isLocationDropEnabled,
+    droppableId: `${player.playerId}:base-units`,
+    location: { kind: "base" },
+  });
 
   return (
     <div
@@ -138,11 +144,10 @@ const BaseLine = ({
       </ZoneArea>
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
-        dropLocation={{ kind: "base" }}
         dropStatus={baseDropStatus}
         isDestinationHighlighted={isBaseHighlighted}
-        isDropEnabled={isLocationDropEnabled}
         isHightlighted={isBaseHighlighted || isHightlighted}
+        ref={baseUnitsDroppable.setNodeRef}
       >
         <CardList
           cards={baseUnits}
@@ -175,9 +180,11 @@ interface RunesProps extends BaseLineProps {
 }
 
 const RunesLine = ({
+  baseDropStatus = "idle",
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
   isBaseHighlighted,
+  isLocationDropEnabled = false,
   onRuneContextAction,
   onRunePrimaryAction,
   onOpenBanish,
@@ -190,6 +197,12 @@ const RunesLine = ({
   );
   const hasBanishment = player.zones.banishment.count > 0;
   const runeCounts = countRuneReadiness(baseRunes);
+
+  const baseRunesDroppable = useBoardLocationDroppable({
+    disabled: !isLocationDropEnabled,
+    droppableId: `${player.playerId}:base-runes`,
+    location: { kind: "base" },
+  });
 
   return (
     <div
@@ -210,8 +223,10 @@ const RunesLine = ({
       </ZoneArea>
       <ZoneArea
         animationZoneId={`${player.playerId}:base`}
+        dropStatus={baseDropStatus}
         isDestinationHighlighted={isBaseHighlighted}
         isHightlighted={isBaseHighlighted || isHightlighted}
+        ref={baseRunesDroppable.setNodeRef}
         totalCardsCount={runeCounts}
       >
         <CardList
@@ -347,9 +362,11 @@ export const PlayerBoard: FC<Props> = ({
         isHightlighted={isActivePlayer}
       />
       <RunesLine
+        baseDropStatus={baseDropStatus}
         highlightedCardInstanceIds={highlightedCardInstanceIds}
         hiddenCardInstanceIds={hiddenCardInstanceIds}
         isBaseHighlighted={isBaseHighlighted}
+        isLocationDropEnabled={isLocationDropEnabled}
         onRuneContextAction={onRuneContextAction}
         onRunePrimaryAction={onRunePrimaryAction}
         onOpenBanish={onOpenBanish}

@@ -1,15 +1,18 @@
 "use client";
 
 import type { ProjectedAction } from "@/shared/game";
-import type { DragOverEvent } from "@dnd-kit/core";
-import { useCallback, useMemo, useState } from "react";
+import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { buildCard } from "../board-model";
 import type { BoardCatalogCard, BoardProjection } from "../board-view-model";
 import { CardTile } from "../components/card-tile";
 import {
   boardLocationDropStatus,
+  findLocationDragActionForDrop,
   isBoardDropLocationData,
+  isLocationDragData,
   legalDropLocationsForCard,
+  locationDragActionKind,
   type BoardDropLocation,
   type LocationDragData,
 } from "../drag-and-drop/location-drag-actions";
@@ -18,15 +21,20 @@ export function useBoardLocationDragState({
   actions,
   cardsByInstanceId,
   cardStates,
+  onAcceptedMoveDrop,
 }: {
   actions: readonly ProjectedAction[];
   cardsByInstanceId: Record<string, BoardCatalogCard>;
   cardStates: BoardProjection["cardStates"];
+  onAcceptedMoveDrop?: (action: ProjectedAction) => void | Promise<boolean>;
 }) {
   const [activeLocationDrag, setActiveLocationDrag] =
     useState<LocationDragData | null>(null);
   const [hoveredLocationDrop, setHoveredLocationDrop] =
     useState<BoardDropLocation | null>(null);
+
+  const activeLocationDragRef = useRef<LocationDragData | null>(null);
+  const hoveredLocationDropRef = useRef<BoardDropLocation | null>(null);
 
   const activeLocationDragCard = useMemo(() => {
     if (!activeLocationDrag) {
@@ -90,36 +98,88 @@ export function useBoardLocationDragState({
     );
   }, [activeLocationDragCard]);
 
+  const setHoveredDrop = useCallback((location: BoardDropLocation | null) => {
+    hoveredLocationDropRef.current = location;
+    setHoveredLocationDrop(location);
+  }, []);
+
   const handleLocationDragDataChange = useCallback(
     (data: LocationDragData | null) => {
+      activeLocationDragRef.current = data;
       setActiveLocationDrag(data);
 
       if (!data) {
-        setHoveredLocationDrop(null);
+        setHoveredDrop(null);
       }
     },
-    [],
+    [setHoveredDrop],
   );
 
-  const clearHoveredLocationDrop = useCallback(() => {
-    setHoveredLocationDrop(null);
-  }, []);
+  const handleLocationDragCancel = useCallback(() => {
+    setHoveredDrop(null);
+  }, [setHoveredDrop]);
 
-  const handleLocationDragOver = useCallback((event: DragOverEvent) => {
-    const overData = event.over?.data.current;
+  const handleLocationDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const overData = event.over?.data.current;
 
-    setHoveredLocationDrop(
-      isBoardDropLocationData(overData) ? overData.location : null,
-    );
-  }, []);
+      setHoveredDrop(
+        isBoardDropLocationData(overData) ? overData.location : null,
+      );
+    },
+    [setHoveredDrop],
+  );
+
+  const handleLocationDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const activeData = event.active.data.current;
+      const dragData = isLocationDragData(activeData)
+        ? activeData
+        : activeLocationDragRef.current;
+
+      const overData = event.over?.data.current;
+      const destinationFromDropData = isBoardDropLocationData(overData)
+        ? overData.location
+        : null;
+
+      const destination =
+        destinationFromDropData ?? hoveredLocationDropRef.current;
+
+      setHoveredDrop(null);
+
+      if (!dragData || !destination || !onAcceptedMoveDrop) {
+        return;
+      }
+
+      // Champion drops are intentionally visual-only for this milestone.
+      // Champion drag uses play actions and should be handled separately.
+      if (dragData.sourceLocation.kind === "champion") {
+        return;
+      }
+
+      const action = findLocationDragActionForDrop({
+        actions,
+        destination,
+        sourceCardInstanceId: dragData.sourceCardInstanceId,
+        sourceLocation: dragData.sourceLocation,
+      });
+
+      if (!action || locationDragActionKind(action) !== "move") {
+        return;
+      }
+
+      void onAcceptedMoveDrop(action);
+    },
+    [actions, onAcceptedMoveDrop, setHoveredDrop],
+  );
 
   return {
     activeLocationDrag,
     activeLocationDragOverlay,
     getLocationDropStatus,
-    handleLocationDragCancel: clearHoveredLocationDrop,
+    handleLocationDragCancel,
     handleLocationDragDataChange,
-    handleLocationDragEnd: clearHoveredLocationDrop,
+    handleLocationDragEnd,
     handleLocationDragOver,
     isLocationDropEnabled,
   };
