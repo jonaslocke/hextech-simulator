@@ -5,8 +5,10 @@ import {
   DragOverlay,
   PointerSensor,
   pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragCancelEvent,
   type DragEndEvent,
   type DragMoveEvent,
@@ -35,6 +37,16 @@ type LocationDragState = {
 const LocationDragStateContext = createContext<LocationDragState>({
   isLocationDragActive: false,
 });
+
+const locationDragCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+
+  return rectIntersection(args);
+};
 
 export function useLocationDragState() {
   return useContext(LocationDragStateContext);
@@ -82,7 +94,7 @@ export function LocationDragProvider({
     <LocationDragStateContext.Provider value={dragState}>
       <DndContext
         autoScroll={false}
-        collisionDetection={pointerWithin}
+        collisionDetection={locationDragCollisionDetection}
         onDragCancel={(event) => {
           onDragCancel?.(event);
           onActiveDragDataChange?.(null);

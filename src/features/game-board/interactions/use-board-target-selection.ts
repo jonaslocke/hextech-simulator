@@ -33,6 +33,7 @@ type SubmitProjectedAction = (
 
 type UseBoardTargetSelectionArgs = {
   actions: GameProjection["actions"];
+  capturePendingAnimationSnapshot?: () => void;
   highlightedCardInstanceIds: Set<string>;
   submitProjectedAction: SubmitProjectedAction;
 };
@@ -41,6 +42,7 @@ const EMPTY_TARGET_IDS: string[] = [];
 
 export function useBoardTargetSelection({
   actions,
+  capturePendingAnimationSnapshot,
   highlightedCardInstanceIds,
   submitProjectedAction,
 }: UseBoardTargetSelectionArgs): {
@@ -147,10 +149,15 @@ export function useBoardTargetSelection({
         return false;
       }
 
+      if (selection.purpose === "move" || selection.purpose === "play") {
+        capturePendingAnimationSnapshot?.();
+      }
+
       const accepted = await submitProjectedAction(
         targetSelectionAction?.id ?? selection.actionId,
         selection.selectedTargetIds,
       );
+
       if (!accepted) return false;
 
       setPendingSubmittedTargetIds(selection.selectedTargetIds);
@@ -158,7 +165,12 @@ export function useBoardTargetSelection({
       setTargetSelection(null);
       return true;
     },
-    [targetSelection, targetSelectionAction, submitProjectedAction],
+    [
+      capturePendingAnimationSnapshot,
+      targetSelection,
+      targetSelectionAction,
+      submitProjectedAction,
+    ],
   );
 
   const chooseBoardTarget = useCallback(

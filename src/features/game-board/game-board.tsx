@@ -26,6 +26,10 @@ import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
+import {
+  sameBoardLocation,
+  type BoardDropLocation,
+} from "./drag-and-drop/location-drag-actions";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
@@ -42,10 +46,6 @@ import {
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
-import {
-  sameBoardLocation,
-  type BoardDropLocation,
-} from "./drag-and-drop/location-drag-actions";
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -120,6 +120,26 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
   >(new Set());
+
+  const board = createBoardModel({
+    cardsByInstanceId,
+    playerNames,
+    projection,
+    scores,
+  });
+
+  const animationData = useMemo(() => createAnimationData(board), [board]);
+
+  const capturePendingAnimationSnapshot = useCallback(() => {
+    setPendingAnimationSnapshot(
+      captureCardZoneAnimationSnapshot({
+        placements: animationData.placements,
+        stateVersion: projection.stateVersion,
+        zoneCounts: animationData.zoneCounts,
+      }),
+    );
+  }, [animationData, projection.stateVersion]);
+
   const {
     chooseBoardTarget,
     clearSubmittedTargetHighlights,
@@ -136,6 +156,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     targetSelectionAction,
   } = useBoardTargetSelection({
     actions: sourceProjection.actions,
+    capturePendingAnimationSnapshot,
     highlightedCardInstanceIds,
     submitProjectedAction,
   });
@@ -159,12 +180,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   const targetSelectionUsesCardPrompt =
     playerDecision?.kind === "cardSelection" &&
     targetSelection?.actionId === playerDecision.actionId;
-  const board = createBoardModel({
-    cardsByInstanceId,
-    playerNames,
-    projection,
-    scores,
-  });
+
   const chainControllerDetails = (controllerPlayerId: string) => {
     if (controllerPlayerId === board.player.playerId) {
       return {
@@ -223,7 +239,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   const activePlayerId = projection.turn?.activePlayerId;
   const isOpponentActive = activePlayerId === board.opponent.playerId;
   const isPlayerActive = activePlayerId === board.player.playerId;
-  const animationData = useMemo(() => createAnimationData(board), [board]);
+
   const handleActiveTransferCardIdsChange = useCallback(
     (cardInstanceIds: Set<string>) => {
       setActiveTransferCardIds((current) =>
@@ -232,15 +248,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [],
   );
-  const capturePendingAnimationSnapshot = useCallback(() => {
-    setPendingAnimationSnapshot(
-      captureCardZoneAnimationSnapshot({
-        placements: animationData.placements,
-        stateVersion: projection.stateVersion,
-        zoneCounts: animationData.zoneCounts,
-      }),
-    );
-  }, [animationData, projection.stateVersion]);
+
   const {
     beginGlobalAction,
     beginPlayOrTargetSelection,
@@ -297,6 +305,14 @@ export const GameBoard: FC<GameBoardProps> = ({
       : null;
 
   const isMovementDraftActive = Boolean(movementDraftDestination);
+
+  const canUseLocationDrag =
+    !isSubmittingAction &&
+    !targetSelection &&
+    !playerDecision &&
+    !sourceProjection.pendingChoice &&
+    !unitPlayChoice &&
+    !isChainLockedOpen;
 
   const stagedMovementCardInstanceIds = useMemo(
     () =>
@@ -456,7 +472,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerLeave={handleTargetPointerLeave}
                   owner="player"
                   showdownState={board.playerBattlefieldShowdownState}
-                  enablePlayerUnitLocationDrag={!isMovementDraftActive}
+                  enablePlayerUnitLocationDrag={canUseLocationDrag}
                   stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
                   dropStatus={getLocationDropStatus({
                     kind: "battlefield",
@@ -479,7 +495,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                       battlefieldId: board.opponentBattlefield.id,
                     })
                   }
-                  enablePlayerUnitLocationDrag={!isMovementDraftActive}
+                  enablePlayerUnitLocationDrag={canUseLocationDrag}
                   stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
                   onCardPrimaryAction={handleBoardCardPrimaryAction}
                   onCardPointerEnter={handleTargetPointerEnter}
@@ -512,7 +528,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               onRunePrimaryAction={handleRunePrimaryAction}
               player={board.player}
               isActivePlayer={isPlayerActive}
-              enableLocationDrag={!isMovementDraftActive}
+              enableLocationDrag={canUseLocationDrag}
               stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
               baseDropStatus={getLocationDropStatus({ kind: "base" })}
               isLocationDropEnabled={isLocationDropEnabled}

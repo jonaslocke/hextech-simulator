@@ -72,8 +72,8 @@ type CardTileProps = Card & {
   enableZoneAnimation?: boolean;
   focusablePreview?: boolean;
   isHighlighted?: boolean;
-  isTransferHidden?: boolean;
   isStagedForMovement?: boolean;
+  isTransferHidden?: boolean;
   orientation?: CardTileOrientation;
   preserveOrientation?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
@@ -95,8 +95,8 @@ export const CardTile: FC<CardTileProps> = ({
   focusablePreview = true,
   instanceId,
   isHighlighted = false,
-  isTransferHidden = false,
   isStagedForMovement = false,
+  isTransferHidden = false,
   isExhausted,
   img,
   might,
