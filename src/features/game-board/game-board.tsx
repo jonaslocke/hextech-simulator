@@ -304,8 +304,6 @@ export const GameBoard: FC<GameBoardProps> = ({
       ? (targetSelectionAction?.presentation.boardLocation ?? null)
       : null;
 
-  const isMovementDraftActive = Boolean(movementDraftDestination);
-
   const canUseLocationDrag =
     !isSubmittingAction &&
     !targetSelection &&
