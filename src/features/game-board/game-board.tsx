@@ -259,6 +259,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     passFocusAction,
     passTurnLabel,
     submitLocationDragMoveAction,
+    submitLocationDragPlayAction,
   } = useGameBoardActions({
     actions: sourceProjection.actions,
     capturePendingAnimationSnapshot,
@@ -287,6 +288,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     cardStates: projection.cardStates,
     cardsByInstanceId,
     onAcceptedMoveDrop: submitLocationDragMoveAction,
+    onAcceptedPlayDrop: submitLocationDragPlayAction,
   });
 
   const movementDraftDestination =

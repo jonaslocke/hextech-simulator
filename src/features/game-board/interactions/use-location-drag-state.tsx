@@ -22,11 +22,13 @@ export function useBoardLocationDragState({
   cardsByInstanceId,
   cardStates,
   onAcceptedMoveDrop,
+  onAcceptedPlayDrop,
 }: {
   actions: readonly ProjectedAction[];
   cardsByInstanceId: Record<string, BoardCatalogCard>;
   cardStates: BoardProjection["cardStates"];
   onAcceptedMoveDrop?: (action: ProjectedAction) => void | Promise<boolean>;
+  onAcceptedPlayDrop?: (action: ProjectedAction) => void | Promise<boolean>;
 }) {
   const [activeLocationDrag, setActiveLocationDrag] =
     useState<LocationDragData | null>(null);
@@ -147,13 +149,7 @@ export function useBoardLocationDragState({
 
       setHoveredDrop(null);
 
-      if (!dragData || !destination || !onAcceptedMoveDrop) {
-        return;
-      }
-
-      // Champion drops are intentionally visual-only for this milestone.
-      // Champion drag uses play actions and should be handled separately.
-      if (dragData.sourceLocation.kind === "champion") {
+      if (!dragData || !destination) {
         return;
       }
 
@@ -164,13 +160,30 @@ export function useBoardLocationDragState({
         sourceLocation: dragData.sourceLocation,
       });
 
-      if (!action || locationDragActionKind(action) !== "move") {
+      const actionKind = action ? locationDragActionKind(action) : null;
+
+      if (!action || !actionKind) {
         return;
       }
 
-      void onAcceptedMoveDrop(action);
+      if (actionKind === "move") {
+        if (!onAcceptedMoveDrop) {
+          return;
+        }
+
+        void onAcceptedMoveDrop(action);
+        return;
+      }
+
+      if (actionKind === "play") {
+        if (!onAcceptedPlayDrop) {
+          return;
+        }
+
+        void onAcceptedPlayDrop(action);
+      }
     },
-    [actions, onAcceptedMoveDrop, setHoveredDrop],
+    [actions, onAcceptedMoveDrop, onAcceptedPlayDrop, setHoveredDrop],
   );
 
   return {

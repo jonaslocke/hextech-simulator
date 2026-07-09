@@ -469,6 +469,59 @@ export function useGameBoardActions({
     ],
   );
 
+  const submitLocationDragPlayAction = useCallback(
+    (action: GameProjection["actions"][number]) => {
+      if (targetSelection) {
+        return Promise.resolve(false);
+      }
+
+      if (
+        !action.enabled ||
+        action.id.split(":")[3] !== "play" ||
+        !action.sourceCardInstanceId
+      ) {
+        return Promise.resolve(false);
+      }
+
+      closeCardActionMenu();
+
+      const targetKind = action.targets.some((target) => target.kind === "card")
+        ? "card"
+        : "battlefield";
+      const requirement = combineTargetRequirements(action, targetKind);
+
+      if (requirement && requirement.maximum > 0) {
+        setTargetSelection({
+          actionId: action.id,
+          legalTargetIds: requirement.legalIds,
+          maxTargets: requirement.maximum,
+          minTargets: requirement.minimum,
+          purpose: "play",
+          requirement,
+          selectedTargetIds: [],
+          targetKind,
+        });
+
+        return Promise.resolve(true);
+      }
+
+      capturePendingAnimationSnapshot();
+
+      if (requirement && requirement.maximum === 0) {
+        return submitProjectedAction(action.id, []);
+      }
+
+      return submitProjectedAction(action.id);
+    },
+    [
+      capturePendingAnimationSnapshot,
+      closeCardActionMenu,
+      setTargetSelection,
+      submitProjectedAction,
+      targetSelection,
+    ],
+  );
+
   return {
     beginGlobalAction,
     beginPlayOrTargetSelection,
@@ -487,6 +540,7 @@ export function useGameBoardActions({
     passFocusAction,
     passTurnLabel,
     submitLocationDragMoveAction,
+    submitLocationDragPlayAction,
   };
 }
 
