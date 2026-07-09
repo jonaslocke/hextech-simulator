@@ -214,6 +214,7 @@ type Props = {
   enablePlayerUnitLocationDrag?: boolean;
   dropStatus?: BoardLocationDropStatus;
   isLocationDropEnabled?: boolean;
+  stagedMovementCardInstanceIds?: Set<string>;
 };
 
 function resolveBattlefieldVisualState({
@@ -268,6 +269,7 @@ export const BattlefieldBoard: FC<Props> = ({
   owner,
   showdownState = "neutral",
   enablePlayerUnitLocationDrag = false,
+  stagedMovementCardInstanceIds,
 }) => {
   const [isBattlefieldCardOpen, setIsBattlefieldCardOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -446,6 +448,7 @@ export const BattlefieldBoard: FC<Props> = ({
           onCardPointerLeave={onCardPointerLeave}
           onCardPrimaryAction={onCardPrimaryAction}
           side="player"
+          stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
           zoneAnimationId={`battlefield:${id}:player`}
         />
       </div>
@@ -472,6 +475,7 @@ function BattlefieldUnitRow({
   onCardPrimaryAction,
   side = "player",
   zoneAnimationId,
+  stagedMovementCardInstanceIds,
 }: {
   cards: Card[];
   className?: string;
@@ -486,6 +490,7 @@ function BattlefieldUnitRow({
   onCardPointerLeave?: (card: Card) => void;
   side?: "opponent" | "player";
   zoneAnimationId: string;
+  stagedMovementCardInstanceIds?: Set<string>;
 }) {
   return (
     <motion.div
@@ -519,6 +524,11 @@ function BattlefieldUnitRow({
             }
             onHighlightPointerLeave={
               onCardPointerLeave ? () => onCardPointerLeave(unit) : undefined
+            }
+            isStagedForMovement={
+              unit.instanceId
+                ? stagedMovementCardInstanceIds?.has(unit.instanceId)
+                : false
             }
             {...unit}
           />

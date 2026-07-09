@@ -29,6 +29,7 @@ type BaseLineProps = {
   isBaseHighlighted?: boolean;
   player: PlayerData;
   isHightlighted: ComponentProps<typeof ZoneArea>["isHightlighted"];
+  stagedMovementCardInstanceIds?: Set<string>;
   onChampionContextAction?: (
     card: Card,
     event: MouseEvent<HTMLDivElement>,
@@ -53,6 +54,7 @@ type Props = {
   hiddenCardInstanceIds?: Set<string>;
   isBaseHighlighted?: boolean;
   isMirrored?: boolean;
+  stagedMovementCardInstanceIds?: Set<string>;
   onChampionContextAction?: (
     card: Card,
     event: MouseEvent<HTMLDivElement>,
@@ -91,6 +93,7 @@ const BaseLine = ({
   onBoardCardPointerLeave,
   baseDropStatus = "idle",
   isLocationDropEnabled = false,
+  stagedMovementCardInstanceIds,
 }: BaseLineProps) => {
   const baseUnits = player.zones.base.cards.filter(
     (card) => card.type !== "Rune",
@@ -159,6 +162,7 @@ const BaseLine = ({
           onCardPointerEnter={onBoardCardPointerEnter}
           onCardPointerLeave={onBoardCardPointerLeave}
           showMight
+          stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
         />
       </ZoneArea>
       <ZoneArea
@@ -315,6 +319,7 @@ export const PlayerBoard: FC<Props> = ({
   isActivePlayer,
   baseDropStatus = "idle",
   isLocationDropEnabled = false,
+  stagedMovementCardInstanceIds,
 }) => {
   if (isMirrored) {
     return (
@@ -360,6 +365,7 @@ export const PlayerBoard: FC<Props> = ({
         onBoardCardPointerLeave={onBoardCardPointerLeave}
         player={player}
         isHightlighted={isActivePlayer}
+        stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
       />
       <RunesLine
         baseDropStatus={baseDropStatus}
@@ -510,6 +516,7 @@ function CardList({
   onClick,
   layout = "row",
   showMight = false,
+  stagedMovementCardInstanceIds,
 }: {
   cards: Card[];
   count?: number;
@@ -526,6 +533,7 @@ function CardList({
   onClick?: () => void;
   layout?: "row" | "scroll" | "wrap";
   showMight?: boolean;
+  stagedMovementCardInstanceIds?: Set<string>;
 }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
@@ -616,6 +624,11 @@ function CardList({
               onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
             }
             showMight={showMight}
+            isStagedForMovement={
+              card.instanceId
+                ? stagedMovementCardInstanceIds?.has(card.instanceId)
+                : false
+            }
             {...card}
           />
         );

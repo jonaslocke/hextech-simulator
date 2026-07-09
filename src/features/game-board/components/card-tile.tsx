@@ -73,6 +73,7 @@ type CardTileProps = Card & {
   focusablePreview?: boolean;
   isHighlighted?: boolean;
   isTransferHidden?: boolean;
+  isStagedForMovement?: boolean;
   orientation?: CardTileOrientation;
   preserveOrientation?: boolean;
   onContextAction?: (event: MouseEvent<HTMLDivElement>) => void;
@@ -95,6 +96,7 @@ export const CardTile: FC<CardTileProps> = ({
   instanceId,
   isHighlighted = false,
   isTransferHidden = false,
+  isStagedForMovement = false,
   isExhausted,
   img,
   might,
@@ -236,7 +238,13 @@ export const CardTile: FC<CardTileProps> = ({
         "relative flex justify-center items-center overflow-visible shrink-0",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
         isTransferHidden && "invisible pointer-events-none",
-        previewPosition ? "z-[2147483647]" : isHighlighted ? "z-20" : "z-10",
+        previewPosition
+          ? "z-[2147483647]"
+          : isStagedForMovement
+            ? "z-30"
+            : isHighlighted
+              ? "z-20"
+              : "z-10",
       )}
       onBlur={clearPreview}
       onClick={(event) => {
@@ -297,6 +305,8 @@ export const CardTile: FC<CardTileProps> = ({
             "hover:border-yellow-300/70 hover:shadow-lg hover:shadow-black/40",
             isHighlighted &&
               "border-cyan-300 ring-2 ring-cyan-300 shadow-cyan-300/40 shadow-lg",
+            isStagedForMovement &&
+              "border-emerald-300 ring-2 ring-emerald-300/90 shadow-[0_0_22px_rgba(110,231,183,0.45)]",
           )}
           draggable={false}
           onLoad={(event) => {
@@ -341,6 +351,11 @@ export const CardTile: FC<CardTileProps> = ({
             )}
           >
             {damage}
+          </span>
+        )}
+        {isStagedForMovement && (
+          <span className="-bottom-1 left-1/2 absolute bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.45)] px-1.5 py-0.5 border border-emerald-100/70 rounded-full font-mono font-bold text-[8px] text-slate-950 uppercase tracking-wide -translate-x-1/2 pointer-events-none">
+            Moving
           </span>
         )}
       </motion.div>

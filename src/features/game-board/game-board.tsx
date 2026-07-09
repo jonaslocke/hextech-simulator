@@ -42,6 +42,10 @@ import {
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
+import {
+  sameBoardLocation,
+  type BoardDropLocation,
+} from "./drag-and-drop/location-drag-actions";
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -285,6 +289,29 @@ export const GameBoard: FC<GameBoardProps> = ({
     onAcceptedMoveDrop: submitLocationDragMoveAction,
   });
 
+  const movementDraftDestination =
+    targetSelection?.purpose === "move"
+      ? (targetSelectionAction?.presentation.boardLocation ?? null)
+      : null;
+
+  const isMovementDraftActive = Boolean(movementDraftDestination);
+
+  const stagedMovementCardInstanceIds = useMemo(
+    () =>
+      targetSelection?.purpose === "move"
+        ? new Set(targetSelection.selectedTargetIds)
+        : new Set<string>(),
+    [targetSelection?.purpose, targetSelection?.selectedTargetIds],
+  );
+
+  const isMovementDraftDestination = useCallback(
+    (location: BoardDropLocation) =>
+      movementDraftDestination
+        ? sameBoardLocation(movementDraftDestination, location)
+        : false,
+    [movementDraftDestination],
+  );
+
   useEffect(() => {
     if (!isChainLockedOpen || !isChainOverlayOpen) {
       setHighlightedCardInstanceIds(new Set());
@@ -414,16 +441,21 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                   hiddenCardInstanceIds={activeTransferCardIds}
                   isHighlighted={
-                    hoveredBoardLocation?.kind === "battlefield" &&
-                    hoveredBoardLocation.battlefieldId ===
-                      board.playerBattlefield.id
+                    (hoveredBoardLocation?.kind === "battlefield" &&
+                      hoveredBoardLocation.battlefieldId ===
+                        board.playerBattlefield.id) ||
+                    isMovementDraftDestination({
+                      kind: "battlefield",
+                      battlefieldId: board.playerBattlefield.id,
+                    })
                   }
                   onCardPrimaryAction={handleBoardCardPrimaryAction}
                   onCardPointerEnter={handleTargetPointerEnter}
                   onCardPointerLeave={handleTargetPointerLeave}
                   owner="player"
                   showdownState={board.playerBattlefieldShowdownState}
-                  enablePlayerUnitLocationDrag
+                  enablePlayerUnitLocationDrag={!isMovementDraftActive}
+                  stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
                   dropStatus={getLocationDropStatus({
                     kind: "battlefield",
                     battlefieldId: board.playerBattlefield.id,
@@ -437,16 +469,21 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                   hiddenCardInstanceIds={activeTransferCardIds}
                   isHighlighted={
-                    hoveredBoardLocation?.kind === "battlefield" &&
-                    hoveredBoardLocation.battlefieldId ===
-                      board.opponentBattlefield.id
+                    (hoveredBoardLocation?.kind === "battlefield" &&
+                      hoveredBoardLocation.battlefieldId ===
+                        board.opponentBattlefield.id) ||
+                    isMovementDraftDestination({
+                      kind: "battlefield",
+                      battlefieldId: board.opponentBattlefield.id,
+                    })
                   }
+                  enablePlayerUnitLocationDrag={!isMovementDraftActive}
+                  stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
                   onCardPrimaryAction={handleBoardCardPrimaryAction}
                   onCardPointerEnter={handleTargetPointerEnter}
                   onCardPointerLeave={handleTargetPointerLeave}
                   owner="opponent"
                   showdownState={board.opponentBattlefieldShowdownState}
-                  enablePlayerUnitLocationDrag
                   dropStatus={getLocationDropStatus({
                     kind: "battlefield",
                     battlefieldId: board.opponentBattlefield.id,
@@ -458,7 +495,10 @@ export const GameBoard: FC<GameBoardProps> = ({
             <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
-              isBaseHighlighted={hoveredBoardLocation?.kind === "base"}
+              isBaseHighlighted={
+                hoveredBoardLocation?.kind === "base" ||
+                isMovementDraftDestination({ kind: "base" })
+              }
               onOpenBanish={() => setOpenZone("banish")}
               onOpenTrash={() => setOpenZone("playerTrash")}
               onChampionContextAction={handleChampionCardAction}
@@ -470,7 +510,8 @@ export const GameBoard: FC<GameBoardProps> = ({
               onRunePrimaryAction={handleRunePrimaryAction}
               player={board.player}
               isActivePlayer={isPlayerActive}
-              enableLocationDrag
+              enableLocationDrag={!isMovementDraftActive}
+              stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
               baseDropStatus={getLocationDropStatus({ kind: "base" })}
               isLocationDropEnabled={isLocationDropEnabled}
             />
@@ -597,6 +638,11 @@ export const GameBoard: FC<GameBoardProps> = ({
                 : targetSelection.purpose === "choice"
                   ? effectSelectionAction?.label
                   : undefined
+            }
+            helperText={
+              targetSelection.purpose === "move"
+                ? "Click additional units to include them, then confirm the move."
+                : undefined
             }
           />
         )}

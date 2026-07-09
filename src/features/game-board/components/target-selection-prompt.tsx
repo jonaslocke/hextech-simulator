@@ -33,6 +33,7 @@ export function TargetSelectionPrompt({
   cancelLabel = "Cancel",
   confirmLabel = "Play",
   costPreview,
+  helperText,
   isSubmitting = false,
   maxTargets,
   minTargets,
@@ -42,6 +43,7 @@ export function TargetSelectionPrompt({
   selectedCount,
   title,
 }: {
+  helperText?: string;
   canSubmit: boolean;
   cancelLabel?: string;
   confirmLabel?: string;
@@ -286,6 +288,11 @@ export function TargetSelectionPrompt({
               {selectedCount}/{maxTargets} selected
               {isOptional ? " · you may play without selecting targets" : ""}
             </div>
+            {helperText && (
+              <div className="mt-1 text-cyan-100/75 text-xs leading-snug">
+                {helperText}
+              </div>
+            )}
           </div>
 
           <TargetCountBadge
@@ -317,7 +324,8 @@ export function TargetSelectionPrompt({
             )}
             {costPreview.availableAnyPower < costPreview.additionalPower && (
               <div className="mt-2 font-medium">
-                Add {costPreview.additionalPower - costPreview.availableAnyPower}{" "}
+                Add{" "}
+                {costPreview.additionalPower - costPreview.availableAnyPower}{" "}
                 more Power to your Rune Pool before confirming.
               </div>
             )}
