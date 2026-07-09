@@ -1,6 +1,6 @@
 # Project Handoff
 
-Snapshot date: 2026-07-06
+Snapshot date: 2026-07-09
 
 ## 1. Project Overview
 
@@ -104,6 +104,40 @@ Setup decisions use `CardSelectionPrompt` directly from
 `OptionDecisionPrompt` is available in the host, but the current decision
 mapper does not produce an `optionDecision` request.
 
+### GameBoard Feature Architecture
+
+`src/features/game-board/game-board.tsx` has been refactored into a board
+orchestrator. It remains the main integration point for `GameProjection`, board
+layout rendering, overlay wiring, root action submission, and player-decision
+host wiring, but most derived model building and interaction-state ownership now
+lives in feature-local modules.
+
+Current game-board responsibilities are split as follows:
+
+- `game-board.tsx`: orchestrates projection adaptation, hook composition,
+  action submission, overlays, prompts, and board layout rendering.
+- `board-view-model.ts`: adapts the transport `GameProjection` into a
+  board-oriented projection.
+- `board-model.ts`: builds board-facing player, battlefield, zone, and card
+  models from the adapted projection.
+- `board-animation-model.ts`: derives card-zone transfer placements and zone
+  counts for movement animation overlays.
+- `components/*`: renders board-specific UI, including player boards,
+  battlefields, zones, hand fan, overlays, prompts, `CardActionMenu`, and
+  `RunePoolBar`.
+- `interactions/*`: owns UI interaction subsystems such as card action menu
+  state, chain overlay state, board-location drag state, board target selection,
+  and game-board action orchestration.
+- `decisions/*`: owns the Player Decision System prompts, mapper, request
+  types, and intent conversion.
+- `drag-and-drop/*`: owns board-location drag primitives, legal drop helpers,
+  provider wiring, and droppable helpers.
+
+The current refactor direction is to keep `game-board.tsx` as an orchestrator,
+not to split files for line count alone. Future extractions should be based on
+plausible concerns with a clear owner, and should preserve the existing server
+action contract.
+
 ## 3. Repository Structure
 
 ```text
@@ -137,8 +171,9 @@ skills/         Repository-specific implementation instructions
 
 ### Feature boundaries
 
-- `src/features/game-board`: board rendering, interaction state, decisions,
-  prompts, card movement, and projection adaptation.
+- `src/features/game-board`: board rendering, board-oriented projection/model
+  adaptation, interaction subsystems, decisions, prompts, card movement,
+  drag-and-drop helpers, and game-board orchestration.
 - `src/features/online-matchmaking`: deck selection, room creation/joining, socket client, and matchmaking UI.
 - `src/features/match-simulator`: local match creation, seat switching, API calls,
   and result presentation.
@@ -263,7 +298,6 @@ The repository does not use:
 
 - Mongoose
 - Redux or another external client state manager
-- Socket.IO or another realtime transport
 - Jest, Vitest, Playwright, or Cypress
 
 No deployment-platform configuration is present.
@@ -282,8 +316,9 @@ React UI
       -> MongoDB repositories
       -> projectGame(viewerPlayerId)
     -> viewer-safe GameProjection
-  -> board view-model adaptation
-  -> GameBoard and PlayerDecisionHost
+  -> board view-model and board model adaptation
+  -> GameBoard orchestrator
+  -> interaction hooks and PlayerDecisionHost
 ```
 
 The online matchmaking flow is:
@@ -310,7 +345,16 @@ Key responsibilities:
 - `src/server/game/effect-resolution.ts` persists and resumes selections.
 - `src/server/game/match-service.ts` coordinates repositories and persistence.
 - `src/features/game-board/board-view-model.ts` adapts transport projections to
-  board-oriented UI data.
+  board-oriented projection data.
+- `src/features/game-board/board-model.ts` builds board-facing player,
+  battlefield, zone, and card models.
+- `src/features/game-board/board-animation-model.ts` derives card-zone transfer
+  animation placements and zone counts.
+- `src/features/game-board/game-board.tsx` orchestrates board rendering,
+  overlays, interaction hooks, root action submission, and decision host wiring.
+- `src/features/game-board/interactions/*` owns feature-local UI interaction
+  state and action orchestration without moving legality or validation into
+  React.
 
 The server persists a deck snapshot for each player. The snapshot contains the
 approved card definitions and unique runtime instances used by the match.
@@ -369,6 +413,8 @@ The UI supports:
 - Unit play to Base or a controlled Battlefield.
 - Unit movement and Showdown initiation.
 - Rune actions, payment previews, and target selection.
+- Board-location drag state and drop feedback built around projected legal
+  actions.
 - Viewer-specific hidden information.
 
 ### Game engine
@@ -447,6 +493,26 @@ execute those bindings without card-name checks.
 The pure `buildPlayerDecisionRequest` function maps current state to one
 decision. The host converts prompt results into the existing intent shape.
 
+### GameBoard orchestrator pattern
+
+`GameBoard` should compose feature-local subsystems rather than own every board
+concern directly. Model derivation belongs in `board-view-model.ts`,
+`board-model.ts`, or similarly focused pure modules. Visual UI belongs in
+`components/*`. Transient UI behavior belongs in `interactions/*`. Gameplay
+legality, payment, target validation, and effect resolution remain server-owned.
+
+The current extracted interaction hooks are:
+
+- `use-card-action-menu.ts`
+- `use-chain-overlay-state.ts`
+- `use-location-drag-state.tsx`
+- `use-board-target-selection.ts`
+- `use-game-board-actions.tsx`
+
+`use-game-board-actions.tsx` centralizes card, rune, board-card, and global
+action orchestration. It should be monitored so it does not become a new
+monolithic replacement for `game-board.tsx`.
+
 ### Testing
 
 Tests use:
@@ -479,12 +545,21 @@ Future work must not:
 - Add a synthetic Vision "keep-on-top" option.
 - Change the player intent payload without an explicit contract change.
 - Treat imported but unapproved card behavior as gameplay-ready.
+- Collapse extracted game-board concerns back into `game-board.tsx` without a
+  clear reason.
+- Split game-board files only to reduce line count when the extracted concern
+  does not have a clear owner.
 - Add broad UI integration tests for unstable decision surfaces.
 
 ## 10. Risks, Gaps, and Open Questions
 
-- `src/features/game-board/game-board.tsx` is approximately 1,800 lines and
-  contains substantial board interaction state.
+- `src/features/game-board/game-board.tsx` has been reduced to an orchestrator
+  of roughly 680 lines in the current refactor baseline. Future game-board
+  changes should preserve the orchestrator direction and avoid artificial
+  extraction.
+- `src/features/game-board/interactions/use-game-board-actions.tsx` is the
+  largest board interaction hook. It is a valid action-orchestration concern,
+  but it should not grow into a second monolith.
 - `src/server/game/actions.ts`,
   `src/features/card-catalog/components/card-catalog-import-preview.tsx`, and
   `CardSelectionPrompt` are also large files.
@@ -500,6 +575,9 @@ Future work must not:
 - The event log is persisted and displayed, but there is no complete replay
   reconstruction feature.
 - There are no automated browser interaction or visual regression tests.
+- Board-location drag-and-drop has feature-local infrastructure, but future
+  drag/drop work must continue to submit projected actions and rely on server
+  validation instead of mutating client state optimistically.
 - The canonical behavior catalog and approved cards must be initialized in
   MongoDB before match deck snapshots can load.
 - Full Riftbound card coverage is not implied by the current Lux and Annie
@@ -522,6 +600,9 @@ Questions to answer before major product work:
   flows.
 - Verify the canonical Lux and Annie cards are approved and available.
 - Confirm prompt cleanup after every projection update.
+- When changing game-board interactions, manually validate hand card actions,
+  board card actions, rune actions, target selection, unit destination choices,
+  chain pass/resolve behavior, and animation cleanup.
 
 ### Safe implementation work
 
@@ -529,7 +610,13 @@ Questions to answer before major product work:
 - Keep specialized board targeting separate until its interaction requirements
   are explicitly represented.
 - Preserve the existing intent and projection contracts.
-- Split large files only through incremental, behavior-preserving changes.
+- Continue game-board work through concern-driven, behavior-preserving changes.
+  Do not continue extracting only because a file is large.
+- If more game-board refactor work is needed, prefer small plausible concerns
+  such as pure chain-card derivation or choice-dialog presentation before broad
+  layout extraction.
+- Keep future drag/drop work aligned with projected legal actions,
+  `submitProjectedAction`, and server validation.
 
 ### Areas requiring confirmation
 
@@ -550,6 +637,10 @@ Questions to answer before major product work:
 - Opponent waiting feedback.
 - Battlefield target selection.
 - Unit destination selection.
+- Hand card action menu and direct play.
+- Board card context menu and primary action.
+- Rune primary/context action.
+- Chain pass priority and pass-and-resolve flow.
 - No stale prompt after a successful action.
 
 Automated additions should remain limited to stable mapper, intent, schema, and
@@ -577,6 +668,22 @@ projection/actions
   -> existing action submission
 ```
 
-The safest continuation is to validate the current gameplay flows manually,
-then centralize remaining ordinary choices incrementally while preserving the
-server action contract and adding only narrow tests for stable behavior.
+`GameBoard` has been refactored into a feature-level orchestrator. Its current
+architecture is:
+
+```text
+source GameProjection
+  -> board-view-model.ts
+  -> board-model.ts / board-animation-model.ts
+  -> game-board.tsx orchestrator
+  -> interactions/* hooks
+  -> components/* rendering
+  -> decisions/* prompts and intent mapping
+```
+
+Continue from this structure. Keep extracted concerns in the `game-board`
+feature, avoid artificial splits, and do not move server-owned legality,
+payment, target validation, or effect resolution into React. The safest
+continuation is to validate the current gameplay flows manually, then centralize
+remaining ordinary choices incrementally while preserving the server action
+contract and adding only narrow tests for stable behavior.
