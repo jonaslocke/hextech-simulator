@@ -410,18 +410,60 @@ export function useGameBoardActions({
         return Promise.resolve(false);
       }
 
-      if (!action.enabled || action.id.split(":")[3] !== "move") {
+      if (
+        !action.enabled ||
+        action.id.split(":")[3] !== "move" ||
+        !action.sourceCardInstanceId
+      ) {
         return Promise.resolve(false);
       }
 
       closeCardActionMenu();
+
+      const destination = action.presentation.boardLocation;
+
+      if (destination?.kind === "battlefield") {
+        const stagedMoveAction = simultaneousMoveAction(
+          actions,
+          action,
+          action.sourceCardInstanceId,
+        );
+
+        if (!stagedMoveAction) {
+          capturePendingAnimationSnapshot();
+          return submitProjectedAction(action.id);
+        }
+
+        const requirement = combineTargetRequirements(stagedMoveAction, "card");
+
+        if (!requirement || requirement.maximum === 0) {
+          capturePendingAnimationSnapshot();
+          return submitProjectedAction(action.id);
+        }
+
+        setTargetSelection({
+          actionId: stagedMoveAction.id,
+          legalTargetIds: requirement.legalIds,
+          maxTargets: requirement.maximum,
+          minTargets: requirement.minimum,
+          purpose: "move",
+          requirement,
+          selectedTargetIds: [action.sourceCardInstanceId],
+          targetKind: "card",
+        });
+
+        return Promise.resolve(true);
+      }
+
       capturePendingAnimationSnapshot();
 
       return submitProjectedAction(action.id);
     },
     [
+      actions,
       capturePendingAnimationSnapshot,
       closeCardActionMenu,
+      setTargetSelection,
       submitProjectedAction,
       targetSelection,
     ],
