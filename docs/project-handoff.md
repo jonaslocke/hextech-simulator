@@ -52,6 +52,15 @@ The repository currently implements:
 - Vision with private reveal and empty-selection "Keep on top" behavior.
 - Viewer-safe projections for zones, pending choices, legal actions, and logs.
 - Card text presentation for keywords and resource notation.
+- Board-location drag-and-drop for viewer-controlled Units and Champion-zone
+  cards, resolved from server-projected legal actions.
+- Drag-to-Battlefield Unit movement drafts that preselect the dragged Unit,
+  allow additional eligible Units to be clicked, and submit through the existing
+  move or moveMany action path only after confirmation.
+- Staged movement feedback and destination highlighting while a movement draft
+  is open, without optimistic board mutation.
+- Champion drag-to-play from the Champion zone to legal Base or Battlefield
+  destinations through the existing play and target-selection flow.
 - Admin card-set JSON import, behavior suggestion, behavior editing,
   validation, and canonical card publication.
 
@@ -130,8 +139,72 @@ Current game-board responsibilities are split as follows:
   and game-board action orchestration.
 - `decisions/*`: owns the Player Decision System prompts, mapper, request
   types, and intent conversion.
-- `drag-and-drop/*`: owns board-location drag primitives, legal drop helpers,
-  provider wiring, and droppable helpers.
+- `drag-and-drop/*`: owns board-location drag primitives, DnD provider wiring,
+  draggable wrappers, semantic board-location helpers, legal-drop resolution,
+  drop-status helpers, and droppable registration helpers.
+
+### Board-location drag/drop architecture
+
+Board-location drag/drop is an interaction layer over projected legal actions.
+It must not mutate board state optimistically and must not invent a client-side
+movement or play contract.
+
+The current drag/drop model is:
+
+```text
+LocationDragProvider
+  -> DraggableLocationCard source data
+  -> useBoardLocationDragState
+  -> location-drag-actions.ts legal drop resolution
+  -> useGameBoardActions submit handler
+  -> submitProjectedAction(action.id, selectedIds)
+  -> server validation and projection refresh
+```
+
+Important ownership boundaries:
+
+- `CardTile` remains visual. It can display drag-related visual states such as
+  staged movement, but it should not own DnD registration or action resolution.
+- `DraggableLocationCard` owns `useDraggable` registration and the source data
+  for board-location drags.
+- `useBoardLocationDroppable` owns `useDroppable` registration for a semantic
+  board location. Multiple visual surfaces may map to the same semantic
+  location.
+- `location-drag-actions.ts` owns source type guards, semantic location IDs,
+  action-kind detection, legal-drop extraction, drop-status calculation, and
+  source/destination action resolution.
+- `use-location-drag-state.tsx` owns active drag state, overlay rendering,
+  hovered drop state, and drag-end dispatch to accepted move/play handlers.
+- `use-game-board-actions.tsx` owns the accepted drop handlers and translates a
+  resolved projected action into the existing play, move, moveMany, or target
+  selection submission path.
+
+Supported source/destination behavior:
+
+- Unit from Base or Battlefield to Base submits a single projected move action
+  when legal.
+- Unit from Base or Battlefield to a Battlefield starts the existing movement
+  draft when a simultaneous moveMany action is available. The dragged Unit is
+  preselected, additional legal Units are added or removed by clicking, and the
+  draft submits only when the player confirms.
+- The movement draft keeps Units in their current rendered zones, shows staged
+  movement feedback on selected Units, and keeps the destination location
+  highlighted. This is visual feedback only; the server has not moved the Units
+  until confirmation.
+- Additional Units are intentionally selected by click during a movement draft.
+  Starting a second drag while a movement draft or another blocking interaction
+  is active should be disabled or ignored.
+- Champion-zone cards may be dragged to legal Base or Battlefield play
+  destinations. The resolved projected play action continues through the
+  existing play or target-selection flow.
+- Champion drag does not currently solve the multiple-payment-modes-for-the-same
+  destination case. If that appears in real gameplay, treat it as a future
+  refinement instead of expanding the current drag/drop contract.
+- Invalid drops are visual only and must submit nothing.
+
+Base is visually split into Unit and Rune surfaces, but both surfaces resolve to
+`{ kind: "base" }`. This decouples visual hit areas from semantic game
+locations and should be preserved for future spatial interactions.
 
 The current refactor direction is to keep `game-board.tsx` as an orchestrator,
 not to split files for line count alone. Future extractions should be based on
@@ -173,7 +246,7 @@ skills/         Repository-specific implementation instructions
 
 - `src/features/game-board`: board rendering, board-oriented projection/model
   adaptation, interaction subsystems, decisions, prompts, card movement,
-  drag-and-drop helpers, and game-board orchestration.
+  board-location drag/drop, and game-board orchestration.
 - `src/features/online-matchmaking`: deck selection, room creation/joining, socket client, and matchmaking UI.
 - `src/features/match-simulator`: local match creation, seat switching, API calls,
   and result presentation.
@@ -415,6 +488,15 @@ The UI supports:
 - Rune actions, payment previews, and target selection.
 - Board-location drag state and drop feedback built around projected legal
   actions.
+- Drag/drop movement of viewer-controlled Units between Base and legal
+  Battlefields, including Battlefield-to-Base returns and legal
+  Battlefield-to-Battlefield movement.
+- Drag-to-Battlefield movement drafts that preselect the dragged Unit and allow
+  additional eligible Units to be clicked before confirming the moveMany flow.
+- Staged movement visual feedback for selected Units during an unsubmitted
+  movement draft.
+- Champion-zone drag to legal Base or Battlefield play destinations through the
+  existing play flow.
 - Viewer-specific hidden information.
 
 ### Game engine
@@ -501,6 +583,29 @@ concern directly. Model derivation belongs in `board-view-model.ts`,
 `components/*`. Transient UI behavior belongs in `interactions/*`. Gameplay
 legality, payment, target validation, and effect resolution remain server-owned.
 
+### Board-location drag/drop pattern
+
+Drag/drop is a UI shortcut for choosing already projected actions. The source of
+truth remains the server projection.
+
+When adding or changing drag/drop behavior:
+
+- Resolve drops by matching source card, source location, and semantic
+  destination to a projected action.
+- Submit only the projected action ID and selected IDs expected by the existing
+  intent contract.
+- Keep visual hit surfaces independent from semantic board locations.
+- Keep DnD registration in `drag-and-drop/*` helpers and component wrappers, not
+  inside `CardTile`.
+- Use target selection for staged or multi-card decisions instead of submitting
+  partial client-side state.
+- Disable or ignore new drags while target selection, player decisions, pending
+  choices, unit-destination dialogs, chain-locked windows, or action submission
+  are active.
+- Preserve hover-preview suppression while a location drag is active.
+- Preserve animation snapshot capture before submissions that move or play
+  cards, including target-selection confirmations.
+
 The current extracted interaction hooks are:
 
 - `use-card-action-menu.ts`
@@ -544,6 +649,12 @@ Future work must not:
 - Convert combat damage into generic card selection.
 - Add a synthetic Vision "keep-on-top" option.
 - Change the player intent payload without an explicit contract change.
+- Implement drag/drop as a client-side board mutation or custom action payload.
+- Add drag/drop behavior that bypasses projected legal actions or server
+  validation.
+- Make `CardTile` own DnD registration or action resolution.
+- Replace the movement draft click-to-add flow with speculative multi-card drag
+  semantics without an explicit UX and rules contract.
 - Treat imported but unapproved card behavior as gameplay-ready.
 - Collapse extracted game-board concerns back into `game-board.tsx` without a
   clear reason.
@@ -575,9 +686,16 @@ Future work must not:
 - The event log is persisted and displayed, but there is no complete replay
   reconstruction feature.
 - There are no automated browser interaction or visual regression tests.
-- Board-location drag-and-drop has feature-local infrastructure, but future
-  drag/drop work must continue to submit projected actions and rely on server
-  validation instead of mutating client state optimistically.
+- Board-location drag-and-drop now covers Unit movement, movement drafts, and
+  Champion drag-to-play. Future drag/drop work must continue to submit
+  projected actions and rely on server validation instead of mutating client
+  state optimistically.
+- Champion drag intentionally does not handle multiple payment modes for the
+  same destination. If that case becomes important, add a scoped future
+  refinement rather than broadening the current drag/drop contract.
+- Drag/drop should be manually regression-tested around blocking UI states,
+  invalid drops, edge-of-zone drops, staged movement cleanup, animation snapshot
+  capture, and prompt cleanup after projection updates.
 - The canonical behavior catalog and approved cards must be initialized in
   MongoDB before match deck snapshots can load.
 - Full Riftbound card coverage is not implied by the current Lux and Annie
@@ -603,6 +721,16 @@ Questions to answer before major product work:
 - When changing game-board interactions, manually validate hand card actions,
   board card actions, rune actions, target selection, unit destination choices,
   chain pass/resolve behavior, and animation cleanup.
+- Manually validate Unit drag from Base to Battlefield, Battlefield to Base, and
+  legal Battlefield to Battlefield movement.
+- Manually validate drag-to-Battlefield movement drafts: dragged Unit
+  preselected, additional Units toggled by click, staged movement feedback,
+  destination highlight, cancel cleanup, and confirm submission.
+- Manually validate Champion drag from the Champion zone to legal Base and
+  Battlefield destinations.
+- Manually validate invalid drops, edge-of-zone drops, and drag-disabled states
+  while target selections, player decisions, pending choices, unit-destination
+  dialogs, locked chain windows, or action submissions are active.
 
 ### Safe implementation work
 
@@ -617,6 +745,10 @@ Questions to answer before major product work:
   layout extraction.
 - Keep future drag/drop work aligned with projected legal actions,
   `submitProjectedAction`, and server validation.
+- Keep movement draft behavior as the multi-Unit movement model: drag starts the
+  draft, clicks adjust selected Units, confirmation submits.
+- Treat new drag/drop capabilities as interaction shortcuts over existing play,
+  move, moveMany, and target-selection flows.
 
 ### Areas requiring confirmation
 
@@ -637,6 +769,12 @@ Questions to answer before major product work:
 - Opponent waiting feedback.
 - Battlefield target selection.
 - Unit destination selection.
+- Unit drag/drop movement between Base and Battlefields.
+- Drag-to-Battlefield movement draft, including staged visual feedback and
+  click-to-add selection.
+- Champion drag-to-play to Base and Battlefields.
+- Invalid and edge-of-zone drops.
+- Drag-disabled states during blocking prompts and submissions.
 - Hand card action menu and direct play.
 - Board card context menu and primary action.
 - Rune primary/context action.
@@ -680,6 +818,14 @@ source GameProjection
   -> components/* rendering
   -> decisions/* prompts and intent mapping
 ```
+
+Board-location drag/drop now lives inside this structure. DnD primitives and
+legal-drop helpers live in `drag-and-drop/*`, active drag state lives in
+`use-location-drag-state.tsx`, submission orchestration lives in
+`use-game-board-actions.tsx`, and visual feedback is passed into board
+components. Unit drag/drop resolves move or moveMany actions, Champion drag
+resolves play actions, and all final submissions still use projected action IDs
+and server validation.
 
 Continue from this structure. Keep extracted concerns in the `game-board`
 feature, avoid artificial splits, and do not move server-owned legality,
