@@ -195,11 +195,12 @@ export function ChainOverlay({
 
           {hasChainItems && (
             <div className="flex items-center gap-2">
-              <div
+              <label
                 className={cn(
                   "flex items-center gap-1.5 bg-white/6 px-2 border border-white/10 rounded-lg w-37 h-9 text-left transition shrink-0",
                   "hover:bg-white/9",
                 )}
+                htmlFor={autoPassControlId}
               >
                 <Checkbox
                   checked={passAllPriority}
@@ -207,12 +208,9 @@ export function ChainOverlay({
                   onCheckedChange={handlePassAllPriorityChange}
                 />
 
-                <label
-                  className="font-semibold text-slate-100 text-xs whitespace-nowrap cursor-pointer"
-                  htmlFor={autoPassControlId}
-                >
+                <span className="font-semibold text-slate-100 text-xs whitespace-nowrap cursor-pointer">
                   Auto-pass
-                </label>
+                </span>
 
                 <Kbd className="bg-white/10 shadow-none ml-auto px-1.5 py-0.5 border-white/15 text-[10px] text-slate-300">
                   L
@@ -239,7 +237,7 @@ export function ChainOverlay({
                     added.
                   </TooltipContent>
                 </Tooltip>
-              </div>
+              </label>
 
               <Button
                 className="flex-1 justify-center gap-2 bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 px-3 min-w-0 h-9 font-semibold text-slate-950 text-xs disabled:cursor-not-allowed"
@@ -247,7 +245,9 @@ export function ChainOverlay({
                 onClick={onPassPriority}
                 type="button"
               >
-                <span className="text-xs whitespace-nowrap">{passButtonLabel}</span>
+                <span className="text-xs whitespace-nowrap">
+                  {passButtonLabel}
+                </span>
 
                 {canUsePassShortcut && (
                   <Kbd className="bg-slate-950/10 shadow-none px-1.5 py-0.5 border-slate-950/20 text-[10px] text-slate-950/80">

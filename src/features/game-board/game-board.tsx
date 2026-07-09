@@ -45,14 +45,13 @@ import { usePlayerDecisionRequest } from "./decisions/use-player-decision-reques
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
 import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
+import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import {
   combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction,
-  targetSelectionCanAdd,
   targetSelectionIsLegal,
-  type CombinedTargetRequirement,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
@@ -71,8 +70,6 @@ type GameBoardProps = {
 
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
-
-const EMPTY_TARGET_IDS: string[] = [];
 
 export const GameBoard: FC<GameBoardProps> = ({
   isSubmittingAction = false,
@@ -167,16 +164,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   >(new Set());
   const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
     useState<CardZoneAnimationSnapshot | null>(null);
-  const [targetSelection, setTargetSelection] = useState<{
-    actionId: string;
-    legalTargetIds: string[];
-    maxTargets: number;
-    minTargets: number;
-    purpose: "choice" | "move" | "play";
-    requirement: CombinedTargetRequirement;
-    selectedTargetIds: string[];
-    targetKind: "battlefield" | "card";
-  } | null>(null);
   const [unitPlayChoice, setUnitPlayChoice] = useState<{
     card: Card;
     modes: PaymentMode[];
@@ -184,11 +171,25 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
   >(new Set());
-  const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
-    useState<string | null>(null);
-  const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
-    string[]
-  >([]);
+  const {
+    chooseBoardTarget,
+    clearSubmittedTargetHighlights,
+    displayedHighlightedCardInstanceIds,
+    handleTargetClickCapture,
+    handleTargetPointerEnter,
+    handleTargetPointerLeave,
+    missingDeflectPower,
+    selectedDeflectPower,
+    selectedDeflectSources,
+    setTargetSelection,
+    submitTargetedPlay,
+    targetSelection,
+    targetSelectionAction,
+  } = useBoardTargetSelection({
+    actions: sourceProjection.actions,
+    highlightedCardInstanceIds,
+    submitProjectedAction,
+  });
   const {
     activeLocationDrag,
     activeLocationDragOverlay,
@@ -337,54 +338,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
   );
   const viewerState = projection.players[projection.viewerPlayerId];
-  const targetSelectionAction = targetSelection
-    ? (sourceProjection.actions.find(
-        (action) => action.id === targetSelection.actionId,
-      ) ??
-      sourceProjection.actions.find((action) =>
-        actionIdsHaveSameIdentity(action.id, targetSelection.actionId),
-      ))
-    : undefined;
-  const selectedDeflectSources =
-    targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
-      targetSelection?.selectedTargetIds.includes(source.targetId),
-    ) ?? [];
-  const selectedDeflectPower = selectedDeflectSources.reduce(
-    (total, source) => total + source.amount,
-    0,
-  );
-  const missingDeflectPower = Math.max(
-    0,
-    selectedDeflectPower -
-      (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
-  );
-  const legalTargetIds = targetSelection?.legalTargetIds ?? EMPTY_TARGET_IDS;
-  const displayedHighlightedCardInstanceIds = useMemo(() => {
-    const next = new Set(highlightedCardInstanceIds);
-
-    for (const targetId of targetSelection?.selectedTargetIds ?? []) {
-      next.add(targetId);
-    }
-
-    for (const targetId of pendingSubmittedTargetIds) {
-      next.add(targetId);
-    }
-
-    if (
-      hoveredTargetCardInstanceId &&
-      legalTargetIds.includes(hoveredTargetCardInstanceId)
-    ) {
-      next.add(hoveredTargetCardInstanceId);
-    }
-
-    return next;
-  }, [
-    highlightedCardInstanceIds,
-    hoveredTargetCardInstanceId,
-    legalTargetIds,
-    pendingSubmittedTargetIds,
-    targetSelection?.selectedTargetIds,
-  ]);
   const activePlayerId = projection.turn?.activePlayerId;
   const isOpponentActive = activePlayerId === board.opponent.playerId;
   const isPlayerActive = activePlayerId === board.player.playerId;
@@ -577,126 +530,6 @@ export const GameBoard: FC<GameBoardProps> = ({
       })),
     );
   };
-  const chooseBoardTarget = (cardInstanceId: string | undefined) => {
-    if (!targetSelection || !cardInstanceId) {
-      return;
-    }
-
-    if (!targetSelection.legalTargetIds.includes(cardInstanceId)) {
-      return;
-    }
-
-    const isSelected =
-      targetSelection.selectedTargetIds.includes(cardInstanceId);
-    if (
-      !isSelected &&
-      !targetSelectionCanAdd(
-        targetSelection.requirement,
-        targetSelection.selectedTargetIds,
-        cardInstanceId,
-      )
-    ) {
-      return;
-    }
-    const selectedTargetIds = isSelected
-      ? targetSelection.selectedTargetIds.filter((id) => id !== cardInstanceId)
-      : [...targetSelection.selectedTargetIds, cardInstanceId];
-    const nextSelection = {
-      ...targetSelection,
-      selectedTargetIds,
-    };
-
-    setTargetSelection(nextSelection);
-
-    if (
-      nextSelection.purpose === "play" &&
-      nextSelection.minTargets === nextSelection.maxTargets &&
-      selectedTargetIds.length === nextSelection.maxTargets &&
-      targetSelectionIsLegal(nextSelection.requirement, selectedTargetIds) &&
-      additionalPowerForTargets(targetSelectionAction, selectedTargetIds) === 0
-    ) {
-      submitTargetedPlay(nextSelection);
-    }
-  };
-  const handleTargetClickCapture = (event: MouseEvent<HTMLElement>) => {
-    if (!targetSelection || !(event.target instanceof Element)) {
-      return;
-    }
-
-    const cardElement = event.target.closest(
-      "[data-card-instance-id]",
-    ) as HTMLElement | null;
-    const cardInstanceId = cardElement?.dataset.cardInstanceId;
-
-    if (
-      !cardInstanceId ||
-      !targetSelection.legalTargetIds.includes(cardInstanceId)
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    chooseBoardTarget(cardInstanceId);
-  };
-  const handleTargetPointerEnter = (card: Card) => {
-    if (!targetSelection || !card.instanceId) {
-      return;
-    }
-
-    if (!legalTargetIds.includes(card.instanceId)) {
-      return;
-    }
-
-    setHoveredTargetCardInstanceId(card.instanceId);
-  };
-  const handleTargetPointerLeave = (card: Card) => {
-    if (hoveredTargetCardInstanceId !== card.instanceId) {
-      return;
-    }
-
-    setHoveredTargetCardInstanceId(null);
-  };
-  const submitTargetedPlay = async (
-    selection = targetSelection,
-  ): Promise<boolean> => {
-    if (!selection) {
-      return false;
-    }
-
-    if (
-      !targetSelectionIsLegal(
-        selection.requirement,
-        selection.selectedTargetIds,
-      )
-    ) {
-      return false;
-    }
-
-    const selectedAdditionalPower = additionalPowerForTargets(
-      targetSelectionAction,
-      selection.selectedTargetIds,
-    );
-    const missingAdditionalPower = Math.max(
-      0,
-      selectedAdditionalPower -
-        (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
-    );
-    if (missingAdditionalPower > 0) {
-      return false;
-    }
-
-    const accepted = await submitProjectedAction(
-      targetSelectionAction?.id ?? selection.actionId,
-      selection.selectedTargetIds,
-    );
-    if (!accepted) return false;
-
-    setPendingSubmittedTargetIds(selection.selectedTargetIds);
-    setHoveredTargetCardInstanceId(null);
-    setTargetSelection(null);
-    return true;
-  };
   const openRuneActionMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
     if (!card.instanceId) {
       return;
@@ -734,9 +567,12 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   useEffect(() => {
     closeCardActionMenu();
-    setHoveredTargetCardInstanceId(null);
-    setPendingSubmittedTargetIds([]);
-  }, [closeCardActionMenu, projection.stateVersion]);
+    clearSubmittedTargetHighlights();
+  }, [
+    clearSubmittedTargetHighlights,
+    closeCardActionMenu,
+    projection.stateVersion,
+  ]);
 
   useEffect(() => {
     if (
@@ -764,7 +600,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             targetKind: "card",
           },
     );
-  }, [effectSelectionAction, playerDecision]);
+  }, [effectSelectionAction, playerDecision, setTargetSelection]);
 
   useEffect(() => {
     if (
@@ -774,7 +610,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     ) {
       setTargetSelection(null);
     }
-  }, [playerDecision, targetSelection]);
+  }, [playerDecision, setTargetSelection, targetSelection]);
 
   return (
     <main
@@ -1120,27 +956,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
-
-function actionIdsHaveSameIdentity(left: string, right: string) {
-  const leftParts = left.split(":");
-  const rightParts = right.split(":");
-  return (
-    leftParts.length >= 5 &&
-    rightParts.length >= 5 &&
-    leftParts.slice(2).join(":") === rightParts.slice(2).join(":")
-  );
-}
-
-function additionalPowerForTargets(
-  action: GameProjection["actions"][number] | undefined,
-  targetIds: readonly string[],
-) {
-  return (
-    action?.costPreview?.targetAdditionalPower
-      .filter((source) => targetIds.includes(source.targetId))
-      .reduce((total, source) => total + source.amount, 0) ?? 0
-  );
-}
 
 function runeActionMenuLabel(
   action: GameProjection["actions"][number],
