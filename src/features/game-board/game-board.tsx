@@ -44,6 +44,7 @@ import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
+import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
 import {
   combineTargetRequirements,
   moveSelectionTitle,
@@ -54,15 +55,7 @@ import {
   type CombinedTargetRequirement,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
-import { CardTile } from "./components/card-tile";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
-import {
-  boardLocationDropStatus,
-  isBoardDropLocationData,
-  legalDropLocationsForCard,
-  type BoardDropLocation,
-  type LocationDragData,
-} from "./drag-and-drop/location-drag-actions";
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -196,10 +189,20 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
-  const [activeLocationDrag, setActiveLocationDrag] =
-    useState<LocationDragData | null>(null);
-  const [hoveredLocationDrop, setHoveredLocationDrop] =
-    useState<BoardDropLocation | null>(null);
+  const {
+    activeLocationDrag,
+    activeLocationDragOverlay,
+    getLocationDropStatus,
+    handleLocationDragCancel,
+    handleLocationDragDataChange,
+    handleLocationDragEnd,
+    handleLocationDragOver,
+    isLocationDropEnabled,
+  } = useBoardLocationDragState({
+    actions: sourceProjection.actions,
+    cardStates: projection.cardStates,
+    cardsByInstanceId,
+  });
 
   const endTurnAction = sourceProjection.actions.find(
     (action) => action.label === "End turn",
@@ -256,49 +259,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
-  const activeLocationDragCard = activeLocationDrag
-    ? (buildCard(
-        activeLocationDrag.sourceCardInstanceId,
-        cardsByInstanceId,
-        projection.cardStates,
-      )[0] ?? null)
-    : null;
-
-  const activeLocationDragLegalDrops = activeLocationDrag
-    ? legalDropLocationsForCard({
-        actions: sourceProjection.actions,
-        sourceCardInstanceId: activeLocationDrag.sourceCardInstanceId,
-        sourceLocation: activeLocationDrag.sourceLocation,
-      })
-    : [];
-
-  const isLocationDropEnabled = Boolean(activeLocationDrag);
-
-  const getLocationDropStatus = (location: BoardDropLocation) =>
-    boardLocationDropStatus({
-      active: isLocationDropEnabled,
-      hoveredLocation: hoveredLocationDrop,
-      legalLocations: activeLocationDragLegalDrops,
-      location,
-    });
-
-  const activeLocationDragOverlay = activeLocationDragCard ? (
-    <div
-      className="inline-flex opacity-95 pointer-events-none"
-      style={{
-        filter:
-          "drop-shadow(0 0 1px rgba(103,232,249,0.95)) drop-shadow(0 0 8px rgba(103,232,249,0.75)) drop-shadow(0 0 22px rgba(103,232,249,0.35))",
-      }}
-    >
-      <CardTile
-        {...activeLocationDragCard}
-        enableHoverPreview={false}
-        enableZoneAnimation={false}
-        focusablePreview={false}
-      />
-    </div>
-  ) : null;
-
   const beginGlobalAction = (action: GameProjection["actions"][number]) => {
     const requirement = combineTargetRequirements(action, "card");
     if (!requirement) {
@@ -865,22 +825,10 @@ export const GameBoard: FC<GameBoardProps> = ({
         <LocationDragProvider
           activeDragData={activeLocationDrag}
           dragOverlay={activeLocationDragOverlay}
-          onActiveDragDataChange={(data) => {
-            setActiveLocationDrag(data);
-
-            if (!data) {
-              setHoveredLocationDrop(null);
-            }
-          }}
-          onDragCancel={() => setHoveredLocationDrop(null)}
-          onDragEnd={() => setHoveredLocationDrop(null)}
-          onDragOver={(event) => {
-            const overData = event.over?.data.current;
-
-            setHoveredLocationDrop(
-              isBoardDropLocationData(overData) ? overData.location : null,
-            );
-          }}
+          onActiveDragDataChange={handleLocationDragDataChange}
+          onDragCancel={handleLocationDragCancel}
+          onDragEnd={handleLocationDragEnd}
+          onDragOver={handleLocationDragOver}
         >
           <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
             <PlayerBoard
