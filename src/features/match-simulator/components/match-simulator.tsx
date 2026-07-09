@@ -2,18 +2,18 @@
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
+import type { DeckId } from "@/shared/game";
 import { useEffect, useRef, useState } from "react";
+import { ActionSubmissionGuard } from "../action-submission-guard";
 import {
   createMatchClient,
   loadDeckOptionsClient,
   loadProjectionClient,
   performActionClient,
 } from "../api";
-import type { DeckId } from "@/shared/game";
+import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { MatchResultDialog } from "./match-result-dialog";
-import { ActionSubmissionGuard } from "../action-submission-guard";
-import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 
 type OnlinePlayerCredentials = {
   matchId: string;
@@ -36,9 +36,10 @@ export function MatchSimulator({
   const [busy, setBusy] = useState(false);
   const actionSubmissionGuardRef = useRef(new ActionSubmissionGuard());
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
-  const [playerDecks, setPlayerDecks] = useState<
-    Record<SeatKey, DeckId>
-  >({ player1: "lux", player2: "lux" });
+  const [playerDecks, setPlayerDecks] = useState<Record<SeatKey, DeckId>>({
+    player1: "lux",
+    player2: "lux",
+  });
   const viewer = match?.players[viewerSeat];
   const projection = viewer && match?.projections[viewer.playerId];
   const currentMatchId = match?.matchId;
@@ -124,12 +125,7 @@ export function MatchSimulator({
     }, 1500);
 
     return () => window.clearInterval(interval);
-  }, [
-    currentMatchId,
-    onlineMatch,
-    viewerPlayerId,
-    viewerToken,
-  ]);
+  }, [currentMatchId, onlineMatch, viewerPlayerId, viewerToken]);
 
   async function createMatch() {
     setBusy(true);
@@ -213,10 +209,12 @@ export function MatchSimulator({
             Choose a deck for each player and start a Riftbound match.
           </p>
           <div className="gap-4 grid sm:grid-cols-2 mt-5">
-            {([
-              ["player1", "Player 1"],
-              ["player2", "Player 2"],
-            ] as const).map(([seat, label]) => (
+            {(
+              [
+                ["player1", "Player 1"],
+                ["player2", "Player 2"],
+              ] as const
+            ).map(([seat, label]) => (
               <label className="gap-2 grid text-sm" key={seat}>
                 <span className="text-slate-300">{label} deck</span>
                 <select
@@ -274,16 +272,15 @@ export function MatchSimulator({
       .find((player) => player.playerId === projection.viewerPlayerId)
       ?.zones.find((zone) => zone.kind === "hand")?.cards ?? [];
 
-  const startingPlayerOptions =
-    startingPlayerAction?.targets[0]?.legalIds.map((playerId) => ({
-      description:
-        playerId === viewer.playerId
-          ? "You take the first turn."
-          : "Your opponent takes the first turn.",
-      id: playerId,
-      label:
-        playerId === match.players.player1.playerId ? "Player 1" : "Player 2",
-    })) ?? [];
+  const startingPlayerOptions = projection.players.map((player) => {
+    return {
+      description: player.isViewer
+        ? "You take the first turn."
+        : "Your opponent takes the first turn.",
+      id: player.playerId,
+      label: player.displayName,
+    };
+  });
 
   const mulliganOptions = handCards.map((card) => ({
     id: card.instanceId,
@@ -433,22 +430,24 @@ export function MatchSimulator({
 function createOnlineAcceptedMatch(
   credentials: OnlinePlayerCredentials,
 ): AcceptedMatch {
-  const player1 = credentials.player.seat === "player-1"
-    ? credentials.player
-    : {
-        playerId: "player-1",
-        seat: "player-1" as const,
-        deckId: credentials.player.deckId,
-        playerToken: "",
-      };
-  const player2 = credentials.player.seat === "player-2"
-    ? credentials.player
-    : {
-        playerId: "player-2",
-        seat: "player-2" as const,
-        deckId: credentials.player.deckId,
-        playerToken: "",
-      };
+  const player1 =
+    credentials.player.seat === "player-1"
+      ? credentials.player
+      : {
+          playerId: "player-1",
+          seat: "player-1" as const,
+          deckId: credentials.player.deckId,
+          playerToken: "",
+        };
+  const player2 =
+    credentials.player.seat === "player-2"
+      ? credentials.player
+      : {
+          playerId: "player-2",
+          seat: "player-2" as const,
+          deckId: credentials.player.deckId,
+          playerToken: "",
+        };
 
   return {
     accepted: true,
