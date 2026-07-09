@@ -1,27 +1,11 @@
 "use client";
 
-import {
-  DomainIcon,
-  EnergyResource,
-  formatDomain,
-} from "@/features/card-presentation";
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { GameProjection } from "@/shared/game";
 import { LayoutGroup } from "motion/react";
-import {
-  FC,
-  MouseEvent,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
-import {
-  adaptProjectionToBoard,
-  type BoardPlayerProjection,
-} from "./board-view-model";
+import { adaptProjectionToBoard } from "./board-view-model";
 import { buildCard, createBoardModel } from "./board-model";
 import { areSetsEqual, createAnimationData } from "./board-animation-model";
 import { ActionRail } from "./components/action-rail";
@@ -47,10 +31,13 @@ import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
 import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
 import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import {
+  useGameBoardActions,
+  type GameBoardUnitPlayChoice,
+} from "./interactions/use-game-board-actions";
+import {
   combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
-  simultaneousMoveAction,
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
@@ -67,9 +54,6 @@ type GameBoardProps = {
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
 };
-
-type PaymentMode =
-  BoardPlayerProjection["availablePaymentModes"][string][number];
 
 export const GameBoard: FC<GameBoardProps> = ({
   isSubmittingAction = false,
@@ -99,43 +83,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [onPerformAction],
   );
-  const sourceActions = useCallback(
-    (sourceCardInstanceId: string) =>
-      sourceProjection.actions.filter(
-        (action) => action.sourceCardInstanceId === sourceCardInstanceId,
-      ),
-    [sourceProjection.actions],
-  );
-  const onEndTurn = () =>
-    submitProjectedAction(
-      sourceProjection.actions.find((action) => action.label === "End turn")
-        ?.id,
-    );
-  const onPass = () =>
-    submitProjectedAction(
-      sourceProjection.actions.find(
-        (action) =>
-          action.label === "Pass priority" || action.label === "Pass focus",
-      )?.id,
-    );
-  const onPlayCard = useCallback(
-    (input: {
-      cardInstanceId: string;
-      choices?: { targetCardInstanceIds?: string[] };
-      selectedModeId?: string;
-    }) => {
-      const action = input.selectedModeId
-        ? sourceProjection.actions.find(
-            (candidate) => candidate.id === input.selectedModeId,
-          )
-        : sourceActions(input.cardInstanceId)[0];
-      submitProjectedAction(
-        action?.id,
-        input.choices?.targetCardInstanceIds ?? [],
-      );
-    },
-    [sourceActions, sourceProjection.actions, submitProjectedAction],
-  );
   const [openZone, setOpenZone] =
     useState<Exclude<TemporaryZone, "chain">>(null);
   const {
@@ -164,10 +111,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   >(new Set());
   const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
     useState<CardZoneAnimationSnapshot | null>(null);
-  const [unitPlayChoice, setUnitPlayChoice] = useState<{
-    card: Card;
-    modes: PaymentMode[];
-  } | null>(null);
+  const [unitPlayChoice, setUnitPlayChoice] =
+    useState<GameBoardUnitPlayChoice>(null);
   const [highlightedCardInstanceIds, setHighlightedCardInstanceIds] = useState<
     Set<string>
   >(new Set());
@@ -205,27 +150,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     cardsByInstanceId,
   });
 
-  const endTurnAction = sourceProjection.actions.find(
-    (action) => action.label === "End turn",
-  );
-  const passFocusAction = sourceProjection.actions.find(
-    (action) => action.label === "Pass focus",
-  );
-  const concedeAction = sourceProjection.actions.find(
-    (action) => action.id.split(":")[3] === "concede",
-  );
-
-  const onConcede = useCallback(async () => {
-    await submitProjectedAction(concedeAction?.id);
-  }, [concedeAction?.id, submitProjectedAction]);
-  const canViewerEndTurn = Boolean(endTurnAction || passFocusAction);
-  const passTurnLabel = isChainLockedOpen
-    ? "Resolve chain first"
-    : passFocusAction
-      ? "Pass Focus"
-      : canViewerEndTurn
-        ? "Pass Turn"
-        : "Waiting for turn";
   const showdownPrompt = showdownPromptState(sourceProjection);
   const showdownBattlefieldName = showdownPrompt
     ? (sourceProjection.battlefields.find(
@@ -233,15 +157,6 @@ export const GameBoard: FC<GameBoardProps> = ({
           battlefield.battlefieldId === showdownPrompt.battlefieldId,
       )?.card.name ?? "Battlefield")
     : null;
-  const globalActions = sourceProjection.actions.filter(
-    (action) =>
-      action.sourceCardInstanceId === null &&
-      action.presentation.surface === "action-rail" &&
-      action.id.split(":")[3] !== "moveMany" &&
-      action.id.split(":")[3] !== "concede" &&
-      !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
-      action.choice?.kind !== "combatDamage",
-  );
   const effectSelectionAction = sourceProjection.actions.find(
     (action) => action.choice?.kind === "effectSelection",
   );
@@ -260,29 +175,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
-  const beginGlobalAction = (action: GameProjection["actions"][number]) => {
-    const requirement = combineTargetRequirements(action, "card");
-    if (!requirement) {
-      submitProjectedAction(action.id);
-      return;
-    }
-    const kind = action.id.split(":")[3];
-    setTargetSelection({
-      actionId: action.id,
-      legalTargetIds: requirement.legalIds,
-      maxTargets: requirement.maximum,
-      minTargets: requirement.minimum,
-      purpose:
-        kind === "moveMany"
-          ? "move"
-          : action.choice?.kind === "effectSelection"
-            ? "choice"
-            : "play",
-      requirement,
-      selectedTargetIds: [],
-      targetKind: "card",
-    });
-  };
   const chainControllerDetails = (controllerPlayerId: string) => {
     if (controllerPlayerId === board.player.playerId) {
       return {
@@ -359,205 +251,36 @@ export const GameBoard: FC<GameBoardProps> = ({
       }),
     );
   }, [animationData, projection.stateVersion]);
-  const submitPlayCard = useCallback(
-    (input: {
-      canPlay: boolean;
-      cardInstanceId: string;
-      choices?: {
-        targetCardInstanceIds?: string[];
-      };
-      selectedModeId?: string;
-    }) => {
-      if (input.canPlay) {
-        capturePendingAnimationSnapshot();
-      }
-
-      onPlayCard?.(input);
-    },
-    [capturePendingAnimationSnapshot, onPlayCard],
-  );
-  const submitRuneAction = (actionId: string) => {
-    capturePendingAnimationSnapshot();
-    submitProjectedAction(actionId);
-  };
-
-  const handlePlayCardFromHand = (card: Card) => {
-    closeCardActionMenu();
-
-    if (!card.instanceId || !onPlayCard || !viewerState) {
-      return;
-    }
-
-    const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
-    const enabledModes = modes.filter((candidate) => candidate.enabled);
-
-    if (enabledModes.length > 1) {
-      setUnitPlayChoice({ card, modes: enabledModes });
-      return;
-    }
-
-    const mode = enabledModes[0];
-
-    submitPlayCard({
-      canPlay: Boolean(mode),
-      cardInstanceId: card.instanceId,
-      selectedModeId: mode?.id,
-    });
-  };
-  const openPlayableCardMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
-    if (!card.instanceId || !viewerState) {
-      return;
-    }
-
-    const modes = (
-      viewerState.availablePaymentModes[card.instanceId] ?? []
-    ).filter((mode) => mode.enabled);
-
-    openCardActionMenu(
-      event,
-      modes.length > 0
-        ? modes.map((mode) => ({
-            boardLocation: mode.boardLocation,
-            id: mode.id,
-            label: mode.label,
-            onSelect: () => beginPlayOrTargetSelection(card, mode.id),
-          }))
-        : [
-            {
-              disabled: true,
-              id: `${card.instanceId}:not-playable`,
-              label: "Not playable",
-            },
-          ],
-    );
-  };
-  const beginPlayOrTargetSelection = (card: Card, selectedModeId?: string) => {
-    if (!card.instanceId || !viewerState) {
-      return;
-    }
-
-    const projectedAction = selectedModeId
-      ? sourceProjection.actions.find((action) => action.id === selectedModeId)
-      : sourceActions(card.instanceId)[0];
-    if (!projectedAction) {
-      return;
-    }
-    const stagedMoveAction = simultaneousMoveAction(
-      sourceProjection.actions,
-      projectedAction,
-      card.instanceId,
-    );
-    const actionToSubmit = stagedMoveAction ?? projectedAction;
-    const targetKind = actionToSubmit.targets.some(
-      (target) => target.kind === "card",
-    )
-      ? "card"
-      : "battlefield";
-    const requirement = combineTargetRequirements(actionToSubmit, targetKind);
-
-    if (requirement && requirement.maximum > 0) {
-      setTargetSelection({
-        actionId: actionToSubmit.id,
-        legalTargetIds: requirement.legalIds,
-        maxTargets: requirement.maximum,
-        minTargets: requirement.minimum,
-        purpose: stagedMoveAction ? "move" : "play",
-        requirement,
-        selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
-        targetKind,
-      });
-      return;
-    }
-
-    if (requirement && requirement.maximum === 0) {
-      submitPlayCard({
-        canPlay: true,
-        cardInstanceId: card.instanceId,
-        choices: {
-          targetCardInstanceIds: [],
-        },
-        selectedModeId,
-      });
-      return;
-    }
-
-    submitPlayCard({
-      canPlay: true,
-      cardInstanceId: card.instanceId,
-      selectedModeId,
-    });
-  };
-  const handleCardContextFromHand = (
-    card: Card,
-    event: MouseEvent<HTMLElement>,
-  ) => {
-    openPlayableCardMenu(card, event);
-  };
-  const handleChampionCardAction = (
-    card: Card,
-    event?: MouseEvent<HTMLElement>,
-  ) => {
-    if (!event) {
-      return;
-    }
-
-    openPlayableCardMenu(card, event);
-  };
-  const handleBoardCardPrimaryAction = (
-    card: Card,
-    event?: MouseEvent<HTMLElement>,
-  ) => {
-    if (targetSelection) {
-      chooseBoardTarget(card.instanceId);
-      return;
-    }
-
-    if (!card.instanceId || !event) {
-      return;
-    }
-    const actions = sourceActions(card.instanceId);
-    if (actions.length === 0) return;
-    openCardActionMenu(
-      event,
-      actions.map((action) => ({
-        boardLocation: action.presentation.boardLocation,
-        disabled: !action.enabled,
-        id: action.id,
-        label: action.enabled
-          ? action.label
-          : `${action.label} (${action.disabledReason ?? "unavailable"})`,
-        onSelect: () => beginPlayOrTargetSelection(card, action.id),
-      })),
-    );
-  };
-  const openRuneActionMenu = (card: Card, event: MouseEvent<HTMLElement>) => {
-    if (!card.instanceId) {
-      return;
-    }
-
-    const actions = sourceActions(card.instanceId);
-    const powerDomain = actions
-      .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
-      .find((domain) => domain !== undefined);
-
-    openCardActionMenu(
-      event,
-      actions.map((action) => ({
-        accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
-        disabled: !action.enabled,
-        id: action.id,
-        label: runeActionMenuLabel(action, powerDomain),
-        onSelect: () => submitRuneAction(action.id),
-      })),
-    );
-  };
-  const handleRunePrimaryAction = (
-    card: Card,
-    event?: MouseEvent<HTMLElement>,
-  ) => {
-    if (event) openRuneActionMenu(card, event);
-  };
-  const handleRuneContextAction = openRuneActionMenu;
+  const {
+    beginGlobalAction,
+    beginPlayOrTargetSelection,
+    canViewerEndTurn,
+    concedeAction,
+    globalActions,
+    handleBoardCardPrimaryAction,
+    handleCardContextFromHand,
+    handleChampionCardAction,
+    handlePlayCardFromHand,
+    handleRuneContextAction,
+    handleRunePrimaryAction,
+    onConcede,
+    onEndTurn,
+    onPass,
+    passFocusAction,
+    passTurnLabel,
+  } = useGameBoardActions({
+    actions: sourceProjection.actions,
+    capturePendingAnimationSnapshot,
+    chooseBoardTarget,
+    closeCardActionMenu,
+    isChainLockedOpen,
+    openCardActionMenu,
+    setTargetSelection,
+    setUnitPlayChoice,
+    submitProjectedAction,
+    targetSelection,
+    viewerState,
+  });
 
   useEffect(() => {
     if (!isChainLockedOpen || !isChainOverlayOpen) {
@@ -956,56 +679,3 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
-
-function runeActionMenuLabel(
-  action: GameProjection["actions"][number],
-  powerDomain: string | undefined,
-): ReactNode {
-  let content: ReactNode = action.label;
-  if (action.label === "Add Energy") {
-    content = (
-      <span className="inline-flex items-center gap-1.5">
-        <span>Add</span>
-        <EnergyResource compact value={1} />
-      </span>
-    );
-  } else if (action.label.startsWith("Add Power [") && powerDomain) {
-    content = (
-      <span className="inline-flex items-center gap-1.5">
-        <span>Add</span>
-        <DomainIcon decorative domain={powerDomain} />
-      </span>
-    );
-  } else if (action.label === "Add Energy and Power" && powerDomain) {
-    content = (
-      <span className="inline-flex items-center gap-1.5">
-        <span>Add</span>
-        <EnergyResource compact value={1} />
-        <span>and</span>
-        <DomainIcon decorative domain={powerDomain} />
-      </span>
-    );
-  }
-
-  if (action.enabled) return content;
-
-  return (
-    <span className="inline-flex items-center gap-1">
-      {content}
-      <span>({action.disabledReason ?? "unavailable"})</span>
-    </span>
-  );
-}
-
-function runeActionAccessibleLabel(
-  action: GameProjection["actions"][number],
-  powerDomain: string | undefined,
-) {
-  const domain = powerDomain ? formatDomain(powerDomain) : "Power";
-  if (action.label === "Add Energy") return "Add 1 Energy";
-  if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;
-  if (action.label === "Add Energy and Power") {
-    return `Add 1 Energy and 1 ${domain} Power`;
-  }
-  return action.label;
-}
