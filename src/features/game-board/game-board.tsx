@@ -27,6 +27,12 @@ import {
 } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
+import {
+  CardActionMenu,
+  type BoardLocation,
+  type CardActionMenuItem,
+  type CardActionMenuState,
+} from "./components/card-action-menu";
 import { CardTile } from "./components/card-tile";
 import {
   CardZoneAnimationSnapshot,
@@ -75,22 +81,6 @@ type GameBoardProps = {
   scores?: Partial<Record<string, number>>;
 };
 
-type BoardLocation = NonNullable<
-  GameProjection["actions"][number]["presentation"]["boardLocation"]
->;
-type CardActionMenuItem = {
-  accessibleLabel?: string;
-  boardLocation?: BoardLocation | null;
-  disabled?: boolean;
-  id: string;
-  label: ReactNode;
-  onSelect?: () => void;
-};
-type CardActionMenuState = {
-  items: CardActionMenuItem[];
-  left: number;
-  top: number;
-} | null;
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
 
@@ -1273,62 +1263,6 @@ function additionalPowerForTargets(
     action?.costPreview?.targetAdditionalPower
       .filter((source) => targetIds.includes(source.targetId))
       .reduce((total, source) => total + source.amount, 0) ?? 0
-  );
-}
-
-function CardActionMenu({
-  items,
-  left,
-  onClose,
-  onItemHighlight,
-  onItemHighlightEnd,
-  top,
-}: {
-  items: CardActionMenuItem[];
-  left: number;
-  onClose: () => void;
-  onItemHighlight?: (item: CardActionMenuItem) => void;
-  onItemHighlightEnd?: () => void;
-  top: number;
-}) {
-  return (
-    <div
-      className="z-[2147483647] fixed bg-slate-950/95 shadow-[0_18px_45px_rgba(0,0,0,0.75)] p-1 border border-white/10 rounded-md ring-1 ring-cyan-300/20 min-w-44 overflow-hidden text-slate-100 text-sm"
-      onPointerDown={(event) => event.stopPropagation()}
-      style={{ left, top }}
-    >
-      {items.map((item) => (
-        <button
-          aria-label={item.accessibleLabel}
-          className="flex items-center enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full disabled:text-slate-500 text-xs text-left transition disabled:cursor-not-allowed"
-          disabled={item.disabled}
-          key={item.id}
-          onClick={() => {
-            onClose();
-            item.onSelect?.();
-          }}
-          onBlur={onItemHighlightEnd}
-          onFocus={() => {
-            if (!item.disabled) {
-              onItemHighlight?.(item);
-            }
-          }}
-          onPointerEnter={() => {
-            if (!item.disabled) {
-              onItemHighlight?.(item);
-            }
-          }}
-          onPointerLeave={(event) => {
-            if (document.activeElement !== event.currentTarget) {
-              onItemHighlightEnd?.();
-            }
-          }}
-          type="button"
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

@@ -260,7 +260,7 @@ export function TargetSelectionPrompt({
     <div
       className={cn(
         "z-2147483646 fixed w-[min(34rem,calc(100vw-2rem))] select-none",
-        position ? "left-0 top-0" : "bottom-24 left-1/2 -translate-x-1/2",
+        position ? "left-0 top-0" : "bottom-100 left-1/2 -translate-x-1/2",
       )}
       ref={panelRef}
       style={
