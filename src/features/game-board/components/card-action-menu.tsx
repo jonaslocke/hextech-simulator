@@ -2,6 +2,7 @@
 
 import { Button } from "@/shared/components/button";
 import type { GameProjection } from "@/shared/game";
+import { cn } from "@/shared/utils/cn";
 import type { ReactNode } from "react";
 
 export type BoardLocation = NonNullable<
@@ -40,14 +41,18 @@ export function CardActionMenu({
 }) {
   return (
     <div
-      className="z-[2147483647] fixed bg-slate-950/95 shadow-[0_18px_45px_rgba(0,0,0,0.75)] p-1 border border-white/10 rounded-md ring-1 ring-cyan-300/20 min-w-44 overflow-hidden text-slate-100 text-sm"
+      className={cn(
+        "fixed flex flex-col max-w-[35vw]",
+        "z-[2147483647] bg-slate-950/95 shadow-[0_18px_45px_rgba(0,0,0,0.75)] p-1 border border-white/10",
+        "rounded-md ring-1 ring-cyan-300/20  overflow-hidden text-slate-100 text-sm",
+      )}
       onPointerDown={(event) => event.stopPropagation()}
       style={{ left, top }}
     >
       {items.map((item) => (
         <Button
           aria-label={item.accessibleLabel}
-          className="justify-start enabled:hover:bg-cyan-300/15 px-3 py-2 rounded w-full h-auto font-normal disabled:text-slate-500 text-xs text-left whitespace-normal transition disabled:cursor-not-allowed"
+          className="justify-start enabled:hover:bg-cyan-300/15 px-3 py-2 rounded min-w-0 h-auto min-h-0 font-normal disabled:text-slate-500 text-xs text-left whitespace-normal transition disabled:cursor-not-allowed"
           disabled={item.disabled}
           key={item.id}
           onBlur={onItemHighlightEnd}
@@ -73,7 +78,7 @@ export function CardActionMenu({
           type="button"
           variant="ghost"
         >
-          {item.label}
+          <span className="flex-1 min-w-0 wrap-break-word">{item.label}</span>
         </Button>
       ))}
     </div>

@@ -27,12 +27,7 @@ import {
 } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
-import {
-  CardActionMenu,
-  type BoardLocation,
-  type CardActionMenuItem,
-  type CardActionMenuState,
-} from "./components/card-action-menu";
+import { CardActionMenu } from "./components/card-action-menu";
 import { CardTile } from "./components/card-tile";
 import {
   CardZoneAnimationSnapshot,
@@ -57,6 +52,7 @@ import {
   type LocationDragData,
 } from "./drag-and-drop/location-drag-actions";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
+import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import {
   chainOverlayOpen,
   combineTargetRequirements,
@@ -154,8 +150,14 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [openZone, setOpenZone] =
     useState<Exclude<TemporaryZone, "chain">>(null);
   const [isChainOverlayOpen, setIsChainOverlayOpen] = useState(false);
-  const [cardActionMenu, setCardActionMenu] =
-    useState<CardActionMenuState>(null);
+  const {
+    cardActionMenu,
+    clearCardActionMenuHighlight,
+    closeCardActionMenu,
+    hoveredBoardLocation,
+    openCardActionMenu,
+    setCardActionMenuHighlight,
+  } = useCardActionMenu();
   const [activeTransferCardIds, setActiveTransferCardIds] = useState<
     Set<string>
   >(new Set());
@@ -180,8 +182,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   >(new Set());
   const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
     useState<string | null>(null);
-  const [hoveredBoardLocation, setHoveredBoardLocation] =
-    useState<BoardLocation | null>(null);
   const [pendingSubmittedTargetIds, setPendingSubmittedTargetIds] = useState<
     string[]
   >([]);
@@ -476,37 +476,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   const submitRuneAction = (actionId: string) => {
     capturePendingAnimationSnapshot();
     submitProjectedAction(actionId);
-  };
-  const closeCardActionMenu = () => {
-    setCardActionMenu(null);
-    setHoveredBoardLocation(null);
-  };
-  const openCardActionMenu = (
-    event: MouseEvent<HTMLElement>,
-    items: CardActionMenuItem[],
-  ) => {
-    if (items.length === 0) {
-      closeCardActionMenu();
-      return;
-    }
-
-    setHoveredBoardLocation(null);
-
-    const menuWidth = 180;
-    const menuHeight = Math.max(44, items.length * 36 + 12);
-    const gutter = 8;
-
-    setCardActionMenu({
-      items,
-      left: Math.min(
-        event.clientX,
-        Math.max(gutter, window.innerWidth - menuWidth - gutter),
-      ),
-      top: Math.min(
-        event.clientY,
-        Math.max(gutter, window.innerHeight - menuHeight - gutter),
-      ),
-    });
   };
 
   const handlePlayCardFromHand = (card: Card) => {
@@ -821,11 +790,10 @@ export const GameBoard: FC<GameBoardProps> = ({
   }, [isChainLockedOpen, isChainOverlayOpen]);
 
   useEffect(() => {
-    setCardActionMenu(null);
-    setHoveredBoardLocation(null);
+    closeCardActionMenu();
     setHoveredTargetCardInstanceId(null);
     setPendingSubmittedTargetIds([]);
-  }, [projection.stateVersion]);
+  }, [closeCardActionMenu, projection.stateVersion]);
 
   useEffect(() => {
     if (
@@ -864,27 +832,6 @@ export const GameBoard: FC<GameBoardProps> = ({
       setTargetSelection(null);
     }
   }, [playerDecision, targetSelection]);
-
-  useEffect(() => {
-    if (!cardActionMenu) {
-      return;
-    }
-
-    const close = () => closeCardActionMenu();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        close();
-      }
-    };
-
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [cardActionMenu]);
 
   return (
     <main
@@ -1233,10 +1180,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             items={cardActionMenu.items}
             left={cardActionMenu.left}
             onClose={closeCardActionMenu}
-            onItemHighlight={(item) =>
-              setHoveredBoardLocation(item.boardLocation ?? null)
-            }
-            onItemHighlightEnd={() => setHoveredBoardLocation(null)}
+            onItemHighlight={setCardActionMenuHighlight}
+            onItemHighlightEnd={clearCardActionMenuHighlight}
             top={cardActionMenu.top}
           />
         </>
