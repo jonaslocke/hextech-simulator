@@ -15,46 +15,36 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
-import { areSetsEqual, createAnimationData } from "./board-animation-model";
-import { buildCard, createBoardModel } from "./board-model";
 import {
   adaptProjectionToBoard,
   type BoardPlayerProjection,
 } from "./board-view-model";
+import { buildCard, createBoardModel } from "./board-model";
+import { areSetsEqual, createAnimationData } from "./board-animation-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
-import { CardActionMenu } from "./components/card-action-menu";
-import { CardTile } from "./components/card-tile";
 import {
   CardZoneAnimationSnapshot,
   CardZoneTransferOverlay,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
+import { CardActionMenu } from "./components/card-action-menu";
 import { ChainOverlay } from "./components/chain-overlay";
 import { PlayerBoard } from "./components/player-board";
-import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
+import { PlayerHandFan } from "./components/player-hand-fan";
 import { ScoreHeader } from "./components/score-header";
 import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
 import { PlayerDecisionHost } from "./decisions/player-decision-host";
 import { usePlayerDecisionRequest } from "./decisions/use-player-decision-request";
-import {
-  boardLocationDropStatus,
-  isBoardDropLocationData,
-  legalDropLocationsForCard,
-  type BoardDropLocation,
-  type LocationDragData,
-} from "./drag-and-drop/location-drag-actions";
-import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
+import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
 import {
-  chainOverlayOpen,
   combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
@@ -64,6 +54,15 @@ import {
   type CombinedTargetRequirement,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
+import { CardTile } from "./components/card-tile";
+import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
+import {
+  boardLocationDropStatus,
+  isBoardDropLocationData,
+  legalDropLocationsForCard,
+  type BoardDropLocation,
+  type LocationDragData,
+} from "./drag-and-drop/location-drag-actions";
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -149,7 +148,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   );
   const [openZone, setOpenZone] =
     useState<Exclude<TemporaryZone, "chain">>(null);
-  const [isChainOverlayOpen, setIsChainOverlayOpen] = useState(false);
   const {
     cardActionMenu,
     clearCardActionMenuHighlight,
@@ -158,6 +156,19 @@ export const GameBoard: FC<GameBoardProps> = ({
     openCardActionMenu,
     setCardActionMenuHighlight,
   } = useCardActionMenu();
+  const {
+    canViewerPassChain,
+    chainPassLabel,
+    isChainLockedOpen,
+    isChainOverlayOpen,
+    onPassPriority,
+    passPriorityAction,
+    setIsChainOverlayOpen,
+  } = useChainOverlayState({
+    actions: sourceProjection.actions,
+    projection,
+    submitProjectedAction,
+  });
   const [activeTransferCardIds, setActiveTransferCardIds] = useState<
     Set<string>
   >(new Set());
@@ -190,27 +201,6 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [hoveredLocationDrop, setHoveredLocationDrop] =
     useState<BoardDropLocation | null>(null);
 
-  const isChainLockedOpen = (projection.chain?.items.length ?? 0) > 0;
-  const wasChainLockedOpen = useRef(isChainLockedOpen);
-  const passPriorityAction = sourceProjection.actions.find(
-    (action) => action.label === "Pass priority",
-  );
-  const canViewerPassChain = isChainLockedOpen && Boolean(passPriorityAction);
-  const onPassPriority = useCallback(
-    () => submitProjectedAction(passPriorityAction?.id),
-    [passPriorityAction?.id, submitProjectedAction],
-  );
-  const chainPassWillResolve =
-    canViewerPassChain &&
-    projection.chain !== null &&
-    projection.chain.relevantPlayerIds.every(
-      (playerId) =>
-        playerId === projection.viewerPlayerId ||
-        projection.chain?.passedPlayerIds.includes(playerId),
-    );
-  const chainPassLabel = chainPassWillResolve
-    ? "Pass and Resolve"
-    : "Pass Priority";
   const endTurnAction = sourceProjection.actions.find(
     (action) => action.label === "End turn",
   );
@@ -775,13 +765,6 @@ export const GameBoard: FC<GameBoardProps> = ({
     if (event) openRuneActionMenu(card, event);
   };
   const handleRuneContextAction = openRuneActionMenu;
-
-  useEffect(() => {
-    setIsChainOverlayOpen((isOpen) =>
-      chainOverlayOpen(isOpen, wasChainLockedOpen.current, isChainLockedOpen),
-    );
-    wasChainLockedOpen.current = isChainLockedOpen;
-  }, [isChainLockedOpen]);
 
   useEffect(() => {
     if (!isChainLockedOpen || !isChainOverlayOpen) {
