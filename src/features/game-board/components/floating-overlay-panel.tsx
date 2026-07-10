@@ -9,9 +9,8 @@ import {
   useState,
 } from "react";
 import { GripVertical, X } from "lucide-react";
-import { Button } from "@/shared/components/button";
-import { Kbd } from "@/shared/components/kbd";
 import { cn } from "@/shared/utils/cn";
+import { GameActionButton } from "./game-action-button";
 
 type OverlayPosition = {
   x: number;
@@ -103,6 +102,7 @@ export function FloatingOverlayPanel({
         startX: currentPosition.x,
         startY: currentPosition.y,
       };
+
       setPosition(currentPosition);
       setIsDragging(true);
     },
@@ -211,30 +211,6 @@ export function FloatingOverlayPanel({
     };
   }, [isOpen]);
 
-  const canCloseWithShortcut = isOpen && !isCloseDisabled && enableCloseShortcut;
-
-  useEffect(() => {
-    if (!canCloseWithShortcut) {
-      return;
-    }
-
-    function handleWindowKeyDown(event: KeyboardEvent) {
-      if (shouldIgnoreCloseShortcut(event)) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    }
-
-    window.addEventListener("keydown", handleWindowKeyDown, true);
-
-    return () => {
-      window.removeEventListener("keydown", handleWindowKeyDown, true);
-    };
-  }, [canCloseWithShortcut, onClose]);
-
   if (!isOpen) {
     return null;
   }
@@ -277,53 +253,33 @@ export function FloatingOverlayPanel({
             <GripVertical className="size-4 text-slate-500 shrink-0" />
             <span className="truncate">{title}</span>
           </div>
+
           <div className="flex items-center gap-1 shrink-0">
-            {!isCloseDisabled && enableCloseShortcut && (
-              <Kbd className="hidden sm:inline-flex bg-white/10 shadow-none px-1.5 py-0.5 border-white/15 text-[10px] text-slate-300">
-                Esc
-              </Kbd>
-            )}
-            <Button
+            <GameActionButton
+              actionSlot="cancel"
               aria-label={closeLabel}
-              className="bg-white/10 hover:bg-white/20 disabled:opacity-40 p-0 border border-white/10 size-7 text-slate-100 disabled:cursor-not-allowed"
+              className={cn(
+                "px-1.5 min-w-0 h-7",
+                !enableCloseShortcut && "w-7 px-0",
+              )}
               disabled={isCloseDisabled}
-              onClick={onClose}
+              isActive={isOpen && enableCloseShortcut && !isCloseDisabled}
+              keyboardEnabled={enableCloseShortcut}
+              keybindClassName="hidden sm:inline-flex"
+              onAction={onClose}
               onPointerDown={(event) => event.stopPropagation()}
-              type="button"
+              showKeybind={enableCloseShortcut && !isCloseDisabled}
+              size="compact"
               variant="secondary"
             >
               <X className="size-4" />
-            </Button>
+            </GameActionButton>
           </div>
         </div>
+
         {children}
       </div>
     </div>
-  );
-}
-
-function shouldIgnoreCloseShortcut(event: KeyboardEvent) {
-  return (
-    event.defaultPrevented ||
-    event.repeat ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey ||
-    isEditableTarget(event.target) ||
-    event.key !== "Escape"
-  );
-}
-
-function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return Boolean(
-    target.closest(
-      'input, textarea, select, [contenteditable="true"], [role="textbox"]',
-    ),
   );
 }
 

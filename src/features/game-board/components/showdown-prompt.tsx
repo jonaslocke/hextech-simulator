@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import { Swords } from "lucide-react";
-import { Button } from "@/shared/components/button";
-import { Kbd } from "@/shared/components/kbd";
+import { GameActionButton } from "./game-action-button";
 import { cn } from "@/shared/utils/cn";
 
 export function ShowdownPrompt({
@@ -34,10 +32,10 @@ export function ShowdownPrompt({
   priorityPlayerId: string | null;
 }) {
   const showsPassFocus = hasFocus && Boolean(onPassFocus);
-  const canPassFocus = showsPassFocus && !isSubmitting;
   const promptTitle = isCombat ? "Combat showdown" : "Showdown";
   const passFocusLabel = getPassFocusLabel({ isCombat, isFinalFocusPass });
   const isResolvingPass = showsPassFocus && isFinalFocusPass;
+
   const statusMessage = getShowdownMessage({
     focusPlayerId,
     hasFocus,
@@ -49,39 +47,6 @@ export function ShowdownPrompt({
     defenderMight,
     priorityPlayerId,
   });
-
-  useEffect(() => {
-    if (!canPassFocus || !onPassFocus) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k") {
-        return;
-      }
-
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        isEditableShortcutTarget(event.target)
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      onPassFocus();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [canPassFocus, onPassFocus]);
 
   return (
     <section
@@ -125,9 +90,11 @@ export function ShowdownPrompt({
             >
               {promptTitle}
             </p>
+
             <h2 className="mt-0.5 font-semibold text-slate-50 text-base truncate leading-tight">
               {battlefieldName}
             </h2>
+
             <p className="mt-1 text-slate-300 text-sm leading-5">
               {statusMessage}
             </p>
@@ -136,26 +103,22 @@ export function ShowdownPrompt({
 
         {showsPassFocus && (
           <div className="flex justify-end items-center gap-2 pt-3 sm:pl-13 border-white/10 border-t">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-slate-400 text-xs">
-              <span>Press</span>
-              <Kbd variant="amber">K</Kbd>
-            </span>
-
-            <Button
+            <GameActionButton
+              actionSlot="secondary"
               className={cn(
-                "shadow-[0_0_18px_rgba(251,191,36,0.14)] border min-w-36 font-semibold",
-                isResolvingPass
-                  ? isCombat
+                "min-w-36",
+                isResolvingPass &&
+                  (isCombat
                     ? "border-amber-100/35 bg-amber-300/18 text-amber-50 hover:bg-amber-300/28"
-                    : "border-cyan-100/35 bg-cyan-300/14 text-cyan-50 hover:bg-cyan-300/24"
-                  : "border-amber-100/35 bg-amber-300 text-slate-950 hover:bg-amber-200",
+                    : "border-cyan-100/35 bg-cyan-300/14 text-cyan-50 hover:bg-cyan-300/24"),
               )}
-              disabled={isSubmitting}
-              onClick={onPassFocus}
-              type="button"
+              disabled={false}
+              isBusy={isSubmitting}
+              onAction={onPassFocus}
+              variant={isResolvingPass ? "secondary" : "default"}
             >
               {isSubmitting ? "Submitting…" : passFocusLabel}
-            </Button>
+            </GameActionButton>
           </div>
         )}
       </div>
@@ -249,22 +212,4 @@ function getCombatResolveMessage({
     attackerMight > defenderMight ? "Attackers lead" : "Defenders lead";
 
   return `Passing ends the combat showdown. ${leader} ${attackerMight}–${defenderMight} in Might.`;
-}
-
-function isEditableShortcutTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-
-  return (
-    target.isContentEditable ||
-    tagName === "input" ||
-    tagName === "textarea" ||
-    tagName === "select" ||
-    target.closest(
-      'input, textarea, select, [contenteditable="true"], [role="textbox"]',
-    ) !== null
-  );
 }

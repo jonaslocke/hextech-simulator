@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type CardSelectionPromptOption = {
   description?: string;
@@ -93,7 +94,8 @@ export function CardSelectionPrompt({
   );
 
   const enabledOptionIds = useMemo(
-    () => options.filter((option) => !option.disabled).map((option) => option.id),
+    () =>
+      options.filter((option) => !option.disabled).map((option) => option.id),
     [options],
   );
 
@@ -389,14 +391,19 @@ export function CardSelectionPrompt({
               selectionMode={selectionMode}
             />
             {onCancel && (
-              <Button onClick={cancelSelection} type="button" variant="secondary">
+              <GameActionButton
+                actionSlot="cancel"
+                onAction={cancelSelection}
+                variant="secondary"
+              >
                 {cancelLabel}
-              </Button>
+              </GameActionButton>
             )}
-            <Button
-              disabled={!canConfirm || isSubmitting}
-              onClick={() => confirmSelection(currentSelectedIds)}
-              type="button"
+            <GameActionButton
+              actionSlot="primary"
+              disabled={!canConfirm}
+              isBusy={isSubmitting}
+              onAction={() => confirmSelection(currentSelectedIds)}
             >
               {isSubmitting
                 ? "Submitting…"
@@ -405,7 +412,7 @@ export function CardSelectionPrompt({
                     selectedIds: currentSelectedIds,
                     selectionMode,
                   })}
-            </Button>
+            </GameActionButton>
           </footer>
         </section>
       </div>
@@ -531,7 +538,10 @@ function readStoredDecisionDraft(storageKey: string | null) {
   return null;
 }
 
-function writeStoredDecisionDraft(storageKey: string | null, selectedIds: string[]) {
+function writeStoredDecisionDraft(
+  storageKey: string | null,
+  selectedIds: string[],
+) {
   if (!storageKey) {
     return;
   }
@@ -606,7 +616,9 @@ function CardChoiceGrid({
           >
             <button
               aria-label={option.label}
-              aria-pressed={selectionMode === "ordered" ? undefined : isSelected}
+              aria-pressed={
+                selectionMode === "ordered" ? undefined : isSelected
+              }
               className={cx(
                 "group relative block w-full overflow-visible rounded-xl border bg-white/4.5 p-1.5 text-left shadow-lg shadow-black/30 outline-none ring-1 ring-white/[0.035] transition",
                 "supports-backdrop-filter:bg-white/[0.035] supports-backdrop-filter:backdrop-blur-sm",

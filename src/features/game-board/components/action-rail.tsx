@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/alert-dialog";
+import { Input } from "@/shared/components/input";
 import {
   AlertTriangle,
   Flag,
@@ -8,19 +16,10 @@ import {
   Layers3,
   SkipForward,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/shared/components/alert-dialog";
-import { Button } from "@/shared/components/button";
-import { Input } from "@/shared/components/input";
+import { useEffect, useState } from "react";
 import { TemporaryZone } from "../types";
 import { ActionButton } from "./action-button";
+import { GameActionButton } from "./game-action-button";
 
 export function ActionRail({
   concedeDisabled = false,
@@ -220,18 +219,26 @@ export function ActionRail({
             </div>
 
             <AlertDialogFooter className="sm:flex sm:justify-center gap-2 grid grid-cols-2">
-              <AlertDialogCancel className="bg-white/6 hover:bg-white/10 mt-0 border-white/10 text-slate-200 hover:text-white">
+              <GameActionButton
+                actionSlot="cancel"
+                className="min-w-24"
+                isActive={isConcedeDialogOpen}
+                onAction={() => handleConcedeDialogOpenChange(false)}
+                variant="secondary"
+              >
                 Cancel
-              </AlertDialogCancel>
+              </GameActionButton>
 
-              <Button
-                className="bg-red-400/15 hover:bg-red-400/25 disabled:opacity-40 shadow-lg shadow-red-950/30 border border-red-300/30 text-red-100 disabled:cursor-not-allowed"
+              <GameActionButton
+                actionSlot="primary"
+                className="bg-red-400/15 hover:bg-red-400/25 disabled:opacity-40 shadow-lg shadow-red-950/30 border-red-300/30 min-w-28 text-red-100"
                 disabled={!canConfirmConcede}
-                onClick={handleConfirmConcede}
-                type="button"
+                isActive={isConcedeDialogOpen}
+                onAction={handleConfirmConcede}
+                variant="destructive"
               >
                 Concede
-              </Button>
+              </GameActionButton>
             </AlertDialogFooter>
           </div>
         </AlertDialogContent>

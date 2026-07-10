@@ -8,6 +8,7 @@ import type { MouseEvent } from "react";
 import type { BoardCatalogCard } from "../board-view-model";
 import type { Card } from "../types";
 import { CardTile, type CardTileSize } from "./card-tile";
+import { GameActionButton } from "./game-action-button";
 
 type CombatDamageChoice = Extract<
   NonNullable<GameProjection["actions"][number]["choice"]>,
@@ -284,29 +285,34 @@ export function CombatDamageDialog({
           </div>
 
           <div className="flex justify-end items-center gap-2">
-            <Button
-              disabled={targets.length === 0 || choice.totalDamage <= 0}
-              onClick={autoAssignDamage}
-              type="button"
+            <GameActionButton
+              actionSlot="secondary"
+              disabled={
+                targets.length === 0 || choice.totalDamage <= 0 || isSubmitting
+              }
+              onAction={autoAssignDamage}
               variant="secondary"
             >
               Auto assign
-            </Button>
-            <Button
-              disabled={assigned === 0}
-              onClick={resetAssignments}
-              type="button"
+            </GameActionButton>
+
+            <GameActionButton
+              actionSlot="tertiary"
+              disabled={assigned === 0 || isSubmitting}
+              onAction={resetAssignments}
               variant="secondary"
             >
               Reset
-            </Button>
-            <Button
-              disabled={!canSubmit || isSubmitting}
-              onClick={() => onSubmit(allocations)}
-              type="button"
+            </GameActionButton>
+
+            <GameActionButton
+              actionSlot="primary"
+              disabled={!canSubmit}
+              isBusy={isSubmitting}
+              onAction={() => onSubmit(allocations)}
             >
               {isSubmitting ? "Submitting…" : "Resolve damage"}
-            </Button>
+            </GameActionButton>
           </div>
         </footer>
       </section>
@@ -388,7 +394,7 @@ function DamageMeter({
   const percentage = totalDamage > 0 ? (assigned / totalDamage) * 100 : 0;
 
   return (
-    <div className="bg-slate-950/32 shadow-black/35 shadow-inner p-2 border border-white/10 rounded-lg min-w-[11rem]">
+    <div className="bg-slate-950/32 shadow-black/35 shadow-inner p-2 border border-white/10 rounded-lg min-w-44">
       <div className="flex justify-between items-center gap-3 text-xs">
         <span className="text-slate-400">Assigned damage</span>
         <span className="font-mono font-semibold text-amber-100">

@@ -36,10 +36,10 @@ export type GameActionSlot =
   | "cancel";
 
 export const DEFAULT_GAME_ACTION_KEYBINDS = {
-  primary: "j",
-  secondary: "k",
-  tertiary: "l",
-  quaternary: "u",
+  primary: "q",
+  secondary: "w",
+  tertiary: "e",
+  quaternary: "r",
   cancel: "escape",
 } as const satisfies Record<GameActionSlot, string>;
 

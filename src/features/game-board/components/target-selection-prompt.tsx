@@ -1,5 +1,7 @@
 "use client";
 
+import { GameActionButton } from "@/features/game-board/components/game-action-button";
+import { cn } from "@/shared/utils/cn";
 import {
   PointerEvent as ReactPointerEvent,
   useCallback,
@@ -7,9 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "@/shared/components/button";
-import { Kbd } from "@/shared/components/kbd";
-import { cn } from "@/shared/utils/cn";
 
 type PanelPosition = {
   x: number;
@@ -227,37 +226,6 @@ export function TargetSelectionPrompt({
     };
   }, [clampPanelPosition, position]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) {
-        return;
-      }
-
-      if (isTypingTarget(event.target)) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-
-      if (key === "escape") {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-
-      if (key === "j" && canSubmit) {
-        event.preventDefault();
-        onSubmit();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [canSubmit, onCancel, onSubmit]);
-
   return (
     <div
       className={cn(
@@ -332,28 +300,23 @@ export function TargetSelectionPrompt({
           </div>
         )}
 
-        <div className="flex justify-between items-center gap-3 px-4 py-3">
-          <div className="flex items-center gap-2 text-slate-500 text-xs">
-            <ShortcutHint label="Cancel" value="Esc" />
-            <ShortcutHint
-              disabled={!canSubmit}
-              label={confirmLabel}
-              value="J"
-            />
-          </div>
+        <div className="flex justify-end items-center gap-2 px-4 py-3">
+          <GameActionButton
+            actionSlot="cancel"
+            onAction={onCancel}
+            variant="secondary"
+          >
+            {cancelLabel}
+          </GameActionButton>
 
-          <div className="flex items-center gap-2">
-            <Button onClick={onCancel} type="button" variant="secondary">
-              {cancelLabel}
-            </Button>
-            <Button
-              disabled={!canSubmit || isSubmitting}
-              onClick={onSubmit}
-              type="button"
-            >
-              {isSubmitting ? "Submitting…" : confirmLabel}
-            </Button>
-          </div>
+          <GameActionButton
+            actionSlot="primary"
+            disabled={!canSubmit}
+            isBusy={isSubmitting}
+            onAction={onSubmit}
+          >
+            {isSubmitting ? "Submitting…" : confirmLabel}
+          </GameActionButton>
         </div>
       </section>
     </div>
@@ -389,43 +352,6 @@ function TargetCountBadge({
     >
       {selectedCount}/{maxTargets}
     </div>
-  );
-}
-
-function ShortcutHint({
-  disabled = false,
-  label,
-  value,
-}: {
-  disabled?: boolean;
-  label: string;
-  value: string;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5",
-        disabled ? "opacity-40" : "opacity-100",
-      )}
-    >
-      <Kbd variant="amber">{value}</Kbd>
-      <span>{label}</span>
-    </span>
-  );
-}
-
-function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-
-  return (
-    tagName === "input" ||
-    tagName === "textarea" ||
-    tagName === "select" ||
-    target.isContentEditable
   );
 }
 

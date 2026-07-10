@@ -1,10 +1,10 @@
 "use client";
 
-import { Crown, RotateCcw, Sparkles, Trophy } from "lucide-react";
-import type { GameProjection } from "@/shared/game";
-import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
+import type { GameProjection } from "@/shared/game";
 import { cn } from "@/shared/utils/cn";
+import { Crown, RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { GameActionButton } from "../../game-board/components/game-action-button";
 
 export function MatchResultDialog({
   busy,
@@ -135,15 +135,18 @@ export function MatchResultDialog({
             Victory Score.
           </div>
 
-          <Button
-            className="relative bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 shadow-cyan-950/30 shadow-lg h-11 font-semibold text-slate-950"
-            disabled={busy}
-            onClick={onCreateMatch}
-            type="button"
+          <GameActionButton
+            actionSlot="primary"
+            className="relative bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 shadow-cyan-950/30 shadow-lg h-11 text-slate-950"
+            isBusy={busy}
+            keybindClassName="border-slate-950/20 bg-slate-950/10 text-slate-950/80"
+            onAction={onCreateMatch}
           >
-            <RotateCcw className="mr-2 w-4 h-4" />
-            {busy ? "Creating…" : "Create New Match"}
-          </Button>
+            <span className="inline-flex items-center gap-2">
+              <RotateCcw className="w-4 h-4" />
+              {busy ? "Creating…" : "Create New Match"}
+            </span>
+          </GameActionButton>
         </section>
       </div>
     </DialogPortal>

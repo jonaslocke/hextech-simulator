@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "@/shared/components/button";
 import { Checkbox } from "@/shared/components/checkbox";
 import { Kbd } from "@/shared/components/kbd";
 import {
@@ -23,6 +22,7 @@ import type { ChainCardEntry } from "../types";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
 import { FloatingOverlayPanel } from "./floating-overlay-panel";
+import { GameActionButton } from "./game-action-button";
 
 export function ChainOverlay({
   canPassPriority = false,
@@ -62,12 +62,6 @@ export function ChainOverlay({
 
   const chainItemKey = chainItemIds.join("|");
   const hasChainItems = chainItemIds.length > 0;
-  const canUsePassShortcut =
-    isOpen &&
-    hasChainItems &&
-    canPassPriority &&
-    !isSubmittingAction &&
-    Boolean(onPassPriority);
   const canTogglePassAll = isOpen && hasChainItems;
 
   useEffect(() => {
@@ -89,28 +83,6 @@ export function ChainOverlay({
     previousChainItemIdsRef.current = chainItemIds;
     wasOpenRef.current = isOpen;
   }, [chainItemIds, isOpen]);
-
-  useEffect(() => {
-    if (!canUsePassShortcut) {
-      return;
-    }
-
-    function handleWindowKeyDown(event: KeyboardEvent) {
-      if (shouldIgnoreKeyShortcut(event, "j")) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      void onPassPriority?.();
-    }
-
-    window.addEventListener("keydown", handleWindowKeyDown, true);
-
-    return () => {
-      window.removeEventListener("keydown", handleWindowKeyDown, true);
-    };
-  }, [canUsePassShortcut, onPassPriority]);
 
   useEffect(() => {
     if (!canTogglePassAll) {
@@ -226,6 +198,7 @@ export function ChainOverlay({
                       <Info className="w-3.5 h-3.5" />
                     </button>
                   </TooltipTrigger>
+
                   <TooltipContent
                     align="start"
                     className="z-100 bg-slate-950 shadow-xl px-3 py-2 border border-white/10 max-w-64 text-slate-100 text-xs leading-snug"
@@ -239,22 +212,17 @@ export function ChainOverlay({
                 </Tooltip>
               </label>
 
-              <Button
-                className="flex-1 justify-center gap-2 bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 px-3 min-w-0 h-9 font-semibold text-slate-950 text-xs disabled:cursor-not-allowed"
-                disabled={!canPassPriority || isSubmittingAction}
-                onClick={onPassPriority}
-                type="button"
+              <GameActionButton
+                actionSlot="primary"
+                className="flex-1 justify-center bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 text-slate-950"
+                disabled={!canPassPriority}
+                isActive={isOpen && hasChainItems}
+                isBusy={isSubmittingAction}
+                keybindClassName="border-slate-950/20 bg-slate-950/10 text-slate-950/80"
+                onAction={onPassPriority}
               >
-                <span className="text-xs whitespace-nowrap">
-                  {passButtonLabel}
-                </span>
-
-                {canUsePassShortcut && (
-                  <Kbd className="bg-slate-950/10 shadow-none px-1.5 py-0.5 border-slate-950/20 text-[10px] text-slate-950/80">
-                    J
-                  </Kbd>
-                )}
-              </Button>
+                {passButtonLabel}
+              </GameActionButton>
             </div>
           )}
         </div>
@@ -313,6 +281,7 @@ function ChainCards({
             showMight={false}
             {...entry.card}
           />
+
           <div className="min-w-0 text-slate-300 text-xs">
             <div
               className={cn(
@@ -324,9 +293,11 @@ function ChainCards({
             >
               {entry.controllerName}
             </div>
+
             <div className="font-semibold text-slate-100">
               {entry.card.name}
             </div>
+
             <div className="text-[11px] text-slate-500">
               {index === 0 ? "Resolves next" : `Resolves ${index + 1}`}
             </div>
