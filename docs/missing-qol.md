@@ -9,8 +9,8 @@
 [x] Choose Starting Player glass like. ![alt text](image-36.png)
 [x] choose mulligan make it glass like and remove layout shift. ![![alt text](image-39.png)](image-38.png)
 [ ] tuck hand on player decision making
-[ ] show zones on player decision making
-[ ] choose battlefield cancel missing gameaction button, firestorm, the code is in ChoiceDialog, with this consumer call:
+[x] show zones on player decision making
+[x] choose battlefield cancel missing gameaction button, firestorm, the code is in ChoiceDialog, with this consumer call:
         <ChoiceDialog
           confirmLabel="Choose battlefield"
           description="Choose the battlefield affected by this action."
@@ -41,5 +41,7 @@
         />
 
  ![alt text](image.png)
-[ ] change autopass keybind to R
-[ ] decision handling needs to be added to choose a battlefield prompt.  ![alt text](image.png)
+[x] change autopass keybind to R
+[x] decision handling needs to be added to choose a battlefield prompt.  ![alt text](image.png)
+[ ] plan for bo3
+[ ] end of a match should close socket connection
