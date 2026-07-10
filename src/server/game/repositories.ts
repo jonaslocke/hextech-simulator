@@ -31,11 +31,18 @@ export type DocumentRepository<T extends BaseDocument> = {
   upsert(document: T): Promise<void>;
 };
 
+export type GameDocumentRepository = DocumentRepository<GameDocument> & {
+  upsertIfStateVersion(
+    document: GameDocument,
+    expectedStateVersion: number,
+  ): Promise<boolean>;
+};
+
 type Stored<T extends { id: string }> = T & { _id: string };
 
 export type GameRepositories = {
   matches: DocumentRepository<MatchDocument>;
-  games: DocumentRepository<GameDocument>;
+  games: GameDocumentRepository;
   gameEvents: DocumentRepository<GameEventDocument> & {
     findByGameId(gameId: string): Promise<GameEventDocument[]>;
   };
@@ -49,7 +56,20 @@ export function createGameRepositories(db: Db): GameRepositories {
   const deckSnapshots = db.collection<Stored<DeckSnapshotDocument>>(gameCollectionNames.deckSnapshots);
   return {
     matches: createRepository(matches),
-    games: createRepository(games),
+    games: {
+      ...createRepository(games),
+      async upsertIfStateVersion(document, expectedStateVersion) {
+        const result = await games.updateOne(
+          {
+            _id: document.id,
+            stateVersion: expectedStateVersion,
+          } as Filter<Stored<GameDocument>>,
+          { $set: toStored(document) },
+        );
+
+        return result.modifiedCount === 1;
+      },
+    },
     gameEvents: {
       ...createRepository(events),
       async findByGameId(gameId) {

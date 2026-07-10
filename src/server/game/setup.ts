@@ -68,6 +68,19 @@ export function performSetupAction(input: {
   return game;
 }
 
+export function isSetupActionId(actionId: string): boolean {
+  return parseSetupActionId(actionId) !== null;
+}
+
+export function rebaseSetupActionId(
+  game: GameDocument,
+  actionId: string,
+): string {
+  const parsed = parseSetupActionId(actionId);
+  if (!parsed) return actionId;
+  return setupActionId(game, parsed.kind, parsed.suffix);
+}
+
 function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckRuntimeSnapshot>) {
   for (const playerId of game.state.setup.playerIds) {
     const deck = decks[playerId]!;
@@ -103,7 +116,23 @@ function deterministicShuffle(values: string[], seed: string): string[] {
   return [...values].sort((left, right) => score(left).localeCompare(score(right)));
 }
 function actionId(game: GameDocument, kind: string, suffix?: string) {
+  return setupActionId(game, kind, suffix);
+}
+function setupActionId(game: GameDocument, kind: string, suffix?: string) {
   return ["game", game.stateVersion, "setup", kind, suffix].filter((value) => value !== undefined).join(":");
+}
+function parseSetupActionId(
+  actionId: string,
+): { kind: string; suffix?: string } | null {
+  const parts = actionId.split(":");
+  if (parts[0] !== "game" || parts[2] !== "setup" || !parts[3]) {
+    return null;
+  }
+
+  return {
+    kind: parts[3],
+    suffix: parts.length > 4 ? parts.slice(4).join(":") : undefined,
+  };
 }
 function validateTargets(action: ProjectedAction, selected: string[]) {
   const requirement = action.targets[0];

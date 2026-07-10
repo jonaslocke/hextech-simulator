@@ -3,7 +3,12 @@ import type { GameProjection } from "../../shared/game";
 import type { DeckId } from "@/shared/game";
 import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
-import { performSetupAction, setupActions } from "./setup";
+import {
+  isSetupActionId,
+  performSetupAction,
+  rebaseSetupActionId,
+  setupActions,
+} from "./setup";
 import { gameplayActions, performGameplayTransition } from "./actions";
 import type { TokenPlacement } from "./effect-resolution";
 import { projectGame } from "./projection";
@@ -175,90 +180,112 @@ export async function performMatchAction(
     now?: string;
   },
 ) {
-  const { match, game, seat, decks } = await loadContext(
-    repositories,
-    input.matchId,
-    input.playerToken,
-  );
-  if (game.stateVersion !== input.stateVersion)
-    throw new Error("Game state version is stale.");
-  const deckRuntime = Object.fromEntries(
-    decks.map((deck) => [
-      deck.playerId,
-      { template: deck.snapshot, instances: deck.instances },
-    ]),
-  );
   const now = input.now ?? new Date().toISOString();
-  const acceptedAction = (
-    game.status === "setup_pending"
-      ? setupActions(game, seat.playerId)
-      : gameplayActions(game, seat.playerId, decks)
-  ).find((action) => action.id === input.actionId);
-  const transition =
-    game.status === "setup_pending"
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { match, game, seat, decks } = await loadContext(
+      repositories,
+      input.matchId,
+      input.playerToken,
+    );
+    const isSetupPending = game.status === "setup_pending";
+    const isSetupAction = isSetupPending && isSetupActionId(input.actionId);
+
+    if (game.stateVersion !== input.stateVersion && !isSetupAction) {
+      throw new Error("Game state version is stale.");
+    }
+
+    const actionId = isSetupPending
+      ? rebaseSetupActionId(game, input.actionId)
+      : input.actionId;
+    const deckRuntime = Object.fromEntries(
+      decks.map((deck) => [
+        deck.playerId,
+        { template: deck.snapshot, instances: deck.instances },
+      ]),
+    );
+    const acceptedAction = (
+      isSetupPending
+        ? setupActions(game, seat.playerId)
+        : gameplayActions(game, seat.playerId, decks)
+    ).find((action) => action.id === actionId);
+    const transition = isSetupPending
       ? null
       : performGameplayTransition({
           game,
           actorPlayerId: seat.playerId,
-          actionId: input.actionId,
+          actionId,
           selectedIds: input.selectedIds,
           allocations: input.allocations,
           tokenPlacements: input.tokenPlacements,
           decks,
           now,
         });
-  const next = transition
-    ? transition.game
-    : performSetupAction({
-        game,
+    const next = transition
+      ? transition.game
+      : performSetupAction({
+          game,
+          actorPlayerId: seat.playerId,
+          actionId,
+          selectedIds: input.selectedIds,
+          decksByPlayerId: deckRuntime,
+          now,
+        });
+    const saved = await repositories.games.upsertIfStateVersion(
+      next,
+      game.stateVersion,
+    );
+
+    if (!saved) {
+      if (isSetupAction) continue;
+      throw new Error("Game state version is stale.");
+    }
+
+    const nextMatch =
+      next.status === "complete"
+        ? { ...match, status: "complete" as const, updatedAt: now }
+        : next.status === "in_progress"
+          ? { ...match, status: "in_progress" as const, updatedAt: now }
+          : match;
+    const transitionEvents = transition?.events ?? [
+      {
+        type: `game.action.${actionId.split(":")[3] ?? "accepted"}`,
         actorPlayerId: seat.playerId,
-        actionId: input.actionId,
-        selectedIds: input.selectedIds,
-        decksByPlayerId: deckRuntime,
-        now,
-      });
-  const nextMatch =
-    next.status === "complete"
-      ? { ...match, status: "complete" as const, updatedAt: now }
-      : next.status === "in_progress"
-        ? { ...match, status: "in_progress" as const, updatedAt: now }
-        : match;
-  const transitionEvents = transition?.events ?? [
-    {
-      type: `game.action.${input.actionId.split(":")[3] ?? "accepted"}`,
-      actorPlayerId: seat.playerId,
-      message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`,
-      payload: { actionId: input.actionId },
-    },
-  ];
-  await Promise.all([
-    repositories.games.upsert(next),
-    repositories.matches.upsert(nextMatch),
-    ...transitionEvents.map((event, eventIndex) =>
-      repositories.gameEvents.insert({
-        id: `${next.id}:event:${next.stateVersion}:${eventIndex}`,
-        createdAt: now,
-        updatedAt: now,
-        matchId: match.id,
-        gameId: next.id,
-        sequence: next.stateVersion * 100 + eventIndex,
-        actionVersion: next.stateVersion,
-        eventIndex,
-        actorPlayerId: event.actorPlayerId,
-        type: event.type,
-        message: event.message,
-        payload: event.payload,
-      }),
-    ),
-  ]);
-  const events = await repositories.gameEvents.findByGameId(next.id);
-  return projectGame({
-    game: next,
-    viewerPlayerId: seat.playerId,
-    decks,
-    events,
-    playerNames: playerNamesFromMatch(nextMatch),
-  });
+        message: `${seat.playerId}: ${acceptedAction?.label ?? "Action accepted"}`,
+        payload: { actionId },
+      },
+    ];
+
+    await Promise.all([
+      repositories.matches.upsert(nextMatch),
+      ...transitionEvents.map((event, eventIndex) =>
+        repositories.gameEvents.insert({
+          id: `${next.id}:event:${next.stateVersion}:${eventIndex}`,
+          createdAt: now,
+          updatedAt: now,
+          matchId: match.id,
+          gameId: next.id,
+          sequence: next.stateVersion * 100 + eventIndex,
+          actionVersion: next.stateVersion,
+          eventIndex,
+          actorPlayerId: event.actorPlayerId,
+          type: event.type,
+          message: event.message,
+          payload: event.payload,
+        }),
+      ),
+    ]);
+    const events = await repositories.gameEvents.findByGameId(next.id);
+    return projectGame({
+      game: next,
+      viewerPlayerId: seat.playerId,
+      decks,
+      events,
+      playerNames: playerNamesFromMatch(nextMatch),
+    });
+  }
+
+  throw new Error("Game state version is stale.");
 }
 
 async function loadContext(
