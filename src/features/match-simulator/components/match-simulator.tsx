@@ -16,6 +16,7 @@ import {
 import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { BetweenGamesScreen } from "./between-games-screen";
+import { GameResultDialog } from "./game-result-dialog";
 import { MatchResultDialog } from "./match-result-dialog";
 import { MatchScoreBar } from "./match-score-bar";
 
@@ -44,6 +45,9 @@ export function MatchSimulator({
   const [viewerSeat, setViewerSeat] = useState<SeatKey>(onlineSeat);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [acknowledgedGameResultKeys, setAcknowledgedGameResultKeys] = useState(
+    () => new Set<string>(),
+  );
   const actionSubmissionGuardRef = useRef(new ActionSubmissionGuard());
   const inFlightGameIntentRef = useRef<InFlightGameIntent | null>(null);
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
@@ -155,6 +159,7 @@ export function MatchSimulator({
       } else {
         setMatch(result);
         setViewerSeat("player1");
+        setAcknowledgedGameResultKeys(new Set());
       }
     } catch {
       setError("Unable to create the match.");
@@ -294,6 +299,15 @@ export function MatchSimulator({
     }
   }
 
+  function acknowledgeGameResult(key: string) {
+    setAcknowledgedGameResultKeys((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
+
   if (!match || !projection || !gameProjection) {
     return (
       <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
@@ -353,6 +367,48 @@ export function MatchSimulator({
   }
 
   if (projection.status === "between_games") {
+    const gameResultKey = projection.betweenGames
+      ? `${projection.viewerPlayerId}:${projection.betweenGames.id}`
+      : null;
+    const showGameResult =
+      gameResultKey !== null && !acknowledgedGameResultKeys.has(gameResultKey);
+
+    if (showGameResult) {
+      return (
+        <main className="relative bg-slate-950 min-h-screen tabletop-background">
+          <ViewerControls
+            busy={busy}
+            gameNumber={projection.gameNumber}
+            gameState={projection.currentGame.stateVersion}
+            matchId={match.matchId}
+            matchState={projection.stateVersion}
+            onlineMatch={Boolean(onlineMatch)}
+            onSeatChange={setViewerSeat}
+            viewerSeat={viewerSeat}
+          />
+
+          <MatchScoreBar projection={projection} />
+
+          {error && (
+            <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+              {error}
+            </div>
+          )}
+
+          <GameBoard
+            isSubmittingAction={busy}
+            onPerformAction={performAction}
+            projection={gameProjection}
+          />
+          <GameResultDialog
+            busy={busy}
+            onContinue={() => acknowledgeGameResult(gameResultKey)}
+            projection={projection}
+          />
+        </main>
+      );
+    }
+
     return (
       <>
         <ViewerControls
