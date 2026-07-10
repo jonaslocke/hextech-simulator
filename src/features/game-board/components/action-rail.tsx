@@ -32,29 +32,9 @@ export function ActionRail({
   setOpenZone: (zone: OpenableActionRailZone | null) => void;
 }) {
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
-  const [concedeConfirmationText, setConcedeConfirmationText] = useState("");
 
   const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled;
   const canConcede = Boolean(onConcede) && !concedeDisabled;
-  const canConfirmConcede = concedeConfirmationText === "concede";
-
-  const handleConcedeDialogOpenChange = (isOpen: boolean) => {
-    setIsConcedeDialogOpen(isOpen);
-
-    if (!isOpen) {
-      setConcedeConfirmationText("");
-    }
-  };
-
-  const handleConfirmConcede = async () => {
-    if (!canConfirmConcede || !onConcede) {
-      return;
-    }
-
-    setIsConcedeDialogOpen(false);
-    setConcedeConfirmationText("");
-    await onConcede();
-  };
 
   return (
     <>

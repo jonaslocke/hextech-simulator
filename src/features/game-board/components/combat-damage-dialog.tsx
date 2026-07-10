@@ -1,10 +1,9 @@
 "use client";
 
 import type { GameProjection } from "@/shared/game";
-import { Button } from "@/shared/components/button";
 import { cn } from "@/shared/utils/cn";
-import { useMemo, useState } from "react";
 import type { MouseEvent } from "react";
+import { useMemo, useState } from "react";
 import type { BoardCatalogCard } from "../board-view-model";
 import type { Card } from "../types";
 import { CardTile, type CardTileSize } from "./card-tile";
