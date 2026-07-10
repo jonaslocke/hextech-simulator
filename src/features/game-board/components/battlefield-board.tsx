@@ -1,5 +1,6 @@
 "use client";
 
+import { CardRulesText } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Info } from "lucide-react";
@@ -455,9 +456,9 @@ export const BattlefieldBoard: FC<Props> = ({
 
       <div className="relative h-8.5 overflow-visible">
         <div className={battlefieldDescriptionBar()}>
-          <p className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] line-clamp-2 leading-snug">
-            {description}
-          </p>
+          <div className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] line-clamp-2 leading-snug">
+            <CardRulesText text={description} />
+          </div>
         </div>
       </div>
     </motion.div>

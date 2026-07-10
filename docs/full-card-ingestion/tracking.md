@@ -2,18 +2,17 @@
 
 Snapshot: 2026-07-10
 
-This file is the active M0 tracking baseline for the full-card ingestion program.
-It follows `docs/full-card-ingestion/plan.md` and keeps M0 documentation-only:
-no runtime APIs, schemas, selectors, catalog data, or database records are
-changed in this milestone.
+This file is the active tracking baseline for the full-card ingestion program.
+It follows `docs/full-card-ingestion/plan.md` and records the current milestone
+gate without treating implementation checks as final user acceptance.
 
 ## Milestone Status Ledger
 
 | Milestone | Scope | Status | Current blocker | Next action | User acceptance |
 |---|---|---|---|---|---|
 | M0 | Operating model and tracking baseline | Accepted | None | Open M1 | Accepted |
-| M1 | Garen Proving Grounds deck | Behavior modeling | None | Publish exact Garen behavior models and keep Garen hidden until full runtime-catalog validation passes | Pending |
-| M2 | Origins full set | Not started | Need two user-provided Origins decks under `docs/full-ingestion-decks/OGN/` | Wait for inputs after M1 acceptance | Pending |
+| M1 | Garen Proving Grounds deck | Accepted | None | Open M2 | Accepted |
+| M2 | Origins full set | Not started | Need two user-provided Origins decks under `docs/full-ingestion-decks/OGN/` | Wait for Origins deck inputs | Pending |
 | M3 | Spiritforged full set | Not started | Need two user-provided Spiritforged decks under `docs/full-ingestion-decks/SFD/` | Wait for inputs after M2 acceptance | Pending |
 | M4 | Unleashed full set | Not started | Need two user-provided Unleashed decks under `docs/full-ingestion-decks/UNL/` | Wait for inputs after M3 acceptance | Pending |
 | M5 | Vendetta full set | Not started | Final `VEN` JSON is not present in `data/sets`; need two user-provided Vendetta decks | Wait for final data after M4 acceptance | Pending |
@@ -87,7 +86,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | Set | Card code | Name | Type | Behavior clauses | Primitive coverage | Executable | In deck validation | Notes |
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
-| OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Primitive delta implemented | No | Garen not selectable | Exact canonical behavior models still need publication and validation. |
+| OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
 
 ## Token Coverage Ledger
 
@@ -104,7 +103,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/lux.dec.txt` | `lux` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
-| OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; not runtime-catalog valid yet | No | No | No | Runtime cards and token behavior not executable yet | No |
+| OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | Defects recorded in `docs/full-card-ingestion/m1-questions.md` fixed | Yes |
 | OGN | `docs/full-ingestion-decks/OGN/` | TBD | No | No | No | No | Deck files not provided | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
@@ -122,9 +121,10 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | Milestone | Matchup | Scenario focus | Result | Issue link / note | Accepted by user |
 |---|---|---|---|---|---|
 | M0 | Existing Lux/Annie/Master Yi deck availability | Operating baseline only | Accepted | Automated checks pass; user accepted M0 operating baseline | Yes |
-| M1 | Garen vs Lux | Baseline interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
-| M1 | Garen vs Annie | Damage/removal interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
-| M1 | Garen vs Master Yi | Combat modifier interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
+| M1 | Garen manual validation | Garen deck behavior corpus and reported defect scenarios | Accepted | User accepted M1 after iterative manual validation and fixes in `m1-questions.md` | Yes |
+| M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
+| M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
+| M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 
 ## M0 Acceptance State
 
@@ -133,9 +133,9 @@ Status: Accepted
 M0 was accepted by the user after the tracking baseline and operating model were
 recorded.
 
-## M1 Active State
+## M1 Acceptance State
 
-Status: Behavior modeling
+Status: Accepted
 
 M1 input normalization, deck construction validation, token coverage check, and
 primitive discovery are complete. The user approved:
@@ -143,14 +143,50 @@ primitive discovery are complete. The user approved:
 - extending the public pending-choice/action intent contract for token placement;
 - enforcing shared selector `excludesSource` behavior.
 
-Runtime implementation for both approved gates is complete and verified by:
+Runtime implementation for both approved gates and the latest manual defect fixes
+is complete and verified by:
 
+- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts tests/garen-m1-card-catalog.test.ts`
 - `node --import tsx --test tests/game-token-placement.test.ts`
+- `node --import tsx --test tests/garen-m1-card-catalog.test.ts`
 - `cmd /c npm run catalog:check-mvp`
-- `npm run typecheck`
-- `npm test`
-- `npm run lint`
-- `npm run build`
+- `cmd /c npm run typecheck`
+- `cmd /c npm test`
+- `cmd /c npm run lint`
+- `cmd /c npm run build`
 
-Next M1 work is exact Garen behavior modeling and runtime-catalog validation.
-Details are recorded in `docs/full-card-ingestion/m1-garen-discovery.md`.
+Exact Garen behavior modeling and code-level runtime-catalog validation are
+complete. `tests/garen-m1-card-catalog.test.ts` certifies 21 unique Garen deck
+cards as approved, executable canonical models and builds a valid deck snapshot
+from those documents.
+
+The user reports that all Garen card behaviors were fixed and all Garen deck
+cards are persisted in the canonical catalog. The code now adds `garen` to the
+permanent local/online deck ID schema and to deck-definition synchronization.
+
+Latest manual defect pass fixed:
+
+- Trifarian War Camp discovery/runtime continuous source-location Might.
+- Generated Recruit/Sprite token image URLs.
+- Recruit the Vanguard token placement count reset.
+- Noxian Drummer fixed-location token placement onto the source battlefield.
+- Decisive Strike-style automatic group Might modifiers without target prompts.
+- Attack-trigger chain resolution returning showdown focus to the trigger controller.
+- Unit play projection no longer treats stale passive/triggered unit text as play-time target requirements.
+- Tokens cease to exist when they would move to a non-board zone.
+- Battlefield rules text now renders resource icons through `CardRulesText`.
+
+Old-match policy for this defect pass: existing matches may be discarded.
+
+The user accepted M1 on 2026-07-10 after confirming the final Crackshot Corsair
+and Recruit the Vanguard fixes.
+
+Per the accepted workflow, Codex should commit the M1 milestone changes before
+starting M2.
+
+## M2 Active State
+
+Status: Not started
+
+Current expectation from the user: provide or confirm the two Origins validation
+decks under `docs/full-ingestion-decks/OGN/` before M2 implementation starts.

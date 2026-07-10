@@ -214,12 +214,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText) &&
     !/\b(?:friendly|enemy) units?\b/.test(context.rulesText) &&
     !/\bunit from your trash\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another"), maximumMight: readMaximumMight(context.rulesText) }, "medium")
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another"), maximumMight: readMaximumMight(context.rulesText), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
     /\bfriendly units?\b/.test(context.rulesText)
-      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "controller", excludesSource: context.rulesText.includes("another") }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "controller", excludesSource: context.rulesText.includes("another") || context.rulesText.includes("other friendly"), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["minimumCount", "maximumCount"], (context) =>
@@ -1416,6 +1416,13 @@ function readNumericModifier(
     operand,
     amount: readNumericAmount(rulesText, attribute, operation, operand),
     target: readNumericTarget(rulesText, attribute),
+    ...(readUnitLocationRelation(rulesText) !== "any"
+      ? { locationRelation: readUnitLocationRelation(rulesText) }
+      : {}),
+    ...(isStaticGroupNumericModifier(rulesText) &&
+    rulesText.includes("other friendly")
+      ? { excludesSource: true }
+      : {}),
     duration: readDuration(rulesText, attribute),
     minimum: readMinimum(rulesText)
   };
@@ -1571,12 +1578,22 @@ function readDuration(rulesText: string, attribute: string): string | null {
   if (
     attribute === "victoryRequirement" ||
     attribute === "damage" ||
-    rulesText.includes("while")
+    rulesText.includes("while") ||
+    isStaticGroupNumericModifier(rulesText)
   ) {
     return "whileSourceOnBoard";
   }
 
   return null;
+}
+
+function isStaticGroupNumericModifier(rulesText: string): boolean {
+  return (
+    !/\bwhen\b|\bchoose\b|\bgive\b|\bthis turn\b/.test(rulesText) &&
+    /\b(?:units?|friendly units?|enemy units?)\b[^.]{0,40}\bhave\b/.test(
+      rulesText,
+    )
+  );
 }
 
 function isSourceAtBattlefieldDuration(rulesText: string): boolean {

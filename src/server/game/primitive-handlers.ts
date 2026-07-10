@@ -88,9 +88,21 @@ export function createPrimitiveHandlers(
   });
   handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
   handlers.set("trigger.on_move", {
-    matches: (_binding, context) =>
-      context.event?.type === "unit.moved" &&
-      context.event.subjectCardInstanceId === context.sourceCardInstanceId
+    matches: (binding, context) => {
+      if (
+        context.event?.type !== "unit.moved" ||
+        context.event.subjectCardInstanceId !== context.sourceCardInstanceId
+      ) {
+        return false;
+      }
+      if (binding.parameters.destination === "battlefield") {
+        return context.event.values.destination !== "base";
+      }
+      if (binding.parameters.destination === "base") {
+        return context.event.values.destination === "base";
+      }
+      return true;
+    },
   });
   handlers.set("trigger.end_of_turn", {
     matches: (binding, context) =>
@@ -385,10 +397,13 @@ export function createPrimitiveHandlers(
           : Array.from({ length: count }, () =>
               fixedTokenDestination(binding, context),
             );
+      const requireControlledDestination =
+        binding.parameters.placement === "chooseBaseOrControlledBattlefield";
       for (const destinationId of placements) {
         playToken(context.game, {
           controllerPlayerId: context.controllerPlayerId,
           destinationId,
+          requireControlledDestination,
           sourceCardInstanceId: context.sourceCardInstanceId,
           tokenName,
           index,
@@ -412,6 +427,7 @@ export function createPrimitiveHandlers(
         const state = context.game.state.cardStates[id];
         if (!state) throw new Error(`Damage target is unavailable: ${id}`);
         state.damage += amount;
+        incrementObjectVersion(context.game, id);
       }
       cleanupLethalDamage(context.game, ids, index);
       for (const id of ids) {
@@ -517,7 +533,11 @@ export function createPrimitiveHandlers(
         ? [context.sourceCardInstanceId]
         : binding.parameters.target === "game" || binding.parameters.target === "controller_spell"
           ? [null]
-          : routedTargets.length > 0 ? routedTargets : context.selectedIds;
+          : routedTargets.length > 0
+            ? routedTargets
+            : context.selectedIds.length > 0
+              ? context.selectedIds
+              : implicitModifierTargets(binding, context, index);
       if (
         binding.parameters.condition === "onlyFriendlyUnitAtLocation" &&
         targets.some((target) =>
@@ -675,6 +695,14 @@ function selectorTargets(
         !game.state.cardStates[id]?.exhausted ||
         lockedSelectedIds.includes(id),
     )
+    .filter((id) =>
+      unitLocationRelationMatches(
+        game,
+        id,
+        sourceCardInstanceId,
+        binding.parameters.locationRelation,
+      ),
+    )
     .filter(
       (id) =>
         binding.parameters.excludesSource !== true ||
@@ -740,6 +768,52 @@ function selectionFor(
     : [];
 }
 
+function implicitModifierTargets(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const target = binding.parameters.target;
+  if (
+    target !== "friendly_unit" &&
+    target !== "enemy_unit" &&
+    target !== "unit"
+  ) {
+    return [];
+  }
+  const allUnits = [
+    ...context.game.state.setup.playerIds.flatMap(
+      (playerId) => context.game.state.players[playerId]?.zones.base ?? [],
+    ),
+    ...context.game.state.battlefields.flatMap(
+      (battlefield) => battlefield.units,
+    ),
+  ];
+  return allUnits
+    .filter(
+      (id) => definitionForInstance(id, index).card.classification.type === "Unit",
+    )
+    .filter((id) =>
+      unitLocationRelationMatches(
+        context.game,
+        id,
+        context.sourceCardInstanceId,
+        binding.parameters.locationRelation,
+      ),
+    )
+    .filter(
+      (id) =>
+        binding.parameters.excludesSource !== true ||
+        id !== context.sourceCardInstanceId,
+    )
+    .filter((id) => {
+      const owner = index.instances.get(id)?.ownerPlayerId;
+      if (target === "friendly_unit") return owner === context.controllerPlayerId;
+      if (target === "enemy_unit") return owner !== context.controllerPlayerId;
+      return true;
+    });
+}
+
 function tokenPlacementDestinations(
   game: GameDocument,
   controllerPlayerId: string,
@@ -760,10 +834,10 @@ function selectedTokenDestinations(
   context: BehaviorExecutionContext,
   count: number,
 ) {
-  if (context.selectedIds.length !== count) {
+  if (context.selectedIds.length < count) {
     throw new Error("Token placement count does not match token count.");
   }
-  return context.selectedIds;
+  return context.selectedIds.slice(-count);
 }
 
 function fixedTokenDestination(
@@ -782,6 +856,7 @@ function playToken(
   input: {
     controllerPlayerId: string;
     destinationId: string;
+    requireControlledDestination: boolean;
     sourceCardInstanceId: string;
     tokenName: string;
     index: RuntimeCardIndex;
@@ -820,11 +895,24 @@ function playToken(
       (candidate) => candidate.battlefieldId === input.destinationId,
     );
     if (!battlefield) throw new Error("Token destination is unavailable.");
-    if (battlefield.controllerPlayerId !== input.controllerPlayerId) {
+    if (
+      input.requireControlledDestination &&
+      battlefield.controllerPlayerId !== input.controllerPlayerId
+    ) {
       throw new Error("Token destination is not controlled by the player.");
     }
     battlefield.units.push(instanceId);
   }
+  if (
+    game.state.ongoingEffects.some(
+      (effect) =>
+        effect.behaviorId === "modifier.enter_ready" &&
+        effect.controllerPlayerId === input.controllerPlayerId,
+    )
+  ) {
+    game.state.cardStates[instanceId]!.exhausted = false;
+  }
+  recomputeMight(game, instanceId, input.index);
   const events = (game.state.queuedBehaviorEvents ??= []);
   events.push({
     type: "card.played",
@@ -842,14 +930,15 @@ function findOrCreateTokenDefinition(
   tokenName: string,
   index: RuntimeCardIndex,
 ): GameCardDefinition {
+  const tokenIdentity = tokenIdentityFromName(tokenName);
   const existing = [...index.definitions.values()].find(
     (definition) =>
       definition.card.classification.supertype === "Token" &&
-      (definition.card.name === tokenName ||
-        definition.card.name.startsWith(`${tokenName} (`)),
+      (definition.card.name === tokenIdentity.name ||
+        definition.card.name.startsWith(`${tokenIdentity.name} (`)),
   );
   if (existing) return existing;
-  const normalized = tokenName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const normalized = tokenIdentity.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const cardCode = `TOKEN-${normalized}`;
   const existingGenerated = index.definitions.get(cardCode);
   if (existingGenerated) return existingGenerated;
@@ -858,11 +947,11 @@ function findOrCreateTokenDefinition(
     sourceTextHash: `generated:${normalized}`,
     card: {
       id: cardCode,
-      name: tokenName,
+      name: tokenIdentity.name,
       public_code: cardCode,
       attributes: {
         energy: null,
-        might: tokenName === "Recruit" ? 1 : null,
+        might: tokenIdentity.might,
         power: null,
       },
       classification: {
@@ -873,7 +962,9 @@ function findOrCreateTokenDefinition(
       },
       text: { plain: "" },
       set: { set_id: "generated", label: "Generated" },
-      media: {},
+      media: tokenIdentity.imageUrl
+        ? { image_url: tokenIdentity.imageUrl }
+        : {},
       tags: [],
       metadata: {},
     },
@@ -882,6 +973,32 @@ function findOrCreateTokenDefinition(
   (game.state.createdCardDefinitions ??= []).push(definition);
   index.definitions.set(cardCode, definition);
   return definition;
+}
+
+function tokenIdentityFromName(tokenName: string) {
+  if (/recruit/i.test(tokenName)) {
+    return {
+      name: "Recruit",
+      might: 1,
+      imageUrl:
+        "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
+    };
+  }
+  if (/sprite/i.test(tokenName)) {
+    return {
+      name: "Sprite",
+      might: 3,
+      imageUrl:
+        "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/055892752559d2d3d32e76f491a7a0b540e1a669-744x1039.png",
+    };
+  }
+  if (/sand soldier/i.test(tokenName)) {
+    return { name: "Sand Soldier", might: 2, imageUrl: null };
+  }
+  if (/mech/i.test(tokenName)) {
+    return { name: "Mech", might: 3, imageUrl: null };
+  }
+  return { name: tokenName, might: null, imageUrl: null };
 }
 
 function unitsForPresenceCondition(
@@ -1011,6 +1128,10 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
   }
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
+  if (isTokenInstance(id, index)) {
+    ceaseToken(game, id);
+    return;
+  }
   const zones = game.state.players[owner]!.zones;
   for (const zone of [
     "mainDeck",
@@ -1030,6 +1151,31 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
   zones.trash.push(id);
   resetStateAfterLeavingBoard(game, id, index);
 }
+
+function isTokenInstance(id: string, index: RuntimeCardIndex) {
+  const instance = index.instances.get(id);
+  const definition = instance && index.definitions.get(instance.cardCode);
+  return (
+    instance?.source === "token" ||
+    definition?.card.classification.supertype === "Token"
+  );
+}
+
+function ceaseToken(game: GameDocument, id: string) {
+  removeFromAllLocations(game, id);
+  delete game.state.cardStates[id];
+  game.state.modifiers = game.state.modifiers.filter(
+    (modifier) =>
+      modifier.sourceCardInstanceId !== id &&
+      modifier.targetCardInstanceId !== id,
+  );
+  game.state.ongoingEffects = game.state.ongoingEffects.filter(
+    (effect) =>
+      effect.sourceCardInstanceId !== id &&
+      !effect.targetCardInstanceIds.includes(id),
+  );
+}
+
 function removeFromAllLocations(game: GameDocument, id: string) {
   for (const player of Object.values(game.state.players)) {
     for (const zone of [
@@ -1092,6 +1238,40 @@ function isOnlyFriendlyUnitAtLocation(
       definitionForInstance(id, index).card.classification.type === "Unit",
   ).length === 1;
 }
+
+function unitLocationRelationMatches(
+  game: GameDocument,
+  targetId: string,
+  sourceId: string,
+  relation: unknown,
+) {
+  if (relation !== "sourceLocation" && relation !== "sharedLocation") {
+    return true;
+  }
+  const sourceLocation = boardLocationForUnit(game, sourceId);
+  const targetLocation = boardLocationForUnit(game, targetId);
+  return (
+    sourceLocation !== null &&
+    targetLocation !== null &&
+    sourceLocation.kind === targetLocation.kind &&
+    sourceLocation.id === targetLocation.id
+  );
+}
+
+function boardLocationForUnit(game: GameDocument, unitId: string) {
+  for (const battlefield of game.state.battlefields) {
+    if (battlefield.units.includes(unitId)) {
+      return { kind: "battlefield" as const, id: battlefield.battlefieldId };
+    }
+  }
+  for (const playerId of game.state.setup.playerIds) {
+    if (game.state.players[playerId]?.zones.base.includes(unitId)) {
+      return { kind: "base" as const, id: playerId };
+    }
+  }
+  return null;
+}
+
 function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "number") throw new Error(`Behavior parameter ${key} must be numeric.`);

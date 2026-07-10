@@ -11,7 +11,7 @@ import {
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
-import { dispatchBehaviorEvent } from "./triggers";
+import { dispatchSimultaneousBehaviorEvents } from "./triggers";
 
 export type DamageAssignment = {
   targetUnitId: string;
@@ -75,22 +75,26 @@ export function startCombat(
     focusPlayerId: attackerPlayerId,
     passedPlayerIds: []
   };
-  for (const id of attackerUnitIds) {
-    dispatchBehaviorEvent(game, {
+  dispatchSimultaneousBehaviorEvents(
+    game,
+    attackerUnitIds.map((id) => ({
       type: "unit.attacks",
       actorPlayerId: attackerPlayerId,
       subjectCardInstanceId: id,
       values: { battlefieldId }
-    }, decks);
-  }
-  for (const id of defenderUnitIds) {
-    dispatchBehaviorEvent(game, {
+    })),
+    decks,
+  );
+  dispatchSimultaneousBehaviorEvents(
+    game,
+    defenderUnitIds.map((id) => ({
       type: "unit.defends",
       actorPlayerId: defenderPlayerId,
       subjectCardInstanceId: id,
       values: { battlefieldId }
-    }, decks);
-  }
+    })),
+    decks,
+  );
   return true;
 }
 

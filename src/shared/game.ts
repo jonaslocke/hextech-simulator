@@ -143,7 +143,7 @@ export const gameIntentRequestSchema = z.object({
   intent: gameActionIntentSchema,
 });
 
-export const deckIdSchema = z.enum(["lux", "annie", "master-yi"]);
+export const deckIdSchema = z.enum(["lux", "annie", "master-yi", "garen"]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
 export const createMatchRequestSchema = z.object({

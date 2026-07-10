@@ -285,6 +285,11 @@ export function CardCatalogImportPreview() {
                     }))
                   }
                   onClose={() => setReviewCardCode(null)}
+                  onRemoveClause={(clauseId) =>
+                    updateDraft(reviewCard.cardCode, (draft) =>
+                      removeClause(draft, clauseId)
+                    )
+                  }
                   onRemovePrimitive={(clauseId, assignmentIndex) =>
                     updateDraft(reviewCard.cardCode, (draft) =>
                       removePrimitiveFromClause(draft, clauseId, assignmentIndex)
@@ -556,6 +561,7 @@ function ReviewPanel({
   onChangeParameter,
   onChangeModelingStatus,
   onClose,
+  onRemoveClause,
   onRemovePrimitive,
   onSave,
   primitiveCatalog,
@@ -576,6 +582,7 @@ function ReviewPanel({
   ): void;
   onChangeModelingStatus(status: ModelingStatus): void;
   onClose(): void;
+  onRemoveClause(clauseId: string): void;
   onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
   onSave(): void;
   primitiveCatalog: PrimitiveCatalogEntry[];
@@ -648,6 +655,7 @@ function ReviewPanel({
                 onAddPrimitive={onAddPrimitive}
                 onChangeSourceText={onChangeClauseSourceText}
                 onChangeParameter={onChangeParameter}
+                onRemoveClause={onRemoveClause}
                 onRemovePrimitive={onRemovePrimitive}
                 primitiveCatalog={primitiveCatalog}
                 primitiveCatalogById={primitiveCatalogById}
@@ -676,6 +684,7 @@ function ClauseEditor({
   onAddPrimitive,
   onChangeSourceText,
   onChangeParameter,
+  onRemoveClause,
   onRemovePrimitive,
   primitiveCatalog,
   primitiveCatalogById
@@ -689,6 +698,7 @@ function ClauseEditor({
     parameterName: string,
     value: string
   ): void;
+  onRemoveClause(clauseId: string): void;
   onRemovePrimitive(clauseId: string, assignmentIndex: number): void;
   primitiveCatalog: PrimitiveCatalogEntry[];
   primitiveCatalogById: Map<string, PrimitiveCatalogEntry>;
@@ -701,7 +711,18 @@ function ClauseEditor({
     <div className="bg-slate-950/70 p-4 border border-white/10 rounded-lg">
       <div className="flex md:flex-row flex-col md:justify-between gap-3">
         <div>
-          <p className="font-mono text-slate-500 text-xs">{clause.id}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-slate-500 text-xs">{clause.id}</p>
+            <Button
+              aria-label={`Remove ${clause.id}`}
+              onClick={() => onRemoveClause(clause.id)}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
           <label className="block mt-2">
             <span className="text-slate-400 text-xs uppercase tracking-wide">
               Clause Source
@@ -927,7 +948,35 @@ function PrimitiveEditor({
                   {parameterName}
                   {parameterDefinition?.required ? " *" : ""}
                 </span>
-                {parameterOptions.length > 0 ? (
+                {parameterDefinition?.type === "boolean" ? (
+                  <Select
+                    onValueChange={(value) =>
+                      onChangeParameter(
+                        clauseId,
+                        assignmentIndex,
+                        parameterName,
+                        value === UNSET_PARAMETER_VALUE ? "" : value
+                      )
+                    }
+                    value={fieldValue || UNSET_PARAMETER_VALUE}
+                  >
+                    <SelectTrigger
+                      aria-label={parameterName}
+                      className="mt-1"
+                    >
+                      <SelectValue placeholder={`Select ${parameterName}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!parameterDefinition.required && (
+                        <SelectItem value={UNSET_PARAMETER_VALUE}>
+                          Not set
+                        </SelectItem>
+                      )}
+                      <SelectItem value="true">true</SelectItem>
+                      <SelectItem value="false">false</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : parameterOptions.length > 0 ? (
                   <Select
                     onValueChange={(value) =>
                       onChangeParameter(
@@ -1056,6 +1105,13 @@ function removePrimitiveFromClause(
           }
         : clause
     )
+  };
+}
+
+function removeClause(draft: ReviewDraft, clauseId: string): ReviewDraft {
+  return {
+    ...draft,
+    clauses: draft.clauses.filter((clause) => clause.id !== clauseId)
   };
 }
 

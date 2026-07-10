@@ -37,8 +37,8 @@ Deck validation against the full local set corpus passes:
 | Total unique Garen deck cards | 21 |
 | Existing MVP catalog cards | 9 |
 | New scoped catalog cards needed | 12 |
-| Supported by current suggested primitives | 16 |
-| Needs new or extended runtime primitive coverage | 5 |
+| Exact code-level executable models certified | 21 |
+| Needs new or extended runtime primitive coverage | 0 |
 | Required gameplay token kinds | 1 |
 | Missing required token data | 0 |
 | Rule blocked | 0 |
@@ -80,20 +80,20 @@ M1 should collapse the printed Recruit variants into one gameplay token identity
 | `timing.delayed` | Yes | No | Targon's Peak | Covered by rules reference | No | None |
 | `trigger.on_play` | Yes | No | Faithful Manufactor, First Mate | Covered by rules reference | No | None |
 | `trigger.on_move` | Yes | No | Noxian Drummer | Covered by rules reference | No | None |
-| `trigger.attack` | Yes | No | Crackshot Corsair, Dune Drake | Covered by rules reference | No | Must be added manually to behavior models because discovery did not infer it |
+| `trigger.attack` | Yes | Catalog seed added | Crackshot Corsair, Dune Drake | Covered by rules reference | No | None |
 | `trigger.conquer_battlefield` | Yes | No | Targon's Peak | Covered by rules reference | No | None |
 | `trigger.hold_battlefield` | Yes | No | The Papertree | Covered by rules reference | No | None |
 | `trigger.conquer` | No | New primitive implemented | Might of Demacia - Starter | Covered by rules reference and card text | No | None |
 | `condition.unit_presence` | No | New primitive implemented | Might of Demacia - Starter, Dune Drake | Covered by card text + existing readiness/location rules | No | None |
 | `selector.unit` / `selector.friendly_unit` / `selector.enemy_unit` `excludesSource` | Yes | Implemented | First Mate now; broader future corpus | Covered by card text + "another" wording | Approved and implemented | None |
-| `selector.unit` | Yes | Manual model correction needed | Might of Demacia - Starter, First Mate | Covered by card text | No | Discovery parameters are insufficient for these cards |
-| `selector.enemy_unit` | Yes | Manual model correction needed | Crackshot Corsair, Dune Drake | Covered by card text | No | Dune Drake needs ready-only existence, not target selection |
+| `selector.unit` | Yes | Manual model correction certified | Might of Demacia - Starter, First Mate | Covered by card text | No | None |
+| `selector.enemy_unit` | Yes | Manual model correction certified | Crackshot Corsair, Dune Drake | Covered by card text | No | None |
 | `action.draw_cards` | Yes | No | Might of Demacia - Starter, Confront | Covered by rules reference | No | None after global conquer condition support |
-| `action.ready_cards` | Yes | Maybe | Targon's Peak, First Mate, Dune Drake | Covered by rules reference | Yes for `First Mate` targeting through `excludesSource` | Needs target-selection model for "another unit" |
+| `action.ready_cards` | Yes | No | Targon's Peak, First Mate | Covered by rules reference | Yes for `First Mate` targeting through `excludesSource` | None |
 | `action.deal_damage` | Yes | No | Crackshot Corsair | Covered by rules reference | No | None after attack trigger model correction |
 | `action.play_token` | Yes | Runtime implemented | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference token rules and card text | Approved and implemented | None |
 | `modifier.enter_ready` | Yes | No | Confront, Vanguard Attendant | Covered by rules reference and card text | No | None |
-| `modifier.modify_numeric_value` | Yes | No | Trifarian War Camp, Back to Back, Decisive Strike, Dune Drake, Garen, Commander | Covered by rules reference | No | Some manual duration/location parameters needed |
+| `modifier.modify_numeric_value` | Yes | Location/source filters implemented for continuous unit modifiers | Trifarian War Camp, Back to Back, Decisive Strike, Dune Drake, Garen, Commander | Covered by rules reference | No | None |
 | `keyword.assault` | Yes | No | Garen, Rugged, Daring Poro, Petty Officer | Covered by rules reference | No | None |
 | `keyword.shield` | Yes | No | Garen, Rugged | Covered by rules reference | No | None |
 
@@ -179,12 +179,15 @@ covered by the rules reference and card text:
 
 ## Remaining Implementation Order
 
-1. Add focused behavior-model tests for the exact Garen cards that need manual
-   model corrections.
-2. Publish/approve exact behavior models for every unique Garen deck card.
-3. Add `garen` to permanent local and online deck selectors only after every
-   unique card and required token is executable.
-4. Run focused automated checks and prepare manual match scenarios.
+1. Run `cmd /c npm run catalog:repair-garen-m1` to repair persisted Garen
+   canonical records for future snapshots.
+2. Run `cmd /c npm run catalog:sync-decks` so future Garen matches use repaired
+   deck snapshots.
+3. Restart/reload the app so the latest runtime code is active.
+4. Create fresh matches. Old matches may be discarded.
+5. Run manual Garen match validation and retest the fixed card scenarios from
+   `docs/full-card-ingestion/m1-questions.md`.
+6. Accept or reject M1 based on gameplay results.
 
 ## Manual Validation Scenarios
 
@@ -202,7 +205,7 @@ covered by the rules reference and card text:
 
 ## M1 Status
 
-Status: Behavior modeling
+Status: Awaiting manual validation
 
 The user approved the public token placement choice contract change and the
 shared selector `excludesSource` extension. Runtime implementation is complete
@@ -213,12 +216,37 @@ for:
 - `excludesSource` unit selector filtering;
 - `trigger.conquer`;
 - `condition.unit_presence`.
+- exact Garen behavior model certification for all 21 unique deck cards.
+
+Latest manual defect pass fixed:
+
+- Trifarian War Camp discovery/runtime continuous source-location Might.
+- Generated Recruit/Sprite token image URLs.
+- Recruit the Vanguard token placement count reset.
+- Noxian Drummer fixed-location token placement onto the source battlefield.
+- Decisive Strike-style automatic group Might modifiers without target prompts.
+- Attack-trigger chain resolution returning showdown focus to the trigger controller.
+- Canonical repair command for stale Garen M1 records used by future matches.
+- Tokens ceasing when they would move to non-board zones.
+- Battlefield rules text rendering through the shared rules text renderer.
 
 Verified commands:
 
+- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts tests/garen-m1-card-catalog.test.ts`
 - `node --import tsx --test tests/game-token-placement.test.ts`
+- `node --import tsx --test tests/garen-m1-card-catalog.test.ts`
 - `cmd /c npm run catalog:check-mvp`
-- `npm run typecheck`
-- `npm test`
-- `npm run lint`
-- `npm run build`
+- `cmd /c npm run typecheck`
+- `cmd /c npm test`
+- `cmd /c npm run lint`
+- `cmd /c npm run build`
+
+The user reports that all Garen card behaviors were fixed and persisted in the
+canonical catalog. Code-level deck exposure now includes `garen` in the
+permanent deck ID schema and deck-definition sync seed list.
+
+Current expectation from the user: sync deck definitions with
+`cmd /c npm run catalog:repair-garen-m1` and
+`cmd /c npm run catalog:sync-decks`, then validate fresh Garen matches and the
+fixed card scenarios. Existing matches may be discarded. M1 should not proceed
+to M2 until fresh matches are manually validated and accepted.

@@ -631,6 +631,40 @@ test("discovers Base, source-location, and shared-location Unit constraints", ()
   );
 });
 
+test("discovers static source-location unit modifiers as automatic continuous effects", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Trifarian War Camp",
+      publicCode: "OGN-294/298",
+      text: "Units here have +1 :rb_might:. (This includes attackers.)",
+      type: "Battlefield"
+    })
+  );
+
+  assert.deepEqual(
+    findAssignment(discovery, "selector.unit")?.parameters,
+    {
+      scope: "any",
+      area: "board",
+      locationRelation: "sourceLocation",
+      excludesSource: false,
+      automatic: true
+    }
+  );
+  assert.deepEqual(
+    findAssignment(discovery, "modifier.modify_numeric_value")?.parameters,
+    {
+      attribute: "might",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "unit",
+      locationRelation: "sourceLocation",
+      duration: "whileSourceOnBoard"
+    }
+  );
+});
+
 test("does not confuse a move destination with the selected Unit area", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({

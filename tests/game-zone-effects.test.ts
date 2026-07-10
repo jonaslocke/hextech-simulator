@@ -5,6 +5,7 @@ import {
   buildPaymentPlan,
   createPrimitiveHandlers,
   legalUnitDestinationIds,
+  recomputeMight,
   type BehaviorBinding,
   type GameDocument,
   type RuntimeCardIndex,
@@ -172,6 +173,115 @@ test("adds open battlefields only through a card destination permission", () => 
   );
 });
 
+test("battlefield cards can apply continuous Might to units here", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const battlefieldDefinition = index.definitions.get("BF")!;
+  battlefieldDefinition.behaviorModel.clauses.push({
+    id: "war-camp",
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    keywords: [],
+    effects: [
+      binding("modifier.modify_numeric_value", {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 1,
+        target: "unit",
+        locationRelation: "sourceLocation",
+        duration: "whileSourceAtBattlefield",
+      }),
+    ],
+  });
+
+  recomputeMight(game, "unit", index);
+
+  assert.equal(game.state.cardStates.unit?.computedMight, 3);
+});
+
+test("stale static source-location models still apply as continuous Might", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const battlefieldDefinition = index.definitions.get("BF")!;
+  battlefieldDefinition.behaviorModel.clauses.push({
+    id: "war-camp",
+    sequence: 0,
+    sourceText: "Units here have +1 :rb_might: (This includes attackers.)",
+    normalizedText: "Units here have +1 :rb_might: (This includes attackers.)",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [
+      binding("selector.unit", {
+        scope: "any",
+        area: "board",
+        locationRelation: "sourceLocation",
+        excludesSource: false,
+      }),
+    ],
+    choices: [],
+    costs: [],
+    timings: [],
+    keywords: [],
+    effects: [
+      binding("modifier.modify_numeric_value", {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 1,
+        target: "unit",
+      }),
+    ],
+  });
+
+  recomputeMight(game, "unit", index);
+
+  assert.equal(game.state.cardStates.unit?.computedMight, 3);
+});
+
+test("friendly unit group modifiers can resolve without interactive targets", () => {
+  const game = fixture();
+  const index = cardIndex();
+  index.instances.set("ally", {
+    instanceId: "ally",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.base.push("ally");
+  game.state.cardStates.ally = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 2,
+    objectVersion: 0,
+  };
+  const handlers = createPrimitiveHandlers(index);
+
+  handlers.get("modifier.modify_numeric_value")!.execute!(
+    binding("modifier.modify_numeric_value", {
+      attribute: "might",
+      operation: "increase",
+      operand: "constant",
+      amount: 2,
+      target: "friendly_unit",
+      duration: "thisTurn",
+    }),
+    createBehaviorContext(game, "p1", "spell", null, []),
+  );
+
+  assert.equal(game.state.cardStates.ally?.computedMight, 4);
+  assert.equal(game.state.cardStates.unit?.computedMight, 2);
+});
+
 test("keeps legacy bounded each-unit selectors interactive", () => {
   const game = fixture();
   const handlers = createPrimitiveHandlers(cardIndex());
@@ -228,13 +338,16 @@ test("selects every eligible card from unordered non-board zones", () => {
 
 function binding(
   behaviorId: string,
-  parameters: Record<string, string | number>,
+  parameters: Record<string, string | number | boolean>,
 ): BehaviorBinding {
   return { behaviorId, parameters, confidence: "high", order: 0 };
 }
 
 function cardIndex(): RuntimeCardIndex {
-  const definition = (cardCode: string, type: "Spell" | "Unit") => ({
+  const definition = (
+    cardCode: string,
+    type: "Battlefield" | "Spell" | "Unit",
+  ) => ({
     cardCode,
     sourceTextHash: "hash",
     behaviorModel: { playTimings: [], clauses: [] },
@@ -242,7 +355,11 @@ function cardIndex(): RuntimeCardIndex {
       id: cardCode,
       name: cardCode,
       public_code: `${cardCode}/1`,
-      attributes: { energy: 0, might: type === "Unit" ? 2 : null, power: 0 },
+      attributes: {
+        energy: type === "Battlefield" ? null : 0,
+        might: type === "Unit" ? 2 : null,
+        power: type === "Battlefield" ? null : 0,
+      },
       classification: { type, supertype: null, domain: ["Fury"] },
       text: { plain: "" },
       set: { set_id: "TEST", label: "Test" },
@@ -255,10 +372,12 @@ function cardIndex(): RuntimeCardIndex {
     definitions: new Map([
       ["SPELL", definition("SPELL", "Spell")],
       ["UNIT", definition("UNIT", "Unit")],
+      ["BF", definition("BF", "Battlefield")],
     ]) as RuntimeCardIndex["definitions"],
     instances: new Map([
       ["spell", { instanceId: "spell", ownerPlayerId: "p1", source: "mainDeck", cardCode: "SPELL" }],
       ["unit", { instanceId: "unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT" }],
+      ["bf", { instanceId: "bf", ownerPlayerId: "p1", source: "battlefield", cardCode: "BF" }],
     ]),
   };
 }
@@ -290,6 +409,7 @@ function fixture(): GameDocument {
       cardStates: {
         spell: { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 },
         unit: { exhausted: true, damage: 0, computedMight: 2, objectVersion: 0 },
+        bf: { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 },
       },
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },
       chain: null, showdown: null, combat: null, modifiers: [], ongoingEffects: [], delayedEffects: [],

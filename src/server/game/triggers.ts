@@ -1,7 +1,7 @@
 import {
   compileBehaviorModel,
+  collectTriggeredClauses,
   createBehaviorContext,
-  queueTriggeredClauses,
   targetRequirementsForClause,
   type BehaviorEvent
 } from "./behavior-runtime";
@@ -19,8 +19,33 @@ export function dispatchBehaviorEvent(
   event: BehaviorEvent,
   decks: readonly DeckSnapshotDocument[]
 ): void {
+  for (const { items } of collectBehaviorEventItems(
+    game,
+    [event],
+    decks,
+  )) {
+    queueChainItemsForTargets(game, items, decks);
+  }
+}
+
+export function dispatchSimultaneousBehaviorEvents(
+  game: GameDocument,
+  events: readonly BehaviorEvent[],
+  decks: readonly DeckSnapshotDocument[],
+): void {
+  for (const { items } of collectBehaviorEventItems(game, events, decks)) {
+    queueChainItemsForTargets(game, items, decks);
+  }
+}
+
+function collectBehaviorEventItems(
+  game: GameDocument,
+  events: readonly BehaviorEvent[],
+  decks: readonly DeckSnapshotDocument[],
+) {
   const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
+  const byController = new Map<string, ChainItem[]>();
   for (const controllerPlayerId of game.state.setup.playerIds) {
     const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => ({
       sourceCardInstanceId,
@@ -30,23 +55,46 @@ export function dispatchBehaviorEvent(
         handlers
       )
     }));
-    queueTriggeredClauses({
-      game,
-      controllerPlayerId,
-      sources,
-      event,
-      handlers,
-      enqueueItems: (items) =>
-        queueChainItemsForTargets(game, items, decks),
-    });
+    for (const event of events) {
+      const items = collectTriggeredClauses({
+        game,
+        controllerPlayerId,
+        sources,
+        event,
+        handlers,
+      });
+      if (items.length > 0) {
+        byController.set(controllerPlayerId, [
+          ...(byController.get(controllerPlayerId) ?? []),
+          ...items,
+        ]);
+      }
+    }
   }
+  return [...byController.entries()].map(([controllerPlayerId, items]) => ({
+    controllerPlayerId,
+    items,
+  }));
 }
 
 export function queueChainItemsForTargets(
   game: GameDocument,
   items: ChainItem[],
   decks: readonly DeckSnapshotDocument[],
+  options: { preserveOrder?: boolean } = {},
 ): void {
+  if (!options.preserveOrder && items.length > 1) {
+    const controllerPlayerId = items[0]?.controllerPlayerId;
+    if (controllerPlayerId) {
+      game.state.queuedTriggerChoices.push({
+        id: `choice:${game.stateVersion}:${controllerPlayerId}:triggers`,
+        playerId: controllerPlayerId,
+        type: "orderTriggers",
+        optionIds: items.map((item) => item.id),
+        pendingItems: items,
+      });
+    }
+  }
   game.state.queuedChainItems = [
     ...(game.state.queuedChainItems ?? []),
     ...items,
@@ -104,8 +152,9 @@ export function submitChainTargetSelection(
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
   );
+  const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
-  appendChainItem(game, item);
+  if (!queuedForOrdering) appendChainItem(game, item);
   continueQueuedChainItems(game, decks);
 }
 
@@ -118,8 +167,9 @@ function continueQueuedChainItems(
   const handlers = createPrimitiveHandlers(index);
   while ((game.state.queuedChainItems?.length ?? 0) > 0) {
     const item = game.state.queuedChainItems!.shift()!;
+    const waitingForOrder = isQueuedForOrdering(game, item.id);
     if (!item.sourceCardInstanceId || !item.behaviorClauseId) {
-      appendChainItem(game, item);
+      if (!waitingForOrder) appendChainItem(game, item);
       continue;
     }
     const definition = definitionForInstance(
@@ -150,7 +200,13 @@ function continueQueuedChainItems(
           new Set(requirement.legalIds).size < requirement.minimum,
       )
     ) {
-      appendChainItem(game, item);
+      if (!waitingForOrder) appendChainItem(game, item);
+      else updateQueuedTriggerItem(game, item);
+      continue;
+    }
+    if (item.targetCardInstanceIds.length > 0) {
+      if (!waitingForOrder) appendChainItem(game, item);
+      else updateQueuedTriggerItem(game, item);
       continue;
     }
     const sourceZones = new Set(
@@ -187,6 +243,7 @@ function continueQueuedChainItems(
     };
     return;
   }
+  queueNextTriggerOrderChoice(game);
 }
 
 function appendChainItem(game: GameDocument, item: ChainItem) {
@@ -202,6 +259,50 @@ function appendChainItem(game: GameDocument, item: ChainItem) {
   chain.priorityPlayerId = item.controllerPlayerId;
   chain.passedPlayerIds = [];
   game.state.chain = chain;
+}
+
+function isQueuedForOrdering(game: GameDocument, itemId: string) {
+  return game.state.queuedTriggerChoices.some((choice) =>
+    choice.pendingItems.some((item) => item.id === itemId),
+  );
+}
+
+function updateQueuedTriggerItem(game: GameDocument, item: ChainItem) {
+  let updated = false;
+  game.state.queuedTriggerChoices = game.state.queuedTriggerChoices.map(
+    (choice) => ({
+      ...choice,
+      pendingItems: choice.pendingItems.map((candidate) => {
+        if (candidate.id !== item.id) return candidate;
+        updated = true;
+        return item;
+      }),
+    }),
+  );
+  return updated;
+}
+
+function queueNextTriggerOrderChoice(game: GameDocument) {
+  if (game.state.pendingChoice) return;
+  let nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  while (nextChoice) {
+    const pendingItems = nextChoice.pendingItems;
+    if (pendingItems.length === 0) {
+      nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+      continue;
+    }
+    if (pendingItems.length === 1) {
+      appendChainItem(game, pendingItems[0]!);
+      nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+      continue;
+    }
+    game.state.pendingChoice = {
+      ...nextChoice,
+      optionIds: pendingItems.map((item) => item.id),
+      pendingItems,
+    };
+    return;
+  }
 }
 
 export function queueDelayedEffects(

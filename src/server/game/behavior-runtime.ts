@@ -221,25 +221,12 @@ export function queueTriggeredClauses(input: {
   handlers: BehaviorHandlerRegistry;
   enqueueItems?: (items: ChainItem[]) => void;
 }): void {
-  const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
-    if (clause.triggers.length === 0) return [];
-    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, []);
-    if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
-    if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
-    return [{
-      id: `trigger:${input.game.stateVersion}:${source.sourceCardInstanceId}:${clause.id}`,
-      kind: "trigger" as const,
-      label: source.label,
-      controllerPlayerId: input.controllerPlayerId,
-      sourceCardInstanceId: source.sourceCardInstanceId,
-      targetCardInstanceIds: [],
-      targetObjectVersions: {},
-      behaviorClauseId: clause.id,
-      activatedBehaviorId: null,
-      behaviorEvent: input.event
-    }];
-  }));
+  const items = collectTriggeredClauses(input);
   if (items.length === 0) return;
+  if (input.enqueueItems) {
+    input.enqueueItems(items);
+    return;
+  }
   if (items.length > 1) {
     const choice = {
       id: `choice:${input.game.stateVersion}:${input.controllerPlayerId}:triggers`,
@@ -262,14 +249,38 @@ export function queueTriggeredClauses(input: {
     priorityPlayerId: input.controllerPlayerId,
     passedPlayerIds: []
   };
-  if (input.enqueueItems) {
-    input.enqueueItems(items);
-    return;
-  }
   chain.items.push(...items);
   chain.priorityPlayerId = chain.items.at(-1)!.controllerPlayerId;
   chain.passedPlayerIds = [];
   input.game.state.chain = chain;
+}
+
+export function collectTriggeredClauses(input: {
+  game: GameDocument;
+  controllerPlayerId: string;
+  sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel }>;
+  event: BehaviorEvent;
+  handlers: BehaviorHandlerRegistry;
+}): ChainItem[] {
+  const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
+    if (clause.triggers.length === 0) return [];
+    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, []);
+    if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
+    if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
+    return [{
+      id: `trigger:${input.game.stateVersion}:${source.sourceCardInstanceId}:${clause.id}`,
+      kind: "trigger" as const,
+      label: source.label,
+      controllerPlayerId: input.controllerPlayerId,
+      sourceCardInstanceId: source.sourceCardInstanceId,
+      targetCardInstanceIds: [],
+      targetObjectVersions: {},
+      behaviorClauseId: clause.id,
+      activatedBehaviorId: null,
+      behaviorEvent: input.event
+    }];
+  }));
+  return items;
 }
 
 export function submitTriggerOrder(game: GameDocument, playerId: string, orderedIds: string[]): void {
@@ -294,15 +305,7 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
   chain.priorityPlayerId = playerId;
   chain.passedPlayerIds = [];
   game.state.chain = chain;
-  let nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
-  while (nextChoice?.optionIds.length === 1) {
-    const item = nextChoice.pendingItems[0]!;
-    chain.items.push(item);
-    chain.priorityPlayerId = item.controllerPlayerId;
-    chain.passedPlayerIds = [];
-    nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
-  }
-  game.state.pendingChoice = nextChoice;
+  game.state.pendingChoice = null;
 }
 
 export function createBehaviorContext(

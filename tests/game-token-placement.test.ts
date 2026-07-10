@@ -9,6 +9,7 @@ import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  moveUnitToTrash,
 } from "../src/server/game/primitive-handlers";
 import { gameplayActions, performGameplayAction } from "../src/server/game";
 import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
@@ -118,6 +119,41 @@ test("token placement choice accepts counted destination allocations", () => {
   );
 });
 
+test("tokens cease to exist instead of remaining in non-board zones", () => {
+  const source = unit("SOURCE", "Recruit the Vanguard", [
+    clause("tokens", {
+      effects: [
+        binding("action.play_token", 0, {
+          tokenName: "Recruit",
+          count: 1,
+          placement: "sourceLocation",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+
+  const completed = beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "tokens",
+    decks,
+  });
+  assert.equal(completed, true);
+  const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenId);
+
+  moveUnitToTrash(game, tokenId, createRuntimeCardIndex(decks, game));
+
+  assert.equal(game.state.players.p1!.zones.trash.includes(tokenId), false);
+  assert.equal(game.state.players.p1!.zones.base.includes(tokenId), false);
+  assert.equal(game.state.cardStates[tokenId], undefined);
+});
+
 test("fixed-location token creation plays token at source location", () => {
   const source = unit("SOURCE", "Faithful Manufactor", [
     clause("token-here", {
@@ -154,6 +190,129 @@ test("fixed-location token creation plays token at source location", () => {
   assert.equal(completed, true);
   assert.equal(game.state.createdCardInstances?.length, 1);
   assert.equal(game.state.battlefields[0]!.units.length, 2);
+  assert.equal(
+    game.state.createdCardDefinitions?.[0]?.card.media.image_url,
+    "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
+  );
+});
+
+test("fixed-location token creation can use an uncontrolled source battlefield", () => {
+  const source = unit("SOURCE", "Noxian Drummer", [
+    clause("token-here", {
+      effects: [
+        binding("action.play_token", 0, {
+          tokenName: "1 :rb_might: Recruit unit",
+          count: 1,
+          placement: "sourceLocation",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([source, battlefield("BF", "Enemy Field")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[1]!.instances.push(instance("bf-card", "p2", "BF", "battlefield"));
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p2",
+    controllerPlayerId: "p2",
+    contestedByPlayerId: "p1",
+    units: ["source"],
+  });
+
+  const completed = beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "token-here",
+    decks,
+  });
+
+  assert.equal(completed, true);
+  assert.equal(game.state.createdCardInstances?.length, 1);
+  assert.equal(game.state.battlefields[0]!.units.length, 2);
+});
+
+test("move triggers can be limited to battlefield destinations", () => {
+  const drummer = unit("DRUMMER", "Noxian Drummer", [
+    clause("battlefield-move-token", {
+      triggers: [
+        binding("trigger.on_move", 0, {
+          subject: "source",
+          destination: "battlefield",
+        }),
+      ],
+      effects: [
+        binding("action.play_token", 1, {
+          tokenName: "1 :rb_might: Recruit unit",
+          count: 1,
+          placement: "sourceLocation",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([drummer, battlefield("BF", "Field")]);
+  decks[0]!.instances.push(instance("drummer", "p1", "DRUMMER"));
+  decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
+  game.state.cardStates.drummer = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["drummer"],
+  });
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiled = compileBehaviorModel(drummer.behaviorModel, handlers);
+  const baseMoveResult = executeBehaviorClause({
+    clause: compiled.clauses[0]!,
+    context: createBehaviorContext(
+      game,
+      "p1",
+      "drummer",
+      {
+        type: "unit.moved",
+        actorPlayerId: "p1",
+        subjectCardInstanceId: "drummer",
+        values: { destination: "base" },
+      },
+      [],
+    ),
+    handlers,
+  });
+
+  assert.equal(baseMoveResult.executed, false);
+  assert.equal(game.state.createdCardInstances?.length ?? 0, 0);
+
+  const battlefieldMoveResult = executeBehaviorClause({
+    clause: compiled.clauses[0]!,
+    context: createBehaviorContext(
+      game,
+      "p1",
+      "drummer",
+      {
+        type: "unit.moved",
+        actorPlayerId: "p1",
+        subjectCardInstanceId: "drummer",
+        values: { destination: "battlefield" },
+      },
+      [],
+    ),
+    handlers,
+  });
+
+  assert.equal(battlefieldMoveResult.executed, true);
+  assert.equal(game.state.createdCardInstances?.length, 1);
+  assert.equal(game.state.battlefields[0]!.units.length, 2);
+  const tokenInstanceId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenInstanceId);
+  assert.equal(game.state.cardStates[tokenInstanceId]?.computedMight, 1);
+  assert.equal(index.definitions.get("TOKEN-recruit")?.card.name, "Recruit");
 });
 
 test("global conquer trigger can be gated by units at conquered battlefield", () => {
@@ -278,6 +437,73 @@ test("unit presence condition detects ready enemy units at source location", () 
   assert.equal(game.state.cardStates.drake?.computedMight, 3);
 });
 
+test("attack triggers return showdown focus to the trigger controller", () => {
+  const drake = unit("DRAKE", "Dune Drake", [
+    clause("attack-ready-enemy", {
+      triggers: [binding("trigger.attack", 0, {})],
+      effects: [
+        binding("modifier.modify_numeric_value", 1, {
+          attribute: "might",
+          operation: "increase",
+          operand: "constant",
+          amount: 2,
+          target: "source",
+          duration: "thisTurn",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([drake, battlefield("BF", "Field")]);
+  decks[0]!.instances.push(instance("drake", "p1", "DRAKE"));
+  decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
+  game.state.cardStates.drake = cardState(2);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    units: ["drake"],
+  });
+  game.state.showdown = {
+    kind: "combat",
+    battlefieldId: "bf",
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+  game.state.chain = {
+    items: [
+      {
+        id: "trigger:dune",
+        kind: "trigger",
+        label: "Dune Drake",
+        controllerPlayerId: "p1",
+        sourceCardInstanceId: "drake",
+        targetCardInstanceIds: [],
+        targetObjectVersions: {},
+        behaviorClauseId: "attack-ready-enemy",
+        activatedBehaviorId: null,
+        behaviorEvent: {
+          type: "unit.attacks",
+          actorPlayerId: "p1",
+          subjectCardInstanceId: "drake",
+          values: { battlefieldId: "bf" },
+        },
+      },
+    ],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+
+  let next = passPriority(game, "p1", decks);
+  next = passPriority(next, "p2", decks);
+
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+  assert.deepEqual(next.state.showdown?.passedPlayerIds, []);
+});
+
 function fixture(cards: GameCardDefinition[]): {
   game: GameDocument;
   decks: DeckSnapshotDocument[];
@@ -346,6 +572,25 @@ function fixture(cards: GameCardDefinition[]): {
       },
     },
   };
+}
+
+function passPriority(
+  game: GameDocument,
+  playerId: string,
+  decks: DeckSnapshotDocument[],
+) {
+  const pass = gameplayActions(game, playerId, decks).find(
+    (action) => action.label === "Pass priority",
+  );
+  assert.ok(pass);
+  return performGameplayAction({
+    game,
+    actorPlayerId: playerId,
+    actionId: pass.id,
+    selectedIds: [],
+    decks,
+    now: `pass-${playerId}`,
+  });
 }
 
 function player(playerId: string) {

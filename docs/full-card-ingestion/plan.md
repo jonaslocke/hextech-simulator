@@ -311,6 +311,20 @@ The commit should include only the accepted milestone work and any tracking
 updates needed to record that acceptance. Codex must not include unrelated user
 changes in that commit.
 
+### 4.7 Approval handoff clarity
+
+Whenever Codex stops implementation to wait for user approval, a user ruling, or
+manual validation, Codex must state the exact expectation from the user before
+ending the turn.
+
+The handoff must include:
+
+- what the user should review or decide;
+- the acceptable forms of response, such as approve, reject, or provide a
+  ruling;
+- whether implementation is blocked or can continue on a different task;
+- what Codex will do next after the user responds.
+
 ## 5. Tracking Model
 
 This plan is meant to be resumed after interruptions. The following ledgers

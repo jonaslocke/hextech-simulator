@@ -51,7 +51,7 @@ test("plans idempotent deck-definition synchronization", async () => {
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
   assert.deepEqual(first.result, {
-    insertedCount: 3,
+    insertedCount: 4,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +61,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 3,
+    unchangedCount: 4,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,7 +75,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 2,
+    unchangedCount: 3,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
@@ -89,7 +89,7 @@ test("requires the complete fixed seed set", async () => {
         [seedSet()[0]!],
         NOW,
       ),
-    /exactly: lux, annie, master-yi/,
+    /exactly: lux, annie, master-yi, garen/,
   );
 });
 
@@ -115,6 +115,7 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
   assert.deepEqual(partial, [
     { id: "lux", label: "Lux" },
     { id: "master-yi", label: "Master Yi" },
+    { id: "garen", label: "Garen" },
   ]);
   assert.equal(errors.length, 1);
 
@@ -159,6 +160,7 @@ test("deck synchronization is confirmation-gated and reset-safe", async () => {
   assert.match(syncSource, /data\/decks\/lux\.dec\.txt/);
   assert.match(syncSource, /data\/decks\/annie\.dec\.txt/);
   assert.match(syncSource, /data\/decks\/masteryi\.dec\.txt/);
+  assert.match(syncSource, /data\/decks\/garen\.dec\.txt/);
   assert.doesNotMatch(resetSource, /deckDefinitions/);
 });
 
@@ -171,6 +173,7 @@ function seedSet(): DeckDefinitionSeed[] {
       label: "Master Yi",
       sourceText: validSourceText("Master Yi"),
     },
+    { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
   ];
 }
 

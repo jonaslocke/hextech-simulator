@@ -38,7 +38,7 @@ import {
 } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameCardDefinition } from "./schemas";
-import type { GameDocument } from "./state";
+import type { ChainItem, GameDocument } from "./state";
 import {
   addConsecutivePass,
   currentTiming,
@@ -470,13 +470,19 @@ export function performGameplayAction(input: {
             orderedIds.includes(item.id),
           ) ?? [];
         if (orderedItems.length > 0 && game.state.chain) {
-          game.state.chain.items = game.state.chain.items.filter(
-            (item) => !orderedIds.includes(item.id),
-          );
-          if (game.state.chain.items.length === 0) {
-            game.state.chain = null;
+          if (chainItemsNeedTargetSelection(game, orderedItems, input.decks)) {
+            game.state.chain.items = game.state.chain.items.filter(
+              (item) => !orderedIds.includes(item.id),
+            );
+            if (game.state.chain.items.length === 0) {
+              game.state.chain = null;
+            }
+            queueChainItemsForTargets(game, orderedItems, input.decks, {
+              preserveOrder: true,
+            });
+          } else {
+            queueChainItemsForTargets(game, [], input.decks);
           }
-          queueChainItemsForTargets(game, orderedItems, input.decks);
         }
       } else if (
         game.state.pendingChoice?.type === "effectSelection" &&
@@ -748,7 +754,7 @@ function playCard(
     sourceCardInstanceId: cardId,
     targetCardInstanceIds: selectedIds,
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
-    behaviorClauseId: null,
+    behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
   };
@@ -766,6 +772,17 @@ function playCard(
       passedPlayerIds: [],
     };
   }
+}
+
+function spellResolutionClauseId(
+  definition: GameCardDefinition,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const clauses = compileBehaviorModel(definition.behaviorModel, handlers)
+    .clauses.filter(
+      (clause) => clause.triggers.length === 0 && clause.abilities.length === 0,
+    );
+  return clauses.length === 1 ? clauses[0]!.id : null;
 }
 
 function passPriority(
@@ -871,6 +888,33 @@ function passPriority(
                 targetsLocked: true,
                 decks,
               });
+              if (definition.card.classification.type === "Spell") {
+                game.state.players[owner]!.zones.trash.push(
+                  item.sourceCardInstanceId,
+                );
+                dispatchBehaviorEvent(
+                  game,
+                  item.behaviorEvent?.type === "card.played"
+                    ? item.behaviorEvent
+                    : {
+                        type: "card.played",
+                        actorPlayerId: controller,
+                        subjectCardInstanceId: item.sourceCardInstanceId,
+                        values: {
+                          "eventSubject.printedEnergyCost":
+                            definition.card.attributes.energy ?? 0,
+                          "eventSubject.effectiveEnergyCost":
+                            effectiveEnergyCost(
+                              game,
+                              controller,
+                              definition,
+                              index,
+                            ),
+                        },
+                      },
+                  decks,
+                );
+              }
             }
           }
         } else {
@@ -920,11 +964,14 @@ function passPriority(
       } else {
         game.state.chain = null;
         if (game.state.showdown) {
-          game.state.showdown.focusPlayerId = nextRelevantPlayer(
-            game,
-            game.state.showdown.focusPlayerId,
-            game.state.showdown.relevantPlayerIds,
-          );
+          game.state.showdown.focusPlayerId =
+            item?.kind === "trigger"
+              ? item.controllerPlayerId
+              : nextRelevantPlayer(
+                  game,
+                  game.state.showdown.focusPlayerId,
+                  game.state.showdown.relevantPlayerIds,
+                );
           game.state.showdown.passedPlayerIds = [];
         }
       }
@@ -1215,7 +1262,7 @@ function addPlayableCardActions(
       continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     const projectedTargets = compiled.clauses
-      .filter((clause) => clause.triggers.length === 0)
+      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
@@ -1559,8 +1606,8 @@ function executeImmediateClauses(
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
   const effectOutcomes: Record<string, boolean | number | string | string[]> =
     {};
-  for (const clause of compiled.clauses.filter(
-    (item) => item.triggers.length === 0 && item.abilities.length === 0,
+  for (const clause of compiled.clauses.filter((item) =>
+    clauseCanResolveImmediately(definition, item),
   )) {
     const availableSelections = targetObjectVersions
       ? selectedIds.filter(
@@ -1584,6 +1631,69 @@ function executeImmediateClauses(
       allowUnavailableSelections: targetObjectVersions !== undefined,
     });
   }
+}
+
+function chainItemsNeedTargetSelection(
+  game: GameDocument,
+  items: ChainItem[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  return items.some((item) => {
+    if (
+      !item.sourceCardInstanceId ||
+      !item.behaviorClauseId ||
+      item.targetCardInstanceIds.length > 0
+    ) {
+      return false;
+    }
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const clause = compileBehaviorModel(
+      definition.behaviorModel,
+      handlers,
+    ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+    if (!clause) return false;
+    const requirements = targetRequirementsForClause(
+      clause,
+      createBehaviorContext(
+        game,
+        item.controllerPlayerId,
+        item.sourceCardInstanceId,
+        item.behaviorEvent,
+        [],
+      ),
+      handlers,
+    );
+    return requirements.some((requirement) => requirement.maximum > 0);
+  });
+}
+
+function clauseCanRequirePlaySelections(
+  definition: GameCardDefinition,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+) {
+  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (definition.card.classification.type !== "Unit") return true;
+  return !looksLikeNonPlayUnitText(clause.sourceText);
+}
+
+function clauseCanResolveImmediately(
+  definition: GameCardDefinition,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+) {
+  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (definition.card.classification.type !== "Unit") return true;
+  return !looksLikeNonPlayUnitText(clause.sourceText);
+}
+
+function looksLikeNonPlayUnitText(sourceText: string) {
+  const text = sourceText.trim().toLowerCase();
+  return (
+    /^when\b/.test(text) ||
+    /^while\b/.test(text) ||
+    /\b(?:units?|friendly units?|enemy units?)\b[^.]{0,50}\bhave\b/.test(text)
+  );
 }
 
 function captureTargetObjectVersions(

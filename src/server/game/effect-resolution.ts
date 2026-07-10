@@ -203,8 +203,10 @@ export function resumeEffectResolution(
       frame.sourceCardInstanceId,
       null,
       [
-        ...frame.initialSelectedIds,
-        ...selectorSelections,
+        ...new Set([
+          ...frame.initialSelectedIds,
+          ...selectorSelections,
+        ]),
         ...(frame.selectionsByBinding[bindingKey] ?? []),
       ],
       clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)

@@ -1,4 +1,4 @@
-import type { BehaviorBinding } from "./schemas";
+import type { BehaviorBinding, BehaviorClause } from "./schemas";
 import type { RuntimeCardIndex } from "./primitive-handlers";
 import type { GameDocument } from "./state";
 import { numericConditionMatches } from "./numeric-condition";
@@ -35,6 +35,9 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     : []) {
     const targetsCandidate =
       binding.parameters.target === input.targetScope ||
+      (binding.parameters.target === "unit" &&
+        input.targetScope === "source" &&
+        input.targetCardInstanceId) ||
       (binding.parameters.target === "friendly_unit" &&
         input.targetScope === "source" &&
         input.targetCardInstanceId &&
@@ -43,7 +46,8 @@ export function effectiveNumericValue(input: NumericValueInput): number {
       binding.parameters.attribute !== input.attribute ||
       !targetsCandidate ||
       (input.controllerPlayerId &&
-        controllerPlayerId !== input.controllerPlayerId) ||
+        controllerPlayerId !== input.controllerPlayerId &&
+        binding.parameters.target !== "unit") ||
       (input.targetScope === "controller_spell" &&
         input.cardType !== "Spell") ||
       (binding.parameters.target === "source" &&
@@ -116,10 +120,28 @@ function continuousConditionApplies(
   sourceId: string,
 ) {
   const condition = binding.parameters.condition;
-  if (typeof condition !== "string") return true;
   const targetId = input.targetCardInstanceId;
-  if (!targetId || !input.index) return false;
+  const needsTarget =
+    binding.parameters.excludesSource === true ||
+    binding.parameters.locationRelation === "sourceLocation" ||
+    binding.parameters.locationRelation === "sharedLocation" ||
+    typeof condition === "string";
+  if (!targetId || !input.index) return !needsTarget;
+  if (
+    binding.parameters.excludesSource === true &&
+    targetId === sourceId
+  ) {
+    return false;
+  }
+  if (
+    (binding.parameters.locationRelation === "sourceLocation" ||
+      binding.parameters.locationRelation === "sharedLocation") &&
+    !sameBoardLocation(input.game, sourceId, targetId)
+  ) {
+    return false;
+  }
   const role = input.game.state.cardStates[targetId]?.combatRole;
+  if (typeof condition !== "string") return true;
   if (condition === "sourceCombatsAlone") {
     return targetId === sourceId &&
       (role === "attacker" || role === "defender") &&
@@ -130,6 +152,38 @@ function continuousConditionApplies(
       combatRoleCount(input.game, input.index, controllerPlayerId, "defender") === 1;
   }
   return true;
+}
+
+function sameBoardLocation(
+  game: GameDocument,
+  sourceId: string,
+  targetId: string,
+) {
+  const sourceLocation = boardLocationForCard(game, sourceId);
+  const targetLocation = boardLocationForCard(game, targetId);
+  return (
+    sourceLocation !== null &&
+    targetLocation !== null &&
+    sourceLocation.kind === targetLocation.kind &&
+    sourceLocation.id === targetLocation.id
+  );
+}
+
+function boardLocationForCard(game: GameDocument, id: string) {
+  for (const battlefield of game.state.battlefields) {
+    if (
+      battlefield.cardInstanceId === id ||
+      battlefield.units.includes(id)
+    ) {
+      return { kind: "battlefield" as const, id: battlefield.battlefieldId };
+    }
+  }
+  for (const playerId of game.state.setup.playerIds) {
+    if (game.state.players[playerId]?.zones.base.includes(id)) {
+      return { kind: "base" as const, id: playerId };
+    }
+  }
+  return null;
 }
 
 function combatRoleCount(
@@ -176,22 +230,66 @@ function activeContinuousBindings(
     const definition = instance && index.definitions.get(instance.cardCode);
     if (!instance || !definition) return [];
     return definition.behaviorModel.clauses.flatMap((clause) =>
-      clause.effects.flatMap((binding) =>
-        binding.behaviorId === "modifier.modify_numeric_value" &&
-        isContinuousDuration(binding.parameters.duration) &&
-        sourceIsActive(game, sourceId, binding.parameters.duration)
+      clause.effects.flatMap((binding) => {
+        const continuousBinding = continuousNumericBinding(clause, binding);
+        return continuousBinding &&
+          sourceIsActive(
+            game,
+            sourceId,
+            continuousBinding.parameters.duration,
+          )
           ? [
               {
-                binding,
+                binding: continuousBinding,
                 conditions: clause.conditions,
                 controllerPlayerId: instance.ownerPlayerId,
                 sourceId,
               },
             ]
-          : [],
-      ),
+          : [];
+      }),
     );
   });
+}
+
+function continuousNumericBinding(
+  clause: BehaviorClause,
+  binding: BehaviorBinding,
+): BehaviorBinding | null {
+  if (binding.behaviorId !== "modifier.modify_numeric_value") return null;
+  if (isContinuousDuration(binding.parameters.duration)) return binding;
+  if (!looksLikeStaticNumericModifier(clause.sourceText)) return null;
+
+  const selector = clause.selectors.find((item) =>
+    ["selector.unit", "selector.friendly_unit", "selector.enemy_unit"].includes(
+      item.behaviorId,
+    ),
+  );
+  return {
+    ...binding,
+    parameters: {
+      ...binding.parameters,
+      ...(selector?.parameters.locationRelation &&
+      !binding.parameters.locationRelation
+        ? { locationRelation: selector.parameters.locationRelation }
+        : {}),
+      ...((selector?.parameters.excludesSource === true ||
+      /\bother\b/.test(clause.sourceText.toLowerCase())) &&
+      binding.parameters.excludesSource !== true
+        ? { excludesSource: true }
+        : {}),
+      duration: "whileSourceOnBoard",
+    },
+  };
+}
+
+function looksLikeStaticNumericModifier(sourceText: string) {
+  const text = sourceText.trim().toLowerCase();
+  return (
+    !/^when\b/.test(text) &&
+    !/\bchoose\b|\bgive\b|\bthis turn\b/.test(text) &&
+    /\b(?:units?|friendly units?|enemy units?)\b[^.]{0,50}\bhave\b/.test(text)
+  );
 }
 
 function sourceIsActive(
@@ -201,6 +299,7 @@ function sourceIsActive(
 ) {
   if (duration === "whileSourceAtBattlefield") {
     return game.state.battlefields.some((battlefield) =>
+      battlefield.cardInstanceId === sourceId ||
       battlefield.units.includes(sourceId),
     );
   }

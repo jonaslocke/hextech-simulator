@@ -126,6 +126,8 @@ export const gameEventKinds = [
   "card.revealed",
   "card.banished",
   "card.returnedToHand",
+  "unit.attacks",
+  "unit.defends",
   "unit.moved",
   "unit.died",
   "unit.damaged",
@@ -148,7 +150,8 @@ export const unitLocationRelations = [
   "any",
   "sourceLocation",
   "sharedLocation",
-  "currentCombat"
+  "currentCombat",
+  "eventBattlefield"
 ] as const;
 
 export const targetReferenceKinds = [
@@ -408,8 +411,28 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "trigger",
     name: "On move trigger",
     description: "Creates an effect when a unit moves.",
-    parameters: [required("subject", "string", "The unit movement event that fires the trigger.", triggerSubjectKinds)],
+    parameters: [
+      required("subject", "string", "The unit movement event that fires the trigger.", triggerSubjectKinds),
+      optional("destination", "string", "Optional movement destination filter.", [
+        "battlefield",
+        "base"
+      ])
+    ],
     listensToEvents: ["unit.moved"]
+  }),
+  "trigger.attack": primitiveSeed({
+    id: "trigger.attack",
+    family: "trigger",
+    name: "Attack trigger",
+    description: "Creates an effect when the source attacks.",
+    listensToEvents: ["unit.attacks"]
+  }),
+  "trigger.defend": primitiveSeed({
+    id: "trigger.defend",
+    family: "trigger",
+    name: "Defend trigger",
+    description: "Creates an effect when the source defends.",
+    listensToEvents: ["unit.defends"]
   }),
   "trigger.on_death": primitiveSeed({
     id: "trigger.on_death",
@@ -848,6 +871,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("amount", "number", "The constant operand when operand is constant."),
       required("target", "target", "The object or game value being modified."),
       optional("selectionKey", "string", "Selector key supplying affected units."),
+      optional("locationRelation", "locationRelation", "How affected units relate to the source location."),
+      optional("excludesSource", "boolean", "Whether the source card is excluded from affected units."),
       optional("condition", "string", "Runtime predicate guarding the modifier.", [
         "friendlyDefendsAlone",
         "sourceCombatsAlone",

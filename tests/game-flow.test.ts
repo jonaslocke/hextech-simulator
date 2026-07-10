@@ -383,6 +383,57 @@ test("plays Units to Base or a controlled battlefield and rejects forged destina
   assert.equal(next.state.cardStates["p1:unit"]!.exhausted, true);
 });
 
+test("stale triggered and passive Unit clauses do not block playing the Unit", () => {
+  const { game, decks } = fixture();
+  const unitDefinition = decks[0]!.snapshot.cards.find(
+    (card) => card.cardCode === "UNIT",
+  )!;
+  unitDefinition.behaviorModel.clauses.push({
+    id: "stale-triggered-target",
+    sequence: 0,
+    sourceText: "When I attack, deal 1 to an enemy unit here",
+    normalizedText: "When I attack, deal 1 to an enemy unit here",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [
+      {
+        behaviorId: "selector.enemy_unit",
+        parameters: {
+          minimumCount: 1,
+          maximumCount: 1,
+          area: "board",
+          locationRelation: "sourceLocation",
+          controller: "opponent",
+        },
+        confidence: "high",
+        order: 0,
+      },
+    ],
+    choices: [],
+    costs: [],
+    timings: [],
+    keywords: [],
+    effects: [
+      {
+        behaviorId: "action.deal_damage",
+        parameters: { amount: 1, target: "enemy_unit" },
+        confidence: "high",
+        order: 1,
+      },
+    ],
+  });
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:unit" &&
+      action.label === "Play Unit to Base",
+  );
+
+  assert.equal(play?.enabled, true);
+  assert.deepEqual(play?.targets, []);
+});
+
 test("playing a permitted Unit to an open battlefield starts a Showdown before Conquer", () => {
   const { game, decks } = fixture();
   const definition = decks[0]!.snapshot.cards.find(

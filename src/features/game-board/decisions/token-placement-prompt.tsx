@@ -1,10 +1,11 @@
 "use client";
 
+import { CardRulesText } from "@/features/card-presentation";
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
 import { cn } from "@/shared/utils/cn";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TokenPlacementDecisionRequest } from "./player-decision-types";
 
 export function TokenPlacementPrompt({
@@ -18,9 +19,20 @@ export function TokenPlacementPrompt({
     placements: Array<{ destinationId: string; count: number }>,
   ) => void;
 }) {
+  const firstDestinationId = decision.destinations[0]?.id ?? "base";
   const [counts, setCounts] = useState<Record<string, number>>(() => ({
-    [decision.destinations[0]?.id ?? "base"]: decision.count,
+    [firstDestinationId]: decision.count,
   }));
+  const destinationKey = useMemo(
+    () => decision.destinations.map((destination) => destination.id).join("|"),
+    [decision.destinations],
+  );
+
+  useEffect(() => {
+    setCounts({
+      [firstDestinationId]: decision.count,
+    });
+  }, [decision.count, decision.decisionKey, destinationKey, firstDestinationId]);
   const assigned = useMemo(
     () =>
       decision.destinations.reduce(
@@ -54,9 +66,9 @@ export function TokenPlacementPrompt({
               {decision.title}
             </h2>
             {decision.description && (
-              <p className="text-slate-400 text-sm leading-5">
-                {decision.description}
-              </p>
+              <div className="text-slate-400 text-sm leading-5">
+                <CardRulesText text={decision.description} />
+              </div>
             )}
           </header>
 

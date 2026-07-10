@@ -11,6 +11,7 @@
     "catalog:check-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts --check",
     "catalog:clear-validations": "node --env-file=.env --import tsx scripts/clear-card-behavior-validations.ts --confirm",
     "catalog:reset-canonical-cards": "node --env-file=.env --import tsx scripts/reset-canonical-card-catalog.ts --confirm",
+    "catalog:repair-garen-m1": "node --env-file=.env --import tsx scripts/repair-garen-m1-canonical-cards.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-decks": "node --env-file=.env --import tsx scripts/sync-deck-definitions.ts --confirm",
     "game:reset-runtime": "node --env-file=.env --import tsx scripts/reset-game-runtime.ts --confirm",
