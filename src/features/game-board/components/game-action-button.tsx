@@ -11,6 +11,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+
 import { Button } from "@/shared/components/button";
 import {
   DropdownMenu,
@@ -42,49 +43,37 @@ export const DEFAULT_GAME_ACTION_KEYBINDS = {
   cancel: "escape",
 } as const satisfies Record<GameActionSlot, string>;
 
-const gameActionButtonVariants = cva(
-  [
-    "inline-flex min-w-0 items-center justify-center gap-2 rounded-md",
-    "font-semibold leading-none transition",
-    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-300",
-    "disabled:cursor-not-allowed disabled:opacity-50",
-  ],
-  {
-    variants: {
-      variant: {
-        default:
-          "bg-amber-300 text-slate-950 shadow-[0_0_20px_rgba(252,211,77,0.18)] hover:bg-amber-200 disabled:bg-amber-300",
-        secondary:
-          "border border-amber-300/25 bg-amber-300/10 text-amber-100 hover:border-amber-300/40 hover:bg-amber-300/15",
-        outline:
-          "border border-amber-300/45 bg-slate-950/20 text-amber-100 hover:bg-amber-300/10",
-        ghost: "bg-amber-300/5 text-amber-100 hover:bg-amber-300/10",
-        destructive:
-          "bg-red-500/90 text-white shadow-[0_0_20px_rgba(239,68,68,0.18)] hover:bg-red-400 disabled:bg-red-500/70",
-      },
-      size: {
-        compact: "h-8 px-2.5",
-        default: "h-9 px-3",
-        lg: "h-10 px-4",
-      },
-      shape: {
-        default: "",
-        splitPrimary: "rounded-r-none",
-        splitTrigger: "w-9 rounded-l-none px-0",
-      },
-      fullWidth: {
-        true: "w-full",
-        false: "",
-      },
+const gameActionButtonVariants = cva(["min-w-0 font-semibold leading-none"], {
+  variants: {
+    variant: {
+      default: "shadow-[0_0_20px_var(--action-glow)]",
+      secondary: "",
+      outline: "border-action-border",
+      ghost: "",
+      destructive: "shadow-[0_0_20px_var(--destructive-glow)]",
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-      shape: "default",
-      fullWidth: false,
+    size: {
+      compact: "h-8 px-2.5",
+      default: "h-9 px-3",
+      lg: "h-10 px-4",
+    },
+    shape: {
+      default: "",
+      splitPrimary: "rounded-r-none",
+      splitTrigger: "w-9 rounded-l-none px-0",
+    },
+    fullWidth: {
+      true: "w-full",
+      false: "",
     },
   },
-);
+  defaultVariants: {
+    variant: "default",
+    size: "default",
+    shape: "default",
+    fullWidth: false,
+  },
+});
 
 const gameActionLabelVariants = cva(
   "min-w-0 font-semibold truncate leading-none",
@@ -110,9 +99,17 @@ const gameActionKeybindVariants = cva(
   {
     variants: {
       tone: {
-        default: "border-amber-300/25 bg-amber-300/15 text-amber-100",
-        inverse: "border-slate-950/20 bg-slate-950/10 text-slate-950/80",
-        destructive: "border-white/20 bg-white/15 text-white",
+        default: ["border-primary/25", "bg-primary/15", "text-primary"],
+        inverse: [
+          "border-primary-foreground/20",
+          "bg-primary-foreground/10",
+          "text-primary-foreground/80",
+        ],
+        destructive: [
+          "border-destructive-foreground/20",
+          "bg-destructive-foreground/15",
+          "text-destructive-foreground",
+        ],
       },
     },
     defaultVariants: {
@@ -123,10 +120,15 @@ const gameActionKeybindVariants = cva(
 
 const gameActionHelpButtonVariants = cva(
   [
-    "inline-flex shrink-0 items-center justify-center rounded-md",
-    "border border-amber-300/20 bg-amber-300/5 text-amber-100/70",
-    "transition hover:bg-amber-300/10 hover:text-amber-100",
-    "focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-300",
+    "inline-flex shrink-0 cursor-pointer items-center justify-center",
+    "rounded-md border border-action-border/60",
+    "bg-secondary text-secondary-foreground/70",
+    "transition-[background-color,border-color,color,box-shadow,transform]",
+    "hover:border-action-border",
+    "hover:bg-accent hover:text-accent-foreground",
+    "focus-visible:outline-none",
+    "focus-visible:ring-2 focus-visible:ring-ring/50",
+    "active:translate-y-px",
   ],
   {
     variants: {
@@ -144,15 +146,24 @@ const gameActionHelpButtonVariants = cva(
 
 type ButtonProps = ComponentPropsWithoutRef<typeof Button>;
 
-type GameActionButtonVisualProps = VariantProps<
-  typeof gameActionButtonVariants
->;
-
 type GameActionButtonVariant = NonNullable<
-  GameActionButtonVisualProps["variant"]
+  VariantProps<typeof gameActionButtonVariants>["variant"]
 >;
 
-type GameActionButtonSize = NonNullable<GameActionButtonVisualProps["size"]>;
+type GameActionButtonSize = NonNullable<
+  VariantProps<typeof gameActionButtonVariants>["size"]
+>;
+
+type GameActionButtonShape = NonNullable<
+  VariantProps<typeof gameActionButtonVariants>["shape"]
+>;
+
+type GameActionButtonVisualProps = {
+  fullWidth?: boolean;
+  shape?: GameActionButtonShape;
+  size?: GameActionButtonSize;
+  variant?: GameActionButtonVariant;
+};
 
 type GameActionKeybindTone = NonNullable<
   VariantProps<typeof gameActionKeybindVariants>["tone"]
@@ -175,7 +186,7 @@ type GameActionShortcutOptions = {
 
 export type GameActionButtonProps = Omit<
   ButtonProps,
-  "onClick" | "variant" | "size"
+  "fullWidth" | "onClick" | "size" | "variant"
 > &
   GameActionButtonVisualProps & {
     actionSlot: GameActionSlot;
@@ -229,7 +240,7 @@ export function GameActionButton({
   children,
   className,
   disabled = false,
-  fullWidth,
+  fullWidth = false,
   helpLabel,
   helpText,
   isActive = true,
@@ -239,11 +250,11 @@ export function GameActionButton({
   keybinds,
   keybindTone,
   onAction,
-  shape,
+  shape = "default",
   showKeybind = true,
-  size,
+  size = "default",
   type = "button",
-  variant,
+  variant = "default",
   ...props
 }: GameActionButtonProps) {
   const isActionDisabled = disabled || isBusy || !onAction;
@@ -262,8 +273,10 @@ export function GameActionButton({
     onAction: invokeAction,
   });
 
+  const resolvedVariant = variant ?? "default";
+
   const resolvedKeybindTone =
-    keybindTone ?? getDefaultKeybindTone(variant ?? "default");
+    keybindTone ?? getDefaultKeybindTone(resolvedVariant);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -286,13 +299,16 @@ export function GameActionButton({
           fullWidth,
           shape,
           size,
-          variant,
+          variant: resolvedVariant,
         }),
         className,
       )}
       disabled={isActionDisabled}
+      fullWidth={fullWidth}
       onClick={handleClick}
+      size={getBaseButtonSize(size)}
       type={type}
+      variant={variant}
       {...props}
     >
       <span className={gameActionLabelVariants({ size })}>{children}</span>
@@ -313,10 +329,10 @@ export function GameActionButton({
 
   return (
     <GameActionHelpWrapper
-      fullWidth={Boolean(fullWidth)}
+      fullWidth={fullWidth}
       helpLabel={helpLabel}
       helpText={helpText}
-      size={size ?? "default"}
+      size={size}
     >
       {button}
     </GameActionHelpWrapper>
@@ -389,10 +405,12 @@ export function GameActionSplitButton({
                   size,
                   variant,
                 }),
-                "border-l border-slate-950/15",
+                "border-l border-primary-foreground/15",
               )}
               disabled={disabled || isBusy}
+              size={getBaseButtonSize(size)}
               type="button"
+              variant={variant}
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </Button>
@@ -404,7 +422,10 @@ export function GameActionSplitButton({
         <DropdownMenuContent
           align={align}
           className={cn(
-            "z-100 bg-slate-950 shadow-black/40 shadow-xl border-amber-300/20 min-w-52 text-slate-100",
+            "z-100 min-w-52",
+            "border border-border",
+            "bg-popover text-popover-foreground",
+            "shadow-xl shadow-black/40",
             "backdrop-blur-xl",
           )}
           sideOffset={sideOffset}
@@ -480,8 +501,9 @@ function GameActionDropdownItem({
     <DropdownMenuItem
       className={cn(
         "flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer",
-        "focus:bg-amber-300/10 focus:text-amber-100",
-        "data-disabled:cursor-not-allowed data-disabled:opacity-50",
+        "focus:bg-accent focus:text-accent-foreground",
+        "data-disabled:cursor-not-allowed",
+        "data-disabled:opacity-50",
       )}
       disabled={isActionDisabled}
       onSelect={(event) => {
@@ -544,7 +566,13 @@ function GameActionHelpWrapper({
 
           <TooltipContent
             align="start"
-            className="z-100 bg-slate-950 shadow-xl px-3 py-2 border border-white/10 max-w-64 text-slate-100 text-xs leading-snug"
+            className={cn(
+              "z-100 max-w-64",
+              "border border-border",
+              "bg-popover px-3 py-2",
+              "text-xs leading-snug text-popover-foreground",
+              "shadow-xl shadow-black/40",
+            )}
             side="bottom"
             sideOffset={8}
           >
@@ -595,6 +623,7 @@ function useGameActionInvoker({
         void result.finally(() => {
           actionLockRef.current = false;
         });
+
         return;
       }
 
@@ -664,6 +693,16 @@ function useGameActionShortcut({
   ]);
 
   return keybind;
+}
+
+function getBaseButtonSize(
+  size: GameActionButtonSize,
+): NonNullable<ButtonProps["size"]> {
+  if (size === "compact") {
+    return "sm";
+  }
+
+  return size;
 }
 
 function resolveGameActionKeybind(
