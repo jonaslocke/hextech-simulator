@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 import { DialogPortal } from "./dialog-portal";
 import { cn } from "@/shared/utils/cn";
@@ -16,6 +16,9 @@ export type ChoiceDialogOption = {
 };
 
 export type ChoiceDialogProps = {
+  headerAction?: ReactNode;
+  interactionSuspended?: boolean;
+  isVisible?: boolean;
   confirmLabel?: string;
   decisionKey?: string;
   description?: string;
@@ -30,6 +33,9 @@ export type ChoiceDialogProps = {
 
 export function ChoiceDialog({
   confirmLabel,
+  headerAction,
+  interactionSuspended = false,
+  isVisible = true,
   decisionKey,
   description,
   isOpen,
@@ -72,9 +78,15 @@ export function ChoiceDialog({
 
   return (
     <DialogPortal>
-      <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100">
+      <div
+        aria-hidden={!isVisible || undefined}
+        className={cn(
+          "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100",
+          !isVisible && "invisible pointer-events-none",
+        )}
+      >
         <section
-          aria-modal="true"
+          aria-modal={isVisible ? "true" : undefined}
           className={cn(
             "gap-4 grid rounded-xl w-full max-w-2xl max-h-[min(42rem,calc(100vh-2rem))] overflow-hidden",
             "border border-cyan-300/25 bg-slate-950/82 p-4 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
@@ -82,23 +94,28 @@ export function ChoiceDialog({
           )}
           role="dialog"
         >
-          <header className="space-y-1">
-            <h2 className="font-semibold text-slate-50 text-lg leading-tight">
-              {title}
-            </h2>
-            {description && (
-              <p className="text-slate-400 text-sm leading-5">{description}</p>
-            )}
+          <header className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <h2 className="font-semibold text-slate-50 text-lg leading-tight">
+                {title}
+              </h2>
+              {description && (
+                <p className="text-slate-400 text-sm leading-5">{description}</p>
+              )}
+            </div>
+            {headerAction}
           </header>
 
           {selectionMode === "single" ? (
             <SingleChoiceList
+              interactionSuspended={interactionSuspended}
               onSelect={setSelectedId}
               options={options}
               selectedId={selectedId}
             />
           ) : (
             <OrderedChoiceList
+              interactionSuspended={interactionSuspended}
               onOrderChange={setOrderedIds}
               options={options}
               orderedIds={orderedIds}
@@ -107,14 +124,20 @@ export function ChoiceDialog({
 
           <footer className="flex justify-end gap-2 pt-3 border-white/10 border-t">
             {onCancel && (
-              <Button onClick={onCancel} type="button" variant="secondary">
+              <Button
+                disabled={interactionSuspended}
+                onClick={onCancel}
+                type="button"
+                variant="secondary"
+              >
                 Cancel
               </Button>
             )}
 
             <GameActionButton
               actionSlot="primary"
-              isBusy={!canConfirm || isSubmitting}
+              disabled={interactionSuspended || !canConfirm}
+              isBusy={isSubmitting}
               onAction={() => onConfirm(selectedIds)}
             >
               {isSubmitting ? "Submitting…" : confirmLabel}
@@ -127,10 +150,12 @@ export function ChoiceDialog({
 }
 
 function SingleChoiceList({
+  interactionSuspended,
   onSelect,
   options,
   selectedId,
 }: {
+  interactionSuspended: boolean;
   onSelect: (id: string) => void;
   options: ChoiceDialogOption[];
   selectedId: string | null;
@@ -150,7 +175,7 @@ function SingleChoiceList({
                 ? "border-cyan-300/80 bg-cyan-300/12 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
                 : "border-white/10 hover:border-cyan-300/45 hover:bg-cyan-300/5.5",
             )}
-            disabled={option.disabled}
+            disabled={interactionSuspended || option.disabled}
             key={option.id}
             onClick={() => onSelect(option.id)}
             type="button"
@@ -165,10 +190,12 @@ function SingleChoiceList({
 }
 
 function OrderedChoiceList({
+  interactionSuspended,
   onOrderChange,
   options,
   orderedIds,
 }: {
+  interactionSuspended: boolean;
   onOrderChange: (ids: string[]) => void;
   options: ChoiceDialogOption[];
   orderedIds: string[];
@@ -199,14 +226,14 @@ function OrderedChoiceList({
             <OptionText option={option} />
             <div className="flex gap-1.5 ml-auto">
               <ReorderButton
-                disabled={index === 0}
+                disabled={interactionSuspended || index === 0}
                 label="Move up"
                 onClick={() => onOrderChange(moveItem(orderedIds, index, -1))}
               >
                 Up
               </ReorderButton>
               <ReorderButton
-                disabled={index === orderedIds.length - 1}
+                disabled={interactionSuspended || index === orderedIds.length - 1}
                 label="Move down"
                 onClick={() => onOrderChange(moveItem(orderedIds, index, 1))}
               >

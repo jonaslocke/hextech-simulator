@@ -1,5 +1,6 @@
 import type { GameProjection } from "@/shared/game";
 import type { ReactNode } from "react";
+import type { DecisionInspectionPolicy } from "./decision-inspection-policy";
 
 export type PlayerDecisionIntent = {
   actionId: string;
@@ -24,7 +25,17 @@ export type CombatDamageChoice = Extract<
   { kind: "combatDamage" }
 >;
 
-export type CardSelectionDecisionRequest = {
+type DecisionInspectionCapability = {
+  /**
+   * Controls whether the active gameplay decision may temporarily expose a
+   * read-only game-state inspection surface.
+   *
+   * Omitted values are treated as "none" so older callers remain compatible.
+   */
+  inspection?: DecisionInspectionPolicy;
+};
+
+export type CardSelectionDecisionRequest = DecisionInspectionCapability & {
   kind: "cardSelection";
   decisionKey: string;
   actionId: string;
@@ -39,7 +50,7 @@ export type CardSelectionDecisionRequest = {
   canCancel?: boolean;
 };
 
-export type OptionDecisionRequest = {
+export type OptionDecisionRequest = DecisionInspectionCapability & {
   kind: "optionDecision";
   decisionKey: string;
   actionId: string;
@@ -50,7 +61,7 @@ export type OptionDecisionRequest = {
   canCancel?: boolean;
 };
 
-export type OrderedDecisionRequest = {
+export type OrderedDecisionRequest = DecisionInspectionCapability & {
   kind: "orderedDecision";
   decisionKey: string;
   actionId: string;
@@ -60,13 +71,14 @@ export type OrderedDecisionRequest = {
   confirmLabel?: string;
 };
 
-export type CombatDamageDecisionRequest = {
+export type CombatDamageDecisionRequest = DecisionInspectionCapability & {
   kind: "combatDamage";
   actionId: string;
+  decisionKey?: string;
   choice: CombatDamageChoice;
 };
 
-export type PendingDecisionRequest = {
+export type PendingDecisionRequest = DecisionInspectionCapability & {
   kind: "pendingDecision";
   title: string;
   message: ReactNode;

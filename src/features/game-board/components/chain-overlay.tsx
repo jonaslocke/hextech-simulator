@@ -29,6 +29,7 @@ export function ChainOverlay({
   chainCards,
   chainPassLabel = "Pass priority",
   isCloseDisabled = false,
+  interactionSuspended = false,
   isOpen,
   isSubmittingAction = false,
   onClose,
@@ -41,6 +42,7 @@ export function ChainOverlay({
   chainCards: ChainCardEntry[];
   chainPassLabel?: string;
   isCloseDisabled?: boolean;
+  interactionSuspended?: boolean;
   isOpen: boolean;
   isSubmittingAction?: boolean;
   onClose: () => void;
@@ -62,7 +64,8 @@ export function ChainOverlay({
 
   const chainItemKey = chainItemIds.join("|");
   const hasChainItems = chainItemIds.length > 0;
-  const canTogglePassAll = isOpen && hasChainItems;
+  const canTogglePassAll =
+    isOpen && hasChainItems && !interactionSuspended;
 
   useEffect(() => {
     const previousChainItemIds = previousChainItemIdsRef.current;
@@ -90,7 +93,7 @@ export function ChainOverlay({
     }
 
     function handleWindowKeyDown(event: KeyboardEvent) {
-      if (shouldIgnoreKeyShortcut(event, "l")) {
+      if (shouldIgnoreKeyShortcut(event, "r")) {
         return;
       }
 
@@ -108,6 +111,7 @@ export function ChainOverlay({
 
   useEffect(() => {
     if (
+      interactionSuspended ||
       !passAllPriority ||
       !canPassPriority ||
       !hasChainItems ||
@@ -128,6 +132,7 @@ export function ChainOverlay({
   }, [
     canPassPriority,
     chainItemKey,
+    interactionSuspended,
     hasChainItems,
     isSubmittingAction,
     onPassPriority,
@@ -176,6 +181,7 @@ export function ChainOverlay({
               >
                 <Checkbox
                   checked={passAllPriority}
+                  disabled={interactionSuspended}
                   id={autoPassControlId}
                   onCheckedChange={handlePassAllPriorityChange}
                 />
@@ -185,7 +191,7 @@ export function ChainOverlay({
                 </span>
 
                 <Kbd className="bg-white/10 shadow-none ml-auto px-1.5 py-0.5 border-white/15 text-[10px] text-slate-300">
-                  L
+                  R
                 </Kbd>
 
                 <Tooltip>
@@ -215,7 +221,7 @@ export function ChainOverlay({
               <GameActionButton
                 actionSlot="primary"
                 className="flex-1 justify-center bg-cyan-300 hover:bg-cyan-200 disabled:bg-cyan-300 disabled:opacity-50 text-slate-950"
-                disabled={!canPassPriority}
+                disabled={interactionSuspended || !canPassPriority}
                 isActive={isOpen && hasChainItems}
                 isBusy={isSubmittingAction}
                 keybindClassName="border-slate-950/20 bg-slate-950/10 text-slate-950/80"
