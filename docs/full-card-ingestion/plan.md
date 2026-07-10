@@ -230,6 +230,7 @@ Input readiness
   -> permanent deck exposure
   -> manual deck/full-match validation
   -> user acceptance
+  -> commit accepted milestone changes
   -> next milestone opens
 ```
 
@@ -300,6 +301,15 @@ Status: Awaiting Manual Acceptance
 
 Codex must not mark a milestone complete based only on code completion, test
 success, build success, or catalog approval.
+
+### 4.6 Post-acceptance commit
+
+After the user accepts a milestone, Codex must commit the accepted milestone
+changes before starting the next milestone.
+
+The commit should include only the accepted milestone work and any tracking
+updates needed to record that acceptance. Codex must not include unrelated user
+changes in that commit.
 
 ## 5. Tracking Model
 
@@ -1029,6 +1039,7 @@ Use this order to keep the work resumable.
 16. User manual validation.
 17. Fixes and retests, if needed.
 18. User acceptance.
+19. Commit accepted milestone changes.
 
 ## 15. Stop Conditions
 
@@ -1054,3 +1065,6 @@ Accepted by user after manual full-match validation.
 ```
 
 Everything before that is an implementation checkpoint.
+
+After acceptance, Codex must commit the accepted milestone changes before moving
+to the next milestone.
