@@ -14,6 +14,7 @@ export type BoardCatalogCard = {
   media: { image_url: string | null };
   metadata: Record<string, never>;
   name: string;
+  ownerPlayerId: string;
   public_code: string;
   set: { label: string };
   text: { plain: string };
@@ -348,6 +349,7 @@ function toCatalogCard(card: ProjectedCardView): BoardCatalogCard {
     media: { image_url: card.imageUrl },
     metadata: {},
     name: card.name,
+    ownerPlayerId: card.ownerPlayerId,
     public_code: card.publicCode,
     set: { label: "" },
     text: { plain: card.rulesText },

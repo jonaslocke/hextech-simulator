@@ -1,4 +1,11 @@
-import type { Collection, Db, Filter, OptionalUnlessRequiredId, WithId } from "mongodb";
+import type {
+  ClientSession,
+  Collection,
+  Db,
+  Filter,
+  OptionalUnlessRequiredId,
+  WithId,
+} from "mongodb";
 import type { DeckSnapshot } from "./schemas";
 import type { CardInstance, GameDocument, MatchDocument } from "./state";
 
@@ -38,10 +45,17 @@ export type GameDocumentRepository = DocumentRepository<GameDocument> & {
   ): Promise<boolean>;
 };
 
+export type MatchDocumentRepository = DocumentRepository<MatchDocument> & {
+  upsertIfStateVersion(
+    document: MatchDocument,
+    expectedStateVersion: number,
+  ): Promise<boolean>;
+};
+
 type Stored<T extends { id: string }> = T & { _id: string };
 
 export type GameRepositories = {
-  matches: DocumentRepository<MatchDocument>;
+  matches: MatchDocumentRepository;
   games: GameDocumentRepository;
   gameEvents: DocumentRepository<GameEventDocument> & {
     findByGameId(gameId: string): Promise<GameEventDocument[]>;
@@ -49,15 +63,32 @@ export type GameRepositories = {
   deckSnapshots: DocumentRepository<DeckSnapshotDocument>;
 };
 
-export function createGameRepositories(db: Db): GameRepositories {
+export function createGameRepositories(
+  db: Db,
+  session?: ClientSession,
+): GameRepositories {
   const matches = db.collection<Stored<MatchDocument>>(gameCollectionNames.matches);
   const games = db.collection<Stored<GameDocument>>(gameCollectionNames.games);
   const events = db.collection<Stored<GameEventDocument>>(gameCollectionNames.gameEvents);
   const deckSnapshots = db.collection<Stored<DeckSnapshotDocument>>(gameCollectionNames.deckSnapshots);
   return {
-    matches: createRepository(matches),
+    matches: {
+      ...createRepository(matches, session),
+      async upsertIfStateVersion(document, expectedStateVersion) {
+        const result = await matches.updateOne(
+          {
+            _id: document.id,
+            stateVersion: expectedStateVersion,
+          } as Filter<Stored<MatchDocument>>,
+          { $set: toStored(document) },
+          { session },
+        );
+
+        return result.modifiedCount === 1;
+      },
+    },
     games: {
-      ...createRepository(games),
+      ...createRepository(games, session),
       async upsertIfStateVersion(document, expectedStateVersion) {
         const result = await games.updateOne(
           {
@@ -65,38 +96,46 @@ export function createGameRepositories(db: Db): GameRepositories {
             stateVersion: expectedStateVersion,
           } as Filter<Stored<GameDocument>>,
           { $set: toStored(document) },
+          { session },
         );
 
         return result.modifiedCount === 1;
       },
     },
     gameEvents: {
-      ...createRepository(events),
+      ...createRepository(events, session),
       async findByGameId(gameId) {
-        const documents = await events.find({ gameId } as Filter<Stored<GameEventDocument>>).sort({ sequence: 1 }).toArray();
+        const documents = await events.find({ gameId } as Filter<Stored<GameEventDocument>>, { session }).sort({ sequence: 1 }).toArray();
         return documents.map((document) => fromStored(document)!);
       }
     },
-    deckSnapshots: createRepository(deckSnapshots)
+    deckSnapshots: createRepository(deckSnapshots, session)
   };
 }
 
 function createRepository<T extends BaseDocument>(
-  collection: Collection<Stored<T>>
+  collection: Collection<Stored<T>>,
+  session?: ClientSession,
 ): DocumentRepository<T> {
   return {
     async findById(id) {
-      const result = await collection.findOne({ _id: id } as Filter<Stored<T>>);
+      const result = await collection.findOne(
+        { _id: id } as Filter<Stored<T>>,
+        { session },
+      );
       return fromStored(result);
     },
     async insert(document) {
-      await collection.insertOne(toStored(document) as OptionalUnlessRequiredId<Stored<T>>);
+      await collection.insertOne(
+        toStored(document) as OptionalUnlessRequiredId<Stored<T>>,
+        { session },
+      );
     },
     async upsert(document) {
       await collection.updateOne(
         { _id: document.id } as Filter<Stored<T>>,
         { $set: toStored(document) },
-        { upsert: true }
+        { upsert: true, session }
       );
     }
   };

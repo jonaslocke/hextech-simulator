@@ -8,6 +8,7 @@ import {
 
 export const cardInstanceSchema = z.object({
   instanceId: z.string().min(1),
+  registeredCardId: z.string().min(1).nullable().optional(),
   ownerPlayerId: z.string().min(1),
   source: z.enum([
     "legend",
@@ -298,9 +299,11 @@ export const gameDocumentSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   matchId: z.string().min(1),
+  gameNumber: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   stateVersion: z.number().int().nonnegative(),
   status: z.enum(["setup_pending", "ready", "in_progress", "complete"]),
   winnerPlayerId: z.string().nullable(),
+  completionReason: z.enum(["victory", "game_concession"]).nullable(),
   state: gameStateSchema,
 });
 
@@ -310,33 +313,98 @@ export type PlayerState = z.infer<typeof playerStateSchema>;
 export type GameState = z.infer<typeof gameStateSchema>;
 export type GameDocument = z.infer<typeof gameDocumentSchema>;
 
-export type MatchDocument = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  status: "setup_pending" | "in_progress" | "complete";
-  currentGameId: string;
-  seats: [
-    {
-      playerId: string;
-      seat: "player-1";
-      tokenHash: string;
-      deckSnapshotId: string;
-      displayName: string;
-    },
-    {
-      playerId: string;
-      seat: "player-2";
-      tokenHash: string;
-      deckSnapshotId: string;
-      displayName: string;
-    },
-  ];
-};
+export const deckConfigurationSchema = z.object({
+  chosenChampionRegisteredCardId: z.string().min(1),
+  mainDeckRegisteredCardIds: z.array(z.string().min(1)),
+  sideboardRegisteredCardIds: z.array(z.string().min(1)),
+});
+
+export const completedGameSummarySchema = z.object({
+  gameId: z.string().min(1),
+  gameNumber: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  winnerPlayerId: z.string().min(1),
+  loserPlayerId: z.string().min(1),
+  startingPlayerChooserId: z.string().min(1),
+  startingPlayerId: z.string().min(1),
+  battlefieldRegisteredCardIdByPlayerId: z.record(z.string().min(1)),
+  completionReason: z.enum(["victory", "game_concession"]),
+  completedAt: z.string(),
+});
+
+export const nextGameSubmissionSchema = z.object({
+  status: z.enum(["pending", "submitted"]),
+  configuration: deckConfigurationSchema.nullable(),
+  submittedAt: z.string().nullable(),
+});
+
+export const betweenGamesSchema = z.object({
+  id: z.string().min(1),
+  afterGameId: z.string().min(1),
+  nextGameNumber: z.union([z.literal(2), z.literal(3)]),
+  previousGameWinnerPlayerId: z.string().min(1),
+  previousGameLoserPlayerId: z.string().min(1),
+  nextStartingPlayerChooserId: z.string().min(1),
+  submissionsByPlayerId: z.record(nextGameSubmissionSchema),
+});
+
+export const matchCompletionSchema = z.discriminatedUnion("reason", [
+  z.object({
+    reason: z.literal("two_set_points"),
+    winnerPlayerId: z.string().min(1),
+    completedAt: z.string(),
+  }),
+  z.object({
+    reason: z.literal("match_concession"),
+    winnerPlayerId: z.string().min(1),
+    concededByPlayerId: z.string().min(1),
+    completedAt: z.string(),
+  }),
+]);
+
+export const matchSeatSchema = z.object({
+  playerId: z.string().min(1),
+  seat: z.enum(["player-1", "player-2"]),
+  tokenHash: z.string().min(1),
+  displayName: z.string().min(1),
+  registeredDeckSnapshotId: z.string().min(1),
+  currentDeckConfiguration: deckConfigurationSchema,
+});
+
+export const matchDocumentSchema = z.object({
+  id: z.string().min(1),
+  format: z.literal("riftbound-1v1-match"),
+  status: z.enum(["playing", "between_games", "complete"]),
+  stateVersion: z.number().int().nonnegative(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  currentGameId: z.string().min(1),
+  gameIds: z.array(z.string().min(1)).min(1).max(3),
+  completedGames: z.array(completedGameSummarySchema).max(3),
+  betweenGames: betweenGamesSchema.nullable(),
+  completion: matchCompletionSchema.nullable(),
+  seats: z.tuple([matchSeatSchema, matchSeatSchema]),
+});
+
+export type DeckConfiguration = z.infer<typeof deckConfigurationSchema>;
+export type CompletedGameSummary = z.infer<typeof completedGameSummarySchema>;
+export type NextGameSubmission = z.infer<typeof nextGameSubmissionSchema>;
+export type BetweenGamesState = z.infer<typeof betweenGamesSchema>;
+export type MatchCompletion = z.infer<typeof matchCompletionSchema>;
+export type MatchSeat = z.infer<typeof matchSeatSchema>;
+export type MatchDocument = z.infer<typeof matchDocumentSchema>;
 
 export type DeckRuntimeSnapshot = {
   template: DeckSnapshot;
   instances: CardInstance[];
+};
+
+export type ActiveGameDeck = {
+  legendRegisteredCardId: string;
+  chosenChampionRegisteredCardId: string;
+  mainDeckRegisteredCardIds: string[];
+  runeDeckRegisteredCardIds: string[];
+  availableBattlefieldRegisteredCardIds: string[];
+  sideboardRegisteredCardIds: string[];
 };
 
 export function createPlayerToken(): { token: string; tokenHash: string } {
@@ -355,13 +423,16 @@ export function verifyPlayerToken(token: string, hash: string): boolean {
 export function createRuntimeDeckSnapshot(
   template: DeckSnapshot,
   playerId: string,
+  idPrefix = playerId,
 ): DeckRuntimeSnapshot {
   const instances: CardInstance[] = [];
   for (const entry of template.entries) {
     const source = sectionSource(entry.section);
     for (let copy = 1; copy <= entry.quantity; copy += 1) {
+      const registeredCardId = `${idPrefix}:${source}:${entry.cardCode}:${copy}`;
       instances.push({
-        instanceId: `${playerId}:${source}:${entry.cardCode}:${copy}`,
+        instanceId: registeredCardId,
+        registeredCardId,
         ownerPlayerId: playerId,
         source,
         cardCode: entry.cardCode,
@@ -426,9 +497,11 @@ export function createInitialGame(input: {
     createdAt: input.now,
     updatedAt: input.now,
     matchId: input.matchId,
+    gameNumber: 1,
     stateVersion: 0,
     status: "setup_pending",
     winnerPlayerId: null,
+    completionReason: null,
     state: {
       setup: {
         playerIds: input.playerIds,

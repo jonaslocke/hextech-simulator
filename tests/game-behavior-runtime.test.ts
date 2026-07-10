@@ -214,8 +214,8 @@ function binding(behaviorId: string, order: number, parameters: Record<string, s
 }
 function gameFixture(): GameDocument {
   return {
-    id: "g", matchId: "m", createdAt: "a", updatedAt: "a", stateVersion: 1,
-    status: "in_progress", winnerPlayerId: null,
+    id: "g", matchId: "m", createdAt: "a", updatedAt: "a", gameNumber: 1, stateVersion: 1,
+    status: "in_progress", winnerPlayerId: null, completionReason: null,
     state: {
       setup: { playerIds: ["p1", "p2"], startingPlayerChooserId: "p1", startingPlayerId: "p1", battlefieldPools: {}, battlefieldChoices: {}, mulligans: {} },
       players: {}, battlefields: [], cardStates: {}, turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },

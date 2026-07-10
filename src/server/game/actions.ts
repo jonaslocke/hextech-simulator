@@ -364,13 +364,11 @@ function battlefieldsInActorBoardOrder(
       actorPlayerId,
       battlefield: left,
       fallbackPlayerOrder,
-      playerIds,
     });
     const rightOrder = battlefieldOwnerOrder({
       actorPlayerId,
       battlefield: right,
       fallbackPlayerOrder,
-      playerIds,
     });
 
     if (leftOrder !== rightOrder) {
@@ -388,18 +386,12 @@ function battlefieldOwnerOrder({
   actorPlayerId,
   battlefield,
   fallbackPlayerOrder,
-  playerIds,
 }: {
   actorPlayerId: string;
   battlefield: GameDocument["state"]["battlefields"][number];
   fallbackPlayerOrder: string[];
-  playerIds: readonly string[];
 }) {
-  const ownerPlayerId = playerIds.find(
-    (playerId) =>
-      valueBelongsToPlayer(battlefield.battlefieldId, playerId) ||
-      valueBelongsToPlayer(battlefield.cardInstanceId, playerId),
-  );
+  const ownerPlayerId = battlefield.selectedByPlayerId;
 
   if (!ownerPlayerId) {
     return Number.MAX_SAFE_INTEGER;
@@ -412,14 +404,6 @@ function battlefieldOwnerOrder({
   const fallbackIndex = fallbackPlayerOrder.indexOf(ownerPlayerId);
 
   return fallbackIndex >= 0 ? fallbackIndex + 1 : Number.MAX_SAFE_INTEGER;
-}
-
-function valueBelongsToPlayer(value: string, playerId: string) {
-  return (
-    value === playerId ||
-    value.startsWith(`${playerId}:`) ||
-    value.startsWith(`${playerId}-`)
-  );
 }
 
 export function performGameplayAction(input: {
@@ -614,6 +598,7 @@ export function performGameplayAction(input: {
       const opponentPlayerId = otherPlayer(game, input.actorPlayerId);
 
       game.winnerPlayerId = opponentPlayerId;
+      game.completionReason = "game_concession";
       game.status = "complete";
 
       game.state.pendingChoice = null;

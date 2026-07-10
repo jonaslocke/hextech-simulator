@@ -231,7 +231,7 @@ export const projectedChainSchema = z
 export const gameProjectionSchema = z.object({
   id: z.string().min(1),
   matchId: z.string().min(1),
-  gameNumber: z.number().int().positive(),
+  gameNumber: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   stateVersion: z.number().int().nonnegative(),
   status: z.enum(["setup_pending", "ready", "in_progress", "complete"]),
   viewerPlayerId: z.string().min(1),
@@ -353,6 +353,82 @@ export const gameProjectionSchema = z.object({
   ),
 });
 
+export const deckConfigurationSchema = z.object({
+  chosenChampionRegisteredCardId: z.string().min(1),
+  mainDeckRegisteredCardIds: z.array(z.string().min(1)),
+  sideboardRegisteredCardIds: z.array(z.string().min(1)),
+});
+
+export const matchReadyIntentSchema = z.object({
+  type: z.literal("match.readyForNextGame"),
+  payload: z.object({
+    betweenGamesId: z.string().min(1),
+  }),
+});
+
+export const matchConcedeIntentSchema = z.object({
+  type: z.literal("match.concedeMatch"),
+  payload: z.object({
+    betweenGamesId: z.string().min(1),
+  }),
+});
+
+export const matchIntentSchema = z.discriminatedUnion("type", [
+  gameActionIntentSchema,
+  matchReadyIntentSchema,
+  matchConcedeIntentSchema,
+]);
+
+export const matchIntentRequestSchema = z.object({
+  playerToken: z.string().min(1),
+  stateVersion: z.number().int().nonnegative(),
+  intent: matchIntentSchema,
+});
+
+export const viewerBetweenGamesProjectionSchema = z.object({
+  id: z.string().min(1),
+  mode: z.literal("ready_with_current_configuration"),
+  nextGameNumber: z.union([z.literal(2), z.literal(3)]),
+  previousGameWinnerPlayerId: z.string().min(1),
+  previousGameLoserPlayerId: z.string().min(1),
+  nextStartingPlayerChooserId: z.string().min(1),
+  viewerStatus: z.enum(["pending", "submitted"]),
+  opponentStatus: z.enum(["pending", "submitted"]),
+  usedBattlefieldRegisteredIdsByPlayerId: z.record(z.array(z.string())),
+  remainingBattlefieldRegisteredIdsByPlayerId: z.record(z.array(z.string())),
+  nextBattlefieldMode: z.enum(["player_choice", "server_auto"]),
+  viewerCurrentDeckConfiguration: deckConfigurationSchema,
+  capabilities: z.object({
+    canReadyWithCurrentConfiguration: z.boolean(),
+    canSubmitDeckReconfiguration: z.literal(false),
+    canConcedeMatch: z.boolean(),
+  }),
+});
+
+export const matchProjectionSchema = z.object({
+  matchId: z.string().min(1),
+  stateVersion: z.number().int().nonnegative(),
+  format: z.literal("riftbound-1v1-match"),
+  status: z.enum(["playing", "between_games", "complete"]),
+  viewerPlayerId: z.string().min(1),
+  scoreByPlayerId: z.record(z.number().int().nonnegative()),
+  winnerPlayerId: z.string().min(1).nullable(),
+  completionReason: z.enum(["two_set_points", "match_concession"]).nullable(),
+  currentGameId: z.string().min(1),
+  gameNumber: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  gameIds: z.array(z.string().min(1)),
+  completedGames: z.array(
+    z.object({
+      gameId: z.string().min(1),
+      gameNumber: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      winnerPlayerId: z.string().min(1),
+      completionReason: z.enum(["victory", "game_concession"]),
+    }),
+  ),
+  currentGame: gameProjectionSchema,
+  betweenGames: viewerBetweenGamesProjectionSchema.nullable(),
+});
+
 export type ProjectedTargetRequirement = z.infer<
   typeof projectedTargetRequirementSchema
 >;
@@ -365,3 +441,9 @@ export type ProjectedBattlefield = z.infer<typeof projectedBattlefieldSchema>;
 export type ProjectedChainItem = z.infer<typeof projectedChainItemSchema>;
 export type ProjectedChain = z.infer<typeof projectedChainSchema>;
 export type GameProjection = z.infer<typeof gameProjectionSchema>;
+export type DeckConfiguration = z.infer<typeof deckConfigurationSchema>;
+export type MatchIntent = z.infer<typeof matchIntentSchema>;
+export type MatchProjection = z.infer<typeof matchProjectionSchema>;
+export type ViewerBetweenGamesProjection = z.infer<
+  typeof viewerBetweenGamesProjectionSchema
+>;

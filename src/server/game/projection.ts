@@ -102,7 +102,7 @@ export function projectGame(input: {
   return gameProjectionSchema.parse({
     id: input.game.id,
     matchId: input.game.matchId,
-    gameNumber: 1,
+    gameNumber: input.game.gameNumber,
     stateVersion: input.game.stateVersion,
     status: input.game.status,
     viewerPlayerId: input.viewerPlayerId,

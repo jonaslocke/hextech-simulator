@@ -62,10 +62,7 @@ export function createBoardModel({
   const opponentBattlefieldProjection = projection.battlefields.find(
     (battlefield) => battlefield.selectedByPlayerId === opponentPlayerId,
   );
-  const cardOwnerByInstanceId = inferCardOwners(
-    projection.setup.playerIds,
-    cardsByInstanceId,
-  );
+  const cardOwnerByInstanceId = inferCardOwners(cardsByInstanceId);
 
   const playerBattlefield = buildBattlefieldData({
     battlefield: playerBattlefieldProjection,
@@ -303,19 +300,13 @@ function isCardAllowedInZone(kind: ZoneKind, card: Card) {
 }
 
 function inferCardOwners(
-  playerIds: readonly string[],
   cardsByInstanceId: Record<string, BoardCatalogCard>,
 ) {
   return Object.fromEntries(
-    Object.keys(cardsByInstanceId).flatMap((cardInstanceId) => {
-      const ownerPlayerId = playerIds.find(
-        (playerId) =>
-          cardInstanceId.startsWith(`${playerId}:`) ||
-          cardInstanceId.startsWith(`${playerId}-`),
-      );
-
-      return ownerPlayerId ? [[cardInstanceId, ownerPlayerId]] : [];
-    }),
+    Object.entries(cardsByInstanceId).map(([cardInstanceId, card]) => [
+      cardInstanceId,
+      card.ownerPlayerId,
+    ]),
   );
 }
 

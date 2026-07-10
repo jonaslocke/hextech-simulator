@@ -394,9 +394,11 @@ function combatFixture(input: {
     matchId: "m",
     createdAt: "a",
     updatedAt: "a",
+    gameNumber: 1,
     stateVersion: 0,
     status: "in_progress",
     winnerPlayerId: null,
+    completionReason: null,
     state: {
       setup: {
         playerIds: ["p1", "p2"],

@@ -1,4 +1,4 @@
-import type { DeckId, GameProjection } from "@/shared/game";
+import type { DeckId, MatchProjection } from "@/shared/game";
 import type { AcceptedMatch, ApiFailure, DeckOption } from "./types";
 
 export async function createMatchClient(
@@ -20,9 +20,9 @@ export async function loadDeckOptionsClient(): Promise<{
   return response.json() as Promise<{ deckOptions: DeckOption[] }>;
 }
 
-export async function loadProjectionClient(matchId: string, playerToken: string): Promise<{ accepted: true; projection: GameProjection } | ApiFailure> {
+export async function loadProjectionClient(matchId: string, playerToken: string): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
   const response = await fetch(`/api/matches/${matchId}?playerToken=${encodeURIComponent(playerToken)}`);
-  return response.json() as Promise<{ accepted: true; projection: GameProjection } | ApiFailure>;
+  return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
 }
 
 export async function performActionClient(input: {
@@ -30,7 +30,7 @@ export async function performActionClient(input: {
   actionId: string; selectedIds: string[];
   allocations?: Array<{ targetUnitId: string; amount: number }>;
   tokenPlacements?: Array<{ destinationId: string; count: number }>;
-}): Promise<{ accepted: true; projection: GameProjection } | ApiFailure> {
+}): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
   const response = await fetch(`/api/matches/${input.matchId}/intents`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -48,5 +48,47 @@ export async function performActionClient(input: {
       }
     })
   });
-  return response.json() as Promise<{ accepted: true; projection: GameProjection } | ApiFailure>;
+  return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
+}
+
+export async function readyForNextGameClient(input: {
+  matchId: string;
+  playerToken: string;
+  stateVersion: number;
+  betweenGamesId: string;
+}): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
+  const response = await fetch(`/api/matches/${input.matchId}/intents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      playerToken: input.playerToken,
+      stateVersion: input.stateVersion,
+      intent: {
+        type: "match.readyForNextGame",
+        payload: { betweenGamesId: input.betweenGamesId },
+      },
+    }),
+  });
+  return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
+}
+
+export async function concedeMatchClient(input: {
+  matchId: string;
+  playerToken: string;
+  stateVersion: number;
+  betweenGamesId: string;
+}): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
+  const response = await fetch(`/api/matches/${input.matchId}/intents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      playerToken: input.playerToken,
+      stateVersion: input.stateVersion,
+      intent: {
+        type: "match.concedeMatch",
+        payload: { betweenGamesId: input.betweenGamesId },
+      },
+    }),
+  });
+  return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
 }

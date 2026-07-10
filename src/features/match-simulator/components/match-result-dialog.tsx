@@ -1,7 +1,7 @@
 "use client";
 
 import { DialogPortal } from "@/shared/components/dialog-portal";
-import type { GameProjection } from "@/shared/game";
+import type { MatchProjection } from "@/shared/game";
 import { cn } from "@/shared/utils/cn";
 import { Crown, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { GameActionButton } from "../../game-board/components/game-action-button";
@@ -13,27 +13,32 @@ export function MatchResultDialog({
 }: {
   busy: boolean;
   onCreateMatch: () => void;
-  projection: GameProjection;
+  projection: MatchProjection;
 }) {
   if (projection.status !== "complete" || !projection.winnerPlayerId) {
     return null;
   }
 
   const viewerWon = projection.winnerPlayerId === projection.viewerPlayerId;
-  const winner = projection.players.find(
+  const winner = projection.currentGame.players.find(
     (player) => player.playerId === projection.winnerPlayerId,
   );
-  const loser = projection.players.find(
+  const loser = projection.currentGame.players.find(
     (player) => player.playerId !== projection.winnerPlayerId,
   );
+  const winnerSetPoints =
+    projection.scoreByPlayerId[projection.winnerPlayerId] ?? 0;
+  const loserSetPoints = loser
+    ? projection.scoreByPlayerId[loser.playerId] ?? 0
+    : 0;
 
   const winnerName = getPlayerDisplayName(winner, "Winner");
   const loserName = getPlayerDisplayName(loser, "Loser");
 
   const resultLabel = viewerWon ? "Victory" : "Defeat";
   const resultDescription = viewerWon
-    ? "You reached the Victory Score first."
-    : "Your opponent reached the Victory Score first.";
+    ? "You won the best-of-three match."
+    : "Your opponent won the best-of-three match.";
 
   return (
     <DialogPortal>
@@ -109,7 +114,7 @@ export function MatchResultDialog({
             <ScorePanel
               label="Winner"
               name={winnerName}
-              points={winner?.points ?? 0}
+              points={winnerSetPoints}
               tone="winner"
             />
 
@@ -118,21 +123,21 @@ export function MatchResultDialog({
                 Goal
               </p>
               <p className="mt-1 font-semibold tabular-nums text-amber-100 text-2xl">
-                {projection.victoryScore}
+                2
               </p>
             </div>
 
             <ScorePanel
               label="Loser"
               name={loserName}
-              points={loser?.points ?? 0}
+              points={loserSetPoints}
               tone="loser"
             />
           </div>
 
           <div className="relative bg-slate-900/50 px-3 py-2 border border-white/10 rounded-xl text-slate-400 text-xs">
-            <span className="text-slate-300">{winnerName}</span> reached the
-            Victory Score.
+            <span className="text-slate-300">{winnerName}</span> won the
+            match.
           </div>
 
           <GameActionButton
@@ -205,7 +210,7 @@ function ScorePanel({
 }
 
 function getPlayerDisplayName(
-  player: GameProjection["players"][number] | undefined,
+  player: MatchProjection["currentGame"]["players"][number] | undefined,
   fallback: string,
 ) {
   if (!player) {

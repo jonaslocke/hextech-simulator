@@ -1060,9 +1060,11 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
     matchId: "m",
     createdAt: "a",
     updatedAt: "a",
+    gameNumber: 1,
     stateVersion: 1,
     status: "in_progress",
     winnerPlayerId: null,
+    completionReason: null,
     state: {
       setup: {
         playerIds: ["p1", "p2"],

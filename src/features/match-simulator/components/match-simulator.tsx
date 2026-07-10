@@ -2,23 +2,33 @@
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
 import { Button } from "@/shared/components/button";
-import type { DeckId } from "@/shared/game";
+import type { DeckId, MatchProjection } from "@/shared/game";
 import { useEffect, useRef, useState } from "react";
 import { ActionSubmissionGuard } from "../action-submission-guard";
 import {
+  concedeMatchClient,
   createMatchClient,
   loadDeckOptionsClient,
   loadProjectionClient,
   performActionClient,
+  readyForNextGameClient,
 } from "../api";
 import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
+import { BetweenGamesScreen } from "./between-games-screen";
 import { MatchResultDialog } from "./match-result-dialog";
+import { MatchScoreBar } from "./match-score-bar";
 
 type OnlinePlayerCredentials = {
   matchId: string;
   gameId: string;
   player: AcceptedMatch["players"]["player1"];
+};
+
+type InFlightGameIntent = {
+  currentGameId: string;
+  playerId: string;
+  submittedGameState: number;
 };
 
 export function MatchSimulator({
@@ -35,6 +45,7 @@ export function MatchSimulator({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const actionSubmissionGuardRef = useRef(new ActionSubmissionGuard());
+  const inFlightGameIntentRef = useRef<InFlightGameIntent | null>(null);
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
   const [playerDecks, setPlayerDecks] = useState<Record<SeatKey, DeckId>>({
     player1: "lux",
@@ -42,11 +53,12 @@ export function MatchSimulator({
   });
   const viewer = match?.players[viewerSeat];
   const projection = viewer && match?.projections[viewer.playerId];
+  const gameProjection = projection?.currentGame;
   const currentMatchId = match?.matchId;
   const viewerPlayerId = viewer?.playerId;
   const viewerToken = viewer?.playerToken;
   const projectionIdentity = projection
-    ? `${projection.viewerPlayerId}:${projection.stateVersion}`
+    ? `${projection.viewerPlayerId}:${projection.stateVersion}:${projection.currentGame.stateVersion}:${projection.status}:${projection.currentGameId}`
     : null;
   const previousProjectionIdentityRef = useRef(projectionIdentity);
 
@@ -101,7 +113,9 @@ export function MatchSimulator({
       }
 
       setMatch((current) =>
-        updateProjection(current, viewerPlayerId, result.projection),
+        updateProjection(current, viewerPlayerId, result.projection, {
+          inFlightGameIntent: inFlightGameIntentRef.current,
+        }),
       );
     });
 
@@ -119,7 +133,9 @@ export function MatchSimulator({
       void loadProjectionClient(currentMatchId, viewerToken).then((result) => {
         if (!result.accepted) return;
         setMatch((current) =>
-          updateProjection(current, viewerPlayerId, result.projection),
+          updateProjection(current, viewerPlayerId, result.projection, {
+            inFlightGameIntent: inFlightGameIntentRef.current,
+          }),
         );
       });
     }, 1500);
@@ -153,7 +169,7 @@ export function MatchSimulator({
     allocations?: Array<{ targetUnitId: string; amount: number }>;
     tokenPlacements?: Array<{ destinationId: string; count: number }>;
   }): Promise<boolean> {
-    if (!match || !viewer || !projection) {
+    if (!match || !viewer || !projection || !gameProjection) {
       return false;
     }
 
@@ -162,29 +178,29 @@ export function MatchSimulator({
 
     setBusy(true);
     setError(null);
+    inFlightGameIntentRef.current = {
+      currentGameId: projection.currentGameId,
+      playerId: viewer.playerId,
+      submittedGameState: gameProjection.stateVersion,
+    };
 
     try {
       const result = await performActionClient({
         matchId: match.matchId,
         playerToken: viewer.playerToken,
-        stateVersion: projection.stateVersion,
+        stateVersion: gameProjection.stateVersion,
         ...input,
       });
 
       if (!result.accepted) {
         setError(result.error.message);
+        if (result.error.code === "state.gameVersionStale") {
+          await refreshViewerProjection();
+        }
         return false;
       } else {
         setMatch((current) =>
-          current
-            ? {
-                ...current,
-                projections: {
-                  ...current.projections,
-                  [viewer.playerId]: result.projection,
-                },
-              }
-            : current,
+          updateProjection(current, viewer.playerId, result.projection),
         );
         return true;
       }
@@ -192,13 +208,93 @@ export function MatchSimulator({
       setError("The action request failed.");
       return false;
     } finally {
+      inFlightGameIntentRef.current = null;
       if (actionSubmissionGuardRef.current.finish(submissionId)) {
         setBusy(false);
       }
     }
   }
 
-  if (!match || !projection) {
+  async function readyForNextGame(): Promise<boolean> {
+    if (!match || !viewer || !projection?.betweenGames) return false;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await readyForNextGameClient({
+        matchId: match.matchId,
+        playerToken: viewer.playerToken,
+        stateVersion: projection.stateVersion,
+        betweenGamesId: projection.betweenGames.id,
+      });
+
+      if (!result.accepted) {
+        setError(result.error.message);
+        return false;
+      }
+
+      setMatch((current) =>
+        updateProjection(current, viewer.playerId, result.projection),
+      );
+      return true;
+    } catch {
+      setError("The readiness request failed.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshViewerProjection() {
+    if (!currentMatchId || !viewerPlayerId || !viewerToken) {
+      return;
+    }
+
+    const result = await loadProjectionClient(currentMatchId, viewerToken);
+    if (!result.accepted) {
+      return;
+    }
+
+    setMatch((current) =>
+      updateProjection(current, viewerPlayerId, result.projection, {
+        inFlightGameIntent: inFlightGameIntentRef.current,
+      }),
+    );
+  }
+
+  async function concedeMatch(): Promise<boolean> {
+    if (!match || !viewer || !projection?.betweenGames) return false;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await concedeMatchClient({
+        matchId: match.matchId,
+        playerToken: viewer.playerToken,
+        stateVersion: projection.stateVersion,
+        betweenGamesId: projection.betweenGames.id,
+      });
+
+      if (!result.accepted) {
+        setError(result.error.message);
+        return false;
+      }
+
+      setMatch((current) =>
+        updateProjection(current, viewer.playerId, result.projection),
+      );
+      return true;
+    } catch {
+      setError("The match concession request failed.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!match || !projection || !gameProjection) {
     return (
       <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
         <section className="bg-slate-900 shadow-2xl p-6 border border-cyan-300/20 rounded-xl w-full max-w-xl">
@@ -256,24 +352,89 @@ export function MatchSimulator({
     );
   }
 
+  if (projection.status === "between_games") {
+    return (
+      <>
+        <ViewerControls
+          busy={busy}
+          gameNumber={projection.gameNumber}
+          gameState={projection.currentGame.stateVersion}
+          matchId={match.matchId}
+          matchState={projection.stateVersion}
+          onlineMatch={Boolean(onlineMatch)}
+          onSeatChange={setViewerSeat}
+          viewerSeat={viewerSeat}
+        />
+        {error && (
+          <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+            {error}
+          </div>
+        )}
+        <BetweenGamesScreen
+          busy={busy}
+          onConcedeMatch={() => {
+            void concedeMatch();
+          }}
+          onReady={() => {
+            void readyForNextGame();
+          }}
+          projection={projection}
+        />
+      </>
+    );
+  }
+
+  if (projection.status === "complete") {
+    return (
+      <main className="relative bg-slate-950 min-h-screen tabletop-background">
+        <ViewerControls
+          busy={busy}
+          gameNumber={projection.gameNumber}
+          gameState={projection.currentGame.stateVersion}
+          matchId={match.matchId}
+          matchState={projection.stateVersion}
+          onlineMatch={Boolean(onlineMatch)}
+          onSeatChange={setViewerSeat}
+          viewerSeat={viewerSeat}
+        />
+        {error && (
+          <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+            {error}
+          </div>
+        )}
+        <MatchResultDialog
+          busy={busy}
+          onCreateMatch={() => {
+            if (onlineMatch) {
+              window.location.assign("/");
+            } else {
+              void createMatch();
+            }
+          }}
+          projection={projection}
+        />
+      </main>
+    );
+  }
+
   const battlefieldSelection = buildBattlefieldSelectionModel({
-    actions: projection.actions,
-    battlefieldPool: projection.setup.battlefieldPool,
+    actions: gameProjection.actions,
+    battlefieldPool: gameProjection.setup.battlefieldPool,
     matchId: match.matchId,
-    viewerPlayerId: projection.viewerPlayerId,
+    viewerPlayerId: gameProjection.viewerPlayerId,
   });
-  const startingPlayerAction = projection.actions.find((action) =>
+  const startingPlayerAction = gameProjection.actions.find((action) =>
     action.targets.some((target) => target.kind === "player"),
   );
-  const mulliganAction = projection.actions.find(
+  const mulliganAction = gameProjection.actions.find(
     (action) => action.label === "Keep opening hand",
   );
   const handCards =
-    projection.players
-      .find((player) => player.playerId === projection.viewerPlayerId)
+    gameProjection.players
+      .find((player) => player.playerId === gameProjection.viewerPlayerId)
       ?.zones.find((zone) => zone.kind === "hand")?.cards ?? [];
 
-  const startingPlayerOptions = projection.players.map((player) => {
+  const startingPlayerOptions = gameProjection.players.map((player) => {
     return {
       description: player.isViewer
         ? "You take the first turn."
@@ -291,38 +452,18 @@ export function MatchSimulator({
 
   return (
     <main className="relative bg-slate-950 min-h-screen tabletop-background">
-      <div className="right-2 bottom-3 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
-        <span className="text-slate-400">Viewer</span>
-        {onlineMatch ? (
-          <span className="font-medium text-cyan-200">
-            {viewerSeat === "player1" ? "Player 1" : "Player 2"}
-          </span>
-        ) : (
-          <>
-            <Button
-              disabled={busy}
-              onClick={() => setViewerSeat("player1")}
-              size="sm"
-              type="button"
-              variant={viewerSeat === "player1" ? "default" : "secondary"}
-            >
-              Player 1
-            </Button>
-            <Button
-              disabled={busy}
-              onClick={() => setViewerSeat("player2")}
-              size="sm"
-              type="button"
-              variant={viewerSeat === "player2" ? "default" : "secondary"}
-            >
-              Player 2
-            </Button>
-          </>
-        )}
-        <span className="text-slate-400">
-          Match {match.matchId} - State {projection.stateVersion}
-        </span>
-      </div>
+      <ViewerControls
+        busy={busy}
+        gameNumber={projection.gameNumber}
+        gameState={gameProjection.stateVersion}
+        matchId={match.matchId}
+        matchState={projection.stateVersion}
+        onlineMatch={Boolean(onlineMatch)}
+        onSeatChange={setViewerSeat}
+        viewerSeat={viewerSeat}
+      />
+
+      <MatchScoreBar projection={projection} />
 
       {error && (
         <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
@@ -334,9 +475,9 @@ export function MatchSimulator({
         cardSize="xl"
         confirmLabel="Lock battlefield"
         description={
-          projection.setup.startingPlayerId
+          gameProjection.setup.startingPlayerId
             ? `${
-                projection.setup.startingPlayerId ===
+                gameProjection.setup.startingPlayerId ===
                 match.players.player1.playerId
                   ? "Player 1"
                   : "Player 2"
@@ -404,25 +545,14 @@ export function MatchSimulator({
         title="Choose Mulligan"
       />
 
-      {projection.setup.waitingReason && (
-        <SetupWaitingOverlay detail={projection.setup.waitingReason} />
+      {gameProjection.setup.waitingReason && (
+        <SetupWaitingOverlay detail={gameProjection.setup.waitingReason} />
       )}
 
       <GameBoard
         isSubmittingAction={busy}
         onPerformAction={performAction}
-        projection={projection}
-      />
-      <MatchResultDialog
-        busy={busy}
-        onCreateMatch={() => {
-          if (onlineMatch) {
-            window.location.assign("/");
-          } else {
-            void createMatch();
-          }
-        }}
-        projection={projection}
+        projection={gameProjection}
       />
     </main>
   );
@@ -463,11 +593,21 @@ function updateProjection(
   match: AcceptedMatch | null,
   playerId: string,
   projection: NonNullable<AcceptedMatch["projections"][string]>,
+  options: { inFlightGameIntent?: InFlightGameIntent | null } = {},
 ): AcceptedMatch | null {
   if (!match) return match;
 
   const current = match.projections[playerId];
-  if (current && current.stateVersion > projection.stateVersion) return match;
+  if (
+    shouldIgnoreIncomingProjection({
+      current,
+      incoming: projection,
+      inFlightGameIntent: options.inFlightGameIntent,
+      playerId,
+    })
+  ) {
+    return match;
+  }
 
   return {
     ...match,
@@ -476,6 +616,108 @@ function updateProjection(
       [playerId]: projection,
     },
   };
+}
+
+function shouldIgnoreIncomingProjection({
+  current,
+  incoming,
+  inFlightGameIntent,
+  playerId,
+}: {
+  current: MatchProjection | undefined;
+  incoming: MatchProjection;
+  inFlightGameIntent?: InFlightGameIntent | null;
+  playerId: string;
+}) {
+  if (
+    inFlightGameIntent &&
+    inFlightGameIntent.playerId === playerId &&
+    inFlightGameIntent.currentGameId === incoming.currentGameId &&
+    incoming.currentGame.stateVersion <=
+      inFlightGameIntent.submittedGameState
+  ) {
+    return true;
+  }
+
+  if (!current) {
+    return false;
+  }
+
+  if (incoming.stateVersion < current.stateVersion) {
+    return true;
+  }
+
+  if (incoming.stateVersion > current.stateVersion) {
+    return false;
+  }
+
+  if (incoming.currentGameId !== current.currentGameId) {
+    return false;
+  }
+
+  return incoming.currentGame.stateVersion <= current.currentGame.stateVersion;
+}
+
+function ViewerControls({
+  busy,
+  gameNumber,
+  gameState,
+  matchId,
+  matchState,
+  onlineMatch,
+  onSeatChange,
+  viewerSeat,
+}: {
+  busy: boolean;
+  gameNumber: number;
+  gameState: number;
+  matchId: string;
+  matchState: number;
+  onlineMatch: boolean;
+  onSeatChange: (seat: SeatKey) => void;
+  viewerSeat: SeatKey;
+}) {
+  return (
+    <div className="right-2 bottom-3 z-[2147483647] fixed flex items-center gap-2 bg-slate-950/90 shadow px-2 py-1 rounded text-slate-100 text-xs">
+      <span className="text-slate-400">Viewer</span>
+      {onlineMatch ? (
+        <span className="font-medium text-cyan-200">
+          {viewerSeat === "player1" ? "Player 1" : "Player 2"}
+        </span>
+      ) : (
+        <>
+          <Button
+            disabled={busy}
+            onClick={() => onSeatChange("player1")}
+            size="sm"
+            type="button"
+            variant={viewerSeat === "player1" ? "default" : "secondary"}
+          >
+            Player 1
+          </Button>
+          <Button
+            disabled={busy}
+            onClick={() => onSeatChange("player2")}
+            size="sm"
+            type="button"
+            variant={viewerSeat === "player2" ? "default" : "secondary"}
+          >
+            Player 2
+          </Button>
+        </>
+      )}
+      <span className="text-slate-400">
+        Match {shortMatchId(matchId)}
+      </span>
+      <span className="text-slate-400">
+        Game {gameNumber} - G{gameState} / M{matchState}
+      </span>
+    </div>
+  );
+}
+
+function shortMatchId(matchId: string) {
+  return matchId.length > 8 ? `${matchId.slice(0, 8)}...` : matchId;
 }
 
 function SetupWaitingOverlay({ detail }: { detail: string }) {
