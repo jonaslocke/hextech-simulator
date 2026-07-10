@@ -29,6 +29,7 @@ export async function performActionClient(input: {
   matchId: string; playerToken: string; stateVersion: number;
   actionId: string; selectedIds: string[];
   allocations?: Array<{ targetUnitId: string; amount: number }>;
+  tokenPlacements?: Array<{ destinationId: string; count: number }>;
 }): Promise<{ accepted: true; projection: GameProjection } | ApiFailure> {
   const response = await fetch(`/api/matches/${input.matchId}/intents`, {
     method: "POST",
@@ -41,7 +42,8 @@ export async function performActionClient(input: {
         payload: {
           actionId: input.actionId,
           selectedIds: input.selectedIds,
-          allocations: input.allocations ?? []
+          allocations: input.allocations ?? [],
+          tokenPlacements: input.tokenPlacements ?? []
         }
       }
     })

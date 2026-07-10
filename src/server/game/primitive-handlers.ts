@@ -18,10 +18,27 @@ export type RuntimeCardIndex = {
   instances: Map<string, CardInstance>;
 };
 
-export function createRuntimeCardIndex(decks: readonly DeckSnapshotDocument[]): RuntimeCardIndex {
+export function createRuntimeCardIndex(
+  decks: readonly DeckSnapshotDocument[],
+  game?: GameDocument,
+): RuntimeCardIndex {
   return {
-    definitions: new Map(decks.flatMap((deck) => deck.snapshot.cards.map((item) => [item.cardCode, item] as const))),
-    instances: new Map(decks.flatMap((deck) => deck.instances.map((item) => [item.instanceId, item] as const)))
+    definitions: new Map([
+      ...decks.flatMap((deck) =>
+        deck.snapshot.cards.map((item) => [item.cardCode, item] as const),
+      ),
+      ...((game?.state.createdCardDefinitions ?? []).map(
+        (item) => [item.cardCode, item] as const,
+      )),
+    ]),
+    instances: new Map([
+      ...decks.flatMap((deck) =>
+        deck.instances.map((item) => [item.instanceId, item] as const),
+      ),
+      ...((game?.state.createdCardInstances ?? []).map(
+        (item) => [item.instanceId, item] as const,
+      )),
+    ]),
   };
 }
 
@@ -64,6 +81,11 @@ export function createPrimitiveHandlers(
     }
   });
   handlers.set("trigger.conquer_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.conquered" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.conquer", {
+    matches: (_binding, context) =>
+      context.event?.type === "battlefield.conquered" &&
+      context.event.actorPlayerId === context.controllerPlayerId,
+  });
   handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
   handlers.set("trigger.on_move", {
     matches: (_binding, context) =>
@@ -101,15 +123,39 @@ export function createPrimitiveHandlers(
     matches: (_binding, context) =>
       context.effectOutcomes.lastDamageKilled === true,
   });
+  handlers.set("condition.unit_presence", {
+    matches(binding, context) {
+      const units = unitsForPresenceCondition(binding, context, index);
+      const minimum =
+        typeof binding.parameters.minimumCount === "number"
+          ? binding.parameters.minimumCount
+          : 1;
+      return units.length >= minimum;
+    },
+  });
 
   handlers.set("selector.unit", {
     targets(binding, context) {
-      return selectorTargets(binding, context.game, index, () => true, context.selectedIds);
+      return selectorTargets(
+        binding,
+        context.game,
+        index,
+        () => true,
+        context.sourceCardInstanceId,
+        context.selectedIds,
+      );
     }
   });
   handlers.set("selector.friendly_unit", {
     targets(binding, context) {
-      return selectorTargets(binding, context.game, index, (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId, context.selectedIds);
+      return selectorTargets(
+        binding,
+        context.game,
+        index,
+        (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId,
+        context.sourceCardInstanceId,
+        context.selectedIds,
+      );
     }
   });
   handlers.set("selector.enemy_unit", {
@@ -121,6 +167,7 @@ export function createPrimitiveHandlers(
         (id) =>
           index.instances.get(id)?.ownerPlayerId !==
           context.controllerPlayerId,
+        context.sourceCardInstanceId,
         context.selectedIds,
       );
     },
@@ -310,6 +357,44 @@ export function createPrimitiveHandlers(
         : context.selectedIds;
       ids.forEach((id) => { context.game.state.cardStates[id]!.exhausted = false; });
     }
+  });
+  handlers.set("action.play_token", {
+    choice(binding, context) {
+      if (binding.parameters.placement !== "chooseBaseOrControlledBattlefield") {
+        return null;
+      }
+      const destinations = tokenPlacementDestinations(context.game, context.controllerPlayerId, index);
+      return destinations.length > 0
+        ? {
+            kind: "tokenPlacement" as const,
+            legalIds: destinations.map((destination) => destination.id),
+            minimum: numberParam(binding, "count"),
+            maximum: numberParam(binding, "count"),
+            prompt: `Choose where to play ${numberParam(binding, "count")} ${stringParam(binding, "tokenName")} token${numberParam(binding, "count") === 1 ? "" : "s"}`,
+            tokenName: stringParam(binding, "tokenName"),
+            destinations,
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const count = numberParam(binding, "count");
+      const tokenName = stringParam(binding, "tokenName");
+      const placements =
+        binding.parameters.placement === "chooseBaseOrControlledBattlefield"
+          ? selectedTokenDestinations(context, count)
+          : Array.from({ length: count }, () =>
+              fixedTokenDestination(binding, context),
+            );
+      for (const destinationId of placements) {
+        playToken(context.game, {
+          controllerPlayerId: context.controllerPlayerId,
+          destinationId,
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          tokenName,
+          index,
+        });
+      }
+    },
   });
   handlers.set("action.deal_damage", {
     execute(binding, context) {
@@ -558,6 +643,7 @@ function selectorTargets(
   game: GameDocument,
   index: RuntimeCardIndex,
   predicate: (id: string) => boolean,
+  sourceCardInstanceId: string,
   lockedSelectedIds: readonly string[] = [],
 ) {
   const baseUnits = game.state.setup.playerIds.flatMap(
@@ -588,6 +674,11 @@ function selectorTargets(
         binding.parameters.readyOnly !== true ||
         !game.state.cardStates[id]?.exhausted ||
         lockedSelectedIds.includes(id),
+    )
+    .filter(
+      (id) =>
+        binding.parameters.excludesSource !== true ||
+        id !== sourceCardInstanceId,
     )
     .filter(predicate);
   const automatic =
@@ -647,6 +738,194 @@ function selectionFor(
   return typeof key === "string"
     ? context.selectedBySelector[key] ?? []
     : [];
+}
+
+function tokenPlacementDestinations(
+  game: GameDocument,
+  controllerPlayerId: string,
+  index: RuntimeCardIndex,
+) {
+  return [
+    { id: "base", label: "Base" },
+    ...game.state.battlefields
+      .filter((battlefield) => battlefield.controllerPlayerId === controllerPlayerId)
+      .map((battlefield) => ({
+        id: battlefield.battlefieldId,
+        label: definitionForInstance(battlefield.cardInstanceId, index).card.name,
+      })),
+  ];
+}
+
+function selectedTokenDestinations(
+  context: BehaviorExecutionContext,
+  count: number,
+) {
+  if (context.selectedIds.length !== count) {
+    throw new Error("Token placement count does not match token count.");
+  }
+  return context.selectedIds;
+}
+
+function fixedTokenDestination(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  if (binding.parameters.placement === "base") return "base";
+  const battlefield = context.game.state.battlefields.find((candidate) =>
+    candidate.units.includes(context.sourceCardInstanceId),
+  );
+  return battlefield?.battlefieldId ?? "base";
+}
+
+function playToken(
+  game: GameDocument,
+  input: {
+    controllerPlayerId: string;
+    destinationId: string;
+    sourceCardInstanceId: string;
+    tokenName: string;
+    index: RuntimeCardIndex;
+  },
+) {
+  const definition = findOrCreateTokenDefinition(
+    game,
+    input.tokenName,
+    input.index,
+  );
+  const instanceId = [
+    input.controllerPlayerId,
+    "token",
+    definition.cardCode,
+    game.stateVersion,
+    (game.state.createdCardInstances ?? []).length + 1,
+  ].join(":");
+  const instance = {
+    instanceId,
+    ownerPlayerId: input.controllerPlayerId,
+    source: "token" as const,
+    cardCode: definition.cardCode,
+  };
+  (game.state.createdCardInstances ??= []).push(instance);
+  input.index.instances.set(instanceId, instance);
+  game.state.cardStates[instanceId] = {
+    exhausted: true,
+    damage: 0,
+    computedMight: definition.card.attributes.might,
+    objectVersion: 0,
+  };
+  if (input.destinationId === "base") {
+    game.state.players[input.controllerPlayerId]!.zones.base.push(instanceId);
+  } else {
+    const battlefield = game.state.battlefields.find(
+      (candidate) => candidate.battlefieldId === input.destinationId,
+    );
+    if (!battlefield) throw new Error("Token destination is unavailable.");
+    if (battlefield.controllerPlayerId !== input.controllerPlayerId) {
+      throw new Error("Token destination is not controlled by the player.");
+    }
+    battlefield.units.push(instanceId);
+  }
+  const events = (game.state.queuedBehaviorEvents ??= []);
+  events.push({
+    type: "card.played",
+    actorPlayerId: input.controllerPlayerId,
+    subjectCardInstanceId: instanceId,
+    values: {
+      "eventSubject.printedEnergyCost": 0,
+      "eventSubject.effectiveEnergyCost": 0,
+    },
+  });
+}
+
+function findOrCreateTokenDefinition(
+  game: GameDocument,
+  tokenName: string,
+  index: RuntimeCardIndex,
+): GameCardDefinition {
+  const existing = [...index.definitions.values()].find(
+    (definition) =>
+      definition.card.classification.supertype === "Token" &&
+      (definition.card.name === tokenName ||
+        definition.card.name.startsWith(`${tokenName} (`)),
+  );
+  if (existing) return existing;
+  const normalized = tokenName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const cardCode = `TOKEN-${normalized}`;
+  const existingGenerated = index.definitions.get(cardCode);
+  if (existingGenerated) return existingGenerated;
+  const definition: GameCardDefinition = {
+    cardCode,
+    sourceTextHash: `generated:${normalized}`,
+    card: {
+      id: cardCode,
+      name: tokenName,
+      public_code: cardCode,
+      attributes: {
+        energy: null,
+        might: tokenName === "Recruit" ? 1 : null,
+        power: null,
+      },
+      classification: {
+        type: "Unit",
+        supertype: "Token",
+        rarity: null,
+        domain: ["Colorless"],
+      },
+      text: { plain: "" },
+      set: { set_id: "generated", label: "Generated" },
+      media: {},
+      tags: [],
+      metadata: {},
+    },
+    behaviorModel: { playTimings: [], clauses: [] },
+  };
+  (game.state.createdCardDefinitions ??= []).push(definition);
+  index.definitions.set(cardCode, definition);
+  return definition;
+}
+
+function unitsForPresenceCondition(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const location = unitsAtPresenceLocation(binding, context);
+  return location.filter((id) => {
+    if (definitionForInstance(id, index).card.classification.type !== "Unit") {
+      return false;
+    }
+    const owner = index.instances.get(id)?.ownerPlayerId;
+    const controller = binding.parameters.controller;
+    const controllerMatches =
+      controller === "controller" || controller === "friendly"
+        ? owner === context.controllerPlayerId
+        : controller === "enemy" || controller === "opponent"
+          ? owner !== context.controllerPlayerId
+          : true;
+    const readyMatches =
+      binding.parameters.readyState !== "ready" ||
+      !context.game.state.cardStates[id]?.exhausted;
+    return controllerMatches && readyMatches;
+  });
+}
+
+function unitsAtPresenceLocation(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  if (binding.parameters.locationRelation === "eventBattlefield") {
+    const battlefield = context.game.state.battlefields.find(
+      (candidate) =>
+        candidate.cardInstanceId === context.event?.subjectCardInstanceId ||
+        candidate.battlefieldId === context.event?.values.battlefieldId,
+    );
+    return battlefield?.units ?? [];
+  }
+  const sourceBattlefield = context.game.state.battlefields.find((candidate) =>
+    candidate.units.includes(context.sourceCardInstanceId),
+  );
+  if (sourceBattlefield) return sourceBattlefield.units;
+  return context.game.state.players[context.controllerPlayerId]?.zones.base ?? [];
 }
 
 export function incrementObjectVersion(game: GameDocument, id: string) {

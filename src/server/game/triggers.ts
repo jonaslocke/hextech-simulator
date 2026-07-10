@@ -19,7 +19,7 @@ export function dispatchBehaviorEvent(
   event: BehaviorEvent,
   decks: readonly DeckSnapshotDocument[]
 ): void {
-  const index = createRuntimeCardIndex(decks);
+  const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
   for (const controllerPlayerId of game.state.setup.playerIds) {
     const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => ({
@@ -114,7 +114,7 @@ function continueQueuedChainItems(
   decks: readonly DeckSnapshotDocument[],
 ) {
   if (game.state.pendingChoice) return;
-  const index = createRuntimeCardIndex(decks);
+  const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
   while ((game.state.queuedChainItems?.length ?? 0) > 0) {
     const item = game.state.queuedChainItems!.shift()!;
@@ -210,7 +210,7 @@ export function queueDelayedEffects(
   decks: readonly DeckSnapshotDocument[],
   endingPlayerId: string
 ): boolean {
-  const index = createRuntimeCardIndex(decks);
+  const index = createRuntimeCardIndex(decks, game);
   const due = game.state.delayedEffects.filter(
     (effect) => effect.point === point
   );

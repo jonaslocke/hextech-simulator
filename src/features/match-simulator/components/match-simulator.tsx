@@ -151,6 +151,7 @@ export function MatchSimulator({
     actionId: string;
     selectedIds: string[];
     allocations?: Array<{ targetUnitId: string; amount: number }>;
+    tokenPlacements?: Array<{ destinationId: string; count: number }>;
   }): Promise<boolean> {
     if (!match || !viewer || !projection) {
       return false;

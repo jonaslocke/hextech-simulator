@@ -1,6 +1,6 @@
 # Full Card Ingestion Tracking
 
-Snapshot: 2026-07-09T23:52:11-03:00
+Snapshot: 2026-07-10
 
 This file is the active M0 tracking baseline for the full-card ingestion program.
 It follows `docs/full-card-ingestion/plan.md` and keeps M0 documentation-only:
@@ -12,7 +12,7 @@ changed in this milestone.
 | Milestone | Scope | Status | Current blocker | Next action | User acceptance |
 |---|---|---|---|---|---|
 | M0 | Operating model and tracking baseline | Accepted | None | Open M1 | Accepted |
-| M1 | Garen Proving Grounds deck | Not started | `data/decks/garen.dec.txt` needs fixture normalization before parsing | Normalize fixture and build primitive delta | Pending |
+| M1 | Garen Proving Grounds deck | Behavior modeling | None | Publish exact Garen behavior models and keep Garen hidden until full runtime-catalog validation passes | Pending |
 | M2 | Origins full set | Not started | Need two user-provided Origins decks under `docs/full-ingestion-decks/OGN/` | Wait for inputs after M1 acceptance | Pending |
 | M3 | Spiritforged full set | Not started | Need two user-provided Spiritforged decks under `docs/full-ingestion-decks/SFD/` | Wait for inputs after M2 acceptance | Pending |
 | M4 | Unleashed full set | Not started | Need two user-provided Unleashed decks under `docs/full-ingestion-decks/UNL/` | Wait for inputs after M3 acceptance | Pending |
@@ -28,7 +28,7 @@ changed in this milestone.
 | `data/sets/unl.json` | Present, 280 cards, 0 printed tokens | Full-set milestone input exists; validation decks not present. |
 | `data/sets/ven.json` | Not present | M5 must not start until final JSON is provided. |
 | `docs/full-ingestion-decks/` | Not present | Full-set validation decks are not yet provided. |
-| `data/decks/garen.dec.txt` | Present, not parser-ready | Uses `Main Deck:` instead of `MainDeck:` and has an uncounted legend entry. |
+| `data/decks/garen.dec.txt` | Present, parser-ready | Normalized for M1; validates against full local set corpus. |
 
 ## Primitive Behavior Coverage Ledger
 
@@ -43,6 +43,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `timing.delayed` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Resolve delayed effect | None |
 | `trigger.on_play` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Trigger after card is played | None |
 | `trigger.conquer_battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Conquer battlefield trigger | None |
+| `trigger.conquer` | Garen M1 | Might of Demacia - Starter | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Controller conquers any battlefield | None |
 | `trigger.hold_battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Hold battlefield trigger | None |
 | `trigger.on_move` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move-triggered ability | None |
 | `trigger.end_of_turn` | Existing | TBD | Covered by rules reference | Existing executable | Existing | End-turn trigger | None |
@@ -50,6 +51,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `trigger.defend` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Defend trigger | None |
 | `condition.compare_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Numeric threshold condition | None |
 | `condition.effect_killed_target` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Damage kills target condition | None |
+| `condition.unit_presence` | Garen M1 | Might of Demacia - Starter, Dune Drake | Covered by rules reference and card text | Executable | `tests/game-token-placement.test.ts` | Count matching units at source/event location | None |
 | `selector.unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select legal unit | None |
 | `selector.friendly_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select friendly unit | None |
 | `selector.enemy_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select enemy unit | None |
@@ -67,6 +69,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
 | `action.move_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move unit to base | None |
+| `action.play_token` | Garen M1 | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Fixed and chosen Recruit token placement | None |
 | `modifier.modify_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Apply numeric modifier | None |
 | `modifier.play_unit_destination` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Play unit to extra destination | None |
 | `modifier.enter_ready` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Enter ready | None |
@@ -84,13 +87,13 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | Set | Card code | Name | Type | Behavior clauses | Primitive coverage | Executable | In deck validation | Notes |
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
-| OGS/OGN | TBD | Garen deck cards | Mixed | TBD | Primitive delta required | No | Garen not selectable | M1 scope after M0 acceptance. |
+| OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Primitive delta implemented | No | Garen not selectable | Exact canonical behavior models still need publication and validation. |
 
 ## Token Coverage Ledger
 
 | Set | Token name | Source card(s) | Token data present | Behavior executable | Blocker | Notes |
 |---|---|---|---|---|---|---|
-| OGN | Recruit token variants | Garen M1 token creators, broader Origins cards | Yes | Not validated for M1 | None for M0 | `Recruit (DE)`, `Recruit (NX)`, and `Recruit (ZN)` exist in `data/sets/ogn.json`; M1 must normalize to one gameplay token identity. |
+| OGN | Recruit token variants | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Yes | Yes | None for primitive runtime | Runtime now supports a generated gameplay Recruit token identity, fixed-location token creation, and counted base/controlled-battlefield placement. |
 | OGN | Sprite | Later Origins cards | Yes | Not reviewed | None for M0 | Full Origins milestone coverage item. |
 | SFD | Gold | Later Spiritforged cards | Yes | Not reviewed | None for M0 | Full Spiritforged milestone coverage item. |
 
@@ -101,7 +104,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/lux.dec.txt` | `lux` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
-| OGS/OGN | `data/decks/garen.dec.txt` | `garen` | No | No | No | No | Fixture uses non-parser section/name format | No |
+| OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; not runtime-catalog valid yet | No | No | No | Runtime cards and token behavior not executable yet | No |
 | OGN | `docs/full-ingestion-decks/OGN/` | TBD | No | No | No | No | Deck files not provided | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
@@ -111,16 +114,17 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 
 | Primitive | Proposed change | Existing cards/decks affected | Regression risk | User approved? | Manual regression focus |
 |---|---|---|---|---|---|
-| None in M0 | None | None | None | Not needed | None |
+| `action.play_token` / token placement choice | Add runtime token creation and a player-facing placement choice for Recruit the Vanguard | No accepted MVP deck currently uses `action.play_token` | Public action/intent contract extension | Yes; implemented | Existing pending choices still work; Garen token placement prompts render and submit correctly |
+| Selector `excludesSource` | Enforce `excludesSource` in unit selectors for text such as "another unit" | No accepted MVP deck currently has a discovered `excludesSource` selector | Shared selector legality change | Yes; implemented | Existing targeted effects keep current legal targets unless their model explicitly sets `excludesSource` |
 
 ## Manual Match Acceptance Ledger
 
 | Milestone | Matchup | Scenario focus | Result | Issue link / note | Accepted by user |
 |---|---|---|---|---|---|
 | M0 | Existing Lux/Annie/Master Yi deck availability | Operating baseline only | Accepted | Automated checks pass; user accepted M0 operating baseline | Yes |
-| M1 | Garen vs Lux | Baseline interaction | Not run | M1 deferred until M0 acceptance | No |
-| M1 | Garen vs Annie | Damage/removal interaction | Not run | M1 deferred until M0 acceptance | No |
-| M1 | Garen vs Master Yi | Combat modifier interaction | Not run | M1 deferred until M0 acceptance | No |
+| M1 | Garen vs Lux | Baseline interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
+| M1 | Garen vs Annie | Damage/removal interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
+| M1 | Garen vs Master Yi | Combat modifier interaction | Not run | Blocked until exact Garen behavior models are published and deck selector exposure is enabled | No |
 
 ## M0 Acceptance State
 
@@ -128,3 +132,25 @@ Status: Accepted
 
 M0 was accepted by the user after the tracking baseline and operating model were
 recorded.
+
+## M1 Active State
+
+Status: Behavior modeling
+
+M1 input normalization, deck construction validation, token coverage check, and
+primitive discovery are complete. The user approved:
+
+- extending the public pending-choice/action intent contract for token placement;
+- enforcing shared selector `excludesSource` behavior.
+
+Runtime implementation for both approved gates is complete and verified by:
+
+- `node --import tsx --test tests/game-token-placement.test.ts`
+- `cmd /c npm run catalog:check-mvp`
+- `npm run typecheck`
+- `npm test`
+- `npm run lint`
+- `npm run build`
+
+Next M1 work is exact Garen behavior modeling and runtime-catalog validation.
+Details are recorded in `docs/full-card-ingestion/m1-garen-discovery.md`.

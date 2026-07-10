@@ -1,5 +1,5 @@
 Legend:
-Might of Demacia
+1 Might of Demacia - Starter
 
 Champion:
 1 Garen, Rugged
@@ -13,7 +13,7 @@ Battlefields:
 1 The Papertree
 1 Targon's Peak
 
-Main Deck:
+MainDeck:
 3 Confront
 3 Daring Poro
 3 Back to Back

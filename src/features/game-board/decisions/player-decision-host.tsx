@@ -6,9 +6,11 @@ import { CombatDamagePrompt } from "./combat-damage-prompt";
 import { OptionDecisionPrompt } from "./option-decision-prompt";
 import { OrderedDecisionPrompt } from "./ordered-decision-prompt";
 import { PendingDecisionStatus } from "./pending-decision-status";
+import { TokenPlacementPrompt } from "./token-placement-prompt";
 import {
   createCombatDamageIntent,
   createSelectionIntent,
+  createTokenPlacementIntent,
 } from "./player-decision-intent";
 import type {
   PlayerDecisionIntent,
@@ -86,6 +88,16 @@ export function PlayerDecisionHost({
             onIntent(
               createCombatDamageIntent(decision.actionId, allocations),
             )
+          }
+        />
+      );
+    case "tokenPlacement":
+      return (
+        <TokenPlacementPrompt
+          decision={decision}
+          isSubmitting={isSubmitting}
+          onSubmit={(placements) =>
+            onIntent(createTokenPlacementIntent(decision.actionId, placements))
           }
         />
       );

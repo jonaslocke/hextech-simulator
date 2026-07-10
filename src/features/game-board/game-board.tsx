@@ -53,6 +53,7 @@ type GameBoardProps = {
     actionId: string;
     selectedIds: string[];
     allocations?: Array<{ targetUnitId: string; amount: number }>;
+    tokenPlacements?: Array<{ destinationId: string; count: number }>;
   }) => Promise<boolean>;
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
@@ -81,9 +82,15 @@ export const GameBoard: FC<GameBoardProps> = ({
       actionId: string | undefined,
       selectedIds: string[] = [],
       allocations?: Array<{ targetUnitId: string; amount: number }>,
+      tokenPlacements?: Array<{ destinationId: string; count: number }>,
     ): Promise<boolean> => {
       if (!actionId) return Promise.resolve(false);
-      return onPerformAction({ actionId, selectedIds, allocations });
+      return onPerformAction({
+        actionId,
+        selectedIds,
+        allocations,
+        tokenPlacements,
+      });
     },
     [onPerformAction],
   );
@@ -401,6 +408,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             intent.actionId,
             intent.selectedIds ?? [],
             intent.allocations,
+            intent.tokenPlacements,
           );
           if (accepted && targetSelection?.actionId === intent.actionId) {
             setTargetSelection(null);

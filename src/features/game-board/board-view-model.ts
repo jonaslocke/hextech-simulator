@@ -118,6 +118,17 @@ export type BoardProjection = {
         playerId: string;
         type: "assignCombatDamage";
         totalDamage: number;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "tokenPlacement";
+        prompt: string;
+        title: string;
+        waitingMessage: string;
+        tokenName: string;
+        count: number;
+        destinations: Array<{ id: string; label: string }>;
       };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{

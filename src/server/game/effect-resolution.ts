@@ -12,6 +12,11 @@ import {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 
+export type TokenPlacement = {
+  destinationId: string;
+  count: number;
+};
+
 export function beginEffectResolution(input: {
   game: GameDocument;
   controllerPlayerId: string;
@@ -73,6 +78,44 @@ export function submitEffectSelection(
   return resumeEffectResolution(game, frame.id, decks);
 }
 
+export function submitTokenPlacement(
+  game: GameDocument,
+  playerId: string,
+  placements: readonly TokenPlacement[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "tokenPlacement" ||
+    pending.playerId !== playerId
+  ) {
+    throw new Error("Token placement is not available.");
+  }
+  const total = placements.reduce((sum, placement) => sum + placement.count, 0);
+  if (
+    total !== pending.count ||
+    placements.length === 0 ||
+    placements.some(
+      (placement) =>
+        placement.count < 1 ||
+        !pending.legalDestinationIds.includes(placement.destinationId),
+    )
+  ) {
+    throw new Error("Token placement does not satisfy its requirements.");
+  }
+  const frame = game.state.effectResolutions.find(
+    (candidate) => candidate.id === pending.resolutionId,
+  );
+  if (!frame) throw new Error("Effect resolution is unavailable.");
+  frame.selectionsByBinding[pending.bindingKey] = placements.flatMap(
+    (placement) =>
+      Array.from({ length: placement.count }, () => placement.destinationId),
+  );
+  game.state.pendingChoice = null;
+  return resumeEffectResolution(game, frame.id, decks);
+}
+
 export function resumeEffectResolution(
   game: GameDocument,
   resolutionId: string,
@@ -82,7 +125,7 @@ export function resumeEffectResolution(
     (candidate) => candidate.id === resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
-  const index = createRuntimeCardIndex(decks);
+  const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
   const definition = definitionForInstance(frame.sourceCardInstanceId, index);
   const clause = compileBehaviorModel(
@@ -173,6 +216,26 @@ export function resumeEffectResolution(
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
     const requirement = handler.choice?.(binding, context) ?? null;
     if (requirement && !frame.selectionsByBinding[bindingKey]) {
+      if (requirement.kind === "tokenPlacement") {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "tokenPlacement",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          tokenName: requirement.tokenName ?? "Token",
+          count: requirement.maximum,
+          legalDestinationIds: requirement.legalIds,
+          destinationLabels: Object.fromEntries(
+            (requirement.destinations ?? []).map((destination) => [
+              destination.id,
+              destination.label,
+            ]),
+          ),
+        };
+        return false;
+      }
       game.state.pendingChoice = {
         id: `choice:${frame.id}:${binding.order}`,
         playerId: frame.controllerPlayerId,

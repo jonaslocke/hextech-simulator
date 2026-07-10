@@ -16,7 +16,7 @@ export function victoryRequirement(
     attribute: "victoryRequirement",
     baseValue: baseRequirement,
     game,
-    index: createRuntimeCardIndex(decks),
+    index: createRuntimeCardIndex(decks, game),
     targetScope: "game",
   });
 }

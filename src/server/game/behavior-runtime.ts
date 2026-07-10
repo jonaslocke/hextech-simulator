@@ -28,10 +28,13 @@ export type BehaviorHandler = {
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,
   ): {
+    kind?: "card" | "battlefield" | "tokenPlacement";
     legalIds: string[];
     minimum: number;
     maximum: number;
     prompt: string;
+    tokenName?: string;
+    destinations?: Array<{ id: string; label: string }>;
     sourceZone?: "hand" | "trash" | "mainDeck";
     presentation?: "cardSelection" | "vision";
   } | null;

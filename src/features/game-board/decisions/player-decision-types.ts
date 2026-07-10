@@ -5,6 +5,7 @@ export type PlayerDecisionIntent = {
   actionId: string;
   selectedIds?: string[];
   allocations?: Array<{ targetUnitId: string; amount: number }>;
+  tokenPlacements?: Array<{ destinationId: string; count: number }>;
 };
 
 export type PlayerDecisionCard = {
@@ -73,9 +74,22 @@ export type PendingDecisionRequest = {
   tone?: "cyan" | "amber";
 };
 
+export type TokenPlacementDecisionRequest = {
+  kind: "tokenPlacement";
+  decisionKey: string;
+  actionId: string;
+  title: string;
+  description?: string;
+  tokenName: string;
+  count: number;
+  destinations: Array<{ id: string; label: string }>;
+  confirmLabel?: string;
+};
+
 export type PlayerDecisionRequest =
   | CardSelectionDecisionRequest
   | OptionDecisionRequest
   | OrderedDecisionRequest
   | CombatDamageDecisionRequest
+  | TokenPlacementDecisionRequest
   | PendingDecisionRequest;

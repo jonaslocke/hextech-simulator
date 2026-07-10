@@ -69,6 +69,19 @@ export const projectedActionSchema = z.object({
         prompt: z.string().min(1),
       }),
       z.object({
+        kind: z.literal("tokenPlacement"),
+        choiceId: z.string().min(1),
+        prompt: z.string().min(1),
+        tokenName: z.string().min(1),
+        count: z.number().int().positive(),
+        destinations: z.array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+          }),
+        ),
+      }),
+      z.object({
         kind: z.literal("orderedOptions"),
         choiceId: z.string().min(1),
         optionIds: z.array(z.string().min(1)),
@@ -110,6 +123,14 @@ export const gameActionIntentSchema = z.object({
         z.object({
           targetUnitId: z.string().min(1),
           amount: z.number().int().positive(),
+        }),
+      )
+      .default([]),
+    tokenPlacements: z
+      .array(
+        z.object({
+          destinationId: z.string().min(1),
+          count: z.number().int().positive(),
         }),
       )
       .default([]),
@@ -294,6 +315,22 @@ export const gameProjectionSchema = z.object({
         revealedCards: z.array(projectedCardViewSchema),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
+      }),
+      z.object({
+        type: z.literal("tokenPlacement"),
+        id: z.string().min(1),
+        playerId: z.string().min(1),
+        prompt: z.string().min(1),
+        title: z.string().min(1),
+        waitingMessage: z.string().min(1),
+        tokenName: z.string().min(1),
+        count: z.number().int().positive(),
+        destinations: z.array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+          }),
+        ),
       }),
       z.object({
         type: z.literal("assignCombatDamage"),

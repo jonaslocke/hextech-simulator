@@ -1,0 +1,4 @@
+- Dune Drake behavior seems off, in simpler terms the cards has a might increase that is conditional, right now it has action.ready_cards on it, not quite sure if is the right approach. ![alt text](images/image.png)
+- First Mate can not ready himself, I can't see anything on the behavior that says so. ![alt text](images/image-1.png)
+- Noxian Drummer create a token at movement destination, if it is in base moving to a BF the token will be automatically placed on the BF, if it is on a BF going base, the token is automatically placed on base, if it gains ganking and move from one BF to another, the token will be automatically placed on the other BF.
+- Might of Demacia - Starter seems off, "conquer any BF" and "conquer this BF" are different things, for instance if for some reason a card could add a BF to the game, it will be possible to trigger "conquer any BF" 2, 3 times. this card should listen to an emmited event. ![alt text](images/image-3.png)

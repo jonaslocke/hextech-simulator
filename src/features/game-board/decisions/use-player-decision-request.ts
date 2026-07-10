@@ -154,6 +154,38 @@ export function buildPlayerDecisionRequest({
       }
     }
 
+    if (pendingChoice.type === "tokenPlacement") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "tokenPlacement" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+
+      if (action?.choice?.kind === "tokenPlacement") {
+        return {
+          actionId: action.id,
+          confirmLabel: "Place tokens",
+          count: pendingChoice.count,
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.count,
+            minimum: pendingChoice.count,
+            selectableIds: pendingChoice.destinations.map(
+              (destination) => destination.id,
+            ),
+            source: "token-placement",
+          }),
+          description: pendingChoice.prompt,
+          destinations: pendingChoice.destinations,
+          kind: "tokenPlacement",
+          title: pendingChoice.title,
+          tokenName: pendingChoice.tokenName,
+        };
+      }
+    }
+
     if (pendingChoice.type === "orderTriggers") {
       const action = sourceProjection.actions.find(
         (candidate) =>
@@ -239,6 +271,12 @@ export function buildPlayerDecisionRequest({
           tone: "amber",
         };
       case "effectSelection":
+        return {
+          kind: "pendingDecision",
+          message: pendingChoice.waitingMessage,
+          title: pendingChoice.title,
+        };
+      case "tokenPlacement":
         return {
           kind: "pendingDecision",
           message: pendingChoice.waitingMessage,

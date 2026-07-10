@@ -5,6 +5,7 @@ import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
 import { performSetupAction, setupActions } from "./setup";
 import { gameplayActions, performGameplayTransition } from "./actions";
+import type { TokenPlacement } from "./effect-resolution";
 import { projectGame } from "./projection";
 import {
   createInitialGame,
@@ -170,6 +171,7 @@ export async function performMatchAction(
     actionId: string;
     selectedIds: string[];
     allocations?: DamageAssignment[];
+    tokenPlacements?: TokenPlacement[];
     now?: string;
   },
 ) {
@@ -201,6 +203,7 @@ export async function performMatchAction(
           actionId: input.actionId,
           selectedIds: input.selectedIds,
           allocations: input.allocations,
+          tokenPlacements: input.tokenPlacements,
           decks,
           now,
         });

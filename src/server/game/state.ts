@@ -1,6 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { DeckSnapshot, GameCardDefinition } from "./schemas";
+import {
+  gameCardDefinitionSchema,
+  type DeckSnapshot,
+  type GameCardDefinition,
+} from "./schemas";
 
 export const cardInstanceSchema = z.object({
   instanceId: z.string().min(1),
@@ -12,6 +16,7 @@ export const cardInstanceSchema = z.object({
     "runeDeck",
     "battlefield",
     "sideboard",
+    "token",
   ]),
   cardCode: z.string().min(1),
 });
@@ -152,6 +157,19 @@ const effectSelectionChoiceSchema = z.object({
     .optional(),
 });
 
+const tokenPlacementChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("tokenPlacement"),
+  resolutionId: z.string().min(1),
+  bindingKey: z.string().min(1),
+  prompt: z.string().min(1),
+  tokenName: z.string().min(1),
+  count: z.number().int().positive(),
+  legalDestinationIds: z.array(z.string().min(1)),
+  destinationLabels: z.record(z.string().min(1)).default({}),
+});
+
 const damageAssignmentSchema = z.object({
   targetUnitId: z.string().min(1),
   amount: z.number().int().positive(),
@@ -162,6 +180,11 @@ export const gameStateSchema = z.object({
   players: z.record(playerStateSchema),
   battlefields: z.array(battlefieldStateSchema),
   cardStates: z.record(cardStateSchema),
+  createdCardInstances: z.array(cardInstanceSchema).default([]).optional(),
+  createdCardDefinitions: z
+    .array(gameCardDefinitionSchema)
+    .default([])
+    .optional(),
   turn: turnStateSchema.nullable(),
   chain: z
     .object({
@@ -251,6 +274,7 @@ export const gameStateSchema = z.object({
       triggerOrderChoiceSchema,
       combatDamageChoiceSchema,
       effectSelectionChoiceSchema,
+      tokenPlacementChoiceSchema,
     ])
     .nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema),
@@ -432,6 +456,8 @@ export function createInitialGame(input: {
       players,
       battlefields: [],
       cardStates,
+      createdCardInstances: [],
+      createdCardDefinitions: [],
       turn: null,
       chain: null,
       showdown: null,

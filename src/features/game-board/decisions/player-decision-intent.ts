@@ -13,3 +13,10 @@ export function createCombatDamageIntent(
 ): PlayerDecisionIntent {
   return { actionId, selectedIds: [], allocations };
 }
+
+export function createTokenPlacementIntent(
+  actionId: string,
+  tokenPlacements: Array<{ destinationId: string; count: number }>,
+): PlayerDecisionIntent {
+  return { actionId, selectedIds: [], tokenPlacements };
+}

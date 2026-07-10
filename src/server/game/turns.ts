@@ -29,7 +29,7 @@ export function applyStartOfTurn(
     throw new Error("A turn is required to apply start-of-turn steps.");
   const player = game.state.players[turn.activePlayerId]!;
   const index =
-    runtimeIndex ?? (decks.length ? createRuntimeCardIndex(decks) : null);
+    runtimeIndex ?? (decks.length ? createRuntimeCardIndex(decks, game) : null);
 
   while (
     game.status === "in_progress" &&

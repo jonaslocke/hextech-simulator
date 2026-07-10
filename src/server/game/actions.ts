@@ -59,6 +59,8 @@ import {
 import {
   beginEffectResolution,
   submitEffectSelection,
+  submitTokenPlacement,
+  type TokenPlacement,
 } from "./effect-resolution";
 import {
   isLegalUnitDestination,
@@ -75,7 +77,7 @@ export function gameplayActions(
   decks: readonly DeckSnapshotDocument[],
 ): ProjectedAction[] {
   if (game.status !== "in_progress") return [];
-  const index = createRuntimeCardIndex(decks);
+  const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
   const player = game.state.players[actorPlayerId];
   if (!player) return [];
@@ -131,6 +133,33 @@ export function gameplayActions(
             kind: "effectSelection",
             choiceId: pendingChoice.id,
             prompt: pendingChoice.prompt,
+          },
+        ),
+      );
+      return actions;
+    }
+    if (pendingChoice.type === "tokenPlacement") {
+      const destinations = pendingChoice.legalDestinationIds.map((id) => ({
+        id,
+        label: pendingChoice.destinationLabels[id] ?? id,
+      }));
+      actions.push(
+        action(
+          game,
+          "submitChoice",
+          pendingChoice.prompt,
+          null,
+          true,
+          null,
+          undefined,
+          [],
+          {
+            kind: "tokenPlacement",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+            tokenName: pendingChoice.tokenName,
+            count: pendingChoice.count,
+            destinations,
           },
         ),
       );
@@ -399,6 +428,7 @@ export function performGameplayAction(input: {
   actionId: string;
   selectedIds: string[];
   allocations?: DamageAssignment[];
+  tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
   now: string;
 }): GameDocument {
@@ -408,7 +438,7 @@ export function performGameplayAction(input: {
     throw new Error("Action is not legal for the current game state.");
   validateActionTargets(projected, input.selectedIds);
   const game = structuredClone(input.game);
-  const index = createRuntimeCardIndex(input.decks);
+  const index = createRuntimeCardIndex(input.decks, game);
   const handlers = createPrimitiveHandlers(index);
   const [, , , kind, encodedSource, encodedExtra] = input.actionId.split(":");
   const source =
@@ -458,6 +488,18 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+      } else if (game.state.pendingChoice?.type === "tokenPlacement") {
+        submitTokenPlacement(
+          game,
+          input.actorPlayerId,
+          input.tokenPlacements ?? [],
+          input.decks,
+        );
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else {
         submitEffectSelection(
           game,
@@ -589,6 +631,7 @@ export function performGameplayTransition(input: {
   actionId: string;
   selectedIds: string[];
   allocations?: DamageAssignment[];
+  tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
   now: string;
 }): GameTransition {

@@ -18,18 +18,28 @@ export function projectGame(input: {
   playerNames?: Partial<Record<string, string>>;
 }): GameProjection {
   const definitions = new Map(
-    input.decks.flatMap((deck) =>
-      deck.snapshot.cards.map(
+    [
+      ...input.decks.flatMap((deck) =>
+        deck.snapshot.cards.map(
+          (definition) => [definition.cardCode, definition] as const,
+        ),
+      ),
+      ...(input.game.state.createdCardDefinitions ?? []).map(
         (definition) => [definition.cardCode, definition] as const,
       ),
-    ),
+    ],
   );
   const instances = new Map(
-    input.decks.flatMap((deck) =>
-      deck.instances.map(
+    [
+      ...input.decks.flatMap((deck) =>
+        deck.instances.map(
+          (instance) => [instance.instanceId, instance] as const,
+        ),
+      ),
+      ...(input.game.state.createdCardInstances ?? []).map(
         (instance) => [instance.instanceId, instance] as const,
       ),
-    ),
+    ],
   );
   const view = (id: string): ProjectedCardView => {
     const instance = instances.get(id)!;
@@ -191,6 +201,35 @@ export function projectGame(input: {
                 playerId: input.game.state.pendingChoice.playerId,
                 totalDamage: input.game.state.pendingChoice.totalDamage,
               }
+            : input.game.state.pendingChoice?.type === "tokenPlacement"
+              ? {
+                  type: "tokenPlacement",
+                  id: input.game.state.pendingChoice.id,
+                  playerId: input.game.state.pendingChoice.playerId,
+                  prompt: input.game.state.pendingChoice.prompt,
+                  title: "Token placement",
+                  waitingMessage:
+                    input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                      ? input.game.state.pendingChoice.prompt
+                      : `Waiting for the other player to place ${input.game.state.pendingChoice.tokenName} tokens.`,
+                  tokenName: input.game.state.pendingChoice.tokenName,
+                  count: input.game.state.pendingChoice.count,
+                  destinations:
+                    input.game.state.pendingChoice.playerId ===
+                    input.viewerPlayerId
+                      ? input.game.state.pendingChoice.legalDestinationIds.map(
+                          (id) => ({
+                            id,
+                            label:
+                              input.game.state.pendingChoice
+                                ?.type === "tokenPlacement"
+                                ? input.game.state.pendingChoice
+                                    .destinationLabels[id] ?? id
+                                : id,
+                          }),
+                        )
+                      : [],
+                }
             : null,
     combat: input.game.state.combat
       ? {

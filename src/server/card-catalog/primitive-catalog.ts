@@ -434,6 +434,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates an effect when a battlefield is conquered.",
     listensToEvents: ["battlefield.conquered"]
   }),
+  "trigger.conquer": primitiveSeed({
+    id: "trigger.conquer",
+    family: "trigger",
+    name: "Conquer trigger",
+    description:
+      "Creates an effect when the controller conquers any battlefield.",
+    listensToEvents: ["battlefield.conquered"]
+  }),
   "trigger.hold_battlefield": primitiveSeed({
     id: "trigger.hold_battlefield",
     family: "trigger",
@@ -795,7 +803,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates or plays a token.",
     parameters: [
       required("tokenName", "string", "The token to create or play.", tokenKinds),
-      required("count", "number", "The number of tokens.")
+      required("count", "number", "The number of tokens."),
+      optional("placement", "string", "How the token destination is chosen.", [
+        "sourceLocation",
+        "base",
+        "chooseBaseOrControlledBattlefield"
+      ])
     ],
     emitsEvents: ["card.played"]
   }),
@@ -932,6 +945,24 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("effectRelation", "string", "The related effect result.", ["previousClause"])
     ],
     engineSupport: requiresEngineSupport("Effect outcomes must be retained by the resolution frame.")
+  }),
+  "condition.unit_presence": primitiveSeed({
+    id: "condition.unit_presence",
+    family: "condition",
+    name: "Unit presence",
+    description:
+      "Checks whether a location contains enough units matching controller and ready-state filters.",
+    parameters: [
+      required("controller", "player", "The controller relationship for counted units."),
+      required("locationRelation", "locationRelation", "The location to inspect."),
+      optional("readyState", "string", "Readiness filter for counted units.", [
+        "ready"
+      ]),
+      optional("minimumCount", "number", "The minimum matching unit count.")
+    ],
+    engineSupport: requiresEngineSupport(
+      "The runtime evaluates source-location and event-battlefield unit presence."
+    )
   }),
   "condition.while": primitiveSeed({
     id: "condition.while",

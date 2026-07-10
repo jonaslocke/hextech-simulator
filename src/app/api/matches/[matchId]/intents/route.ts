@@ -12,7 +12,8 @@ export async function POST(request: Request, context: { params: Promise<{ matchI
       matchId: (await context.params).matchId, playerToken: parsed.data.playerToken,
       stateVersion: parsed.data.stateVersion, actionId: parsed.data.intent.payload.actionId,
       selectedIds: parsed.data.intent.payload.selectedIds,
-      allocations: parsed.data.intent.payload.allocations
+      allocations: parsed.data.intent.payload.allocations,
+      tokenPlacements: parsed.data.intent.payload.tokenPlacements
     });
     return NextResponse.json({ accepted: true, projection });
   } catch (error) {
