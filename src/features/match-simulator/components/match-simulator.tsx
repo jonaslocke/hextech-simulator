@@ -61,6 +61,7 @@ export function MatchSimulator({
   const currentMatchId = match?.matchId;
   const viewerPlayerId = viewer?.playerId;
   const viewerToken = viewer?.playerToken;
+  const matchStatus = projection?.status;
   const projectionIdentity = projection
     ? `${projection.viewerPlayerId}:${projection.stateVersion}:${projection.currentGame.stateVersion}:${projection.status}:${projection.currentGameId}`
     : null;
@@ -129,7 +130,13 @@ export function MatchSimulator({
   }, [currentMatchId, viewerPlayerId, viewerToken]);
 
   useEffect(() => {
-    if (!onlineMatch || !currentMatchId || !viewerPlayerId || !viewerToken) {
+    if (
+      !onlineMatch ||
+      !currentMatchId ||
+      !viewerPlayerId ||
+      !viewerToken ||
+      matchStatus === "complete"
+    ) {
       return;
     }
 
@@ -145,7 +152,7 @@ export function MatchSimulator({
     }, 1500);
 
     return () => window.clearInterval(interval);
-  }, [currentMatchId, onlineMatch, viewerPlayerId, viewerToken]);
+  }, [currentMatchId, matchStatus, onlineMatch, viewerPlayerId, viewerToken]);
 
   async function createMatch() {
     setBusy(true);
