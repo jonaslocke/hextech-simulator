@@ -103,7 +103,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/lux.dec.txt` | `lux` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
-| OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | Defects recorded in `docs/full-card-ingestion/m1-questions.md` fixed | Yes |
+| OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
 | OGN | `docs/full-ingestion-decks/OGN/` | TBD | No | No | No | No | Deck files not provided | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
@@ -121,7 +121,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | Milestone | Matchup | Scenario focus | Result | Issue link / note | Accepted by user |
 |---|---|---|---|---|---|
 | M0 | Existing Lux/Annie/Master Yi deck availability | Operating baseline only | Accepted | Automated checks pass; user accepted M0 operating baseline | Yes |
-| M1 | Garen manual validation | Garen deck behavior corpus and reported defect scenarios | Accepted | User accepted M1 after iterative manual validation and fixes in `m1-questions.md` | Yes |
+| M1 | Garen manual validation | Garen deck behavior corpus and reported defect scenarios | Accepted | User accepted M1 after iterative manual validation and fixes | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |

@@ -1,6 +1,6 @@
 # Riftbound Full Card Ingestion Plan
 
-Snapshot date: 2026-07-07
+Snapshot date: 2026-07-10
 
 ## 1. Purpose
 
@@ -158,6 +158,20 @@ that token must have card data and executable behavior coverage.
 Missing token data blocks the milestone. If required token data is not present in
 `data/sets`, Codex must stop and ask the user to provide it.
 
+For full-set milestones, Codex should build a token inventory before modeling
+individual cards. The inventory must cross-reference:
+
+- printed token definitions in the set JSON;
+- cards that create, play, move, modify, count, or reference those tokens;
+- token variants that collapse to one gameplay identity;
+- token placement requirements, including fixed destination, chosen destination,
+  base, battlefield, "here", split counts, and controller/source ownership;
+- token lifecycle requirements, including entering ready, recomputing continuous
+  modifiers immediately, and ceasing to exist when leaving board zones.
+
+Token support must be implemented as reusable runtime behavior. Codex must not
+solve token cards through card-name-specific branches.
+
 ### 2.10 Behavior change detection policy
 
 Rules-text-focused hashing remains the behavior-change gate.
@@ -205,6 +219,30 @@ Vendetta ingestion waits for final JSON only.
 No prerelease Vendetta ingestion should begin unless the user explicitly changes
 this decision. When the final JSON is available, the user will provide it under
 `data/sets`.
+
+### 2.14 M1 lessons for full-set ingestion
+
+M1 produced durable workflow lessons. The transient bug notes and screenshots are
+not part of this plan and should not be treated as permanent source material.
+The lessons that matter for future milestones are:
+
+- manual fresh-match validation is the primary proof of gameplay correctness;
+- catalog approval, behavior-model approval, typecheck, build, and automated
+  tests are useful checkpoints but did not catch the runtime issues found in M1;
+- after catalog or runtime fixes, validation should use newly created matches,
+  freshly synced deck snapshots, and the current runtime;
+- old persisted matches can be discarded and should not drive compatibility work;
+- when a manual issue is reported, Codex should inspect the canonical card data,
+  deck snapshot, persisted game state, pending choices, chain entries, selected
+  targets, token placements, and exact action payload before changing code;
+- fixes should land in reusable primitives, selectors, token handling,
+  continuous modifiers, chain/priority handling, or intent validation paths;
+- tests should be minimal or omitted unless they directly protect a narrow,
+  deterministic parser, schema, catalog, or primitive behavior.
+
+Full-set ingestion should spend tokens on reusable primitive discovery, database
+inspection, exact manual reproduction, and clear handoff notes instead of broad
+automated gameplay tests.
 
 ## 3. Milestone Sequence
 
@@ -280,16 +318,18 @@ only after the reference is updated.
 
 ### 4.4 Testing discipline
 
-Codex should add only limited automated tests:
+Automated tests are optional checkpoints, not acceptance proof.
 
-- primitive handler tests;
-- behavior-model validation tests;
-- schema/repository tests;
-- deterministic regression tests for confirmed bugs;
-- deck/catalog validation tests.
+Codex should prefer zero new tests during ingestion defect loops unless a test
+is clearly worth its maintenance and token cost. Acceptable cases are narrow:
 
-Codex should not add broad gameplay integration tests as the main proof of
-correctness.
+- parser, schema, repository, or catalog checks that are cheap and deterministic;
+- a focused primitive unit check when a reusable runtime primitive is changed;
+- a small deterministic regression check for a confirmed bug, only when it would
+  have caught the exact class of failure.
+
+Codex must not add broad gameplay integration tests as proof of correctness for a
+milestone. Manual full-match validation remains the required proof.
 
 ### 4.5 Manual acceptance gate
 
@@ -324,6 +364,48 @@ The handoff must include:
   ruling;
 - whether implementation is blocked or can continue on a different task;
 - what Codex will do next after the user responds.
+
+### 4.8 Manual-first defect workflow
+
+When manual validation finds a behavior issue, Codex should use this order before
+making more changes:
+
+1. Record the match ID, state version, endpoint, request payload, response, and
+   expected behavior when the user provides them.
+2. Inspect canonical card behavior, deck snapshots, persisted match state,
+   pending choices, chain entries, selected targets, token placements, and object
+   versions.
+3. Replay or reason from the exact persisted state when possible.
+4. Identify whether the issue is catalog data, behavior modeling, selector
+   legality, pending-choice validation, chain/priority timing, continuous
+   modifier recomputation, token lifecycle, or stale-match data.
+5. Fix the reusable runtime or catalog path. Do not add old-match compatibility
+   unless the user explicitly asks for it.
+6. Resync catalog/decks or restart the dev server when the fix requires fresh
+   runtime data.
+7. Ask the user to validate in a fresh match and state exactly what scenario must
+   be checked.
+
+Manual issue notes should be summarized into durable process lessons only. Do
+not preserve transient screenshot evidence or one-off bug documents in this plan
+unless the user explicitly asks.
+
+### 4.9 Integration risk checklist
+
+Future full-set milestones should explicitly check these integration points:
+
+- set JSON import -> canonical catalog -> behavior approval -> deck snapshot;
+- deck selector exposure -> match creation -> fresh runtime data;
+- card playability projection vs server-side intent validation;
+- pending choices, selected target locks, token placements, and allocation
+  payloads;
+- simultaneous triggers, target choice timing, chain ordering, focus, and
+  priority return;
+- object version changes that should invalidate locked targets;
+- continuous modifiers after unit play, token placement, movement, attack,
+  defend, showdown, and location changes;
+- token identity normalization, image/media projection, entering ready, split
+  placement counts, and board-leave cleanup.
 
 ## 5. Tracking Model
 
@@ -428,6 +510,13 @@ A required token is complete only when:
 - token data exists in `data/sets` or has been provided by the user;
 - token identity is normalized;
 - token behavior is executable;
+- token placement count validation works for fixed and chosen destinations;
+- split placement across base and battlefields works when rules allow it;
+- continuous modifiers apply immediately to placed tokens;
+- enter-ready modifiers apply to tokens when the rules say the token is played;
+- tokens cease to exist when they would move to non-board zones;
+- token image/media projection works in hand, board, trash, dialogs, and
+  inspection surfaces;
 - cards that create or reference the token can resolve correctly.
 
 ### 5.5 Deck Validation Ledger
@@ -565,7 +654,7 @@ This milestone is deck-scoped, not full Proving Grounds set-scoped.
 10. Validate every Garen deck card is executable.
 11. Expose the Garen deck as a permanent selectable deck in local and online selectors.
 12. Keep selectors data-driven where possible.
-13. Run focused automated checks.
+13. Run minimal deterministic checks only when justified by section 4.4.
 14. Prepare manual validation scenarios.
 
 ### Required primitive-first output
@@ -623,20 +712,22 @@ docs/full-ingestion-decks/OGN/
 
 1. Validate the full Origins JSON schema.
 2. Normalize all Origins card identities using the established variant-collapse policy.
-3. Detect required tokens and block if token data is missing.
-4. Build the Origins primitive inventory.
+3. Build the Origins token inventory and block if required token data is missing.
+4. Build the Origins primitive inventory, grouped by reusable behavior and token
+   interaction instead of by card name.
 5. Classify primitives as existing, extension-needed, new, or rule-blocked.
-6. Identify regression-risking primitive changes and request user approval before
+6. Identify high-risk integration paths from section 4.9 before implementation.
+7. Identify regression-risking primitive changes and request user approval before
    implementation.
-7. Resolve all rule blockers through user-updated rules reference entries.
-8. Implement primitive behavior in reusable runtime handlers.
-9. Upload Origins into the card catalog.
-10. Model and approve executable behavior for every Origins card and required token.
-11. Validate full Origins card/token executability.
-12. Validate and expose the two Origins decks as permanent selectable decks.
-13. Prepare manual validation scenarios by primitive and by deck.
-14. Run focused automated checks.
-15. Wait for manual full-match acceptance.
+8. Resolve all rule blockers through user-updated rules reference entries.
+9. Implement primitive behavior in reusable runtime handlers.
+10. Upload Origins into the card catalog.
+11. Model and approve executable behavior for every Origins card and required token.
+12. Validate full Origins card/token executability.
+13. Validate and expose the two Origins decks as permanent selectable decks.
+14. Prepare manual validation scenarios by primitive, token behavior, and deck.
+15. Run minimal deterministic checks only when justified by section 4.4.
+16. Wait for manual full-match acceptance.
 
 ### Required primitive-first output
 
@@ -715,7 +806,7 @@ docs/full-ingestion-decks/SFD/
 12. Validate full Spiritforged card/token executability.
 13. Validate and expose the two Spiritforged decks as permanent selectable decks.
 14. Prepare manual validation scenarios by primitive and by deck.
-15. Run focused automated checks.
+15. Run minimal deterministic checks only when justified by section 4.4.
 16. Wait for manual full-match acceptance.
 
 ### Required primitive-first output
@@ -795,7 +886,7 @@ docs/full-ingestion-decks/UNL/
 12. Validate full Unleashed card/token executability.
 13. Validate and expose the two Unleashed decks as permanent selectable decks.
 14. Prepare manual validation scenarios by primitive and by deck.
-15. Run focused automated checks.
+15. Run minimal deterministic checks only when justified by section 4.4.
 16. Wait for manual full-match acceptance.
 
 ### Required primitive-first output
@@ -880,7 +971,7 @@ docs/full-ingestion-decks/VEN/
 13. Validate full Vendetta card/token executability.
 14. Validate and expose the two Vendetta decks as permanent selectable decks.
 15. Prepare manual validation scenarios by primitive and by deck.
-16. Run focused automated checks.
+16. Run minimal deterministic checks only when justified by section 4.4.
 17. Wait for manual full-match acceptance.
 
 ### Required primitive-first output
@@ -959,6 +1050,8 @@ Required first output before implementation:
 - Rule blockers.
 - Regression-risking primitive changes that need user approval.
 - Proposed implementation order.
+- Integration risk checklist entries from section 4.9 that apply to this
+  milestone.
 - Manual validation scenarios.
 
 Implementation constraints:
@@ -972,9 +1065,10 @@ Implementation constraints:
 - Do not add metadata drift or backward-compatibility work unless explicitly requested.
 - Do not wipe the database; the user handles cleanup manually.
 - Ask for user approval before implementing primitive changes with regression potential.
-- Add only focused deterministic tests for primitives, schemas, repositories, and
-  confirmed regressions.
+- Prefer zero new tests during ingestion defect loops.
+- Add a deterministic test only when section 4.4 clearly justifies the cost.
 - Do not add broad gameplay integration tests as proof of correctness.
+- Use fresh matches for manual validation after catalog/runtime changes.
 
 Expected final output:
 - Updated primitive ledger.
@@ -996,6 +1090,15 @@ Decks tested:
 Matchups tested:
 Date:
 Tester:
+
+Manual defect evidence, when applicable:
+- Match ID:
+- State version:
+- Endpoint:
+- Request payload:
+- Response:
+- Expected behavior:
+- Actual behavior:
 
 Primitive behaviors intentionally exercised:
 - [ ] Primitive/mechanic:
@@ -1043,7 +1146,7 @@ Use this order to keep the work resumable.
 6. Regression-risking primitive change report and user approval, if needed.
 7. Primitive implementation plan.
 8. Primitive implementation.
-9. Focused primitive tests.
+9. Minimal deterministic checks only when justified by section 4.4.
 10. Catalog upload.
 11. Card behavior modeling and approval.
 12. Full card/token executability report.
