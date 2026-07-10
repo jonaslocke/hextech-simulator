@@ -43,5 +43,10 @@
  ![alt text](image.png)
 [x] change autopass keybind to R
 [x] decision handling needs to be added to choose a battlefield prompt.  ![alt text](image.png)
-[ ] plan for bo3
-[ ] end of a match should close socket connection
+[x] plan for bo3
+[x] end of a match should close socket connection
+[ ] ready a permanent animation
+[ ] place tokens decision view
+[ ] better between games screen
+[x] better game header
+[ ] concede in between games more dificult

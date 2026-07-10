@@ -18,7 +18,6 @@ import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { BetweenGamesScreen } from "./between-games-screen";
 import { GameResultDialog } from "./game-result-dialog";
 import { MatchResultDialog } from "./match-result-dialog";
-import { MatchScoreBar } from "./match-score-bar";
 
 type OnlinePlayerCredentials = {
   matchId: string;
@@ -394,8 +393,6 @@ export function MatchSimulator({
             viewerSeat={viewerSeat}
           />
 
-          <MatchScoreBar projection={projection} />
-
           {error && (
             <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
               {error}
@@ -404,9 +401,14 @@ export function MatchSimulator({
 
           <GameBoard
             isSubmittingAction={busy}
+            matchContext={{
+              gameNumber: projection.gameNumber,
+              scoreByPlayerId: projection.scoreByPlayerId,
+            }}
             onPerformAction={performAction}
-            projection={gameProjection}
+            projection={projection.currentGame}
           />
+
           <GameResultDialog
             busy={busy}
             onContinue={() => acknowledgeGameResult(gameResultKey)}
@@ -526,8 +528,6 @@ export function MatchSimulator({
         viewerSeat={viewerSeat}
       />
 
-      <MatchScoreBar projection={projection} />
-
       {error && (
         <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
           {error}
@@ -613,6 +613,10 @@ export function MatchSimulator({
       )}
 
       <GameBoard
+        matchContext={{
+          gameNumber: projection.gameNumber,
+          scoreByPlayerId: projection.scoreByPlayerId,
+        }}
         isSubmittingAction={busy}
         onPerformAction={performAction}
         projection={gameProjection}
@@ -696,8 +700,7 @@ function shouldIgnoreIncomingProjection({
     inFlightGameIntent &&
     inFlightGameIntent.playerId === playerId &&
     inFlightGameIntent.currentGameId === incoming.currentGameId &&
-    incoming.currentGame.stateVersion <=
-      inFlightGameIntent.submittedGameState
+    incoming.currentGame.stateVersion <= inFlightGameIntent.submittedGameState
   ) {
     return true;
   }
@@ -769,9 +772,7 @@ function ViewerControls({
           </Button>
         </>
       )}
-      <span className="text-slate-400">
-        Match {shortMatchId(matchId)}
-      </span>
+      <span className="text-slate-400">Match {shortMatchId(matchId)}</span>
       <span className="text-slate-400">
         Game {gameNumber} - G{gameState} / M{matchState}
       </span>

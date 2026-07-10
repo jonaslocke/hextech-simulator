@@ -23,7 +23,7 @@ import { ChainOverlay } from "./components/chain-overlay";
 import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
-import { ScoreHeader } from "./components/score-header";
+import { ScoreHeader, type MatchHudContext } from "./components/score-header";
 import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
@@ -63,6 +63,7 @@ type GameBoardProps = {
   playerNames?: Partial<Record<string, string>>;
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
+  matchContext?: MatchHudContext;
 };
 
 export const GameBoard: FC<GameBoardProps> = ({
@@ -71,6 +72,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   playerNames = {},
   projection: sourceProjection,
   scores = {},
+  matchContext,
 }) => {
   const adapted = useMemo(
     () => adaptProjectionToBoard(sourceProjection),
@@ -457,19 +459,13 @@ export const GameBoard: FC<GameBoardProps> = ({
   const openPlayerBanishment = decisionInspection.isInspecting
     ? canInspectPublicZones && board.player.zones.banishment.count > 0
       ? () =>
-          decisionInspection.inspectZone(
-            board.player.playerId,
-            "banishment",
-          )
+          decisionInspection.inspectZone(board.player.playerId, "banishment")
       : undefined
     : () => setOpenZone("banish");
   const openOpponentBanishment = decisionInspection.isInspecting
     ? canInspectPublicZones && board.opponent.zones.banishment.count > 0
       ? () =>
-          decisionInspection.inspectZone(
-            board.opponent.playerId,
-            "banishment",
-          )
+          decisionInspection.inspectZone(board.opponent.playerId, "banishment")
       : undefined
     : () => setOpenZone("banish");
 
@@ -481,6 +477,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       }
     >
       <ScoreHeader
+        matchContext={matchContext}
         opponent={board.opponent}
         player={board.player}
         victoryScore={projection.victoryScore}
@@ -701,9 +698,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         </div>
       )}
       <ChainOverlay
-        canPassPriority={
-          !decisionInspection.isInspecting && canViewerPassChain
-        }
+        canPassPriority={!decisionInspection.isInspecting && canViewerPassChain}
         chainCards={chainCards}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
         isCloseDisabled={isChainLockedOpen}
@@ -741,9 +736,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             : handleCardContextFromHand
         }
         onPlayCard={
-          decisionInspection.isInspecting
-            ? undefined
-            : handlePlayCardFromHand
+          decisionInspection.isInspecting ? undefined : handlePlayCardFromHand
         }
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
@@ -795,10 +788,10 @@ export const GameBoard: FC<GameBoardProps> = ({
                   ? "Exhaust unit"
                   : "Decline"
                 : targetSelection.purpose === "move"
-                ? "Confirm move"
-                : targetSelection.purpose === "choice"
-                  ? "Confirm"
-                  : "Play"
+                  ? "Confirm move"
+                  : targetSelection.purpose === "choice"
+                    ? "Confirm"
+                    : "Play"
             }
             title={
               targetSelection.purpose === "move"
@@ -812,14 +805,14 @@ export const GameBoard: FC<GameBoardProps> = ({
                   ? effectSelectionAction?.label
                   : targetSelectionHasOptionalCost(targetSelection)
                     ? optionalCostTitle(targetSelectionAction?.label)
-                  : undefined
+                    : undefined
             }
             helperText={
               targetSelectionHasOptionalCost(targetSelection)
                 ? "Exhaust a ready friendly unit to draw 2. Decline to draw 1 instead."
                 : targetSelection.purpose === "move"
-                ? "Click additional units to include them, then confirm the move."
-                : undefined
+                  ? "Click additional units to include them, then confirm the move."
+                  : undefined
             }
           />
         )}
@@ -917,7 +910,9 @@ export const GameBoard: FC<GameBoardProps> = ({
 };
 
 function targetSelectionHasOptionalCost(
-  targetSelection: NonNullable<ReturnType<typeof useBoardTargetSelection>["targetSelection"]>,
+  targetSelection: NonNullable<
+    ReturnType<typeof useBoardTargetSelection>["targetSelection"]
+  >,
 ) {
   return targetSelection.requirement.requirements.some(
     (requirement) => requirement.selectionPurpose === "optionalCost",

@@ -43,9 +43,9 @@ export function ScoreTrack({
     <div
       aria-label={`Score track. Player ${playerScore}, opponent ${opponentScore}. Victory score ${victoryScore}.`}
       className={cn(
-        "relative flex items-center gap-1 px-2 py-1 border border-white/10 rounded-full",
-        "bg-slate-950/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.20)]",
-        "supports-backdrop-filter:bg-slate-950/18 supports-backdrop-filter:backdrop-blur-md",
+        "z-10 relative flex items-center gap-1 px-2 py-1 rounded-full select-none",
+        "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.20)]",
+        "bg-slate-600/30 supports-backdrop-filter:bg-slate-600/18 supports-backdrop-filter:backdrop-blur-md border border-white/10",
       )}
       role="group"
     >
