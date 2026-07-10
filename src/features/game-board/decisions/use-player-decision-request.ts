@@ -67,6 +67,8 @@ export function buildPlayerDecisionRequest({
         return {
           actionId: action.id,
           choice: action.choice,
+          decisionKey: pendingChoice.id,
+          inspection: "publicGameState",
           kind: "combatDamage",
         };
       }
@@ -97,6 +99,7 @@ export function buildPlayerDecisionRequest({
           }),
           description:
             "Choose cards to recycle. Unselected cards stay on top.",
+          inspection: "publicGameState",
           kind: "cardSelection",
           maxSelected: pendingChoice.revealedCards.length,
           minSelected: 0,
@@ -139,6 +142,7 @@ export function buildPlayerDecisionRequest({
             source: pendingChoice.sourceZone,
           }),
           description: pendingChoice.prompt,
+          inspection: "publicGameState",
           kind: "cardSelection",
           maxSelected: pendingChoice.maximum,
           minSelected: pendingChoice.minimum,
@@ -212,6 +216,7 @@ export function buildPlayerDecisionRequest({
           }),
           description:
             "Move triggered effects into the order they should resolve.",
+          inspection: "publicGameState",
           kind: "orderedDecision",
           options: pendingChoice.optionIds.map((id) => {
             const item = itemById.get(id);
@@ -243,6 +248,8 @@ export function buildPlayerDecisionRequest({
     return {
       actionId: combatDamageAction.id,
       choice: combatDamageAction.choice,
+      decisionKey: combatDamageAction.id,
+      inspection: "publicGameState",
       kind: "combatDamage",
     };
   }
@@ -265,6 +272,7 @@ export function buildPlayerDecisionRequest({
     switch (pendingChoice.type) {
       case "assignCombatDamage":
         return {
+          inspection: "none",
           kind: "pendingDecision",
           message: `Waiting for ${playerName} to assign combat damage.`,
           title: "Combat Damage",
@@ -272,6 +280,7 @@ export function buildPlayerDecisionRequest({
         };
       case "effectSelection":
         return {
+          inspection: "none",
           kind: "pendingDecision",
           message: pendingChoice.waitingMessage,
           title: pendingChoice.title,
@@ -284,6 +293,7 @@ export function buildPlayerDecisionRequest({
         };
       case "orderTriggers":
         return {
+          inspection: "none",
           kind: "pendingDecision",
           message: `Waiting for ${playerName} to choose the order of triggered abilities.`,
           title: "Triggered abilities",
@@ -365,6 +375,7 @@ function mapActiveNonBoardCardDecision({
       source: activeTargetSelection.targetKind,
     }),
     description: `Choose ${requirement?.label ?? "card"}`,
+    inspection: "publicGameState",
     kind: "cardSelection",
     maxSelected: activeTargetSelection.maxTargets,
     minSelected: activeTargetSelection.minTargets,

@@ -1,7 +1,7 @@
 "use client";
 
 import { Flag, History, Layers3, SkipForward } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TemporaryZone } from "../types";
 import { ActionButton } from "./action-button";
 import { ConcedeGameDialog } from "./concede-game-dialog";
@@ -10,6 +10,7 @@ type OpenableActionRailZone = Exclude<TemporaryZone, "chain">;
 
 export function ActionRail({
   concedeDisabled = false,
+  disabled = false,
   isChainOpen = false,
   isChainLockedOpen = false,
   onChainOpenChange,
@@ -21,6 +22,7 @@ export function ActionRail({
   setOpenZone,
 }: {
   concedeDisabled?: boolean;
+  disabled?: boolean;
   isChainOpen?: boolean;
   isChainLockedOpen?: boolean;
   onChainOpenChange: (isOpen: boolean) => void;
@@ -33,8 +35,14 @@ export function ActionRail({
 }) {
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
 
-  const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled;
-  const canConcede = Boolean(onConcede) && !concedeDisabled;
+  const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled && !disabled;
+  const canConcede = Boolean(onConcede) && !concedeDisabled && !disabled;
+
+  useEffect(() => {
+    if (disabled) {
+      setIsConcedeDialogOpen(false);
+    }
+  }, [disabled]);
 
   return (
     <>
@@ -56,6 +64,7 @@ export function ActionRail({
           <div className="flex flex-col flex-1 justify-center gap-3">
             <ActionButton
               active={isChainOpen}
+              disabled={disabled}
               label={isChainLockedOpen ? "Chain is resolving" : "Chain"}
               onClick={() =>
                 onChainOpenChange(isChainLockedOpen ? true : !isChainOpen)
@@ -66,6 +75,7 @@ export function ActionRail({
 
             <ActionButton
               active={openZone === "log"}
+              disabled={disabled}
               label="Game Log"
               onClick={() => setOpenZone(openZone === "log" ? null : "log")}
             >

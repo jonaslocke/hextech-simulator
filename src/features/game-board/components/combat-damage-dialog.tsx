@@ -2,7 +2,7 @@
 
 import type { GameProjection } from "@/shared/game";
 import { cn } from "@/shared/utils/cn";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { BoardCatalogCard } from "../board-view-model";
 import type { Card } from "../types";
@@ -43,12 +43,18 @@ type DamagePlanValidation = {
 export function CombatDamageDialog({
   choice,
   cardsByInstanceId,
+  headerAction,
+  interactionSuspended = false,
   isSubmitting = false,
+  isVisible = true,
   onSubmit,
 }: {
   choice: CombatDamageChoice;
   cardsByInstanceId: Record<string, BoardCatalogCard>;
+  headerAction?: ReactNode;
+  interactionSuspended?: boolean;
   isSubmitting?: boolean;
+  isVisible?: boolean;
   onSubmit: (allocations: DamageAllocation[]) => void;
 }) {
   const [amounts, setAmounts] = useState<Record<string, number>>({});
@@ -123,7 +129,7 @@ export function CombatDamageDialog({
   const cardSize = getDamageCardSize(targets.length);
 
   const assignDamage = (unitId: string) => {
-    if (assigned >= choice.totalDamage) {
+    if (interactionSuspended || assigned >= choice.totalDamage) {
       return;
     }
 
@@ -143,6 +149,10 @@ export function CombatDamageDialog({
   };
 
   const removeDamage = (unitId: string) => {
+    if (interactionSuspended) {
+      return;
+    }
+
     const currentAmount = targetById.get(unitId)?.amount ?? 0;
 
     setAmounts((currentAmounts) => {
@@ -166,6 +176,10 @@ export function CombatDamageDialog({
   };
 
   const autoAssignDamage = () => {
+    if (interactionSuspended) {
+      return;
+    }
+
     let remainingDamage = choice.totalDamage;
     const nextAmounts: Record<string, number> = {};
     const nextAssignmentOrder: string[] = [];
@@ -198,15 +212,25 @@ export function CombatDamageDialog({
   };
 
   const resetAssignments = () => {
+    if (interactionSuspended) {
+      return;
+    }
+
     setAmounts({});
     setAssignmentOrder([]);
   };
 
   return (
-    <div className="z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4 select-none">
+    <div
+      aria-hidden={!isVisible || undefined}
+      className={cn(
+        "z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4 select-none",
+        !isVisible && "invisible pointer-events-none",
+      )}
+    >
       <section
         aria-labelledby="combat-damage-title"
-        aria-modal="true"
+        aria-modal={isVisible ? "true" : undefined}
         className={cn(
           "gap-3 grid bg-slate-950/80 shadow-2xl shadow-black/85 p-3.5 border border-amber-200/22 rounded-xl ring-1 ring-amber-300/10 w-full overflow-hidden text-slate-100 select-none",
           "supports-backdrop-filter:bg-slate-950/64 supports-backdrop-filter:backdrop-blur-md",
@@ -234,7 +258,10 @@ export function CombatDamageDialog({
             </p>
           </div>
 
-          <DamageMeter assigned={assigned} totalDamage={choice.totalDamage} />
+          <div className="flex shrink-0 items-start gap-2">
+            {headerAction}
+            <DamageMeter assigned={assigned} totalDamage={choice.totalDamage} />
+          </div>
         </header>
 
         <div
@@ -287,7 +314,10 @@ export function CombatDamageDialog({
             <GameActionButton
               actionSlot="secondary"
               disabled={
-                targets.length === 0 || choice.totalDamage <= 0 || isSubmitting
+                interactionSuspended ||
+                targets.length === 0 ||
+                choice.totalDamage <= 0 ||
+                isSubmitting
               }
               onAction={autoAssignDamage}
               variant="secondary"
@@ -297,7 +327,7 @@ export function CombatDamageDialog({
 
             <GameActionButton
               actionSlot="tertiary"
-              disabled={assigned === 0 || isSubmitting}
+              disabled={interactionSuspended || assigned === 0 || isSubmitting}
               onAction={resetAssignments}
               variant="secondary"
             >
@@ -306,7 +336,7 @@ export function CombatDamageDialog({
 
             <GameActionButton
               actionSlot="primary"
-              disabled={!canSubmit}
+              disabled={interactionSuspended || !canSubmit}
               isBusy={isSubmitting}
               onAction={() => onSubmit(allocations)}
             >

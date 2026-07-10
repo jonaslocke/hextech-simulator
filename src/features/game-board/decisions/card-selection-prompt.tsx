@@ -3,7 +3,14 @@
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 export type CardSelectionPromptOption = {
   description?: string;
@@ -23,6 +30,9 @@ export type CardSelectionPromptCardSize = "md" | "lg" | "xl";
 type ConfirmLabelResolver = string | ((selectedIds: string[]) => string);
 
 export type CardSelectionPromptProps = {
+  headerAction?: ReactNode;
+  interactionSuspended?: boolean;
+  isVisible?: boolean;
   cancelLabel?: string;
   confirmLabel?: ConfirmLabelResolver;
   cardSize?: CardSelectionPromptCardSize;
@@ -65,6 +75,9 @@ export type CardSelectionPromptProps = {
 
 export function CardSelectionPrompt({
   cancelLabel = "Cancel",
+  headerAction,
+  interactionSuspended = false,
+  isVisible = true,
   cardSize = "md",
   clearDraftOnConfirm = true,
   confirmLabel,
@@ -280,7 +293,12 @@ export function CardSelectionPrompt({
 
   const selectOption = useCallback(
     (option: CardSelectionPromptOption) => {
-      if (option.disabled || isSubmitting || selectionMode === "ordered") {
+      if (
+        interactionSuspended ||
+        option.disabled ||
+        isSubmitting ||
+        selectionMode === "ordered"
+      ) {
         return;
       }
 
@@ -312,6 +330,7 @@ export function CardSelectionPrompt({
       confirmOnSelect,
       confirmSelection,
       draftStorageKey,
+      interactionSuspended,
       isSubmitting,
       maxSelected,
       selectionMode,
@@ -325,9 +344,15 @@ export function CardSelectionPrompt({
 
   return (
     <DialogPortal>
-      <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4">
+      <div
+        aria-hidden={!isVisible || undefined}
+        className={cx(
+          "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4",
+          !isVisible && "invisible pointer-events-none",
+        )}
+      >
         <section
-          aria-modal="true"
+          aria-modal={isVisible ? "true" : undefined}
           className={cx(
             "relative grid max-h-[min(46rem,calc(100vh-2rem))] w-full gap-4 overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/82 p-4 text-slate-100 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
             "supports-backdrop-filter:bg-slate-950/68 supports-backdrop-filter:backdrop-blur-md",
@@ -340,19 +365,23 @@ export function CardSelectionPrompt({
             className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.10),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.045),transparent_34%)] pointer-events-none"
           />
 
-          <header className="relative space-y-1">
-            <h2 className="font-semibold text-slate-50 text-lg leading-tight">
-              {title}
-            </h2>
-            {description && (
-              <p className="max-w-2xl text-slate-400 text-sm">{description}</p>
-            )}
+          <header className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <h2 className="font-semibold text-slate-50 text-lg leading-tight">
+                {title}
+              </h2>
+              {description && (
+                <p className="max-w-2xl text-slate-400 text-sm">{description}</p>
+              )}
+            </div>
+            {headerAction}
           </header>
 
           <div className="relative min-h-0">
             {usesCardPresentation ? (
               <CardChoiceGrid
                 cardSize={cardSize}
+                interactionSuspended={interactionSuspended}
                 maxSelected={maxSelected}
                 onOrderChange={updateOrderedIds}
                 onSelect={selectOption}
@@ -368,12 +397,14 @@ export function CardSelectionPrompt({
               />
             ) : selectionMode === "ordered" ? (
               <OrderedChoiceList
+                interactionSuspended={interactionSuspended}
                 onOrderChange={updateOrderedIds}
                 options={options}
                 orderedIds={orderedIds}
               />
             ) : (
               <ChoiceList
+                interactionSuspended={interactionSuspended}
                 maxSelected={maxSelected}
                 onSelect={selectOption}
                 options={options}
@@ -393,6 +424,7 @@ export function CardSelectionPrompt({
             {onCancel && (
               <GameActionButton
                 actionSlot="cancel"
+                disabled={interactionSuspended}
                 onAction={cancelSelection}
                 variant="secondary"
               >
@@ -401,7 +433,7 @@ export function CardSelectionPrompt({
             )}
             <GameActionButton
               actionSlot="primary"
-              disabled={!canConfirm}
+              disabled={interactionSuspended || !canConfirm}
               isBusy={isSubmitting}
               onAction={() => confirmSelection(currentSelectedIds)}
             >
@@ -567,6 +599,7 @@ function clearStoredDecisionDraft(storageKey: string | null) {
 
 function CardChoiceGrid({
   cardSize,
+  interactionSuspended,
   maxSelected,
   onOrderChange,
   onSelect,
@@ -577,6 +610,7 @@ function CardChoiceGrid({
   selectionMode,
 }: {
   cardSize: CardSelectionPromptCardSize;
+  interactionSuspended: boolean;
   maxSelected?: number;
   onOrderChange: (ids: string[]) => void;
   onSelect: (option: CardSelectionPromptOption) => void;
@@ -607,7 +641,9 @@ function CardChoiceGrid({
         const isSelected = selectedIndex >= 0;
         const disabledByLimit =
           selectionMode === "multiple" && !isSelected && selectionLimitReached;
-        const disabled = Boolean(option.disabled || disabledByLimit);
+        const disabled = Boolean(
+          interactionSuspended || option.disabled || disabledByLimit,
+        );
 
         return (
           <div
@@ -659,7 +695,7 @@ function CardChoiceGrid({
             {selectionMode === "ordered" && (
               <div className="flex justify-center gap-1 mt-2">
                 <ReorderButton
-                  disabled={selectedIndex <= 0}
+                  disabled={interactionSuspended || selectedIndex <= 0}
                   label={`Move ${option.label} up`}
                   onClick={() =>
                     onOrderChange(moveItem(orderedIds, selectedIndex, -1))
@@ -668,7 +704,10 @@ function CardChoiceGrid({
                   Up
                 </ReorderButton>
                 <ReorderButton
-                  disabled={selectedIndex === orderedIds.length - 1}
+                  disabled={
+                    interactionSuspended ||
+                    selectedIndex === orderedIds.length - 1
+                  }
                   label={`Move ${option.label} down`}
                   onClick={() =>
                     onOrderChange(moveItem(orderedIds, selectedIndex, 1))
@@ -698,6 +737,7 @@ function CardChoiceGrid({
 }
 
 function ChoiceList({
+  interactionSuspended,
   maxSelected,
   onSelect,
   options,
@@ -705,6 +745,7 @@ function ChoiceList({
   selectionLimitReached,
   selectionMode,
 }: {
+  interactionSuspended: boolean;
   maxSelected?: number;
   onSelect: (option: CardSelectionPromptOption) => void;
   options: CardSelectionPromptOption[];
@@ -718,7 +759,9 @@ function ChoiceList({
         const isSelected = selectedIds.includes(option.id);
         const disabledByLimit =
           selectionMode === "multiple" && !isSelected && selectionLimitReached;
-        const disabled = Boolean(option.disabled || disabledByLimit);
+        const disabled = Boolean(
+          interactionSuspended || option.disabled || disabledByLimit,
+        );
 
         return (
           <button
@@ -749,10 +792,12 @@ function ChoiceList({
 }
 
 function OrderedChoiceList({
+  interactionSuspended,
   onOrderChange,
   options,
   orderedIds,
 }: {
+  interactionSuspended: boolean;
   onOrderChange: (ids: string[]) => void;
   options: CardSelectionPromptOption[];
   orderedIds: string[];
@@ -780,14 +825,16 @@ function OrderedChoiceList({
             <OptionText option={option} />
             <div className="flex gap-1 ml-auto">
               <ReorderButton
-                disabled={index === 0}
+                disabled={interactionSuspended || index === 0}
                 label="Move up"
                 onClick={() => onOrderChange(moveItem(orderedIds, index, -1))}
               >
                 Up
               </ReorderButton>
               <ReorderButton
-                disabled={index === orderedIds.length - 1}
+                disabled={
+                  interactionSuspended || index === orderedIds.length - 1
+                }
                 label="Move down"
                 onClick={() => onOrderChange(moveItem(orderedIds, index, 1))}
               >

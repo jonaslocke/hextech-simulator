@@ -3,7 +3,7 @@
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { GameProjection } from "@/shared/game";
 import { LayoutGroup } from "motion/react";
-import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { areSetsEqual, createAnimationData } from "./board-animation-model";
 import { buildCard, createBoardModel } from "./board-model";
@@ -11,6 +11,9 @@ import { adaptProjectionToBoard } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import { CardActionMenu } from "./components/card-action-menu";
+import { DecisionInspectionToolbar } from "./components/decision-inspection-toolbar";
+import { DecisionInspectionTrigger } from "./components/decision-inspection-trigger";
+import { DecisionZoneBrowser } from "./components/decision-zone-browser";
 import {
   CardZoneAnimationSnapshot,
   CardZoneTransferOverlay,
@@ -34,6 +37,8 @@ import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
+import { resolveDecisionInspectionRequest } from "./interactions/decision-inspection-request";
+import { useDecisionInspection } from "./interactions/use-decision-inspection";
 import {
   useGameBoardActions,
   type GameBoardUnitPlayChoice,
@@ -77,6 +82,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     ...entry,
     sequence: index + 1,
   }));
+  const interactionLockedRef = useRef(false);
   const submitProjectedAction = useCallback(
     (
       actionId: string | undefined,
@@ -84,7 +90,10 @@ export const GameBoard: FC<GameBoardProps> = ({
       allocations?: Array<{ targetUnitId: string; amount: number }>,
       tokenPlacements?: Array<{ destinationId: string; count: number }>,
     ): Promise<boolean> => {
-      if (!actionId) return Promise.resolve(false);
+      if (!actionId || interactionLockedRef.current) {
+        return Promise.resolve(false);
+      }
+
       return onPerformAction({
         actionId,
         selectedIds,
@@ -184,6 +193,14 @@ export const GameBoard: FC<GameBoardProps> = ({
     playerNames,
     sourceProjection,
   });
+  const decisionInspectionRequest = resolveDecisionInspectionRequest({
+    playerDecision,
+    targetSelection,
+  });
+  const decisionInspection = useDecisionInspection({
+    request: decisionInspectionRequest,
+  });
+  interactionLockedRef.current = decisionInspection.isInspecting;
   const targetSelectionUsesCardPrompt =
     playerDecision?.kind === "cardSelection" &&
     targetSelection?.actionId === playerDecision.actionId;
@@ -312,6 +329,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       : null;
 
   const canUseLocationDrag =
+    !decisionInspection.isInspecting &&
     !isSubmittingAction &&
     !targetSelection &&
     !playerDecision &&
@@ -355,13 +373,19 @@ export const GameBoard: FC<GameBoardProps> = ({
       !effectSelectionAction ||
       (playerDecision?.kind === "cardSelection" &&
         playerDecision.actionId === effectSelectionAction.id)
-    )
+    ) {
       return;
+    }
+
     const requirement = combineTargetRequirements(
       effectSelectionAction,
       "card",
     );
-    if (!requirement) return;
+
+    if (!requirement) {
+      return;
+    }
+
     setTargetSelection((current) =>
       current?.actionId === effectSelectionAction.id
         ? current
@@ -388,10 +412,73 @@ export const GameBoard: FC<GameBoardProps> = ({
     }
   }, [playerDecision, setTargetSelection, targetSelection]);
 
+  useEffect(() => {
+    if (!decisionInspection.isInspecting) {
+      return;
+    }
+
+    closeCardActionMenu();
+    setOpenZone(null);
+    setUnitPlayChoice(null);
+
+    if (!isChainLockedOpen) {
+      setIsChainOverlayOpen(false);
+    }
+  }, [
+    closeCardActionMenu,
+    decisionInspection.isInspecting,
+    isChainLockedOpen,
+    setIsChainOverlayOpen,
+  ]);
+
+  const boardCardPrimaryAction = decisionInspection.isInspecting
+    ? undefined
+    : handleBoardCardPrimaryAction;
+  const boardCardPointerEnter = decisionInspection.isInspecting
+    ? undefined
+    : handleTargetPointerEnter;
+  const boardCardPointerLeave = decisionInspection.isInspecting
+    ? undefined
+    : handleTargetPointerLeave;
+  const canInspectPublicZones =
+    decisionInspection.isInspecting &&
+    decisionInspection.policy === "publicGameState";
+
+  const openPlayerTrash = decisionInspection.isInspecting
+    ? canInspectPublicZones && board.player.zones.trash.count > 0
+      ? () => decisionInspection.inspectZone(board.player.playerId, "trash")
+      : undefined
+    : () => setOpenZone("playerTrash");
+  const openOpponentTrash = decisionInspection.isInspecting
+    ? canInspectPublicZones && board.opponent.zones.trash.count > 0
+      ? () => decisionInspection.inspectZone(board.opponent.playerId, "trash")
+      : undefined
+    : () => setOpenZone("opponentTrash");
+  const openPlayerBanishment = decisionInspection.isInspecting
+    ? canInspectPublicZones && board.player.zones.banishment.count > 0
+      ? () =>
+          decisionInspection.inspectZone(
+            board.player.playerId,
+            "banishment",
+          )
+      : undefined
+    : () => setOpenZone("banish");
+  const openOpponentBanishment = decisionInspection.isInspecting
+    ? canInspectPublicZones && board.opponent.zones.banishment.count > 0
+      ? () =>
+          decisionInspection.inspectZone(
+            board.opponent.playerId,
+            "banishment",
+          )
+      : undefined
+    : () => setOpenZone("banish");
+
   return (
     <main
       className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"
-      onClickCapture={handleTargetClickCapture}
+      onClickCapture={
+        decisionInspection.isInspecting ? undefined : handleTargetClickCapture
+      }
     >
       <ScoreHeader
         opponent={board.opponent}
@@ -401,8 +488,15 @@ export const GameBoard: FC<GameBoardProps> = ({
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
+        interactionSuspended={decisionInspection.isInspecting}
+        isPromptVisible={!decisionInspection.isInspecting}
         isSubmitting={isSubmittingAction}
         onCancel={() => setTargetSelection(null)}
+        onInspect={
+          decisionInspection.canInspect
+            ? decisionInspection.inspectBoard
+            : undefined
+        }
         onIntent={async (intent) => {
           const accepted = await submitProjectedAction(
             intent.actionId,
@@ -416,7 +510,27 @@ export const GameBoard: FC<GameBoardProps> = ({
           return accepted;
         }}
       />
+      {decisionInspection.isInspecting && (
+        <DecisionInspectionToolbar
+          decisionTitle={decisionInspection.decisionTitle}
+          onInspectZone={decisionInspection.inspectZone}
+          onReturnToDecision={decisionInspection.returnToDecision}
+          opponent={board.opponent}
+          player={board.player}
+          policy={decisionInspection.policy}
+        />
+      )}
+      {decisionInspection.state.mode === "zone" && (
+        <DecisionZoneBrowser
+          inspectedZone={decisionInspection.state}
+          onClose={decisionInspection.closeZone}
+          onInspectZone={decisionInspection.inspectZone}
+          opponent={board.opponent}
+          player={board.player}
+        />
+      )}
       {showdownPrompt &&
+        !decisionInspection.isInspecting &&
         showdownBattlefieldName &&
         !sourceProjection.pendingChoice && (
           <ShowdownPrompt
@@ -447,11 +561,11 @@ export const GameBoard: FC<GameBoardProps> = ({
             <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
-              onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
-              onBoardCardPointerEnter={handleTargetPointerEnter}
-              onBoardCardPointerLeave={handleTargetPointerLeave}
-              onOpenBanish={() => setOpenZone("banish")}
-              onOpenTrash={() => setOpenZone("opponentTrash")}
+              onBoardCardPrimaryAction={boardCardPrimaryAction}
+              onBoardCardPointerEnter={boardCardPointerEnter}
+              onBoardCardPointerLeave={boardCardPointerLeave}
+              onOpenBanish={openOpponentBanishment}
+              onOpenTrash={openOpponentTrash}
               player={board.opponent}
               isActivePlayer={isOpponentActive}
               isMirrored
@@ -473,9 +587,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                       battlefieldId: board.playerBattlefield.id,
                     })
                   }
-                  onCardPrimaryAction={handleBoardCardPrimaryAction}
-                  onCardPointerEnter={handleTargetPointerEnter}
-                  onCardPointerLeave={handleTargetPointerLeave}
+                  onCardPrimaryAction={boardCardPrimaryAction}
+                  onCardPointerEnter={boardCardPointerEnter}
+                  onCardPointerLeave={boardCardPointerLeave}
                   owner="player"
                   showdownState={board.playerBattlefieldShowdownState}
                   enablePlayerUnitLocationDrag={canUseLocationDrag}
@@ -503,9 +617,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                   enablePlayerUnitLocationDrag={canUseLocationDrag}
                   stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
-                  onCardPrimaryAction={handleBoardCardPrimaryAction}
-                  onCardPointerEnter={handleTargetPointerEnter}
-                  onCardPointerLeave={handleTargetPointerLeave}
+                  onCardPrimaryAction={boardCardPrimaryAction}
+                  onCardPointerEnter={boardCardPointerEnter}
+                  onCardPointerLeave={boardCardPointerLeave}
                   owner="opponent"
                   showdownState={board.opponentBattlefieldShowdownState}
                   dropStatus={getLocationDropStatus({
@@ -523,15 +637,31 @@ export const GameBoard: FC<GameBoardProps> = ({
                 hoveredBoardLocation?.kind === "base" ||
                 isMovementDraftDestination({ kind: "base" })
               }
-              onOpenBanish={() => setOpenZone("banish")}
-              onOpenTrash={() => setOpenZone("playerTrash")}
-              onChampionContextAction={handleChampionCardAction}
-              onChampionPrimaryAction={handleChampionCardAction}
-              onBoardCardPrimaryAction={handleBoardCardPrimaryAction}
-              onBoardCardPointerEnter={handleTargetPointerEnter}
-              onBoardCardPointerLeave={handleTargetPointerLeave}
-              onRuneContextAction={handleRuneContextAction}
-              onRunePrimaryAction={handleRunePrimaryAction}
+              onOpenBanish={openPlayerBanishment}
+              onOpenTrash={openPlayerTrash}
+              onChampionContextAction={
+                decisionInspection.isInspecting
+                  ? undefined
+                  : handleChampionCardAction
+              }
+              onChampionPrimaryAction={
+                decisionInspection.isInspecting
+                  ? undefined
+                  : handleChampionCardAction
+              }
+              onBoardCardPrimaryAction={boardCardPrimaryAction}
+              onBoardCardPointerEnter={boardCardPointerEnter}
+              onBoardCardPointerLeave={boardCardPointerLeave}
+              onRuneContextAction={
+                decisionInspection.isInspecting
+                  ? undefined
+                  : handleRuneContextAction
+              }
+              onRunePrimaryAction={
+                decisionInspection.isInspecting
+                  ? undefined
+                  : handleRunePrimaryAction
+              }
               player={board.player}
               isActivePlayer={isPlayerActive}
               enableLocationDrag={canUseLocationDrag}
@@ -544,6 +674,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         </LocationDragProvider>
         <ActionRail
           concedeDisabled={isSubmittingAction}
+          disabled={decisionInspection.isInspecting}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
           onChainOpenChange={setIsChainOverlayOpen}
@@ -555,7 +686,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           setOpenZone={setOpenZone}
         />
       </section>
-      {globalActions.length > 0 && (
+      {!decisionInspection.isInspecting && globalActions.length > 0 && (
         <div className="top-12 left-1/2 z-50 fixed flex gap-2 -translate-x-1/2">
           {globalActions.map((action) => (
             <button
@@ -570,12 +701,17 @@ export const GameBoard: FC<GameBoardProps> = ({
         </div>
       )}
       <ChainOverlay
-        canPassPriority={canViewerPassChain}
+        canPassPriority={
+          !decisionInspection.isInspecting && canViewerPassChain
+        }
         chainCards={chainCards}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
         isCloseDisabled={isChainLockedOpen}
+        interactionSuspended={decisionInspection.isInspecting}
         isOpen={isChainOverlayOpen}
-        isSubmittingAction={isSubmittingAction}
+        isSubmittingAction={
+          isSubmittingAction || decisionInspection.isInspecting
+        }
         onClose={() => setIsChainOverlayOpen(false)}
         onItemPointerEnter={(targetCardInstanceIds) =>
           setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
@@ -585,7 +721,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         priorityWindowKey={`${projection.stateVersion}:${passPriorityAction?.id ?? "none"}`}
       />
       <TemporaryZoneOverlay
-        enableCloseShortcut
+        enableCloseShortcut={!decisionInspection.isInspecting}
         logEntries={logEntries}
         onClose={() => setOpenZone(null)}
         openZone={openZone}
@@ -599,12 +735,21 @@ export const GameBoard: FC<GameBoardProps> = ({
       <PlayerHandFan
         cards={board.player.zones.hand.cards}
         hiddenCardInstanceIds={activeTransferCardIds}
-        onCardContextAction={handleCardContextFromHand}
-        onPlayCard={handlePlayCardFromHand}
+        onCardContextAction={
+          decisionInspection.isInspecting
+            ? undefined
+            : handleCardContextFromHand
+        }
+        onPlayCard={
+          decisionInspection.isInspecting
+            ? undefined
+            : handlePlayCardFromHand
+        }
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
       />
-      {targetSelection?.targetKind === "card" &&
+      {!decisionInspection.isInspecting &&
+        targetSelection?.targetKind === "card" &&
         !targetSelectionUsesCardPrompt && (
           <TargetSelectionPrompt
             canSubmit={
@@ -681,9 +826,19 @@ export const GameBoard: FC<GameBoardProps> = ({
       {targetSelection?.targetKind === "battlefield" && (
         <ChoiceDialog
           confirmLabel="Choose battlefield"
+          decisionKey={`battlefield:${targetSelection.actionId}`}
           description="Choose the battlefield affected by this action."
+          headerAction={
+            decisionInspection.request?.source === "battlefieldChoice" ? (
+              <DecisionInspectionTrigger
+                onInspect={decisionInspection.inspectBoard}
+              />
+            ) : undefined
+          }
+          interactionSuspended={decisionInspection.isInspecting}
           isOpen
           isSubmitting={isSubmittingAction}
+          isVisible={!decisionInspection.isInspecting}
           onCancel={() => setTargetSelection(null)}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({
@@ -708,7 +863,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           title="Choose a Battlefield"
         />
       )}
-      {unitPlayChoice && (
+      {!decisionInspection.isInspecting && unitPlayChoice && (
         <ChoiceDialog
           confirmLabel="Play unit"
           description="Units may be played to your Base or a battlefield you control."
@@ -739,7 +894,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         stateVersion={projection.stateVersion}
         zoneCounts={animationData.zoneCounts}
       />
-      {cardActionMenu && (
+      {cardActionMenu && !decisionInspection.isInspecting && (
         <>
           <button
             aria-label="Close card action menu"

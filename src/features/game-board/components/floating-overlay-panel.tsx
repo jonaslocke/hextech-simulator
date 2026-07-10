@@ -8,9 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { GripVertical, X } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { cn } from "@/shared/utils/cn";
-import { GameActionButton } from "./game-action-button";
+import { OverlayCloseButton } from "./overlay-close-button";
 
 type OverlayPosition = {
   x: number;
@@ -254,26 +254,16 @@ export function FloatingOverlayPanel({
             <span className="truncate">{title}</span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <GameActionButton
-              actionSlot="cancel"
-              aria-label={closeLabel}
-              className={cn(
-                "px-1.5 min-w-0 h-7",
-                !enableCloseShortcut && "w-7 px-0",
-              )}
+          <div
+            className="flex items-center gap-1 shrink-0"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <OverlayCloseButton
               disabled={isCloseDisabled}
-              isActive={isOpen && enableCloseShortcut && !isCloseDisabled}
-              keyboardEnabled={enableCloseShortcut}
-              keybindClassName="hidden sm:inline-flex"
-              onAction={onClose}
-              onPointerDown={(event) => event.stopPropagation()}
-              showKeybind={enableCloseShortcut && !isCloseDisabled}
-              size="compact"
-              variant="secondary"
-            >
-              <X className="size-4" />
-            </GameActionButton>
+              enableShortcut={enableCloseShortcut}
+              label={closeLabel}
+              onClose={onClose}
+            />
           </div>
         </div>
 
