@@ -76,7 +76,7 @@ const gameActionButtonVariants = cva(["min-w-0 font-semibold leading-none"], {
 });
 
 const gameActionLabelVariants = cva(
-  "min-w-0 font-semibold truncate leading-none",
+  "min-w-0 font-semibold truncate leading-[1.25]",
   {
     variants: {
       size: {
@@ -94,7 +94,7 @@ const gameActionLabelVariants = cva(
 const gameActionKeybindVariants = cva(
   [
     "shrink-0 rounded border px-1.5 py-0.5",
-    "text-[10px] font-semibold leading-none shadow-none",
+    "text-[10px] font-semibold leading-[1.2] shadow-none",
   ],
   {
     variants: {
@@ -515,7 +515,7 @@ function GameActionDropdownItem({
         invokeAction();
       }}
     >
-      <span className="flex-1 min-w-0 font-semibold text-[12px] truncate leading-none">
+      <span className="flex-1 min-w-0 font-semibold text-[12px] truncate leading-tight">
         {action.label}
       </span>
 
