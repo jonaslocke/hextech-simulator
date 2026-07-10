@@ -127,9 +127,12 @@ export function resumeEffectResolution(
       type: "effectSelection",
       resolutionId: frame.id,
       bindingKey,
-      prompt: requirement.label
-        ? `Choose ${requirement.label}`
-        : "Choose effect target",
+      prompt:
+        requirement.selectionPurpose === "optionalCost"
+          ? "Optional Cost: Exhaust a ready friendly unit, or decline."
+          : requirement.label
+            ? `Choose ${requirement.label}`
+            : "Choose effect target",
       optionKind:
         requirement.kind === "battlefield" ? "battlefield" : "card",
       sourceZone: requirement.sourceZone ?? null,
@@ -137,6 +140,7 @@ export function resumeEffectResolution(
       legalCardIds: requirement.legalIds,
       minimum: requirement.minimum,
       maximum: requirement.maximum,
+      targetRequirements: [requirement],
     };
     return false;
   }

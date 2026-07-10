@@ -637,7 +637,11 @@ export const GameBoard: FC<GameBoardProps> = ({
                   : "Cancel"
             }
             confirmLabel={
-              targetSelection.purpose === "move"
+              targetSelectionHasOptionalCost(targetSelection)
+                ? targetSelection.selectedTargetIds.length > 0
+                  ? "Exhaust unit"
+                  : "Decline"
+                : targetSelection.purpose === "move"
                 ? "Confirm move"
                 : targetSelection.purpose === "choice"
                   ? "Confirm"
@@ -653,10 +657,14 @@ export const GameBoard: FC<GameBoardProps> = ({
                   )
                 : targetSelection.purpose === "choice"
                   ? effectSelectionAction?.label
+                  : targetSelectionHasOptionalCost(targetSelection)
+                    ? optionalCostTitle(targetSelectionAction?.label)
                   : undefined
             }
             helperText={
-              targetSelection.purpose === "move"
+              targetSelectionHasOptionalCost(targetSelection)
+                ? "Exhaust a ready friendly unit to draw 2. Decline to draw 1 instead."
+                : targetSelection.purpose === "move"
                 ? "Click additional units to include them, then confirm the move."
                 : undefined
             }
@@ -744,3 +752,16 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
+
+function targetSelectionHasOptionalCost(
+  targetSelection: NonNullable<ReturnType<typeof useBoardTargetSelection>["targetSelection"]>,
+) {
+  return targetSelection.requirement.requirements.some(
+    (requirement) => requirement.selectionPurpose === "optionalCost",
+  );
+}
+
+function optionalCostTitle(actionLabel: string | undefined) {
+  const cardName = actionLabel?.replace(/^Play\s+/i, "").trim();
+  return cardName ? `${cardName} - Optional Cost` : "Optional Cost";
+}

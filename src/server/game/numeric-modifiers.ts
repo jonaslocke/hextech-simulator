@@ -20,6 +20,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
   for (const modifier of input.game.state.modifiers) {
     if (
       modifier.attribute !== input.attribute ||
+      shouldDeferTargetModifier(input, modifier) ||
       (!modifier.targetCardInstanceId &&
         modifier.targetScope !== input.targetScope) ||
       !modifierAppliesToInput(input, modifier)
@@ -83,7 +84,29 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     });
   }
 
+  for (const modifier of input.game.state.modifiers) {
+    if (
+      modifier.attribute !== input.attribute ||
+      !shouldDeferTargetModifier(input, modifier) ||
+      !modifierAppliesToInput(input, modifier)
+    ) {
+      continue;
+    }
+    value = applyNumericOperation(value, modifier);
+  }
+
   return Math.max(0, value);
+}
+
+function shouldDeferTargetModifier(
+  input: NumericValueInput,
+  modifier: GameDocument["state"]["modifiers"][number],
+) {
+  return (
+    input.attribute === "might" &&
+    input.targetScope === "source" &&
+    modifier.targetCardInstanceId !== null
+  );
 }
 
 function continuousConditionApplies(

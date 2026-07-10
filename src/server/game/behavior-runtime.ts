@@ -264,6 +264,8 @@ export function queueTriggeredClauses(input: {
     return;
   }
   chain.items.push(...items);
+  chain.priorityPlayerId = chain.items.at(-1)!.controllerPlayerId;
+  chain.passedPlayerIds = [];
   input.game.state.chain = chain;
 }
 

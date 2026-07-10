@@ -2,6 +2,7 @@ import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import {
   definitionForInstance,
+  recomputeAllMight,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 
@@ -155,6 +156,9 @@ export function payCardCost(
       state.damage = 0;
       state.exhausted = false;
     }
+  }
+  if (plan.powerRuneIds.length > 0) {
+    recomputeAllMight(game, index);
   }
 }
 

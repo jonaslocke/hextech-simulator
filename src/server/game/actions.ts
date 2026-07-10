@@ -115,16 +115,18 @@ export function gameplayActions(
           true,
           null,
           undefined,
-          [
-            {
-              kind: pendingChoice.optionKind,
-              label: pendingChoice.prompt,
-              sourceZone: pendingChoice.sourceZone ?? undefined,
-              legalIds: pendingChoice.legalCardIds,
-              minimum: pendingChoice.minimum,
-              maximum: pendingChoice.maximum,
-            },
-          ],
+          pendingChoice.targetRequirements?.length
+            ? pendingChoice.targetRequirements
+            : [
+                {
+                  kind: pendingChoice.optionKind,
+                  label: pendingChoice.prompt,
+                  sourceZone: pendingChoice.sourceZone ?? undefined,
+                  legalIds: pendingChoice.legalCardIds,
+                  minimum: pendingChoice.minimum,
+                  maximum: pendingChoice.maximum,
+                },
+              ],
           {
             kind: "effectSelection",
             choiceId: pendingChoice.id,
@@ -465,6 +467,7 @@ export function performGameplayAction(input: {
         );
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
         openPendingShowdown(game, index, input.decks);
         finishTurnProgressionIfReady(game, index, input.decks);
       }
@@ -884,6 +887,7 @@ function passPriority(
       }
       cleanupBoard(game, index);
       drainQueuedBehaviorEvents(game, decks);
+      resetChainPriorityToTopItem(game);
       openPendingShowdown(game, index, decks);
       finishTurnProgressionIfReady(game, index, decks);
     } else {
@@ -1129,6 +1133,14 @@ function drainQueuedBehaviorEvents(
   for (const event of events) {
     dispatchBehaviorEvent(game, event, decks);
   }
+}
+
+function resetChainPriorityToTopItem(game: GameDocument) {
+  const chain = game.state.chain;
+  const topItem = chain?.items.at(-1);
+  if (!chain || !topItem) return;
+  chain.priorityPlayerId = topItem.controllerPlayerId;
+  chain.passedPlayerIds = [];
 }
 
 function addPlayableCardActions(

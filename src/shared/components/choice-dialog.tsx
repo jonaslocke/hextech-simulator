@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { DialogPortal } from "./dialog-portal";
 import { cn } from "@/shared/utils/cn";
+import { GameActionButton } from "@/features/game-board/components/game-action-button";
 
 export type ChoiceDialogOption = {
   description?: string;
@@ -110,16 +111,14 @@ export function ChoiceDialog({
                 Cancel
               </Button>
             )}
-            <Button
-              disabled={!canConfirm || isSubmitting}
-              onClick={() => onConfirm(selectedIds)}
-              type="button"
+
+            <GameActionButton
+              actionSlot="primary"
+              isBusy={!canConfirm || isSubmitting}
+              onAction={() => onConfirm(selectedIds)}
             >
-              {isSubmitting
-                ? "Submitting…"
-                : confirmLabel ??
-                  (selectionMode === "ordered" ? "Submit order" : "Confirm")}
-            </Button>
+              {isSubmitting ? "Submitting…" : confirmLabel}
+            </GameActionButton>
           </footer>
         </section>
       </div>
@@ -137,7 +136,7 @@ function SingleChoiceList({
   selectedId: string | null;
 }) {
   return (
-    <div className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
+    <div className="gap-2 grid pr-1 max-h-112 overflow-auto">
       {options.map((option) => {
         const isSelected = selectedId === option.id;
 
@@ -145,11 +144,11 @@ function SingleChoiceList({
           <button
             className={cn(
               "flex items-center gap-3 p-2 border rounded-lg min-h-16 text-left transition",
-              "bg-white/[0.055] shadow-sm shadow-black/20",
+              "bg-white/5.5 shadow-sm shadow-black/20",
               "disabled:cursor-not-allowed disabled:opacity-45",
               isSelected
                 ? "border-cyan-300/80 bg-cyan-300/12 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
-                : "border-white/10 hover:border-cyan-300/45 hover:bg-cyan-300/[0.055]",
+                : "border-white/10 hover:border-cyan-300/45 hover:bg-cyan-300/5.5",
             )}
             disabled={option.disabled}
             key={option.id}
@@ -177,7 +176,7 @@ function OrderedChoiceList({
   const optionById = new Map(options.map((option) => [option.id, option]));
 
   return (
-    <ol className="gap-2 grid pr-1 max-h-[28rem] overflow-auto">
+    <ol className="gap-2 grid pr-1 max-h-112 overflow-auto">
       {orderedIds.map((id, index) => {
         const option = optionById.get(id);
 
@@ -189,7 +188,7 @@ function OrderedChoiceList({
           <li
             className={cn(
               "items-center gap-3 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] p-2 border rounded-lg min-h-20",
-              "border-white/10 bg-white/[0.055] shadow-sm shadow-black/25",
+              "border-white/10 bg-white/5.5 shadow-sm shadow-black/25",
             )}
             key={id}
           >
@@ -233,7 +232,7 @@ function OptionImage({ option }: { option: ChoiceDialogOption }) {
   const orientation =
     option.imageOrientation && option.imageOrientation !== "auto"
       ? option.imageOrientation
-      : detectedOrientation ?? "portrait";
+      : (detectedOrientation ?? "portrait");
 
   return (
     <span

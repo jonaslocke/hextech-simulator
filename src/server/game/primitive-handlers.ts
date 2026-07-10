@@ -724,12 +724,10 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
     removeFromAllLocations(game, id);
     game.state.players[owner]!.zones.base.push(id);
+    resetStateAfterLeavingBoard(game, id, index);
     const state = game.state.cardStates[id]!;
     state.exhausted = true;
-    state.combatRole = null;
     recomputeMight(game, id, index);
-    state.lethalSuppressedDamage = state.damage;
-    state.lethalSuppressedMight = state.computedMight;
     return;
   }
   const owner = index.instances.get(id)?.ownerPlayerId;
