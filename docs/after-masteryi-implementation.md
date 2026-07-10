@@ -2,7 +2,7 @@
 
 After implementing the Master Yi deck, I found three issues that need investigation and fixes. Please validate using only `docs/riftbound_core_rules_reference.md` and the local card data. Do not search online.
 
-### 1. Highlander recall replacement keeps damage on the protected unit
+### 1. Highlander sometimes recall replacement keeps damage on the protected unit
 
 **Card involved:** Highlander  
 **Current behavior:** When Highlander replaces a unit death, the unit is recalled exhausted, but the damage state appears to remain on the unit after it returns to base.
@@ -45,6 +45,8 @@ After implementing the Master Yi deck, I found three issues that need investigat
 ---
 
 ### 3. Stupefy is not reducing Stalwart Poro’s combat Might under Wuju Bladesman
+
+later note: this is happening in more cases, basically whenever Wuju Blademaster would add might to a unit it reset to the base might.
 
 **Cards involved:** Stalwart Poro, Wuju Bladesman - Starter, Stupefy  
 **Scenario:**
@@ -167,46 +169,3 @@ The implementation appears to continue priority from the previous passer / next 
 - The opponent receives priority only after the Lux player passes.
 - This works whether the trigger is added to an existing Chain or creates a new Chain after the original spell resolves.
 - This works outside showdown and inside showdown, without breaking Focus rules.
-
-### 6. Chain spell hover does not highlight Firestorm’s chosen battlefield target
-
-**Card involved:** Firestorm  
-**Area:** Chain UI / target highlight feedback  
-**Not related to:** Master Yi deck implementation
-
-**Scenario:**
-
-1. Player casts Firestorm.
-2. Player chooses a battlefield as the spell target.
-3. Firestorm is added to the Chain.
-4. A player hovers Firestorm in the Chain panel.
-
-**Expected behavior:**
-When hovering Firestorm on the Chain, the UI should highlight the battlefield chosen for Firestorm.
-
-Since Firestorm’s effect is `Deal 3 to all enemy units at a battlefield`, the chosen battlefield should remain visible as the spell’s target while the spell is on the Chain. This helps both players understand what the Chain item will affect before choosing whether to react or pass priority.
-
-Ideally, the UI can also highlight the enemy units currently at that battlefield as affected objects, but the minimum expected behavior is highlighting the selected battlefield.
-
-**Current behavior:**
-Hovering Firestorm in the Chain does not highlight anything. Players cannot visually tell which battlefield was chosen after the spell is placed on the Chain.
-
-**Why this matters:**
-Chain hover feedback is used to support priority decisions. If the Chain item does not expose or render its selected target, players must rely on memory instead of the board UI.
-
-**Please check:**
-
-- Whether Firestorm’s chosen `battlefieldId` is persisted on the Chain item.
-- Whether the Chain projection includes chosen targets for spells that are waiting to resolve.
-- Whether the Chain hover UI only supports card/unit targets and not battlefield/location targets.
-- Whether battlefield target highlighting is implemented for target-selection mode but not reused for Chain hover mode.
-- Whether derived affected objects, such as enemy units at the chosen battlefield, can be highlighted separately from the actual selected battlefield target.
-- Whether highlight cleanup works when hover ends or when the Chain item resolves.
-
-**Acceptance criteria:**
-
-- After Firestorm is played and placed on the Chain, hovering it highlights the chosen battlefield.
-- The highlight is visible to both players.
-- The highlight remains accurate while the spell is on the Chain.
-- The highlight is removed when the hover ends or when Firestorm resolves/leaves the Chain.
-- This works for battlefield/location targets generally, not only Firestorm.
