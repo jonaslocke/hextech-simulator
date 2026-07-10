@@ -8,3 +8,5 @@
 [x] Choose Order for trigger abilities, transform glass like and fix card orientation when showing BF's. ![alt text](image-33.png)
 [x] Choose Starting Player glass like. ![alt text](image-36.png)
 [x] choose mulligan make it glass like and remove layout shift. ![![alt text](image-39.png)](image-38.png)
+[ ] tuck hand on player decision making
+[ ] show zones on player decision making
