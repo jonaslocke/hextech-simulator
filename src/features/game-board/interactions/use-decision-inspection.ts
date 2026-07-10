@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  DecisionInspectionPolicy,
-  DecisionInspectionZone,
-} from "../decisions/decision-inspection-policy";
-import type { PlayerDecisionRequest } from "../decisions/player-decision-types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { DecisionInspectionZone } from "../decisions/decision-inspection-policy";
+import type { DecisionInspectionRequest } from "./decision-inspection-request";
 
 type DecisionInspectionState =
   | { mode: "decision" }
@@ -18,16 +15,13 @@ type DecisionInspectionState =
     };
 
 export function useDecisionInspection({
-  decision,
+  request,
 }: {
-  decision: PlayerDecisionRequest | null;
+  request: DecisionInspectionRequest | null;
 }) {
-  const policy = decision?.inspection ?? "none";
-  const decisionKey = useMemo(
-    () => getInspectableDecisionKey(decision, policy),
-    [decision, policy],
-  );
-  const decisionTitle = getDecisionTitle(decision);
+  const decisionKey = request?.decisionKey ?? null;
+  const policy = request?.policy ?? "none";
+  const decisionTitle = request?.title ?? "Decision";
   const [state, setState] = useState<DecisionInspectionState>({
     mode: "decision",
   });
@@ -37,7 +31,7 @@ export function useDecisionInspection({
     state.mode !== "decision" && state.decisionKey === decisionKey
       ? state
       : ({ mode: "decision" } as const);
-  const canInspect = Boolean(decisionKey);
+  const canInspect = Boolean(request);
   const isInspecting = currentState.mode !== "decision";
 
   useEffect(() => {
@@ -134,38 +128,8 @@ export function useDecisionInspection({
     inspectZone,
     isInspecting,
     policy,
+    request,
     returnToDecision,
     state: currentState,
   };
-}
-
-function getInspectableDecisionKey(
-  decision: PlayerDecisionRequest | null,
-  policy: DecisionInspectionPolicy,
-) {
-  if (!decision || policy === "none" || decision.kind === "pendingDecision") {
-    return null;
-  }
-
-  switch (decision.kind) {
-    case "cardSelection":
-    case "optionDecision":
-    case "orderedDecision":
-      return `${policy}:${decision.kind}:${decision.decisionKey}`;
-    case "combatDamage":
-      return `${policy}:${decision.kind}:${decision.decisionKey ?? decision.actionId}`;
-  }
-}
-
-function getDecisionTitle(decision: PlayerDecisionRequest | null) {
-  if (!decision) {
-    return "Decision";
-  }
-
-  switch (decision.kind) {
-    case "combatDamage":
-      return "Assign combat damage";
-    default:
-      return decision.title;
-  }
 }

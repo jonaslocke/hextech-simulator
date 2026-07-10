@@ -12,6 +12,7 @@ import { ActionRail } from "./components/action-rail";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import { CardActionMenu } from "./components/card-action-menu";
 import { DecisionInspectionToolbar } from "./components/decision-inspection-toolbar";
+import { DecisionInspectionTrigger } from "./components/decision-inspection-trigger";
 import { DecisionZoneBrowser } from "./components/decision-zone-browser";
 import {
   CardZoneAnimationSnapshot,
@@ -36,6 +37,7 @@ import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
+import { resolveDecisionInspectionRequest } from "./interactions/decision-inspection-request";
 import { useDecisionInspection } from "./interactions/use-decision-inspection";
 import {
   useGameBoardActions,
@@ -184,8 +186,12 @@ export const GameBoard: FC<GameBoardProps> = ({
     playerNames,
     sourceProjection,
   });
+  const decisionInspectionRequest = resolveDecisionInspectionRequest({
+    playerDecision,
+    targetSelection,
+  });
   const decisionInspection = useDecisionInspection({
-    decision: playerDecision,
+    request: decisionInspectionRequest,
   });
   interactionLockedRef.current = decisionInspection.isInspecting;
   const targetSelectionUsesCardPrompt =
@@ -809,13 +815,22 @@ export const GameBoard: FC<GameBoardProps> = ({
             }
           />
         )}
-      {!decisionInspection.isInspecting &&
-        targetSelection?.targetKind === "battlefield" && (
+      {targetSelection?.targetKind === "battlefield" && (
         <ChoiceDialog
           confirmLabel="Choose battlefield"
+          decisionKey={`battlefield:${targetSelection.actionId}`}
           description="Choose the battlefield affected by this action."
+          headerAction={
+            decisionInspection.request?.source === "battlefieldChoice" ? (
+              <DecisionInspectionTrigger
+                onInspect={decisionInspection.inspectBoard}
+              />
+            ) : undefined
+          }
+          interactionSuspended={decisionInspection.isInspecting}
           isOpen
           isSubmitting={isSubmittingAction}
+          isVisible={!decisionInspection.isInspecting}
           onCancel={() => setTargetSelection(null)}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({

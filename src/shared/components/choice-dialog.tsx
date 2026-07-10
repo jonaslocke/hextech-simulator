@@ -94,13 +94,15 @@ export function ChoiceDialog({
           )}
           role="dialog"
         >
-          <header className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
+          <header className="flex justify-between items-start gap-3">
+            <div className="space-y-1 min-w-0">
               <h2 className="font-semibold text-slate-50 text-lg leading-tight">
                 {title}
               </h2>
               {description && (
-                <p className="text-slate-400 text-sm leading-5">{description}</p>
+                <p className="text-slate-400 text-sm leading-5">
+                  {description}
+                </p>
               )}
             </div>
             {headerAction}
@@ -124,14 +126,14 @@ export function ChoiceDialog({
 
           <footer className="flex justify-end gap-2 pt-3 border-white/10 border-t">
             {onCancel && (
-              <Button
+              <GameActionButton
+                actionSlot="cancel"
+                onAction={onCancel}
                 disabled={interactionSuspended}
-                onClick={onCancel}
-                type="button"
                 variant="secondary"
               >
                 Cancel
-              </Button>
+              </GameActionButton>
             )}
 
             <GameActionButton
@@ -233,7 +235,9 @@ function OrderedChoiceList({
                 Up
               </ReorderButton>
               <ReorderButton
-                disabled={interactionSuspended || index === orderedIds.length - 1}
+                disabled={
+                  interactionSuspended || index === orderedIds.length - 1
+                }
                 label="Move down"
                 onClick={() => onOrderChange(moveItem(orderedIds, index, 1))}
               >

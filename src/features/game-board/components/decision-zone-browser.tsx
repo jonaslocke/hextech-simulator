@@ -8,6 +8,8 @@ import type { DecisionInspectionZone } from "../decisions/decision-inspection-po
 import type { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
+import { OverlayCloseButton } from "./overlay-close-button";
+import { GameActionButton } from "./game-action-button";
 
 export type DecisionInspectedZone = {
   playerId: string;
@@ -44,56 +46,51 @@ export function DecisionZoneBrowser({
   return (
     <DialogPortal>
       <div
-        className="z-[2147483647] fixed inset-0 flex items-center justify-center bg-black/62 p-4 backdrop-blur-sm"
+        className="z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/62 backdrop-blur-sm p-4"
         role="presentation"
       >
         <section
           aria-labelledby="decision-zone-browser-title"
           aria-modal="true"
           className={cn(
-            "grid max-h-[min(52rem,calc(100vh-2rem))] w-full max-w-7xl grid-rows-[auto_auto_minmax(0,1fr)] gap-3 overflow-hidden rounded-2xl",
+            "gap-3 grid grid-rows-[auto_auto_minmax(0,1fr)] rounded-2xl w-full max-w-7xl max-h-[min(52rem,calc(100vh-2rem))] overflow-hidden",
             "border border-cyan-300/25 bg-slate-950/92 p-4 text-slate-100 shadow-2xl shadow-black/85 ring-1 ring-cyan-300/10",
             "supports-backdrop-filter:bg-slate-950/78 supports-backdrop-filter:backdrop-blur-xl",
           )}
           role="dialog"
         >
-          <header className="flex items-start justify-between gap-3">
+          <header className="flex justify-between items-start gap-3">
             <div className="min-w-0">
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200/75">
+              <p className="font-mono font-semibold text-[10px] text-cyan-200/75 uppercase tracking-[0.2em]">
                 Public game state
               </p>
               <h2
-                className="mt-1 text-xl font-semibold text-slate-50"
+                className="mt-1 font-semibold text-slate-50 text-xl"
                 id="decision-zone-browser-title"
               >
                 {title}
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {zone.count} {zone.count === 1 ? "card" : "cards"}. This view
-                is read-only.
+              <p className="mt-1 text-slate-400 text-sm">
+                {zone.count} {zone.count === 1 ? "card" : "cards"}. This view is
+                read-only.
               </p>
             </div>
 
-            <Button
+            <GameActionButton
+              actionSlot="cancel"
               aria-label="Close zone browser"
               autoFocus
-              className="h-9 shrink-0"
-              onClick={onClose}
-              size="sm"
-              type="button"
+              onAction={onClose}
+              size="compact"
               variant="secondary"
             >
-              <X aria-hidden="true" className="size-4" />
-              Close
-              <span className="rounded border border-white/15 bg-white/8 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
-                Esc
-              </span>
-            </Button>
+              Back to board
+            </GameActionButton>
           </header>
 
           <nav
             aria-label="Inspectable public zones"
-            className="flex flex-wrap gap-2 border-y border-white/10 py-3"
+            className="flex flex-wrap gap-2 py-3 border-white/10 border-y"
           >
             {players.flatMap((candidate) =>
               (["trash", "banishment"] as const).map((zoneKind) => {
@@ -162,14 +159,12 @@ function ZoneCardGrid({
 }) {
   if (zone.cards.length === 0) {
     return (
-      <EmptyState
-        label={`No cards in ${zoneLabel(zoneKind).toLowerCase()}.`}
-      />
+      <EmptyState label={`No cards in ${zoneLabel(zoneKind).toLowerCase()}.`} />
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-wrap content-start justify-center gap-3 overflow-auto rounded-xl border border-white/8 bg-black/18 p-4 [scrollbar-color:rgba(103,232,249,0.28)_transparent]">
+    <div className="flex flex-wrap justify-center content-start gap-3 bg-black/18 p-4 border border-white/8 rounded-xl min-h-0 overflow-auto [scrollbar-color:rgba(103,232,249,0.28)_transparent]">
       {zone.cards.map((card, index) => (
         <ReadOnlyZoneCard
           card={card}
