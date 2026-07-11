@@ -1,0 +1,36 @@
+Legend:
+1 Might of Demacia - Starter
+
+Champion:
+1 Garen, Rugged
+
+MainDeck:
+3 Confront
+3 Crackshot Corsair
+3 First Mate
+3 Back to Back
+3 Daring Poro
+3 Faithful Manufactor
+3 Vanguard Sergeant
+3 Noxian Drummer
+3 Recruit the Vanguard
+3 Vanguard Attendant
+2 Dune Drake
+2 Petty Officer
+2 Decisive Strike
+1 Garen, Rugged
+2 Garen, Commander
+
+Battlefields:
+1 Targon's Peak
+1 Trifarian War Camp
+1 The Papertree
+
+Runes:
+6 Body Rune
+6 Order Rune
+
+Sideboard:
+3 Gentlemen's Duel
+3 Master Yi, Honed
+2 Blast of Power

@@ -138,16 +138,16 @@ export function OnlineMatchmakingLobby() {
       return;
     }
 
-    setBusy(true);
-    setError(null);
-    setCopiedRoomCode(null);
-
     const displayName = normalizeOnlinePlayerName(playerName);
 
     if (!displayName) {
       setError("Enter your player name.");
       return;
     }
+
+    setBusy(true);
+    setError(null);
+    setCopiedRoomCode(null);
 
     saveOnlinePlayerName(displayName);
 
@@ -331,19 +331,18 @@ export function OnlineMatchmakingLobby() {
       ) : (
         <>
           <label className="gap-2 grid mt-6 text-sm">
-            <label className="gap-2 grid mt-6 text-sm">
-              <span className="text-slate-300">Your name</span>
-              <Input
-                autoComplete="name"
-                disabled={busy}
-                maxLength={32}
-                onChange={(event) =>
-                  updatePlayerName(event.currentTarget.value)
-                }
-                placeholder="Enter your name"
-                value={playerName}
-              />
-            </label>
+            <span className="text-slate-300">Your name</span>
+            <Input
+              autoComplete="name"
+              disabled={busy}
+              maxLength={32}
+              onChange={(event) => updatePlayerName(event.currentTarget.value)}
+              placeholder="Enter your name"
+              value={playerName}
+            />
+          </label>
+
+          <label className="gap-2 grid mt-4 text-sm">
             <span className="text-slate-300">Your deck</span>
             <select
               className="bg-slate-950 px-3 py-2 border border-white/10 rounded"

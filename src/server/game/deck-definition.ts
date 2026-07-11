@@ -6,7 +6,20 @@ import { parseDeckList } from "@/server/deck";
 export type { DeckId } from "@/shared/game";
 
 export const DECK_DEFINITIONS_COLLECTION = "deckDefinitions";
-export const DECK_IDS = deckIdSchema.options;
+export const CORE_DECK_IDS = [
+  "lux",
+  "annie",
+  "master-yi",
+  "garen",
+] as const satisfies DeckId[];
+export const SIDEBOARD_VALIDATION_DECK_IDS = [
+  "lux-s",
+  "annie-s",
+  "master-yi-s",
+  "garen-s",
+] as const satisfies DeckId[];
+export const DECK_IDS = CORE_DECK_IDS;
+export const PLAYABLE_DECK_IDS = deckIdSchema.options;
 
 export const deckDefinitionDocumentSchema = z.object({
   id: deckIdSchema,

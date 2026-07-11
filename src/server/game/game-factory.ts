@@ -178,7 +178,7 @@ export function createMatchGame(input: CreateMatchGameInput): GameDocument {
       players,
       battlefields: [],
       cardStates,
-      createdCardInstances: allRuntimeInstances,
+      createdCardInstances: [],
       createdCardDefinitions: [],
       turn: null,
       chain: null,
@@ -252,6 +252,10 @@ function createRuntimeInstances(input: {
   registeredCopies: readonly CardInstance[];
   activeDeck: ActiveGameDeck;
 }): CardInstance[] {
+  void input.matchId;
+  void input.gameNumber;
+  void input.playerId;
+
   const activeRegisteredIds = new Set([
     input.activeDeck.legendRegisteredCardId,
     input.activeDeck.chosenChampionRegisteredCardId,
@@ -261,14 +265,11 @@ function createRuntimeInstances(input: {
   ]);
 
   return input.registeredCopies
-    .filter((copy) => copy.registeredCardId && activeRegisteredIds.has(copy.registeredCardId))
-    .map((copy) => ({
-      instanceId: `${input.matchId}:game:${input.gameNumber}:card:${copy.registeredCardId}`,
-      registeredCardId: copy.registeredCardId,
-      ownerPlayerId: input.playerId,
-      source: copy.source,
-      cardCode: copy.cardCode,
-    }));
+    .filter(
+      (copy) =>
+        copy.registeredCardId && activeRegisteredIds.has(copy.registeredCardId),
+    )
+    .map((copy) => ({ ...copy }));
 }
 
 function requireRuntimeId(

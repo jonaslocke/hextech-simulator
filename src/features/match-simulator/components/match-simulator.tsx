@@ -1,6 +1,12 @@
 "use client";
 
 import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
+import {
+  SideboardingScreen,
+  validateDeckClient,
+  type DeckReconfigurationIntent,
+  type IntentResult,
+} from "@/features/sideboarding";
 import { Button } from "@/shared/components/button";
 import type { DeckId, MatchProjection } from "@/shared/game";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +18,7 @@ import {
   loadProjectionClient,
   performActionClient,
   readyForNextGameClient,
+  submitDeckReconfigurationClient,
 } from "../api";
 import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
@@ -105,28 +112,41 @@ export function MatchSimulator({
   }, [onlineMatch]);
 
   useEffect(() => {
+    if (onlineMatch) {
+      return;
+    }
     if (!currentMatchId || !viewerPlayerId || !viewerToken) {
       return;
     }
 
     let active = true;
+    const abortController = new AbortController();
 
-    void loadProjectionClient(currentMatchId, viewerToken).then((result) => {
-      if (!active || !result.accepted) {
-        return;
-      }
+    void loadProjectionClient(currentMatchId, viewerToken, {
+      signal: abortController.signal,
+    })
+      .then((result) => {
+        if (!active || !result.accepted) {
+          return;
+        }
 
-      setMatch((current) =>
-        updateProjection(current, viewerPlayerId, result.projection, {
-          inFlightGameIntent: inFlightGameIntentRef.current,
-        }),
-      );
-    });
+        setMatch((current) =>
+          updateProjection(current, viewerPlayerId, result.projection, {
+            inFlightGameIntent: inFlightGameIntentRef.current,
+          }),
+        );
+      })
+      .catch((loadError: unknown) => {
+        if (active && !isAbortError(loadError)) {
+          setError("Unable to refresh the match state.");
+        }
+      });
 
     return () => {
       active = false;
+      abortController.abort();
     };
-  }, [currentMatchId, viewerPlayerId, viewerToken]);
+  }, [currentMatchId, onlineMatch, viewerPlayerId, viewerToken]);
 
   useEffect(() => {
     if (
@@ -139,18 +159,45 @@ export function MatchSimulator({
       return;
     }
 
-    const interval = window.setInterval(() => {
-      void loadProjectionClient(currentMatchId, viewerToken).then((result) => {
+    let active = true;
+    let timeoutId: number | null = null;
+    let abortController: AbortController | null = null;
+
+    const poll = async () => {
+      abortController = new AbortController();
+      try {
+        const result = await loadProjectionClient(currentMatchId, viewerToken, {
+          signal: abortController.signal,
+        });
         if (!result.accepted) return;
         setMatch((current) =>
           updateProjection(current, viewerPlayerId, result.projection, {
             inFlightGameIntent: inFlightGameIntentRef.current,
           }),
         );
-      });
-    }, 1500);
+      } catch (pollError: unknown) {
+        if (active && !isAbortError(pollError)) {
+          setError("Unable to refresh the match state.");
+        }
+      } finally {
+        abortController = null;
+        if (active) {
+          timeoutId = window.setTimeout(() => {
+            void poll();
+          }, 1500);
+        }
+      }
+    };
 
-    return () => window.clearInterval(interval);
+    void poll();
+
+    return () => {
+      active = false;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      abortController?.abort();
+    };
   }, [currentMatchId, matchStatus, onlineMatch, viewerPlayerId, viewerToken]);
 
   async function createMatch() {
@@ -257,6 +304,48 @@ export function MatchSimulator({
     }
   }
 
+  async function submitDeckReconfiguration(
+    intent: DeckReconfigurationIntent,
+  ): Promise<IntentResult> {
+    if (!match || !viewer || !projection?.betweenGames) {
+      return { accepted: false, message: "Sideboarding is not available." };
+    }
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await submitDeckReconfigurationClient({
+        matchId: intent.matchId,
+        playerToken: viewer.playerToken,
+        stateVersion: intent.expectedIntermissionVersion,
+        betweenGamesId: projection.betweenGames.id,
+        configuration: intent.configuration,
+      });
+
+      if (!result.accepted) {
+        setError(result.error.message);
+        if (result.error.code === "match.betweenGamesChanged") {
+          await refreshViewerProjection();
+        }
+        return {
+          accepted: false,
+          code: result.error.code,
+          message: result.error.message,
+        };
+      }
+
+      setMatch((current) =>
+        updateProjection(current, viewer.playerId, result.projection),
+      );
+      return { accepted: true };
+    } catch {
+      return { accepted: false, message: "The sideboarding request failed." };
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refreshViewerProjection() {
     if (!currentMatchId || !viewerPlayerId || !viewerToken) {
       return;
@@ -312,6 +401,10 @@ export function MatchSimulator({
       next.add(key);
       return next;
     });
+  }
+
+  if (onlineMatch && (!match || !projection || !gameProjection)) {
+    return <OnlineMatchLoading />;
   }
 
   if (!match || !projection || !gameProjection) {
@@ -415,6 +508,34 @@ export function MatchSimulator({
             projection={projection}
           />
         </main>
+      );
+    }
+
+    if (projection.betweenGames?.sideboardingSession) {
+      return (
+        <>
+          <ViewerControls
+            busy={busy}
+            gameNumber={projection.gameNumber}
+            gameState={projection.currentGame.stateVersion}
+            matchId={match.matchId}
+            matchState={projection.stateVersion}
+            onlineMatch={Boolean(onlineMatch)}
+            onSeatChange={setViewerSeat}
+            viewerSeat={viewerSeat}
+          />
+          {error && (
+            <div className="right-4 bottom-4 z-60 fixed bg-red-950 px-3 py-2 border border-red-400/40 rounded text-red-100 text-sm">
+              {error}
+            </div>
+          )}
+          <SideboardingScreen
+            onIntent={submitDeckReconfiguration}
+            projection={projection}
+            session={projection.betweenGames.sideboardingSession}
+            validateDeck={validateDeckClient}
+          />
+        </>
       );
     }
 
@@ -625,6 +746,20 @@ export function MatchSimulator({
   );
 }
 
+function OnlineMatchLoading() {
+  return (
+    <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
+      <section
+        aria-live="polite"
+        className="bg-slate-900/95 shadow-2xl p-5 border border-cyan-300/20 rounded-xl text-center"
+        role="status"
+      >
+        <p className="font-medium text-slate-100 text-sm">Restoring match...</p>
+      </section>
+    </main>
+  );
+}
+
 function createOnlineAcceptedMatch(
   credentials: OnlinePlayerCredentials,
 ): AcceptedMatch {
@@ -724,6 +859,10 @@ function shouldIgnoreIncomingProjection({
   return incoming.currentGame.stateVersion <= current.currentGame.stateVersion;
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 function ViewerControls({
   busy,
   gameNumber,
@@ -772,16 +911,12 @@ function ViewerControls({
           </Button>
         </>
       )}
-      <span className="text-slate-400">Match {shortMatchId(matchId)}</span>
+      <span className="text-slate-400">Match {matchId}</span>
       <span className="text-slate-400">
         Game {gameNumber} - G{gameState} / M{matchState}
       </span>
     </div>
   );
-}
-
-function shortMatchId(matchId: string) {
-  return matchId.length > 8 ? `${matchId.slice(0, 8)}...` : matchId;
 }
 
 function SetupWaitingOverlay({ detail }: { detail: string }) {

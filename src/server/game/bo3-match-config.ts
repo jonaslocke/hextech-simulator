@@ -1,10 +1,10 @@
 export const BO3_MATCH_FEATURES = {
-  enableDeckReconfigurationBetweenGames: false,
-  readyWithCurrentDeckConfiguration: true,
+  sideboardingDeckReconfiguration: true,
+  readyWithCurrentDeckConfiguration: false,
 } as const;
 
 const enabledBetweenGamesModes = [
-  BO3_MATCH_FEATURES.enableDeckReconfigurationBetweenGames,
+  BO3_MATCH_FEATURES.sideboardingDeckReconfiguration,
   BO3_MATCH_FEATURES.readyWithCurrentDeckConfiguration,
 ].filter(Boolean).length;
 

@@ -10,6 +10,7 @@ import {
 } from "@/server/game/catalog";
 import {
   DECK_IDS,
+  PLAYABLE_DECK_IDS,
   hashDeckSourceText,
   validateDeckDefinitionDocument,
   type DeckDefinitionDocument,
@@ -50,10 +51,13 @@ export async function getPlayableDeckOptions(
   repository: DeckDefinitionRepository = createDeckDefinitionRepository(db),
 ): Promise<PlayableDeckOption[]> {
   const options = await Promise.all(
-    DECK_IDS.map(async (id): Promise<PlayableDeckOption | null> => {
+    PLAYABLE_DECK_IDS.map(async (id): Promise<PlayableDeckOption | null> => {
       try {
         const definition = await repository.findById(id);
         if (!definition) {
+          if (!DECK_IDS.includes(id as (typeof DECK_IDS)[number])) {
+            return null;
+          }
           throw new Error(`Missing persisted deck definition: ${id}.`);
         }
         await loader(db, id);
