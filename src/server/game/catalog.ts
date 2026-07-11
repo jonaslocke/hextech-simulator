@@ -11,6 +11,10 @@ import {
   type PrimitiveCatalogEntry,
 } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
+import {
+  getDeckCardLookupCandidates,
+  getDeckCardNameAliases,
+} from "../catalog";
 import { parseDeckList } from "../deck";
 import { getRuntimeCoverageStatus } from "./runtime-coverage";
 import {
@@ -62,7 +66,9 @@ export function buildDeckSnapshot(
   const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
   const cardsByName = new Map<string, CanonicalCardDocument>();
   for (const document of canonicalCards) {
-    cardsByName.set(document.card.name, document);
+    for (const name of getDeckCardNameAliases(document.card)) {
+      cardsByName.set(name, document);
+    }
     for (const alias of legacyCardNameAliases(document.card.name)) {
       cardsByName.set(alias, document);
     }
@@ -100,7 +106,9 @@ export function buildDeckSnapshot(
 
   const cardsByNameResolved = new Map<string, GameCardDefinition>();
   for (const definition of cards) {
-    cardsByNameResolved.set(definition.card.name, definition);
+    for (const name of getDeckCardNameAliases(definition.card)) {
+      cardsByNameResolved.set(name, definition);
+    }
     for (const alias of legacyCardNameAliases(definition.card.name)) {
       cardsByNameResolved.set(alias, definition);
     }
@@ -146,11 +154,10 @@ function legacyCardNameAliases(name: string): string[] {
 }
 
 function cardNameLookupCandidates(name: string): string[] {
-  if (name.startsWith("Yi, ")) {
-    return [name, name.replace(/^Yi, /, "Master Yi, ")];
-  }
+  const candidates = getDeckCardLookupCandidates(name);
+  if (!name.startsWith("Yi, ")) return candidates;
 
-  return [name];
+  return [...new Set([...candidates, name.replace(/^Yi, /, "Master Yi, ")])];
 }
 
 function validateCanonicalDocument(

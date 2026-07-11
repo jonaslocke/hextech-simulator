@@ -16,6 +16,8 @@ import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { GameDocument } from "../src/server/game/state";
 
+const RECRUIT_TOKEN_CARD_CODE = "OGN-272";
+
 test("unit selectors enforce excludesSource", () => {
   const { game, decks } = fixture([
     unit("SOURCE", "First Mate", [
@@ -52,6 +54,7 @@ test("token placement choice accepts counted destination allocations", () => {
     clause("tokens", {
       effects: [
         binding("action.play_token", 0, {
+          tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
           tokenName: "Recruit",
           count: 4,
           placement: "chooseBaseOrControlledBattlefield",
@@ -124,6 +127,7 @@ test("tokens cease to exist instead of remaining in non-board zones", () => {
     clause("tokens", {
       effects: [
         binding("action.play_token", 0, {
+          tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
           tokenName: "Recruit",
           count: 1,
           placement: "sourceLocation",
@@ -159,6 +163,7 @@ test("fixed-location token creation plays token at source location", () => {
     clause("token-here", {
       effects: [
         binding("action.play_token", 0, {
+          tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
           tokenName: "Recruit",
           count: 1,
           placement: "sourceLocation",
@@ -191,7 +196,8 @@ test("fixed-location token creation plays token at source location", () => {
   assert.equal(game.state.createdCardInstances?.length, 1);
   assert.equal(game.state.battlefields[0]!.units.length, 2);
   assert.equal(
-    game.state.createdCardDefinitions?.[0]?.card.media.image_url,
+    createRuntimeCardIndex(decks, game).definitions.get(RECRUIT_TOKEN_CARD_CODE)
+      ?.card.media.image_url,
     "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
   );
 });
@@ -201,6 +207,7 @@ test("fixed-location token creation can use an uncontrolled source battlefield",
     clause("token-here", {
       effects: [
         binding("action.play_token", 0, {
+          tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
           tokenName: "1 :rb_might: Recruit unit",
           count: 1,
           placement: "sourceLocation",
@@ -246,6 +253,7 @@ test("move triggers can be limited to battlefield destinations", () => {
       ],
       effects: [
         binding("action.play_token", 1, {
+          tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
           tokenName: "1 :rb_might: Recruit unit",
           count: 1,
           placement: "sourceLocation",
@@ -312,7 +320,10 @@ test("move triggers can be limited to battlefield destinations", () => {
   const tokenInstanceId = game.state.createdCardInstances?.[0]?.instanceId;
   assert.ok(tokenInstanceId);
   assert.equal(game.state.cardStates[tokenInstanceId]?.computedMight, 1);
-  assert.equal(index.definitions.get("TOKEN-recruit")?.card.name, "Recruit");
+  assert.equal(
+    index.definitions.get(RECRUIT_TOKEN_CARD_CODE)?.card.name,
+    "Recruit (NX)",
+  );
 });
 
 test("global conquer trigger can be gated by units at conquered battlefield", () => {

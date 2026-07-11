@@ -12,6 +12,7 @@ import {
   isContinuousDuration,
 } from "./numeric-modifiers";
 import { numericConditionMatches } from "./numeric-condition";
+import { getTokenCatalogDefinitions } from "./token-catalog";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -26,6 +27,9 @@ export function createRuntimeCardIndex(
     definitions: new Map([
       ...decks.flatMap((deck) =>
         deck.snapshot.cards.map((item) => [item.cardCode, item] as const),
+      ),
+      ...getTokenCatalogDefinitions().map(
+        (item) => [item.cardCode, item] as const,
       ),
       ...((game?.state.createdCardDefinitions ?? []).map(
         (item) => [item.cardCode, item] as const,
@@ -375,6 +379,7 @@ export function createPrimitiveHandlers(
       if (binding.parameters.placement !== "chooseBaseOrControlledBattlefield") {
         return null;
       }
+      const definition = tokenDefinitionForBinding(binding, index);
       const destinations = tokenPlacementDestinations(context.game, context.controllerPlayerId, index);
       return destinations.length > 0
         ? {
@@ -382,15 +387,15 @@ export function createPrimitiveHandlers(
             legalIds: destinations.map((destination) => destination.id),
             minimum: numberParam(binding, "count"),
             maximum: numberParam(binding, "count"),
-            prompt: `Choose where to play ${numberParam(binding, "count")} ${stringParam(binding, "tokenName")} token${numberParam(binding, "count") === 1 ? "" : "s"}`,
-            tokenName: stringParam(binding, "tokenName"),
+            prompt: `Choose where to play ${numberParam(binding, "count")} ${tokenDisplayName(binding, definition)} token${numberParam(binding, "count") === 1 ? "" : "s"}`,
+            tokenName: tokenDisplayName(binding, definition),
             destinations,
           }
         : null;
     },
     execute(binding, context) {
       const count = numberParam(binding, "count");
-      const tokenName = stringParam(binding, "tokenName");
+      const tokenCardCode = stringParam(binding, "tokenCardCode");
       const placements =
         binding.parameters.placement === "chooseBaseOrControlledBattlefield"
           ? selectedTokenDestinations(context, count)
@@ -405,7 +410,7 @@ export function createPrimitiveHandlers(
           destinationId,
           requireControlledDestination,
           sourceCardInstanceId: context.sourceCardInstanceId,
-          tokenName,
+          tokenCardCode,
           index,
         });
       }
@@ -858,15 +863,14 @@ function playToken(
     destinationId: string;
     requireControlledDestination: boolean;
     sourceCardInstanceId: string;
-    tokenName: string;
+    tokenCardCode: string;
     index: RuntimeCardIndex;
   },
 ) {
-  const definition = findOrCreateTokenDefinition(
-    game,
-    input.tokenName,
-    input.index,
-  );
+  const definition = input.index.definitions.get(input.tokenCardCode);
+  if (!definition || definition.card.classification.supertype !== "Token") {
+    throw new Error(`Token definition is unavailable: ${input.tokenCardCode}`);
+  }
   const instanceId = [
     input.controllerPlayerId,
     "token",
@@ -925,80 +929,25 @@ function playToken(
   });
 }
 
-function findOrCreateTokenDefinition(
-  game: GameDocument,
-  tokenName: string,
+function tokenDefinitionForBinding(
+  binding: BehaviorBinding,
   index: RuntimeCardIndex,
 ): GameCardDefinition {
-  const tokenIdentity = tokenIdentityFromName(tokenName);
-  const existing = [...index.definitions.values()].find(
-    (definition) =>
-      definition.card.classification.supertype === "Token" &&
-      (definition.card.name === tokenIdentity.name ||
-        definition.card.name.startsWith(`${tokenIdentity.name} (`)),
-  );
-  if (existing) return existing;
-  const normalized = tokenIdentity.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const cardCode = `TOKEN-${normalized}`;
-  const existingGenerated = index.definitions.get(cardCode);
-  if (existingGenerated) return existingGenerated;
-  const definition: GameCardDefinition = {
-    cardCode,
-    sourceTextHash: `generated:${normalized}`,
-    card: {
-      id: cardCode,
-      name: tokenIdentity.name,
-      public_code: cardCode,
-      attributes: {
-        energy: null,
-        might: tokenIdentity.might,
-        power: null,
-      },
-      classification: {
-        type: "Unit",
-        supertype: "Token",
-        rarity: null,
-        domain: ["Colorless"],
-      },
-      text: { plain: "" },
-      set: { set_id: "generated", label: "Generated" },
-      media: tokenIdentity.imageUrl
-        ? { image_url: tokenIdentity.imageUrl }
-        : {},
-      tags: [],
-      metadata: {},
-    },
-    behaviorModel: { playTimings: [], clauses: [] },
-  };
-  (game.state.createdCardDefinitions ??= []).push(definition);
-  index.definitions.set(cardCode, definition);
+  const cardCode = stringParam(binding, "tokenCardCode");
+  const definition = index.definitions.get(cardCode);
+  if (!definition || definition.card.classification.supertype !== "Token") {
+    throw new Error(`Token definition is unavailable: ${cardCode}`);
+  }
   return definition;
 }
 
-function tokenIdentityFromName(tokenName: string) {
-  if (/recruit/i.test(tokenName)) {
-    return {
-      name: "Recruit",
-      might: 1,
-      imageUrl:
-        "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
-    };
-  }
-  if (/sprite/i.test(tokenName)) {
-    return {
-      name: "Sprite",
-      might: 3,
-      imageUrl:
-        "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/055892752559d2d3d32e76f491a7a0b540e1a669-744x1039.png",
-    };
-  }
-  if (/sand soldier/i.test(tokenName)) {
-    return { name: "Sand Soldier", might: 2, imageUrl: null };
-  }
-  if (/mech/i.test(tokenName)) {
-    return { name: "Mech", might: 3, imageUrl: null };
-  }
-  return { name: tokenName, might: null, imageUrl: null };
+function tokenDisplayName(
+  binding: BehaviorBinding,
+  definition: GameCardDefinition,
+): string {
+  return typeof binding.parameters.tokenName === "string"
+    ? binding.parameters.tokenName
+    : definition.card.name;
 }
 
 function unitsForPresenceCondition(

@@ -825,7 +825,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Play token",
     description: "Creates or plays a token.",
     parameters: [
-      required("tokenName", "string", "The token to create or play.", tokenKinds),
+      required("tokenCardCode", "string", "The canonical source card code for the token."),
+      optional("tokenName", "string", "The player-facing token name."),
       required("count", "number", "The number of tokens."),
       optional("placement", "string", "How the token destination is chosen.", [
         "sourceLocation",

@@ -42,6 +42,7 @@ type AssignmentInput = {
 };
 
 const RECRUIT_TOKEN = "1 :rb_might: Recruit unit";
+const RECRUIT_TOKEN_CARD_CODE = "OGN-272";
 
 const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
   "OGS-023": {
@@ -218,7 +219,12 @@ const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
         effects: [
           [
             "action.play_token",
-            { tokenName: RECRUIT_TOKEN, count: 1, placement: "sourceLocation" },
+            {
+              tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+              tokenName: RECRUIT_TOKEN,
+              count: 1,
+              placement: "sourceLocation",
+            },
             1,
           ],
         ],
@@ -260,7 +266,12 @@ const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
         effects: [
           [
             "action.play_token",
-            { tokenName: RECRUIT_TOKEN, count: 1, placement: "sourceLocation" },
+            {
+              tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+              tokenName: RECRUIT_TOKEN,
+              count: 1,
+              placement: "sourceLocation",
+            },
             1,
           ],
         ],
@@ -378,6 +389,7 @@ const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
           [
             "action.play_token",
             {
+              tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
               tokenName: RECRUIT_TOKEN,
               count: 4,
               placement: "chooseBaseOrControlledBattlefield",

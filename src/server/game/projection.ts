@@ -9,6 +9,7 @@ import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
 import { victoryRequirement } from "./victory";
+import { getTokenCatalogDefinitions } from "./token-catalog";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -23,6 +24,9 @@ export function projectGame(input: {
         deck.snapshot.cards.map(
           (definition) => [definition.cardCode, definition] as const,
         ),
+      ),
+      ...getTokenCatalogDefinitions().map(
+        (definition) => [definition.cardCode, definition] as const,
       ),
       ...(input.game.state.createdCardDefinitions ?? []).map(
         (definition) => [definition.cardCode, definition] as const,

@@ -11,6 +11,7 @@ import path from "node:path";
 
 const CONFIRM_FLAG = "--confirm";
 const RECRUIT_TOKEN = "1 :rb_might: Recruit unit";
+const RECRUIT_TOKEN_CARD_CODE = "OGN-272";
 
 const CARD_MODELS: Record<
   string,
@@ -105,6 +106,7 @@ const CARD_MODELS: Record<
           family: "action",
           primitiveId: "action.play_token",
           parameters: {
+            tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
             tokenName: RECRUIT_TOKEN,
             count: 4,
             placement: "chooseBaseOrControlledBattlefield",
@@ -146,6 +148,53 @@ const CARD_MODELS: Record<
             target: "friendly_unit",
             duration: "thisTurn",
             selectionKey: "friendlyUnits",
+          },
+        },
+      ],
+    },
+  ],
+  "OGN-211": [
+    {
+      id: "clause-1",
+      sourceText: "When you play me, play a 1 :rb_might: Recruit unit token here.",
+      assignments: [
+        {
+          family: "trigger",
+          primitiveId: "trigger.on_play",
+          parameters: { actor: "controller", subject: "source" },
+        },
+        {
+          family: "action",
+          primitiveId: "action.play_token",
+          parameters: {
+            tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+            tokenName: RECRUIT_TOKEN,
+            count: 1,
+            placement: "sourceLocation",
+          },
+        },
+      ],
+    },
+  ],
+  "OGN-222": [
+    {
+      id: "clause-1",
+      sourceText:
+        "When I move to a battlefield, play a 1 :rb_might: Recruit unit token here. (It is also at the battlefield.)",
+      assignments: [
+        {
+          family: "trigger",
+          primitiveId: "trigger.on_move",
+          parameters: { subject: "source", destination: "battlefield" },
+        },
+        {
+          family: "action",
+          primitiveId: "action.play_token",
+          parameters: {
+            tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+            tokenName: RECRUIT_TOKEN,
+            count: 1,
+            placement: "sourceLocation",
           },
         },
       ],

@@ -1,6 +1,6 @@
 
 Legend:
-1 Kai'sa, Daughter of the Void
+1 Kai'Sa - Daughter of the Void
 
 Champion:
 1 Kai'Sa, Survivor
@@ -26,7 +26,7 @@ Battlefields:
 1 The Candlelit Sanctum
 1 Reaver's Row
 
-Rune Pool:
+Runes:
 7 Fury Rune
 5 Mind Rune
 

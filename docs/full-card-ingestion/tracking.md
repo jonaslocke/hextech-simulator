@@ -1,6 +1,6 @@
 # Full Card Ingestion Tracking
 
-Snapshot: 2026-07-10
+Snapshot: 2026-07-11
 
 This file is the active tracking baseline for the full-card ingestion program.
 It follows `docs/full-card-ingestion/plan.md` and records the current milestone
@@ -12,7 +12,7 @@ gate without treating implementation checks as final user acceptance.
 |---|---|---|---|---|---|
 | M0 | Operating model and tracking baseline | Accepted | None | Open M1 | Accepted |
 | M1 | Garen Proving Grounds deck | Accepted | None | Open M2 | Accepted |
-| M2 | Origins full set | Not started | Need two user-provided Origins decks under `docs/full-ingestion-decks/OGN/` | Wait for Origins deck inputs | Pending |
+| M2 | Origins full set | Primitive implementation in progress | Full corpus behavior review and remaining primitive work | Continue approved shared primitive implementation | Pending |
 | M3 | Spiritforged full set | Not started | Need two user-provided Spiritforged decks under `docs/full-ingestion-decks/SFD/` | Wait for inputs after M2 acceptance | Pending |
 | M4 | Unleashed full set | Not started | Need two user-provided Unleashed decks under `docs/full-ingestion-decks/UNL/` | Wait for inputs after M3 acceptance | Pending |
 | M5 | Vendetta full set | Not started | Final `VEN` JSON is not present in `data/sets`; need two user-provided Vendetta decks | Wait for final data after M4 acceptance | Pending |
@@ -104,7 +104,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
-| OGN | `docs/full-ingestion-decks/OGN/` | TBD | No | No | No | No | Deck files not provided | No |
+| OGN | `docs/full-ingestion-decks/OGN/kaisa.dec.txt` | TBD | Valid against the full local source catalog | Pending catalog approval | No | No | Retains real Legend display name; permanent deck ID is not assigned yet | No |
+| OGN | `docs/full-ingestion-decks/OGN/viktor.dec.txt` | TBD | Valid against the full local source catalog | Pending catalog approval | No | No | Retains real Legend display name; permanent deck ID is not assigned yet | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
 | VEN | `docs/full-ingestion-decks/VEN/` | TBD | No | No | No | No | Final JSON and deck files not provided | No |
@@ -115,6 +116,9 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 |---|---|---|---|---|---|
 | `action.play_token` / token placement choice | Add runtime token creation and a player-facing placement choice for Recruit the Vanguard | No accepted MVP deck currently uses `action.play_token` | Public action/intent contract extension | Yes; implemented | Existing pending choices still work; Garen token placement prompts render and submit correctly |
 | Selector `excludesSource` | Enforce `excludesSource` in unit selectors for text such as "another unit" | No accepted MVP deck currently has a discovered `excludesSource` selector | Shared selector legality change | Yes; implemented | Existing targeted effects keep current legal targets unless their model explicitly sets `excludesSource` |
+| Catalog-driven token resolution | Replace name-based generated token data with resolved canonical token definitions | Accepted Garen Recruit paths: Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Shared token identity, media, and placement behavior | Yes; implemented 2026-07-11 | Recruit placement and board-leave cleanup |
+| Generalized choices and non-standard costs | Extend the shared pending-choice and effect-resolution model for optional/modal choices and costs | Existing target and token-placement pending choices | Public choice and effect-resolution behavior | Yes; approved 2026-07-11 | Existing targeted spell and Recruit the Vanguard placement |
+| Trigger and replacement processing | Extend shared event processing for Deathknell, delayed, prevention, and replacement behavior | Existing Garen attack, hold/conquer, and end-of-turn triggers | Chain ordering and showdown-focus behavior | Yes; approved 2026-07-11 | One scenario for each affected existing trigger class |
 
 ## Manual Match Acceptance Ledger
 
@@ -122,6 +126,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 |---|---|---|---|---|---|
 | M0 | Existing Lux/Annie/Master Yi deck availability | Operating baseline only | Accepted | Automated checks pass; user accepted M0 operating baseline | Yes |
 | M1 | Garen manual validation | Garen deck behavior corpus and reported defect scenarios | Accepted | User accepted M1 after iterative manual validation and fixes | Yes |
+| M2 foundation | Garen token regression | Recruit the Vanguard, Faithful Manufactor, and Noxian Drummer token placement | Passed | User manually confirmed token placement after catalog-driven token migration | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
@@ -186,7 +191,13 @@ starting M2.
 
 ## M2 Active State
 
-Status: Not started
+Status: Primitive implementation in progress
 
-Current expectation from the user: provide or confirm the two Origins validation
-decks under `docs/full-ingestion-decks/OGN/` before M2 implementation starts.
+Input readiness is complete. `data/sets/ogn.json` passes local schema and
+identity checks, and both user-provided OGN decks now parse and validate without
+changing their card choices or real Legend names. The full analysis and token
+inventory are in `docs/full-card-ingestion/ogn-corpus-analysis.md`.
+
+The user approved the three regression-risking shared changes on 2026-07-11.
+Catalog-driven token resolution is implemented and synchronized. Generalized
+choice/cost processing and trigger/replacement processing remain in progress.

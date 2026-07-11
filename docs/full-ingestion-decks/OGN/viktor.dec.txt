@@ -1,6 +1,6 @@
 
 Legend:
-1 Viktor, Herald of the Arcane
+1 Viktor - Herald of the Arcane
 
 Champion:
 1 Viktor, Leader
@@ -24,11 +24,11 @@ MainDeck:
 3 Vanguard Captain
 
 Battlefields:
-Obelisk of Power
-Trifarian War Camp
-Vilemaw's Lair
+1 Obelisk of Power
+1 Trifarian War Camp
+1 Vilemaw's Lair
 
-Rune Pool:
+Runes:
 6 Mind Rune
 6 Order Rune
 

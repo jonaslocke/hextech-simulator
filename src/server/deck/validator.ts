@@ -1,4 +1,5 @@
 import type { Card, CardCatalog } from "../catalog";
+import { getDeckCardNameAliases } from "../catalog";
 import { parseDeckList } from "./parser";
 import type {
   DeckEntry,
@@ -41,7 +42,7 @@ export function validateDeckList(
 
   const resolved = parsed.entries.map((entry) => ({
     ...entry,
-    card: catalog.byName.get(entry.name)
+    card: findCardByDeckName(catalog, entry.name)
   }));
 
   for (const entry of resolved) {
@@ -143,6 +144,17 @@ export function validateDeckList(
       sideboard: bySection.Sideboard
     })
   };
+}
+
+function findCardByDeckName(catalog: CardCatalog, deckName: string): Card | undefined {
+  const exactMatch = catalog.byName.get(deckName);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  return catalog.cards.find((card) =>
+    getDeckCardNameAliases(card).includes(deckName),
+  );
 }
 
 function sumQuantities(entries: DeckEntry[]): number {

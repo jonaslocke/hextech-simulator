@@ -170,7 +170,27 @@ Codex must preserve the project's established identity policy and must not
 create separate runtime behavior solely because a printing has a different
 collector treatment.
 
-### 5.4 Behavior change detection
+### 5.4 Legend decklist names
+
+The source JSON stores a Legend's title in `name` without its champion name.
+For decklists and player-facing display only, the real Legend name is:
+
+```text
+<tags[0]> - <name>
+```
+
+For example, the OGN source record named `Daughter of the Void` with first tag
+`Kai'Sa` is written in a decklist as `Kai'Sa - Daughter of the Void`.
+
+This rule applies only to cards whose type is `Legend`. Codex must preserve the
+source JSON `name`, card code, tags, and canonical gameplay identity unchanged.
+Deck parsing, validation, catalog lookup, and persisted deck source must accept
+and preserve this Legend display name, resolving it only to the Legend whose
+first tag and source `name` form that exact value. A missing first Legend tag or
+an ambiguous display-name resolution blocks deck integration; Codex must not
+strip the tag, rename the source card, or apply this alias to non-Legend cards.
+
+### 5.5 Behavior change detection
 
 Rules-text-focused hashing remains the behavior-change gate.
 
@@ -178,7 +198,7 @@ Cards are stable real objects for this ingestion program. Codex must not add a
 metadata-drift, broad full-definition-diff, or backward-compatible reimport
 system unless the user explicitly requests one in the future.
 
-### 5.5 Required tokens are corpus dependencies
+### 5.6 Required tokens are corpus dependencies
 
 Token completeness is evaluated across the cumulative corpus, not only inside
 the active set file.
@@ -202,7 +222,7 @@ it. It must, however, exist somewhere in the available corpus and be executable.
 If no sufficient token definition exists, the active milestone is blocked and
 Codex must ask the user to provide the missing token data.
 
-### 5.6 Primitive-first implementation
+### 5.7 Primitive-first implementation
 
 Runtime behavior must be implemented through reusable primitives and generic
 game systems.
@@ -211,7 +231,7 @@ Card-name-specific runtime branches are not acceptable. A card name may be used
 for import diagnostics, migration reporting, or temporary discovery analysis,
 but not as the condition that executes gameplay behavior.
 
-### 5.7 Regression approval
+### 5.8 Regression approval
 
 A new primitive that does not alter existing behavior may be implemented within
 the active milestone.
@@ -228,7 +248,7 @@ user approval before implementation. Codex must first report:
 
 Codex must not silently broaden the user's manual validation burden.
 
-### 5.8 Testing discipline
+### 5.9 Testing discipline
 
 Manual gameplay is the acceptance authority.
 
@@ -244,7 +264,7 @@ cheap to maintain, such as:
 Broad gameplay integration suites, component-structure tests, and large
 card-by-card test matrices must not be used as the proof that a set works.
 
-### 5.9 Old matches and database cleanup
+### 5.10 Old matches and database cleanup
 
 Old persisted matches do not require backward compatibility after ingestion or
 runtime changes. Manual validation must use fresh matches created from the
@@ -252,7 +272,7 @@ current catalog, deck configuration, and runtime.
 
 Codex must not wipe the database. The user owns database cleanup when needed.
 
-### 5.10 Accepted milestone commits
+### 5.11 Accepted milestone commits
 
 After user acceptance, Codex must commit the accepted set work before starting
 the next set.
