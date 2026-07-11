@@ -1,4 +1,4 @@
-import type { DeckId, MatchProjection } from "@/shared/game";
+import type { DeckConfiguration, DeckId, MatchProjection } from "@/shared/game";
 import type { AcceptedMatch, ApiFailure, DeckOption } from "./types";
 
 export async function createMatchClient(
@@ -20,8 +20,15 @@ export async function loadDeckOptionsClient(): Promise<{
   return response.json() as Promise<{ deckOptions: DeckOption[] }>;
 }
 
-export async function loadProjectionClient(matchId: string, playerToken: string): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
-  const response = await fetch(`/api/matches/${matchId}?playerToken=${encodeURIComponent(playerToken)}`);
+export async function loadProjectionClient(
+  matchId: string,
+  playerToken: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
+  const response = await fetch(
+    `/api/matches/${matchId}?playerToken=${encodeURIComponent(playerToken)}`,
+    { signal: options.signal },
+  );
   return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
 }
 
@@ -91,4 +98,31 @@ export async function concedeMatchClient(input: {
     }),
   });
   return response.json() as Promise<{ accepted: true; projection: MatchProjection } | ApiFailure>;
+}
+
+export async function submitDeckReconfigurationClient(input: {
+  matchId: string;
+  playerToken: string;
+  stateVersion: number;
+  betweenGamesId: string;
+  configuration: DeckConfiguration;
+}): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
+  const response = await fetch(`/api/matches/${input.matchId}/intents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      playerToken: input.playerToken,
+      stateVersion: input.stateVersion,
+      intent: {
+        type: "match.submitDeckReconfiguration",
+        payload: {
+          betweenGamesId: input.betweenGamesId,
+          configuration: input.configuration,
+        },
+      },
+    }),
+  });
+  return response.json() as Promise<
+    { accepted: true; projection: MatchProjection } | ApiFailure
+  >;
 }

@@ -43,9 +43,10 @@ export async function buildDeckSnapshotFromSource(
 ): Promise<DeckSnapshot> {
   const parsedDeck = parseDeckList(sourceText);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
+  const queryNames = [...new Set(names.flatMap(cardNameLookupCandidates))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
     db.collection<CanonicalCardStoredDocument>(CANONICAL_CARDS_COLLECTION)
-      .find({ "card.name": { $in: names } }).toArray(),
+      .find({ "card.name": { $in: queryNames } }).toArray(),
     loadBehaviorDefinitions(db),
   ]);
 
@@ -59,13 +60,19 @@ export function buildDeckSnapshot(
 ): DeckSnapshot {
   const parsedDeck = parseDeckList(sourceText);
   const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
-  const cardsByName = new Map(canonicalCards.map((document) => [document.card.name, document]));
+  const cardsByName = new Map<string, CanonicalCardDocument>();
+  for (const document of canonicalCards) {
+    cardsByName.set(document.card.name, document);
+    for (const alias of legacyCardNameAliases(document.card.name)) {
+      cardsByName.set(alias, document);
+    }
+  }
   const definitionsById = new Map(behaviorDefinitions.map((definition) => [definition.id, definition]));
   const issues: string[] = [];
 
-  if (expectedNames.length !== INITIAL_DECK_UNIQUE_CARD_COUNT) {
+  if (expectedNames.length < INITIAL_DECK_UNIQUE_CARD_COUNT) {
     issues.push(
-      `Deck must contain ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
+      `Deck must contain at least ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
     );
   }
 
@@ -91,7 +98,13 @@ export function buildDeckSnapshot(
 
   if (issues.length > 0) throw new GameCatalogError(issues);
 
-  const cardsByNameResolved = new Map(cards.map((definition) => [definition.card.name, definition]));
+  const cardsByNameResolved = new Map<string, GameCardDefinition>();
+  for (const definition of cards) {
+    cardsByNameResolved.set(definition.card.name, definition);
+    for (const alias of legacyCardNameAliases(definition.card.name)) {
+      cardsByNameResolved.set(alias, definition);
+    }
+  }
   const handlers = createPrimitiveHandlers({
     definitions: new Map(cards.map((definition) => [definition.cardCode, definition])),
     instances: new Map(),
@@ -122,6 +135,22 @@ export function buildDeckSnapshot(
     })),
     cards
   });
+}
+
+function legacyCardNameAliases(name: string): string[] {
+  if (name.startsWith("Master Yi, ")) {
+    return [name.replace(/^Master Yi, /, "Yi, ")];
+  }
+
+  return [];
+}
+
+function cardNameLookupCandidates(name: string): string[] {
+  if (name.startsWith("Yi, ")) {
+    return [name, name.replace(/^Yi, /, "Master Yi, ")];
+  }
+
+  return [name];
 }
 
 function validateCanonicalDocument(

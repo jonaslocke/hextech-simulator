@@ -1,6 +1,7 @@
 import { MongoClient } from "mongodb";
 
 let clientPromise: Promise<MongoClient> | null = null;
+let indexesPromise: Promise<void> | null = null;
 
 export function getMongoDatabaseName() {
   return process.env.MONGODB_DB_NAME ?? "hextech_simulator";
@@ -23,5 +24,14 @@ export function getMongoClient() {
 
 export async function getMongoDatabase() {
   const client = await getMongoClient();
-  return client.db(getMongoDatabaseName());
+  const database = client.db(getMongoDatabaseName());
+  indexesPromise ??= ensureIndexes(database);
+  await indexesPromise;
+  return database;
+}
+
+async function ensureIndexes(database: ReturnType<MongoClient["db"]>) {
+  await database
+    .collection("gameEvents")
+    .createIndex({ gameId: 1, sequence: 1 }, { name: "gameEvents_gameId_sequence" });
 }

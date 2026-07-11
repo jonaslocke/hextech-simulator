@@ -1,0 +1,10 @@
+- if the deck has the right amount of cards, the sideboard screen do not allow to remove a card from the main deck;
+- the runes decks part is not what I'm expecting, we could change this for the amout of runes the deck have. ![alt text](image.png) ![alt text](image-1.png)
+- is possible to change the choosen champion to invalid ones. the "change choosen champion" feature should only allow valid champions to be choosen. ![alt text](image-2.png)
+- the change choosen champion icon could use a tooltip to make it more explicit what the intention is
+- the label "Chosen Champion changed" shifts the top of the card, and it shouldn't. ![alt text](image-4.png)
+- this card tiles should use game assets like domain icons. ![alt text](image-3.png)
+- the change view mode group tabs should be closer to the card listing, visual hierarchy matters.
+- the "change choosen champion" button is almost unnoticeble on the grid view.
+- I would like to implement a new view mode, where every card face shows individually, here is a benchmark. ![alt text](image-5.png)
+- the used battlefields should be shown on the next game screen as disabled. ![alt text](image-6.png)

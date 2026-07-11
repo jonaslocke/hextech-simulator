@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DeckId, MatchIntent, MatchProjection } from "@/shared/game";
+import { assertLegalRegisteredDeckConfiguration } from "@/server/deck/deck-validation-service";
 import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { Db } from "mongodb";
 import type { DamageAssignment } from "./combat";
@@ -43,7 +44,11 @@ export class MatchServiceError extends Error {
   }
 }
 
-export async function createMatch(input: {
+const deckSnapshotCache = new Map<string, DeckSnapshotDocument>();
+const matchDocumentCache = new Map<string, MatchDocument>();
+const gameDocumentCache = new Map<string, GameDocument>();
+
+type CreateMatchInput = {
   db: Db;
   repositories: GameRepositories;
   now?: string;
@@ -54,7 +59,32 @@ export async function createMatch(input: {
     player1?: string;
     player2?: string;
   };
-}) {
+};
+
+export async function createMatch(input: CreateMatchInput) {
+  const maxAttempts = input.matchId ? 1 : 5;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await createMatchAttempt(input);
+    } catch (error) {
+      lastError = error;
+      if (!isDuplicateKeyError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new MatchServiceError(
+        "match.creationFailed",
+        "Unable to allocate a unique match identity.",
+      );
+}
+
+async function createMatchAttempt(input: CreateMatchInput) {
   const now = input.now ?? new Date().toISOString();
   const matchId = input.matchId ?? createMatchId();
   const selectedDecks = input.playerDecks ?? {
@@ -104,6 +134,12 @@ export async function createMatch(input: {
       ),
     },
   ] as MatchDocument["seats"];
+  deckDocuments.forEach((deck, index) => {
+    assertLegalRegisteredDeckConfiguration({
+      registeredDeck: deck,
+      configuration: seats[index]!.currentDeckConfiguration,
+    });
+  });
   const registeredDecksByPlayerId = Object.fromEntries(
     deckDocuments.map((deck) => [deck.playerId, deck]),
   );
@@ -141,13 +177,16 @@ export async function createMatch(input: {
   });
 
   await runInTransaction(input.db, async (repositories) => {
-    await Promise.all([
-      ...deckDocuments.map((document) => repositories.deckSnapshots.insert(document)),
-      repositories.games.insert(game),
-      repositories.matches.insert(match),
-    ]);
+    for (const document of deckDocuments) {
+      await repositories.deckSnapshots.insert(document);
+    }
+    await repositories.games.insert(game);
+    await repositories.matches.insert(match);
     return true;
   });
+  cacheMatchDocument(match);
+  cacheGameDocument(game);
+  cacheDeckSnapshots(deckDocuments);
 
   return {
     matchId,
@@ -178,6 +217,15 @@ export async function createMatch(input: {
       ]),
     ),
   };
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === 11000
+  );
 }
 
 export async function loadMatchDeckTemplates(
@@ -293,7 +341,32 @@ export async function performMatchAction(
     return concedeMatch(input.db, input, intent.payload.betweenGamesId, now);
   }
 
-  return performGameAction(repositories, input, intent.payload, now);
+  if (intent.type === "match.submitDeckReconfiguration") {
+    if (!("db" in input) || !input.db) {
+      throw new MatchServiceError(
+        "match.invariantViolation",
+        "Database handle is required for deck reconfiguration.",
+      );
+    }
+    return submitDeckReconfiguration(
+      input.db,
+      input,
+      intent.payload.betweenGamesId,
+      intent.payload.configuration,
+      now,
+    );
+  }
+
+  return performGameAction(
+    repositories,
+    {
+      matchId: input.matchId,
+      playerToken: input.playerToken,
+      stateVersion: input.stateVersion,
+    },
+    intent.payload,
+    now,
+  );
 }
 
 export function deckSnapshotIdHash(value: string): string {
@@ -491,6 +564,8 @@ async function saveGameTransition(input: {
     if (loaded) currentGame = loaded;
   }
 
+  cacheGameDocument(currentGame);
+  cacheMatchDocument(nextMatch);
   return { saved: true, match: nextMatch, currentGame };
 }
 
@@ -651,6 +726,200 @@ async function readyForNextGame(
       },
     });
 
+    cacheGameDocument(currentGame);
+    cacheMatchDocument(nextMatch);
+    return projectMatch({
+      match: nextMatch,
+      currentGame,
+      viewerPlayerId: seat.playerId,
+      decks,
+      events: await repositories.gameEvents.findByGameId(currentGame.id),
+    });
+  });
+}
+
+async function submitDeckReconfiguration(
+  db: Db,
+  input: { matchId: string; playerToken: string; stateVersion: number },
+  betweenGamesId: string,
+  configuration: MatchDocument["seats"][number]["currentDeckConfiguration"],
+  now: string,
+): Promise<MatchProjection> {
+  return runInTransaction(db, async (repositories) => {
+    const { match, game, seat, decks } = await loadContext(
+      repositories,
+      input.matchId,
+      input.playerToken,
+    );
+    if (match.status !== "between_games" || !match.betweenGames) {
+      throw new MatchServiceError(
+        "match.intentNotAllowed",
+        "Deck reconfiguration is allowed only between games.",
+      );
+    }
+    if (match.stateVersion !== input.stateVersion) {
+      throw new MatchServiceError(
+        "match.betweenGamesChanged",
+        "Between-games state has changed.",
+      );
+    }
+    if (match.betweenGames.id !== betweenGamesId) {
+      throw new MatchServiceError(
+        "match.betweenGamesChanged",
+        "Between-games state has changed.",
+      );
+    }
+    const currentSubmission =
+      match.betweenGames.submissionsByPlayerId[seat.playerId];
+    if (currentSubmission?.status === "submitted") {
+      throw new MatchServiceError(
+        "match.alreadyReady",
+        "Player has already submitted for the next game.",
+      );
+    }
+
+    const registeredDeck = decks.find((deck) => deck.playerId === seat.playerId);
+    if (!registeredDeck) {
+      throw new MatchServiceError(
+        "match.invariantViolation",
+        "Registered deck snapshot is unavailable.",
+      );
+    }
+
+    try {
+      assertLegalRegisteredDeckConfiguration({
+        registeredDeck,
+        configuration,
+      });
+    } catch (error) {
+      throw new MatchServiceError(
+        "deck.illegalConfiguration",
+        error instanceof Error
+          ? error.message
+          : "Deck configuration is not legal.",
+      );
+    }
+
+    const updatedBetweenGames = {
+      ...match.betweenGames,
+      submissionsByPlayerId: {
+        ...match.betweenGames.submissionsByPlayerId,
+        [seat.playerId]: {
+          status: "submitted" as const,
+          configuration,
+          submittedAt: now,
+        },
+      },
+    };
+    const allSubmitted = match.seats.every(
+      (item) =>
+        updatedBetweenGames.submissionsByPlayerId[item.playerId]?.status ===
+        "submitted",
+    );
+    let nextMatch: MatchDocument;
+    let currentGame = game;
+
+    if (allSubmitted) {
+      if (match.gameIds.length >= 3) {
+        throw new MatchServiceError(
+          "match.nextGameAlreadyCreated",
+          "No additional games can be created for this match.",
+        );
+      }
+
+      const remainingBattlefields =
+        deriveRemainingBattlefieldRegisteredIdsByPlayerId(match, decks);
+      const activeConfigurations = Object.fromEntries(
+        match.seats.map((item) => [
+          item.playerId,
+          updatedBetweenGames.submissionsByPlayerId[item.playerId]!
+            .configuration ?? item.currentDeckConfiguration,
+        ]),
+      );
+      const nextSeats = match.seats.map((item) => ({
+        ...item,
+        currentDeckConfiguration: activeConfigurations[item.playerId]!,
+      })) as MatchDocument["seats"];
+      const nextGame = createMatchGame({
+        matchId: match.id,
+        gameNumber: updatedBetweenGames.nextGameNumber,
+        now,
+        players: nextSeats,
+        registeredDecksByPlayerId: Object.fromEntries(
+          decks.map((deck) => [deck.playerId, deck]),
+        ),
+        activeConfigurationsByPlayerId: activeConfigurations,
+        startingPlayerChooserId:
+          updatedBetweenGames.nextStartingPlayerChooserId,
+        availableBattlefieldRegisteredIdsByPlayerId: remainingBattlefields,
+        autoSelectedBattlefieldRegisteredIdByPlayerId:
+          updatedBetweenGames.nextGameNumber === 3
+            ? Object.fromEntries(
+                match.seats.map((item) => {
+                  const remaining = remainingBattlefields[item.playerId] ?? [];
+                  if (remaining.length !== 1) {
+                    throw new MatchServiceError(
+                      "match.invariantViolation",
+                      "Game 3 requires exactly one remaining Battlefield per player.",
+                    );
+                  }
+                  return [item.playerId, remaining[0]!];
+                }),
+              )
+            : undefined,
+      });
+      nextMatch = matchDocumentSchema.parse({
+        ...match,
+        status: "playing",
+        stateVersion: match.stateVersion + 1,
+        updatedAt: now,
+        currentGameId: nextGame.id,
+        gameIds: [...match.gameIds, nextGame.id],
+        betweenGames: null,
+        seats: nextSeats,
+      });
+      await repositories.games.insert(nextGame);
+      currentGame = nextGame;
+    } else {
+      nextMatch = matchDocumentSchema.parse({
+        ...match,
+        stateVersion: match.stateVersion + 1,
+        updatedAt: now,
+        betweenGames: updatedBetweenGames,
+      });
+    }
+
+    const saved = await repositories.matches.upsertIfStateVersion(
+      nextMatch,
+      match.stateVersion,
+    );
+    if (!saved) {
+      throw new MatchServiceError(
+        "match.betweenGamesChanged",
+        "Between-games state has changed.",
+      );
+    }
+
+    await repositories.gameEvents.insert({
+      id: `${match.id}:match-event:${nextMatch.stateVersion}:sideboard:${seat.playerId}`,
+      createdAt: now,
+      updatedAt: now,
+      matchId: match.id,
+      gameId: game.id,
+      sequence: nextMatch.stateVersion * 100,
+      actorPlayerId: seat.playerId,
+      type: allSubmitted ? "match.nextGameCreated" : "match.playerReady",
+      message: allSubmitted
+        ? `Game ${nextMatch.gameIds.length} created.`
+        : `${seat.playerId} completed sideboarding.`,
+      payload: {
+        playerId: seat.playerId,
+        betweenGamesId,
+      },
+    });
+
+    cacheGameDocument(currentGame);
+    cacheMatchDocument(nextMatch);
     return projectMatch({
       match: nextMatch,
       currentGame,
@@ -728,6 +997,7 @@ async function concedeMatch(
       payload: { winnerPlayerId, concededByPlayerId: seat.playerId },
     });
 
+    cacheMatchDocument(nextMatch);
     return projectMatch({
       match: nextMatch,
       currentGame: game,
@@ -879,7 +1149,7 @@ async function loadContext(
   matchId: string,
   token: string,
 ) {
-  const match = await repositories.matches.findById(matchId);
+  const match = await loadMatchDocumentFromCache(repositories, matchId);
   if (!match) {
     throw new MatchServiceError("match.notFound", "Match was not found.");
   }
@@ -892,25 +1162,81 @@ async function loadContext(
       "Player token is invalid for this match.",
     );
   }
-  const game = await repositories.games.findById(match.currentGameId);
+  const [game, decks] = await Promise.all([
+    loadGameDocumentFromCache(repositories, match.currentGameId),
+    Promise.all(
+      match.seats.map((item) =>
+        loadDeckSnapshotFromCache(
+          repositories,
+          item.registeredDeckSnapshotId,
+        ),
+      ),
+    ),
+  ]);
   if (!game) {
     throw new MatchServiceError("match.notFound", "Game was not found.");
   }
-  const decks = (
-    await Promise.all(
-      match.seats.map((item) =>
-        repositories.deckSnapshots.findById(item.registeredDeckSnapshotId),
-      ),
-    )
-  ).filter((item): item is DeckSnapshotDocument => item !== null);
-  if (decks.length !== 2) {
+  const resolvedDecks = decks.filter(
+    (item): item is DeckSnapshotDocument => item !== null,
+  );
+  if (resolvedDecks.length !== 2) {
     throw new MatchServiceError(
       "match.invariantViolation",
       "Deck snapshots are unavailable.",
     );
   }
 
-  return { match, seat, game, decks };
+  return { match, seat, game, decks: resolvedDecks };
+}
+
+async function loadMatchDocumentFromCache(
+  repositories: GameRepositories,
+  id: string,
+): Promise<MatchDocument | null> {
+  const cached = matchDocumentCache.get(id);
+  if (cached) return structuredClone(cached);
+
+  const match = await repositories.matches.findById(id);
+  if (match) cacheMatchDocument(match);
+  return match;
+}
+
+async function loadGameDocumentFromCache(
+  repositories: GameRepositories,
+  id: string,
+): Promise<GameDocument | null> {
+  const cached = gameDocumentCache.get(id);
+  if (cached) return structuredClone(cached);
+
+  const game = await repositories.games.findById(id);
+  if (game) cacheGameDocument(game);
+  return game;
+}
+
+async function loadDeckSnapshotFromCache(
+  repositories: GameRepositories,
+  id: string,
+): Promise<DeckSnapshotDocument | null> {
+  const cached = deckSnapshotCache.get(id);
+  if (cached) return cached;
+
+  const deck = await repositories.deckSnapshots.findById(id);
+  if (deck) deckSnapshotCache.set(id, deck);
+  return deck;
+}
+
+function cacheDeckSnapshots(decks: readonly DeckSnapshotDocument[]): void {
+  for (const deck of decks) {
+    deckSnapshotCache.set(deck.id, deck);
+  }
+}
+
+function cacheMatchDocument(match: MatchDocument): void {
+  matchDocumentCache.set(match.id, structuredClone(match));
+}
+
+function cacheGameDocument(game: GameDocument): void {
+  gameDocumentCache.set(game.id, structuredClone(game));
 }
 
 async function runInTransaction<T>(
@@ -945,9 +1271,16 @@ function runtimeDecksForGame(
       deck.playerId,
       {
         template: deck.snapshot,
-        instances: (game.state.createdCardInstances ?? []).filter(
-          (instance) => instance.ownerPlayerId === deck.playerId,
-        ),
+        instances: [
+          ...deck.instances.filter(
+            (instance) =>
+              instance.ownerPlayerId === deck.playerId &&
+              Boolean(game.state.cardStates[instance.instanceId]),
+          ),
+          ...(game.state.createdCardInstances ?? []).filter(
+            (instance) => instance.ownerPlayerId === deck.playerId,
+          ),
+        ],
       },
     ]),
   );

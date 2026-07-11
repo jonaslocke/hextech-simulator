@@ -1,0 +1,37 @@
+Legend:
+1 Wuju Bladesman - Starter
+
+Champion:
+1 Master Yi, Honed
+
+MainDeck:
+3 En Garde
+3 Meditation
+3 Playful Phantom
+3 Stalwart Poro
+3 Wielder of Water
+3 Cannon Barrage
+3 Mobilize
+3 Stormclaw Ursine
+3 Zephyr Sage
+3 Gentlemen's Duel
+2 Confront
+2 Mountain Drake
+2 Highlander
+1 Master Yi, Honed
+2 Master Yi, Meditative
+
+Battlefields:
+1 Aspirant's Climb
+1 Targon's Peak
+1 The Papertree
+
+Runes:
+6 Calm Rune
+6 Body Rune
+
+Sideboard:
+3 Garen, Rugged
+1 Master Yi, Meditative
+1 Master Yi, Honed
+1 Highlander

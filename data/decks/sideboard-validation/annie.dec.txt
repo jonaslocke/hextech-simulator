@@ -1,0 +1,38 @@
+Legend:
+1 Dark Child - Starter
+
+Champion:
+1 Annie, Stubborn
+
+MainDeck:
+3 Disintegrate
+3 Gust
+3 Morbid Return
+3 Mystic Poro
+3 Sai Scout
+3 Sneaky Deckhand
+3 Traveling Merchant
+3 Maddened Marauder
+3 Firestorm
+3 Incinerate
+2 Pouty Poro
+2 Flash
+2 Tibbers
+1 Annie, Stubborn
+2 Annie, Fiery
+
+Battlefields:
+1 Aspirant's Climb
+1 Targon's Peak
+1 The Papertree
+
+Runes:
+6 Fury Rune
+6 Chaos Rune
+
+Sideboard:
+1 Pouty Poro
+1 Annie, Fiery
+1 Annie, Stubborn
+1 Flash
+1 Tibbers

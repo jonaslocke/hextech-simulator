@@ -1,5 +1,11 @@
-import { matchProjectionSchema, type MatchProjection } from "@/shared/game";
+import {
+  matchProjectionSchema,
+  type MatchProjection,
+  type RegisteredDeckConfiguration,
+  type SideboardingCardView,
+} from "@/shared/game";
 import { BO3_MATCH_FEATURES } from "./bo3-match-config";
+import { createInitialDeckConfiguration, registeredBattlefieldIds } from "./game-factory";
 import {
   deriveRemainingBattlefieldRegisteredIdsByPlayerId,
   deriveScoreByPlayerId,
@@ -7,6 +13,7 @@ import {
 } from "./match-derivations";
 import { projectGame } from "./projection";
 import type { DeckSnapshotDocument, GameEventDocument } from "./repositories";
+import type { CardInstance } from "./state";
 import type { GameDocument, MatchDocument } from "./state";
 
 export function projectMatch(input: {
@@ -30,6 +37,9 @@ export function projectMatch(input: {
     deriveUsedBattlefieldRegisteredIdsByPlayerId(input.match);
   const remainingBattlefields =
     deriveRemainingBattlefieldRegisteredIdsByPlayerId(input.match, input.decks);
+  const viewerDeck = input.decks.find(
+    (deck) => deck.playerId === input.viewerPlayerId,
+  );
   const currentGame = projectGame({
     game: input.currentGame,
     viewerPlayerId: input.viewerPlayerId,
@@ -60,7 +70,7 @@ export function projectMatch(input: {
     betweenGames: input.match.betweenGames
       ? {
           id: input.match.betweenGames.id,
-          mode: "ready_with_current_configuration",
+          mode: "sideboarding",
           nextGameNumber: input.match.betweenGames.nextGameNumber,
           previousGameWinnerPlayerId:
             input.match.betweenGames.previousGameWinnerPlayerId,
@@ -86,14 +96,36 @@ export function projectMatch(input: {
             viewerSeat.currentDeckConfiguration,
           capabilities: {
             canReadyWithCurrentConfiguration:
+              !BO3_MATCH_FEATURES.sideboardingDeckReconfiguration &&
               BO3_MATCH_FEATURES.readyWithCurrentDeckConfiguration &&
               input.match.status === "between_games" &&
               (input.match.betweenGames.submissionsByPlayerId[
                 input.viewerPlayerId
               ]?.status ?? "pending") === "pending",
-            canSubmitDeckReconfiguration: false,
+            canSubmitDeckReconfiguration:
+              BO3_MATCH_FEATURES.sideboardingDeckReconfiguration &&
+              input.match.status === "between_games" &&
+              (input.match.betweenGames.submissionsByPlayerId[
+                input.viewerPlayerId
+              ]?.status ?? "pending") === "pending",
             canConcedeMatch: input.match.status === "between_games",
           },
+          sideboardingSession:
+            viewerDeck && BO3_MATCH_FEATURES.sideboardingDeckReconfiguration
+              ? buildSideboardingSession({
+                  match: input.match,
+                  viewerDeck,
+                  viewerSeat,
+                  opponentStatus:
+                    input.match.betweenGames.submissionsByPlayerId[
+                      opponentSeat.playerId
+                    ]?.status ?? "pending",
+                  usedBattlefields:
+                    usedBattlefields[input.viewerPlayerId] ?? [],
+                  remainingBattlefields:
+                    remainingBattlefields[input.viewerPlayerId] ?? [],
+                })
+              : null,
         }
       : null,
   });
@@ -106,4 +138,103 @@ function playerNamesFromMatch(match: MatchDocument): Record<string, string> {
       seat.displayName || seat.playerId,
     ]),
   );
+}
+
+function buildSideboardingSession(input: {
+  match: MatchDocument;
+  viewerDeck: DeckSnapshotDocument;
+  viewerSeat: MatchDocument["seats"][number];
+  opponentStatus: "pending" | "submitted";
+  usedBattlefields: string[];
+  remainingBattlefields: string[];
+}) {
+  const betweenGames = input.match.betweenGames;
+  if (!betweenGames) return null;
+
+  return {
+    matchId: input.match.id,
+    playerId: input.viewerSeat.playerId,
+    gameNumber: betweenGames.nextGameNumber,
+    expectedIntermissionVersion: input.match.stateVersion,
+    originalRegisteredDeck: originalRegisteredDeckConfiguration(
+      input.viewerDeck.instances,
+    ),
+    currentDeckConfiguration: input.viewerSeat.currentDeckConfiguration,
+    registeredCardPool: input.viewerDeck.instances.flatMap((copy) => {
+      if (!copy.registeredCardId) return [];
+      const card = input.viewerDeck.snapshot.cards.find(
+        (candidate) => candidate.cardCode === copy.cardCode,
+      )?.card;
+      if (!card) return [];
+
+      return [
+        {
+          registeredCardId: copy.registeredCardId,
+          cardCode: copy.cardCode,
+          canonicalName: canonicalGameplayName(card),
+        },
+      ];
+    }),
+    cardsByCode: Object.fromEntries(
+      input.viewerDeck.snapshot.cards.map((definition) => [
+        definition.cardCode,
+        {
+          cardCode: definition.cardCode,
+          canonicalName: canonicalGameplayName(definition.card),
+          name: definition.card.name,
+          imageUrl: definition.card.media.image_url ?? null,
+          rulesText: definition.card.text.plain,
+          publicCode: definition.card.public_code,
+          type: definition.card.classification.type,
+          supertype: definition.card.classification.supertype,
+          domains: definition.card.classification.domain,
+          tags: definition.card.tags,
+          energy: definition.card.attributes.energy,
+          might: definition.card.attributes.might,
+          power: definition.card.attributes.power,
+        } satisfies SideboardingCardView,
+      ]),
+    ),
+    context: {
+      previousGameWinnerPlayerId: betweenGames.previousGameWinnerPlayerId,
+      previousGameLoserPlayerId: betweenGames.previousGameLoserPlayerId,
+      nextStartingPlayerChooserId: betweenGames.nextStartingPlayerChooserId,
+      usedBattlefieldRegisteredCardIds: input.usedBattlefields,
+      remainingBattlefieldRegisteredCardIds: input.remainingBattlefields,
+      nextBattlefieldMode:
+        betweenGames.nextGameNumber === 3 ? "server-auto" : "player-choice",
+    },
+    opponentStatus:
+      input.opponentStatus === "submitted" ? "submitted" : "editing",
+  };
+}
+
+function originalRegisteredDeckConfiguration(
+  registeredCopies: readonly CardInstance[],
+): RegisteredDeckConfiguration {
+  const legend = registeredCopies.find((copy) => copy.source === "legend");
+  if (!legend?.registeredCardId) {
+    throw new Error("Registered deck is missing its Champion Legend.");
+  }
+
+  return {
+    legendRegisteredCardId: legend.registeredCardId,
+    ...createInitialDeckConfiguration(registeredCopies),
+    runeDeckRegisteredCardIds: registeredCopies
+      .filter((copy) => copy.source === "runeDeck")
+      .map(requireRegisteredCardId),
+    battlefieldRegisteredCardIds: registeredBattlefieldIds(registeredCopies),
+  };
+}
+
+function canonicalGameplayName(card: { metadata: { clean_name?: string }; name: string }) {
+  return (card.metadata.clean_name ?? card.name).replace(/\s+/g, " ").trim();
+}
+
+function requireRegisteredCardId(copy: CardInstance): string {
+  if (!copy.registeredCardId) {
+    throw new Error(`Registered card identity is unavailable: ${copy.instanceId}.`);
+  }
+
+  return copy.registeredCardId;
 }

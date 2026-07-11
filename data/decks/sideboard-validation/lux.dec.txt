@@ -1,0 +1,37 @@
+Legend:
+1 Lady of Luminosity - Starter
+
+Champion:
+1 Lux, Crownguard
+
+MainDeck:
+3 Falling Comet
+3 Lecturing Yordle
+3 Stupefy
+3 Ravenbloom Student
+3 Singularity
+3 Back to Back
+3 Daring Poro
+3 Vanguard Sergeant
+3 Blast of Power
+3 Vanguard Attendant
+2 Eager Apprentice
+2 Mega-Mech
+2 Final Spark
+1 Lux, Crownguard
+2 Lux, Illuminated
+
+Battlefields:
+1 Aspirant's Climb
+1 Targon's Peak
+1 The Papertree
+
+Runes:
+6 Mind Rune
+6 Order Rune
+
+Sideboard:
+3 Garen, Commander
+3 Recruit the Vanguard
+1 Lux, Illuminated
+1 Final Spark
