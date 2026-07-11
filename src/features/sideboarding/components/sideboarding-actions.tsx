@@ -21,12 +21,29 @@ export function SideboardingActions({
   viewModel: SideboardingViewModel;
 }) {
   return (
-    <footer className="sticky bottom-0 z-20 border-cyan-300/20 border-t bg-slate-950/95 px-4 py-3 text-slate-100 backdrop-blur-xl">
+    <footer className="sticky bottom-0 z-20 border-cyan-300/20 border-t bg-slate-950/95 px-3 py-2.5 text-slate-100 backdrop-blur-xl">
       <div className="grid items-center gap-3 lg:grid-cols-[auto_1fr_auto]">
         <div className="flex flex-wrap gap-2 text-xs">
-          <Count label="Active" value={`${viewModel.counts.active}/40`} />
-          <Count label="Main" value={`${viewModel.counts.mainDeck}/39`} />
-          <Count label="Sideboard" value={`${viewModel.counts.sideboard}/8`} />
+          <Count
+            invalid={viewModel.counts.active !== 40}
+            label="Active Deck"
+            value={`${viewModel.counts.active}/40`}
+          />
+          <Count
+            invalid={viewModel.counts.mainDeck !== 39}
+            label="Main Deck"
+            value={String(viewModel.counts.mainDeck)}
+          />
+          <Count
+            invalid={viewModel.counts.chosenChampion !== 1}
+            label="Chosen Champion"
+            value={String(viewModel.counts.chosenChampion)}
+          />
+          <Count
+            invalid={viewModel.counts.sideboard > 8}
+            label="Sideboard"
+            value={`${viewModel.counts.sideboard}/8`}
+          />
         </div>
         <ValidationSummary validation={validation} />
         <div className="grid gap-2 sm:grid-cols-2">
@@ -63,11 +80,35 @@ export function SideboardingActions({
   );
 }
 
-function Count({ label, value }: { label: string; value: string }) {
+function Count({
+  invalid = false,
+  label,
+  value,
+}: {
+  invalid?: boolean;
+  label: string;
+  value: string;
+}) {
   return (
-    <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-      <span className="text-slate-500">{label}</span>{" "}
-      <span className="font-semibold text-cyan-100 tabular-nums">{value}</span>
+    <span
+      className={[
+        "rounded-md border px-2 py-1",
+        invalid
+          ? "border-amber-300/40 bg-amber-300/10"
+          : "border-white/10 bg-white/5",
+      ].join(" ")}
+    >
+      <span className={invalid ? "text-amber-100/80" : "text-slate-500"}>
+        {label}
+      </span>{" "}
+      <span
+        className={[
+          "font-semibold tabular-nums",
+          invalid ? "text-amber-100" : "text-cyan-100",
+        ].join(" ")}
+      >
+        {value}
+      </span>
     </span>
   );
 }

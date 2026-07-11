@@ -19,9 +19,6 @@ export function createSideboardingDraftReducer(input: {
         if (!draft.mainDeckRegisteredCardIds.includes(action.registeredCardId)) {
           return draft;
         }
-        if (draft.sideboardRegisteredCardIds.length >= 8) {
-          return draft;
-        }
 
         return {
           ...draft,
@@ -70,7 +67,13 @@ export function createSideboardingDraftReducer(input: {
         return {
           chosenChampionRegisteredCardId: action.registeredCardId,
           mainDeckRegisteredCardIds: inMainDeck
-            ? removeOne(draft.mainDeckRegisteredCardIds, action.registeredCardId)
+            ? [
+                ...removeOne(
+                  draft.mainDeckRegisteredCardIds,
+                  action.registeredCardId,
+                ),
+                draft.chosenChampionRegisteredCardId,
+              ]
             : draft.mainDeckRegisteredCardIds,
           sideboardRegisteredCardIds: [
             ...(inSideboard
@@ -79,7 +82,7 @@ export function createSideboardingDraftReducer(input: {
                   action.registeredCardId,
                 )
               : draft.sideboardRegisteredCardIds),
-            draft.chosenChampionRegisteredCardId,
+            ...(inSideboard ? [draft.chosenChampionRegisteredCardId] : []),
           ],
         };
       }

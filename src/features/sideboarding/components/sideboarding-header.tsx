@@ -1,16 +1,10 @@
-import { Grid2X2, List, Users } from "lucide-react";
-import { Button } from "@/shared/components/button";
+import { Users } from "lucide-react";
 import type { MatchProjection, SideboardingSessionInput } from "@/shared/game";
-import type { SideboardingEditorMode } from "../sideboarding-types";
 
 export function SideboardingHeader({
-  editorMode,
-  onEditorModeChange,
   projection,
   session,
 }: {
-  editorMode: SideboardingEditorMode;
-  onEditorModeChange: (mode: SideboardingEditorMode) => void;
   projection: MatchProjection;
   session: SideboardingSessionInput;
 }) {
@@ -23,13 +17,13 @@ export function SideboardingHeader({
   );
 
   return (
-    <header className="sticky top-0 z-20 border-cyan-300/20 border-b bg-slate-950/95 px-4 py-3 text-slate-100 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-cyan-300/20 border-b bg-slate-950/95 px-4 py-2.5 text-slate-100 backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-cyan-200 text-xs uppercase tracking-[0.18em]">
             Between games
           </p>
-          <h1 className="mt-1 font-semibold text-xl">
+          <h1 className="mt-1 font-semibold text-lg">
             Game {session.gameNumber} sideboarding
           </h1>
           <p className="mt-1 text-slate-400 text-xs">
@@ -46,26 +40,6 @@ export function SideboardingHeader({
             <span className="font-semibold text-slate-100">
               {session.opponentStatus === "submitted" ? "Submitted" : "Editing"}
             </span>
-          </div>
-          <div className="inline-flex rounded-md border border-white/10 bg-white/5 p-1">
-            <Button
-              aria-label="Compact list"
-              onClick={() => onEditorModeChange("compact")}
-              size="icon-sm"
-              type="button"
-              variant={editorMode === "compact" ? "default" : "ghost"}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              aria-label="Card grid"
-              onClick={() => onEditorModeChange("grid")}
-              size="icon-sm"
-              type="button"
-              variant={editorMode === "grid" ? "default" : "ghost"}
-            >
-              <Grid2X2 className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>

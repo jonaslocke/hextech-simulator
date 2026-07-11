@@ -1,10 +1,12 @@
-import { Crown, MoveLeft, MoveRight } from "lucide-react";
-import { Button } from "@/shared/components/button";
+import { MoveLeft, MoveRight } from "lucide-react";
 import type { SideboardingDraftAction } from "../sideboarding-draft-reducer";
 import {
   isChampionUnit,
   type SideboardingCardGroup,
+  type SideboardingViewModel,
 } from "../sideboarding-view-model";
+import { CardMetadata } from "./card-metadata";
+import { ChosenChampionAction } from "./chosen-champion-action";
 
 export function CompactCardList({
   disabled,
@@ -12,12 +14,14 @@ export function CompactCardList({
   onDispatch,
   onInspect,
   source,
+  viewModel,
 }: {
   disabled: boolean;
   groups: SideboardingCardGroup[];
   onDispatch: (action: SideboardingDraftAction) => void;
   onInspect: (registeredCardId: string) => void;
   source: "mainDeck" | "sideboard";
+  viewModel: SideboardingViewModel;
 }) {
   return (
     <div className="divide-y divide-white/10">
@@ -27,10 +31,17 @@ export function CompactCardList({
           source === "mainDeck"
             ? "moveMainDeckCopyToSideboard"
             : "moveSideboardCopyToMainDeck";
+        const isCurrent =
+          viewModel.chosenChampionRegisteredCardId ===
+          firstCopy.registeredCardId;
+        const isEligible =
+          viewModel.eligibleChosenChampionRegisteredCardIds.has(
+            firstCopy.registeredCardId,
+          );
 
         return (
           <div
-            className="grid w-full grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 text-sm transition hover:bg-white/5 focus-within:bg-white/5"
+            className="grid w-full grid-cols-[1fr_auto] items-center gap-2 px-2.5 py-1.5 text-sm transition hover:bg-white/5 focus-within:bg-white/5"
             key={`${source}:${group.canonicalName}`}
             onMouseEnter={() => onInspect(firstCopy.registeredCardId)}
           >
@@ -53,29 +64,23 @@ export function CompactCardList({
                 <span className="block truncate font-medium text-slate-100">
                   {group.card.name}
                 </span>
-                <span className="mt-0.5 block truncate text-slate-500 text-xs">
-                  {metadata(group)}
-                </span>
+                <CardMetadata card={group.card} />
               </span>
             </button>
             <span className="flex items-center gap-1">
               {isChampionUnit(group.card) && (
-                <Button
-                  aria-label={`Set ${group.card.name} as Chosen Champion`}
+                <ChosenChampionAction
+                  cardName={group.card.name}
                   disabled={disabled}
-                  onClick={(event) => {
-                    event.stopPropagation();
+                  isCurrent={isCurrent}
+                  isEligible={isEligible}
+                  onSelect={() =>
                     onDispatch({
                       type: "setChosenChampion",
                       registeredCardId: firstCopy.registeredCardId,
-                    });
-                  }}
-                  size="icon-xs"
-                  type="button"
-                  variant="secondary"
-                >
-                  <Crown className="h-3 w-3" />
-                </Button>
+                    })
+                  }
+                />
               )}
               {source === "mainDeck" ? (
                 <MoveRight className="h-4 w-4 text-slate-500" />
@@ -88,15 +93,4 @@ export function CompactCardList({
       })}
     </div>
   );
-}
-
-function metadata(group: SideboardingCardGroup) {
-  const values = [
-    group.card.type,
-    group.card.supertype,
-    group.card.energy === null ? null : `${group.card.energy} energy`,
-    group.card.domains.join("/"),
-  ].filter(Boolean);
-
-  return values.join(" / ");
 }

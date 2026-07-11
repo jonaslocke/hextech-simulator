@@ -18,6 +18,7 @@ import { useSideboardingDraft } from "./use-sideboarding-draft";
 import { useSideboardingValidation } from "./use-sideboarding-validation";
 import { CardInspector } from "./components/card-inspector";
 import { DeckIdentityPanel } from "./components/deck-identity-panel";
+import { EditorToolbar } from "./components/editor-toolbar";
 import { MainDeckEditor } from "./components/main-deck-editor";
 import { SideboardEditor } from "./components/sideboard-editor";
 import { SideboardingActions } from "./components/sideboarding-actions";
@@ -112,8 +113,6 @@ export function SideboardingScreen({
   return (
     <main className="flex h-screen min-h-0 flex-col overflow-hidden bg-slate-950 text-slate-100 tabletop-background">
       <SideboardingHeader
-        editorMode={editorMode}
-        onEditorModeChange={setEditorMode}
         projection={projection}
         session={session}
       />
@@ -123,26 +122,36 @@ export function SideboardingScreen({
           {submissionError}
         </div>
       )}
-      <section className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="grid min-h-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-          <MainDeckEditor
-            disabled={editingDisabled}
-            groups={viewModel.mainDeckGroups}
-            mode={editorMode}
-            onDispatch={dispatchAndTrack}
-            onInspect={setSelectedRegisteredCardId}
-            viewModel={viewModel}
-          />
-          <SideboardEditor
-            disabled={editingDisabled}
-            groups={viewModel.sideboardGroups}
-            mode={editorMode}
-            onDispatch={dispatchAndTrack}
-            onInspect={setSelectedRegisteredCardId}
-            viewModel={viewModel}
-          />
+      <section
+        className={[
+          "grid min-h-0 flex-1 gap-3 p-3",
+          editorMode === "allCards"
+            ? "lg:grid-cols-1"
+            : "lg:grid-cols-[minmax(0,1fr)_18rem]",
+        ].join(" ")}
+      >
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-md border border-white/10 bg-slate-950/60">
+          <EditorToolbar mode={editorMode} onModeChange={setEditorMode} />
+          <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.65fr)]">
+            <MainDeckEditor
+              disabled={editingDisabled}
+              groups={viewModel.mainDeckGroups}
+              mode={editorMode}
+              onDispatch={dispatchAndTrack}
+              onInspect={setSelectedRegisteredCardId}
+              viewModel={viewModel}
+            />
+            <SideboardEditor
+              disabled={editingDisabled}
+              groups={viewModel.sideboardGroups}
+              mode={editorMode}
+              onDispatch={dispatchAndTrack}
+              onInspect={setSelectedRegisteredCardId}
+              viewModel={viewModel}
+            />
+          </div>
         </div>
-        <CardInspector card={viewModel.selectedCard} />
+        {editorMode !== "allCards" && <CardInspector card={viewModel.selectedCard} />}
       </section>
       <SideboardingActions
         disabled={editingDisabled}

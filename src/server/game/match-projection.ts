@@ -160,6 +160,8 @@ function buildSideboardingSession(input: {
       input.viewerDeck.instances,
     ),
     currentDeckConfiguration: input.viewerSeat.currentDeckConfiguration,
+    eligibleChosenChampionRegisteredCardIds:
+      eligibleChosenChampionRegisteredCardIds(input.viewerDeck),
     registeredCardPool: input.viewerDeck.instances.flatMap((copy) => {
       if (!copy.registeredCardId) return [];
       const card = input.viewerDeck.snapshot.cards.find(
@@ -207,6 +209,44 @@ function buildSideboardingSession(input: {
     opponentStatus:
       input.opponentStatus === "submitted" ? "submitted" : "editing",
   };
+}
+
+function eligibleChosenChampionRegisteredCardIds(
+  deck: DeckSnapshotDocument,
+): string[] {
+  const definitionsByCode = new Map(
+    deck.snapshot.cards.map((definition) => [definition.cardCode, definition]),
+  );
+  const legend = deck.instances.find((copy) => copy.source === "legend");
+  const legendDefinition = legend
+    ? definitionsByCode.get(legend.cardCode)
+    : undefined;
+  if (!legend?.registeredCardId || !legendDefinition) return [];
+
+  const legendTags = new Set(legendDefinition.card.tags);
+  const legendDomains = new Set(legendDefinition.card.classification.domain);
+
+  return deck.instances
+    .filter(
+      (copy) =>
+        copy.registeredCardId &&
+        ["champion", "mainDeck", "sideboard"].includes(copy.source),
+    )
+    .filter((copy) => {
+      const definition = definitionsByCode.get(copy.cardCode);
+      if (!definition) return false;
+      const card = definition.card;
+      const isChampionUnit =
+        card.classification.type === "Unit" &&
+        card.classification.supertype === "Champion";
+      const matchesLegendTag = card.tags.some((tag) => legendTags.has(tag));
+      const matchesLegendDomains = card.classification.domain.every((domain) =>
+        legendDomains.has(domain),
+      );
+
+      return isChampionUnit && matchesLegendTag && matchesLegendDomains;
+    })
+    .map(requireRegisteredCardId);
 }
 
 function originalRegisteredDeckConfiguration(

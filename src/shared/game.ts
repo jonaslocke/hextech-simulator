@@ -403,6 +403,7 @@ export const sideboardingSessionSchema = z.object({
   expectedIntermissionVersion: z.number().int().nonnegative(),
   originalRegisteredDeck: registeredDeckConfigurationSchema,
   currentDeckConfiguration: deckConfigurationSchema,
+  eligibleChosenChampionRegisteredCardIds: z.array(z.string().min(1)),
   registeredCardPool: z.array(registeredCardCopySchema),
   cardsByCode: z.record(sideboardingCardViewSchema),
   context: z.object({

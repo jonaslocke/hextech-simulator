@@ -14,7 +14,7 @@ export type {
   SideboardingSessionInput,
 };
 
-export type SideboardingEditorMode = "compact" | "grid";
+export type SideboardingEditorMode = "compact" | "grid" | "allCards";
 
 export type DeckReconfigurationIntent = {
   kind: "submitDeckReconfiguration";

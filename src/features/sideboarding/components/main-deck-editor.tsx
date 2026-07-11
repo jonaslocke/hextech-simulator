@@ -6,6 +6,7 @@ import type {
 import type { SideboardingEditorMode } from "../sideboarding-types";
 import { CardGrid } from "./card-grid";
 import { CompactCardList } from "./compact-card-list";
+import { IndividualCardGrid } from "./individual-card-grid";
 
 export function MainDeckEditor({
   disabled,
@@ -24,11 +25,11 @@ export function MainDeckEditor({
 }) {
   return (
     <section className="flex min-h-0 flex-col rounded-md border border-white/10 bg-slate-950/75">
-      <header className="flex items-center justify-between border-white/10 border-b px-3 py-2">
+      <header className="flex items-center justify-between border-white/10 border-b px-2.5 py-1.5">
         <div>
-          <h2 className="font-semibold text-slate-100">Main Deck</h2>
+          <h2 className="font-semibold text-slate-100 text-sm">Main Deck</h2>
           <p className="text-slate-500 text-xs">
-            {viewModel.counts.mainDeck}/39 editable cards
+            {viewModel.counts.mainDeck} editable cards
           </p>
         </div>
       </header>
@@ -40,14 +41,25 @@ export function MainDeckEditor({
             onDispatch={onDispatch}
             onInspect={onInspect}
             source="mainDeck"
+            viewModel={viewModel}
           />
-        ) : (
+        ) : mode === "grid" ? (
           <CardGrid
             disabled={disabled}
             groups={groups}
             onDispatch={onDispatch}
             onInspect={onInspect}
             source="mainDeck"
+            viewModel={viewModel}
+          />
+        ) : (
+          <IndividualCardGrid
+            copies={viewModel.mainDeckCopies}
+            disabled={disabled}
+            onDispatch={onDispatch}
+            onInspect={onInspect}
+            source="mainDeck"
+            viewModel={viewModel}
           />
         )}
       </div>

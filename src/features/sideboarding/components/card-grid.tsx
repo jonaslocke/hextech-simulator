@@ -1,11 +1,11 @@
-import { Crown } from "lucide-react";
-import { Button } from "@/shared/components/button";
 import type { SideboardingDraftAction } from "../sideboarding-draft-reducer";
 import {
   isChampionUnit,
   type SideboardingCardGroup,
+  type SideboardingViewModel,
 } from "../sideboarding-view-model";
 import { CardFace } from "./card-face";
+import { ChosenChampionAction } from "./chosen-champion-action";
 
 export function CardGrid({
   disabled,
@@ -13,21 +13,30 @@ export function CardGrid({
   onDispatch,
   onInspect,
   source,
+  viewModel,
 }: {
   disabled: boolean;
   groups: SideboardingCardGroup[];
   onDispatch: (action: SideboardingDraftAction) => void;
   onInspect: (registeredCardId: string) => void;
   source: "mainDeck" | "sideboard";
+  viewModel: SideboardingViewModel;
 }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-3 p-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(5.8rem,1fr))] gap-2.5 p-2.5">
       {groups.map((group) => {
         const firstCopy = group.copies[0]!;
         const moveAction =
           source === "mainDeck"
             ? "moveMainDeckCopyToSideboard"
             : "moveSideboardCopyToMainDeck";
+        const isCurrent =
+          viewModel.chosenChampionRegisteredCardId ===
+          firstCopy.registeredCardId;
+        const isEligible =
+          viewModel.eligibleChosenChampionRegisteredCardIds.has(
+            firstCopy.registeredCardId,
+          );
 
         return (
           <div className="relative" key={`${source}:${group.canonicalName}`}>
@@ -50,22 +59,20 @@ export function CardGrid({
               </span>
             </button>
             {isChampionUnit(group.card) && (
-              <Button
-                aria-label={`Set ${group.card.name} as Chosen Champion`}
-                className="absolute bottom-1 right-1"
+              <ChosenChampionAction
+                cardName={group.card.name}
+                className="absolute right-1 top-1"
                 disabled={disabled}
-                onClick={() =>
+                isCurrent={isCurrent}
+                isEligible={isEligible}
+                onSelect={() =>
                   onDispatch({
                     type: "setChosenChampion",
                     registeredCardId: firstCopy.registeredCardId,
                   })
                 }
-                size="icon-xs"
-                type="button"
-                variant="secondary"
-              >
-                <Crown className="h-3 w-3" />
-              </Button>
+                visibleOnArtwork
+              />
             )}
           </div>
         );
