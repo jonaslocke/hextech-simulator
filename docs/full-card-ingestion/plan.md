@@ -1,6 +1,6 @@
 # Riftbound Full Card Ingestion Plan
 
-Snapshot date: 2026-07-10
+Snapshot date: 2026-07-11
 
 ## 1. Purpose
 
@@ -63,7 +63,7 @@ primitive discovery
   -> user acceptance
 ```
 
-“Block the milestone” means:
+"Block the milestone" means:
 
 ```text
 Do not move to the next milestone.
@@ -198,7 +198,7 @@ user before implementation. Codex must identify:
 - expected behavior before and after;
 - suggested manual regression focus.
 
-Codex must not silently expand the user’s manual testing burden.
+Codex must not silently expand the user's manual testing burden.
 
 ### 2.12 Persistence and old-match policy
 
@@ -272,6 +272,58 @@ for M2 onward:
 
 Full-set milestones should validate at least one BO3 path after any runtime,
 projection, deck-configuration, or sideboarding change.
+
+### 2.16 Runtime safeguards for full-set ingestion
+
+The sideboarding milestone exposed integration risks that become more important
+when full sets add more cards, tokens, deck variants, and behavior primitives.
+Apply these safeguards during M2 onward:
+
+- preserve the difference between imported deck data, deck snapshot data,
+  registered card-copy identity, current deck configuration, and per-game
+  runtime instances;
+- do not duplicate active deck cards or full card definitions into
+  `game.state.createdCardInstances`; reserve created-card state for generated
+  cards, token cards, and other runtime-created objects only;
+- treat section arrays such as main deck, sideboard, champion, battlefield, and
+  runes as configuration sources. Active gameplay roles are determined by the
+  current deck configuration for that game;
+- validate rune/domain identity against the fixed Champion Legend, not the
+  mutable Chosen Champion selected for a game;
+- allow sideboarding and deck-edit drafts to pass through temporary illegal
+  states, but enforce all deck construction, copy conservation, Chosen Champion,
+  rune, battlefield, and sideboard limits at final submit;
+- keep Chosen Champion eligibility server-authoritative. UI components should
+  consume projected eligible registered-card IDs instead of reimplementing tag
+  or domain rules;
+- support canonical-name cleanup through aliases or migration-safe lookup paths.
+  Correcting set JSON names must not break existing deck snapshots or require
+  overwriting already persisted decks;
+- when creating validation decks for a new ingestion scope, persist them as new
+  selectable decks with distinct names rather than replacing current decks;
+- avoid `Promise.all` or other parallel database operations inside a Mongo
+  transaction session. Transactional writes must be sequential;
+- use transactions only for match-level mutations that truly need atomicity.
+  Ordinary `game.performAction` intents should not be forced through the
+  transactional match path unless a new requirement proves it is necessary;
+- add retry handling for generated persisted IDs that have unique indexes;
+- keep match/game projection reads fast before manual validation. Full-set work
+  should not increase common GET projection latency or intent latency by
+  repeatedly loading immutable deck snapshots, overfetching card data, or
+  growing game documents unnecessarily;
+- add indexes for new event or lookup patterns before manual validation, and
+  verify that read paths use cached immutable data where appropriate;
+- client polling must be completion-based, abort on unmount or lifecycle change,
+  ignore stale or equal versions, and stop after match completion;
+- online route loaders must not briefly render local create-match UI while an
+  existing online match projection is still loading after refresh;
+- after changing the custom Socket.IO server, match service, persistence layer,
+  or other backend runtime code, restart the dev server before manual online
+  validation. The custom server path may keep stale module code across hot
+  reloads;
+- avoid nested interactive HTML such as a `button` inside another `button` or a
+  `label` inside another `label`, because hydration errors can mask real
+  gameplay defects during validation.
 
 ## 3. Milestone Sequence
 
@@ -408,11 +460,14 @@ making more changes:
 3. Replay or reason from the exact persisted state when possible.
 4. Identify whether the issue is catalog data, behavior modeling, selector
    legality, pending-choice validation, chain/priority timing, continuous
-   modifier recomputation, token lifecycle, or stale-match data.
+   modifier recomputation, token lifecycle, sideboard configuration, projection
+   staleness, persistence latency, or stale-match data.
 5. Fix the reusable runtime or catalog path. Do not add old-match compatibility
    unless the user explicitly asks for it.
 6. Resync catalog/decks or restart the dev server when the fix requires fresh
-   runtime data.
+   runtime data. Always restart before validating changes to the custom socket
+   server, match service, persistence code, or other backend runtime paths that
+   may not hot reload cleanly.
 7. Ask the user to validate in a fresh match and state exactly what scenario must
    be checked.
 
@@ -425,6 +480,8 @@ unless the user explicitly asks.
 Future full-set milestones should explicitly check these integration points:
 
 - set JSON import -> canonical catalog -> behavior approval -> deck snapshot;
+- canonical-name aliases or cleanup -> existing deck snapshots -> new validation
+  deck persistence;
 - deck selector exposure -> match creation -> fresh runtime data;
 - card playability projection vs server-side intent validation;
 - pending choices, selected target locks, token placements, and allocation
@@ -438,10 +495,36 @@ Future full-set milestones should explicitly check these integration points:
   placement counts, and board-leave cleanup;
 - registered card identity -> fresh per-game runtime instances -> projected
   `ownerPlayerId` and placement ownership;
-- sideboard deck configuration -> next game creation -> current deck snapshot;
+- Champion Legend identity -> rune/domain validation -> mutable Chosen Champion
+  selection;
+- sideboard deck configuration -> current deck snapshot -> next game creation;
 - game-result acknowledgement -> between-games setup -> next game start;
 - intent response vs polling response ordering, including stale game-state
   rejection and match-complete polling shutdown.
+- match/game read latency, intent latency, game document size, deck snapshot
+  cache behavior, and any indexes needed by newly introduced lookup paths.
+
+### 4.10 Performance and persistence baseline
+
+Full-set ingestion must protect the online simulator's normal latency. Before
+handing a milestone to manual validation, Codex should do a short local
+performance sanity check on a fresh online match:
+
+- common match projection GETs should remain near the previously observed fast
+  path, not regress into multi-second responses;
+- common `game.performAction` intents should avoid unnecessary match-level
+  transactions;
+- game documents should not grow because active deck cards were copied into
+  created-card state;
+- immutable deck snapshots and catalog lookups should use the existing cache or
+  an explicit new cache when repeated projection reads would otherwise reload
+  them;
+- any new persisted event stream, lookup, or projection query should have a
+  matching index when the access pattern is not already covered.
+
+If latency regresses, fix the server path before masking symptoms with longer
+polling intervals. Polling should avoid request pile-ups, but slow server
+responses are still ingestion blockers when they affect ordinary gameplay.
 
 ## 5. Tracking Model
 
@@ -607,7 +690,7 @@ Needs retest
 Accepted
 ```
 
-## 6. Milestone M0 — Operating Model and Tracking Baseline
+## 6. Milestone M0 - Operating Model and Tracking Baseline
 
 ### Goal
 
@@ -658,7 +741,7 @@ Prepare the project for resumable full-card ingestion before adding more cards.
 M0 is complete only after user acceptance.
 ```
 
-## 7. Milestone M1 — Garen Proving Grounds Deck Ingestion
+## 7. Milestone M1 - Garen Proving Grounds Deck Ingestion
 
 ### Goal
 
@@ -726,7 +809,7 @@ At minimum, manually validate:
 M1 is complete only after user acceptance.
 ```
 
-## 8. Milestone M2 — Origins Full Set Ingestion
+## 8. Milestone M2 - Origins Full Set Ingestion
 
 ### Goal
 
@@ -802,14 +885,27 @@ docs/full-ingestion-decks/OGN/
   its projected `ownerPlayerId` and placement owner are explicit and correct.
 - Confirm Origins sideboarding keeps registered card-copy identity stable while
   creating fresh game instances for the next game.
+- If the Origins decks include alternate Champion candidates, validate Chosen
+  Champion selection from both main-deck and sideboard sources. Confirm game 2
+  setup normalizes the active champion role correctly and rune validation still
+  uses the Champion Legend.
 - If a primitive changes projection shape, target legality, or object movement,
   check that polling does not overwrite newer intent results with older or
   equal game states.
+- Before manual acceptance, create a fresh online BO3 match after restarting the
+  dev server and verify projection GETs and ordinary `game.performAction`
+  intents do not regress into multi-second responses.
+- Inspect any latency regression for oversized game documents, repeated deck
+  snapshot reads, missing indexes, or unnecessary transactional intent handling
+  before changing polling cadence.
+- Persist Origins validation decks as new selectable decks. Do not overwrite
+  existing user-facing decks when adding sideboard or full-ingestion variants.
 
 ### Exit criteria
 
 - Every Origins card and required token is approved and executable.
 - Both Origins decks are valid and permanently selectable.
+- Section 4.10 performance and persistence baseline has no unresolved blocker.
 - Manual full matches are accepted by the user.
 - No unresolved Origins primitive blocker remains.
 
@@ -819,7 +915,7 @@ docs/full-ingestion-decks/OGN/
 M2 is complete only after user acceptance.
 ```
 
-## 9. Milestone M3 — Spiritforged Full Set Ingestion
+## 9. Milestone M3 - Spiritforged Full Set Ingestion
 
 ### Goal
 
@@ -901,11 +997,17 @@ docs/full-ingestion-decks/SFD/
 - Validate any new selector or pending-choice path with a stale/changed
   `betweenGames.id` or game-state version treated as a refresh/blocker, not a
   silent acceptance.
+- Re-run the section 4.10 performance baseline because Spiritforged adds to the
+  existing OGS and OGN catalog size. Investigate deck snapshot cache misses,
+  game document growth, and missing indexes before manual validation.
+- If Spiritforged data requires canonical-name corrections, preserve alias or
+  migration-safe lookup behavior so existing persisted decks continue to parse.
 
 ### Exit criteria
 
 - Every Spiritforged card and required token is approved and executable.
 - Both Spiritforged decks are valid and permanently selectable.
+- Section 4.10 performance and persistence baseline has no unresolved blocker.
 - Manual full matches are accepted by the user.
 - No unresolved Spiritforged primitive blocker remains.
 
@@ -915,7 +1017,7 @@ docs/full-ingestion-decks/SFD/
 M3 is complete only after user acceptance.
 ```
 
-## 10. Milestone M4 — Unleashed Full Set Ingestion
+## 10. Milestone M4 - Unleashed Full Set Ingestion
 
 ### Goal
 
@@ -995,12 +1097,19 @@ docs/full-ingestion-decks/UNL/
 - If Unleashed changes any shared movement or ownership primitive, manually
   verify attackers, scoring units, defenders, returned units, tokens, and
   attachments remain on the correct player's side across projection updates.
+- Re-run the section 4.10 performance baseline against fresh online matches
+  because the cumulative catalog and validation deck set is larger by this
+  milestone.
+- For every new generated card, token, or copy-producing behavior, confirm only
+  runtime-created objects enter created-card state and active deck cards remain
+  represented by registered card-copy identity plus fresh per-game instances.
 
 ### Exit criteria
 
 - Every Unleashed card and required token is approved and executable.
 - Both Unleashed decks are valid and permanently selectable.
 - User-approved regression-risking primitive changes have focused validation notes.
+- Section 4.10 performance and persistence baseline has no unresolved blocker.
 - Manual full matches are accepted by the user.
 - No unresolved Unleashed primitive blocker remains.
 
@@ -1010,7 +1119,7 @@ docs/full-ingestion-decks/UNL/
 M4 is complete only after user acceptance.
 ```
 
-## 11. Milestone M5 — Vendetta Full Set Ingestion
+## 11. Milestone M5 - Vendetta Full Set Ingestion
 
 ### Goal
 
@@ -1088,6 +1197,11 @@ docs/full-ingestion-decks/VEN/
 - Validate final Vendetta decks through a complete BO3 match, including game
   result acknowledgement, between-games setup, game 2 or game 3 creation, and
   match-complete polling shutdown.
+- Re-run the section 4.10 performance baseline after final Vendetta data is
+  uploaded. Treat new multi-second projection or intent responses as blockers,
+  not as normal cost of full catalog size.
+- Confirm final Vendetta ingestion does not require overwriting previously
+  accepted validation decks or changing old-match compatibility policy.
 - Do not relax the final-data policy to work around BO3 issues. Missing rules,
   missing tokens, or ambiguous final text remain blockers.
 
@@ -1096,6 +1210,7 @@ docs/full-ingestion-decks/VEN/
 - Every Vendetta card and required token is approved and executable.
 - Both Vendetta decks are valid and permanently selectable.
 - User-approved regression-risking primitive changes have focused validation notes.
+- Section 4.10 performance and persistence baseline has no unresolved blocker.
 - Manual full matches are accepted by the user.
 - No unresolved Vendetta primitive blocker remains.
 
@@ -1142,6 +1257,7 @@ Required first output before implementation:
 - Proposed implementation order.
 - Integration risk checklist entries from section 4.9 that apply to this
   milestone.
+- Performance and persistence baseline checks from section 4.10.
 - BO3, sideboarding, projection, and polling risk mitigations that apply to this
   milestone.
 - Manual validation scenarios.
@@ -1156,12 +1272,24 @@ Implementation constraints:
 - Preserve rules-text-focused behavior change detection.
 - Do not add metadata drift or backward-compatibility work unless explicitly requested.
 - Do not wipe the database; the user handles cleanup manually.
+- Do not overwrite existing persisted decks when adding validation decks.
+- Preserve canonical-name alias or migration-safe lookup behavior when set JSON
+  names are corrected.
 - Treat runtime card instance IDs as opaque and per-game. Use registered card
   identity and explicit owner/placement fields instead of parsing ID strings.
 - Keep sideboarding based on current deck configuration and active
   `betweenGames.id`.
+- Validate rune/domain identity against the Champion Legend, not the mutable
+  Chosen Champion.
+- Keep active deck cards out of `game.state.createdCardInstances`; reserve that
+  state for generated cards and tokens.
+- Avoid parallel database operations inside Mongo transactions.
+- Avoid unnecessary match-level transactions for ordinary `game.performAction`
+  intents.
 - Preserve stale projection rejection, intent/polling ordering protections, and
   match-complete polling shutdown.
+- Restart the dev server before online validation after socket server, match
+  service, persistence, or backend runtime changes.
 - Ask for user approval before implementing primitive changes with regression potential.
 - Prefer zero new tests during ingestion defect loops.
 - Add a deterministic test only when section 4.4 clearly justifies the cost.
@@ -1194,13 +1322,21 @@ Manual defect evidence, when applicable:
 - Game number:
 - Match state version:
 - Game state version:
+- Active betweenGames ID, if applicable:
 - Viewer/player:
 - Endpoint:
 - Request payload:
 - Response:
 - Expected behavior:
 - Actual behavior:
-- Active betweenGames ID, if applicable:
+
+Performance and persistence sanity:
+- Projection GET latency acceptable? Yes/No
+- Ordinary action intent latency acceptable? Yes/No
+- Game document size acceptable? Yes/No
+- Created-card state contains only generated cards/tokens? Yes/No
+- Deck snapshot/cache/index issue suspected? Yes/No
+- Dev server restarted after backend runtime changes? Yes/No
 
 Primitive behaviors intentionally exercised:
 - [ ] Primitive/mechanic:
@@ -1247,19 +1383,21 @@ Use this order to keep the work resumable.
 4. Primitive discovery.
 5. Rule blocker report.
 6. Regression-risking primitive change report and user approval, if needed.
-7. Primitive implementation plan.
-8. Primitive implementation.
-9. Minimal deterministic checks only when justified by section 4.4.
-10. Catalog upload.
-11. Card behavior modeling and approval.
-12. Full card/token executability report.
-13. Deck fixture validation.
-14. Permanent deck selector exposure.
-15. Manual scenario checklist.
-16. User manual validation.
-17. Fixes and retests, if needed.
-18. User acceptance.
-19. Commit accepted milestone changes.
+7. Integration risk report from section 4.9.
+8. Performance and persistence baseline plan from section 4.10.
+9. Primitive implementation plan.
+10. Primitive implementation.
+11. Minimal deterministic checks only when justified by section 4.4.
+12. Catalog upload.
+13. Card behavior modeling and approval.
+14. Full card/token executability report.
+15. Deck fixture validation.
+16. Permanent deck selector exposure.
+17. Manual scenario checklist.
+18. User manual validation.
+19. Fixes and retests, if needed.
+20. User acceptance.
+21. Commit accepted milestone changes.
 
 ## 15. Stop Conditions
 
