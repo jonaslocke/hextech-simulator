@@ -244,6 +244,35 @@ Full-set ingestion should spend tokens on reusable primitive discovery, database
 inspection, exact manual reproduction, and clear handoff notes instead of broad
 automated gameplay tests.
 
+### 2.15 Post-BO3 lessons for full-set ingestion
+
+BO3 is now part of the runtime surface that future ingestion milestones must
+preserve. These lessons are not a changelog; they are implementation constraints
+for M2 onward:
+
+- treat `registeredCardId` as the stable match/deck card-copy identity and
+  `instanceId` as an opaque, fresh per-game runtime identity;
+- never infer card owner, side, or zone from runtime ID text. Use explicit
+  fields such as `ownerPlayerId`, `selectedByPlayerId`, projected zone fields,
+  and deck-configuration section arrays;
+- keep `GameBoard` game-scoped and pass it only `GameProjection`; match-level
+  flow, game summaries, sideboarding, and between-games readiness belong to the
+  match projection and match components;
+- sideboarding and deck edits must read and write `currentDeckConfiguration`,
+  not the original imported deck source;
+- between-games submissions must be tied to the active `betweenGames.id` and
+  rejected or refreshed when the match has moved to another phase;
+- client projection updates must merge by match/game version, ignore stale or
+  equal polling responses, and stop polling once the match is complete;
+- lifecycle boundaries need explicit UI states. A completed game should be
+  acknowledged before entering between-games setup, and a completed match should
+  stop gameplay polling;
+- future sideboarding feature gates should use the centralized
+  `BO3_MATCH_FEATURES` configuration instead of duplicating flags in React.
+
+Full-set milestones should validate at least one BO3 path after any runtime,
+projection, deck-configuration, or sideboarding change.
+
 ## 3. Milestone Sequence
 
 ```text
@@ -370,8 +399,9 @@ The handoff must include:
 When manual validation finds a behavior issue, Codex should use this order before
 making more changes:
 
-1. Record the match ID, state version, endpoint, request payload, response, and
-   expected behavior when the user provides them.
+1. Record the match ID, game number, match state version, game state version,
+   endpoint, request payload, response, and expected behavior when the user
+   provides them.
 2. Inspect canonical card behavior, deck snapshots, persisted match state,
    pending choices, chain entries, selected targets, token placements, and object
    versions.
@@ -405,7 +435,13 @@ Future full-set milestones should explicitly check these integration points:
 - continuous modifiers after unit play, token placement, movement, attack,
   defend, showdown, and location changes;
 - token identity normalization, image/media projection, entering ready, split
-  placement counts, and board-leave cleanup.
+  placement counts, and board-leave cleanup;
+- registered card identity -> fresh per-game runtime instances -> projected
+  `ownerPlayerId` and placement ownership;
+- sideboard deck configuration -> next game creation -> current deck snapshot;
+- game-result acknowledgement -> between-games setup -> next game start;
+- intent response vs polling response ordering, including stale game-state
+  rejection and match-complete polling shutdown.
 
 ## 5. Tracking Model
 
@@ -757,6 +793,19 @@ docs/full-ingestion-decks/OGN/
 - Any card not represented by the two decks but introducing a unique primitive
   must be explicitly called out in the manual validation notes.
 
+### BO3 and sideboarding risk mitigation
+
+- Validate at least one Origins BO3 match through game result, between-games
+  setup, sideboarding confirmation, next-game creation, and match completion.
+- During validation, inspect any unit that moves through attack, score, return
+  to base, defeat, recall, token creation, or board-leave cleanup and confirm
+  its projected `ownerPlayerId` and placement owner are explicit and correct.
+- Confirm Origins sideboarding keeps registered card-copy identity stable while
+  creating fresh game instances for the next game.
+- If a primitive changes projection shape, target legality, or object movement,
+  check that polling does not overwrite newer intent results with older or
+  equal game states.
+
 ### Exit criteria
 
 - Every Origins card and required token is approved and executable.
@@ -838,6 +887,21 @@ docs/full-ingestion-decks/SFD/
 - Codex must not infer missing equipment or attachment rules from outside
   sources.
 
+### BO3 and sideboarding risk mitigation
+
+- Recheck Origins-era BO3 assumptions before implementing new Spiritforged
+  mechanics: stable `registeredCardId`, opaque runtime `instanceId`, explicit
+  owner fields, and current deck configuration as the sideboarding source of
+  truth.
+- If Spiritforged introduces attachments, equipment, replacement effects, or
+  persistent modifiers, validate that those effects survive only the intended
+  game scope and do not leak into later BO3 games.
+- Confirm game 2 and game 3 setup rebuilds runtime objects from the active
+  sideboarded configuration and not from stale deck snapshots.
+- Validate any new selector or pending-choice path with a stale/changed
+  `betweenGames.id` or game-state version treated as a refresh/blocker, not a
+  silent acceptance.
+
 ### Exit criteria
 
 - Every Spiritforged card and required token is approved and executable.
@@ -918,6 +982,19 @@ docs/full-ingestion-decks/UNL/
 - Any primitive extension with regression potential must be approved by the user
   before implementation and must include a focused manual regression note for
   affected earlier decks.
+
+### BO3 and sideboarding risk mitigation
+
+- Treat this milestone as a cross-set regression check for BO3 because reused
+  primitives may now affect OGS, OGN, and SFD decks.
+- For every approved primitive extension, record whether it can affect
+  sideboarding, game setup, card movement, token placement, projection merging,
+  or match lifecycle transitions.
+- Run at least one manual BO3 path that includes sideboarding after game 1 and
+  verifies no match-complete polling continues after the final result.
+- If Unleashed changes any shared movement or ownership primitive, manually
+  verify attackers, scoring units, defenders, returned units, tokens, and
+  attachments remain on the correct player's side across projection updates.
 
 ### Exit criteria
 
@@ -1001,6 +1078,19 @@ docs/full-ingestion-decks/VEN/
   blockers that require user input through the normal rule/token process.
 - No online rulings, prerelease assumptions, or unreleased-source assumptions are allowed.
 
+### BO3 and sideboarding risk mitigation
+
+- Before implementation, compare Vendetta primitive needs against all previously
+  accepted BO3, sideboarding, projection, identity, and polling constraints.
+- Any Vendetta primitive that changes shared identity, deck configuration,
+  movement, replacement, trigger, or token behavior must include a focused
+  regression note for earlier accepted decks.
+- Validate final Vendetta decks through a complete BO3 match, including game
+  result acknowledgement, between-games setup, game 2 or game 3 creation, and
+  match-complete polling shutdown.
+- Do not relax the final-data policy to work around BO3 issues. Missing rules,
+  missing tokens, or ambiguous final text remain blockers.
+
 ### Exit criteria
 
 - Every Vendetta card and required token is approved and executable.
@@ -1052,6 +1142,8 @@ Required first output before implementation:
 - Proposed implementation order.
 - Integration risk checklist entries from section 4.9 that apply to this
   milestone.
+- BO3, sideboarding, projection, and polling risk mitigations that apply to this
+  milestone.
 - Manual validation scenarios.
 
 Implementation constraints:
@@ -1064,6 +1156,12 @@ Implementation constraints:
 - Preserve rules-text-focused behavior change detection.
 - Do not add metadata drift or backward-compatibility work unless explicitly requested.
 - Do not wipe the database; the user handles cleanup manually.
+- Treat runtime card instance IDs as opaque and per-game. Use registered card
+  identity and explicit owner/placement fields instead of parsing ID strings.
+- Keep sideboarding based on current deck configuration and active
+  `betweenGames.id`.
+- Preserve stale projection rejection, intent/polling ordering protections, and
+  match-complete polling shutdown.
 - Ask for user approval before implementing primitive changes with regression potential.
 - Prefer zero new tests during ingestion defect loops.
 - Add a deterministic test only when section 4.4 clearly justifies the cost.
@@ -1093,12 +1191,16 @@ Tester:
 
 Manual defect evidence, when applicable:
 - Match ID:
-- State version:
+- Game number:
+- Match state version:
+- Game state version:
+- Viewer/player:
 - Endpoint:
 - Request payload:
 - Response:
 - Expected behavior:
 - Actual behavior:
+- Active betweenGames ID, if applicable:
 
 Primitive behaviors intentionally exercised:
 - [ ] Primitive/mechanic:
@@ -1109,6 +1211,7 @@ Primitive behaviors intentionally exercised:
 Full match results:
 - [ ] Matchup:
       Completed? Yes/No
+      BO3 path checked? Yes/No
       Winner:
       Issues:
       Retest required? Yes/No
