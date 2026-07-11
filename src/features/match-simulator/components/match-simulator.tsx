@@ -403,6 +403,10 @@ export function MatchSimulator({
     });
   }
 
+  if (onlineMatch && (!match || !projection || !gameProjection)) {
+    return <OnlineMatchLoading />;
+  }
+
   if (!match || !projection || !gameProjection) {
     return (
       <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
@@ -738,6 +742,20 @@ export function MatchSimulator({
         onPerformAction={performAction}
         projection={gameProjection}
       />
+    </main>
+  );
+}
+
+function OnlineMatchLoading() {
+  return (
+    <main className="place-items-center grid bg-slate-950 p-6 min-h-screen text-slate-100 tabletop-background">
+      <section
+        aria-live="polite"
+        className="bg-slate-900/95 shadow-2xl p-5 border border-cyan-300/20 rounded-xl text-center"
+        role="status"
+      >
+        <p className="font-medium text-slate-100 text-sm">Restoring match...</p>
+      </section>
     </main>
   );
 }
