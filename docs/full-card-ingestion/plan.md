@@ -1,1428 +1,748 @@
-# Riftbound Full Card Ingestion Plan
+# Riftbound Full Card Corpus Ingestion Plan
 
 Snapshot date: 2026-07-11
 
-## 1. Purpose
+## 1. Objective
 
-Plan the next card-ingestion work for Hextech Simulator in a controlled,
-resumable, and trackable way.
+Expand Hextech Simulator from its current playable-card baseline into complete,
+set-by-set Riftbound card corpus support.
 
-The ingestion strategy is intentionally incremental:
+This plan starts from the system that already exists after the Garen ingestion,
+BO3 implementation, sideboarding implementation, and their follow-up fixes. It
+does not preserve those implementation sessions as separate planning eras.
+Their durable outcomes are expressed here as current engine contracts.
 
-1. Ingest the active milestone scope.
-2. Detect and implement reusable primitive behavior.
-3. Upload the set or scoped cards into the card catalog.
-4. Approve executable behavior models.
-5. Expose the validation decks permanently.
-6. Validate through manual full matches.
-7. Fix behavior gaps.
-8. Accept the milestone manually.
-9. Only then move to the next milestone.
+The program succeeds when every gameplay-distinct card and every required token
+in the active set:
 
-The long-term direction is broader than deck ingestion, but the validation model
-remains gameplay-first. Full-set milestones are not complete until every card and
-required token in the set has executable behavior and the user accepts the
-manual gameplay result.
+- exists in the card catalog;
+- has an approved executable behavior model;
+- is supported through reusable runtime primitives;
+- can participate in valid permanent deck configurations;
+- works through fresh full matches, including BO3 and sideboarding where
+  applicable; and
+- is explicitly accepted by the user after manual validation.
 
-## 2. Core Decisions
+The work remains incremental by set, but each set is treated as part of one
+cumulative corpus. Later sets extend the same primitive catalog and game engine;
+they do not create independent implementations.
 
-These decisions define the plan and should not be changed by Codex without an
-explicit user decision.
+## 2. Current Baseline
 
-### 2.1 Definition of done
+The following capabilities are established foundations for this plan and are not
+milestones to implement again:
 
-A milestone is done only after the user manually validates full matches and
-accepts the behavior.
+- the existing Lux, Annie, Master Yi, and Garen playable decks;
+- the card-set import, behavior review, and canonical card approval workflow;
+- reusable behavior primitives and server-authoritative game execution;
+- viewer-safe game projections and server-validated player intents;
+- BO3 match state, game results, between-games flow, and sideboarding;
+- permanent selectable deck persistence;
+- fresh per-game runtime card instances created from stable registered card
+  copies; and
+- manual fresh-match validation as the final gameplay authority.
 
-Catalog upload, behavior approval, passing tests, and successful builds are
-necessary checkpoints, but they are not final acceptance.
+When future ingestion exposes a flaw in this baseline, the fix belongs in the
+shared primitive, catalog, deck, match, projection, or persistence layer that
+owns the behavior. The plan must not create card-name-specific or set-specific
+engine branches to preserve an old implementation.
 
-### 2.2 Full-set completeness
+## 3. Corpus Roadmap
 
-For full-set milestones, Codex must block milestone completion until every card
-and every required token in that set has executable behavior.
+The remaining corpus is ingested in this order:
 
-Cards may temporarily sit in unsupported, ambiguous, or runtime-pending states
-during implementation, but the milestone cannot be marked complete while any
-card or required token remains non-executable.
+| Order | Set                  | Scope                                | Input gate                                            |
+| ----: | -------------------- | ------------------------------------ | ----------------------------------------------------- |
+|     1 | Origins (`OGN`)      | Complete set and all required tokens | Set JSON and two user-provided validation decks       |
+|     2 | Spiritforged (`SFD`) | Complete set and all required tokens | Set JSON and two user-provided validation decks       |
+|     3 | Unleashed (`UNL`)    | Complete set and all required tokens | Set JSON and two user-provided validation decks       |
+|     4 | Vendetta (`VEN`)     | Complete set and all required tokens | Final set JSON and two user-provided validation decks |
 
-### 2.3 Normal ingestion flow
+A set does not open until the preceding set is accepted. Vendetta must wait for
+final JSON; prerelease or unstable data is not an accepted input.
 
-Codex must follow this flow for each milestone:
+## 4. Authorities and Repository Locations
 
-```text
-primitive discovery
-  -> primitive delta review
-  -> rule blocker resolution, if needed
-  -> reusable primitive implementation
-  -> upload set or scoped cards into card catalog
-  -> approve executable behavior models
-  -> expose permanent validation decks
-  -> manual full-match testing
-  -> fixes and retesting
-  -> user acceptance
-```
+### 4.1 Rules authority
 
-"Block the milestone" means:
+Gameplay behavior must be derived only from:
 
-```text
-Do not move to the next milestone.
-Do not call the milestone accepted.
-Do not treat partial executable coverage as complete.
-```
+1. `docs/riftbound_core_rules_reference.md`
+2. the card text in the provided set JSON
 
-It does not mean Codex should invent a separate publication model outside the
-existing card-catalog workflow.
+Codex must not search online for rulings, errata, Discord discussions,
+prerelease interpretations, or unofficial examples.
 
-### 2.4 Deck validation per set
+When the rules reference and card text do not determine one implementation,
+Codex must stop and request a user ruling. The user will update the local rules
+reference before implementation continues.
 
-For each full set, the user will provide two playable decks that contain cards
-with behaviors tied to that set.
+### 4.2 Set source data
 
-Deck files will be placed under:
-
-```text
-docs/full-ingestion-decks/<SET_CODE>/
-```
-
-Expected set folders:
-
-```text
-data/decks/full-ingestion-decks/OGN/
-data/decks/full-ingestion-decks/SFD/
-data/decks/full-ingestion-decks/UNL/
-data/decks/full-ingestion-decks/VEN/
-```
-
-The user will decide the decklists later. Codex must not invent or select those
-decks.
-
-The validation decks are permanent selectable decks, not temporary test-only
-fixtures.
-
-### 2.5 Set JSON source path
-
-All set JSON files used for ingestion must be read from:
+Set JSON source files must be read from:
 
 ```text
 data/sets
 ```
 
-Codex must not assume set JSON files live under `docs/` or any generated catalog
-folder. Generated artifacts may be produced by the implementation, but the set
-JSON source of truth for ingestion is `data/sets`.
+These files are the source of truth for card ingestion. Generated catalog or
+tracking artifacts must not replace them.
 
-This plan lives in the repository as `docs/full-card-ingestion/plan.md`. If Codex
-needs to create any companion files, work notes, tracking ledgers, or generated
-planning artifacts for this ingestion program, those files must be created under
-`docs/full-card-ingestion/`.
+### 4.3 Validation decks
 
-### 2.6 Rules authority
+The user will provide two validation decks for each full-set milestone under:
 
-Codex must use only:
+```text
+docs/full-ingestion-decks/<SET_CODE>/
+```
 
-1. `docs/riftbound_core_rules_reference.md`
-2. The card text from the provided set JSON
+Expected folders are:
 
-If a required rule is missing, unclear, or contradicted by a card, Codex must
-stop and ask the user for a ruling. The user will update
-`docs/riftbound_core_rules_reference.md`, and only then should implementation
-continue.
+```text
+docs/full-ingestion-decks/OGN/
+docs/full-ingestion-decks/SFD/
+docs/full-ingestion-decks/UNL/
+docs/full-ingestion-decks/VEN/
+```
 
-Codex must not search online for rulings, errata, Discord discussions, prerelease
-interpretations, or unofficial examples.
+Codex must not invent or select the decklists. Once implemented, these decks are
+permanent selectable decks, not temporary test fixtures.
 
-### 2.7 Tracking priority
+### 4.4 Program documentation
 
-Track progress first by primitive behavior, then by card.
+This plan lives at:
 
-Primitive behaviors are the key planning unit because they are reusable. Card
-coverage is the completeness layer that proves every card in the milestone has a
-valid executable behavior model.
+```text
+docs/full-card-ingestion/plan.md
+```
 
-### 2.8 Card identity and variant policy
+Any companion tracking, analysis, or handoff file created specifically for this
+program must be created under:
 
-Alternate art, showcase, overnumbered, star cards, and equivalent printed
-variants collapse into one gameplay definition, as already done by the current
-project.
+```text
+docs/full-card-ingestion/
+```
 
-Codex must preserve this identity policy unless the user explicitly changes it.
+## 5. Non-Negotiable Program Decisions
 
-### 2.9 Token policy
+### 5.1 Definition of done
 
-Tokens are part of set completeness.
+A set is complete only after the user manually validates fresh full matches and
+explicitly accepts the set.
 
-If a card in the milestone creates, plays, references, or requires a token, then
-that token must have card data and executable behavior coverage.
+Catalog upload, behavior approval, typecheck, build, lint, automated checks, and
+successful deck creation are implementation checkpoints. They are not final
+acceptance.
 
-Missing token data blocks the milestone. If required token data is not present in
-`data/sets`, Codex must stop and ask the user to provide it.
+Until acceptance, the only valid completion-facing status is:
 
-For full-set milestones, Codex should build a token inventory before modeling
-individual cards. The inventory must cross-reference:
+```text
+Awaiting Manual Acceptance
+```
 
-- printed token definitions in the set JSON;
-- cards that create, play, move, modify, count, or reference those tokens;
-- token variants that collapse to one gameplay identity;
-- token placement requirements, including fixed destination, chosen destination,
-  base, battlefield, "here", split counts, and controller/source ownership;
-- token lifecycle requirements, including entering ready, recomputing continuous
-  modifiers immediately, and ceasing to exist when leaving board zones.
+### 5.2 Full-set completeness
 
-Token support must be implemented as reusable runtime behavior. Codex must not
-solve token cards through card-name-specific branches.
+A full-set milestone is blocked while any gameplay-distinct card or required
+token remains:
 
-### 2.10 Behavior change detection policy
+- unreviewed;
+- unsupported;
+- ambiguously modeled;
+- missing required source data;
+- unapproved;
+- non-executable; or
+- affected by an unresolved manual gameplay defect.
+
+Partial catalog coverage or successful validation of only the two provided decks
+does not prove full-set completeness.
+
+### 5.3 Card identity and printed variants
+
+Alternate art, showcase, overnumbered, signature-printing, star, and equivalent
+printed variants collapse into one gameplay definition when they represent the
+same card behavior.
+
+Coverage and executability are measured by gameplay definition, while the
+existing catalog may retain the printed source entries and media needed to
+represent those variants.
+
+Codex must preserve the project's established identity policy and must not
+create separate runtime behavior solely because a printing has a different
+collector treatment.
+
+### 5.4 Behavior change detection
 
 Rules-text-focused hashing remains the behavior-change gate.
 
-Cards are treated as stable real objects for this ingestion program. Codex does
-not need to plan for metadata drift, full-definition drift, or broad reimport
-comparison outside the current rules-text-focused behavior workflow.
+Cards are stable real objects for this ingestion program. Codex must not add a
+metadata-drift, broad full-definition-diff, or backward-compatible reimport
+system unless the user explicitly requests one in the future.
 
-Codex must not replace the current behavior-change model with a metadata-driven
-or full-card-definition-driven model unless the user explicitly requests that
-change later.
+### 5.5 Required tokens are corpus dependencies
 
-### 2.11 Primitive regression policy
+Token completeness is evaluated across the cumulative corpus, not only inside
+the active set file.
 
-Primitive changes are allowed when they improve the game engine or make broader
-card coverage possible.
+Before behavior modeling, Codex must build a token dependency inventory that
+connects:
 
-However, every primitive change with regression potential must be approved by the
-user before implementation. Codex must identify:
+- each card that creates, copies, replaces, moves, modifies, counts, or
+  references a token;
+- the canonical token definition already available anywhere in `data/sets`;
+- the token's gameplay identity and printed variants;
+- its card type, stats, tags, rules text, and media;
+- placement rules, controller, ownership, readiness, and quantity;
+- copy or transformation behavior;
+- continuous modifiers that must apply immediately; and
+- board-leave behavior, including tokens ceasing to exist when required by the
+  rules.
+
+A token definition does not need to be duplicated in every set that references
+it. It must, however, exist somewhere in the available corpus and be executable.
+If no sufficient token definition exists, the active milestone is blocked and
+Codex must ask the user to provide the missing token data.
+
+### 5.6 Primitive-first implementation
+
+Runtime behavior must be implemented through reusable primitives and generic
+game systems.
+
+Card-name-specific runtime branches are not acceptable. A card name may be used
+for import diagnostics, migration reporting, or temporary discovery analysis,
+but not as the condition that executes gameplay behavior.
+
+### 5.7 Regression approval
+
+A new primitive that does not alter existing behavior may be implemented within
+the active milestone.
+
+An extension or correction that can change already accepted behavior requires
+user approval before implementation. Codex must first report:
 
 - the primitive being changed;
-- the reason the change is needed;
-- existing cards/decks affected;
-- expected behavior before and after;
-- suggested manual regression focus.
+- why the current primitive is insufficient;
+- the affected existing cards and permanent decks;
+- the behavior before and after the proposed change;
+- the regression risk; and
+- the smallest useful manual regression scope.
 
-Codex must not silently expand the user's manual testing burden.
+Codex must not silently broaden the user's manual validation burden.
 
-### 2.12 Persistence and old-match policy
+### 5.8 Testing discipline
 
-Do not plan for backward compatibility of old persisted matches.
+Manual gameplay is the acceptance authority.
 
-Any match created before a new card-ingestion implementation is considered
-outdated and not relevant for future validation. The user will handle database
-cleanup manually when needed.
+Codex should prefer zero new automated tests during ingestion defect loops.
+Automated checks are appropriate only when they are narrow, deterministic, and
+cheap to maintain, such as:
 
-Codex must not wipe the database and must not treat runtime reset planning as a
-milestone concern. Manual validation should use fresh matches created after the
-current milestone implementation is ready.
+- set-schema, parser, repository, or catalog validation;
+- a focused primitive unit check;
+- a deterministic mapper or intent-builder check; or
+- a small regression test that would have caught the exact confirmed defect.
 
-### 2.13 Vendetta policy
+Broad gameplay integration suites, component-structure tests, and large
+card-by-card test matrices must not be used as the proof that a set works.
 
-Vendetta ingestion waits for final JSON only.
+### 5.9 Old matches and database cleanup
 
-No prerelease Vendetta ingestion should begin unless the user explicitly changes
-this decision. When the final JSON is available, the user will provide it under
-`data/sets`.
+Old persisted matches do not require backward compatibility after ingestion or
+runtime changes. Manual validation must use fresh matches created from the
+current catalog, deck configuration, and runtime.
 
-### 2.14 M1 lessons for full-set ingestion
+Codex must not wipe the database. The user owns database cleanup when needed.
 
-M1 produced durable workflow lessons. The transient bug notes and screenshots are
-not part of this plan and should not be treated as permanent source material.
-The lessons that matter for future milestones are:
+### 5.10 Accepted milestone commits
 
-- manual fresh-match validation is the primary proof of gameplay correctness;
-- catalog approval, behavior-model approval, typecheck, build, and automated
-  tests are useful checkpoints but did not catch the runtime issues found in M1;
-- after catalog or runtime fixes, validation should use newly created matches,
-  freshly synced deck snapshots, and the current runtime;
-- old persisted matches can be discarded and should not drive compatibility work;
-- when a manual issue is reported, Codex should inspect the canonical card data,
-  deck snapshot, persisted game state, pending choices, chain entries, selected
-  targets, token placements, and exact action payload before changing code;
-- fixes should land in reusable primitives, selectors, token handling,
-  continuous modifiers, chain/priority handling, or intent validation paths;
-- tests should be minimal or omitted unless they directly protect a narrow,
-  deterministic parser, schema, catalog, or primitive behavior.
+After user acceptance, Codex must commit the accepted set work before starting
+the next set.
 
-Full-set ingestion should spend tokens on reusable primitive discovery, database
-inspection, exact manual reproduction, and clear handoff notes instead of broad
-automated gameplay tests.
+The commit must contain only the accepted milestone and the tracking updates
+that record its acceptance. Unrelated user changes must not be included.
 
-### 2.15 Post-BO3 lessons for full-set ingestion
+## 6. Engine Contracts the Corpus Must Preserve
 
-BO3 is now part of the runtime surface that future ingestion milestones must
-preserve. These lessons are not a changelog; they are implementation constraints
-for M2 onward:
+These contracts consolidate the durable outcomes of the Garen, BO3, and
+sideboarding work.
 
-- treat `registeredCardId` as the stable match/deck card-copy identity and
-  `instanceId` as an opaque, fresh per-game runtime identity;
-- never infer card owner, side, or zone from runtime ID text. Use explicit
-  fields such as `ownerPlayerId`, `selectedByPlayerId`, projected zone fields,
-  and deck-configuration section arrays;
-- keep `GameBoard` game-scoped and pass it only `GameProjection`; match-level
-  flow, game summaries, sideboarding, and between-games readiness belong to the
-  match projection and match components;
-- sideboarding and deck edits must read and write `currentDeckConfiguration`,
-  not the original imported deck source;
-- between-games submissions must be tied to the active `betweenGames.id` and
-  rejected or refreshed when the match has moved to another phase;
-- client projection updates must merge by match/game version, ignore stale or
-  equal polling responses, and stop polling once the match is complete;
-- lifecycle boundaries need explicit UI states. A completed game should be
-  acknowledged before entering between-games setup, and a completed match should
-  stop gameplay polling;
-- future sideboarding feature gates should use the centralized
-  `BO3_MATCH_FEATURES` configuration instead of duplicating flags in React.
+### 6.1 Server authority
 
-Full-set milestones should validate at least one BO3 path after any runtime,
-projection, deck-configuration, or sideboarding change.
+The server remains the source of truth for:
 
-### 2.16 Runtime safeguards for full-set ingestion
+- legal actions;
+- card and ability costs;
+- targets and selections;
+- pending choices and ordering;
+- deck legality;
+- sideboard submission;
+- game and match transitions;
+- hidden information; and
+- persisted state.
 
-The sideboarding milestone exposed integration risks that become more important
-when full sets add more cards, tokens, deck variants, and behavior primitives.
-Apply these safeguards during M2 onward:
+The client consumes projections and submits intents. It must not recreate
+legality or resolve gameplay independently.
 
-- preserve the difference between imported deck data, deck snapshot data,
-  registered card-copy identity, current deck configuration, and per-game
-  runtime instances;
-- do not duplicate active deck cards or full card definitions into
-  `game.state.createdCardInstances`; reserve created-card state for generated
-  cards, token cards, and other runtime-created objects only;
-- treat section arrays such as main deck, sideboard, champion, battlefield, and
-  runes as configuration sources. Active gameplay roles are determined by the
-  current deck configuration for that game;
-- validate rune/domain identity against the fixed Champion Legend, not the
-  mutable Chosen Champion selected for a game;
-- allow sideboarding and deck-edit drafts to pass through temporary illegal
-  states, but enforce all deck construction, copy conservation, Chosen Champion,
-  rune, battlefield, and sideboard limits at final submit;
-- keep Chosen Champion eligibility server-authoritative. UI components should
-  consume projected eligible registered-card IDs instead of reimplementing tag
-  or domain rules;
-- support canonical-name cleanup through aliases or migration-safe lookup paths.
-  Correcting set JSON names must not break existing deck snapshots or require
-  overwriting already persisted decks;
-- when creating validation decks for a new ingestion scope, persist them as new
-  selectable decks with distinct names rather than replacing current decks;
-- avoid `Promise.all` or other parallel database operations inside a Mongo
-  transaction session. Transactional writes must be sequential;
-- use transactions only for match-level mutations that truly need atomicity.
-  Ordinary `game.performAction` intents should not be forced through the
-  transactional match path unless a new requirement proves it is necessary;
-- add retry handling for generated persisted IDs that have unique indexes;
-- keep match/game projection reads fast before manual validation. Full-set work
-  should not increase common GET projection latency or intent latency by
-  repeatedly loading immutable deck snapshots, overfetching card data, or
-  growing game documents unnecessarily;
-- add indexes for new event or lookup patterns before manual validation, and
-  verify that read paths use cached immutable data where appropriate;
-- client polling must be completion-based, abort on unmount or lifecycle change,
-  ignore stale or equal versions, and stop after match completion;
-- online route loaders must not briefly render local create-match UI while an
-  existing online match projection is still loading after refresh;
-- after changing the custom Socket.IO server, match service, persistence layer,
-  or other backend runtime code, restart the dev server before manual online
-  validation. The custom server path may keep stale module code across hot
-  reloads;
-- avoid nested interactive HTML such as a `button` inside another `button` or a
-  `label` inside another `label`, because hydration errors can mask real
-  gameplay defects during validation.
+### 6.2 Card identity layers
 
-## 3. Milestone Sequence
+The implementation must preserve the distinction between:
+
+1. source card or canonical gameplay definition;
+2. imported or persisted deck configuration;
+3. stable registered card-copy identity for a match;
+4. fresh opaque runtime `instanceId` for each game; and
+5. runtime-created objects such as tokens, copies, or generated cards.
+
+Ownership, controller, side, zone, and role must come from explicit state fields.
+They must never be inferred from the text or shape of an ID.
+
+Active deck cards must not be duplicated into created-card storage. Created-card
+state is reserved for objects that are actually generated during gameplay.
+
+### 6.3 Match scope and game scope
+
+Game state and `GameProjection` remain game-scoped. BO3 score, completed-game
+summaries, between-games readiness, and sideboarding remain match-scoped.
+
+Gameplay UI must not receive match-level responsibilities merely because a new
+card primitive needs additional state.
+
+### 6.4 Current deck configuration
+
+New games in a match must be built from the accepted current deck configuration,
+not from the original imported deck source.
+
+Sideboard drafts may temporarily be illegal while the user edits them. Final
+submission must validate all applicable construction rules, copy conservation,
+Chosen Champion eligibility, sideboard limits, and fixed-section constraints.
+
+Runes and Battlefields remain fixed across the match according to the established
+sideboarding product decision.
+
+Deck legality must still follow the local rules reference:
+
+- the Champion Legend determines the Main Deck's Domain Identity;
+- the Rune Deck must be legal for the active Chosen Champion; and
+- any Chosen Champion selected after sideboarding must remain compatible with
+  the fixed Rune Deck.
+
+Chosen Champion eligibility and the legal registered-card IDs must remain
+server-projected and server-validated.
+
+### 6.5 BO3 lifecycle and stale state
+
+Between-games actions must be tied to the active between-games state and rejected
+or refreshed after the match moves forward.
+
+Projection and polling behavior must preserve version ordering:
+
+- a stale or equal response must not overwrite newer intent results;
+- polling must stop after match completion;
+- completed-game acknowledgement must not be confused with match completion;
+- each next game must create fresh runtime instances from the current accepted
+  configuration; and
+- state from one game must not leak into later games.
+
+### 6.6 Behavior state and reusable systems
+
+New cards may require extensions to selectors, pending choices, effects,
+triggers, replacements, continuous modifiers, cost calculation, movement,
+attachments, tokens, or visibility.
+
+Those extensions must live in the generic subsystem that owns the concept. They
+must preserve:
+
+- viewer-safe projections;
+- server-side target validation;
+- resumable pending decisions;
+- explicit object versioning where selections can become stale;
+- immediate recomputation of relevant continuous modifiers; and
+- existing player intent contracts unless the user approves a contract change.
+
+### 6.7 Runtime size and latency
+
+Full-corpus support must not grow match documents by copying immutable catalog
+or deck data into runtime state, repeatedly reload immutable data on common
+projection paths, or route ordinary gameplay intents through unnecessarily heavy
+match-level persistence work.
+
+Before manual acceptance, Codex must perform a short sanity check that common
+projection reads and ordinary actions remain suitable for interactive play. An
+obvious latency or document-growth regression introduced by the milestone is a
+blocker.
+
+## 7. Unified Set Ingestion Workflow
+
+Every full set follows this workflow. Set sections must not redefine it.
+
+### Phase 1 — Input readiness
+
+Codex must:
+
+1. read this plan and the current tracking state;
+2. read `docs/riftbound_core_rules_reference.md`;
+3. read the active set JSON from `data/sets`;
+4. read the two user-provided validation decks;
+5. validate the set JSON shape and required identity fields;
+6. confirm all records belong to the expected set;
+7. identify gameplay-equivalent printed variants; and
+8. confirm that the milestone is not blocked by missing source files.
+
+No runtime implementation starts before input readiness is complete.
+
+### Phase 2 — Corpus analysis and implementation proposal
+
+Before changing runtime code, Codex must produce:
+
+- a primitive delta grouped by reusable behavior;
+- full card coverage counts by gameplay definition;
+- a corpus-wide token dependency inventory;
+- missing rule or token blockers;
+- primitives that are already executable;
+- new primitives required;
+- existing primitives that need extension;
+- regression-risking changes requiring user approval;
+- engine subsystems affected by the set;
+- the proposed implementation order; and
+- manual scenarios needed for unique behavior not exercised by the two decks.
+
+This phase is analysis, not behavior approval. Heuristic primitive discovery may
+suggest a model, but it must not silently publish or certify behavior.
+
+If a rule, token, contract change, or regression decision is blocked, Codex must
+stop with a precise request before implementing the blocked work.
+
+### Phase 3 — Full set catalog intake
+
+After input readiness and blocker review, upload the complete set into the
+existing card-catalog workflow.
+
+Catalog intake must:
+
+- preserve the source JSON as the source of truth;
+- map printed variants to the established gameplay identity policy;
+- retain imported-but-unapproved cards as non-gameplay-ready;
+- surface unsupported or ambiguous behavior explicitly; and
+- avoid inventing a new publication path outside the existing catalog workflow.
+
+Catalog intake does not mean the cards are executable.
+
+### Phase 4 — Primitive implementation and behavior approval
+
+Codex must implement or extend the reusable runtime primitives approved for the
+milestone, then approve exact behavior models through the existing catalog
+workflow.
+
+For each gameplay definition:
+
+1. every rules-text clause must be accounted for;
+2. every referenced selector, condition, cost, timing, choice, trigger,
+   replacement, modifier, or effect must map to executable runtime support;
+3. all token dependencies must resolve to executable definitions;
+4. unsupported and ambiguous clauses must remain unapproved; and
+5. approval must be based on the current rules-text hash.
+
+Primitive implementation and card approval may progress in batches, but the
+milestone remains incomplete until coverage reaches 100 percent.
+
+### Phase 5 — Full corpus completeness gate
+
+Before deck integration, Codex must report:
+
+| Coverage measure                        | Required result |
+| --------------------------------------- | --------------- |
+| Gameplay-distinct cards reviewed        | 100%            |
+| Behavior clauses modeled                | 100%            |
+| Required primitives executable          | 100%            |
+| Required tokens defined and executable  | 100%            |
+| Rule blockers                           | 0               |
+| Unsupported or ambiguous approved cards | 0               |
+
+A card outside the two validation decks still blocks the set if its behavior is
+not executable.
+
+### Phase 6 — Permanent deck integration
+
+For each user-provided deck, Codex must:
+
+- parse and validate the deck;
+- validate Champion Legend, Chosen Champion, domain, Rune, Battlefield,
+  signature, copy-limit, and sideboard rules;
+- persist it as a new permanent selectable deck;
+- expose it through the existing data-driven local and online deck selectors;
+- preserve registered card-copy identity through sideboarding; and
+- confirm fresh games are built from the current accepted configuration.
+
+Codex must not replace an existing selectable deck merely to add the new
+validation deck.
+
+### Phase 7 — Technical readiness
+
+Before asking for manual validation, Codex must complete only the technical
+checks relevant to the work performed:
+
+- set/catalog validation;
+- behavior-definition synchronization;
+- typecheck;
+- build and lint when the touched code requires them;
+- narrow deterministic checks justified by this plan;
+- fresh local and online match creation;
+- ordinary projection/action latency sanity; and
+- fresh runtime startup when backend hot reload cannot be trusted.
+
+Passing these checks moves the milestone to manual validation. It does not
+complete the milestone.
+
+### Phase 8 — Manual gameplay validation
+
+Manual validation must use fresh matches and must include:
+
+1. full matches using both provided decks;
+2. at least one complete BO3 path for the active set, including sideboarding and
+   next-game creation;
+3. a scenario for every new primitive;
+4. a scenario for each approved extension of an existing primitive;
+5. explicit scenarios for unique behavior not naturally exercised by the two
+   decks; and
+6. only the focused earlier-deck regression scope approved by the user.
+
+Validation should exercise the actual player-facing path, including projected
+legal actions, target and choice UI, chain/focus/priority behavior, game result,
+between-games state, and match completion when relevant.
+
+### Phase 9 — Defect correction
+
+When manual validation exposes a defect, Codex must first inspect the exact
+failing state instead of guessing from the card name or screenshot alone.
+
+Useful evidence includes:
+
+- match and game identifiers;
+- match and game state versions;
+- active between-games identifier when relevant;
+- viewer/player;
+- endpoint and request payload;
+- response or projected legal actions;
+- canonical behavior model;
+- registered card and runtime instance identities;
+- pending choices, selected targets, chain entries, and object versions;
+- current deck configuration; and
+- expected versus actual behavior.
+
+The fix must be applied to the reusable owner of the defect. After catalog or
+runtime changes, validation restarts from a fresh match. Old-match compatibility
+must not be added unless the user explicitly requests it.
+
+### Phase 10 — Acceptance and closeout
+
+After implementation and manual testing, Codex must report:
+
+- final primitive coverage;
+- final card and token coverage;
+- permanent deck status;
+- manual scenarios completed;
+- focused regressions completed;
+- remaining blockers, if any; and
+- milestone status.
+
+The milestone remains `Awaiting Manual Acceptance` until the user accepts it.
+After acceptance, Codex updates tracking, commits the accepted work, and only
+then opens the next set.
+
+## 8. Tracking Model
+
+Use one companion tracking file unless the volume of data makes a split clearly
+necessary. The default location is:
 
 ```text
-M0  Operating model and tracking baseline
-M1  Garen Proving Grounds deck ingestion
-M2  Origins full set ingestion
-M3  Spiritforged full set ingestion
-M4  Unleashed full set ingestion
-M5  Vendetta full set ingestion
+docs/full-card-ingestion/tracking.md
 ```
 
-Each milestone has the same gate structure:
+Tracking is updated throughout the milestone, not reconstructed at the end.
+
+### 8.1 Set status
+
+| Set | Input               | Primitive analysis | Catalog intake | Executable coverage | Decks | Manual validation | User acceptance |
+| --- | ------------------- | ------------------ | -------------- | ------------------- | ----- | ----------------- | --------------- |
+| OGN | Pending/Ready       | Pending            | Pending        | 0%                  | 0/2   | Pending           | Pending         |
+| SFD | Pending/Ready       | Pending            | Pending        | 0%                  | 0/2   | Pending           | Pending         |
+| UNL | Pending/Ready       | Pending            | Pending        | 0%                  | 0/2   | Pending           | Pending         |
+| VEN | Final JSON required | Pending            | Pending        | 0%                  | 0/2   | Pending           | Pending         |
+
+Recommended set statuses:
 
 ```text
-Input readiness
-  -> primitive discovery
-  -> rule-blocker resolution
-  -> primitive implementation
-  -> catalog upload
-  -> behavior approval
-  -> full card/token executability check
-  -> permanent deck exposure
-  -> manual deck/full-match validation
-  -> user acceptance
-  -> commit accepted milestone changes
-  -> next milestone opens
+Waiting for input
+Input ready
+Analysis in progress
+Blocked by rule
+Blocked by token data
+Regression approval required
+Catalog intake
+Primitive implementation
+Behavior approval
+Completeness validation
+Deck integration
+Manual validation
+Awaiting Manual Acceptance
+Accepted
 ```
 
-## 4. Global Codex Operating Rules
+### 8.2 Primitive ledger
 
-Codex must follow these rules for every milestone.
+| Primitive | First card in active set | Active-set cards | Existing status | Proposed change | Rule status | Regression approval | Manual scenario | Final status |
+| --------- | ------------------------ | ---------------: | --------------- | --------------- | ----------- | ------------------- | --------------- | ------------ |
+| TBD       | TBD                      |              TBD | TBD             | TBD             | TBD         | TBD                 | TBD             | TBD          |
 
-### 4.1 Before implementation
+### 8.3 Card coverage ledger
 
-- Read `docs/riftbound_core_rules_reference.md` before making gameplay behavior
-  changes.
-- Read the relevant set JSON from `data/sets` and deck files for the active milestone.
-- Compare new rules text against existing canonical cards and behavior
-  definitions using the current behavior-change workflow.
-- Build a primitive delta before implementing card behavior.
-- Identify blockers before writing runtime code.
-- Identify any primitive change with regression potential and request user
-  approval before implementing that change.
+| Set | Gameplay identity | Representative source code | Printed variants | Clauses | Primitive coverage | Token dependencies | Approval | Executable | Manual issue |
+| --- | ----------------- | -------------------------- | ---------------: | ------: | ------------------ | ------------------ | -------- | ---------- | ------------ |
+| TBD | TBD               | TBD                        |              TBD |     TBD | TBD                | TBD                | TBD      | TBD        | TBD          |
 
-### 4.2 During implementation
+### 8.4 Token dependency ledger
 
-- Implement reusable primitive behavior, not card-specific runtime branches.
-- Keep route handlers thin and game behavior inside server/game modules.
-- Keep imported-but-unapproved behavior out of gameplay-ready state.
-- Preserve viewer-safe projections and server-side target validation.
-- Preserve existing player intent contracts unless explicitly approved.
-- Keep setup, card choices, targeting, and pending choices server-authoritative.
-- Preserve the established card identity policy that collapses gameplay-equivalent
-  variants into one definition.
-- Treat missing required token data as a blocker.
+| Token identity | Definition source | Referencing sets/cards | Behavior executable | Placement/lifecycle coverage | Missing data | Final status |
+| -------------- | ----------------- | ---------------------- | ------------------- | ---------------------------- | ------------ | ------------ |
+| TBD            | TBD               | TBD                    | TBD                 | TBD                          | TBD          | TBD          |
 
-### 4.3 When a rule is missing
+### 8.5 Deck and BO3 ledger
 
-Codex must stop and produce a ruling request with:
+| Set | Deck | Permanent ID | Construction valid | Local selector | Online selector | Full match | BO3 + sideboard | Accepted |
+| --- | ---- | ------------ | ------------------ | -------------- | --------------- | ---------- | --------------- | -------- |
+| TBD | TBD  | TBD          | TBD                | TBD            | TBD             | TBD        | TBD             | TBD      |
+
+### 8.6 Regression approval ledger
+
+| Primitive | Existing cards/decks affected | Proposed behavior change | Risk | Approved scope | User decision | Result |
+| --------- | ----------------------------- | ------------------------ | ---- | -------------- | ------------- | ------ |
+| TBD       | TBD                           | TBD                      | TBD  | TBD            | Pending       | TBD    |
+
+## 9. User Decision and Handoff Contract
+
+Whenever Codex stops for a ruling, approval, missing token, or manual validation,
+it must state exactly:
+
+- what is blocked;
+- what evidence was found;
+- what the user must decide or provide;
+- the acceptable response forms;
+- whether any independent work can continue; and
+- what Codex will do after the response.
+
+### 9.1 Rule request format
 
 ```text
 Card(s):
 Primitive or mechanic:
-Missing/unclear rule:
-Why the current rules reference is insufficient:
+Missing or unclear rule:
+Why the local rules reference and card text are insufficient:
 Possible interpretations, if any:
-Implementation impact:
+Implementation and regression impact:
+Required user decision:
 ```
 
-The user will update `docs/riftbound_core_rules_reference.md`. Codex may continue
-only after the reference is updated.
-
-### 4.4 Testing discipline
-
-Automated tests are optional checkpoints, not acceptance proof.
-
-Codex should prefer zero new tests during ingestion defect loops unless a test
-is clearly worth its maintenance and token cost. Acceptable cases are narrow:
-
-- parser, schema, repository, or catalog checks that are cheap and deterministic;
-- a focused primitive unit check when a reusable runtime primitive is changed;
-- a small deterministic regression check for a confirmed bug, only when it would
-  have caught the exact class of failure.
-
-Codex must not add broad gameplay integration tests as proof of correctness for a
-milestone. Manual full-match validation remains the required proof.
-
-### 4.5 Manual acceptance gate
-
-Every milestone must end in this state until the user accepts it:
+### 9.2 Regression approval format
 
 ```text
+Primitive:
+Current behavior:
+Proposed behavior:
+Why the extension is required:
+Existing cards/decks affected:
+Regression risk:
+Proposed minimum manual regression scope:
+Required user decision: Approve / Reject / Change scope
+```
+
+### 9.3 Manual validation handoff
+
+```text
+Set:
 Status: Awaiting Manual Acceptance
+Permanent decks:
+Scenarios to validate:
+Complete BO3 path required:
+Focused earlier-deck regressions:
+Known limitations or blockers:
+Expected user response: Accept / Report defects / Provide ruling
 ```
 
-Codex must not mark a milestone complete based only on code completion, test
-success, build success, or catalog approval.
+## 10. Stop Conditions
 
-### 4.6 Post-acceptance commit
+Codex must stop the blocked work when:
 
-After the user accepts a milestone, Codex must commit the accepted milestone
-changes before starting the next milestone.
+- a required rule is missing or supports multiple valid implementations;
+- required token data is unavailable anywhere in the current corpus;
+- a gameplay-distinct card still has unsupported or ambiguous behavior;
+- a primitive extension has regression potential and lacks user approval;
+- implementation would change a public player-intent or projection contract
+  without user approval;
+- deck legality cannot be determined from the local rules and current product
+  decisions;
+- a manual defect contradicts the expected behavior and the exact state has not
+  been investigated;
+- the active set cannot reach complete executable coverage; or
+- Vendetta final JSON is not available.
 
-The commit should include only the accepted milestone work and any tracking
-updates needed to record that acceptance. Codex must not include unrelated user
-changes in that commit.
+A stop condition blocks the dependent work. Codex may continue only with clearly
+independent work that cannot prejudge the missing decision.
 
-### 4.7 Approval handoff clarity
+## 11. Set Acceptance Criteria
 
-Whenever Codex stops implementation to wait for user approval, a user ruling, or
-manual validation, Codex must state the exact expectation from the user before
-ending the turn.
+A set is accepted only when all of the following are true:
 
-The handoff must include:
+- the complete set has passed catalog intake;
+- every gameplay-distinct card has approved executable behavior;
+- every required token dependency is defined and executable;
+- there are no unresolved rule blockers;
+- there are no unapproved regression-risking primitive changes;
+- both user-provided decks are valid permanent selectable decks;
+- manual full matches have completed;
+- at least one complete BO3 and sideboarding path has completed;
+- unique primitive behavior outside the validation decks has been exercised;
+- approved focused regressions have completed;
+- no unresolved gameplay or interactive-latency blocker remains; and
+- the user explicitly accepts the milestone.
 
-- what the user should review or decide;
-- the acceptable forms of response, such as approve, reject, or provide a
-  ruling;
-- whether implementation is blocked or can continue on a different task;
-- what Codex will do next after the user responds.
+Technical completion without user acceptance is not completion.
 
-### 4.8 Manual-first defect workflow
+## 12. Codex Milestone Execution Prompt
 
-When manual validation finds a behavior issue, Codex should use this order before
-making more changes:
-
-1. Record the match ID, game number, match state version, game state version,
-   endpoint, request payload, response, and expected behavior when the user
-   provides them.
-2. Inspect canonical card behavior, deck snapshots, persisted match state,
-   pending choices, chain entries, selected targets, token placements, and object
-   versions.
-3. Replay or reason from the exact persisted state when possible.
-4. Identify whether the issue is catalog data, behavior modeling, selector
-   legality, pending-choice validation, chain/priority timing, continuous
-   modifier recomputation, token lifecycle, sideboard configuration, projection
-   staleness, persistence latency, or stale-match data.
-5. Fix the reusable runtime or catalog path. Do not add old-match compatibility
-   unless the user explicitly asks for it.
-6. Resync catalog/decks or restart the dev server when the fix requires fresh
-   runtime data. Always restart before validating changes to the custom socket
-   server, match service, persistence code, or other backend runtime paths that
-   may not hot reload cleanly.
-7. Ask the user to validate in a fresh match and state exactly what scenario must
-   be checked.
-
-Manual issue notes should be summarized into durable process lessons only. Do
-not preserve transient screenshot evidence or one-off bug documents in this plan
-unless the user explicitly asks.
-
-### 4.9 Integration risk checklist
-
-Future full-set milestones should explicitly check these integration points:
-
-- set JSON import -> canonical catalog -> behavior approval -> deck snapshot;
-- canonical-name aliases or cleanup -> existing deck snapshots -> new validation
-  deck persistence;
-- deck selector exposure -> match creation -> fresh runtime data;
-- card playability projection vs server-side intent validation;
-- pending choices, selected target locks, token placements, and allocation
-  payloads;
-- simultaneous triggers, target choice timing, chain ordering, focus, and
-  priority return;
-- object version changes that should invalidate locked targets;
-- continuous modifiers after unit play, token placement, movement, attack,
-  defend, showdown, and location changes;
-- token identity normalization, image/media projection, entering ready, split
-  placement counts, and board-leave cleanup;
-- registered card identity -> fresh per-game runtime instances -> projected
-  `ownerPlayerId` and placement ownership;
-- Champion Legend identity -> rune/domain validation -> mutable Chosen Champion
-  selection;
-- sideboard deck configuration -> current deck snapshot -> next game creation;
-- game-result acknowledgement -> between-games setup -> next game start;
-- intent response vs polling response ordering, including stale game-state
-  rejection and match-complete polling shutdown.
-- match/game read latency, intent latency, game document size, deck snapshot
-  cache behavior, and any indexes needed by newly introduced lookup paths.
-
-### 4.10 Performance and persistence baseline
-
-Full-set ingestion must protect the online simulator's normal latency. Before
-handing a milestone to manual validation, Codex should do a short local
-performance sanity check on a fresh online match:
-
-- common match projection GETs should remain near the previously observed fast
-  path, not regress into multi-second responses;
-- common `game.performAction` intents should avoid unnecessary match-level
-  transactions;
-- game documents should not grow because active deck cards were copied into
-  created-card state;
-- immutable deck snapshots and catalog lookups should use the existing cache or
-  an explicit new cache when repeated projection reads would otherwise reload
-  them;
-- any new persisted event stream, lookup, or projection query should have a
-  matching index when the access pattern is not already covered.
-
-If latency regresses, fix the server path before masking symptoms with longer
-polling intervals. Polling should avoid request pile-ups, but slow server
-responses are still ingestion blockers when they affect ordinary gameplay.
-
-## 5. Tracking Model
-
-This plan is meant to be resumed after interruptions. The following ledgers
-should be maintained in the milestone work notes or in a companion tracking file.
-
-### 5.1 Milestone Status Ledger
-
-| Milestone | Scope | Status | Current blocker | Next action | User acceptance |
-|---|---|---|---|---|---|
-| M0 | Operating model | Not started | None | Confirm tracking files | Pending |
-| M1 | Garen Proving Grounds deck | Not started | Need Garen decklist and OGS data in `data/sets` | Discover primitive delta | Pending |
-| M2 | Origins full set | Not started | Need OGN JSON in `data/sets` + 2 decks | Wait for inputs | Pending |
-| M3 | Spiritforged full set | Not started | Need SFD JSON in `data/sets` + 2 decks | Wait for inputs | Pending |
-| M4 | Unleashed full set | Not started | Need UNL JSON in `data/sets` + 2 decks | Wait for inputs | Pending |
-| M5 | Vendetta full set | Not started | Need final VEN JSON in `data/sets` + 2 decks | Wait for final data | Pending |
-
-Recommended statuses:
+Use this template to begin a set milestone.
 
 ```text
-Not started
-Input ready
-Primitive discovery
-Rule blocked
-Regression approval needed
-Primitive implementation
-Catalog upload
-Behavior approval
-Card executability validation
-Deck integration
-Manual validation
-Awaiting manual acceptance
-Accepted
+You are implementing the <SET_CODE> full card corpus milestone for Hextech
+Simulator.
+
+Read and follow:
+- docs/full-card-ingestion/plan.md
+- docs/full-card-ingestion/tracking.md, if it exists
+- docs/riftbound_core_rules_reference.md
+- the <SET_CODE> source JSON in data/sets
+- the two user-provided decks in docs/full-ingestion-decks/<SET_CODE>/
+
+Do not search online for Riftbound rules or rulings.
+
+First, complete the input-readiness and corpus-analysis phases. Before changing
+runtime behavior, report:
+- primitive delta;
+- card coverage summary by gameplay identity;
+- corpus-wide token dependency inventory;
+- missing rules or token data;
+- regression-risking primitive extensions requiring user approval;
+- affected engine subsystems;
+- proposed implementation order; and
+- manual scenarios, including unique behavior outside the two decks.
+
+Then follow the existing flow:
+primitive discovery -> full set catalog intake -> reusable primitive support ->
+behavior approval -> 100% card/token executability -> permanent deck integration
+-> fresh manual full matches and BO3 -> user acceptance.
+
+Preserve the established server-authoritative, identity, match/game,
+sideboarding, projection-version, and old-match policies in this plan.
+
+Do not mark the milestone complete. End implementation handoff with:
+Status: Awaiting Manual Acceptance
+and state exactly what the user must validate.
 ```
-
-### 5.2 Primitive Behavior Ledger
-
-Track this first. It is the main resumability layer.
-
-| Primitive / mechanic | First seen in | Cards using it | Rule status | Runtime status | Tests | Manual scenario | Blocker |
-|---|---|---:|---|---|---|---|---|
-| Example: modifier.enter_ready | Existing | TBD | Covered | Executable | Existing/TBD | Play unit after effect | None |
-| TBD | OGS/OGN/SFD/UNL/VEN | TBD | TBD | TBD | TBD | TBD | TBD |
-
-Recommended primitive statuses:
-
-```text
-Existing executable
-Existing needs approved extension
-New primitive needed
-Rule blocked
-Regression approval needed
-Implemented pending validation
-Executable
-Rejected / not applicable
-```
-
-Rule status values:
-
-```text
-Covered by rules reference
-Covered by card text + Golden Rule
-Needs user ruling
-User ruling added to rules reference
-```
-
-### 5.3 Card Coverage Ledger
-
-Track this after primitive discovery. A card is complete only when every behavior
-clause is modeled and executable.
-
-| Set | Card code | Name | Type | Behavior clauses | Primitive coverage | Executable | In deck validation | Notes |
-|---|---|---|---|---:|---|---|---|---|
-| OGS | TBD | TBD | TBD | TBD | TBD | No | TBD | TBD |
-
-Recommended card statuses:
-
-```text
-Not reviewed
-Vanilla / no executable text needed
-Uses existing primitives
-Needs approved primitive extension
-Needs new primitive
-Rule blocked
-Missing required token data
-Modeled pending approval
-Approved executable
-Manual issue found
-Accepted
-```
-
-### 5.4 Token Coverage Ledger
-
-Track tokens separately when a milestone contains or references tokens.
-
-| Set | Token name | Source card(s) | Token data present | Behavior executable | Blocker | Notes |
-|---|---|---|---|---|---|---|
-| TBD | TBD | TBD | No | No | Missing data | TBD |
-
-A required token is complete only when:
-
-- token data exists in `data/sets` or has been provided by the user;
-- token identity is normalized;
-- token behavior is executable;
-- token placement count validation works for fixed and chosen destinations;
-- split placement across base and battlefields works when rules allow it;
-- continuous modifiers apply immediately to placed tokens;
-- enter-ready modifiers apply to tokens when the rules say the token is played;
-- tokens cease to exist when they would move to non-board zones;
-- token image/media projection works in hand, board, trash, dialogs, and
-  inspection surfaces;
-- cards that create or reference the token can resolve correctly.
-
-### 5.5 Deck Validation Ledger
-
-For each provided deck, track whether the deck can be selected, loaded, and used
-in full matches.
-
-| Set | Deck file | Deck ID | Catalog valid | Permanent selector exposure | Match loads | Full match completed | Issues found | Accepted |
-|---|---|---|---|---|---|---|---|---|
-| OGN | docs/full-ingestion-decks/OGN/TBD | TBD | No | No | No | No | TBD | No |
-
-Deck validation must include:
-
-- deck parsing;
-- domain identity;
-- champion pairing;
-- signature count;
-- copy limits;
-- required tokens or generated cards;
-- local selector exposure;
-- online selector exposure, if applicable;
-- complete-match manual validation.
-
-### 5.6 Primitive Regression Approval Ledger
-
-Track this whenever a primitive extension may affect already accepted behavior.
-
-| Primitive | Proposed change | Existing cards/decks affected | Regression risk | User approved? | Manual regression focus |
-|---|---|---|---|---|---|
-| TBD | TBD | TBD | TBD | No | TBD |
-
-Codex must not implement regression-risking primitive changes until the user
-approves them.
-
-### 5.7 Manual Match Acceptance Ledger
-
-Manual match testing is the final acceptance surface.
-
-| Milestone | Matchup | Scenario focus | Result | Issue link / note | Accepted by user |
-|---|---|---|---|---|---|
-| M1 | Garen vs Lux | Baseline interaction | Pending | TBD | No |
-| M1 | Garen vs Annie | Damage/removal interaction | Pending | TBD | No |
-| M1 | Garen vs Master Yi | Combat modifier interaction | Pending | TBD | No |
-
-Manual result statuses:
-
-```text
-Not run
-Passed
-Failed
-Needs retest
-Accepted
-```
-
-## 6. Milestone M0 - Operating Model and Tracking Baseline
-
-### Goal
-
-Prepare the project for resumable full-card ingestion before adding more cards.
-
-### Inputs
-
-- Current repository state.
-- Existing canonical cards.
-- Existing behavior definitions.
-- Existing rules reference.
-- Existing playable decks: Lux, Annie, Master Yi.
-- This plan.
-
-### Codex tasks
-
-1. Confirm the current card-catalog ingestion flow still works.
-2. Confirm the current behavior definition sync flow still works.
-3. Confirm existing playable decks still load in fresh matches after any baseline changes.
-4. Create or update tracking documents for:
-   - milestone status;
-   - primitive behavior coverage;
-   - card coverage;
-   - token coverage;
-   - deck validation;
-   - primitive regression approvals;
-   - manual match acceptance.
-5. Document the exact commands used for:
-   - catalog validation;
-   - behavior definition sync;
-   - typecheck;
-   - lint;
-   - build.
-6. Confirm that rules-text-focused behavior change detection remains the
-   behavior gate for this ingestion program.
-
-### Exit criteria
-
-- Tracking files exist or this plan is updated with active tracking sections.
-- Current decks load in fresh matches.
-- Codex can list existing executable primitives.
-- Codex confirms the current rules-text-focused behavior workflow remains in use.
-- User accepts the operating model.
-
-### Completion state
-
-```text
-M0 is complete only after user acceptance.
-```
-
-## 7. Milestone M1 - Garen Proving Grounds Deck Ingestion
-
-### Goal
-
-Ingest and validate the Garen Proving Grounds deck as the bridge between
-single-deck ingestion and full-set ingestion.
-
-This milestone is deck-scoped, not full Proving Grounds set-scoped.
-
-### Inputs
-
-- Garen Proving Grounds decklist.
-- Proving Grounds set JSON/card data from `data/sets` needed for that deck.
-- Existing Lux, Annie, and Master Yi cards/decks.
-- `docs/riftbound_core_rules_reference.md`.
-
-### Codex tasks
-
-1. Normalize the Garen deck fixture.
-2. Validate the deck construction rules.
-3. Compare Garen cards against the existing catalog through the current
-   rules-text-focused behavior workflow.
-4. Build a primitive delta for Garen cards.
-5. Identify rule blockers before implementation.
-6. Identify regression-risking primitive changes and request user approval before
-   implementation.
-7. Implement or extend reusable primitives.
-8. Upload the required Garen cards into the card catalog.
-9. Create and approve exact executable behavior models for all unique Garen deck cards.
-10. Validate every Garen deck card is executable.
-11. Expose the Garen deck as a permanent selectable deck in local and online selectors.
-12. Keep selectors data-driven where possible.
-13. Run minimal deterministic checks only when justified by section 4.4.
-14. Prepare manual validation scenarios.
-
-### Required primitive-first output
-
-Codex must produce a Garen primitive delta before implementing card behavior:
-
-| Primitive / mechanic | Existing? | Needs extension? | Cards affected | Rule status | Regression approval needed? | Blocker |
-|---|---|---|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Manual validation focus
-
-At minimum, manually validate:
-
-- Garen vs Lux;
-- Garen vs Annie;
-- Garen vs Master Yi;
-- Garen mirror, if useful after deck exposure;
-- Garen cards that introduce new or extended primitives;
-- interaction with combat, damage, modifiers, Chain, Focus/Priority, and scoring;
-- online room schema acceptance with Garen selected.
-
-### Exit criteria
-
-- Every unique Garen deck card is approved and executable.
-- Garen deck can be selected locally and online as a permanent deck option.
-- Full matches complete without unresolved behavior blockers.
-- User manually accepts the behavior.
-
-### Completion state
-
-```text
-M1 is complete only after user acceptance.
-```
-
-## 8. Milestone M2 - Origins Full Set Ingestion
-
-### Goal
-
-Ingest the complete Origins set and make every Origins card and required token
-executable.
-
-### Inputs
-
-- Full Origins JSON from `data/sets`.
-- Two user-provided Origins decklists under:
-
-```text
-docs/full-ingestion-decks/OGN/
-```
-
-- `docs/riftbound_core_rules_reference.md`.
-
-### Codex tasks
-
-1. Validate the full Origins JSON schema.
-2. Normalize all Origins card identities using the established variant-collapse policy.
-3. Build the Origins token inventory and block if required token data is missing.
-4. Build the Origins primitive inventory, grouped by reusable behavior and token
-   interaction instead of by card name.
-5. Classify primitives as existing, extension-needed, new, or rule-blocked.
-6. Identify high-risk integration paths from section 4.9 before implementation.
-7. Identify regression-risking primitive changes and request user approval before
-   implementation.
-8. Resolve all rule blockers through user-updated rules reference entries.
-9. Implement primitive behavior in reusable runtime handlers.
-10. Upload Origins into the card catalog.
-11. Model and approve executable behavior for every Origins card and required token.
-12. Validate full Origins card/token executability.
-13. Validate and expose the two Origins decks as permanent selectable decks.
-14. Prepare manual validation scenarios by primitive, token behavior, and deck.
-15. Run minimal deterministic checks only when justified by section 4.4.
-16. Wait for manual full-match acceptance.
-
-### Required primitive-first output
-
-| Primitive / mechanic | First Origins card | Total Origins cards | Runtime status | Rule status | Regression approval needed? | Manual scenario |
-|---|---|---:|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Required card coverage output
-
-| Origins card status | Count |
-|---|---:|
-| Total cards | TBD |
-| Required tokens | TBD |
-| Approved executable | TBD |
-| Uses existing primitives | TBD |
-| Needs approved primitive extension | TBD |
-| Needs new primitive | TBD |
-| Rule blocked | TBD |
-| Missing required token data | TBD |
-| Manual issue found | TBD |
-
-### Manual validation focus
-
-- Each provided Origins deck must complete full matches.
-- Each new Origins primitive should have at least one manual scenario, even if
-  that scenario is not naturally emphasized by the two decks.
-- Any card not represented by the two decks but introducing a unique primitive
-  must be explicitly called out in the manual validation notes.
-
-### BO3 and sideboarding risk mitigation
-
-- Validate at least one Origins BO3 match through game result, between-games
-  setup, sideboarding confirmation, next-game creation, and match completion.
-- During validation, inspect any unit that moves through attack, score, return
-  to base, defeat, recall, token creation, or board-leave cleanup and confirm
-  its projected `ownerPlayerId` and placement owner are explicit and correct.
-- Confirm Origins sideboarding keeps registered card-copy identity stable while
-  creating fresh game instances for the next game.
-- If the Origins decks include alternate Champion candidates, validate Chosen
-  Champion selection from both main-deck and sideboard sources. Confirm game 2
-  setup normalizes the active champion role correctly and rune validation still
-  uses the Champion Legend.
-- If a primitive changes projection shape, target legality, or object movement,
-  check that polling does not overwrite newer intent results with older or
-  equal game states.
-- Before manual acceptance, create a fresh online BO3 match after restarting the
-  dev server and verify projection GETs and ordinary `game.performAction`
-  intents do not regress into multi-second responses.
-- Inspect any latency regression for oversized game documents, repeated deck
-  snapshot reads, missing indexes, or unnecessary transactional intent handling
-  before changing polling cadence.
-- Persist Origins validation decks as new selectable decks. Do not overwrite
-  existing user-facing decks when adding sideboard or full-ingestion variants.
-
-### Exit criteria
-
-- Every Origins card and required token is approved and executable.
-- Both Origins decks are valid and permanently selectable.
-- Section 4.10 performance and persistence baseline has no unresolved blocker.
-- Manual full matches are accepted by the user.
-- No unresolved Origins primitive blocker remains.
-
-### Completion state
-
-```text
-M2 is complete only after user acceptance.
-```
-
-## 9. Milestone M3 - Spiritforged Full Set Ingestion
-
-### Goal
-
-Ingest the complete Spiritforged set and make every Spiritforged card and
-required token executable.
-
-### Inputs
-
-- Full Spiritforged JSON from `data/sets`.
-- Two user-provided Spiritforged decklists under:
-
-```text
-docs/full-ingestion-decks/SFD/
-```
-
-- `docs/riftbound_core_rules_reference.md`.
-
-### Codex tasks
-
-1. Validate the full Spiritforged JSON schema.
-2. Normalize all Spiritforged card identities using the established variant-collapse policy.
-3. Detect required tokens and block if token data is missing.
-4. Build the Spiritforged primitive inventory.
-5. Compare Spiritforged primitives against existing OGS/OGN primitive coverage.
-6. Identify mechanics that require new runtime state, new selectors, new pending
-   choices, or new replacement/continuous-effect logic.
-7. Identify regression-risking primitive changes and request user approval before
-   implementation.
-8. Stop for user rulings whenever rules are missing or unclear.
-9. Implement reusable primitive behavior.
-10. Upload Spiritforged into the card catalog.
-11. Model and approve executable behavior for every Spiritforged card and required token.
-12. Validate full Spiritforged card/token executability.
-13. Validate and expose the two Spiritforged decks as permanent selectable decks.
-14. Prepare manual validation scenarios by primitive and by deck.
-15. Run minimal deterministic checks only when justified by section 4.4.
-16. Wait for manual full-match acceptance.
-
-### Required primitive-first output
-
-| Primitive / mechanic | First Spiritforged card | Total Spiritforged cards | Runtime status | Rule status | Regression approval needed? | Manual scenario |
-|---|---|---:|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Required card coverage output
-
-| Spiritforged card status | Count |
-|---|---:|
-| Total cards | TBD |
-| Required tokens | TBD |
-| Approved executable | TBD |
-| Uses existing primitives | TBD |
-| Needs approved primitive extension | TBD |
-| Needs new primitive | TBD |
-| Rule blocked | TBD |
-| Missing required token data | TBD |
-| Manual issue found | TBD |
-
-### Manual validation focus
-
-- Both Spiritforged decks must complete full matches.
-- Any new equipment, attachment, cost-modification, replacement, repeat,
-  temporary, token, or continuous-effect behavior must be validated through
-  manual scenarios when present in the set data.
-- Codex must not infer missing equipment or attachment rules from outside
-  sources.
-
-### BO3 and sideboarding risk mitigation
-
-- Recheck Origins-era BO3 assumptions before implementing new Spiritforged
-  mechanics: stable `registeredCardId`, opaque runtime `instanceId`, explicit
-  owner fields, and current deck configuration as the sideboarding source of
-  truth.
-- If Spiritforged introduces attachments, equipment, replacement effects, or
-  persistent modifiers, validate that those effects survive only the intended
-  game scope and do not leak into later BO3 games.
-- Confirm game 2 and game 3 setup rebuilds runtime objects from the active
-  sideboarded configuration and not from stale deck snapshots.
-- Validate any new selector or pending-choice path with a stale/changed
-  `betweenGames.id` or game-state version treated as a refresh/blocker, not a
-  silent acceptance.
-- Re-run the section 4.10 performance baseline because Spiritforged adds to the
-  existing OGS and OGN catalog size. Investigate deck snapshot cache misses,
-  game document growth, and missing indexes before manual validation.
-- If Spiritforged data requires canonical-name corrections, preserve alias or
-  migration-safe lookup behavior so existing persisted decks continue to parse.
-
-### Exit criteria
-
-- Every Spiritforged card and required token is approved and executable.
-- Both Spiritforged decks are valid and permanently selectable.
-- Section 4.10 performance and persistence baseline has no unresolved blocker.
-- Manual full matches are accepted by the user.
-- No unresolved Spiritforged primitive blocker remains.
-
-### Completion state
-
-```text
-M3 is complete only after user acceptance.
-```
-
-## 10. Milestone M4 - Unleashed Full Set Ingestion
-
-### Goal
-
-Ingest the complete Unleashed set and make every Unleashed card and required
-token executable.
-
-### Inputs
-
-- Full Unleashed JSON from `data/sets`.
-- Two user-provided Unleashed decklists under:
-
-```text
-docs/full-ingestion-decks/UNL/
-```
-
-- `docs/riftbound_core_rules_reference.md`.
-
-### Codex tasks
-
-1. Validate the full Unleashed JSON schema.
-2. Normalize all Unleashed card identities using the established variant-collapse policy.
-3. Detect required tokens and block if token data is missing.
-4. Build the Unleashed primitive inventory.
-5. Compare Unleashed primitives against existing OGS/OGN/SFD primitive coverage.
-6. Identify new or extended primitives.
-7. Identify regression-risking primitive changes and request user approval before
-   implementation.
-8. Stop for user rulings whenever rules are missing or unclear.
-9. Implement reusable primitive behavior.
-10. Upload Unleashed into the card catalog.
-11. Model and approve executable behavior for every Unleashed card and required token.
-12. Validate full Unleashed card/token executability.
-13. Validate and expose the two Unleashed decks as permanent selectable decks.
-14. Prepare manual validation scenarios by primitive and by deck.
-15. Run minimal deterministic checks only when justified by section 4.4.
-16. Wait for manual full-match acceptance.
-
-### Required primitive-first output
-
-| Primitive / mechanic | First Unleashed card | Total Unleashed cards | Runtime status | Rule status | Regression approval needed? | Manual scenario |
-|---|---|---:|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Required card coverage output
-
-| Unleashed card status | Count |
-|---|---:|
-| Total cards | TBD |
-| Required tokens | TBD |
-| Approved executable | TBD |
-| Uses existing primitives | TBD |
-| Needs approved primitive extension | TBD |
-| Needs new primitive | TBD |
-| Rule blocked | TBD |
-| Missing required token data | TBD |
-| Manual issue found | TBD |
-
-### Manual validation focus
-
-- Both Unleashed decks must complete full matches.
-- Primitive reuse should be checked carefully because this milestone comes after
-  multiple sets and may reveal earlier primitive assumptions that were too
-  narrow.
-- Any primitive extension with regression potential must be approved by the user
-  before implementation and must include a focused manual regression note for
-  affected earlier decks.
-
-### BO3 and sideboarding risk mitigation
-
-- Treat this milestone as a cross-set regression check for BO3 because reused
-  primitives may now affect OGS, OGN, and SFD decks.
-- For every approved primitive extension, record whether it can affect
-  sideboarding, game setup, card movement, token placement, projection merging,
-  or match lifecycle transitions.
-- Run at least one manual BO3 path that includes sideboarding after game 1 and
-  verifies no match-complete polling continues after the final result.
-- If Unleashed changes any shared movement or ownership primitive, manually
-  verify attackers, scoring units, defenders, returned units, tokens, and
-  attachments remain on the correct player's side across projection updates.
-- Re-run the section 4.10 performance baseline against fresh online matches
-  because the cumulative catalog and validation deck set is larger by this
-  milestone.
-- For every new generated card, token, or copy-producing behavior, confirm only
-  runtime-created objects enter created-card state and active deck cards remain
-  represented by registered card-copy identity plus fresh per-game instances.
-
-### Exit criteria
-
-- Every Unleashed card and required token is approved and executable.
-- Both Unleashed decks are valid and permanently selectable.
-- User-approved regression-risking primitive changes have focused validation notes.
-- Section 4.10 performance and persistence baseline has no unresolved blocker.
-- Manual full matches are accepted by the user.
-- No unresolved Unleashed primitive blocker remains.
-
-### Completion state
-
-```text
-M4 is complete only after user acceptance.
-```
-
-## 11. Milestone M5 - Vendetta Full Set Ingestion
-
-### Goal
-
-Ingest the complete Vendetta set and make every Vendetta card and required token
-executable after final card data is available.
-
-This milestone must not begin from prerelease or unstable Vendetta data.
-
-### Inputs
-
-- Final Vendetta JSON from `data/sets`, when available.
-- Two user-provided Vendetta decklists under:
-
-```text
-docs/full-ingestion-decks/VEN/
-```
-
-- `docs/riftbound_core_rules_reference.md`.
-
-### Codex tasks
-
-1. Confirm the final Vendetta JSON exists in `data/sets`.
-2. Validate the full Vendetta JSON schema.
-3. Normalize all Vendetta card identities using the established variant-collapse policy.
-4. Detect required tokens and block if token data is missing.
-5. Build the Vendetta primitive inventory.
-6. Compare Vendetta primitives against existing OGS/OGN/SFD/UNL primitive coverage.
-7. Identify new or extended primitives.
-8. Identify regression-risking primitive changes and request user approval before
-   implementation.
-9. Stop for user rulings whenever rules are missing or unclear.
-10. Implement reusable primitive behavior.
-11. Upload Vendetta into the card catalog.
-12. Model and approve executable behavior for every Vendetta card and required token.
-13. Validate full Vendetta card/token executability.
-14. Validate and expose the two Vendetta decks as permanent selectable decks.
-15. Prepare manual validation scenarios by primitive and by deck.
-16. Run minimal deterministic checks only when justified by section 4.4.
-17. Wait for manual full-match acceptance.
-
-### Required primitive-first output
-
-| Primitive / mechanic | First Vendetta card | Total Vendetta cards | Runtime status | Rule status | Regression approval needed? | Manual scenario |
-|---|---|---:|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-### Required card coverage output
-
-| Vendetta card status | Count |
-|---|---:|
-| Total cards | TBD |
-| Required tokens | TBD |
-| Approved executable | TBD |
-| Uses existing primitives | TBD |
-| Needs approved primitive extension | TBD |
-| Needs new primitive | TBD |
-| Rule blocked | TBD |
-| Missing required token data | TBD |
-| Manual issue found | TBD |
-
-### Manual validation focus
-
-- Both Vendetta decks must complete full matches.
-- Because this milestone uses only final JSON, unclear text or missing tokens are
-  blockers that require user input through the normal rule/token process.
-- No online rulings, prerelease assumptions, or unreleased-source assumptions are allowed.
-
-### BO3 and sideboarding risk mitigation
-
-- Before implementation, compare Vendetta primitive needs against all previously
-  accepted BO3, sideboarding, projection, identity, and polling constraints.
-- Any Vendetta primitive that changes shared identity, deck configuration,
-  movement, replacement, trigger, or token behavior must include a focused
-  regression note for earlier accepted decks.
-- Validate final Vendetta decks through a complete BO3 match, including game
-  result acknowledgement, between-games setup, game 2 or game 3 creation, and
-  match-complete polling shutdown.
-- Re-run the section 4.10 performance baseline after final Vendetta data is
-  uploaded. Treat new multi-second projection or intent responses as blockers,
-  not as normal cost of full catalog size.
-- Confirm final Vendetta ingestion does not require overwriting previously
-  accepted validation decks or changing old-match compatibility policy.
-- Do not relax the final-data policy to work around BO3 issues. Missing rules,
-  missing tokens, or ambiguous final text remain blockers.
-
-### Exit criteria
-
-- Every Vendetta card and required token is approved and executable.
-- Both Vendetta decks are valid and permanently selectable.
-- User-approved regression-risking primitive changes have focused validation notes.
-- Section 4.10 performance and persistence baseline has no unresolved blocker.
-- Manual full matches are accepted by the user.
-- No unresolved Vendetta primitive blocker remains.
-
-### Completion state
-
-```text
-M5 is complete only after user acceptance.
-```
-
-## 12. Per-Milestone Codex Prompt Template
-
-Use this template when assigning one milestone to Codex.
-
-```text
-You are working on Hextech Simulator card ingestion.
-
-Active milestone:
-<MILESTONE NAME>
-
-Rules authority and source data:
-Use only docs/riftbound_core_rules_reference.md and the card text from set JSON files in data/sets.
-Do not search online. If a rule is missing or unclear, stop and ask for a user
-ruling. The user will update docs/riftbound_core_rules_reference.md before you
-continue.
-
-Main objective:
-Make every card and required token in the milestone scope executable, then
-validate the provided decks through manual gameplay. Do not mark the milestone
-complete until the user manually accepts full-match behavior.
-
-Tracking priority:
-1. Primitive behavior coverage.
-2. Card coverage.
-3. Token coverage, when tokens are present or referenced.
-4. Deck validation.
-5. Manual match acceptance.
-
-Required first output before implementation:
-- Primitive delta table.
-- Card coverage summary.
-- Token coverage summary, when applicable.
-- Rule blockers.
-- Regression-risking primitive changes that need user approval.
-- Proposed implementation order.
-- Integration risk checklist entries from section 4.9 that apply to this
-  milestone.
-- Performance and persistence baseline checks from section 4.10.
-- BO3, sideboarding, projection, and polling risk mitigations that apply to this
-  milestone.
-- Manual validation scenarios.
-
-Implementation constraints:
-- Implement reusable primitives, not card-name-specific runtime branches.
-- Keep gameplay rules server-authoritative.
-- Keep imported but unsupported cards out of gameplay-ready state.
-- Block milestone completion until every scoped card and required token is executable.
-- Collapse gameplay-equivalent variants into one gameplay definition.
-- Treat missing required token data as a blocker.
-- Preserve rules-text-focused behavior change detection.
-- Do not add metadata drift or backward-compatibility work unless explicitly requested.
-- Do not wipe the database; the user handles cleanup manually.
-- Do not overwrite existing persisted decks when adding validation decks.
-- Preserve canonical-name alias or migration-safe lookup behavior when set JSON
-  names are corrected.
-- Treat runtime card instance IDs as opaque and per-game. Use registered card
-  identity and explicit owner/placement fields instead of parsing ID strings.
-- Keep sideboarding based on current deck configuration and active
-  `betweenGames.id`.
-- Validate rune/domain identity against the Champion Legend, not the mutable
-  Chosen Champion.
-- Keep active deck cards out of `game.state.createdCardInstances`; reserve that
-  state for generated cards and tokens.
-- Avoid parallel database operations inside Mongo transactions.
-- Avoid unnecessary match-level transactions for ordinary `game.performAction`
-  intents.
-- Preserve stale projection rejection, intent/polling ordering protections, and
-  match-complete polling shutdown.
-- Restart the dev server before online validation after socket server, match
-  service, persistence, or backend runtime changes.
-- Ask for user approval before implementing primitive changes with regression potential.
-- Prefer zero new tests during ingestion defect loops.
-- Add a deterministic test only when section 4.4 clearly justifies the cost.
-- Do not add broad gameplay integration tests as proof of correctness.
-- Use fresh matches for manual validation after catalog/runtime changes.
-
-Expected final output:
-- Updated primitive ledger.
-- Updated card coverage ledger.
-- Updated token coverage ledger, when applicable.
-- Updated deck validation ledger.
-- Known manual test scenarios.
-- Remaining blockers, if any.
-- Clear status: Awaiting Manual Acceptance, not Complete.
-```
-
-## 13. Manual Validation Template
-
-Use this template after Codex finishes implementation for a milestone.
-
-```text
-Milestone:
-Decks tested:
-Matchups tested:
-Date:
-Tester:
-
-Manual defect evidence, when applicable:
-- Match ID:
-- Game number:
-- Match state version:
-- Game state version:
-- Active betweenGames ID, if applicable:
-- Viewer/player:
-- Endpoint:
-- Request payload:
-- Response:
-- Expected behavior:
-- Actual behavior:
-
-Performance and persistence sanity:
-- Projection GET latency acceptable? Yes/No
-- Ordinary action intent latency acceptable? Yes/No
-- Game document size acceptable? Yes/No
-- Created-card state contains only generated cards/tokens? Yes/No
-- Deck snapshot/cache/index issue suspected? Yes/No
-- Dev server restarted after backend runtime changes? Yes/No
-
-Primitive behaviors intentionally exercised:
-- [ ] Primitive/mechanic:
-      Cards involved:
-      Scenario:
-      Result:
-
-Full match results:
-- [ ] Matchup:
-      Completed? Yes/No
-      BO3 path checked? Yes/No
-      Winner:
-      Issues:
-      Retest required? Yes/No
-
-Card-specific issues:
-- Card:
-  Expected behavior:
-  Actual behavior:
-  Rule reference:
-  Decision needed? Yes/No
-
-Regression-risking primitive changes validated:
-- Primitive:
-  Earlier cards/decks checked:
-  Result:
-
-Acceptance decision:
-- [ ] Accepted
-- [ ] Needs fixes
-- [ ] Blocked by missing rule
-- [ ] Blocked by missing token data
-
-User notes:
-```
-
-## 14. Recommended Implementation Order Inside Each Milestone
-
-Use this order to keep the work resumable.
-
-1. Input validation.
-2. Identity normalization using the established variant-collapse policy.
-3. Token coverage check.
-4. Primitive discovery.
-5. Rule blocker report.
-6. Regression-risking primitive change report and user approval, if needed.
-7. Integration risk report from section 4.9.
-8. Performance and persistence baseline plan from section 4.10.
-9. Primitive implementation plan.
-10. Primitive implementation.
-11. Minimal deterministic checks only when justified by section 4.4.
-12. Catalog upload.
-13. Card behavior modeling and approval.
-14. Full card/token executability report.
-15. Deck fixture validation.
-16. Permanent deck selector exposure.
-17. Manual scenario checklist.
-18. User manual validation.
-19. Fixes and retests, if needed.
-20. User acceptance.
-21. Commit accepted milestone changes.
-
-## 15. Stop Conditions
-
-Codex must stop instead of continuing when any of these happens:
-
-- A required rule is missing from `docs/riftbound_core_rules_reference.md`.
-- A card can be interpreted in multiple valid ways from current rules/card text.
-- A primitive would require changing the public action/intent contract.
-- A required token is missing from the set data.
-- A full-set milestone has any non-executable card or required token remaining.
-- A manual validation failure contradicts Codex's expected behavior.
-- A primitive extension has regression potential and has not been approved by the user.
-- Vendetta final JSON is not available in `data/sets`.
-
-## 16. Done Means Accepted
-
-For this ingestion program, the final status is not technical completion.
-
-The only valid final status for a milestone is:
-
-```text
-Accepted by user after manual full-match validation.
-```
-
-Everything before that is an implementation checkpoint.
-
-After acceptance, Codex must commit the accepted milestone changes before moving
-to the next milestone.
