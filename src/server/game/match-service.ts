@@ -419,7 +419,7 @@ async function performGameAction(
         ? setupActions(game, seat.playerId)
         : gameplayActions(game, seat.playerId, decks)
     ).find((action) => action.id === actionId);
-    const deckRuntime = runtimeDecksForGame(decks, game);
+    const deckRuntime = runtimeDecksForGame(decks, game, match);
     const transition = isSetupPending
       ? null
       : performGameplayTransition({
@@ -1265,24 +1265,36 @@ async function runInTransaction<T>(
 function runtimeDecksForGame(
   decks: readonly DeckSnapshotDocument[],
   game: GameDocument,
+  match: MatchDocument,
 ): Record<string, DeckRuntimeSnapshot> {
   return Object.fromEntries(
-    decks.map((deck) => [
-      deck.playerId,
-      {
-        template: deck.snapshot,
-        instances: [
-          ...deck.instances.filter(
-            (instance) =>
-              instance.ownerPlayerId === deck.playerId &&
-              Boolean(game.state.cardStates[instance.instanceId]),
-          ),
-          ...(game.state.createdCardInstances ?? []).filter(
-            (instance) => instance.ownerPlayerId === deck.playerId,
-          ),
-        ],
-      },
-    ]),
+    decks.map((deck) => {
+      const seat = match.seats.find((item) => item.playerId === deck.playerId);
+      const chosenChampionRegisteredCardId =
+        seat?.currentDeckConfiguration.chosenChampionRegisteredCardId;
+      return [
+        deck.playerId,
+        {
+          template: deck.snapshot,
+          instances: [
+            ...deck.instances
+              .filter(
+                (instance) =>
+                  instance.ownerPlayerId === deck.playerId &&
+                  Boolean(game.state.cardStates[instance.instanceId]),
+              )
+              .map((instance) =>
+                instance.registeredCardId === chosenChampionRegisteredCardId
+                  ? { ...instance, source: "champion" as const }
+                  : instance,
+              ),
+            ...(game.state.createdCardInstances ?? []).filter(
+              (instance) => instance.ownerPlayerId === deck.playerId,
+            ),
+          ],
+        },
+      ] as const;
+    }),
   );
 }
 

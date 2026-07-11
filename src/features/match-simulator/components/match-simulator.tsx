@@ -893,16 +893,12 @@ function ViewerControls({
           </Button>
         </>
       )}
-      <span className="text-slate-400">Match {shortMatchId(matchId)}</span>
+      <span className="text-slate-400">Match {matchId}</span>
       <span className="text-slate-400">
         Game {gameNumber} - G{gameState} / M{matchState}
       </span>
     </div>
   );
-}
-
-function shortMatchId(matchId: string) {
-  return matchId.length > 8 ? `${matchId.slice(0, 8)}...` : matchId;
 }
 
 function SetupWaitingOverlay({ detail }: { detail: string }) {
