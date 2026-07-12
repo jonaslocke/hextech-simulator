@@ -61,7 +61,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
+    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
     "keyword.temporary",
   ]) handlers.set(id, passive);
   handlers.set("choice.optional", {
@@ -108,6 +108,13 @@ export function createPrimitiveHandlers(
           battlefield.units.includes(context.sourceCardInstanceId),
       );
     },
+  });
+  handlers.set("trigger.second_card_played", {
+    matches: (_binding, context) =>
+      context.event?.type === "card.played" &&
+      context.event.actorPlayerId === context.controllerPlayerId &&
+      (context.game.state.players[context.controllerPlayerId]
+        ?.playedMainDeckCardIdsThisTurn.length ?? 0) === 2,
   });
   handlers.set("trigger.conquer", {
     matches: (_binding, context) =>
@@ -849,7 +856,7 @@ export function effectiveEnergyCost(
   definition: GameCardDefinition,
   index?: RuntimeCardIndex,
 ): number {
-  return effectiveNumericValue({
+  const baseCost = effectiveNumericValue({
     attribute: "energyCost",
     baseValue: definition.card.attributes.energy ?? 0,
     cardType: definition.card.classification.type,
@@ -858,6 +865,31 @@ export function effectiveEnergyCost(
     index,
     targetScope: "controller_spell",
   });
+  const hasPriorMainDeckCard =
+    (game.state.players[controllerPlayerId]?.playedMainDeckCardIdsThisTurn
+      ?.length ?? 0) > 0;
+  const legionDiscount = hasPriorMainDeckCard
+    ? definition.behaviorModel.clauses
+        .filter((clause) =>
+          clause.keywords.some(
+            (binding) => binding.behaviorId === "keyword.legion",
+          ),
+        )
+        .flatMap((clause) => clause.effects)
+        .filter(
+          (binding) =>
+            binding.behaviorId === "modifier.legion_energy_discount",
+        )
+        .reduce(
+          (total, binding) =>
+            total +
+            (typeof binding.parameters.amount === "number"
+              ? binding.parameters.amount
+              : 0),
+          0,
+        )
+    : 0;
+  return Math.max(0, baseCost - legionDiscount);
 }
 
 export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {

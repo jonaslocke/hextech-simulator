@@ -449,6 +449,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     listensToEvents: ["unit.died"],
     engineSupport: supported("Own-death triggers are queued after the unit leaves play.")
   }),
+  "trigger.second_card_played": primitiveSeed({
+    id: "trigger.second_card_played",
+    family: "trigger",
+    name: "Second card played trigger",
+    description: "Creates an effect when its controller plays their second Main Deck card in a turn.",
+    listensToEvents: ["card.played"],
+    engineSupport: supported("The shared turn state records Main Deck cards played by each controller."),
+  }),
   "keyword.accelerate": primitiveSeed({
     id: "keyword.accelerate",
     family: "keyword",
@@ -969,6 +977,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("destination", "string", "The additional destination kind.", ["openBattlefield"])
     ],
     engineSupport: requiresEngineSupport("Unit destination permissions require a generalized legality policy.")
+  }),
+  "modifier.legion_energy_discount": primitiveSeed({
+    id: "modifier.legion_energy_discount",
+    family: "modifier",
+    name: "Legion Energy discount",
+    description: "Reduces this card's Energy cost while its Legion condition is satisfied.",
+    parameters: [required("amount", "number", "The Energy reduction.")],
+    engineSupport: supported("The card-play cost evaluator applies the discount before payment."),
   }),
   "condition.if": primitiveSeed({
     id: "condition.if",

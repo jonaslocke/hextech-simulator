@@ -69,6 +69,13 @@ const MODELS: Record<string, { sourceText: string; assignments: Assignment[] }> 
       { family: "action", primitiveId: "action.draw_cards", parameters: { player: "controller", count: 1 } },
     ],
   },
+  "OGN-012": {
+    sourceText: "[Legion] — I cost :rb_energy_2: less. (Get the effect if you've played another card this turn.)",
+    assignments: [
+      { family: "keyword", primitiveId: "keyword.legion", parameters: {} },
+      { family: "modifier", primitiveId: "modifier.legion_energy_discount", parameters: { amount: 2 } },
+    ],
+  },
 };
 
 const client = await getMongoClient();

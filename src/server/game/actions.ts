@@ -724,7 +724,6 @@ function playCard(
   const energyCost =
     (ignoreBaseCost ? 0 : effectiveEnergyCost(game, playerId, definition, index)) +
     (accelerated ? 1 : 0);
-  recordLegionStatus(game, playerId, cardId, index);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -753,6 +752,7 @@ function playCard(
     targetDeflectCost(playerId, selectedIds, index),
     accelerated ? 1 : 0,
   );
+  recordLegionStatus(game, playerId, cardId, index);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
