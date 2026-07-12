@@ -69,9 +69,28 @@ function collectBehaviorEventItems(
         handlers,
       });
       if (items.length > 0) {
+        const existing = byController.get(controllerPlayerId) ?? [];
+        const uniqueItems = items.filter((item) => {
+          const clause = sources
+            .find(
+              (source) =>
+                source.sourceCardInstanceId === item.sourceCardInstanceId,
+            )
+            ?.model.clauses.find(
+              (candidate) => candidate.id === item.behaviorClauseId,
+            );
+          const dedupeForBattlefieldDefend = clause?.triggers.some(
+            (trigger) =>
+              trigger.behaviorId === "trigger.defend_at_source_battlefield",
+          );
+          return (
+            !dedupeForBattlefieldDefend ||
+            !existing.some((candidate) => candidate.id === item.id)
+          );
+        });
         byController.set(controllerPlayerId, [
-          ...(byController.get(controllerPlayerId) ?? []),
-          ...items,
+          ...existing,
+          ...uniqueItems,
         ]);
       }
     }
@@ -259,6 +278,7 @@ function appendChainItem(game: GameDocument, item: ChainItem) {
       [...game.state.setup.playerIds],
     priorityPlayerId: item.controllerPlayerId,
     passedPlayerIds: [],
+    resumeFocusPlayerId: game.state.showdown?.focusPlayerId ?? null,
   };
   chain.items.push(item);
   chain.priorityPlayerId = item.controllerPlayerId;

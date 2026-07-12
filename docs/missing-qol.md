@@ -50,3 +50,4 @@
 [ ] better between games screen
 [x] better game header
 [ ] concede in between games more dificult
+[ ] The Candlelit Sanctum - reorder + recycle better xp

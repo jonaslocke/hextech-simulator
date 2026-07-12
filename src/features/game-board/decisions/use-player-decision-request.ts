@@ -82,6 +82,28 @@ export function buildPlayerDecisionRequest({
       );
 
       if (action && pendingChoice.presentation === "vision") {
+        if (pendingChoice.minimum === pendingChoice.maximum && pendingChoice.minimum > 1) {
+          return {
+            actionId: action.id,
+            confirmLabel: "Set top-deck order",
+            decisionKey: createDecisionKey({
+              actorPlayerId: pendingChoice.playerId,
+              decisionId: pendingChoice.id,
+              kind: "topDeckOrder",
+              maximum: pendingChoice.maximum,
+              minimum: pendingChoice.minimum,
+              selectableIds: pendingChoice.revealedCards.map(
+                (card) => card.instanceId,
+              ),
+              source: pendingChoice.presentation,
+            }),
+            description: "Use Up and Down to set the top-to-bottom order.",
+            inspection: "publicGameState",
+            kind: "orderedDecision",
+            options: pendingChoice.revealedCards.map(toDecisionCard),
+            title: "Order cards on top",
+          };
+        }
         return {
           actionId: action.id,
           cards: pendingChoice.revealedCards.map(toDecisionCard),

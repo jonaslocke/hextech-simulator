@@ -170,7 +170,7 @@ const MODELS: Record<string, Model> = {
         sourceText: "At the start of your Beginning Phase, recycle 3 from your trash.",
         assignments: [
           { family: "trigger", primitiveId: "trigger.beginning", parameters: { player: "controller" } },
-          { family: "selector", primitiveId: "selector.card", parameters: { zone: "trash", cardType: "any", owner: "controller", minimumCount: 0, maximumCount: 3 } },
+          { family: "selector", primitiveId: "selector.card", parameters: { zone: "trash", cardType: "any", owner: "controller", minimumCount: 0, maximumCount: 3, requireMaximumAvailable: true } },
           { family: "action", primitiveId: "action.recycle_cards", parameters: { target: "card", count: 3 } },
         ],
       },
@@ -214,9 +214,9 @@ const MODELS: Record<string, Model> = {
     sourceText: "When you conquer here, look at the top two cards of your Main Deck. You may recycle one or both of them. Put those you don't back in any order.",
     assignments: [
       { family: "trigger", primitiveId: "trigger.conquer_battlefield", parameters: {} },
-      { family: "action", primitiveId: "action.look", parameters: { count: 2 } },
-      { family: "action", primitiveId: "action.recycle_top_cards", parameters: { count: 2 } },
-      { family: "action", primitiveId: "action.order_top_cards", parameters: { count: 2 } },
+      { family: "action", primitiveId: "action.look", parameters: { count: 2, selectionKey: "lookedCards" } },
+      { family: "action", primitiveId: "action.recycle_top_cards", parameters: { count: 2, sourceSelectionKey: "lookedCards", selectionKey: "recycledCards" } },
+      { family: "action", primitiveId: "action.order_top_cards", parameters: { count: 2, sourceSelectionKey: "lookedCards", recycledSelectionKey: "recycledCards" } },
     ],
   },
 };

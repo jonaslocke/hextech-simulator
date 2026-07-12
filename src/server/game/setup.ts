@@ -1,5 +1,6 @@
 import type { ProjectedAction } from "../../shared/game";
 import { createHash } from "node:crypto";
+import type { DeckSnapshotDocument } from "./repositories";
 import type { DeckRuntimeSnapshot, GameDocument } from "./state";
 import { applyStartOfTurn } from "./turns";
 
@@ -60,12 +61,30 @@ export function performSetupAction(input: {
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
       game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken" };
-      applyStartOfTurn(game);
+      applyStartOfTurn(game, runtimeDeckDocuments(game, input.decksByPlayerId));
     }
   }
   game.stateVersion += 1;
   game.updatedAt = input.now;
   return game;
+}
+
+function runtimeDeckDocuments(
+  game: GameDocument,
+  decksByPlayerId: Record<string, DeckRuntimeSnapshot>,
+): DeckSnapshotDocument[] {
+  return game.state.setup.playerIds.map((playerId) => {
+    const deck = decksByPlayerId[playerId]!;
+    return {
+      id: `${game.id}:setup:${playerId}`,
+      createdAt: game.createdAt,
+      updatedAt: game.updatedAt,
+      matchId: game.matchId,
+      playerId,
+      snapshot: deck.template,
+      instances: deck.instances,
+    };
+  });
 }
 
 export function isSetupActionId(actionId: string): boolean {

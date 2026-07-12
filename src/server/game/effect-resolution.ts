@@ -254,6 +254,14 @@ export function resumeEffectResolution(
         context.selectedBySelector[selector.parameters.selectionKey] = selected;
       }
     }
+    for (const effect of clause.orderedEffects) {
+      const selectionKey = effect.parameters.selectionKey;
+      if (typeof selectionKey !== "string") continue;
+      context.selectedBySelector[selectionKey] =
+        frame.selectionsByBinding[
+          `${clause.id}:effects:${effect.order}`
+        ] ?? [];
+    }
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
@@ -299,6 +307,17 @@ export function resumeEffectResolution(
         maximum: requirement.maximum,
       };
       return false;
+    }
+    if (
+      binding.behaviorId === "action.look" &&
+      typeof binding.parameters.selectionKey === "string"
+    ) {
+      const count = typeof binding.parameters.count === "number"
+        ? binding.parameters.count
+        : 1;
+      frame.selectionsByBinding[bindingKey] = game.state.players[
+        frame.controllerPlayerId
+      ]!.zones.mainDeck.slice(0, Math.max(0, count));
     }
     handler.execute(binding, context);
     frame.nextEffectIndex += 1;

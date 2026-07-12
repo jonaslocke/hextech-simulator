@@ -5,17 +5,29 @@ import {
   createBehaviorContext,
   executeBehaviorClause,
 } from "../src/server/game/behavior-runtime";
-import { beginEffectResolution } from "../src/server/game/effect-resolution";
+import {
+  beginEffectResolution,
+  submitEffectSelection,
+} from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   cleanupTurnModifiers,
+  effectiveEnergyCost,
   moveUnitToTrash,
   recomputeMight,
 } from "../src/server/game/primitive-handlers";
 import { getTokenCatalogDefinition } from "../src/server/game/token-catalog";
-import { gameplayActions, performGameplayAction } from "../src/server/game";
-import { dispatchBehaviorEvent } from "../src/server/game/triggers";
+import {
+  applyStartOfTurn,
+  gameplayActions,
+  performGameplayAction,
+  startCombat,
+} from "../src/server/game";
+import {
+  dispatchBehaviorEvent,
+  dispatchSimultaneousBehaviorEvents,
+} from "../src/server/game/triggers";
 import { clearStunned } from "../src/server/game/board-rules";
 import { buildPaymentPlan, payCardCost } from "../src/server/game/payment";
 import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
@@ -790,6 +802,398 @@ test("battlefield defend triggers can optionally move a friendly defender to bas
   assert.deepEqual(game.state.players.p1!.zones.base, ["defender"]);
 });
 
+test("a battlefield defend trigger is queued once for multiple defenders", () => {
+  const reaversRow = battlefield("REAVERS_ROW", "Reaver's Row");
+  reaversRow.behaviorModel.clauses = [
+    clause("defend-here", {
+      triggers: [binding("trigger.defend_at_source_battlefield", 0)],
+      effects: [binding("action.draw_cards", 1, { player: "controller", count: 0 })],
+    }),
+  ];
+  const { game, decks } = fixture([
+    reaversRow,
+    unit("DEFENDER_A", "Defender A"),
+    unit("DEFENDER_B", "Defender B"),
+  ]);
+  decks[0]!.instances.push(
+    instance("reavers-row", "p1", "REAVERS_ROW", "battlefield"),
+    instance("defender-a", "p1", "DEFENDER_A"),
+    instance("defender-b", "p1", "DEFENDER_B"),
+  );
+  game.state.cardStates["reavers-row"] = cardState(null);
+  game.state.cardStates["defender-a"] = cardState(1);
+  game.state.cardStates["defender-b"] = cardState(1);
+  game.state.battlefields.push({
+    battlefieldId: "row",
+    cardInstanceId: "reavers-row",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["defender-a", "defender-b"],
+  });
+
+  dispatchSimultaneousBehaviorEvents(game, [
+    {
+      type: "unit.defends",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "defender-a",
+      values: { battlefieldId: "row" },
+    },
+    {
+      type: "unit.defends",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "defender-b",
+      values: { battlefieldId: "row" },
+    },
+  ], decks);
+
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "reavers-row");
+});
+
+test("a defender's battlefield trigger restores focus to the attacker", () => {
+  const reaversRow = battlefield("REAVERS_ROW", "Reaver's Row");
+  reaversRow.behaviorModel.clauses = [
+    clause("defend-here", {
+      triggers: [binding("trigger.defend_at_source_battlefield", 0)],
+      effects: [binding("action.draw_cards", 1, { player: "controller", count: 0 })],
+    }),
+  ];
+  const { game, decks } = fixture([reaversRow, unit("DEFENDER", "Defender")]);
+  decks[1]!.instances.push(
+    instance("reavers-row", "p2", "REAVERS_ROW", "battlefield"),
+    instance("defender", "p2", "DEFENDER"),
+  );
+  game.state.cardStates["reavers-row"] = cardState(null);
+  game.state.cardStates.defender = cardState(1);
+  game.state.battlefields.push({
+    battlefieldId: "row",
+    cardInstanceId: "reavers-row",
+    selectedByPlayerId: "p2",
+    controllerPlayerId: "p2",
+    units: ["defender"],
+  });
+  game.state.showdown = {
+    kind: "combat",
+    battlefieldId: "row",
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+
+  dispatchBehaviorEvent(game, {
+    type: "unit.defends",
+    actorPlayerId: "p2",
+    subjectCardInstanceId: "defender",
+    values: { battlefieldId: "row" },
+  }, decks);
+  let next = passPriority(game, "p2", decks);
+  next = passPriority(next, "p1", decks);
+
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+});
+
+test("declining Reaver's Row selection resumes the trigger chain", () => {
+  const reaversRow = battlefield("REAVERS_ROW", "Reaver's Row");
+  reaversRow.behaviorModel.clauses = [
+    clause("defend-here", {
+      triggers: [binding("trigger.defend_at_source_battlefield", 0)],
+      selectors: [
+        binding("selector.friendly_unit", 1, {
+          area: "battlefield",
+          locationRelation: "sourceBattlefield",
+          controller: "controller",
+          minimumCount: 0,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [binding("action.move_unit", 2, { destination: "base", count: 1 })],
+    }),
+  ];
+  const { game, decks } = fixture([reaversRow, unit("DEFENDER", "Defender")]);
+  decks[0]!.instances.push(
+    instance("reavers-row", "p1", "REAVERS_ROW", "battlefield"),
+    instance("defender", "p1", "DEFENDER"),
+  );
+  game.state.cardStates["reavers-row"] = cardState(null);
+  game.state.cardStates.defender = cardState(1);
+  game.state.battlefields.push({
+    battlefieldId: "row",
+    cardInstanceId: "reavers-row",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["defender"],
+  });
+
+  dispatchBehaviorEvent(game, {
+    type: "unit.defends",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "defender",
+    values: { battlefieldId: "row" },
+  }, decks);
+  const choice = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(choice);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: choice.id,
+    selectedIds: [],
+    decks,
+    now: "decline-reaver",
+  });
+  assert.equal(next.state.pendingChoice, null);
+  assert.equal(next.state.chain?.items.length, 1);
+  assert.deepEqual(next.state.battlefields[0]?.units, ["defender"]);
+
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+  assert.equal(next.state.chain, null);
+});
+
+test("Candlelit Sanctum recycles and orders only its original looked-at cards", () => {
+  const sanctum = battlefield("SANCTUM", "The Candlelit Sanctum");
+  sanctum.behaviorModel.clauses = [
+    clause("conquer", {
+      effects: [
+        binding("action.look", 0, { count: 2, selectionKey: "lookedCards" }),
+        binding("action.recycle_top_cards", 1, {
+          count: 2,
+          sourceSelectionKey: "lookedCards",
+          selectionKey: "recycledCards",
+        }),
+        binding("action.order_top_cards", 2, {
+          count: 2,
+          sourceSelectionKey: "lookedCards",
+          recycledSelectionKey: "recycledCards",
+        }),
+      ],
+    }),
+  ];
+  const { game, decks } = fixture([
+    sanctum,
+    unit("TOP_A", "Top A"),
+    unit("TOP_B", "Top B"),
+    unit("TOP_C", "Top C"),
+  ]);
+  decks[0]!.instances.push(
+    instance("sanctum", "p1", "SANCTUM", "battlefield"),
+    instance("top-a", "p1", "TOP_A"),
+    instance("top-b", "p1", "TOP_B"),
+    instance("top-c", "p1", "TOP_C"),
+  );
+  game.state.players.p1!.zones.mainDeck.push("top-a", "top-b", "top-c");
+  game.state.cardStates.sanctum = cardState(null);
+  game.state.cardStates["top-a"] = cardState(1);
+  game.state.cardStates["top-b"] = cardState(1);
+  game.state.cardStates["top-c"] = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "sanctum",
+    clauseId: "conquer",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["top-a", "top-b"],
+  );
+  submitEffectSelection(game, "p1", ["top-a"], decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["top-b", "top-c", "top-a"]);
+});
+
+test("Candlelit Sanctum persists a submitted order when no cards are recycled", () => {
+  const sanctum = battlefield("SANCTUM", "The Candlelit Sanctum");
+  sanctum.behaviorModel.clauses = [
+    clause("conquer", {
+      effects: [
+        binding("action.look", 0, { count: 2, selectionKey: "lookedCards" }),
+        binding("action.recycle_top_cards", 1, {
+          count: 2,
+          sourceSelectionKey: "lookedCards",
+          selectionKey: "recycledCards",
+        }),
+        binding("action.order_top_cards", 2, {
+          count: 2,
+          sourceSelectionKey: "lookedCards",
+          recycledSelectionKey: "recycledCards",
+        }),
+      ],
+    }),
+  ];
+  const { game, decks } = fixture([
+    sanctum,
+    unit("TOP_A", "Top A"),
+    unit("TOP_B", "Top B"),
+    unit("TOP_C", "Top C"),
+  ]);
+  decks[0]!.instances.push(
+    instance("sanctum", "p1", "SANCTUM", "battlefield"),
+    instance("top-a", "p1", "TOP_A"),
+    instance("top-b", "p1", "TOP_B"),
+    instance("top-c", "p1", "TOP_C"),
+  );
+  game.state.players.p1!.zones.mainDeck.push("top-a", "top-b", "top-c");
+  game.state.cardStates.sanctum = cardState(null);
+  game.state.cardStates["top-a"] = cardState(1);
+  game.state.cardStates["top-b"] = cardState(1);
+  game.state.cardStates["top-c"] = cardState(1);
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "sanctum",
+    clauseId: "conquer",
+    decks,
+  });
+  submitEffectSelection(game, "p1", [], decks);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["top-a", "top-b"],
+  );
+  submitEffectSelection(game, "p1", ["top-b", "top-a"], decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["top-b", "top-a", "top-c"]);
+});
+
+test("combat deaths immediately queue their own Deathknell trigger", () => {
+  const sentry = unit("SENTRY", "Watchful Sentry", [
+    clause("deathknell", {
+      triggers: [binding("trigger.on_death", 0, { subject: "source" })],
+      effects: [binding("action.draw_cards", 1, { player: "controller", count: 1 })],
+    }),
+  ]);
+  const { game, decks } = fixture([
+    sentry,
+    unit("DEFENDER", "Defender"),
+    battlefield("BF", "Battlefield"),
+  ]);
+  decks[0]!.instances.push(instance("sentry", "p1", "SENTRY"));
+  decks[1]!.instances.push(
+    instance("defender", "p2", "DEFENDER"),
+    instance("bf-card", "p2", "BF", "battlefield"),
+  );
+  game.state.cardStates.sentry = cardState(1);
+  game.state.cardStates.defender = cardState(2);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p2",
+    controllerPlayerId: "p2",
+    units: ["sentry", "defender"],
+  });
+
+  const index = createRuntimeCardIndex(decks, game);
+  assert.equal(startCombat(game, "bf", "p1", index, decks), true);
+  let next = passFocus(game, "p1", decks);
+  next = passFocus(next, "p2", decks);
+
+  assert.ok(next.state.players.p1!.zones.trash.includes("sentry"));
+  assert.equal(next.state.chain?.items.length, 1);
+  assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "sentry");
+});
+
+test("the first-beginning trigger awards the active player once", () => {
+  const arena = battlefield("ARENA", "The Arena's Greatest");
+  arena.behaviorModel.clauses = [
+    clause("first-beginning", {
+      triggers: [binding("trigger.first_beginning", 0)],
+      effects: [binding("action.gain_points", 1)],
+    }),
+  ];
+  const { game, decks } = fixture([arena]);
+  decks[0]!.instances.push(instance("arena", "p1", "ARENA", "battlefield"));
+  game.state.cardStates.arena = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "arena-field",
+    cardInstanceId: "arena",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+  game.state.turn = { turnNumber: 1, activePlayerId: "p1", phase: "beginning" };
+
+  applyStartOfTurn(game, decks);
+  let next = passPriority(game, "p1", decks);
+  next = passPriority(next, "p2", decks);
+
+  assert.equal(next.state.players.p1!.points, 1);
+  assert.equal(next.state.players.p2!.points ?? 0, 0);
+  assert.equal(next.state.players.p1!.hasTakenBeginningPhase, true);
+});
+
+test("Legion cost reduction needs a previously played Main Deck card", () => {
+  const hopeful = unit("HOPEFUL", "Noxus Hopeful", [
+    clause("legion-discount", {
+      keywords: [binding("keyword.legion", 0)],
+      effects: [binding("modifier.legion_energy_discount", 1, { amount: 2 })],
+    }),
+  ]);
+  hopeful.card.attributes.energy = 3;
+  const { game, decks } = fixture([hopeful]);
+  const index = createRuntimeCardIndex(decks, game);
+
+  assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 3);
+  game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier-card"];
+  assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 1);
+});
+
+test("Darius triggers after a second Unit card is played", () => {
+  const darius = unit("DARIUS", "Darius, Trifarian", [
+    clause("second-card", {
+      triggers: [binding("trigger.second_card_played", 0)],
+      effects: [
+        binding("modifier.modify_numeric_value", 1, {
+          attribute: "might",
+          operation: "increase",
+          operand: "constant",
+          amount: 2,
+          target: "source",
+          duration: "thisTurn",
+        }),
+        binding("action.ready_cards", 2, { player: "controller", target: "source", count: 1 }),
+      ],
+    }),
+  ]);
+  const first = unit("FIRST", "First Unit");
+  const second = unit("SECOND", "Second Unit");
+  first.card.attributes.energy = 0;
+  second.card.attributes.energy = 0;
+  const { game, decks } = fixture([darius, first, second]);
+  decks[0]!.instances.push(
+    instance("darius", "p1", "DARIUS"),
+    instance("first", "p1", "FIRST"),
+    instance("second", "p1", "SECOND"),
+  );
+  game.state.players.p1!.zones.base.push("darius");
+  game.state.players.p1!.zones.hand.push("first", "second");
+  game.state.cardStates.darius = cardState(1, true);
+  game.state.cardStates.first = cardState(1);
+  game.state.cardStates.second = cardState(1);
+
+  let next = playToBase(game, "p1", "first", decks);
+  next = playToBase(next, "p1", "second", decks);
+  assert.equal(next.state.chain?.items.length, 1);
+
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+
+  assert.equal(next.state.cardStates.darius?.exhausted, false);
+  assert.equal(next.state.cardStates.darius?.computedMight, 3);
+});
+
 test("automatic friendly-unit exhaustion resolves before battlefield-wide damage", () => {
   const uncheckedPower = unit("UNCHECKED_POWER", "Unchecked Power", [
     clause("resolve", {
@@ -973,6 +1377,7 @@ test("trash-count Might updates and Beginning triggers recycle selected trash ca
           owner: "controller",
           minimumCount: 0,
           maximumCount: 3,
+          requireMaximumAvailable: true,
         }),
       ],
       effects: [binding("action.recycle_cards", 2, { target: "card", count: 3 })],
@@ -1007,6 +1412,53 @@ test("trash-count Might updates and Beginning triggers recycle selected trash ca
   assert.deepEqual(game.state.players.p1!.zones.trash, []);
   assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["trash-a", "trash-b"]);
   assert.equal(game.state.cardStates.mundo?.computedMight, 3);
+});
+
+test("Dr. Mundo requires every available trash card up to three", () => {
+  const mundo = unit("MUNDO", "Dr. Mundo, Expert", [
+    clause("beginning-recycle", {
+      selectors: [
+        binding("selector.card", 0, {
+          zone: "trash",
+          cardType: "any",
+          owner: "controller",
+          minimumCount: 0,
+          maximumCount: 3,
+          requireMaximumAvailable: true,
+        }),
+      ],
+      effects: [binding("action.recycle_cards", 1, { target: "card", count: 3 })],
+    }),
+  ]);
+  const { game, decks } = fixture([mundo, unit("TRASH", "Trash")]);
+  decks[0]!.instances.push(
+    instance("mundo", "p1", "MUNDO"),
+    instance("trash-a", "p1", "TRASH"),
+    instance("trash-b", "p1", "TRASH"),
+  );
+  game.state.players.p1!.zones.trash.push("trash-a", "trash-b");
+  game.state.cardStates.mundo = cardState(1);
+  game.state.cardStates["trash-a"] = cardState(1);
+  game.state.cardStates["trash-b"] = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "mundo",
+    clauseId: "beginning-recycle",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.minimum
+      : null,
+    2,
+  );
+  assert.throws(
+    () => submitEffectSelection(game, "p1", [], decks),
+    /does not satisfy its requirements/,
+  );
 });
 
 test("turn-scoped card-play restrictions remove an opponent's play actions", () => {
@@ -1391,6 +1843,47 @@ function passPriority(
     selectedIds: [],
     decks,
     now: `pass-${playerId}`,
+  });
+}
+
+function passFocus(
+  game: GameDocument,
+  playerId: string,
+  decks: DeckSnapshotDocument[],
+) {
+  const pass = gameplayActions(game, playerId, decks).find(
+    (action) => action.label === "Pass focus",
+  );
+  assert.ok(pass);
+  return performGameplayAction({
+    game,
+    actorPlayerId: playerId,
+    actionId: pass.id,
+    selectedIds: [],
+    decks,
+    now: `focus-${playerId}`,
+  });
+}
+
+function playToBase(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  decks: DeckSnapshotDocument[],
+) {
+  const play = gameplayActions(game, playerId, decks).find(
+    (action) =>
+      action.sourceCardInstanceId === cardId &&
+      action.presentation.boardLocation?.kind === "base",
+  );
+  assert.ok(play);
+  return performGameplayAction({
+    game,
+    actorPlayerId: playerId,
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: `play-${cardId}`,
   });
 }
 

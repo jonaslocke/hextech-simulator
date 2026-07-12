@@ -637,6 +637,12 @@ export function performGameplayAction(input: {
         index,
         input.decks,
       );
+      // Combat cleanup can move lethal units to trash. Their Deathknell events
+      // must enter the chain before this action is returned to the client.
+      drainQueuedBehaviorEvents(game, input.decks);
+      resetChainPriorityToTopItem(game);
+      openPendingShowdown(game, index, input.decks);
+      finishTurnProgressionIfReady(game, index, input.decks);
       break;
     case "pass":
       passPriority(game, input.actorPlayerId, index, handlers, input.decks);
@@ -1025,11 +1031,14 @@ function passPriority(
           passedPlayerIds: [],
         };
       } else {
+        const resumeFocusPlayerId = game.state.chain.resumeFocusPlayerId;
         game.state.chain = null;
         if (game.state.showdown) {
           game.state.showdown.focusPlayerId =
-            item?.kind === "trigger"
-              ? item.controllerPlayerId
+            item?.kind === "trigger" && resumeFocusPlayerId
+              ? resumeFocusPlayerId
+              : item?.kind === "trigger"
+                ? item.controllerPlayerId
               : nextRelevantPlayer(
                   game,
                   game.state.showdown.focusPlayerId,
@@ -1066,6 +1075,10 @@ function passPriority(
       } else {
         beginCombatDamage(game, index, decks);
       }
+      drainQueuedBehaviorEvents(game, decks);
+      resetChainPriorityToTopItem(game);
+      openPendingShowdown(game, index, decks);
+      finishTurnProgressionIfReady(game, index, decks);
     } else {
       game.state.showdown.passedPlayerIds = passed;
       game.state.showdown.focusPlayerId = nextRelevantPlayer(

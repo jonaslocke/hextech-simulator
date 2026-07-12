@@ -1,5 +1,6 @@
 "use client";
 
+import { CardRulesText } from "@/features/card-presentation";
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { ReactNode } from "react";
 import type { OrderedDecisionRequest } from "./player-decision-types";
@@ -30,7 +31,12 @@ export function OrderedDecisionPrompt({
       isSubmitting={isSubmitting}
       isVisible={isVisible}
       onConfirm={onSubmit}
-      options={decision.options}
+      options={decision.options.map((option) => ({
+        ...option,
+        descriptionContent: option.description ? (
+          <CardRulesText text={option.description} />
+        ) : undefined,
+      }))}
       selectionMode="ordered"
       title={decision.title}
     />

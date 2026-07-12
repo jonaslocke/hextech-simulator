@@ -66,9 +66,12 @@ export function applyStartOfTurn(
     if (turn.phase === "beginning") {
       if (decks.length && !turn.beginningTriggersQueued) {
         turn.beginningTriggersQueued = true;
+        const isFirstBeginningPhase = player.hasTakenBeginningPhase !== true;
+        player.hasTakenBeginningPhase = true;
         dispatchBehaviorEvent(game, {
           type: "turn.beginning", actorPlayerId: turn.activePlayerId,
-          subjectCardInstanceId: null, values: {},
+          subjectCardInstanceId: null,
+          values: { isFirstBeginningPhase },
         }, decks);
         if (game.state.chain || game.state.pendingChoice) return;
       }

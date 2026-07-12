@@ -626,7 +626,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("cardType", "string", "The required card type.", ["any", "Spell", "Unit"]),
       required("owner", "player", "The required owner relationship."),
       required("minimumCount", "number", "The minimum selection count."),
-      required("maximumCount", "number", "The maximum selection count.")
+      required("maximumCount", "number", "The maximum selection count."),
+      optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
   }),
@@ -866,7 +867,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Look at cards",
     description: "Lets a player look at hidden cards.",
-    parameters: [optional("count", "number", "The number of cards looked at.")],
+    parameters: [
+      optional("count", "number", "The number of cards looked at."),
+      optional("selectionKey", "string", "Stable key that preserves the looked-at cards for later effects."),
+    ],
     engineSupport: supported("The controller receives a private top-deck inspection choice without moving the cards.")
   }),
   "action.vision": primitiveSeed({
@@ -932,7 +936,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Recycle looked-at top cards",
     description: "Lets the controller recycle any number of the top cards of their Main Deck.",
-    parameters: [required("count", "number", "How many top cards are eligible.")],
+    parameters: [
+      required("count", "number", "How many top cards are eligible."),
+      optional("sourceSelectionKey", "string", "Key containing the previously looked-at cards."),
+      optional("selectionKey", "string", "Key storing the selected recycled cards."),
+    ],
     emitsEvents: ["card.recycled"],
     engineSupport: supported("Uses a private Main Deck selection during effect resolution."),
   }),
@@ -941,7 +949,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Order top cards",
     description: "Lets the controller choose the order of the remaining top cards.",
-    parameters: [required("count", "number", "How many top cards are ordered.")],
+    parameters: [
+      required("count", "number", "How many top cards are ordered."),
+      optional("sourceSelectionKey", "string", "Key containing the previously looked-at cards."),
+      optional("recycledSelectionKey", "string", "Key containing the cards already recycled."),
+    ],
     engineSupport: supported("The submitted selection order becomes the new top-to-bottom deck order."),
   }),
   "modifier.modify_numeric_value": primitiveSeed({

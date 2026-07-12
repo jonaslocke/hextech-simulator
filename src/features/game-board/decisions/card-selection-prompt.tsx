@@ -1,6 +1,7 @@
 "use client";
 
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
+import { CardRulesText } from "@/features/card-presentation";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
 import {
@@ -865,16 +866,16 @@ function OptionImage({ option }: { option: CardSelectionPromptOption }) {
 
 function OptionText({ option }: { option: CardSelectionPromptOption }) {
   return (
-    <span className="min-w-0">
+    <div className="min-w-0">
       <span className="block font-semibold text-slate-100 text-sm truncate">
         {option.label}
       </span>
       {option.description && (
-        <span className="block mt-0.5 text-slate-400 text-xs">
-          {option.description}
-        </span>
+        <div className="block mt-0.5 text-slate-400 text-xs">
+          <CardRulesText text={option.description} />
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 

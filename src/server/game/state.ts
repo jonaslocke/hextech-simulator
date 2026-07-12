@@ -210,6 +210,7 @@ export const gameStateSchema = z.object({
       relevantPlayerIds: z.array(z.string().min(1)).min(1),
       priorityPlayerId: z.string().min(1),
       passedPlayerIds: z.array(z.string().min(1)),
+      resumeFocusPlayerId: z.string().min(1).nullable().optional(),
     })
     .nullable(),
   showdown: z

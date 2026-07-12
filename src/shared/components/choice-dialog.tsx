@@ -8,6 +8,7 @@ import { GameActionButton } from "@/features/game-board/components/game-action-b
 
 export type ChoiceDialogOption = {
   description?: string;
+  descriptionContent?: ReactNode;
   disabled?: boolean;
   id: string;
   imageOrientation?: "auto" | "portrait" | "landscape";
@@ -295,16 +296,16 @@ function OptionImage({ option }: { option: ChoiceDialogOption }) {
 
 function OptionText({ option }: { option: ChoiceDialogOption }) {
   return (
-    <span className="min-w-0">
+    <div className="min-w-0">
       <span className="block font-semibold text-slate-100 text-sm truncate">
         {option.label}
       </span>
-      {option.description && (
-        <span className="block mt-0.5 text-slate-400 text-xs line-clamp-2 leading-5">
-          {option.description}
-        </span>
+      {(option.description || option.descriptionContent) && (
+        <div className="block mt-0.5 text-slate-400 text-xs line-clamp-2 leading-5">
+          {option.descriptionContent ?? option.description}
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 

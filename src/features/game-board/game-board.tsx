@@ -772,14 +772,28 @@ export const GameBoard: FC<GameBoardProps> = ({
             maxTargets={targetSelection.maxTargets}
             minTargets={targetSelection.minTargets}
             isSubmitting={isSubmittingAction}
-            onCancel={() => setTargetSelection(null)}
+            onCancel={() => {
+              if (
+                targetSelection.purpose === "choice" &&
+                targetSelection.minTargets === 0
+              ) {
+                void submitTargetedPlay({
+                  ...targetSelection,
+                  selectedTargetIds: [],
+                });
+                return;
+              }
+              setTargetSelection(null);
+            }}
             onSubmit={() => submitTargetedPlay()}
             selectedCount={targetSelection.selectedTargetIds.length}
             cancelLabel={
               targetSelection.purpose === "move"
                 ? "Cancel move"
                 : targetSelection.purpose === "choice"
-                  ? "Close"
+                  ? targetSelection.minTargets === 0
+                    ? "Decline"
+                    : "Close"
                   : "Cancel"
             }
             confirmLabel={

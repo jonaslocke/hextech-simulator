@@ -64,6 +64,10 @@ export function createPrimitiveHandlers(
     "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
     "keyword.temporary",
   ]) handlers.set(id, passive);
+  // Legion's Energy modifier is consumed by effectiveEnergyCost before the
+  // card enters play. It has no separate state mutation when the clause is
+  // resolved as part of playing that card.
+  handlers.set("modifier.legion_energy_discount", { execute() {} });
   handlers.set("choice.optional", {
     choice(binding) {
       return { kind: "binary", legalIds: ["accept", "decline"], minimum: 1, maximum: 1,
@@ -150,14 +154,9 @@ export function createPrimitiveHandlers(
       (binding.parameters.player !== "controller" || context.event.actorPlayerId === context.controllerPlayerId),
   });
   handlers.set("trigger.first_beginning", {
-    matches: (_binding, context) => {
-      const playerId = context.event?.actorPlayerId;
-      return (
-        context.event?.type === "turn.beginning" &&
-        playerId != null &&
-        context.game.state.players[playerId]?.hasTakenBeginningPhase !== true
-      );
-    },
+    matches: (_binding, context) =>
+      context.event?.type === "turn.beginning" &&
+      context.event.values.isFirstBeginningPhase === true,
   });
   handlers.set("trigger.attack", {
     matches: (_binding, context) =>
@@ -269,6 +268,16 @@ export function createPrimitiveHandlers(
           ? [zoneValue]
           : [];
       const cardType = stringParam(binding, "cardType");
+      const legalIds = ids.filter(
+        (id) =>
+          cardType === "any" ||
+          definitionForInstance(id, index).card.classification.type ===
+            cardType,
+      );
+      const maximum = numberParam(binding, "maximumCount");
+      const minimum = binding.parameters.requireMaximumAvailable === true
+        ? Math.min(maximum, legalIds.length)
+        : numberParam(binding, "minimumCount");
       return {
         kind: "card" as const,
         label: `${cardType === "any" ? "card" : cardType.toLowerCase()} from ${zone}`,
@@ -276,14 +285,9 @@ export function createPrimitiveHandlers(
           zone === "hand" || zone === "trash" || zone === "mainDeck"
             ? zone
             : undefined,
-        legalIds: ids.filter(
-          (id) =>
-            cardType === "any" ||
-            definitionForInstance(id, index).card.classification.type ===
-              cardType,
-        ),
-        minimum: numberParam(binding, "minimumCount"),
-        maximum: numberParam(binding, "maximumCount"),
+        legalIds,
+        minimum,
+        maximum,
       };
     },
   });
@@ -459,22 +463,6 @@ export function createPrimitiveHandlers(
     }
   });
   handlers.set("action.look", {
-    choice(binding, context) {
-      ensureMainDeck(context.game, context.controllerPlayerId, index);
-      const count = Math.max(0, optionalNumberParam(binding, "count", 1));
-      const cards = context.game.state.players[context.controllerPlayerId]!
-        .zones.mainDeck.slice(0, count);
-      return cards.length > 0
-        ? {
-            legalIds: cards,
-            minimum: 0,
-            maximum: 0,
-            prompt: `Look at the top ${cards.length} card${cards.length === 1 ? "" : "s"}.`,
-            sourceZone: "mainDeck",
-            presentation: "vision",
-          }
-        : null;
-    },
     execute(binding, context) {
       const count = Math.max(0, optionalNumberParam(binding, "count", 1));
       const cards = context.game.state.players[context.controllerPlayerId]!
@@ -492,8 +480,10 @@ export function createPrimitiveHandlers(
   handlers.set("action.recycle_top_cards", {
     choice(binding, context) {
       ensureMainDeck(context.game, context.controllerPlayerId, index);
-      const cards = context.game.state.players[context.controllerPlayerId]!
-        .zones.mainDeck.slice(0, numberParam(binding, "count"));
+      const cards = lookedCardsFor(binding, context).slice(
+        0,
+        numberParam(binding, "count"),
+      );
       return cards.length > 0
         ? {
             legalIds: cards,
@@ -505,10 +495,11 @@ export function createPrimitiveHandlers(
           }
         : null;
     },
-    execute(_binding, context) {
+    execute(binding, context) {
       const player = context.game.state.players[context.controllerPlayerId]!;
+      const eligible = new Set(lookedCardsFor(binding, context));
       const selected = context.selectedIds.filter((id) =>
-        player.zones.mainDeck.includes(id),
+        eligible.has(id) && player.zones.mainDeck.includes(id),
       );
       player.zones.mainDeck = player.zones.mainDeck.filter(
         (id) => !selected.includes(id),
@@ -527,8 +518,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.order_top_cards", {
     choice(binding, context) {
-      const cards = context.game.state.players[context.controllerPlayerId]!
-        .zones.mainDeck.slice(0, numberParam(binding, "count"));
+      const cards = remainingLookedCards(binding, context);
       return cards.length > 1
         ? {
             legalIds: cards,
@@ -542,8 +532,7 @@ export function createPrimitiveHandlers(
     },
     execute(binding, context) {
       const player = context.game.state.players[context.controllerPlayerId]!;
-      const count = numberParam(binding, "count");
-      const current = player.zones.mainDeck.slice(0, count);
+      const current = remainingLookedCards(binding, context);
       const ordered = context.selectedIds.filter((id) => current.includes(id));
       if (ordered.length !== current.length) return;
       player.zones.mainDeck = [
@@ -740,7 +729,6 @@ export function createPrimitiveHandlers(
       if (!playerId) throw new Error("Point effect requires a turn player.");
       const player = context.game.state.players[playerId];
       if (!player) throw new Error("Point recipient is unavailable.");
-      player.hasTakenBeginningPhase = true;
       player.points = (player.points ?? 0) + 1;
       const requirement = effectiveNumericValue({
         attribute: "victoryRequirement",
@@ -1358,6 +1346,31 @@ function tokenDefinitionForBinding(
     throw new Error(`Token definition is unavailable: ${cardCode}`);
   }
   return definition;
+}
+
+function lookedCardsFor(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const selectionKey = binding.parameters.sourceSelectionKey;
+  if (typeof selectionKey === "string") {
+    return context.selectedBySelector[selectionKey] ?? [];
+  }
+  return context.game.state.players[context.controllerPlayerId]!
+    .zones.mainDeck.slice(0, numberParam(binding, "count"));
+}
+
+function remainingLookedCards(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const player = context.game.state.players[context.controllerPlayerId]!;
+  const recycledSelectionKey = binding.parameters.recycledSelectionKey;
+  const recycled = typeof recycledSelectionKey === "string"
+    ? new Set(context.selectedBySelector[recycledSelectionKey] ?? [])
+    : new Set<string>();
+  return lookedCardsFor(binding, context)
+    .filter((id) => !recycled.has(id) && player.zones.mainDeck.includes(id));
 }
 
 function boardUnitsControlledBy(

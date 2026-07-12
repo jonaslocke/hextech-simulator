@@ -1,3 +1,5 @@
+Resolution control: see [resolution-ledger.md](resolution-ledger.md). This file remains the original manual-test evidence.
+
 [] The Areana's Greatest trigger should happen on the Beggining Phase, from the ABCD start of the turn setup, currently it's triggering at end of the turn. it is also triggering for both players even if only one of them have the BF. ![alt text](image.png)
 [ ] in the middle of payment for Void Seeker on a unit that has deflect, the pass focus option was enabled. ![alt text](image-1.png)
 [ ] the image associated on "Daughter of the Void" was not the cannonical one, the simplest and smallest, no letters no start, number on the set is the cannonical one. ![alt text](image-2.png)
@@ -40,3 +42,5 @@ response: {
 [ ] Time warp was in to places at same time. trash and banished. ![alt text](image-13.png) ![alt text](image-14.png)
 [ ] Darius was not readied after playing a second unit, with spells it works. ![alt text](image-16.png)
 [ ] Dr. Mundo, expert - is possible to select none cards from the trash, you are obligated to resolve the most possible, so if there's none cards in trash no user choice prompt should show, there is one more, the choice prompt should show and player is obligated to select the maximum he can, 1, 2 or 3.
+---new issues
+[ ] sideboarding got an error when both players try to submit at the same time. ![alt text](image-17.png)
