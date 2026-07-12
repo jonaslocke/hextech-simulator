@@ -66,6 +66,7 @@ export function projectGame(input: {
       computedMight: state.computedMight,
       damage: state.damage,
       exhausted: state.exhausted,
+      stunned: state.stunned ?? false,
     };
   };
   const players = input.game.state.setup.playerIds.map((playerId) => {

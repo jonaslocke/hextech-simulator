@@ -151,7 +151,7 @@ export type BoardProjection = {
   }>;
   cardStates: Record<
     string,
-    { exhausted: boolean; damage: number; computedMight?: number }
+    { exhausted: boolean; stunned: boolean; damage: number; computedMight?: number }
   >;
 };
 
@@ -168,6 +168,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       card.instanceId,
       {
         exhausted: card.exhausted,
+        stunned: card.stunned ?? false,
         damage: card.damage,
         ...(card.computedMight === null
           ? {}

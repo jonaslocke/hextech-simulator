@@ -16,6 +16,7 @@ import {
 } from "./primitive-handlers";
 import {
   clearMarkedDamage,
+  clearStunned,
   cleanupBoard,
   markBattlefieldContested,
   openPendingNonCombatShowdown,
@@ -1031,6 +1032,10 @@ function continueEndTurn(
 ) {
   const turn = game.state.turn;
   if (!turn || turn.activePlayerId !== actor || turn.phase !== "end") return;
+  if (!turn.stunsCleared) {
+    clearStunned(game);
+    turn.stunsCleared = true;
+  }
   if (!turn.endTriggersQueued) {
     turn.endTriggersQueued = true;
     turn.endDelayedEffectsQueued = true;
@@ -1403,7 +1408,15 @@ function addAbilityActions(
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
-        const enabled = sourceReady && canSatisfyTargetRequirements(targets);
+        const costStatus = activatedAbilityCostStatus(
+          game,
+          playerId,
+          sourceId,
+          clause,
+        );
+        const hasLegalTargets = canSatisfyTargetRequirements(targets);
+        const enabled =
+          sourceReady && costStatus.enabled && hasLegalTargets;
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
@@ -1421,9 +1434,11 @@ function addAbilityActions(
             enabled,
             enabled
               ? null
-              : sourceReady
-                ? "No legal targets are available."
-                : "Source is exhausted.",
+              : !sourceReady
+                ? "Source is exhausted."
+                : !costStatus.enabled
+                  ? costStatus.reason
+                  : "No legal targets are available.",
             `${clause.id}|${ability.behaviorId}`,
             targets,
           ),
@@ -1447,6 +1462,8 @@ function addAbilityActions(
         energyActivation.ability,
         timing,
       ) &&
+      energyActivation.clause.costs.length === 0 &&
+      powerActivation.clause.costs.length === 0 &&
       abilityAvailableAtTiming(
         compiled,
         powerActivation.clause,
@@ -1539,11 +1556,12 @@ function executeActivatedAbility(
   const binding = clause?.abilities.find(
     (item) => item.behaviorId === behaviorId,
   );
-  if (!binding) throw new Error("Activated ability is unavailable.");
+  if (!clause || !binding) throw new Error("Activated ability is unavailable.");
   const handler = handlers.get(binding.behaviorId);
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
+  payActivatedAbilityCosts(game, actorPlayerId, sourceId, clause);
   const resolvesImmediately = isAddResourceAbility(binding.behaviorId);
   if (resolvesImmediately) {
     handler.execute(
@@ -1582,6 +1600,66 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function activatedAbilityCostStatus(
+  game: GameDocument,
+  playerId: string,
+  sourceId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+): { enabled: boolean; reason: string | null } {
+  let energyCost = 0;
+  for (const cost of clause.costs) {
+    if (cost.behaviorId === "cost.exhaust_source") {
+      if (game.state.cardStates[sourceId]?.exhausted) {
+        return { enabled: false, reason: "Source is exhausted." };
+      }
+      continue;
+    }
+    if (cost.behaviorId !== "cost.pay") {
+      return {
+        enabled: false,
+        reason: "This ability's cost is not implemented.",
+      };
+    }
+    const amount = cost.parameters.amount;
+    if (
+      cost.parameters.resource !== "energy" ||
+      typeof amount !== "number" ||
+      !Number.isInteger(amount) ||
+      amount < 0
+    ) {
+      return {
+        enabled: false,
+        reason: "This ability's cost is not implemented.",
+      };
+    }
+    energyCost += amount;
+  }
+  if (game.state.players[playerId]!.energy < energyCost) {
+    return { enabled: false, reason: "Not enough Energy." };
+  }
+  return { enabled: true, reason: null };
+}
+
+function payActivatedAbilityCosts(
+  game: GameDocument,
+  playerId: string,
+  sourceId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+) {
+  const status = activatedAbilityCostStatus(game, playerId, sourceId, clause);
+  if (!status.enabled) throw new Error(status.reason ?? "Ability costs cannot be paid.");
+
+  for (const cost of clause.costs) {
+    if (cost.behaviorId === "cost.exhaust_source") {
+      game.state.cardStates[sourceId]!.exhausted = true;
+      continue;
+    }
+    if (cost.behaviorId === "cost.pay") {
+      game.state.players[playerId]!.energy -= cost.parameters.amount as number;
+    }
+  }
 }
 
 function isAddResourceAbility(behaviorId: string) {

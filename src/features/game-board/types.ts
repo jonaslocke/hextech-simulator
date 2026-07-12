@@ -55,6 +55,7 @@ export type Card = {
   supertype?: ProjectedCardView["supertype"];
   type?: ProjectedCardView["type"];
   isExhausted?: boolean;
+  isStunned?: boolean;
   damage?: number;
   comesToPlayReady?: boolean;
 };

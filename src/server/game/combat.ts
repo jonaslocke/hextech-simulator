@@ -367,6 +367,7 @@ function totalCombatMight(
   index: RuntimeCardIndex
 ) {
   return unitIds.reduce((sum, id) => {
+    if (game.state.cardStates[id]?.stunned) return sum;
     const base = game.state.cardStates[id]?.computedMight
       ?? definitionForInstance(id, index).card.attributes.might
       ?? 0;

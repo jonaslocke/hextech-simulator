@@ -259,6 +259,7 @@ export function buildCard(
       img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,
       isExhausted: cardStates[cardInstanceId]?.exhausted ?? false,
+      isStunned: cardStates[cardInstanceId]?.stunned ?? false,
       might:
         cardStates[cardInstanceId]?.computedMight ??
         card.attributes.might ??

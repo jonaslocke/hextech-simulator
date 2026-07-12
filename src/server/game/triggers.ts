@@ -47,13 +47,18 @@ function collectBehaviorEventItems(
   const handlers = createPrimitiveHandlers(index);
   const byController = new Map<string, ChainItem[]>();
   for (const controllerPlayerId of game.state.setup.playerIds) {
-    const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => ({
+    const sources = activeSourceIds(
+      game,
+      controllerPlayerId,
+      index,
+      events,
+    ).map((sourceCardInstanceId) => ({
       sourceCardInstanceId,
       label: definitionForInstance(sourceCardInstanceId, index).card.name,
       model: compileBehaviorModel(
         definitionForInstance(sourceCardInstanceId, index).behaviorModel,
-        handlers
-      )
+        handlers,
+      ),
     }));
     for (const event of events) {
       const items = collectTriggeredClauses({
@@ -430,20 +435,35 @@ export function beginDelayedEffectResolution(
 function activeSourceIds(
   game: GameDocument,
   controllerPlayerId: string,
-  index: ReturnType<typeof createRuntimeCardIndex>
+  index: ReturnType<typeof createRuntimeCardIndex>,
+  events: readonly BehaviorEvent[],
 ): string[] {
   const player = game.state.players[controllerPlayerId]!;
-  return [...new Set([
-    ...(player.zones.legend ? [player.zones.legend] : []),
-    ...(player.zones.champion ? [player.zones.champion] : []),
-    ...player.zones.base,
-    ...game.state.battlefields
-      .filter((battlefield) =>
-        (battlefield.controllerPlayerId ?? battlefield.selectedByPlayerId)
-          === controllerPlayerId
-      )
-      .map((battlefield) => battlefield.cardInstanceId),
-    ...game.state.battlefields.flatMap((battlefield) => battlefield.units)
-      .filter((id) => index.instances.get(id)?.ownerPlayerId === controllerPlayerId)
-  ])];
+  const justDiedSources = events.flatMap((event) => {
+    if (event.type !== "unit.died" || !event.subjectCardInstanceId) return [];
+    return index.instances.get(event.subjectCardInstanceId)?.ownerPlayerId ===
+      controllerPlayerId
+      ? [event.subjectCardInstanceId]
+      : [];
+  });
+  return [
+    ...new Set([
+      ...(player.zones.legend ? [player.zones.legend] : []),
+      ...(player.zones.champion ? [player.zones.champion] : []),
+      ...player.zones.base,
+      ...game.state.battlefields
+        .filter(
+          (battlefield) =>
+            (battlefield.controllerPlayerId ?? battlefield.selectedByPlayerId) ===
+            controllerPlayerId,
+        )
+        .map((battlefield) => battlefield.cardInstanceId),
+      ...game.state.battlefields
+        .flatMap((battlefield) => battlefield.units)
+        .filter(
+          (id) => index.instances.get(id)?.ownerPlayerId === controllerPlayerId,
+        ),
+      ...justDiedSources,
+    ]),
+  ];
 }

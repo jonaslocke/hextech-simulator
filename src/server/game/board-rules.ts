@@ -50,6 +50,12 @@ export function clearMarkedDamage(game: GameDocument): void {
   }
 }
 
+export function clearStunned(game: GameDocument): void {
+  for (const state of Object.values(game.state.cardStates)) {
+    state.stunned = false;
+  }
+}
+
 export function markBattlefieldContested(
   game: GameDocument,
   battlefieldId: string,

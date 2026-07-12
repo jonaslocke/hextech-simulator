@@ -4,6 +4,7 @@ import {
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import { applyHoldScoring } from "./scoring";
+import { dispatchBehaviorEvent } from "./triggers";
 import type { GameDocument } from "./state";
 
 type StartOfTurnPhase = "awaken" | "beginning" | "channel" | "draw";
@@ -63,12 +64,19 @@ export function applyStartOfTurn(
     }
 
     if (turn.phase === "beginning") {
-      // Hold is the Beginning step. Advance the checkpoint before dispatching
-      // triggers so resolution resumes at Channel instead of scoring twice.
-      turn.phase = "channel";
+      if (decks.length && !turn.beginningTriggersQueued) {
+        turn.beginningTriggersQueued = true;
+        dispatchBehaviorEvent(game, {
+          type: "turn.beginning", actorPlayerId: turn.activePlayerId,
+          subjectCardInstanceId: null, values: {},
+        }, decks);
+        if (game.state.chain || game.state.pendingChoice) return;
+      }
       if (decks.length) {
         applyHoldScoring(game, turn.activePlayerId, decks);
       }
+      turn.phase = "channel";
+      delete turn.beginningTriggersQueued;
       continue;
     }
 

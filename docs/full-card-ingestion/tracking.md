@@ -45,7 +45,9 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `trigger.conquer` | Garen M1 | Might of Demacia - Starter | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Controller conquers any battlefield | None |
 | `trigger.hold_battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Hold battlefield trigger | None |
 | `trigger.on_move` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move-triggered ability | None |
+| `trigger.on_death` | OGN M2 | Machine Evangel and Deathknell cards | Covered by rules reference | Executable for own-death clauses | `tests/game-token-placement.test.ts` | Deathknell resolves after source leaves play | Other-unit death filters remain unimplemented |
 | `trigger.end_of_turn` | Existing | TBD | Covered by rules reference | Existing executable | Existing | End-turn trigger | None |
+| `trigger.beginning` | OGN M2 | Temporary tokens | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Temporary cleanup before scoring | None for own-controller Beginning triggers |
 | `trigger.attack` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Attack trigger | None |
 | `trigger.defend` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Defend trigger | None |
 | `condition.compare_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Numeric threshold condition | None |
@@ -59,14 +61,18 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.draw_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Draw cards | None |
 | `action.vision` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Resolve Vision choice | None |
 | `action.discard_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Discard chosen cards | None |
-| `action.ready_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Ready exhausted runes/cards | None |
+| `action.ready_cards` | Existing | TBD | Covered by rules reference | Executable with `card.readied` event | `tests/game-token-placement.test.ts` | Ready selected exhausted card | Exact ready-trigger models remain unapproved |
+| `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | `tests/game-token-placement.test.ts` | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
 | `action.channel_runes` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel runes | None |
 | `action.deal_damage` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deal damage to unit | None |
 | `action.draw_by_optional_cost` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Optional-cost draw branch | None |
 | `action.channel_or_draw` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel fallback draw | None |
 | `action.fight` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Two units fight | None |
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
+| `action.banish_card` | OGN M2 | Time Warp, Portal Rescue | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Banish selected card to its owner's Banishment | Follow-up play-from-banishment model remains unapproved |
+| `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
+| `action.recycle_cards` | OGN M2 | Vi, Destructive and other recycle cards | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Recycle selected card from trash | Exact recycle cost/card models remain unapproved |
 | `action.move_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move unit to base | None |
 | `action.play_token` | Garen M1 | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Fixed and chosen Recruit token placement | None |
 | `modifier.modify_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Apply numeric modifier | None |
@@ -78,6 +84,9 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `keyword.tank` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Tank combat damage assignment | None |
 | `keyword.deflect` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deflect targeting cost | None |
 | `keyword.ganking` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Battlefield-to-battlefield movement | None |
+| `keyword.temporary` | OGN M2 | Sprite | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Kill at controller Beginning Phase before scoring | None |
+| `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | `tests/game-token-placement.test.ts` | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
+| `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Exhaust source before activation | None |
 | `cost.exhaust_selected_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Exhaust selected unit as cost | None |
 | `replacement.recall_on_next_death` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Recall instead of next death | None |
 
@@ -92,8 +101,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 
 | Set | Token name | Source card(s) | Token data present | Behavior executable | Blocker | Notes |
 |---|---|---|---|---|---|---|
-| OGN | Recruit token variants | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Yes | Yes | None for primitive runtime | Runtime now supports a generated gameplay Recruit token identity, fixed-location token creation, and counted base/controlled-battlefield placement. |
-| OGN | Sprite | Later Origins cards | Yes | Not reviewed | None for M0 | Full Origins milestone coverage item. |
+| OGN | Recruit token variants | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Yes | Yes | None for primitive runtime | Runtime resolves the canonical source token definition and supports fixed-location and counted base/controlled-battlefield placement. |
+| OGN | Sprite | Sprite Call, Sprite Mother | Yes | Yes | Exact creator-card models not reviewed | Source-derived token definition enters ready and resolves Temporary before scoring. |
 | SFD | Gold | Later Spiritforged cards | Yes | Not reviewed | None for M0 | Full Spiritforged milestone coverage item. |
 
 ## Deck Validation Ledger
@@ -127,6 +136,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | M0 | Existing Lux/Annie/Master Yi deck availability | Operating baseline only | Accepted | Automated checks pass; user accepted M0 operating baseline | Yes |
 | M1 | Garen manual validation | Garen deck behavior corpus and reported defect scenarios | Accepted | User accepted M1 after iterative manual validation and fixes | Yes |
 | M2 foundation | Garen token regression | Recruit the Vanguard, Faithful Manufactor, and Noxian Drummer token placement | Passed | User manually confirmed token placement after catalog-driven token migration | Yes |
+| M2 foundation | Garen shared-choice regression | Target selection, choice flow, and Recruit placement after the binary-choice extension | Passed | User manually confirmed the focused shared-contract regression pass | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
@@ -201,3 +211,6 @@ inventory are in `docs/full-card-ingestion/ogn-corpus-analysis.md`.
 The user approved the three regression-risking shared changes on 2026-07-11.
 Catalog-driven token resolution is implemented and synchronized. Generalized
 choice/cost processing and trigger/replacement processing remain in progress.
+The current executable subset includes optional binary decisions, explicit
+Energy/source-exhaustion activated costs, Beginning-Phase Temporary cleanup,
+own-death triggers, and selected-card recycle effects.

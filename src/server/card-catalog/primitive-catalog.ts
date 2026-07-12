@@ -440,7 +440,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "On death trigger",
     description: "Creates an effect when a unit dies.",
     parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)],
-    listensToEvents: ["unit.died"]
+    listensToEvents: ["unit.died"],
+    engineSupport: supported("Own-death triggers are queued after the unit leaves play.")
   }),
   "trigger.end_of_turn": primitiveSeed({
     id: "trigger.end_of_turn",
@@ -449,6 +450,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates an effect at the end of a turn.",
     parameters: [required("player", "player", "Which player's end of turn fires the trigger.")],
     listensToEvents: ["turn.ended"]
+  }),
+  "trigger.beginning": primitiveSeed({
+    id: "trigger.beginning", family: "trigger", name: "Beginning Phase trigger",
+    description: "Creates an effect at the start of a player's Beginning Phase.",
+    parameters: [required("player", "player", "Which player's Beginning Phase fires the trigger.")],
+    listensToEvents: ["turn.beginning"],
+    engineSupport: supported("Beginning triggers are dispatched before scoring."),
   }),
   "trigger.conquer_battlefield": primitiveSeed({
     id: "trigger.conquer_battlefield",
@@ -645,7 +653,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("count", "number", "The number of cards to ready.")
     ],
     emitsEvents: ["card.readied"],
-    engineSupport: requiresEngineSupport("Ready effects are recurring in the corpus and need generalized card-driven execution.")
+    engineSupport: supported("Selected readyable cards become ready and emit card.readied events.")
   }),
   "action.exhaust_cards": primitiveSeed({
     id: "action.exhaust_cards",
@@ -657,7 +665,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("count", "number", "The number of cards to exhaust.")
     ],
     emitsEvents: ["card.exhausted"],
-    engineSupport: partiallySupported("Exhaustion appears both as a cost and effect; arbitrary target exhaustion still needs validation.")
+    engineSupport: supported("Selected ready cards become exhausted and emit card.exhausted events.")
   }),
   "action.channel_runes": primitiveSeed({
     id: "action.channel_runes",
@@ -753,13 +761,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
+  "keyword.temporary": primitiveSeed({
+    id: "keyword.temporary", family: "keyword", name: "Temporary",
+    description: "Kills the permanent at the start of its controller's Beginning Phase before scoring.",
+    engineSupport: supported("Temporary is represented by its Beginning-Phase trigger model."),
+  }),
   "action.banish_card": primitiveSeed({
     id: "action.banish_card",
     family: "action",
     name: "Banish card",
     description: "Moves a card to banishment.",
     parameters: [required("target", "target", "The card to banish.")],
-    emitsEvents: ["card.banished"]
+    emitsEvents: ["card.banished"],
+    engineSupport: supported("Selected cards move to their owner's Banishment.")
   }),
   "action.return_to_hand": primitiveSeed({
     id: "action.return_to_hand",
@@ -779,7 +793,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("count", "number", "The number of cards recycled.")
     ],
     emitsEvents: ["card.recycled"],
-    engineSupport: requiresEngineSupport("Recycle effects are recurring in the corpus and need generalized card-driven execution.")
+    engineSupport: supported("Selected cards return to the bottom of their corresponding deck.")
   }),
   "action.look": primitiveSeed({
     id: "action.look",
@@ -826,7 +840,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates or plays a token.",
     parameters: [
       required("tokenCardCode", "string", "The canonical source card code for the token."),
-      optional("tokenName", "string", "The player-facing token name."),
+      optional("tokenName", "string", "The player-facing token name.", tokenKinds),
       required("count", "number", "The number of tokens."),
       optional("placement", "string", "How the token destination is chosen.", [
         "sourceLocation",
@@ -842,7 +856,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Stun card",
     description: "Applies stun to a card.",
     parameters: [required("target", "target", "The card to stun.")],
-    emitsEvents: ["unit.stunned"]
+    emitsEvents: ["unit.stunned"],
+    engineSupport: supported("Stunned units do not contribute Might in combat and clear at the next Ending Step.")
   }),
   "modifier.modify_numeric_value": primitiveSeed({
     id: "modifier.modify_numeric_value",

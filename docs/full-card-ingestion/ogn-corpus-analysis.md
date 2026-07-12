@@ -54,8 +54,8 @@ request by themselves.
 
 | Gameplay token | Canonical source and variants | OGN references | Required behavior | Current state |
 |---|---|---|---|---|
-| 1 Might Recruit Unit, Recruit tag | `OGN-271` Recruit (DE), `OGN-272` Recruit (NX), `OGN-273` Recruit (ZN); one gameplay identity, three media variants | Vanguard Captain, Viktor Innovator, Viktor Leader, Forge of the Future, Faithful Manufactor, Altar to Unity, Machine Evangel, Noxian Drummer, Herald of the Arcane; plus prior OGS Recruit the Vanguard | Unit token, exhausted by default; source-specified base, source battlefield, or controlled destination; controller and owner are the creator; ceases to exist outside the board | Existing runtime placement supports the M1 Recruit cases, but currently resolves token identity through name-specific generated data. It must become catalog-driven before the OGN milestone can pass. |
-| ready 3 Might Sprite Unit, Fae tag, Temporary | `OGN-274` Sprite | Sprite Call and Sprite Mother | Unit token, enters ready, gets Temporary, is created at the specified base or battlefield, and ceases to exist outside the board | Definition source exists. Runtime lacks approved Temporary behavior and a catalog-driven token definition. |
+| 1 Might Recruit Unit, Recruit tag | `OGN-271` Recruit (DE), `OGN-272` Recruit (NX), `OGN-273` Recruit (ZN); one gameplay identity, three media variants | Vanguard Captain, Viktor Innovator, Viktor Leader, Forge of the Future, Faithful Manufactor, Altar to Unity, Machine Evangel, Noxian Drummer, Herald of the Arcane; plus prior OGS Recruit the Vanguard | Unit token, exhausted by default; source-specified base, source battlefield, or controlled destination; controller and owner are the creator; ceases to exist outside the board | Executable from the source-derived token catalog. |
+| ready 3 Might Sprite Unit, Fae tag, Temporary | `OGN-274` Sprite | Sprite Call and Sprite Mother | Unit token, enters ready, gets Temporary, is created at the specified base or battlefield, and ceases to exist outside the board | Executable token definition with a controller-Beginning-Phase Temporary trigger. Exact Sprite-creating card models are not yet approved. |
 
 No OGN card references a token whose source data is missing. The later-set Gold,
 Mech, and Sand Soldier tokens are outside M2 behavior scope and remain future
@@ -140,18 +140,42 @@ The first approved shared change is implemented:
   all affected M1 cards were synchronized on 2026-07-11.
 
 The remaining approved choice/cost, trigger/replacement, and OGN-specific
-primitive work remains in progress. Sprite is intentionally still unapproved
-until the Temporary keyword and its Beginning-Phase timing are executable.
+primitive work remains in progress. Sprite card-creator models remain
+unapproved until their exact text, placement, and card-play clauses are
+reviewed.
 
 Fresh Garen manual regression validation completed after this migration. The
 user confirmed Recruit the Vanguard, Faithful Manufactor, and Noxian Drummer
 token placement on 2026-07-11.
+
+The focused Garen shared-choice regression also passed: target selection,
+choice flow, and Recruit placement all worked after the optional-choice
+extension.
 
 The optional-choice foundation is also implemented. It creates a viewer-safe,
 server-validated Accept/Decline decision and records the result by a stable
 choice key. Effects with `requiresChoiceKey` execute only after the matching
 Accept decision. Card-specific optional costs and modes still require their
 own exact models and supporting cost or mode primitives.
+
+The following further generic foundations are implemented and synchronized:
+
+- `trigger.beginning` and `keyword.temporary` dispatch before scoring, so a
+  Temporary token is killed at the start of its controller's Beginning Phase.
+- Activated abilities now enforce explicit Energy and source-exhaustion costs
+  before entering the chain. Power/domain payments and other non-standard costs
+  remain deliberately unavailable until their exact parameters are modeled.
+- `trigger.on_death` preserves an own-death source long enough to queue and
+  resolve its Deathknell-style clause after it leaves play.
+- `action.recycle_cards` returns selected physical cards to the bottom of the
+  owner's Main Deck or Rune Deck and emits one grouped recycle event.
+- `action.banish_card` moves selected physical cards to their owner's
+  Banishment; tokens still cease when they would leave the board.
+- `action.ready_cards` and `action.exhaust_cards` now change selected cards
+  only when their state actually changes and emit the corresponding event.
+- `action.stun_card` records the binary Stunned state, omits Stunned units'
+  Might from combat damage, clears it at the next Ending Step, and exposes it
+  in the card projection.
 
 ## Manual Coverage to Reserve
 

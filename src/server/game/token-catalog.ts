@@ -14,7 +14,9 @@ const tokenDefinitions = tokenCards.map((card) => ({
   cardCode: deriveCardCodeFromCard(card),
   sourceTextHash: `token:${deriveCardCodeFromCard(card)}`,
   card,
-  behaviorModel: { playTimings: [], clauses: [] },
+  behaviorModel: card.text.plain.includes("[Temporary]")
+    ? { playTimings: [], clauses: [{ id: "temporary", sequence: 0, sourceText: "[Temporary]", normalizedText: "[Temporary]", abilities: [], triggers: [{ behaviorId: "trigger.beginning", parameters: { player: "controller" }, confidence: "high", order: 0 }], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [{ behaviorId: "action.kill_unit", parameters: { target: "source" }, confidence: "high", order: 1 }], keywords: [{ behaviorId: "keyword.temporary", parameters: {}, confidence: "high", order: 2 }] }] }
+    : { playTimings: [], clauses: [] },
 }) satisfies GameCardDefinition);
 
 const tokenDefinitionsByCode = new Map(

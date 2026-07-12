@@ -77,10 +77,13 @@ export const turnStateSchema = z.object({
   phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
   endTriggersQueued: z.boolean().optional(),
   endDelayedEffectsQueued: z.boolean().optional(),
+  stunsCleared: z.boolean().optional(),
+  beginningTriggersQueued: z.boolean().optional(),
 });
 
 export const cardStateSchema = z.object({
   exhausted: z.boolean(),
+  stunned: z.boolean().optional(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
   objectVersion: z.number().int().nonnegative().optional(),

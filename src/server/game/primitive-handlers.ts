@@ -61,7 +61,8 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.ganking", "cost.exhaust_selected_unit",
+    "keyword.ganking", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
+    "keyword.temporary",
   ]) handlers.set(id, passive);
   handlers.set("choice.optional", {
     choice(binding) {
@@ -121,6 +122,10 @@ export function createPrimitiveHandlers(
       (binding.parameters.player !== "controller" ||
         context.event.actorPlayerId === context.controllerPlayerId)
   });
+  handlers.set("trigger.beginning", {
+    matches: (binding, context) => context.event?.type === "turn.beginning" &&
+      (binding.parameters.player !== "controller" || context.event.actorPlayerId === context.controllerPlayerId),
+  });
   handlers.set("trigger.attack", {
     matches: (_binding, context) =>
       context.event?.type === "unit.attacks" &&
@@ -130,6 +135,13 @@ export function createPrimitiveHandlers(
     matches: (_binding, context) =>
       context.event?.type === "unit.defends" &&
       context.event.subjectCardInstanceId === context.sourceCardInstanceId
+  });
+  handlers.set("trigger.on_death", {
+    matches: (binding, context) =>
+      context.event?.type === "unit.died" &&
+      context.event.subjectCardInstanceId === context.sourceCardInstanceId &&
+      (binding.parameters.subject === "source" ||
+        binding.parameters.subject === "event_subject"),
   });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
@@ -378,8 +390,48 @@ export function createPrimitiveHandlers(
             .filter((id) => definitionForInstance(id, index).card.classification.type === "Rune")
             .slice(0, numberParam(binding, "count"))
         : context.selectedIds;
-      ids.forEach((id) => { context.game.state.cardStates[id]!.exhausted = false; });
+      const readied = ids.filter(
+        (id) => context.game.state.cardStates[id]?.exhausted,
+      );
+      readied.forEach((id) => {
+        context.game.state.cardStates[id]!.exhausted = false;
+      });
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...readied.map((id) => ({
+          type: "card.readied",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
     }
+  });
+  handlers.set("action.exhaust_cards", {
+    execute(binding, context) {
+      const requestedCount = binding.parameters.count;
+      const candidates =
+        binding.parameters.target === "source"
+          ? [context.sourceCardInstanceId]
+          : context.selectedIds;
+      const ids =
+        typeof requestedCount === "number"
+          ? candidates.slice(0, requestedCount)
+          : candidates;
+      const exhausted = ids.filter(
+        (id) => !context.game.state.cardStates[id]?.exhausted,
+      );
+      exhausted.forEach((id) => {
+        context.game.state.cardStates[id]!.exhausted = true;
+      });
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...exhausted.map((id) => ({
+          type: "card.exhausted",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
+    },
   });
   handlers.set("action.play_token", {
     choice(binding, context) {
@@ -473,9 +525,61 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.kill_unit", {
-    execute(_binding, context) {
-      context.selectedIds.forEach((id) => moveUnitToTrash(context.game, id, index));
+    execute(binding, context) {
+      const ids = binding.parameters.target === "source" ? [context.sourceCardInstanceId] : context.selectedIds;
+      ids.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
+  });
+  handlers.set("action.banish_card", {
+    execute(binding, context) {
+      const ids =
+        binding.parameters.target === "source"
+          ? [context.sourceCardInstanceId]
+          : context.selectedIds;
+      const banished: string[] = [];
+      for (const id of ids) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        if (isTokenInstance(id, index)) {
+          ceaseToken(context.game, id);
+          continue;
+        }
+        removeFromAllLocations(context.game, id);
+        context.game.state.players[owner]!.zones.banishment.push(id);
+        resetStateAfterLeavingBoard(context.game, id, index);
+        banished.push(id);
+      }
+      if (banished.length > 0) {
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "card.banished",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: banished[0]!,
+          values: { count: banished.length },
+        });
+      }
+    },
+  });
+  handlers.set("action.stun_card", {
+    execute(binding, context) {
+      const ids =
+        binding.parameters.target === "source"
+          ? [context.sourceCardInstanceId]
+          : context.selectedIds;
+      const newlyStunned = ids.filter(
+        (id) => context.game.state.cardStates[id] && !context.game.state.cardStates[id]!.stunned,
+      );
+      newlyStunned.forEach((id) => {
+        context.game.state.cardStates[id]!.stunned = true;
+      });
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...newlyStunned.map((id) => ({
+          type: "unit.stunned",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
+    },
   });
   handlers.set("action.return_to_hand", {
     execute(_binding, context) {
@@ -485,6 +589,45 @@ export function createPrimitiveHandlers(
         removeFromAllLocations(context.game, id);
         context.game.state.players[owner]!.zones.hand.push(id);
         resetStateAfterLeavingBoard(context.game, id, index);
+      }
+    },
+  });
+  handlers.set("action.recycle_cards", {
+    execute(binding, context) {
+      const requestedCount = binding.parameters.count;
+      const candidates =
+        binding.parameters.target === "source"
+          ? [context.sourceCardInstanceId]
+          : context.selectedIds;
+      const ids =
+        typeof requestedCount === "number"
+          ? candidates.slice(0, requestedCount)
+          : candidates;
+      const recycled: string[] = [];
+      for (const id of ids) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        if (isTokenInstance(id, index)) {
+          ceaseToken(context.game, id);
+          continue;
+        }
+        removeFromAllLocations(context.game, id);
+        const definition = definitionForInstance(id, index);
+        const destination =
+          definition.card.classification.type === "Rune"
+            ? context.game.state.players[owner]!.zones.runeDeck
+            : context.game.state.players[owner]!.zones.mainDeck;
+        destination.push(id);
+        resetStateAfterLeavingBoard(context.game, id, index);
+        recycled.push(id);
+      }
+      if (recycled.length > 0) {
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "card.recycled",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: recycled[0]!,
+          values: { count: recycled.length },
+        });
       }
     },
   });
@@ -1106,6 +1249,12 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
   });
   zones.trash.push(id);
   resetStateAfterLeavingBoard(game, id, index);
+  (game.state.queuedBehaviorEvents ??= []).push({
+    type: "unit.died",
+    actorPlayerId: owner,
+    subjectCardInstanceId: id,
+    values: {},
+  });
 }
 
 function isTokenInstance(id: string, index: RuntimeCardIndex) {
@@ -1165,6 +1314,7 @@ function resetStateAfterLeavingBoard(
   incrementObjectVersion(game, id);
   state.damage = 0;
   state.exhausted = false;
+  state.stunned = false;
   state.combatRole = null;
   state.lethalSuppressedDamage = null;
   state.lethalSuppressedMight = null;

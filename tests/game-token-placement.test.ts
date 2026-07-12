@@ -11,7 +11,10 @@ import {
   createRuntimeCardIndex,
   moveUnitToTrash,
 } from "../src/server/game/primitive-handlers";
+import { getTokenCatalogDefinition } from "../src/server/game/token-catalog";
 import { gameplayActions, performGameplayAction } from "../src/server/game";
+import { dispatchBehaviorEvent } from "../src/server/game/triggers";
+import { clearStunned } from "../src/server/game/board-rules";
 import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { GameDocument } from "../src/server/game/state";
@@ -380,6 +383,265 @@ test("accepted optional choices execute their gated effects", () => {
 
   const accepted = performGameplayAction({ game, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["accept"], decks, now: "accept" });
   assert.deepEqual(accepted.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("activated abilities pay Energy and exhaust their source before resolving", () => {
+  const source = unit("SOURCE", "Costed Ability", [
+    clause("draw", {
+      costs: [
+        binding("cost.pay", 0, { amount: 2, resource: "energy" }),
+        binding("cost.exhaust_source", 1),
+      ],
+      abilities: [binding("action.draw_cards", 2, { player: "controller", count: 1 })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.energy = 2;
+  game.state.cardStates.source = cardState(1);
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "source" && action.enabled,
+  );
+  assert.ok(activate);
+
+  const activated = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: [],
+    decks,
+    now: "activate-costed-ability",
+  });
+
+  assert.equal(activated.state.players.p1!.energy, 0);
+  assert.equal(activated.state.cardStates.source?.exhausted, true);
+  assert.equal(activated.state.chain?.items[0]?.kind, "activatedAbility");
+});
+
+test("own-death triggers resolve after their source leaves play", () => {
+  const martyr = unit("MARTYR", "Machine Evangel", [
+    clause("deathknell", {
+      triggers: [binding("trigger.on_death", 0, { subject: "source" })],
+      effects: [binding("action.draw_cards", 1, { player: "controller", count: 1 })],
+    }),
+  ]);
+  const { game, decks } = fixture([martyr, unit("DRAW", "Draw Card")]);
+  decks[0]!.instances.push(instance("martyr", "p1", "MARTYR"));
+  decks[0]!.instances.push(instance("draw", "p1", "DRAW"));
+  game.state.players.p1!.zones.base.push("martyr");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+  game.state.cardStates.martyr = cardState(1);
+  game.state.cardStates.draw = cardState(1);
+
+  moveUnitToTrash(game, "martyr", createRuntimeCardIndex(decks, game));
+  const deathEvent = game.state.queuedBehaviorEvents?.at(-1);
+  assert.equal(deathEvent?.type, "unit.died");
+  dispatchBehaviorEvent(game, deathEvent!, decks);
+  assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "martyr");
+
+  let resolved = passPriority(game, "p1", decks);
+  resolved = passPriority(resolved, "p2", decks);
+  assert.deepEqual(resolved.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("recycle effects return selected cards to the matching deck", () => {
+  const source = unit("SOURCE", "Recycler", [
+    clause("recycle", {
+      selectors: [
+        binding("selector.card", 0, {
+          zone: "trash",
+          cardType: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [binding("action.recycle_cards", 1, { target: "selected", count: 1 })],
+    }),
+  ]);
+  const { game, decks } = fixture([source, unit("CARD", "Discarded Card")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("recycled", "p1", "CARD"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.trash.push("recycled");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.recycled = cardState(1);
+
+  const completed = beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "recycle",
+    selectedIds: ["recycled"],
+    decks,
+  });
+
+  assert.equal(completed, true);
+  assert.deepEqual(game.state.players.p1!.zones.trash, []);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["recycled"]);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.recycled");
+});
+
+test("banish effects move selected cards to their owner's Banishment", () => {
+  const source = unit("SOURCE", "Banisher", [
+    clause("banish", {
+      selectors: [
+        binding("selector.card", 0, {
+          zone: "trash",
+          cardType: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [binding("action.banish_card", 1, { target: "selected" })],
+    }),
+  ]);
+  const { game, decks } = fixture([source, unit("CARD", "Discarded Card")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("banished", "p1", "CARD"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.trash.push("banished");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.banished = cardState(1);
+
+  const completed = beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "banish",
+    selectedIds: ["banished"],
+    decks,
+  });
+
+  assert.equal(completed, true);
+  assert.deepEqual(game.state.players.p1!.zones.trash, []);
+  assert.deepEqual(game.state.players.p1!.zones.banishment, ["banished"]);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.banished");
+});
+
+test("ready and exhaust effects update selected cards and emit events", () => {
+  const source = unit("SOURCE", "Status Changer", [
+    clause("exhaust", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          excludesSource: true,
+        }),
+      ],
+      effects: [binding("action.exhaust_cards", 1, { target: "selected", count: 1 })],
+    }),
+    { ...clause("ready", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          excludesSource: true,
+        }),
+      ],
+      effects: [
+        binding("action.ready_cards", 1, {
+          player: "controller",
+          target: "selected",
+          count: 1,
+        }),
+      ],
+    }), sequence: 1 },
+  ]);
+  const { game, decks } = fixture([source, unit("ALLY", "Ally")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("ally", "p1", "ALLY"));
+  game.state.players.p1!.zones.base.push("source", "ally");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.ally = cardState(1);
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "exhaust",
+    selectedIds: ["ally"],
+    decks,
+  });
+  assert.equal(game.state.cardStates.ally?.exhausted, true);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.exhausted");
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "ready",
+    selectedIds: ["ally"],
+    decks,
+  });
+  assert.equal(game.state.cardStates.ally?.exhausted, false);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.readied");
+});
+
+test("stun marks a unit once and clears at the next Ending Step", () => {
+  const source = unit("SOURCE", "Stunner", [
+    clause("stun", {
+      selectors: [
+        binding("selector.enemy_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [binding("action.stun_card", 1, { target: "selected" })],
+    }),
+  ]);
+  const { game, decks } = fixture([source, unit("ENEMY", "Enemy")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[1]!.instances.push(instance("enemy", "p2", "ENEMY"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p2!.zones.base.push("enemy");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.enemy = cardState(2);
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "stun",
+    selectedIds: ["enemy"],
+    decks,
+  });
+  assert.equal(game.state.cardStates.enemy?.stunned, true);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "unit.stunned");
+
+  clearStunned(game);
+  assert.equal(game.state.cardStates.enemy?.stunned, false);
+});
+
+test("Temporary token dies at its controller's Beginning Phase", () => {
+  const sprite = getTokenCatalogDefinition("OGN-274");
+  assert.ok(sprite);
+  const { game, decks } = fixture([]);
+  game.state.createdCardInstances = [instance("sprite", "p1", "OGN-274", "token")];
+  game.state.players.p1!.zones.base.push("sprite");
+  game.state.cardStates.sprite = cardState(3);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const clause = compileBehaviorModel(sprite.behaviorModel, handlers).clauses[0]!;
+  const result = executeBehaviorClause({
+    clause,
+    context: createBehaviorContext(game, "p1", "sprite", {
+      type: "turn.beginning", actorPlayerId: "p1", subjectCardInstanceId: null, values: {},
+    }, []),
+    handlers,
+  });
+
+  assert.equal(result.executed, true);
+  assert.equal(game.state.players.p1!.zones.base.includes("sprite"), false);
+  assert.equal(game.state.cardStates.sprite, undefined);
 });
 
 test("global conquer trigger can be gated by units at conquered battlefield", () => {
@@ -770,7 +1032,7 @@ function instance(
   instanceId: string,
   ownerPlayerId: string,
   cardCode: string,
-  source: "mainDeck" | "legend" | "battlefield" = "mainDeck",
+  source: "mainDeck" | "legend" | "battlefield" | "token" = "mainDeck",
 ) {
   return { instanceId, ownerPlayerId, cardCode, source };
 }

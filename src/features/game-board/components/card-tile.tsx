@@ -98,6 +98,7 @@ export const CardTile: FC<CardTileProps> = ({
   isStagedForMovement = false,
   isTransferHidden = false,
   isExhausted,
+  isStunned,
   img,
   might,
   name,
@@ -351,6 +352,11 @@ export const CardTile: FC<CardTileProps> = ({
             )}
           >
             {damage}
+          </span>
+        )}
+        {isStunned && (
+          <span className="-bottom-1 left-1/2 absolute bg-violet-300 px-1.5 py-0.5 border border-violet-100/70 rounded-full font-mono font-bold text-[8px] text-violet-950 uppercase tracking-wide -translate-x-1/2 pointer-events-none">
+            Stunned
           </span>
         )}
         {isStagedForMovement && (

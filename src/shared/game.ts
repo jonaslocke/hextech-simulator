@@ -183,6 +183,7 @@ export const projectedCardViewSchema = z.object({
   computedMight: z.number().nullable(),
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
+  stunned: z.boolean().optional(),
 });
 
 export const projectedZoneSchema = z.object({
