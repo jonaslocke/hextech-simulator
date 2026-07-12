@@ -101,7 +101,9 @@ export function useSideboardingValidation(input: {
   };
 }
 
-function fingerprintDeckValidationRequest(request: DeckValidationRequest): string {
+export function fingerprintDeckValidationRequest(
+  request: DeckValidationRequest,
+): string {
   const payload = JSON.stringify({
     policy: request.policy,
     deck: {
