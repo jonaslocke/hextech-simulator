@@ -8,6 +8,7 @@ import {
 import {
   beginEffectResolution,
   submitEffectSelection,
+  submitTokenPlacement,
 } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
@@ -849,6 +850,425 @@ test("stun marks a unit once and clears at the next Ending Step", () => {
   assert.equal(game.state.cardStates.enemy?.stunned, false);
 });
 
+test("dependent deferred unit selectors constrain the second target to the first target's battlefield", () => {
+  const facebreaker = unit("FACEBREAKER", "Facebreaker", [
+    clause("stun-pair", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "battlefield",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "friendlyTarget",
+        }),
+        binding("selector.enemy_unit", 1, {
+          area: "battlefield",
+          locationRelation: "selectedTargetLocation",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "enemyTarget",
+          referenceSelectionKey: "friendlyTarget",
+        }),
+      ],
+      effects: [binding("action.stun_card", 2, { target: "unit" })],
+    }),
+  ]);
+  facebreaker.card.classification.type = "Spell";
+  const { game, decks } = fixture([
+    facebreaker,
+    unit("FRIENDLY", "Friendly"),
+    unit("ENEMY_SAME", "Enemy at same battlefield"),
+    unit("ENEMY_OTHER", "Enemy at other battlefield"),
+    battlefield("FIELD_ONE", "Field one"),
+    battlefield("FIELD_TWO", "Field two"),
+  ]);
+  decks[0]!.instances.push(
+    instance("facebreaker", "p1", "FACEBREAKER"),
+    instance("friendly", "p1", "FRIENDLY"),
+    instance("field-one", "p1", "FIELD_ONE", "battlefield"),
+    instance("field-two", "p1", "FIELD_TWO", "battlefield"),
+  );
+  decks[1]!.instances.push(
+    instance("enemy-same", "p2", "ENEMY_SAME"),
+    instance("enemy-other", "p2", "ENEMY_OTHER"),
+  );
+  game.state.cardStates.facebreaker = cardState(null);
+  game.state.cardStates.friendly = cardState(1);
+  game.state.cardStates["enemy-same"] = cardState(1);
+  game.state.cardStates["enemy-other"] = cardState(1);
+  game.state.cardStates["field-one"] = cardState(null);
+  game.state.cardStates["field-two"] = cardState(null);
+  game.state.battlefields.push(
+    {
+      battlefieldId: "field-one",
+      cardInstanceId: "field-one",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      units: ["friendly", "enemy-same"],
+    },
+    {
+      battlefieldId: "field-two",
+      cardInstanceId: "field-two",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      units: ["enemy-other"],
+    },
+  );
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "facebreaker",
+    clauseId: "stun-pair",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected the friendly target selection.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["friendly"]);
+
+  submitEffectSelection(game, "p1", ["friendly"], decks);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected the enemy target selection.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["enemy-same"]);
+
+  submitEffectSelection(game, "p1", ["enemy-same"], decks);
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.cardStates.friendly?.stunned, true);
+  assert.equal(game.state.cardStates["enemy-same"]?.stunned, true);
+  assert.notEqual(game.state.cardStates["enemy-other"]?.stunned, true);
+});
+
+test("an optional Buff cost can replace a spell's normal cost before its deferred target is chosen", () => {
+  const callToGlory = unit("CALL_TO_GLORY", "Call to Glory", [
+    clause("call-to-glory", {
+      timings: [binding("timing.reaction", 0)],
+      selectors: [
+        binding("selector.friendly_unit", 1, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 0,
+          maximumCount: 1,
+          buffedOnly: true,
+          selectionKey: "spentBuff",
+          selectionPurpose: "optionalCost",
+        }),
+        binding("selector.unit", 3, {
+          scope: "any",
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "targetUnit",
+        }),
+      ],
+      costs: [binding("cost.spend_buff", 2, {
+        selectionKey: "spentBuff",
+        optional: true,
+        ignoreBaseCost: true,
+      })],
+      effects: [binding("modifier.modify_numeric_value", 4, {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 3,
+        target: "unit",
+        selectionKey: "targetUnit",
+        duration: "thisTurn",
+      })],
+    }),
+  ]);
+  callToGlory.card.classification.type = "Spell";
+  callToGlory.card.attributes.energy = 5;
+  callToGlory.card.attributes.power = 1;
+  const { game, decks } = fixture([
+    callToGlory,
+    unit("BUFFED", "Buffed ally"),
+    unit("TARGET", "Target"),
+  ]);
+  decks[0]!.instances.push(
+    instance("call-to-glory", "p1", "CALL_TO_GLORY"),
+    instance("buffed", "p1", "BUFFED"),
+  );
+  decks[1]!.instances.push(instance("target", "p2", "TARGET"));
+  game.state.players.p1!.zones.hand.push("call-to-glory");
+  game.state.players.p1!.zones.base.push("buffed");
+  game.state.players.p2!.zones.base.push("target");
+  game.state.cardStates["call-to-glory"] = cardState(null);
+  game.state.cardStates.buffed = { ...cardState(2), buffed: true };
+  game.state.cardStates.target = cardState(2);
+
+  const action = gameplayActions(game, "p1", decks).find(
+    (candidate) => candidate.sourceCardInstanceId === "call-to-glory",
+  );
+  assert.ok(action?.enabled);
+  assert.deepEqual(action?.targets.map((target) => target.legalIds), [["buffed"]]);
+
+  const played = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: action.id,
+    selectedIds: ["buffed"],
+    decks,
+    now: "call-to-glory",
+  });
+  assert.equal(played.state.cardStates.buffed?.buffed, false);
+  assert.equal(played.state.cardStates.buffed?.computedMight, 1);
+  assert.equal(played.state.players.p1!.energy, 0);
+  assert.deepEqual(played.state.chain?.items.at(-1)?.targetCardInstanceIds, ["buffed"]);
+
+  assert.equal(beginEffectResolution({
+    game: played,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "call-to-glory",
+    clauseId: "call-to-glory",
+    selectedIds: ["buffed"],
+    targetsLocked: false,
+    decks,
+  }), false);
+  assert.equal(played.state.pendingChoice?.type, "effectSelection");
+  if (played.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected a deferred target choice.");
+  }
+  assert.deepEqual(played.state.pendingChoice.legalCardIds, ["buffed", "target"]);
+  submitEffectSelection(played, "p1", ["target"], decks);
+  assert.equal(played.state.cardStates.target?.computedMight, 4);
+});
+
+test("each player can make their own deferred unit selection before both units are killed", () => {
+  const cullTheWeak = unit("CULL_THE_WEAK", "Cull the Weak", [
+    clause("cull", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "controllerUnit",
+          selectionPlayer: "controller",
+        }),
+        binding("selector.enemy_unit", 1, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "opponentUnit",
+          selectionPlayer: "opponent",
+        }),
+      ],
+      effects: [binding("action.kill_unit", 2, { target: "unit" })],
+    }),
+  ]);
+  cullTheWeak.card.classification.type = "Spell";
+  const { game, decks } = fixture([
+    cullTheWeak,
+    unit("CONTROLLER_UNIT", "Controller unit"),
+    unit("OPPONENT_UNIT", "Opponent unit"),
+  ]);
+  decks[0]!.instances.push(
+    instance("cull", "p1", "CULL_THE_WEAK"),
+    instance("controller-unit", "p1", "CONTROLLER_UNIT"),
+  );
+  decks[1]!.instances.push(instance("opponent-unit", "p2", "OPPONENT_UNIT"));
+  game.state.players.p1!.zones.base.push("controller-unit");
+  game.state.players.p2!.zones.base.push("opponent-unit");
+  game.state.cardStates.cull = cardState(null);
+  game.state.cardStates["controller-unit"] = cardState(1);
+  game.state.cardStates["opponent-unit"] = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "cull",
+    clauseId: "cull",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.playerId, "p1");
+  submitEffectSelection(game, "p1", ["controller-unit"], decks);
+  assert.equal(game.state.pendingChoice?.playerId, "p2");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected the opponent's unit choice.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["opponent-unit"]);
+
+  submitEffectSelection(game, "p2", ["opponent-unit"], decks);
+  assert.equal(game.state.players.p1!.zones.trash.includes("controller-unit"), true);
+  assert.equal(game.state.players.p2!.zones.trash.includes("opponent-unit"), true);
+});
+
+test("a turn-scoped ongoing trigger remains active after its source spell is in Trash", () => {
+  const imperialDecree = unit("IMPERIAL_DECREE", "Imperial Decree", [
+    clause("activate-decree", {
+      timings: [binding("timing.action", 0)],
+      effects: [binding("modifier.enable_source_triggers", 1, {
+        duration: "thisTurn",
+      })],
+    }),
+    clause("kill-damaged-unit", {
+      triggers: [binding("trigger.on_damage", 0, { subject: "any_unit" })],
+      effects: [binding("action.kill_unit", 1, { target: "event_subject" })],
+    }),
+  ]);
+  imperialDecree.card.classification.type = "Spell";
+  imperialDecree.behaviorModel.clauses[1]!.sequence = 1;
+  const damageSource = unit("DAMAGE_SOURCE", "Damage source", [
+    clause("damage", {
+      selectors: [binding("selector.unit", 0, {
+        scope: "any",
+        area: "board",
+        locationRelation: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+      })],
+      effects: [binding("action.deal_damage", 1, {
+        amount: 1,
+        target: "unit",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([
+    imperialDecree,
+    damageSource,
+    unit("TARGET", "Target"),
+  ]);
+  decks[0]!.instances.push(instance("decree", "p1", "IMPERIAL_DECREE"));
+  decks[1]!.instances.push(
+    instance("damage-source", "p2", "DAMAGE_SOURCE"),
+    instance("target", "p2", "TARGET"),
+  );
+  game.state.players.p1!.zones.trash.push("decree");
+  game.state.players.p2!.zones.base.push("damage-source", "target");
+  game.state.cardStates.decree = cardState(null);
+  game.state.cardStates["damage-source"] = cardState(1);
+  game.state.cardStates.target = cardState(2);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "decree",
+    clauseId: "activate-decree",
+    decks,
+  }), true);
+  assert.equal(game.state.ongoingEffects.length, 1);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const damageClause = compileBehaviorModel(
+    damageSource.behaviorModel,
+    handlers,
+  ).clauses[0]!;
+  executeBehaviorClause({
+    clause: damageClause,
+    context: createBehaviorContext(game, "p2", "damage-source", null, ["target"]),
+    handlers,
+  });
+  const damageEvent = game.state.queuedBehaviorEvents?.shift();
+  assert.ok(damageEvent);
+  dispatchBehaviorEvent(game, damageEvent, decks);
+  const trigger = game.state.chain?.items.at(-1);
+  assert.equal(trigger?.sourceCardInstanceId, "decree");
+  assert.equal(trigger?.behaviorClauseId, "kill-damaged-unit");
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "decree",
+    clauseId: "kill-damaged-unit",
+    behaviorEvent: damageEvent,
+    decks,
+  }), true);
+  assert.equal(game.state.players.p2!.zones.trash.includes("target"), true);
+});
+
+test("a selected eligible Unit can be played from Trash to a chosen controlled battlefield", () => {
+  const spectralMatron = unit("SPECTRAL_MATRON", "Spectral Matron", [
+    clause("play-from-trash", {
+      triggers: [binding("trigger.on_play", 0, {
+        actor: "controller",
+        subject: "source",
+      })],
+      selectors: [binding("selector.card", 1, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 0,
+        maximumCount: 1,
+        maximumEnergy: 3,
+        maximumPower: 1,
+        deferred: true,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 2, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+      })],
+    }),
+  ]);
+  const eligible = unit("ELIGIBLE", "Eligible Unit");
+  eligible.card.attributes.energy = 3;
+  eligible.card.attributes.power = 1;
+  const expensive = unit("EXPENSIVE", "Expensive Unit");
+  expensive.card.attributes.energy = 4;
+  const { game, decks } = fixture([
+    spectralMatron,
+    eligible,
+    expensive,
+    battlefield("FIELD", "Controlled field"),
+  ]);
+  decks[0]!.instances.push(
+    instance("matron", "p1", "SPECTRAL_MATRON"),
+    instance("eligible", "p1", "ELIGIBLE"),
+    instance("expensive", "p1", "EXPENSIVE"),
+    instance("field", "p1", "FIELD", "battlefield"),
+  );
+  game.state.players.p1!.zones.base.push("matron");
+  game.state.players.p1!.zones.trash.push("eligible", "expensive");
+  game.state.cardStates.matron = cardState(1);
+  game.state.cardStates.eligible = cardState(1);
+  game.state.cardStates.expensive = cardState(1);
+  game.state.cardStates.field = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "field",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "matron",
+    clauseId: "play-from-trash",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected the Unit selection from Trash.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["eligible"]);
+  submitEffectSelection(game, "p1", ["eligible"], decks);
+  const destinationChoice = game.state.pendingChoice as GameDocument["state"]["pendingChoice"];
+  assert.equal(destinationChoice?.type, "tokenPlacement");
+  if (destinationChoice?.type !== "tokenPlacement") {
+    throw new Error("Expected the Unit destination choice.");
+  }
+  assert.deepEqual(destinationChoice.legalDestinationIds, ["base", "field"]);
+
+  submitTokenPlacement(game, "p1", [{ destinationId: "field", count: 1 }], decks);
+  assert.equal(game.state.players.p1!.zones.trash.includes("eligible"), false);
+  assert.deepEqual(game.state.battlefields[0]?.units, ["eligible"]);
+  assert.equal(game.state.cardStates.eligible?.exhausted, true);
+});
+
 test("Hidden cards use an empty controlled facedown slot and play free next turn", () => {
   const hiddenUnit = unit("HIDDEN", "Hidden Unit", [
     clause("hidden", { keywords: [binding("keyword.hidden", 0)] }),
@@ -1473,6 +1893,8 @@ test("automatic friendly-unit exhaustion resolves before battlefield-wide damage
     [
       "card.exhausted:friendly-base",
       "card.exhausted:friendly-field",
+      "unit.damaged:friendly-field",
+      "unit.damaged:enemy-field",
       "unit.died:friendly-field",
       "unit.died:enemy-field",
     ],

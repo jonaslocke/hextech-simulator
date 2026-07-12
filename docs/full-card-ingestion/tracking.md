@@ -97,7 +97,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
 | OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12; associated manual-test issues are closed in the resolution ledger. |
-| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 19 | `approve-viktor-deck-foundation` published the shared-primitive subset; the remaining five cards await their reusable mechanics | Yes for published cards | In progress | Foundation adds Gear play/selection/kill, Buff counters, activated Recruit creation, non-token death filtering, ready token entry, first-Beginning rune channeling, target-owner draw, and battlefield move restrictions. |
+| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | `approve-viktor-deck-foundation` published all exact Viktor models | Yes | Ready for manual validation | Adds linked target selection, optional Buff costs, player-owned choices, turn-scoped trigger sources, and Trash Unit play destinations alongside the foundation primitives. |
 
 ## Token Coverage Ledger
 
@@ -116,7 +116,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
 | OGN | `data/decks/kaisa.dec.txt` | `kaisa` | Yes | Yes | Automated catalog snapshot succeeds | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12 | Yes |
-| OGN | `data/decks/viktor.dec.txt` | Pending | Valid against the full local source catalog | Blocked by five remaining canonical card approvals | No | No | Foundation batch is published; `Call to Glory`, `Cull the Weak`, `Imperial Decree`, `Spectral Matron`, and `Facebreaker` remain | No |
+| OGN | `data/decks/viktor.dec.txt` | `viktor` | Valid against the full local source catalog | Yes | Synchronized after behavior catalog refresh | Pending manual validation | All 24 canonical cards are published and deck persistence is enabled | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
 | VEN | `docs/full-ingestion-decks/VEN/` | TBD | No | No | No | No | Final JSON and deck files not provided | No |
@@ -220,8 +220,8 @@ own-death triggers, selected-card recycle effects, Hidden, Accelerate, Legion,
 and basic look/reveal flows. Arbitrary replacement and prevention text remains
 unapproved until its exact model has sufficient parameters.
 
-Viktor implementation began on 2026-07-12. The published foundation covers
-the Legend/Champion, Recruit and Sprite token creation, Deathknell, Legion,
-Reaction Gear, first-Beginning rune channeling, and the straightforward
-targeted/group effects. The remaining eight cards are intentionally gated by
-their still-unimplemented reusable mechanics rather than partial card models.
+Viktor implementation began on 2026-07-12. All 24 canonical cards are now
+published and the persisted `viktor` deck is synchronized. Its reusable
+mechanics include Recruit and Sprite token creation, Deathknell, Legion,
+Reaction Gear, optional Buff alternate costs, linked and player-owned target
+choices, turn-scoped damage triggers, and playing an eligible Unit from Trash.

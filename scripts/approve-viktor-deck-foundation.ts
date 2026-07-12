@@ -28,7 +28,27 @@ type Assignment = {
   parameters: Record<string, string | number | boolean | null>;
 };
 
+type ClauseModel = { id: string; assignments: Assignment[] };
+
 const MODELS: Record<string, Assignment[]> = {
+  "OGN-207": [
+    { family: "timing", primitiveId: "timing.reaction", parameters: {} },
+    { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "board", locationRelation: "any", minimumCount: 0, maximumCount: 1, buffedOnly: true, selectionKey: "spentBuff", selectionPurpose: "optionalCost" } },
+    { family: "cost", primitiveId: "cost.spend_buff", parameters: { selectionKey: "spentBuff", optional: true, ignoreBaseCost: true } },
+    { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "targetUnit" } },
+    { family: "modifier", primitiveId: "modifier.modify_numeric_value", parameters: { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "unit", selectionKey: "targetUnit", duration: "thisTurn" } },
+  ],
+  "OGN-209": [
+    { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "controllerUnit", selectionPlayer: "controller" } },
+    { family: "selector", primitiveId: "selector.enemy_unit", parameters: { area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "opponentUnit", selectionPlayer: "opponent" } },
+    { family: "action", primitiveId: "action.kill_unit", parameters: { target: "unit" } },
+  ],
+  "OGN-221": [],
+  "OGN-226": [
+    { family: "trigger", primitiveId: "trigger.on_play", parameters: { actor: "controller", subject: "source" } },
+    { family: "selector", primitiveId: "selector.card", parameters: { zone: "trash", cardType: "Unit", owner: "controller", minimumCount: 0, maximumCount: 1, maximumEnergy: 3, maximumPower: 1, deferred: true, selectionKey: "unitToPlay" } },
+    { family: "action", primitiveId: "action.play_selected_unit", parameters: { sourceSelectionKey: "unitToPlay", selectionKey: "destination" } },
+  ],
   "OGN-083": [
     { family: "keyword", primitiveId: "keyword.hidden", parameters: {} },
     { family: "timing", primitiveId: "timing.reaction", parameters: {} },
@@ -52,6 +72,13 @@ const MODELS: Record<string, Assignment[]> = {
     { family: "keyword", primitiveId: "keyword.legion", parameters: {} },
     { family: "trigger", primitiveId: "trigger.on_play", parameters: { actor: "controller", subject: "source" } },
     { family: "action", primitiveId: "action.play_token", parameters: { tokenCardCode: RECRUIT_TOKEN_CARD_CODE, tokenName: RECRUIT_TOKEN, count: 2, placement: "sourceLocation" } },
+  ],
+  "OGN-220": [
+    { family: "keyword", primitiveId: "keyword.hidden", parameters: {} },
+    { family: "timing", primitiveId: "timing.action", parameters: {} },
+    { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "battlefield", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "friendlyTarget" } },
+    { family: "selector", primitiveId: "selector.enemy_unit", parameters: { area: "battlefield", locationRelation: "selectedTargetLocation", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "enemyTarget", referenceSelectionKey: "friendlyTarget" } },
+    { family: "action", primitiveId: "action.stun_card", parameters: { target: "unit" } },
   ],
   "OGN-213": [
     { family: "keyword", primitiveId: "keyword.hidden", parameters: {} },
@@ -107,6 +134,25 @@ const MODELS: Record<string, Assignment[]> = {
   ],
 };
 
+const MULTI_CLAUSE_MODELS: Record<string, ClauseModel[]> = {
+  "OGN-221": [
+    {
+      id: "activate-decree",
+      assignments: [
+        { family: "timing", primitiveId: "timing.action", parameters: {} },
+        { family: "modifier", primitiveId: "modifier.enable_source_triggers", parameters: { duration: "thisTurn" } },
+      ],
+    },
+    {
+      id: "kill-damaged-unit",
+      assignments: [
+        { family: "trigger", primitiveId: "trigger.on_damage", parameters: { subject: "any_unit" } },
+        { family: "action", primitiveId: "action.kill_unit", parameters: { target: "event_subject" } },
+      ],
+    },
+  ],
+};
+
 const client = await getMongoClient();
 try {
   const cards = await loadEffectiveCards();
@@ -128,17 +174,17 @@ try {
         cardCode,
         modelingStatus: "approved",
         sourceTextHash: hashCardRulesText(card),
-        clauses: [{
-          id: "clause-1",
+        clauses: (MULTI_CLAUSE_MODELS[cardCode] ?? [{ id: "clause-1", assignments }]).map((model) => ({
+          id: model.id,
           sourceText: card.text.plain,
           normalizedText: card.text.plain,
           unsupportedReason: null,
-          assignments: assignments.map((assignment) => ({
+          assignments: model.assignments.map((assignment) => ({
             ...assignment,
             confidence: "high" as const,
             sourceText: card.text.plain,
           })),
-        }],
+        })),
       },
       new Date().toISOString(),
       behaviorCatalog,

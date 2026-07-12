@@ -51,7 +51,7 @@ test("plans idempotent deck-definition synchronization", async () => {
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
   assert.deepEqual(first.result, {
-    insertedCount: 5,
+    insertedCount: 6,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +61,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 5,
+    unchangedCount: 6,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,7 +75,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 4,
+    unchangedCount: 5,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
@@ -89,7 +89,7 @@ test("requires the complete fixed seed set", async () => {
         [seedSet()[0]!],
         NOW,
       ),
-    /exactly: lux, annie, master-yi, garen, kaisa/,
+    /exactly: lux, annie, master-yi, garen, kaisa, viktor/,
   );
 });
 
@@ -117,6 +117,7 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
     { id: "master-yi", label: "Master Yi" },
     { id: "garen", label: "Garen" },
     { id: "kaisa", label: "Kai'Sa" },
+    { id: "viktor", label: "Viktor" },
   ]);
   assert.equal(errors.length, 1);
 
@@ -163,6 +164,7 @@ test("deck synchronization is confirmation-gated and reset-safe", async () => {
   assert.match(syncSource, /data\/decks\/masteryi\.dec\.txt/);
   assert.match(syncSource, /data\/decks\/garen\.dec\.txt/);
   assert.match(syncSource, /data\/decks\/kaisa\.dec\.txt/);
+  assert.match(syncSource, /data\/decks\/viktor\.dec\.txt/);
   assert.doesNotMatch(resetSource, /deckDefinitions/);
 });
 
@@ -177,6 +179,7 @@ function seedSet(): DeckDefinitionSeed[] {
     },
     { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
     { id: "kaisa", label: "Kai'Sa", sourceText: validSourceText("Kai'Sa") },
+    { id: "viktor", label: "Viktor", sourceText: validSourceText("Viktor") },
   ];
 }
 

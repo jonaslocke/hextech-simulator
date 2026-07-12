@@ -483,6 +483,13 @@ function activeSourceIds(
         .filter(
           (id) => index.instances.get(id)?.ownerPlayerId === controllerPlayerId,
         ),
+      ...game.state.ongoingEffects
+        .filter(
+          (effect) =>
+            effect.behaviorId === "modifier.enable_source_triggers" &&
+            effect.controllerPlayerId === controllerPlayerId,
+        )
+        .map((effect) => effect.sourceCardInstanceId),
       ...justDiedSources,
     ]),
   ];

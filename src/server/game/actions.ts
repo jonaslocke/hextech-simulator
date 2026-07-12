@@ -3,6 +3,7 @@ import {
   compileBehaviorModel,
   createBehaviorContext,
   executeBehaviorClause,
+  selectionRequirementsForClause,
   submitTriggerOrder,
   targetRequirementsForClause,
 } from "./behavior-runtime";
@@ -12,6 +13,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  recomputeMight,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import {
@@ -732,8 +734,16 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
+  const optionalPlayCost = payOptionalPlayCosts(
+    game,
+    playerId,
+    definition,
+    selectedIds,
+    index,
+  );
+  const ignoresBaseCost = ignoreBaseCost || optionalPlayCost.ignoreBaseCost;
   const energyCost =
-    (ignoreBaseCost ? 0 : effectiveEnergyCost(game, playerId, definition, index)) +
+    (ignoresBaseCost ? 0 : effectiveEnergyCost(game, playerId, definition, index)) +
     (accelerated ? 1 : 0);
   const playEvent = {
     type: "card.played",
@@ -744,8 +754,7 @@ function playCard(
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
-  payOptionalPlayCosts(game, definition, selectedIds, index);
-  const paymentDefinition = ignoreBaseCost
+  const paymentDefinition = ignoresBaseCost
     ? {
         ...definition,
         card: {
@@ -1353,11 +1362,12 @@ function addPlayableCardActions(
     )
       continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
-    const projectedTargets = compiled.clauses
-      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
-      .flatMap((clause) =>
-        targetRequirementsForClause(clause, context, handlers),
-      );
+    const projectedTargets = playSelectionRequirements(
+      definition,
+      compiled,
+      context,
+      handlers,
+    );
     const cost = effectiveEnergyCost(game, playerId, definition, index);
     const paymentPlan = buildPaymentPlan(
       game,
@@ -1371,10 +1381,15 @@ function addPlayableCardActions(
       : null;
     const targets = projectedTargets;
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
-    const enabled = paymentPlan !== null && hasLegalTargets;
+    const canPayAlternateCost = hasPayableAlternateCost(
+      definition,
+      projectedTargets,
+    );
+    const enabled =
+      (paymentPlan !== null || canPayAlternateCost) && hasLegalTargets;
     const disabledReason = !hasLegalTargets
       ? "No legal targets are available."
-      : paymentPlan
+      : paymentPlan || canPayAlternateCost
         ? null
         : "Card costs cannot be paid.";
     const targetAdditionalPower = targets
@@ -1499,18 +1514,12 @@ function addHiddenPlayActions(
     if (!hasBehavior(definition, "keyword.hidden")) continue;
     const isUnit = definition.card.classification.type === "Unit";
     const handlers = createPrimitiveHandlers(index);
-    const hiddenTargets = compileBehaviorModel(
-      definition.behaviorModel,
+    const hiddenTargets = playSelectionRequirements(
+      definition,
+      compileBehaviorModel(definition.behaviorModel, handlers),
+      createBehaviorContext(game, playerId, cardId, null, []),
       handlers,
-    ).clauses
-      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
-      .flatMap((clause) =>
-        targetRequirementsForClause(
-          clause,
-          createBehaviorContext(game, playerId, cardId, null, []),
-          handlers,
-        ),
-      )
+    )
       .map((requirement) => ({
         ...requirement,
         legalIds: requirement.legalIds.filter((id) =>
@@ -2030,22 +2039,76 @@ function captureTargetObjectVersions(
 
 function payOptionalPlayCosts(
   game: GameDocument,
+  playerId: string,
   definition: GameCardDefinition,
   selectedIds: string[],
   index: RuntimeCardIndex,
 ) {
+  let ignoreBaseCost = false;
   const hasExhaustCost = definition.behaviorModel.clauses.some((clause) =>
     clause.costs.some(
       (cost) => cost.behaviorId === "cost.exhaust_selected_unit",
     ),
   );
-  if (!hasExhaustCost || selectedIds.length === 0) return;
-  const selected = selectedIds.find(
-    (id) =>
-      definitionForInstance(id, index).card.classification.type === "Unit" &&
-      !game.state.cardStates[id]?.exhausted,
+  if (hasExhaustCost) {
+    const selected = selectedIds.find(
+      (id) =>
+        definitionForInstance(id, index).card.classification.type === "Unit" &&
+        !game.state.cardStates[id]?.exhausted,
+    );
+    if (selected) game.state.cardStates[selected]!.exhausted = true;
+  }
+  for (const clause of definition.behaviorModel.clauses) {
+    for (const cost of clause.costs) {
+      if (cost.behaviorId !== "cost.spend_buff") continue;
+      const selected = selectedIds.find(
+        (id) =>
+          index.instances.get(id)?.ownerPlayerId === playerId &&
+          game.state.cardStates[id]?.buffed === true,
+      );
+      if (!selected) continue;
+      game.state.cardStates[selected]!.buffed = false;
+      recomputeMight(game, selected, index);
+      if (cost.parameters.ignoreBaseCost === true) ignoreBaseCost = true;
+    }
+  }
+  return { ignoreBaseCost };
+}
+
+function playSelectionRequirements(
+  definition: GameCardDefinition,
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  context: ReturnType<typeof createBehaviorContext>,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  return compiled.clauses.flatMap((clause) =>
+    selectionRequirementsForClause(clause, context, handlers)
+      .filter(({ binding }) =>
+        clauseCanRequirePlaySelections(definition, clause) ||
+        binding.parameters.selectionPurpose === "optionalCost",
+      )
+      .map(({ requirement }) => requirement),
   );
-  if (selected) game.state.cardStates[selected]!.exhausted = true;
+}
+
+function hasPayableAlternateCost(
+  definition: GameCardDefinition,
+  targets: readonly ReturnType<typeof targetRequirementsForClause>[number][],
+) {
+  const selectionKeys = new Set(
+    definition.behaviorModel.clauses.flatMap((clause) =>
+      clause.costs
+        .filter((cost) => cost.behaviorId === "cost.spend_buff")
+        .map((cost) => cost.parameters.selectionKey)
+        .filter((key): key is string => typeof key === "string"),
+    ),
+  );
+  return targets.some(
+    (target) =>
+      target.selectionKey !== undefined &&
+      selectionKeys.has(target.selectionKey) &&
+      target.legalIds.length > 0,
+  );
 }
 
 function hasBehavior(definition: GameCardDefinition, behaviorId: string) {

@@ -17,6 +17,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "trigger.hold_battlefield": "executable",
   "trigger.on_move": "executable",
   "trigger.on_death": "executable",
+  "trigger.on_damage": "executable",
   "trigger.end_of_turn": "executable",
   "trigger.beginning": "executable",
   "trigger.first_beginning": "executable",
@@ -56,6 +57,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.recycle_cards": "executable",
   "action.move_unit": "executable",
   "action.play_token": "executable",
+  "action.play_selected_unit": "executable",
   "modifier.modify_numeric_value": "executable",
   "modifier.play_unit_destination": "executable",
   "modifier.cannot_move_from_source_battlefield": "executable",
@@ -76,10 +78,12 @@ export const GAME__RUNTIME_COVERAGE = {
   "cost.pay": "executable",
   "cost.exhaust_source": "executable",
   "cost.exhaust_selected_unit": "executable",
+  "cost.spend_buff": "executable",
   "choice.optional": "executable",
   "keyword.temporary": "executable",
   "replacement.recall_on_next_death": "executable",
   "modifier.cannot_play_cards": "executable",
+  "modifier.enable_source_triggers": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 
 export function getRuntimeCoverageStatus(

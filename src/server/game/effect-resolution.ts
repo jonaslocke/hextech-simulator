@@ -148,6 +148,22 @@ export function resumeEffectResolution(
   ).clauses.find((candidate) => candidate.id === frame.clauseId);
   if (!clause)
     throw new Error(`Behavior clause is unavailable: ${frame.clauseId}`);
+  if (!frame.targetsLocked) {
+    const remainingInitialSelections = [...frame.initialSelectedIds];
+    for (const selector of clause.selectors) {
+      if (selector.parameters.selectionPurpose !== "optionalCost") continue;
+      const bindingKey = `${clause.id}:selectors:${selector.order}`;
+      if (frame.selectionsByBinding[bindingKey]) continue;
+      const maximum =
+        typeof selector.parameters.maximumCount === "number"
+          ? selector.parameters.maximumCount
+          : 1;
+      frame.selectionsByBinding[bindingKey] = remainingInitialSelections.splice(
+        0,
+        maximum,
+      );
+    }
+  }
   if (
     clause.keywords.some((binding) => binding.behaviorId === "keyword.legion") &&
     !(game.state.players[frame.controllerPlayerId]
@@ -164,6 +180,19 @@ export function resumeEffectResolution(
     frame.behaviorEvent,
     [],
   );
+  for (const selector of clause.selectors) {
+    const selected =
+      frame.selectionsByBinding[
+        `${clause.id}:selectors:${selector.order}`
+      ] ?? [];
+    selectorContext.selectedBySelector[
+      `${clause.id}:selectors:${selector.order}`
+    ] = selected;
+    if (typeof selector.parameters.selectionKey === "string") {
+      selectorContext.selectedBySelector[selector.parameters.selectionKey] =
+        selected;
+    }
+  }
   const selectorRequirements = selectionRequirementsForClause(
     clause,
     selectorContext,
@@ -193,13 +222,13 @@ export function resumeEffectResolution(
     }
     game.state.pendingChoice = {
       id: `choice:${frame.id}:${binding.order}`,
-      playerId: frame.controllerPlayerId,
+      playerId: selectorChoicePlayerId(game, frame.controllerPlayerId, binding),
       type: "effectSelection",
       resolutionId: frame.id,
       bindingKey,
       prompt:
         requirement.selectionPurpose === "optionalCost"
-          ? "Optional Cost: Exhaust a ready friendly unit, or decline."
+          ? "Optional cost: choose a card to pay it, or decline."
           : requirement.label
             ? `Choose ${requirement.label}`
             : "Choose effect target",
@@ -333,6 +362,18 @@ export function resumeEffectResolution(
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);
   return true;
+}
+
+function selectorChoicePlayerId(
+  game: GameDocument,
+  controllerPlayerId: string,
+  binding: import("./schemas").BehaviorBinding,
+) {
+  if (binding.parameters.selectionPlayer !== "opponent") {
+    return controllerPlayerId;
+  }
+  return game.state.setup.playerIds.find((id) => id !== controllerPlayerId) ??
+    controllerPlayerId;
 }
 
 function finishResolutionFrame(

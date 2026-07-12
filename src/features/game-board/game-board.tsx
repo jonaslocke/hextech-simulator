@@ -812,7 +812,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             confirmLabel={
               targetSelectionHasOptionalCost(targetSelection)
                 ? targetSelection.selectedTargetIds.length > 0
-                  ? "Exhaust unit"
+                  ? "Pay optional cost"
                   : "Decline"
                 : targetSelection.purpose === "move"
                   ? "Confirm move"
@@ -836,7 +836,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             }
             helperText={
               targetSelectionHasOptionalCost(targetSelection)
-                ? "Exhaust a ready friendly unit to draw 2. Decline to draw 1 instead."
+                ? "Choose a card to pay the optional cost, or decline."
                 : targetSelection.purpose === "move"
                   ? "Click additional units to include them, then confirm the move."
                   : undefined

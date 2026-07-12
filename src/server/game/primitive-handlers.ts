@@ -61,7 +61,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
+    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit", "cost.spend_buff",
     "keyword.temporary", "modifier.cannot_move_from_source_battlefield",
   ]) handlers.set(id, passive);
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
@@ -192,6 +192,27 @@ export function createPrimitiveHandlers(
       return subject === "enemy_unit" && deadOwner !== context.controllerPlayerId;
     },
   });
+  handlers.set("trigger.on_damage", {
+    matches(binding, context) {
+      if (
+        context.event?.type !== "unit.damaged" ||
+        !context.event.subjectCardInstanceId
+      ) {
+        return false;
+      }
+      const subject = binding.parameters.subject;
+      if (subject === "any_unit") return true;
+      if (subject === "source") {
+        return context.event.subjectCardInstanceId === context.sourceCardInstanceId;
+      }
+      const owner = index.instances.get(
+        context.event.subjectCardInstanceId,
+      )?.ownerPlayerId;
+      return subject === "friendly_unit"
+        ? owner === context.controllerPlayerId
+        : subject === "enemy_unit" && owner !== context.controllerPlayerId;
+    },
+  });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
       return numericConditionMatches({
@@ -231,7 +252,7 @@ export function createPrimitiveHandlers(
         context.game,
         index,
         () => true,
-        context.sourceCardInstanceId,
+        selectorReferenceSource(binding, context),
         context.selectedIds,
       );
     }
@@ -243,7 +264,7 @@ export function createPrimitiveHandlers(
         context.game,
         index,
         (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId,
-        context.sourceCardInstanceId,
+        selectorReferenceSource(binding, context),
         context.selectedIds,
       );
     }
@@ -257,7 +278,7 @@ export function createPrimitiveHandlers(
         (id) =>
           index.instances.get(id)?.ownerPlayerId !==
           context.controllerPlayerId,
-        context.sourceCardInstanceId,
+        selectorReferenceSource(binding, context),
         context.selectedIds,
       );
     },
@@ -279,7 +300,15 @@ export function createPrimitiveHandlers(
           cardType === "any" ||
           definitionForInstance(id, index).card.classification.type ===
             cardType,
-      );
+      ).filter((id) => {
+        const attributes = definitionForInstance(id, index).card.attributes;
+        return (
+          (typeof binding.parameters.maximumEnergy !== "number" ||
+            (attributes.energy ?? 0) <= binding.parameters.maximumEnergy) &&
+          (typeof binding.parameters.maximumPower !== "number" ||
+            (attributes.power ?? 0) <= binding.parameters.maximumPower)
+        );
+      });
       const maximum = numberParam(binding, "maximumCount");
       const minimum = binding.parameters.requireMaximumAvailable === true
         ? Math.min(maximum, legalIds.length)
@@ -486,6 +515,9 @@ export function createPrimitiveHandlers(
         );
       return {
         kind: "card" as const,
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
         label: "gear",
         legalIds,
         minimum: numberParam(binding, "minimumCount"),
@@ -665,6 +697,75 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("ability.play_token", handlers.get("action.play_token")!);
+  handlers.set("action.play_selected_unit", {
+    choice(binding, context) {
+      const unitId = selectionForSource(binding, context)[0];
+      if (!unitId) return null;
+      const destinations = [
+        { id: "base", label: "Base" },
+        ...context.game.state.battlefields
+          .filter(
+            (battlefield) =>
+              battlefield.controllerPlayerId === context.controllerPlayerId,
+          )
+          .map((battlefield) => ({
+            id: battlefield.battlefieldId,
+            label: `Battlefield: ${definitionForInstance(
+              battlefield.cardInstanceId,
+              index,
+            ).card.name}`,
+          })),
+      ];
+      return {
+        kind: "tokenPlacement" as const,
+        prompt: "Choose where to play the selected Unit.",
+        tokenName: definitionForInstance(unitId, index).card.name,
+        legalIds: destinations.map((destination) => destination.id),
+        minimum: 1,
+        maximum: 1,
+        destinations,
+      };
+    },
+    execute(binding, context) {
+      const unitId = selectionForSource(binding, context)[0];
+      const destinationId = selectionFor(binding, context)[0];
+      if (!unitId || !destinationId) return;
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      if (!player.zones.trash.includes(unitId)) return;
+      const definition = definitionForInstance(unitId, index);
+      if (definition.card.classification.type !== "Unit") return;
+      const destination =
+        destinationId === "base"
+          ? null
+          : context.game.state.battlefields.find(
+              (battlefield) => battlefield.battlefieldId === destinationId,
+            );
+      if (destinationId !== "base" &&
+        destination?.controllerPlayerId !== context.controllerPlayerId) {
+        return;
+      }
+      player.zones.trash = player.zones.trash.filter((id) => id !== unitId);
+      if (destination) destination.units.push(unitId);
+      else player.zones.base.push(unitId);
+      const state = context.game.state.cardStates[unitId];
+      if (state) {
+        state.exhausted = true;
+        state.damage = 0;
+        state.stunned = false;
+        incrementObjectVersion(context.game, unitId);
+      }
+      recomputeMight(context.game, unitId, index);
+      (context.game.state.queuedBehaviorEvents ??= []).push({
+        type: "card.played",
+        actorPlayerId: context.controllerPlayerId,
+        subjectCardInstanceId: unitId,
+        values: {
+          "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0,
+          "eventSubject.effectiveEnergyCost": 0,
+        },
+      });
+    },
+  });
   handlers.set("action.deal_damage", {
     execute(binding, context) {
       const amount = effectiveNumericValue({
@@ -685,6 +786,14 @@ export function createPrimitiveHandlers(
         state.damage += amount;
         incrementObjectVersion(context.game, id);
       }
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...ids.map((id) => ({
+          type: "unit.damaged",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: { amount },
+        })),
+      );
       cleanupLethalDamage(context.game, ids, index);
       for (const id of ids) {
         const owner = index.instances.get(id)?.ownerPlayerId;
@@ -720,6 +829,9 @@ export function createPrimitiveHandlers(
     execute(binding, context) {
       const ids = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
+        : binding.parameters.target === "event_subject" &&
+            context.event?.subjectCardInstanceId
+          ? [context.event.subjectCardInstanceId]
         : selectionFor(binding, context).length > 0
           ? selectionFor(binding, context)
           : context.selectedIds;
@@ -1066,6 +1178,19 @@ export function createPrimitiveHandlers(
       });
     },
   });
+  handlers.set("modifier.enable_source_triggers", {
+    execute(binding, context) {
+      context.game.state.ongoingEffects.push({
+        id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+        behaviorId: binding.behaviorId,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        targetCardInstanceIds: [],
+        duration: stringParam(binding, "duration"),
+        createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+      });
+    },
+  });
   return handlers;
 }
 
@@ -1172,6 +1297,11 @@ function selectorTargets(
         !game.state.cardStates[id]?.exhausted ||
         lockedSelectedIds.includes(id),
     )
+    .filter(
+      (id) =>
+        binding.parameters.buffedOnly !== true ||
+        game.state.cardStates[id]?.buffed === true,
+    )
     .filter((id) =>
       unitLocationRelationMatches(
         game,
@@ -1198,7 +1328,9 @@ function selectorTargets(
     ...(binding.parameters.selectionPurpose === "optionalCost"
       ? {
           selectionPurpose: "optionalCost" as const,
-          label: "ready friendly unit to exhaust (optional)",
+          label: binding.parameters.buffedOnly === true
+            ? "friendly Unit with a Buff to spend (optional)"
+            : "ready friendly unit to exhaust (optional)",
         }
       : {}),
     legalIds,
@@ -1414,6 +1546,14 @@ function tokenDefinitionForBinding(
     throw new Error(`Token definition is unavailable: ${cardCode}`);
   }
   return definition;
+}
+
+function selectionForSource(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const key = binding.parameters.sourceSelectionKey;
+  return typeof key === "string" ? context.selectedBySelector[key] ?? [] : [];
 }
 
 function lookedCardsFor(
@@ -1751,7 +1891,11 @@ function unitLocationRelationMatches(
     );
     return sourceBattlefield?.units.includes(targetId) ?? false;
   }
-  if (relation !== "sourceLocation" && relation !== "sharedLocation") {
+  if (
+    relation !== "sourceLocation" &&
+    relation !== "selectedTargetLocation" &&
+    relation !== "sharedLocation"
+  ) {
     return true;
   }
   const sourceLocation = boardLocationForUnit(game, sourceId);
@@ -1762,6 +1906,16 @@ function unitLocationRelationMatches(
     sourceLocation.kind === targetLocation.kind &&
     sourceLocation.id === targetLocation.id
   );
+}
+
+function selectorReferenceSource(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const key = binding.parameters.referenceSelectionKey;
+  return typeof key === "string"
+    ? context.selectedBySelector[key]?.[0] ?? context.sourceCardInstanceId
+    : context.sourceCardInstanceId;
 }
 
 function boardLocationForUnit(game: GameDocument, unitId: string) {

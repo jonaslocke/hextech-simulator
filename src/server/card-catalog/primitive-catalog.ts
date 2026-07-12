@@ -151,12 +151,15 @@ export type GameEventKind = (typeof gameEventKinds)[number];
 
 export const unitScopeKinds = ["any", "each", "friendly", "enemy"] as const;
 
+export const selectionPlayerKinds = ["controller", "opponent"] as const;
+
 export const unitTargetAreas = ["board", "base", "battlefield", "combat"] as const;
 
 export const unitLocationRelations = [
   "any",
   "sourceLocation",
   "sourceBattlefield",
+  "selectedTargetLocation",
   "sharedLocation",
   "currentCombat",
   "eventBattlefield"
@@ -478,6 +481,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     listensToEvents: ["unit.died"],
     engineSupport: supported("Own-death triggers are queued after the unit leaves play.")
   }),
+  "trigger.on_damage": primitiveSeed({
+    id: "trigger.on_damage",
+    family: "trigger",
+    name: "Damage trigger",
+    description: "Creates an effect when a Unit takes damage.",
+    parameters: [
+      required("subject", "string", "The damaged Unit relationship that fires the trigger.", ["any_unit", "source", "friendly_unit", "enemy_unit"]),
+    ],
+    listensToEvents: ["unit.damaged"],
+    engineSupport: supported("Matches the shared Unit-damage event."),
+  }),
   "trigger.second_card_played": primitiveSeed({
     id: "trigger.second_card_played",
     family: "trigger",
@@ -591,7 +605,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ,optional("automatic", "boolean", "Whether the affected units are derived automatically.")
       ,optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card.")
       ,optional("readyOnly", "boolean", "Whether only ready units are legal.")
+      ,optional("buffedOnly", "boolean", "Whether only units with a Buff are legal.")
       ,optional("selectionKey", "string", "Stable key used to route this selection.")
+      ,optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target.")
+      ,optional("selectionPlayer", "player", "Player who makes this selection.", selectionPlayerKinds)
       ,optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
@@ -610,8 +627,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
+      optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
       optional("readyOnly", "boolean", "Whether only ready units are legal."),
+      optional("buffedOnly", "boolean", "Whether only units with a Buff are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target."),
+      optional("selectionPlayer", "player", "Player who makes this selection.", selectionPlayerKinds),
       optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
@@ -630,7 +651,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
-      optional("selectionKey", "string", "Stable key used to route this selection.")
+      optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
+      optional("buffedOnly", "boolean", "Whether only units with a Buff are legal."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target."),
+      optional("selectionPlayer", "player", "Player who makes this selection.", selectionPlayerKinds)
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
@@ -646,6 +671,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("owner", "player", "The required owner relationship."),
       required("minimumCount", "number", "The minimum selection count."),
       required("maximumCount", "number", "The maximum selection count."),
+      optional("maximumEnergy", "number", "Maximum printed Energy cost for legal cards."),
+      optional("maximumPower", "number", "Maximum printed Power cost for legal cards."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
       optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
@@ -994,6 +1023,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["unit.stunned"],
     engineSupport: supported("Stunned units do not contribute Might in combat and clear at the next Ending Step.")
   }),
+  "action.play_selected_unit": primitiveSeed({
+    id: "action.play_selected_unit",
+    family: "action",
+    name: "Play selected Unit",
+    description: "Plays a selected Unit from a permitted zone without paying its normal cost.",
+    parameters: [
+      required("sourceSelectionKey", "string", "Selector key containing the Unit to play."),
+      required("selectionKey", "string", "Key storing the chosen destination."),
+    ],
+    engineSupport: supported("Places the selected Unit at a legal Base or controlled battlefield destination."),
+  }),
   "action.recycle_top_cards": primitiveSeed({
     id: "action.recycle_top_cards",
     family: "action",
@@ -1312,6 +1352,18 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Instead replacement",
     description: "Replaces an event or result before it happens."
   }),
+  "cost.spend_buff": primitiveSeed({
+    id: "cost.spend_buff",
+    family: "cost",
+    name: "Spend Buff cost",
+    description: "Removes a Buff from a selected Unit as an optional additional cost.",
+    parameters: [
+      required("selectionKey", "string", "Cost selector key."),
+      optional("optional", "boolean", "Whether the cost may be declined."),
+      optional("ignoreBaseCost", "boolean", "Whether paying this cost ignores the card's normal cost."),
+    ],
+    engineSupport: supported("Paid during the card-play process before resolution."),
+  }),
   "condition.non_token": primitiveSeed({
     id: "condition.non_token",
     family: "condition",
@@ -1330,6 +1382,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Prevents opponents from playing cards for the stated duration.",
     parameters: [required("duration", "duration", "How long the restriction lasts.")],
     engineSupport: supported("Card-play action generation respects active player restrictions."),
+  }),
+  "modifier.enable_source_triggers": primitiveSeed({
+    id: "modifier.enable_source_triggers",
+    family: "modifier",
+    name: "Enable source triggers",
+    description: "Keeps the source card's triggered clauses active for a duration after it leaves normal play zones.",
+    parameters: [required("duration", "duration", "How long the source triggers remain active.")],
+    engineSupport: supported("Registers the source as an active trigger provider for the stated duration."),
   }),
   "prevention.prevent": primitiveSeed({
     id: "prevention.prevent",
