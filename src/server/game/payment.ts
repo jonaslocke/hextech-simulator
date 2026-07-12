@@ -12,6 +12,7 @@ export type PaymentPlan = {
   energySourceIds: string[];
   generatedConditionalEnergy: number;
   generatedPooledEnergy: number;
+  conditionalPowerFromPool: Record<string, number>;
   powerFromPool: Record<string, number>;
   powerRuneIds: string[];
 };
@@ -40,8 +41,15 @@ export function buildPaymentPlan(
     (domain) => domain !== "Colorless",
   );
   if (remainingPower > 0 && allowedDomains.length === 0) return null;
+  const conditionalPowerFromPool: Record<string, number> = {};
   const powerFromPool: Record<string, number> = {};
   for (const domain of [...allowedDomains, "Rainbow"]) {
+    const conditionalSpend =
+      definition.card.classification.type === "Spell"
+        ? Math.min(player.conditionalPower?.[domain] ?? 0, remainingPower)
+        : 0;
+    if (conditionalSpend > 0) conditionalPowerFromPool[domain] = conditionalSpend;
+    remainingPower -= conditionalSpend;
     const spend = Math.min(player.power[domain] ?? 0, remainingPower);
     if (spend > 0) powerFromPool[domain] = spend;
     remainingPower -= spend;
@@ -70,6 +78,19 @@ export function buildPaymentPlan(
     if (spend > 0) {
       powerFromPool[domain] = (powerFromPool[domain] ?? 0) + spend;
       remainingAnyPower -= spend;
+    }
+  }
+  if (definition.card.classification.type === "Spell") {
+    for (const domain of Object.keys(player.conditionalPower ?? {}).sort()) {
+      const available =
+        (player.conditionalPower?.[domain] ?? 0) -
+        (conditionalPowerFromPool[domain] ?? 0);
+      const spend = Math.min(available, remainingAnyPower);
+      if (spend > 0) {
+        conditionalPowerFromPool[domain] =
+          (conditionalPowerFromPool[domain] ?? 0) + spend;
+        remainingAnyPower -= spend;
+      }
     }
   }
   if (remainingAnyPower > 0) return null;
@@ -116,6 +137,7 @@ export function buildPaymentPlan(
     energySourceIds,
     generatedConditionalEnergy,
     generatedPooledEnergy,
+    conditionalPowerFromPool,
     powerFromPool,
     powerRuneIds,
   };
@@ -145,6 +167,10 @@ export function payCardCost(
   player.energy -= plan.pooledEnergy;
   player.conditionalEnergy += plan.generatedConditionalEnergy;
   player.energy += plan.generatedPooledEnergy;
+  for (const [domain, amount] of Object.entries(plan.conditionalPowerFromPool)) {
+    const conditionalPower = (player.conditionalPower ??= {});
+    conditionalPower[domain] = (conditionalPower[domain] ?? 0) - amount;
+  }
   plan.energySourceIds.forEach((id) => {
     game.state.cardStates[id]!.exhausted = true;
   });

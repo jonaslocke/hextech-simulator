@@ -96,7 +96,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
-| OGN | 6 unique cards | Kai'Sa deck: Kai'Sa, Survivor; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat | Unit/Spell | 6 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Partial; remaining Kai'Sa cards still block deck synchronization | Added source-unit conquer trigger on 2026-07-12. |
+| OGN | 18 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain | Legend/Unit/Spell/Battlefield | 18 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Partial; remaining Kai'Sa cards still block deck synchronization | Added automatic affected-unit resolution, battlefield defend triggers, spell-only Power accounting, temporary keyword grants, trash-count modifiers, turn-scoped card-play restrictions, and deferred repeated target selection on 2026-07-12. |
 
 ## Token Coverage Ledger
 

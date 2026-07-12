@@ -155,6 +155,7 @@ export const unitTargetAreas = ["board", "base", "battlefield", "combat"] as con
 export const unitLocationRelations = [
   "any",
   "sourceLocation",
+  "sourceBattlefield",
   "sharedLocation",
   "currentCombat",
   "eventBattlefield"
@@ -230,6 +231,7 @@ export const behaviorDurationKinds = [
 
 export const numericOperandKinds = [
   "constant",
+  "controllerTrashCount",
   "sourceMight",
   "selectedUnitMight",
   "highestControlledUnitMight",
@@ -440,6 +442,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates an effect when the source defends.",
     listensToEvents: ["unit.defends"]
   }),
+  "trigger.defend_at_source_battlefield": primitiveSeed({
+    id: "trigger.defend_at_source_battlefield",
+    family: "trigger",
+    name: "Defend at source battlefield trigger",
+    description: "Creates an effect when a unit defends at the source battlefield.",
+    listensToEvents: ["unit.defends"],
+    engineSupport: supported("Matches the defender event's battlefield against the source battlefield."),
+  }),
   "trigger.on_death": primitiveSeed({
     id: "trigger.on_death",
     family: "trigger",
@@ -554,6 +564,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("locationRelation", "locationRelation", "How target locations relate to the behavior source or other targets."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source.")
       ,optional("automatic", "boolean", "Whether the affected units are derived automatically.")
+      ,optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card.")
       ,optional("readyOnly", "boolean", "Whether only ready units are legal.")
       ,optional("selectionKey", "string", "Stable key used to route this selection.")
       ,optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
@@ -986,6 +997,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [required("amount", "number", "The Energy reduction.")],
     engineSupport: supported("The card-play cost evaluator applies the discount before payment."),
   }),
+  "modifier.grant_keyword": primitiveSeed({
+    id: "modifier.grant_keyword",
+    family: "modifier",
+    name: "Grant keyword",
+    description: "Grants a keyword amount to selected units for a defined duration.",
+    parameters: [
+      required("keywordId", "string", "The granted keyword behavior id."),
+      optional("amount", "number", "The keyword amount."),
+      required("target", "target", "The units receiving the keyword."),
+      required("duration", "duration", "How long the granted keyword lasts."),
+    ],
+    engineSupport: supported("Temporary keyword grants use the shared modifier lifecycle."),
+  }),
   "condition.if": primitiveSeed({
     id: "condition.if",
     family: "condition",
@@ -1168,6 +1192,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "replacement",
     name: "Instead replacement",
     description: "Replaces an event or result before it happens."
+  }),
+  "modifier.cannot_play_cards": primitiveSeed({
+    id: "modifier.cannot_play_cards",
+    family: "modifier",
+    name: "Cannot play cards",
+    description: "Prevents opponents from playing cards for the stated duration.",
+    parameters: [required("duration", "duration", "How long the restriction lasts.")],
+    engineSupport: supported("Card-play action generation respects active player restrictions."),
   }),
   "prevention.prevent": primitiveSeed({
     id: "prevention.prevent",

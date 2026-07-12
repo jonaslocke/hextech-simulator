@@ -209,6 +209,7 @@ export const projectedPlayerSchema = z.object({
   points: z.number().int().nonnegative(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
+  conditionalPower: z.record(z.number().int().nonnegative()).optional(),
   power: z.record(z.number().int().nonnegative()),
   zones: z.array(projectedZoneSchema),
 });

@@ -942,7 +942,9 @@ function passPriority(
                   controller,
                   handlers,
                 ),
-                targetsLocked: true,
+                targetsLocked: !clause.selectors.some(
+                  (selector) => selector.parameters.deferred === true,
+                ),
                 decks,
               });
               if (definition.card.classification.type === "Spell") {
@@ -1306,6 +1308,7 @@ function addPlayableCardActions(
   index: RuntimeCardIndex,
   timing: TurnTiming,
 ) {
+  if (isCardPlayRestricted(game, playerId)) return;
   const player = game.state.players[playerId]!;
   const handlers = createPrimitiveHandlers(index);
   for (const cardId of [
@@ -1456,6 +1459,7 @@ function addHiddenPlayActions(
   decks: readonly DeckSnapshotDocument[],
   index: RuntimeCardIndex,
 ) {
+  if (isCardPlayRestricted(game, playerId)) return;
   const turn = game.state.turn;
   if (!turn || turn.activePlayerId === playerId) return;
   for (const battlefield of game.state.battlefields) {
@@ -1617,9 +1621,13 @@ function addAbilityActions(
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
             : ability.behaviorId === "ability.exhaust_for_resource"
-              ? ability.parameters.usage === "spellsOnly"
-                ? "Add spell Energy"
-                : "Add Energy"
+              ? ability.parameters.resourceType === "power"
+                ? ability.parameters.usage === "spellsOnly"
+                  ? `Add spell Power [${ability.parameters.domain}]`
+                  : `Add Power [${ability.parameters.domain}]`
+                : ability.parameters.usage === "spellsOnly"
+                  ? "Add spell Energy"
+                  : "Add Energy"
               : `${definition.card.name} ability`;
         actions.push(
           action(
@@ -1961,6 +1969,7 @@ function clauseCanRequirePlaySelections(
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
 ) {
   if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (clause.selectors.some((selector) => selector.parameters.deferred === true)) return false;
   if (definition.card.classification.type !== "Unit") return true;
   return !looksLikeNonPlayUnitText(clause.sourceText);
 }
@@ -2083,6 +2092,15 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     throw new Error("Selected targets are not legal for this action.");
   }
 }
+function isCardPlayRestricted(game: GameDocument, playerId: string) {
+  return game.state.ongoingEffects.some(
+    (effect) =>
+      effect.behaviorId === "modifier.cannot_play_cards" &&
+      effect.controllerPlayerId !== playerId &&
+      effect.duration === "thisTurn",
+  );
+}
+
 function otherPlayer(game: GameDocument, playerId: string) {
   return game.state.setup.playerIds.find((id) => id !== playerId)!;
 }

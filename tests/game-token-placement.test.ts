@@ -9,12 +9,15 @@ import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  cleanupTurnModifiers,
   moveUnitToTrash,
+  recomputeMight,
 } from "../src/server/game/primitive-handlers";
 import { getTokenCatalogDefinition } from "../src/server/game/token-catalog";
 import { gameplayActions, performGameplayAction } from "../src/server/game";
 import { dispatchBehaviorEvent } from "../src/server/game/triggers";
 import { clearStunned } from "../src/server/game/board-rules";
+import { buildPaymentPlan, payCardCost } from "../src/server/game/payment";
 import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { GameDocument } from "../src/server/game/state";
@@ -669,6 +672,422 @@ test("Hidden cards use an empty controlled facedown slot and play free next turn
   });
   assert.deepEqual(played.state.battlefields[0]?.units, ["hidden"]);
   assert.equal(played.state.battlefields[0]?.facedownCardInstanceId, null);
+});
+
+test("automatic enemy-unit modifiers affect every enemy without a target choice", () => {
+  const watcher = unit("WATCHER", "Thousand-Tailed Watcher", [
+    clause("play", {
+      triggers: [
+        binding("trigger.on_play", 0, { actor: "controller", subject: "source" }),
+      ],
+      selectors: [
+        binding("selector.enemy_unit", 1, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 0,
+          automatic: true,
+        }),
+      ],
+      effects: [
+        binding("modifier.modify_numeric_value", 2, {
+          attribute: "might",
+          operation: "reduce",
+          operand: "constant",
+          amount: 3,
+          target: "enemy_unit",
+          duration: "thisTurn",
+          minimum: 1,
+        }),
+      ],
+    }),
+  ]);
+  const enemyBase = unit("ENEMY_BASE", "Enemy Base");
+  enemyBase.card.attributes.might = 2;
+  const enemyField = unit("ENEMY_FIELD", "Enemy Field");
+  enemyField.card.attributes.might = 6;
+  const { game, decks } = fixture([watcher, unit("ALLY", "Ally"), enemyBase, enemyField]);
+  decks[0]!.instances.push(instance("watcher", "p1", "WATCHER"), instance("ally", "p1", "ALLY"));
+  decks[1]!.instances.push(instance("enemy-base", "p2", "ENEMY_BASE"), instance("enemy-field", "p2", "ENEMY_FIELD"));
+  game.state.players.p1!.zones.base.push("watcher", "ally");
+  game.state.players.p2!.zones.base.push("enemy-base");
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "field-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["enemy-field"],
+  });
+  game.state.cardStates.watcher = cardState(7);
+  game.state.cardStates.ally = cardState(4);
+  game.state.cardStates["enemy-base"] = cardState(2);
+  game.state.cardStates["enemy-field"] = cardState(6);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(watcher.behaviorModel, handlers).clauses[0]!;
+  const result = executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "watcher", {
+      type: "card.played",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "watcher",
+      values: {},
+    }, []),
+    handlers,
+  });
+
+  assert.equal(result.executed, true);
+  assert.equal(game.state.cardStates.ally?.computedMight, 4);
+  assert.equal(game.state.cardStates["enemy-base"]?.computedMight, 1);
+  assert.equal(game.state.cardStates["enemy-field"]?.computedMight, 3);
+});
+
+test("battlefield defend triggers can optionally move a friendly defender to base", () => {
+  const reaversRow = battlefield("REAVERS_ROW", "Reaver's Row");
+  reaversRow.behaviorModel.clauses = [
+    clause("defend-here", {
+      triggers: [binding("trigger.defend_at_source_battlefield", 0)],
+      selectors: [
+        binding("selector.friendly_unit", 1, {
+          area: "battlefield",
+          locationRelation: "sourceBattlefield",
+          controller: "controller",
+          minimumCount: 0,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [binding("action.move_unit", 2, { destination: "base", count: 1 })],
+    }),
+  ];
+  const { game, decks } = fixture([reaversRow, unit("DEFENDER", "Defender")]);
+  decks[0]!.instances.push(instance("reavers-row", "p1", "REAVERS_ROW", "battlefield"), instance("defender", "p1", "DEFENDER"));
+  game.state.battlefields.push({
+    battlefieldId: "row",
+    cardInstanceId: "reavers-row",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["defender"],
+  });
+  game.state.cardStates["reavers-row"] = cardState(null);
+  game.state.cardStates.defender = cardState(1);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(reaversRow.behaviorModel, handlers).clauses[0]!;
+  const result = executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "reavers-row", {
+      type: "unit.defends",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "defender",
+      values: { battlefieldId: "row" },
+    }, ["defender"]),
+    handlers,
+  });
+
+  assert.equal(result.executed, true);
+  assert.deepEqual(game.state.battlefields[0]?.units, []);
+  assert.deepEqual(game.state.players.p1!.zones.base, ["defender"]);
+});
+
+test("automatic friendly-unit exhaustion resolves before battlefield-wide damage", () => {
+  const uncheckedPower = unit("UNCHECKED_POWER", "Unchecked Power", [
+    clause("resolve", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          controller: "controller",
+          minimumCount: 0,
+          automatic: true,
+        }),
+        binding("selector.unit", 1, {
+          scope: "each",
+          area: "battlefield",
+          locationRelation: "any",
+          minimumCount: 0,
+          automatic: true,
+        }),
+      ],
+      effects: [
+        binding("action.exhaust_cards", 2, { target: "friendly_unit" }),
+        binding("action.deal_damage", 3, { amount: 12, target: "unit" }),
+      ],
+    }),
+  ]);
+  uncheckedPower.card.classification.type = "Spell";
+  uncheckedPower.card.attributes.might = null;
+  const friendlyField = unit("FRIENDLY_FIELD", "Friendly Field");
+  const enemyField = unit("ENEMY_FIELD", "Enemy Field");
+  const { game, decks } = fixture([uncheckedPower, unit("FRIENDLY_BASE", "Friendly Base"), friendlyField, enemyField]);
+  decks[0]!.instances.push(
+    instance("unchecked-power", "p1", "UNCHECKED_POWER"),
+    instance("friendly-base", "p1", "FRIENDLY_BASE"),
+    instance("friendly-field", "p1", "FRIENDLY_FIELD"),
+  );
+  decks[1]!.instances.push(instance("enemy-field", "p2", "ENEMY_FIELD"));
+  game.state.players.p1!.zones.base.push("friendly-base");
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "field-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["friendly-field", "enemy-field"],
+  });
+  game.state.cardStates["friendly-base"] = cardState(1);
+  game.state.cardStates["friendly-field"] = cardState(1);
+  game.state.cardStates["enemy-field"] = cardState(1);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(uncheckedPower.behaviorModel, handlers).clauses[0]!;
+  const result = executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "unchecked-power", null, []),
+    handlers,
+  });
+
+  assert.equal(result.executed, true);
+  assert.deepEqual(
+    game.state.queuedBehaviorEvents?.map(
+      (event) => `${event.type}:${event.subjectCardInstanceId}`,
+    ),
+    [
+      "card.exhausted:friendly-base",
+      "card.exhausted:friendly-field",
+      "unit.died:friendly-field",
+      "unit.died:enemy-field",
+    ],
+  );
+  assert.equal(game.state.cardStates["friendly-base"]?.exhausted, true);
+  assert.ok(game.state.players.p1!.zones.trash.includes("friendly-field"));
+  assert.ok(game.state.players.p2!.zones.trash.includes("enemy-field"));
+});
+
+test("spell-only Power pays spells but not units", () => {
+  const legend = unit("LEGEND", "Kai'Sa - Daughter of the Void", [
+    clause("add-rainbow", {
+      abilities: [
+        binding("ability.exhaust_for_resource", 0, {
+          resourceType: "power",
+          amountSource: "constant",
+          amount: 1,
+          domain: "Rainbow",
+          usage: "spellsOnly",
+        }),
+      ],
+    }),
+  ]);
+  legend.card.classification.type = "Legend";
+  const spell = unit("SPELL", "Spell");
+  spell.card.classification.type = "Spell";
+  spell.card.classification.domain = ["Mind"];
+  spell.card.attributes.power = 1;
+  spell.card.attributes.might = null;
+  const unitCard = unit("UNIT", "Unit");
+  unitCard.card.classification.domain = ["Mind"];
+  unitCard.card.attributes.power = 1;
+  const { game, decks } = fixture([legend, spell, unitCard]);
+  decks[0]!.instances.push(instance("legend", "p1", "LEGEND", "legend"));
+  game.state.players.p1!.zones.legend = "legend";
+  game.state.cardStates.legend = cardState(null);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const ability = legend.behaviorModel.clauses[0]!.abilities[0]!;
+  handlers.get(ability.behaviorId)?.execute?.(
+    ability,
+    createBehaviorContext(game, "p1", "legend", null, []),
+  );
+
+  assert.deepEqual(game.state.players.p1!.conditionalPower, { Rainbow: 1 });
+  assert.ok(buildPaymentPlan(game, "p1", spell, 0, index));
+  assert.equal(buildPaymentPlan(game, "p1", unitCard, 0, index), null);
+  payCardCost(game, "p1", spell, 0, index);
+  assert.deepEqual(game.state.players.p1!.conditionalPower, { Rainbow: 0 });
+});
+
+test("temporary Assault grants Might only while the selected unit attacks", () => {
+  const cleave = unit("CLEAVE", "Cleave", [
+    clause("grant-assault", {
+      selectors: [
+        binding("selector.unit", 0, {
+          scope: "any",
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+        }),
+      ],
+      effects: [
+        binding("modifier.grant_keyword", 1, {
+          keywordId: "keyword.assault",
+          amount: 3,
+          target: "unit",
+          duration: "thisTurn",
+        }),
+      ],
+    }),
+  ]);
+  cleave.card.classification.type = "Spell";
+  const target = unit("TARGET", "Target");
+  target.card.attributes.might = 4;
+  const { game, decks } = fixture([cleave, target]);
+  decks[0]!.instances.push(instance("cleave", "p1", "CLEAVE"), instance("target", "p1", "TARGET"));
+  game.state.players.p1!.zones.base.push("target");
+  game.state.cardStates.target = { ...cardState(4), combatRole: "attacker" };
+
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(cleave.behaviorModel, handlers).clauses[0]!;
+  executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "cleave", null, ["target"]),
+    handlers,
+  });
+  assert.equal(game.state.cardStates.target?.computedMight, 7);
+
+  cleanupTurnModifiers(game, index);
+  assert.equal(game.state.cardStates.target?.computedMight, 4);
+});
+
+test("trash-count Might updates and Beginning triggers recycle selected trash cards", () => {
+  const mundo = unit("MUNDO", "Dr. Mundo, Expert", [
+    clause("trash-might", {
+      effects: [
+        binding("modifier.modify_numeric_value", 0, {
+          attribute: "might",
+          operation: "increase",
+          operand: "controllerTrashCount",
+          target: "source",
+          duration: "whileSourceOnBoard",
+        }),
+      ],
+    }),
+    { ...clause("beginning-recycle", {
+      triggers: [binding("trigger.beginning", 0, { player: "controller" })],
+      selectors: [
+        binding("selector.card", 1, {
+          zone: "trash",
+          cardType: "any",
+          owner: "controller",
+          minimumCount: 0,
+          maximumCount: 3,
+        }),
+      ],
+      effects: [binding("action.recycle_cards", 2, { target: "card", count: 3 })],
+    }), sequence: 1 },
+  ]);
+  mundo.card.attributes.might = 3;
+  const { game, decks } = fixture([mundo, unit("TRASH", "Trash")]);
+  decks[0]!.instances.push(
+    instance("mundo", "p1", "MUNDO"),
+    instance("trash-a", "p1", "TRASH"),
+    instance("trash-b", "p1", "TRASH"),
+  );
+  game.state.players.p1!.zones.base.push("mundo");
+  game.state.players.p1!.zones.trash.push("trash-a", "trash-b");
+  game.state.cardStates.mundo = cardState(3);
+  game.state.cardStates["trash-a"] = cardState(1);
+  game.state.cardStates["trash-b"] = cardState(1);
+
+  const index = createRuntimeCardIndex(decks, game);
+  recomputeMight(game, "mundo", index);
+  assert.equal(game.state.cardStates.mundo?.computedMight, 5);
+
+  const started = beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "mundo",
+    clauseId: "beginning-recycle",
+    selectedIds: ["trash-a", "trash-b"],
+    decks,
+  });
+  assert.equal(started, true);
+  assert.deepEqual(game.state.players.p1!.zones.trash, []);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["trash-a", "trash-b"]);
+  assert.equal(game.state.cardStates.mundo?.computedMight, 3);
+});
+
+test("turn-scoped card-play restrictions remove an opponent's play actions", () => {
+  const brynhir = unit("BRYNHIR", "Brynhir Thundersong", [
+    clause("restrict", {
+      triggers: [
+        binding("trigger.on_play", 0, { actor: "controller", subject: "source" }),
+      ],
+      effects: [
+        binding("modifier.cannot_play_cards", 1, { duration: "thisTurn" }),
+      ],
+    }),
+  ]);
+  const spell = unit("SPELL", "Spell");
+  spell.card.classification.type = "Spell";
+  const { game, decks } = fixture([brynhir, spell]);
+  decks[0]!.instances.push(instance("brynhir", "p1", "BRYNHIR"));
+  decks[1]!.instances.push(instance("spell", "p2", "SPELL"));
+  game.state.players.p1!.zones.base.push("brynhir");
+  game.state.players.p2!.zones.hand.push("spell");
+  game.state.cardStates.brynhir = cardState(1);
+  game.state.cardStates.spell = cardState(null);
+  game.state.turn = { turnNumber: 1, activePlayerId: "p2", phase: "action" };
+
+  assert.ok(
+    gameplayActions(game, "p2", decks).some(
+      (action) => action.sourceCardInstanceId === "spell",
+    ),
+  );
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(brynhir.behaviorModel, handlers).clauses[0]!;
+  executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "brynhir", {
+      type: "card.played",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "brynhir",
+      values: {},
+    }, []),
+    handlers,
+  });
+
+  assert.equal(
+    gameplayActions(game, "p2", decks).some(
+      (action) => action.sourceCardInstanceId === "spell",
+    ),
+    false,
+  );
+});
+
+test("deferred repeated targets can select the same unit for each hit", () => {
+  const fallingStar = unit("FALLING_STAR", "Falling Star", [
+    clause("repeat-damage", {
+      selectors: [
+        binding("selector.unit", 0, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "firstTarget", deferred: true }),
+        binding("selector.unit", 1, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "secondTarget", deferred: true }),
+      ],
+      effects: [
+        binding("action.deal_damage", 2, { amount: 3, target: "unit", selectionKey: "firstTarget" }),
+        binding("action.deal_damage", 3, { amount: 3, target: "unit", selectionKey: "secondTarget" }),
+      ],
+    }),
+  ]);
+  fallingStar.card.classification.type = "Spell";
+  const target = unit("TARGET", "Target");
+  target.card.attributes.might = 10;
+  const { game, decks } = fixture([fallingStar, target]);
+  decks[0]!.instances.push(instance("falling-star", "p1", "FALLING_STAR"), instance("target", "p2", "TARGET"));
+  game.state.players.p2!.zones.base.push("target");
+  game.state.cardStates.target = cardState(10);
+
+  assert.equal(beginEffectResolution({ game, controllerPlayerId: "p1", sourceCardInstanceId: "falling-star", clauseId: "repeat-damage", decks }), false);
+  let action = gameplayActions(game, "p1", decks).find((candidate) => candidate.choice?.kind === "effectSelection");
+  assert.ok(action);
+  let next = performGameplayAction({ game, actorPlayerId: "p1", actionId: action.id, selectedIds: ["target"], decks, now: "first-hit" });
+  action = gameplayActions(next, "p1", decks).find((candidate) => candidate.choice?.kind === "effectSelection");
+  assert.ok(action);
+  next = performGameplayAction({ game: next, actorPlayerId: "p1", actionId: action.id, selectedIds: ["target"], decks, now: "second-hit" });
+
+  assert.equal(next.state.cardStates.target?.damage, 6);
 });
 
 test("Temporary token dies at its controller's Beginning Phase", () => {

@@ -39,6 +39,7 @@ export const playerStateSchema = z.object({
   scoredBattlefieldIdsThisTurn: z.array(z.string()).optional(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
+  conditionalPower: z.record(z.number().int().nonnegative()).optional(),
   power: z.record(z.number().int().nonnegative()),
   playedMainDeckCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   legionSatisfiedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
@@ -478,6 +479,7 @@ export function createInitialGame(input: {
           scoredBattlefieldIdsThisTurn: [],
           energy: 0,
           conditionalEnergy: 0,
+          conditionalPower: {},
           power: {},
           zones: {
             legend: null,

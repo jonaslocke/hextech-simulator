@@ -100,6 +100,7 @@ export function projectGame(input: {
       points: player.points ?? 0,
       energy: player.energy,
       conditionalEnergy: player.conditionalEnergy,
+      conditionalPower: player.conditionalPower ?? {},
       power: player.power,
       zones,
     };

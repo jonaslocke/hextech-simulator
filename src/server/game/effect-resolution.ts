@@ -241,6 +241,16 @@ export function resumeEffectResolution(
         ? { automaticTargets: true }
         : {},
     );
+    for (const selector of clause.selectors) {
+      const selected =
+        frame.selectionsByBinding[
+          `${clause.id}:selectors:${selector.order}`
+        ] ?? [];
+      context.selectedBySelector[`${clause.id}:selectors:${selector.order}`] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+    }
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);

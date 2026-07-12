@@ -79,7 +79,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
       continue;
     }
     value = applyNumericOperation(value, {
-      amount: numberParameter(binding, "amount"),
+      amount: modifierOperandAmount(binding, input.game, controllerPlayerId),
       minimum:
         typeof binding.parameters.minimum === "number"
           ? binding.parameters.minimum
@@ -361,6 +361,17 @@ function numberParameter(binding: BehaviorBinding, key: string) {
   if (typeof value !== "number")
     throw new Error(`Behavior parameter ${key} must be numeric.`);
   return value;
+}
+
+function modifierOperandAmount(
+  binding: BehaviorBinding,
+  game: GameDocument,
+  controllerPlayerId: string,
+) {
+  if (binding.parameters.operand === "controllerTrashCount") {
+    return game.state.players[controllerPlayerId]?.zones.trash.length ?? 0;
+  }
+  return numberParameter(binding, "amount");
 }
 
 function stringParameter(binding: BehaviorBinding, key: string) {
