@@ -234,6 +234,12 @@ export function projectGame(input: {
                         )
                       : [],
                 }
+            : input.game.state.pendingChoice?.type === "binary"
+              ? {
+                  type: "binary", id: input.game.state.pendingChoice.id, playerId: input.game.state.pendingChoice.playerId,
+                  prompt: input.game.state.pendingChoice.prompt, acceptLabel: input.game.state.pendingChoice.acceptLabel,
+                  declineLabel: input.game.state.pendingChoice.declineLabel,
+                }
             : null,
     combat: input.game.state.combat
       ? {

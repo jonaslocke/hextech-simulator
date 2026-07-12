@@ -116,6 +116,16 @@ export function submitTokenPlacement(
   return resumeEffectResolution(game, frame.id, decks);
 }
 
+export function submitBinaryChoice(game: GameDocument, playerId: string, selectedIds: string[], decks: readonly DeckSnapshotDocument[]) {
+  const pending = game.state.pendingChoice;
+  if (!pending || pending.type !== "binary" || pending.playerId !== playerId || selectedIds.length !== 1 || !["accept", "decline"].includes(selectedIds[0]!)) throw new Error("Optional choice is invalid.");
+  const frame = game.state.effectResolutions.find((item) => item.id === pending.resolutionId);
+  if (!frame) throw new Error("Effect resolution is unavailable.");
+  frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
+  game.state.pendingChoice = null;
+  return resumeEffectResolution(game, frame.id, decks);
+}
+
 export function resumeEffectResolution(
   game: GameDocument,
   resolutionId: string,
@@ -188,8 +198,18 @@ export function resumeEffectResolution(
     return false;
   }
 
+  for (const binding of clause.choices as import("./schemas").BehaviorBinding[]) {
+    const bindingKey = `${clause.id}:choices:${binding.order}`;
+    if (frame.selectionsByBinding[bindingKey]) continue;
+    const requirement = handlers.get(binding.behaviorId)?.choice?.(binding, selectorContext);
+    if (!requirement || requirement.kind !== "binary") continue;
+    game.state.pendingChoice = { id: `choice:${frame.id}:${binding.order}`, playerId: frame.controllerPlayerId, type: "binary", resolutionId: frame.id, bindingKey, prompt: requirement.prompt, acceptLabel: requirement.acceptLabel ?? "Accept", declineLabel: requirement.declineLabel ?? "Decline" };
+    return false;
+  }
+
   while (frame.nextEffectIndex < clause.orderedEffects.length) {
-    const binding = clause.orderedEffects[frame.nextEffectIndex]!;
+    const binding: import("./schemas").BehaviorBinding =
+      clause.orderedEffects[frame.nextEffectIndex]!;
     const bindingKey = `${clause.id}:effects:${binding.order}`;
     const selectorSelections = clause.selectors.flatMap(
       (selector) =>
@@ -216,6 +236,11 @@ export function resumeEffectResolution(
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
+    const requiredChoiceKey = binding.parameters.requiresChoiceKey;
+    if (typeof requiredChoiceKey === "string" && frame.selectionsByBinding[requiredChoiceKey]?.[0] !== "accept") {
+      frame.nextEffectIndex += 1;
+      continue;
+    }
     const requirement = handler.choice?.(binding, context) ?? null;
     if (requirement && !frame.selectionsByBinding[bindingKey]) {
       if (requirement.kind === "tokenPlacement") {

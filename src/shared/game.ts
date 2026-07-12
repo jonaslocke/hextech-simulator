@@ -86,6 +86,10 @@ export const projectedActionSchema = z.object({
         choiceId: z.string().min(1),
         optionIds: z.array(z.string().min(1)),
       }),
+      z.object({
+        kind: z.literal("binary"), choiceId: z.string().min(1), prompt: z.string().min(1),
+        acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+      }),
     ])
     .nullable()
     .optional(),
@@ -340,6 +344,10 @@ export const gameProjectionSchema = z.object({
             label: z.string().min(1),
           }),
         ),
+      }),
+      z.object({
+        type: z.literal("binary"), id: z.string().min(1), playerId: z.string().min(1),
+        prompt: z.string().min(1), acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
       }),
       z.object({
         type: z.literal("assignCombatDamage"),

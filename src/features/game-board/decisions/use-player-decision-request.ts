@@ -190,6 +190,14 @@ export function buildPlayerDecisionRequest({
       }
     }
 
+    if (pendingChoice.type === "binary") {
+      const action = sourceProjection.actions.find((candidate) => candidate.choice?.kind === "binary" && candidate.choice.choiceId === pendingChoice.id);
+      if (action?.choice?.kind === "binary") {
+        return { actionId: action.id, decisionKey: pendingChoice.id, kind: "optionDecision", title: pendingChoice.prompt,
+          options: [{ id: "accept", label: pendingChoice.acceptLabel }, { id: "decline", label: pendingChoice.declineLabel }] };
+      }
+    }
+
     if (pendingChoice.type === "orderTriggers") {
       const action = sourceProjection.actions.find(
         (candidate) =>
@@ -291,6 +299,8 @@ export function buildPlayerDecisionRequest({
           message: pendingChoice.waitingMessage,
           title: pendingChoice.title,
         };
+      case "binary":
+        return { inspection: "none", kind: "pendingDecision", message: `Waiting for ${playerName} to decide: ${pendingChoice.prompt}`, title: pendingChoice.prompt };
       case "orderTriggers":
         return {
           inspection: "none",

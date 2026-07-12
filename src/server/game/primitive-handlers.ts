@@ -63,6 +63,13 @@ export function createPrimitiveHandlers(
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
     "keyword.ganking", "cost.exhaust_selected_unit",
   ]) handlers.set(id, passive);
+  handlers.set("choice.optional", {
+    choice(binding) {
+      return { kind: "binary", legalIds: ["accept", "decline"], minimum: 1, maximum: 1,
+        prompt: typeof binding.parameters.prompt === "string" ? binding.parameters.prompt : "Use this optional effect?",
+        acceptLabel: "Accept", declineLabel: "Decline" };
+    },
+  });
   handlers.set("modifier.play_unit_destination", {
     execute() {
       // The permission is consumed by the unit destination policy.

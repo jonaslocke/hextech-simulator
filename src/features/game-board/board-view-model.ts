@@ -130,6 +130,14 @@ export type BoardProjection = {
         tokenName: string;
         count: number;
         destinations: Array<{ id: string; label: string }>;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "binary";
+        prompt: string;
+        acceptLabel: string;
+        declineLabel: string;
       };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{

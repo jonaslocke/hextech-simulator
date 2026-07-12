@@ -171,6 +171,12 @@ const tokenPlacementChoiceSchema = z.object({
   destinationLabels: z.record(z.string().min(1)).default({}),
 });
 
+const binaryChoiceSchema = z.object({
+  id: z.string().min(1), playerId: z.string().min(1), type: z.literal("binary"),
+  resolutionId: z.string().min(1), bindingKey: z.string().min(1), prompt: z.string().min(1),
+  acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+});
+
 const damageAssignmentSchema = z.object({
   targetUnitId: z.string().min(1),
   amount: z.number().int().positive(),
@@ -276,6 +282,7 @@ export const gameStateSchema = z.object({
       combatDamageChoiceSchema,
       effectSelectionChoiceSchema,
       tokenPlacementChoiceSchema,
+      binaryChoiceSchema,
     ])
     .nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema),

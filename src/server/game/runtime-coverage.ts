@@ -47,6 +47,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "keyword.deflect": "executable",
   "keyword.ganking": "executable",
   "cost.exhaust_selected_unit": "executable",
+  "choice.optional": "executable",
   "replacement.recall_on_next_death": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 

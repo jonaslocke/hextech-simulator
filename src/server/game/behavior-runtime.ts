@@ -28,7 +28,7 @@ export type BehaviorHandler = {
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,
   ): {
-    kind?: "card" | "battlefield" | "tokenPlacement";
+    kind?: "card" | "battlefield" | "tokenPlacement" | "binary";
     legalIds: string[];
     minimum: number;
     maximum: number;
@@ -37,6 +37,8 @@ export type BehaviorHandler = {
     destinations?: Array<{ id: string; label: string }>;
     sourceZone?: "hand" | "trash" | "mainDeck";
     presentation?: "cardSelection" | "vision";
+    acceptLabel?: string;
+    declineLabel?: string;
   } | null;
 };
 

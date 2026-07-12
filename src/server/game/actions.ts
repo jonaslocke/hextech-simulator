@@ -59,6 +59,7 @@ import {
 import {
   beginEffectResolution,
   submitEffectSelection,
+  submitBinaryChoice,
   submitTokenPlacement,
   type TokenPlacement,
 } from "./effect-resolution";
@@ -163,6 +164,10 @@ export function gameplayActions(
           },
         ),
       );
+      return actions;
+    }
+    if (pendingChoice.type === "binary") {
+      actions.push(action(game, "submitChoice", pendingChoice.prompt, null, true, null, undefined, [{ kind: "card", label: pendingChoice.prompt, legalIds: ["accept", "decline"], minimum: 1, maximum: 1 }], { kind: "binary", choiceId: pendingChoice.id, prompt: pendingChoice.prompt, acceptLabel: pendingChoice.acceptLabel, declineLabel: pendingChoice.declineLabel }));
       return actions;
     }
     actions.push(
@@ -485,6 +490,13 @@ export function performGameplayAction(input: {
           input.tokenPlacements ?? [],
           input.decks,
         );
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (game.state.pendingChoice?.type === "binary") {
+        submitBinaryChoice(game, input.actorPlayerId, input.selectedIds, input.decks);
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);

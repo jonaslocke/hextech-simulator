@@ -147,6 +147,12 @@ Fresh Garen manual regression validation completed after this migration. The
 user confirmed Recruit the Vanguard, Faithful Manufactor, and Noxian Drummer
 token placement on 2026-07-11.
 
+The optional-choice foundation is also implemented. It creates a viewer-safe,
+server-validated Accept/Decline decision and records the result by a stable
+choice key. Effects with `requiresChoiceKey` execute only after the matching
+Accept decision. Card-specific optional costs and modes still require their
+own exact models and supporting cost or mode primitives.
+
 ## Manual Coverage to Reserve
 
 The two supplied decks exercise Hidden, Action, Reaction, Recruit creation,

@@ -326,6 +326,62 @@ test("move triggers can be limited to battlefield destinations", () => {
   );
 });
 
+test("optional choices branch effect resolution without exposing card targets", () => {
+  const source = unit("SOURCE", "Optional Effect", [
+    clause("optional", {
+      choices: [binding("choice.optional", 0, {
+        player: "controller", selectionKey: "optional", prompt: "Draw a card?",
+      })],
+      effects: [binding("action.draw_cards", 1, {
+        player: "controller", count: 1, requiresChoiceKey: "optional:choices:0",
+      })],
+    }),
+  ]);
+  const draw = unit("DRAW", "Draw");
+  const { game, decks } = fixture([source, draw]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("draw", "p1", "DRAW"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.draw = cardState(1);
+
+  assert.equal(beginEffectResolution({ game, controllerPlayerId: "p1", sourceCardInstanceId: "source", clauseId: "optional", decks }), false);
+  const choice = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "binary");
+  assert.ok(choice);
+
+  const declined = performGameplayAction({ game, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["decline"], decks, now: "decline" });
+  assert.deepEqual(declined.state.players.p1!.zones.hand, []);
+});
+
+test("accepted optional choices execute their gated effects", () => {
+  const source = unit("SOURCE", "Optional Effect", [
+    clause("optional", {
+      choices: [binding("choice.optional", 0, {
+        player: "controller", selectionKey: "optional", prompt: "Draw a card?",
+      })],
+      effects: [binding("action.draw_cards", 1, {
+        player: "controller", count: 1, requiresChoiceKey: "optional:choices:0",
+      })],
+    }),
+  ]);
+  const draw = unit("DRAW", "Draw");
+  const { game, decks } = fixture([source, draw]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("draw", "p1", "DRAW"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.draw = cardState(1);
+
+  beginEffectResolution({ game, controllerPlayerId: "p1", sourceCardInstanceId: "source", clauseId: "optional", decks });
+  const choice = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "binary");
+  assert.ok(choice);
+
+  const accepted = performGameplayAction({ game, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["accept"], decks, now: "accept" });
+  assert.deepEqual(accepted.state.players.p1!.zones.hand, ["draw"]);
+});
+
 test("global conquer trigger can be gated by units at conquered battlefield", () => {
   const legend = unit("LEGEND", "Might of Demacia", [
     clause("conquer-four", {

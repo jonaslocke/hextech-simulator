@@ -1029,8 +1029,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "choice",
     name: "Optional choice",
     description: "Lets a player decide whether to apply an optional behavior.",
-    parameters: [required("player", "player", "The player who may choose to apply the behavior.")],
-    engineSupport: requiresEngineSupport("Optional effect support requires player prompts and declined-choice logging.")
+    parameters: [
+      required("player", "player", "The player who may choose to apply the behavior."),
+      required("selectionKey", "string", "Stable key read by the optional behavior branch."),
+      optional("prompt", "string", "The optional effect prompt."),
+    ],
+    engineSupport: supported("The runtime records an explicit Accept or Decline decision before executing effects gated by the choice key.")
   }),
   "keyword.vision": primitiveSeed({
     id: "keyword.vision",
