@@ -11,6 +11,7 @@ const seeds = await Promise.all([
   loadSeed("annie", "Annie", "data/decks/annie.dec.txt"),
   loadSeed("master-yi", "Master Yi", "data/decks/masteryi.dec.txt"),
   loadSeed("garen", "Garen", "data/decks/garen.dec.txt"),
+  loadSeed("kaisa", "Kai'Sa", "data/decks/kaisa.dec.txt"),
 ]);
 const client = await getMongoClient();
 
@@ -28,7 +29,7 @@ try {
 }
 
 async function loadSeed(
-  id: "lux" | "annie" | "master-yi" | "garen",
+  id: "lux" | "annie" | "master-yi" | "garen" | "kaisa",
   label: string,
   filePath: string,
 ) {

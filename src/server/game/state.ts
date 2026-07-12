@@ -37,6 +37,7 @@ export const playerStateSchema = z.object({
   playerId: z.string().min(1),
   points: z.number().int().nonnegative().optional(),
   scoredBattlefieldIdsThisTurn: z.array(z.string()).optional(),
+  hasTakenBeginningPhase: z.boolean().optional(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   conditionalPower: z.record(z.number().int().nonnegative()).optional(),
@@ -196,6 +197,7 @@ export const gameStateSchema = z.object({
   players: z.record(playerStateSchema),
   battlefields: z.array(battlefieldStateSchema),
   cardStates: z.record(cardStateSchema),
+  extraTurnPlayerIds: z.array(z.string().min(1)).optional(),
   createdCardInstances: z.array(cardInstanceSchema).default([]).optional(),
   createdCardDefinitions: z
     .array(gameCardDefinitionSchema)
@@ -283,6 +285,15 @@ export const gameStateSchema = z.object({
       initialSelectedIds: z.array(z.string()).default([]),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
+      behaviorEvent: z
+        .object({
+          type: z.string(),
+          actorPlayerId: z.string().nullable(),
+          subjectCardInstanceId: z.string().nullable(),
+          values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+        })
+        .nullable()
+        .default(null),
     }),
   ),
   pendingChoice: z

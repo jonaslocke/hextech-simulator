@@ -496,6 +496,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     listensToEvents: ["turn.beginning"],
     engineSupport: supported("Beginning triggers are dispatched before scoring."),
   }),
+  "trigger.first_beginning": primitiveSeed({
+    id: "trigger.first_beginning", family: "trigger", name: "First Beginning Phase trigger",
+    description: "Creates an effect at the start of each player's first Beginning Phase.",
+    listensToEvents: ["turn.beginning"],
+    engineSupport: supported("Tracks whether each player has begun a turn in the current game."),
+  }),
   "trigger.conquer_battlefield": primitiveSeed({
     id: "trigger.conquer_battlefield",
     family: "trigger",
@@ -822,6 +828,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["card.banished"],
     engineSupport: supported("Selected cards move to their owner's Banishment.")
   }),
+  "action.take_extra_turn": primitiveSeed({
+    id: "action.take_extra_turn",
+    family: "action",
+    name: "Take extra turn",
+    description: "Queues the controller to take the next turn after the current turn ends.",
+    engineSupport: supported("Extra turns are stored in the shared turn queue."),
+  }),
+  "action.gain_points": primitiveSeed({
+    id: "action.gain_points", family: "action", name: "Gain points",
+    description: "Awards points to the current turn player.",
+    emitsEvents: [],
+    engineSupport: supported("Updates points and checks the current victory requirement."),
+  }),
   "action.return_to_hand": primitiveSeed({
     id: "action.return_to_hand",
     family: "action",
@@ -907,6 +926,23 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [required("target", "target", "The card to stun.")],
     emitsEvents: ["unit.stunned"],
     engineSupport: supported("Stunned units do not contribute Might in combat and clear at the next Ending Step.")
+  }),
+  "action.recycle_top_cards": primitiveSeed({
+    id: "action.recycle_top_cards",
+    family: "action",
+    name: "Recycle looked-at top cards",
+    description: "Lets the controller recycle any number of the top cards of their Main Deck.",
+    parameters: [required("count", "number", "How many top cards are eligible.")],
+    emitsEvents: ["card.recycled"],
+    engineSupport: supported("Uses a private Main Deck selection during effect resolution."),
+  }),
+  "action.order_top_cards": primitiveSeed({
+    id: "action.order_top_cards",
+    family: "action",
+    name: "Order top cards",
+    description: "Lets the controller choose the order of the remaining top cards.",
+    parameters: [required("count", "number", "How many top cards are ordered.")],
+    engineSupport: supported("The submitted selection order becomes the new top-to-bottom deck order."),
   }),
   "modifier.modify_numeric_value": primitiveSeed({
     id: "modifier.modify_numeric_value",

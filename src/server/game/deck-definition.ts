@@ -11,6 +11,7 @@ export const CORE_DECK_IDS = [
   "annie",
   "master-yi",
   "garen",
+  "kaisa",
 ] as const satisfies DeckId[];
 export const SIDEBOARD_VALIDATION_DECK_IDS = [
   "lux-s",

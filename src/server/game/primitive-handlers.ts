@@ -149,6 +149,16 @@ export function createPrimitiveHandlers(
     matches: (binding, context) => context.event?.type === "turn.beginning" &&
       (binding.parameters.player !== "controller" || context.event.actorPlayerId === context.controllerPlayerId),
   });
+  handlers.set("trigger.first_beginning", {
+    matches: (_binding, context) => {
+      const playerId = context.event?.actorPlayerId;
+      return (
+        context.event?.type === "turn.beginning" &&
+        playerId != null &&
+        context.game.state.players[playerId]?.hasTakenBeginningPhase !== true
+      );
+    },
+  });
   handlers.set("trigger.attack", {
     matches: (_binding, context) =>
       context.event?.type === "unit.attacks" &&
@@ -479,6 +489,69 @@ export function createPrimitiveHandlers(
       );
     },
   });
+  handlers.set("action.recycle_top_cards", {
+    choice(binding, context) {
+      ensureMainDeck(context.game, context.controllerPlayerId, index);
+      const cards = context.game.state.players[context.controllerPlayerId]!
+        .zones.mainDeck.slice(0, numberParam(binding, "count"));
+      return cards.length > 0
+        ? {
+            legalIds: cards,
+            minimum: 0,
+            maximum: cards.length,
+            prompt: "Choose any looked-at cards to recycle.",
+            sourceZone: "mainDeck" as const,
+            presentation: "vision" as const,
+          }
+        : null;
+    },
+    execute(_binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const selected = context.selectedIds.filter((id) =>
+        player.zones.mainDeck.includes(id),
+      );
+      player.zones.mainDeck = player.zones.mainDeck.filter(
+        (id) => !selected.includes(id),
+      );
+      player.zones.mainDeck.push(...selected);
+      if (selected.length > 0) {
+        recomputeAllMight(context.game, index);
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "card.recycled",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: selected[0]!,
+          values: { count: selected.length },
+        });
+      }
+    },
+  });
+  handlers.set("action.order_top_cards", {
+    choice(binding, context) {
+      const cards = context.game.state.players[context.controllerPlayerId]!
+        .zones.mainDeck.slice(0, numberParam(binding, "count"));
+      return cards.length > 1
+        ? {
+            legalIds: cards,
+            minimum: cards.length,
+            maximum: cards.length,
+            prompt: "Choose the order for the remaining looked-at cards.",
+            sourceZone: "mainDeck" as const,
+            presentation: "vision" as const,
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const count = numberParam(binding, "count");
+      const current = player.zones.mainDeck.slice(0, count);
+      const ordered = context.selectedIds.filter((id) => current.includes(id));
+      if (ordered.length !== current.length) return;
+      player.zones.mainDeck = [
+        ...ordered,
+        ...player.zones.mainDeck.filter((id) => !current.includes(id)),
+      ];
+    },
+  });
   handlers.set("action.reveal", {
     execute(binding, context) {
       const count = Math.max(0, optionalNumberParam(binding, "count", 1));
@@ -651,6 +724,34 @@ export function createPrimitiveHandlers(
           subjectCardInstanceId: banished[0]!,
           values: { count: banished.length },
         });
+      }
+    },
+  });
+  handlers.set("action.take_extra_turn", {
+    execute(_binding, context) {
+      (context.game.state.extraTurnPlayerIds ??= []).push(
+        context.controllerPlayerId,
+      );
+    },
+  });
+  handlers.set("action.gain_points", {
+    execute(_binding, context) {
+      const playerId = context.event?.actorPlayerId;
+      if (!playerId) throw new Error("Point effect requires a turn player.");
+      const player = context.game.state.players[playerId];
+      if (!player) throw new Error("Point recipient is unavailable.");
+      player.hasTakenBeginningPhase = true;
+      player.points = (player.points ?? 0) + 1;
+      const requirement = effectiveNumericValue({
+        attribute: "victoryRequirement",
+        baseValue: 8,
+        game: context.game,
+        index,
+        targetScope: "game",
+      });
+      if (player.points >= requirement) {
+        context.game.winnerPlayerId = playerId;
+        context.game.status = "complete";
       }
     },
   });

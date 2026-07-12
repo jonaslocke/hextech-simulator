@@ -945,6 +945,7 @@ function passPriority(
                 targetsLocked: !clause.selectors.some(
                   (selector) => selector.parameters.deferred === true,
                 ),
+                behaviorEvent: item.behaviorEvent,
                 decks,
               });
               if (definition.card.classification.type === "Spell") {
@@ -986,7 +987,10 @@ function passPriority(
             handlers,
             item.targetObjectVersions,
           );
-          if (definition.card.classification.type === "Spell") {
+          if (
+            definition.card.classification.type === "Spell" &&
+            !isCardInAnyZone(game, item.sourceCardInstanceId)
+          ) {
             game.state.players[owner]!.zones.trash.push(
               item.sourceCardInstanceId,
             );
@@ -1126,7 +1130,7 @@ function completeEndTurn(
   if (!turn || turn.activePlayerId !== actor) {
     throw new Error("The ending turn is no longer active.");
   }
-  const next = otherPlayer(game, actor);
+  const next = game.state.extraTurnPlayerIds?.shift() ?? otherPlayer(game, actor);
   clearMarkedDamage(game);
   cleanupTurnModifiers(game, index);
   for (const player of Object.values(game.state.players)) {
@@ -2098,6 +2102,22 @@ function isCardPlayRestricted(game: GameDocument, playerId: string) {
       effect.behaviorId === "modifier.cannot_play_cards" &&
       effect.controllerPlayerId !== playerId &&
       effect.duration === "thisTurn",
+  );
+}
+
+function isCardInAnyZone(game: GameDocument, cardId: string) {
+  return (
+    Object.values(game.state.players).some((player) =>
+      Object.values(player.zones).some((zone) =>
+        Array.isArray(zone) ? zone.includes(cardId) : zone === cardId,
+      ),
+    ) ||
+    game.state.battlefields.some(
+      (battlefield) =>
+        battlefield.cardInstanceId === cardId ||
+        battlefield.units.includes(cardId) ||
+        battlefield.facedownCardInstanceId === cardId,
+    )
   );
 }
 

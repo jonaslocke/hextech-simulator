@@ -196,6 +196,29 @@ const MODELS: Record<string, Model> = {
     sourceText: "Do this 6 times:Deal 2 to a unit. (You can choose different units.)",
     assignments: repeatedDamageAssignments(6, 2),
   },
+  "OGN-122": {
+    sourceText: "Take a turn after this one. Banish this.",
+    assignments: [
+      { family: "action", primitiveId: "action.take_extra_turn", parameters: {} },
+      { family: "action", primitiveId: "action.banish_card", parameters: { target: "source" } },
+    ],
+  },
+  "OGN-290": {
+    sourceText: "At the start of each player's first Beginning Phase, that player gains 1 point.",
+    assignments: [
+      { family: "trigger", primitiveId: "trigger.first_beginning", parameters: {} },
+      { family: "action", primitiveId: "action.gain_points", parameters: {} },
+    ],
+  },
+  "OGN-291": {
+    sourceText: "When you conquer here, look at the top two cards of your Main Deck. You may recycle one or both of them. Put those you don't back in any order.",
+    assignments: [
+      { family: "trigger", primitiveId: "trigger.conquer_battlefield", parameters: {} },
+      { family: "action", primitiveId: "action.look", parameters: { count: 2 } },
+      { family: "action", primitiveId: "action.recycle_top_cards", parameters: { count: 2 } },
+      { family: "action", primitiveId: "action.order_top_cards", parameters: { count: 2 } },
+    ],
+  },
 };
 
 const client = await getMongoClient();

@@ -4,6 +4,7 @@ import {
   createBehaviorContext,
   selectionRequirementsForClause,
 } from "./behavior-runtime";
+import type { BehaviorEvent } from "./behavior-runtime";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
@@ -26,6 +27,7 @@ export function beginEffectResolution(input: {
   endingPlayerId?: string;
   selectedIds?: string[];
   targetsLocked?: boolean;
+  behaviorEvent?: BehaviorEvent | null;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
   const id = `resolution:${input.game.stateVersion}:${input.sourceCardInstanceId}:${input.clauseId}:${input.game.state.effectResolutions.length}`;
@@ -40,6 +42,7 @@ export function beginEffectResolution(input: {
     initialSelectedIds: input.selectedIds ?? [],
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
+    behaviorEvent: input.behaviorEvent ?? null,
   });
   return resumeEffectResolution(input.game, id, input.decks);
 }
@@ -157,7 +160,7 @@ export function resumeEffectResolution(
     game,
     frame.controllerPlayerId,
     frame.sourceCardInstanceId,
-    null,
+    frame.behaviorEvent,
     [],
   );
   for (const { binding, requirement } of selectionRequirementsForClause(
@@ -229,7 +232,7 @@ export function resumeEffectResolution(
       game,
       frame.controllerPlayerId,
       frame.sourceCardInstanceId,
-      null,
+      frame.behaviorEvent,
       [
         ...new Set([
           ...frame.initialSelectedIds,

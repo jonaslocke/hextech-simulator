@@ -96,7 +96,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
-| OGN | 18 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain | Legend/Unit/Spell/Battlefield | 18 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Partial; remaining Kai'Sa cards still block deck synchronization | Added automatic affected-unit resolution, battlefield defend triggers, spell-only Power accounting, temporary keyword grants, trash-count modifiers, turn-scoped card-play restrictions, and deferred repeated target selection on 2026-07-12. |
+| OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Awaiting manual validation | Added extra-turn scheduling, first-Beginning-Phase scoring, and private look/recycle/reorder resolution on 2026-07-12. |
 
 ## Token Coverage Ledger
 
@@ -114,7 +114,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
-| OGN | `data/decks/kaisa.dec.txt` | Pending | Valid against the full local source catalog | Blocked by canonical approval | No | No | Permanent-source file staged; deck synchronization correctly rejects missing approved OGN card definitions | No |
+| OGN | `data/decks/kaisa.dec.txt` | `kaisa` | Yes | Yes | Automated catalog snapshot succeeds | Awaiting manual validation | Time Warp, The Arena's Greatest, and The Candlelit Sanctum require focused manual validation | No |
 | OGN | `data/decks/viktor.dec.txt` | Pending | Valid against the full local source catalog | Blocked by canonical approval | No | No | Permanent-source file staged; deck synchronization remains gated until every referenced card is approved | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
