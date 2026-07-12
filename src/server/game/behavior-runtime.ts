@@ -207,7 +207,7 @@ export function executeBehaviorClause(input: {
   return { executed: true, delayed: false };
 }
 
-function keywordsAllowClause(
+export function keywordsAllowClause(
   clause: CompiledBehaviorClause,
   context: BehaviorExecutionContext,
 ) {
@@ -281,13 +281,34 @@ export function collectTriggeredClauses(input: {
   event: BehaviorEvent;
   handlers: BehaviorHandlerRegistry;
 }): ChainItem[] {
+  const knownItemIds = new Set([
+    ...(input.game.state.chain?.items ?? []).map((item) => item.id),
+    ...(input.game.state.queuedChainItems ?? []).map((item) => item.id),
+    ...input.game.state.queuedTriggerChoices.flatMap((choice) =>
+      choice.pendingItems.map((item) => item.id),
+    ),
+  ]);
   const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
     if (clause.triggers.length === 0) return [];
     const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, []);
+    if (!keywordsAllowClause(clause, context)) return [];
     if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
+    const baseId = [
+      "trigger",
+      input.game.stateVersion,
+      source.sourceCardInstanceId,
+      clause.id,
+      input.event.type,
+      input.event.actorPlayerId ?? "none",
+      input.event.subjectCardInstanceId ?? "none",
+    ].join(":");
+    let id = baseId;
+    let suffix = 2;
+    while (knownItemIds.has(id)) id = `${baseId}:${suffix++}`;
+    knownItemIds.add(id);
     return [{
-      id: `trigger:${input.game.stateVersion}:${source.sourceCardInstanceId}:${clause.id}`,
+      id,
       kind: "trigger" as const,
       label: source.label,
       controllerPlayerId: input.controllerPlayerId,

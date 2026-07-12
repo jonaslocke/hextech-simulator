@@ -2,6 +2,7 @@
 
 import { CardRulesText } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
+import cardBackImage from "../../../assets/cardback.jpg";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Info } from "lucide-react";
 import { motion } from "motion/react";
@@ -253,6 +254,7 @@ export const BattlefieldBoard: FC<Props> = ({
     contestedByPlayerId,
     controllerPlayerId,
     description,
+    hasFacedownCard,
     id,
     name,
     opponentUnits,
@@ -412,6 +414,20 @@ export const BattlefieldBoard: FC<Props> = ({
               VS
             </div>
             <div className="px-1 py-0.5 leading-none">{playerTotalMight}</div>
+          </div>
+        )}
+
+        {hasFacedownCard && (
+          <div className="right-3 bottom-9 z-20 absolute flex items-center gap-1.5 bg-slate-950/75 shadow-lg px-1.5 py-1 border border-cyan-100/25 rounded-md backdrop-blur-sm pointer-events-none">
+            {/* eslint-disable-next-line @next/next/no-img-element -- Local card-back asset for a hidden card. */}
+            <img
+              alt="Facedown card"
+              className="shadow-sm border border-white/20 rounded-sm w-7 h-10 object-cover"
+              src={cardBackImage.src}
+            />
+            <span className="font-mono font-semibold text-[9px] text-cyan-50 uppercase tracking-wide">
+              Facedown
+            </span>
           </div>
         )}
 

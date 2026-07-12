@@ -99,6 +99,24 @@ export type CombinedTargetRequirement = {
   requirements: ProjectedAction["targets"];
 };
 
+export function activeTargetRequirement(
+  requirement: CombinedTargetRequirement,
+  selectedIds: readonly string[],
+) {
+  let cursor = 0;
+  for (const individual of requirement.requirements) {
+    const selectedCount = Math.min(
+      individual.maximum,
+      Math.max(0, selectedIds.length - cursor),
+    );
+    if (selectedCount < individual.minimum || selectedCount < individual.maximum) {
+      return individual;
+    }
+    cursor += selectedCount;
+  }
+  return requirement.requirements.at(-1) ?? null;
+}
+
 export function combineTargetRequirements(
   action: ProjectedAction,
   kind: ProjectedAction["targets"][number]["kind"],
@@ -147,7 +165,8 @@ export function targetSelectionCanAdd(
   selectedIds: readonly string[],
   candidateId: string,
 ): boolean {
-  if (!requirement.legalIds.includes(candidateId)) {
+  const active = activeTargetRequirement(requirement, selectedIds);
+  if (!active?.legalIds.includes(candidateId)) {
     return false;
   }
   if (
@@ -208,7 +227,7 @@ export function moveSelectionTitle(
     (candidate) => candidate.battlefieldId === destination
   );
   return battlefield
-    ? `Choose units to ${battlefield.units.length === 0 ? "Conquer" : "Contest"} ${battlefield.card.name}`
+    ? `Move units to ${battlefield.card.name}`
     : undefined;
 }
 

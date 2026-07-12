@@ -755,6 +755,12 @@ export function createPrimitiveHandlers(
         incrementObjectVersion(context.game, unitId);
       }
       recomputeMight(context.game, unitId, index);
+      recordLegionStatus(
+        context.game,
+        context.controllerPlayerId,
+        unitId,
+        index,
+      );
       (context.game.state.queuedBehaviorEvents ??= []).push({
         type: "card.played",
         actorPlayerId: context.controllerPlayerId,
@@ -1707,6 +1713,22 @@ export function keywordAmount(
     .reduce((sum, modifier) => sum + modifier.amount, 0);
   return printedAmount + grantedAmount;
 }
+
+export function recordLegionStatus(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  index: RuntimeCardIndex,
+) {
+  const instance = index.instances.get(cardId);
+  if (instance?.source !== "mainDeck") return;
+  const player = game.state.players[playerId]!;
+  const played = (player.playedMainDeckCardIdsThisTurn ??= []);
+  if (played.length > 0) {
+    (player.legionSatisfiedCardIdsThisTurn ??= []).push(cardId);
+  }
+  played.push(cardId);
+}
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
     const state = game.state.cardStates[id];
@@ -1900,6 +1922,9 @@ function unitLocationRelationMatches(
   }
   const sourceLocation = boardLocationForUnit(game, sourceId);
   const targetLocation = boardLocationForUnit(game, targetId);
+  if (relation === "selectedTargetLocation" && sourceLocation === null) {
+    return true;
+  }
   return (
     sourceLocation !== null &&
     targetLocation !== null &&

@@ -16,7 +16,11 @@ import {
 } from "react";
 import type { BoardPlayerProjection } from "../board-view-model";
 import type { CardActionMenuItem } from "../components/card-action-menu";
-import { combineTargetRequirements, simultaneousMoveAction } from "../model";
+import {
+  activeTargetRequirement,
+  combineTargetRequirements,
+  simultaneousMoveAction,
+} from "../model";
 import type { Card } from "../types";
 import type { BoardTargetSelection } from "./use-board-target-selection";
 
@@ -186,7 +190,7 @@ export function useGameBoardActions({
       if (requirement && requirement.maximum > 0) {
         setTargetSelection({
           actionId: actionToSubmit.id,
-          legalTargetIds: requirement.legalIds,
+          legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
           purpose: stagedMoveAction ? "move" : "play",
@@ -228,7 +232,7 @@ export function useGameBoardActions({
       const kind = action.id.split(":")[3];
       setTargetSelection({
         actionId: action.id,
-        legalTargetIds: requirement.legalIds,
+        legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
         maxTargets: requirement.maximum,
         minTargets: requirement.minimum,
         purpose:
@@ -278,18 +282,21 @@ export function useGameBoardActions({
         return;
       }
 
-      const modes = (
-        viewerState.availablePaymentModes[card.instanceId] ?? []
-      ).filter((mode) => mode.enabled);
+      const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
 
       openCardActionMenu(
         event,
         modes.length > 0
           ? modes.map((mode) => ({
               boardLocation: mode.boardLocation,
+              disabled: !mode.enabled,
               id: mode.id,
-              label: mode.label,
-              onSelect: () => beginPlayOrTargetSelection(card, mode.id),
+              label: mode.enabled
+                ? mode.label
+                : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
+              onSelect: mode.enabled
+                ? () => beginPlayOrTargetSelection(card, mode.id)
+                : undefined,
             }))
           : [
               {
@@ -333,6 +340,27 @@ export function useGameBoardActions({
       }
       const cardActions = sourceActions(card.instanceId);
       if (cardActions.length === 0) return;
+      const allActionsAddResources = cardActions.every((action) =>
+        /^(Add (?:spell )?(?:Energy|Power)|Add Energy and Power)/.test(
+          action.label,
+        ),
+      );
+      if (allActionsAddResources) {
+        const powerDomain = cardActions
+          .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
+          .find((domain) => domain !== undefined);
+        openCardActionMenu(
+          event,
+          cardActions.map((action) => ({
+            accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
+            disabled: !action.enabled,
+            id: action.id,
+            label: runeActionMenuLabel(action, powerDomain),
+            onSelect: () => submitRuneAction(action.id),
+          })),
+        );
+        return;
+      }
       openCardActionMenu(
         event,
         cardActions.map((action) => ({
@@ -351,6 +379,7 @@ export function useGameBoardActions({
       chooseBoardTarget,
       openCardActionMenu,
       sourceActions,
+      submitRuneAction,
       targetSelection,
     ],
   );
@@ -451,7 +480,7 @@ export function useGameBoardActions({
 
         setTargetSelection({
           actionId: stagedMoveAction.id,
-          legalTargetIds: requirement.legalIds,
+          legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
           purpose: "move",
@@ -501,7 +530,7 @@ export function useGameBoardActions({
       if (requirement && requirement.maximum > 0) {
         setTargetSelection({
           actionId: action.id,
-          legalTargetIds: requirement.legalIds,
+          legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
           purpose: "play",

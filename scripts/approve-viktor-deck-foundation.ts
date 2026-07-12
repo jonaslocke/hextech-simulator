@@ -33,9 +33,9 @@ type ClauseModel = { id: string; assignments: Assignment[] };
 const MODELS: Record<string, Assignment[]> = {
   "OGN-207": [
     { family: "timing", primitiveId: "timing.reaction", parameters: {} },
+    { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "targetUnit" } },
     { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "board", locationRelation: "any", minimumCount: 0, maximumCount: 1, buffedOnly: true, selectionKey: "spentBuff", selectionPurpose: "optionalCost" } },
     { family: "cost", primitiveId: "cost.spend_buff", parameters: { selectionKey: "spentBuff", optional: true, ignoreBaseCost: true } },
-    { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "targetUnit" } },
     { family: "modifier", primitiveId: "modifier.modify_numeric_value", parameters: { attribute: "might", operation: "increase", operand: "constant", amount: 3, target: "unit", selectionKey: "targetUnit", duration: "thisTurn" } },
   ],
   "OGN-209": [
@@ -76,8 +76,8 @@ const MODELS: Record<string, Assignment[]> = {
   "OGN-220": [
     { family: "keyword", primitiveId: "keyword.hidden", parameters: {} },
     { family: "timing", primitiveId: "timing.action", parameters: {} },
-    { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "battlefield", locationRelation: "any", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "friendlyTarget" } },
-    { family: "selector", primitiveId: "selector.enemy_unit", parameters: { area: "battlefield", locationRelation: "selectedTargetLocation", minimumCount: 1, maximumCount: 1, deferred: true, selectionKey: "enemyTarget", referenceSelectionKey: "friendlyTarget" } },
+    { family: "selector", primitiveId: "selector.friendly_unit", parameters: { area: "battlefield", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "friendlyTarget" } },
+    { family: "selector", primitiveId: "selector.enemy_unit", parameters: { area: "battlefield", locationRelation: "selectedTargetLocation", minimumCount: 1, maximumCount: 1, selectionKey: "enemyTarget", referenceSelectionKey: "friendlyTarget" } },
     { family: "action", primitiveId: "action.stun_card", parameters: { target: "unit" } },
   ],
   "OGN-213": [

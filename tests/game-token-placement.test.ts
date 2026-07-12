@@ -16,6 +16,7 @@ import {
   cleanupTurnModifiers,
   effectiveEnergyCost,
   moveUnitToTrash,
+  recordLegionStatus,
   recomputeMight,
 } from "../src/server/game/primitive-handlers";
 import { getTokenCatalogDefinition } from "../src/server/game/token-catalog";
@@ -427,6 +428,54 @@ test("Gear plays ready to its controller's base and exposes its activated abilit
   });
   assert.equal(activated.state.players.p1!.power.Order, 1);
   assert.equal(activated.state.cardStates.seal?.exhausted, true);
+});
+
+test("a ready Add Power permanent can pay a matching card cost", () => {
+  const seal = card("SEAL", "Seal of Unity", "Gear", [
+    clause("add-order", {
+      abilities: [
+        binding("ability.exhaust_for_resource", 0, {
+          resourceType: "power",
+          amountSource: "constant",
+          amount: 1,
+          domain: "Order",
+          usage: "unrestricted",
+        }),
+      ],
+      timings: [binding("timing.reaction", 1)],
+    }),
+  ], null);
+  seal.card.classification.domain = ["Order"];
+  const spell = unit("SPELL", "Order Spell");
+  spell.card.classification.type = "Spell";
+  spell.card.classification.domain = ["Order"];
+  spell.card.attributes.power = 1;
+  spell.card.attributes.energy = 0;
+  const { game, decks } = fixture([seal, spell]);
+  decks[0]!.instances.push(
+    instance("seal", "p1", "SEAL"),
+    instance("spell", "p1", "SPELL"),
+  );
+  game.state.players.p1!.zones.base.push("seal");
+  game.state.players.p1!.zones.hand.push("spell");
+  game.state.cardStates.seal = cardState(null);
+  game.state.cardStates.spell = cardState(null);
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "spell",
+  );
+  assert.ok(play?.enabled);
+  const played = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "pay-with-seal",
+  });
+  assert.equal(played.state.cardStates.seal?.exhausted, true);
+  assert.equal(played.state.players.p1!.zones.hand.includes("spell"), false);
+  assert.equal(played.state.chain?.items.at(-1)?.sourceCardInstanceId, "spell");
 });
 
 test("an optional Gear kill can target either player's Gear and still draws", () => {
@@ -944,12 +993,131 @@ test("dependent deferred unit selectors constrain the second target to the first
   assert.notEqual(game.state.cardStates["enemy-other"]?.stunned, true);
 });
 
-test("an optional Buff cost can replace a spell's normal cost before its deferred target is chosen", () => {
+test("locked linked targets validate the second target against the first target's battlefield", () => {
+  const facebreaker = unit("FACEBREAKER", "Facebreaker", [
+    clause("stun-pair", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "battlefield",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "friendlyTarget",
+        }),
+        binding("selector.enemy_unit", 1, {
+          area: "battlefield",
+          locationRelation: "selectedTargetLocation",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "enemyTarget",
+          referenceSelectionKey: "friendlyTarget",
+        }),
+      ],
+      effects: [binding("action.stun_card", 2, { target: "unit" })],
+    }),
+  ]);
+  facebreaker.card.classification.type = "Spell";
+  const { game, decks } = fixture([
+    facebreaker,
+    unit("FRIENDLY", "Friendly"),
+    unit("ENEMY_SAME", "Enemy at same battlefield"),
+    unit("ENEMY_OTHER", "Enemy at other battlefield"),
+    battlefield("FIELD_ONE", "Field one"),
+    battlefield("FIELD_TWO", "Field two"),
+  ]);
+  decks[0]!.instances.push(
+    instance("facebreaker", "p1", "FACEBREAKER"),
+    instance("friendly", "p1", "FRIENDLY"),
+    instance("field-one", "p1", "FIELD_ONE", "battlefield"),
+    instance("field-two", "p1", "FIELD_TWO", "battlefield"),
+  );
+  decks[1]!.instances.push(
+    instance("enemy-same", "p2", "ENEMY_SAME"),
+    instance("enemy-other", "p2", "ENEMY_OTHER"),
+  );
+  for (const id of ["facebreaker", "friendly", "enemy-same", "enemy-other"]) {
+    game.state.cardStates[id] = cardState(id === "facebreaker" ? null : 1);
+  }
+  game.state.cardStates["field-one"] = cardState(null);
+  game.state.cardStates["field-two"] = cardState(null);
+  game.state.battlefields.push(
+    {
+      battlefieldId: "field-one",
+      cardInstanceId: "field-one",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      units: ["friendly", "enemy-same"],
+    },
+    {
+      battlefieldId: "field-two",
+      cardInstanceId: "field-two",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      units: ["enemy-other"],
+    },
+  );
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "facebreaker",
+    clauseId: "stun-pair",
+    selectedIds: ["friendly", "enemy-same"],
+    targetsLocked: true,
+    decks,
+  }), true);
+  assert.equal(game.state.cardStates.friendly?.stunned, true);
+  assert.equal(game.state.cardStates["enemy-same"]?.stunned, true);
+
+  const invalid = fixture([
+    facebreaker,
+    unit("FRIENDLY", "Friendly"),
+    unit("ENEMY_OTHER", "Enemy at other battlefield"),
+    battlefield("FIELD_ONE", "Field one"),
+    battlefield("FIELD_TWO", "Field two"),
+  ]);
+  invalid.decks[0]!.instances.push(
+    instance("facebreaker", "p1", "FACEBREAKER"),
+    instance("friendly", "p1", "FRIENDLY"),
+    instance("field-one", "p1", "FIELD_ONE", "battlefield"),
+    instance("field-two", "p1", "FIELD_TWO", "battlefield"),
+  );
+  invalid.decks[1]!.instances.push(instance("enemy-other", "p2", "ENEMY_OTHER"));
+  for (const id of ["facebreaker", "friendly", "enemy-other"]) {
+    invalid.game.state.cardStates[id] = cardState(id === "facebreaker" ? null : 1);
+  }
+  invalid.game.state.cardStates["field-one"] = cardState(null);
+  invalid.game.state.cardStates["field-two"] = cardState(null);
+  invalid.game.state.battlefields.push(
+    { battlefieldId: "field-one", cardInstanceId: "field-one", selectedByPlayerId: "p1", controllerPlayerId: "p1", units: ["friendly"] },
+    { battlefieldId: "field-two", cardInstanceId: "field-two", selectedByPlayerId: "p2", controllerPlayerId: "p2", units: ["enemy-other"] },
+  );
+  assert.equal(beginEffectResolution({
+    game: invalid.game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "facebreaker",
+    clauseId: "stun-pair",
+    selectedIds: ["friendly", "enemy-other"],
+    targetsLocked: true,
+    decks: invalid.decks,
+  }), true);
+  assert.notEqual(invalid.game.state.cardStates.friendly?.stunned, true);
+});
+
+test("Call to Glory chooses its target before optionally spending a Buff", () => {
   const callToGlory = unit("CALL_TO_GLORY", "Call to Glory", [
     clause("call-to-glory", {
       timings: [binding("timing.reaction", 0)],
       selectors: [
-        binding("selector.friendly_unit", 1, {
+        binding("selector.unit", 1, {
+          scope: "any",
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "targetUnit",
+        }),
+        binding("selector.friendly_unit", 3, {
           area: "board",
           locationRelation: "any",
           minimumCount: 0,
@@ -957,15 +1125,6 @@ test("an optional Buff cost can replace a spell's normal cost before its deferre
           buffedOnly: true,
           selectionKey: "spentBuff",
           selectionPurpose: "optionalCost",
-        }),
-        binding("selector.unit", 3, {
-          scope: "any",
-          area: "board",
-          locationRelation: "any",
-          minimumCount: 1,
-          maximumCount: 1,
-          deferred: true,
-          selectionKey: "targetUnit",
         }),
       ],
       costs: [binding("cost.spend_buff", 2, {
@@ -985,6 +1144,7 @@ test("an optional Buff cost can replace a spell's normal cost before its deferre
     }),
   ]);
   callToGlory.card.classification.type = "Spell";
+  callToGlory.card.classification.domain = ["Order"];
   callToGlory.card.attributes.energy = 5;
   callToGlory.card.attributes.power = 1;
   const { game, decks } = fixture([
@@ -1003,42 +1163,61 @@ test("an optional Buff cost can replace a spell's normal cost before its deferre
   game.state.cardStates["call-to-glory"] = cardState(null);
   game.state.cardStates.buffed = { ...cardState(2), buffed: true };
   game.state.cardStates.target = cardState(2);
+  game.state.players.p1!.energy = 5;
+  game.state.players.p1!.power.Order = 1;
 
   const action = gameplayActions(game, "p1", decks).find(
     (candidate) => candidate.sourceCardInstanceId === "call-to-glory",
   );
   assert.ok(action?.enabled);
-  assert.deepEqual(action?.targets.map((target) => target.legalIds), [["buffed"]]);
+  assert.deepEqual(action?.targets.map((target) => target.legalIds), [
+    ["buffed", "target"],
+    ["buffed"],
+  ]);
 
   const played = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: action.id,
-    selectedIds: ["buffed"],
+    selectedIds: ["target"],
     decks,
     now: "call-to-glory",
   });
-  assert.equal(played.state.cardStates.buffed?.buffed, false);
-  assert.equal(played.state.cardStates.buffed?.computedMight, 1);
+  assert.equal(played.state.cardStates.buffed?.buffed, true);
   assert.equal(played.state.players.p1!.energy, 0);
-  assert.deepEqual(played.state.chain?.items.at(-1)?.targetCardInstanceIds, ["buffed"]);
+  assert.deepEqual(played.state.chain?.items.at(-1)?.targetCardInstanceIds, ["target"]);
 
   assert.equal(beginEffectResolution({
     game: played,
     controllerPlayerId: "p1",
     sourceCardInstanceId: "call-to-glory",
     clauseId: "call-to-glory",
-    selectedIds: ["buffed"],
-    targetsLocked: false,
+    selectedIds: ["target"],
+    targetsLocked: true,
     decks,
-  }), false);
-  assert.equal(played.state.pendingChoice?.type, "effectSelection");
-  if (played.state.pendingChoice?.type !== "effectSelection") {
-    throw new Error("Expected a deferred target choice.");
-  }
-  assert.deepEqual(played.state.pendingChoice.legalCardIds, ["buffed", "target"]);
-  submitEffectSelection(played, "p1", ["target"], decks);
+  }), true);
   assert.equal(played.state.cardStates.target?.computedMight, 4);
+
+  played.state.chain = null;
+  played.state.players.p1!.zones.hand.push("call-to-glory");
+  played.state.players.p1!.zones.trash = played.state.players.p1!.zones.trash.filter(
+    (id) => id !== "call-to-glory",
+  );
+  played.state.cardStates.buffed!.buffed = true;
+  const alternateAction = gameplayActions(played, "p1", decks).find(
+    (candidate) => candidate.sourceCardInstanceId === "call-to-glory",
+  );
+  assert.ok(alternateAction?.enabled);
+  const alternate = performGameplayAction({
+    game: played,
+    actorPlayerId: "p1",
+    actionId: alternateAction.id,
+    selectedIds: ["target", "buffed"],
+    decks,
+    now: "call-to-glory-alternate",
+  });
+  assert.equal(alternate.state.cardStates.buffed?.buffed, false);
+  assert.equal(alternate.state.players.p1!.energy, 0);
 });
 
 test("each player can make their own deferred unit selection before both units are killed", () => {
@@ -1212,7 +1391,16 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
       })],
     }),
   ]);
-  const eligible = unit("ELIGIBLE", "Eligible Unit");
+  const eligible = unit("ELIGIBLE", "Eligible Unit", [
+    clause("legion-on-play", {
+      keywords: [binding("keyword.legion", 0)],
+      triggers: [binding("trigger.on_play", 1, {
+        actor: "controller",
+        subject: "source",
+      })],
+      effects: [binding("action.buff_unit", 2, { target: "source" })],
+    }),
+  ]);
   eligible.card.attributes.energy = 3;
   eligible.card.attributes.power = 1;
   const expensive = unit("EXPENSIVE", "Expensive Unit");
@@ -1235,6 +1423,7 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
   game.state.cardStates.eligible = cardState(1);
   game.state.cardStates.expensive = cardState(1);
   game.state.cardStates.field = cardState(null);
+  game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier-card"];
   game.state.battlefields.push({
     battlefieldId: "field",
     cardInstanceId: "field",
@@ -1267,18 +1456,50 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
   assert.equal(game.state.players.p1!.zones.trash.includes("eligible"), false);
   assert.deepEqual(game.state.battlefields[0]?.units, ["eligible"]);
   assert.equal(game.state.cardStates.eligible?.exhausted, true);
+  assert.deepEqual(
+    game.state.players.p1!.legionSatisfiedCardIdsThisTurn,
+    ["eligible"],
+  );
+  const playedEvent = game.state.queuedBehaviorEvents?.shift();
+  assert.ok(playedEvent);
+  dispatchBehaviorEvent(game, playedEvent, decks);
+  assert.equal(
+    game.state.chain?.items.at(-1)?.behaviorClauseId,
+    "legion-on-play",
+  );
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "eligible",
+    clauseId: "legion-on-play",
+    decks,
+  }), true);
+  assert.equal(game.state.cardStates.eligible?.buffed, true);
 });
 
 test("Hidden cards use an empty controlled facedown slot and play free next turn", () => {
   const hiddenUnit = unit("HIDDEN", "Hidden Unit", [
     clause("hidden", { keywords: [binding("keyword.hidden", 0)] }),
   ]);
-  const { game, decks } = fixture([hiddenUnit, battlefield("BF", "Field")]);
+  const rune = unit("RUNE", "Rainbow Rune", [
+    clause("add-power", {
+      abilities: [binding("ability.recycle_for_power", 0)],
+    }),
+  ]);
+  rune.card.classification.type = "Rune";
+  rune.card.classification.domain = ["Rainbow"];
+  const { game, decks } = fixture([
+    hiddenUnit,
+    rune,
+    battlefield("BF", "Field"),
+  ]);
   decks[0]!.instances.push(instance("hidden", "p1", "HIDDEN"));
+  decks[0]!.instances.push(instance("rune", "p1", "RUNE"));
   decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
   game.state.players.p1!.zones.hand.push("hidden");
-  game.state.players.p1!.power.Rainbow = 1;
+  game.state.players.p1!.zones.base.push("rune");
   game.state.cardStates.hidden = cardState(1);
+  game.state.cardStates.rune = cardState(null);
   game.state.cardStates["bf-card"] = cardState(null);
   game.state.battlefields.push({
     battlefieldId: "bf",
@@ -1288,20 +1509,34 @@ test("Hidden cards use an empty controlled facedown slot and play free next turn
     units: [],
   });
 
+  game.state.turn = { turnNumber: 1, activePlayerId: "p2", phase: "action" };
+  const opponentTurnHide = gameplayActions(game, "p1", decks).find(
+    (action) => action.label.startsWith("Hide Hidden Unit"),
+  );
+  assert.equal(opponentTurnHide, undefined);
+  game.state.turn = { turnNumber: 1, activePlayerId: "p1", phase: "action" };
+
   const hide = gameplayActions(game, "p1", decks).find(
     (action) => action.label.startsWith("Hide Hidden Unit"),
   );
   assert.ok(hide);
+  assert.deepEqual(hide.targets, [{
+    kind: "card",
+    label: "Power source",
+    legalIds: ["rune"],
+    minimum: 1,
+    maximum: 1,
+  }]);
   const hidden = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: hide.id,
-    selectedIds: [],
+    selectedIds: ["rune"],
     decks,
     now: "hide",
   });
   assert.equal(hidden.state.battlefields[0]?.facedownCardInstanceId, "hidden");
-  assert.equal(hidden.state.players.p1!.power.Rainbow, 0);
+  assert.equal(hidden.state.players.p1!.zones.runeDeck.includes("rune"), true);
 
   hidden.state.turn = { turnNumber: 2, activePlayerId: "p2", phase: "action" };
   const playHidden = gameplayActions(hidden, "p1", decks).find(
@@ -1782,6 +2017,109 @@ test("Legion cost reduction needs a previously played Main Deck card", () => {
   assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 3);
   game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier-card"];
   assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 1);
+});
+
+test("Legion triggers are not placed on the Chain until the source has satisfied Legion", () => {
+  const gloryseeker = unit("GLORYSEEKER", "Trifarian Gloryseeker", [
+    clause("legion-buff", {
+      keywords: [binding("keyword.legion", 0)],
+      triggers: [binding("trigger.on_play", 1, {
+        actor: "controller",
+        subject: "source",
+      })],
+      effects: [binding("action.buff_unit", 2, { target: "source" })],
+    }),
+  ]);
+  const { game, decks } = fixture([gloryseeker]);
+  decks[0]!.instances.push(instance("gloryseeker", "p1", "GLORYSEEKER"));
+  game.state.players.p1!.zones.base.push("gloryseeker");
+  game.state.cardStates.gloryseeker = cardState(2);
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "gloryseeker",
+    values: {},
+  }, decks);
+  assert.equal(game.state.chain, null);
+
+  const index = createRuntimeCardIndex(decks, game);
+  game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier"];
+  recordLegionStatus(game, "p1", "gloryseeker", index);
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "gloryseeker",
+    values: {},
+  }, decks);
+  const chainAfterLegion = game.state.chain as GameDocument["state"]["chain"];
+  assert.equal(chainAfterLegion?.items.length, 1);
+});
+
+test("Champion-zone cards are not active trigger sources", () => {
+  const champion = unit("CHAMPION", "Chosen Champion", [
+    clause("leaked-trigger", {
+      triggers: [binding("trigger.on_play", 0, {
+        actor: "controller",
+        subject: "spell",
+      })],
+      effects: [binding("action.draw_cards", 1, {
+        player: "controller",
+        count: 1,
+      })],
+    }),
+  ]);
+  const enemySpell = unit("SPELL", "Enemy spell");
+  enemySpell.card.classification.type = "Spell";
+  const { game, decks } = fixture([champion, enemySpell]);
+  decks[0]!.instances.push(instance("champion", "p1", "CHAMPION"));
+  decks[1]!.instances.push(instance("spell", "p2", "SPELL"));
+  game.state.players.p1!.zones.champion = "champion";
+  game.state.cardStates.champion = cardState(1);
+  game.state.cardStates.spell = cardState(null);
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p2",
+    subjectCardInstanceId: "spell",
+    values: {},
+  }, decks);
+  assert.equal(game.state.chain, null);
+});
+
+test("simultaneous trigger items use distinct event-specific IDs", () => {
+  const viktor = unit("VIKTOR", "Viktor, Leader", [
+    clause("recruit", {
+      triggers: [binding("trigger.on_death", 0, {
+        subject: "another_friendly_unit",
+      })],
+      effects: [binding("action.draw_cards", 1, {
+        player: "controller",
+        count: 1,
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([viktor, unit("UNIT", "Unit")]);
+  decks[0]!.instances.push(
+    instance("viktor", "p1", "VIKTOR"),
+    instance("first", "p1", "UNIT"),
+    instance("second", "p1", "UNIT"),
+  );
+  game.state.players.p1!.zones.base.push("viktor", "first", "second");
+  game.state.cardStates.viktor = cardState(2);
+  game.state.cardStates.first = cardState(1);
+  game.state.cardStates.second = cardState(1);
+
+  dispatchSimultaneousBehaviorEvents(game, [
+    { type: "unit.died", actorPlayerId: "p1", subjectCardInstanceId: "first", values: {} },
+    { type: "unit.died", actorPlayerId: "p1", subjectCardInstanceId: "second", values: {} },
+  ], decks);
+  assert.equal(game.state.pendingChoice?.type, "orderTriggers");
+  const triggerIds = game.state.pendingChoice?.type === "orderTriggers"
+    ? game.state.pendingChoice.optionIds
+    : [];
+  assert.equal(triggerIds.length, 2);
+  assert.equal(new Set(triggerIds).size, 2);
 });
 
 test("Darius triggers after a second Unit card is played", () => {

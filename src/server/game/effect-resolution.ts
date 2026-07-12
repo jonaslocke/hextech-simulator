@@ -2,7 +2,6 @@ import {
   clauseHasAutomaticAffectedGroup,
   compileBehaviorModel,
   createBehaviorContext,
-  allocateSelections,
   selectionRequirementsForClause,
 } from "./behavior-runtime";
 import type { BehaviorEvent } from "./behavior-runtime";
@@ -180,6 +179,18 @@ export function resumeEffectResolution(
     frame.behaviorEvent,
     [],
   );
+  if (
+    frame.targetsLocked &&
+    !hydrateLockedSelectorSelections(
+      frame,
+      clause,
+      selectorContext,
+      handlers,
+    )
+  ) {
+    finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+    return true;
+  }
   for (const selector of clause.selectors) {
     const selected =
       frame.selectionsByBinding[
@@ -198,23 +209,11 @@ export function resumeEffectResolution(
     selectorContext,
     handlers,
   );
-  const lockedSelectionsByRequirement = frame.targetsLocked
-    ? allocateSelections(
-        selectorRequirements.map(({ requirement }) => requirement),
-        frame.initialSelectedIds,
-      )
-    : null;
-  for (const [selectorIndex, { binding, requirement }] of selectorRequirements.entries()) {
+  for (const { binding, requirement } of selectorRequirements) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
     if (frame.targetsLocked) {
-      const lockedSelections = lockedSelectionsByRequirement?.[selectorIndex] ?? [];
-      if (lockedSelections.length < requirement.minimum) {
-        finishResolutionFrame(game, frame.id, frame.delayedEffectId);
-        return true;
-      }
-      frame.selectionsByBinding[bindingKey] = lockedSelections;
-      continue;
+      throw new Error(`Locked selector was not initialized: ${bindingKey}`);
     }
     if (requirement.legalIds.length < requirement.minimum) {
       finishResolutionFrame(game, frame.id, frame.delayedEffectId);
@@ -362,6 +361,39 @@ export function resumeEffectResolution(
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);
   return true;
+}
+
+function hydrateLockedSelectorSelections(
+  frame: GameDocument["state"]["effectResolutions"][number],
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  context: ReturnType<typeof createBehaviorContext>,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  let cursor = 0;
+  for (const selector of clause.selectors) {
+    const handler = handlers.get(selector.behaviorId);
+    if (!handler?.targets) {
+      throw new Error(`Behavior handler cannot project targets: ${selector.behaviorId}`);
+    }
+    const requirement = handler.targets(selector, context);
+    const bindingKey = `${clause.id}:selectors:${selector.order}`;
+    const selected = requirement.maximum === 0
+      ? requirement.legalIds
+      : frame.initialSelectedIds.slice(cursor, cursor + requirement.maximum);
+    if (requirement.maximum > 0) cursor += selected.length;
+    if (
+      selected.length < requirement.minimum ||
+      selected.some((id) => !requirement.legalIds.includes(id))
+    ) {
+      return false;
+    }
+    frame.selectionsByBinding[bindingKey] = selected;
+    context.selectedBySelector[bindingKey] = selected;
+    if (typeof selector.parameters.selectionKey === "string") {
+      context.selectedBySelector[selector.parameters.selectionKey] = selected;
+    }
+  }
+  return cursor === frame.initialSelectedIds.length;
 }
 
 function selectorChoicePlayerId(

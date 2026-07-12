@@ -85,7 +85,11 @@ function collectBehaviorEventItems(
           );
           return (
             !dedupeForBattlefieldDefend ||
-            !existing.some((candidate) => candidate.id === item.id)
+            !existing.some(
+              (candidate) =>
+                candidate.sourceCardInstanceId === item.sourceCardInstanceId &&
+                candidate.behaviorClauseId === item.behaviorClauseId,
+            )
           );
         });
         byController.set(controllerPlayerId, [
@@ -469,7 +473,6 @@ function activeSourceIds(
   return [
     ...new Set([
       ...(player.zones.legend ? [player.zones.legend] : []),
-      ...(player.zones.champion ? [player.zones.champion] : []),
       ...player.zones.base,
       ...game.state.battlefields
         .filter(

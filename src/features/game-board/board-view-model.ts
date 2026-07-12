@@ -148,7 +148,7 @@ export type BoardProjection = {
     contestedByPlayerId: string | null;
     cardInstanceId: string;
     units: string[];
-    facedownSlot: null;
+    facedownSlot: boolean;
   }>;
   cardStates: Record<
     string,
@@ -312,7 +312,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
-        facedownSlot: null,
+        facedownSlot: battlefield.hasFacedownCard,
       })),
       cardStates,
     },

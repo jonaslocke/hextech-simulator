@@ -285,6 +285,7 @@ export function projectGame(input: {
         battlefield.facedownControllerPlayerId === input.viewerPlayerId
           ? view(battlefield.facedownCardInstanceId)
           : null,
+      hasFacedownCard: Boolean(battlefield.facedownCardInstanceId),
     })),
     chain: input.game.state.chain
       ? {

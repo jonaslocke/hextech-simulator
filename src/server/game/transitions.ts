@@ -17,10 +17,14 @@ export function acceptedActionEvent(
   actorPlayerId: string,
   action: ProjectedAction
 ): GameTransitionEvent {
+  const actionKind = action.id.split(":")[3];
   return {
     type: "game.action.accepted",
     actorPlayerId,
-    message: `${actorPlayerId}: ${action.label}`,
+    message:
+      actionKind === "hide"
+        ? `${actorPlayerId}: Hid a card.`
+        : `${actorPlayerId}: ${action.label}`,
     payload: { actionId: action.id }
   };
 }

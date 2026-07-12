@@ -232,6 +232,7 @@ export const projectedBattlefieldSchema = z.object({
   card: projectedCardViewSchema,
   units: z.array(projectedCardViewSchema),
   facedownCard: projectedCardViewSchema.nullable().default(null),
+  hasFacedownCard: z.boolean().default(false),
 });
 
 export const projectedChainItemSchema = z.object({

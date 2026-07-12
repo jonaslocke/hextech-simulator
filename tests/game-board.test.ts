@@ -178,7 +178,8 @@ test("describes the final combat Focus pass with live Might", () => {
         card("attacker", "p1", 5),
         card("defender", "p2", 3)
       ],
-      facedownCard: null
+      facedownCard: null,
+      hasFacedownCard: false,
     }],
     chain: null,
     combat: {
@@ -263,7 +264,7 @@ test("stages a single-unit move through the simultaneous move action", () => {
       card: { name: "The Papertree" },
       units: []
     }]),
-    "Choose units to Conquer The Papertree"
+    "Move units to The Papertree"
   );
   assert.equal(
     moveSelectionTitle(simultaneousMove, [{
@@ -271,7 +272,7 @@ test("stages a single-unit move through the simultaneous move action", () => {
       card: { name: "The Papertree" },
       units: [{}]
     }]),
-    "Choose units to Contest The Papertree"
+    "Move units to The Papertree"
   );
 });
 

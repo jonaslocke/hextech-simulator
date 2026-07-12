@@ -15,6 +15,7 @@ export type PaymentPlan = {
   conditionalPowerFromPool: Record<string, number>;
   powerFromPool: Record<string, number>;
   powerRuneIds: string[];
+  powerAbilityIds: string[];
 };
 
 export function buildPaymentPlan(
@@ -55,14 +56,26 @@ export function buildPaymentPlan(
     remainingPower -= spend;
   }
   const powerRuneIds: string[] = [];
+  const powerAbilityIds: string[] = [];
   for (const id of player.zones.base) {
     if (remainingPower === 0) break;
-    if (!hasAbility(id, "ability.recycle_for_power", index)) continue;
-    const runeDomain = definitionForInstance(id, index).card.classification
-      .domain[0];
-    if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
-    powerRuneIds.push(id);
-    remainingPower -= 1;
+    if (hasAbility(id, "ability.recycle_for_power", index)) {
+      const runeDomain = definitionForInstance(id, index).card.classification
+        .domain[0];
+      if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
+      powerRuneIds.push(id);
+      remainingPower -= 1;
+      continue;
+    }
+    const ability = exhaustForPowerAbility(
+      id,
+      game,
+      definition.card.classification.type,
+      index,
+    );
+    if (!ability || !allowedDomains.includes(ability.domain)) continue;
+    powerAbilityIds.push(id);
+    remainingPower = Math.max(0, remainingPower - ability.amount);
   }
   if (remainingPower > 0) return null;
   let remainingAnyPower = additionalAnyPower;
@@ -140,6 +153,7 @@ export function buildPaymentPlan(
     conditionalPowerFromPool,
     powerFromPool,
     powerRuneIds,
+    powerAbilityIds,
   };
 }
 
@@ -172,6 +186,9 @@ export function payCardCost(
     conditionalPower[domain] = (conditionalPower[domain] ?? 0) - amount;
   }
   plan.energySourceIds.forEach((id) => {
+    game.state.cardStates[id]!.exhausted = true;
+  });
+  plan.powerAbilityIds.forEach((id) => {
     game.state.cardStates[id]!.exhausted = true;
   });
   for (const [domain, amount] of Object.entries(plan.powerFromPool))
@@ -309,6 +326,41 @@ function exhaustForEnergyAbility(
         continue;
       }
       return { amount, usage };
+    }
+  }
+  return null;
+}
+
+function exhaustForPowerAbility(
+  id: string,
+  game: GameDocument,
+  cardType: string,
+  index: RuntimeCardIndex,
+): { amount: number; domain: string } | null {
+  if (index.instances.get(id) == null) return null;
+  for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
+    for (const ability of clause.abilities) {
+      if (
+        ability.behaviorId !== "ability.exhaust_for_resource" ||
+        ability.parameters.resourceType !== "power" ||
+        ability.parameters.domain === undefined
+      ) {
+        continue;
+      }
+      const amount = ability.parameters.amount;
+      const domain = ability.parameters.domain;
+      const usage = ability.parameters.usage;
+      if (
+        game.state.cardStates[id]?.exhausted ||
+        typeof amount !== "number" ||
+        amount <= 0 ||
+        typeof domain !== "string" ||
+        typeof usage !== "string" ||
+        (usage === "spellsOnly" && cardType !== "Spell")
+      ) {
+        continue;
+      }
+      return { amount, domain };
     }
   }
   return null;

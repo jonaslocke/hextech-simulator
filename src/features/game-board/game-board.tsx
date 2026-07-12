@@ -45,6 +45,7 @@ import {
 } from "./interactions/use-game-board-actions";
 import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
 import {
+  activeTargetRequirement,
   combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
@@ -810,10 +811,10 @@ export const GameBoard: FC<GameBoardProps> = ({
                   : "Cancel"
             }
             confirmLabel={
-              targetSelectionHasOptionalCost(targetSelection)
-                ? targetSelection.selectedTargetIds.length > 0
+              targetSelectionIsChoosingOptionalCost(targetSelection)
+                ? targetSelectionHasChosenOptionalCost(targetSelection)
                   ? "Pay optional cost"
-                  : "Decline"
+                  : "Pay normal cost"
                 : targetSelection.purpose === "move"
                   ? "Confirm move"
                   : targetSelection.purpose === "choice"
@@ -830,13 +831,13 @@ export const GameBoard: FC<GameBoardProps> = ({
                   )
                 : targetSelection.purpose === "choice"
                   ? effectSelectionAction?.label
-                  : targetSelectionHasOptionalCost(targetSelection)
+                  : targetSelectionIsChoosingOptionalCost(targetSelection)
                     ? optionalCostTitle(targetSelectionAction?.label)
                     : undefined
             }
             helperText={
-              targetSelectionHasOptionalCost(targetSelection)
-                ? "Choose a card to pay the optional cost, or decline."
+              targetSelectionIsChoosingOptionalCost(targetSelection)
+                ? "Choose a card to pay the optional cost, or pay the normal cost."
                 : targetSelection.purpose === "move"
                   ? "Click additional units to include them, then confirm the move."
                   : undefined
@@ -936,14 +937,36 @@ export const GameBoard: FC<GameBoardProps> = ({
   );
 };
 
-function targetSelectionHasOptionalCost(
+function targetSelectionIsChoosingOptionalCost(
   targetSelection: NonNullable<
     ReturnType<typeof useBoardTargetSelection>["targetSelection"]
   >,
 ) {
-  return targetSelection.requirement.requirements.some(
-    (requirement) => requirement.selectionPurpose === "optionalCost",
+  return (
+    activeTargetRequirement(
+      targetSelection.requirement,
+      targetSelection.selectedTargetIds,
+    )?.selectionPurpose === "optionalCost"
   );
+}
+
+function targetSelectionHasChosenOptionalCost(
+  targetSelection: NonNullable<
+    ReturnType<typeof useBoardTargetSelection>["targetSelection"]
+  >,
+) {
+  let cursor = 0;
+  for (const requirement of targetSelection.requirement.requirements) {
+    const selected = targetSelection.selectedTargetIds.slice(
+      cursor,
+      cursor + requirement.maximum,
+    );
+    if (requirement.selectionPurpose === "optionalCost" && selected.length > 0) {
+      return true;
+    }
+    cursor += selected.length;
+  }
+  return false;
 }
 
 function optionalCostTitle(actionLabel: string | undefined) {

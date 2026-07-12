@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  activeTargetRequirement,
   targetSelectionCanAdd,
   targetSelectionIsLegal,
   type CombinedTargetRequirement,
@@ -201,6 +202,11 @@ export function useBoardTargetSelection({
       const nextSelection = {
         ...targetSelection,
         selectedTargetIds,
+        legalTargetIds:
+          activeTargetRequirement(
+            targetSelection.requirement,
+            selectedTargetIds,
+          )?.legalIds ?? [],
       };
 
       setTargetSelection(nextSelection);

@@ -136,6 +136,9 @@ export const CardTile: FC<CardTileProps> = ({
     orientation === "auto" ? autoOrientation : orientation;
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
+  const isBuffed = activeModifiers.some(
+    (modifier) => modifier.label === "Buff +1",
+  );
   const { isLocationDragActive } = useLocationDragState();
   const canShowHoverPreview = enableHoverPreview && !isLocationDragActive;
 
@@ -355,10 +358,19 @@ export const CardTile: FC<CardTileProps> = ({
             {damage}
           </span>
         )}
-        {isStunned && (
-          <span className="-bottom-1 left-1/2 absolute bg-violet-300 px-1.5 py-0.5 border border-violet-100/70 rounded-full font-mono font-bold text-[8px] text-violet-950 uppercase tracking-wide -translate-x-1/2 pointer-events-none">
-            Stunned
-          </span>
+        {(isBuffed || isStunned) && (
+          <div className="-bottom-1 left-1/2 absolute flex gap-1 -translate-x-1/2 pointer-events-none">
+            {isBuffed && (
+              <span className="bg-emerald-300 px-1.5 py-0.5 border border-emerald-100/70 rounded-full font-mono font-bold text-[8px] text-emerald-950 uppercase tracking-wide">
+                Buff +1
+              </span>
+            )}
+            {isStunned && (
+              <span className="bg-violet-300 px-1.5 py-0.5 border border-violet-100/70 rounded-full font-mono font-bold text-[8px] text-violet-950 uppercase tracking-wide">
+                Stunned
+              </span>
+            )}
+          </div>
         )}
         {isStagedForMovement && (
           <span className="-bottom-1 left-1/2 absolute bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.45)] px-1.5 py-0.5 border border-emerald-100/70 rounded-full font-mono font-bold text-[8px] text-slate-950 uppercase tracking-wide -translate-x-1/2 pointer-events-none">
@@ -371,6 +383,7 @@ export const CardTile: FC<CardTileProps> = ({
         domains={domains}
         energy={energy}
         img={img}
+        isStunned={isStunned}
         might={might}
         name={name}
         ownerLabel={ownerLabel}
@@ -393,6 +406,7 @@ function CardHoverPreviewPortal({
   domains,
   energy,
   img,
+  isStunned,
   might,
   name,
   ownerLabel,
@@ -410,6 +424,7 @@ function CardHoverPreviewPortal({
   domains: string[];
   energy?: number;
   img: string;
+  isStunned?: boolean;
   might?: number;
   name: string;
   ownerLabel?: string;
@@ -461,6 +476,7 @@ function CardHoverPreviewPortal({
         activeModifiers={activeModifiers}
         domains={domains}
         energy={energy}
+        isStunned={isStunned}
         might={might}
         name={name}
         ownerLabel={ownerLabel}
@@ -511,6 +527,7 @@ function CardSummary({
   activeModifiers,
   domains,
   energy,
+  isStunned,
   might,
   name,
   ownerLabel,
@@ -525,6 +542,7 @@ function CardSummary({
   activeModifiers: NonNullable<Card["activeModifiers"]>;
   domains: string[];
   energy?: number;
+  isStunned?: boolean;
   might?: number;
   name: string;
   ownerLabel?: string;
@@ -589,6 +607,11 @@ function CardSummary({
             <SummaryStatChip label="Might">
               <MightResource compact value={might} />
             </SummaryStatChip>
+          )}
+          {isStunned && (
+            <span className="inline-flex items-center bg-violet-300/15 px-2 py-0.5 border border-violet-300/30 rounded-full text-[11px] text-violet-100">
+              Stunned
+            </span>
           )}
         </div>
       )}

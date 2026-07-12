@@ -13,6 +13,8 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  recordLegionStatus,
+  recomputeAllMight,
   recomputeMight,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -56,8 +58,6 @@ import {
 import {
   availableAnyPowerAfterBaseCost,
   buildPaymentPlan,
-  canPayAnyPower,
-  payAnyPower,
   payCardCost,
   targetDeflectCost,
 } from "./payment";
@@ -475,7 +475,14 @@ export function performGameplayAction(input: {
       );
       break;
     case "hide":
-      hideCard(game, input.actorPlayerId, source, extra, index);
+      hideCard(
+        game,
+        input.actorPlayerId,
+        source,
+        extra,
+        input.selectedIds,
+        index,
+      );
       break;
     case "playHidden":
       playCard(
@@ -734,6 +741,14 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
+  validateLockedPlaySelections(
+    game,
+    playerId,
+    cardId,
+    selectedIds,
+    definition,
+    handlers,
+  );
   const optionalPlayCost = payOptionalPlayCosts(
     game,
     playerId,
@@ -1467,6 +1482,20 @@ function addPlayableCardActions(
       }
     }
     if (hasBehavior(definition, "keyword.hidden")) {
+      const canHideThisTurn = game.state.turn?.activePlayerId === playerId;
+      const powerSourceIds = hidePowerSourceIds(game, playerId, index);
+      const pooledPowerAvailable = Object.values(player.power).some(
+        (amount) => amount > 0,
+      );
+      const hideTargets: ProjectedAction["targets"] = powerSourceIds.length > 0
+        ? [{
+            kind: "card",
+            label: "Power source",
+            legalIds: powerSourceIds,
+            minimum: pooledPowerAvailable ? 0 : 1,
+            maximum: 1,
+          }]
+        : [];
       for (const battlefield of game.state.battlefields) {
         const isControlled = battlefield.controllerPlayerId === playerId;
         const isEmpty = !battlefield.facedownCardInstanceId;
@@ -1476,13 +1505,16 @@ function addPlayableCardActions(
             "hide",
             `Hide ${definition.card.name} at ${definitionForInstance(battlefield.cardInstanceId, index).card.name}`,
             cardId,
-            isControlled && isEmpty && canPayAnyPower(game, playerId, index),
-            !isControlled
+            canHideThisTurn && isControlled && isEmpty && (pooledPowerAvailable || powerSourceIds.length > 0),
+            !canHideThisTurn
+              ? "You can hide a card only on your turn."
+              : !isControlled
               ? "You do not control this battlefield."
               : !isEmpty
                 ? "That battlefield already has a facedown card."
-                : "A Power cost cannot be paid.",
+                : "Choose a Power source or channel Power first.",
             battlefield.battlefieldId,
+            hideTargets,
           ),
         );
       }
@@ -1554,6 +1586,7 @@ function hideCard(
   playerId: string,
   cardId: string,
   battlefieldId: string,
+  selectedIds: readonly string[],
   index: RuntimeCardIndex,
 ) {
   const player = game.state.players[playerId]!;
@@ -1566,15 +1599,76 @@ function hideCard(
     battlefield.controllerPlayerId !== playerId ||
     battlefield.facedownCardInstanceId ||
     !player.zones.hand.includes(cardId) ||
-    !hasBehavior(definition, "keyword.hidden")
+    !hasBehavior(definition, "keyword.hidden") ||
+    game.state.turn?.activePlayerId !== playerId
   ) {
     throw new Error("Hidden card cannot be placed there.");
   }
-  payAnyPower(game, playerId, index);
+  payHidePower(game, playerId, selectedIds, index);
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   battlefield.facedownCardInstanceId = cardId;
   battlefield.facedownControllerPlayerId = playerId;
   battlefield.hiddenAtTurnNumber = game.state.turn?.turnNumber ?? 1;
+}
+
+function hidePowerSourceIds(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  return game.state.players[playerId]!.zones.base.filter((id) => {
+    if (hasBehavior(definitionForInstance(id, index), "ability.recycle_for_power")) {
+      return true;
+    }
+    return (
+      !game.state.cardStates[id]?.exhausted &&
+      definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+        clause.abilities.some(
+          (ability) =>
+            ability.behaviorId === "ability.exhaust_for_resource" &&
+            ability.parameters.resourceType === "power",
+        ),
+      )
+    );
+  });
+}
+
+function payHidePower(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  if (selectedIds.length > 1) {
+    throw new Error("Choose at most one Power source to hide a card.");
+  }
+  const [sourceId] = selectedIds;
+  if (sourceId) {
+    if (!hidePowerSourceIds(game, playerId, index).includes(sourceId)) {
+      throw new Error("Selected Power source cannot pay to hide this card.");
+    }
+    if (hasBehavior(definitionForInstance(sourceId, index), "ability.recycle_for_power")) {
+      const player = game.state.players[playerId]!;
+      player.zones.base = player.zones.base.filter((id) => id !== sourceId);
+      player.zones.runeDeck.push(sourceId);
+      const state = game.state.cardStates[sourceId];
+      if (state) {
+        state.damage = 0;
+        state.exhausted = false;
+      }
+      recomputeAllMight(game, index);
+      return;
+    }
+    game.state.cardStates[sourceId]!.exhausted = true;
+    return;
+  }
+
+  const player = game.state.players[playerId]!;
+  const domain = Object.keys(player.power)
+    .filter((candidate) => (player.power[candidate] ?? 0) > 0)
+    .sort()[0];
+  if (!domain) throw new Error("A selected Power source is required to hide this card.");
+  player.power[domain]! -= 1;
 }
 
 function canSatisfyTargetRequirements(
@@ -1839,22 +1933,6 @@ function executeActivatedAbility(
   game.state.chain.passedPlayerIds = [];
 }
 
-function recordLegionStatus(
-  game: GameDocument,
-  playerId: string,
-  cardId: string,
-  index: RuntimeCardIndex,
-) {
-  const instance = index.instances.get(cardId);
-  if (instance?.source !== "mainDeck") return;
-  const player = game.state.players[playerId]!;
-  const played = (player.playedMainDeckCardIdsThisTurn ??= []);
-  if (played.length > 0) {
-    (player.legionSatisfiedCardIdsThisTurn ??= []).push(cardId);
-  }
-  played.push(cardId);
-}
-
 function activatedAbilityCostStatus(
   game: GameDocument,
   playerId: string,
@@ -2045,34 +2123,62 @@ function payOptionalPlayCosts(
   index: RuntimeCardIndex,
 ) {
   let ignoreBaseCost = false;
-  const hasExhaustCost = definition.behaviorModel.clauses.some((clause) =>
-    clause.costs.some(
-      (cost) => cost.behaviorId === "cost.exhaust_selected_unit",
-    ),
-  );
-  if (hasExhaustCost) {
-    const selected = selectedIds.find(
-      (id) =>
-        definitionForInstance(id, index).card.classification.type === "Unit" &&
-        !game.state.cardStates[id]?.exhausted,
-    );
-    if (selected) game.state.cardStates[selected]!.exhausted = true;
-  }
+  const selectionsByKey = preplaySelectionsByKey(definition, selectedIds);
   for (const clause of definition.behaviorModel.clauses) {
     for (const cost of clause.costs) {
+      const selectionKey = cost.parameters.selectionKey;
+      const selected =
+        typeof selectionKey === "string"
+          ? selectionsByKey[selectionKey]?.[0]
+          : undefined;
+      if (cost.behaviorId === "cost.exhaust_selected_unit") {
+        if (
+          selected &&
+          definitionForInstance(selected, index).card.classification.type ===
+            "Unit" &&
+          !game.state.cardStates[selected]?.exhausted
+        ) {
+          game.state.cardStates[selected]!.exhausted = true;
+        }
+        continue;
+      }
       if (cost.behaviorId !== "cost.spend_buff") continue;
-      const selected = selectedIds.find(
-        (id) =>
-          index.instances.get(id)?.ownerPlayerId === playerId &&
-          game.state.cardStates[id]?.buffed === true,
-      );
-      if (!selected) continue;
+      if (
+        !selected ||
+        index.instances.get(selected)?.ownerPlayerId !== playerId ||
+        game.state.cardStates[selected]?.buffed !== true
+      ) {
+        continue;
+      }
       game.state.cardStates[selected]!.buffed = false;
       recomputeMight(game, selected, index);
       if (cost.parameters.ignoreBaseCost === true) ignoreBaseCost = true;
     }
   }
   return { ignoreBaseCost };
+}
+
+function preplaySelectionsByKey(
+  definition: GameCardDefinition,
+  selectedIds: readonly string[],
+) {
+  const selectionsByKey: Record<string, string[]> = {};
+  let cursor = 0;
+  for (const clause of definition.behaviorModel.clauses) {
+    for (const selector of clause.selectors) {
+      if (selector.parameters.deferred === true) continue;
+      const maximum =
+        typeof selector.parameters.maximumCount === "number"
+          ? selector.parameters.maximumCount
+          : 1;
+      const selected = selectedIds.slice(cursor, cursor + maximum);
+      cursor += selected.length;
+      if (typeof selector.parameters.selectionKey === "string") {
+        selectionsByKey[selector.parameters.selectionKey] = selected;
+      }
+    }
+  }
+  return selectionsByKey;
 }
 
 function playSelectionRequirements(
@@ -2089,6 +2195,50 @@ function playSelectionRequirements(
       )
       .map(({ requirement }) => requirement),
   );
+}
+
+function validateLockedPlaySelections(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  selectedIds: readonly string[],
+  definition: GameCardDefinition,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
+  const clauses = compiled.clauses.filter((clause) =>
+    clauseCanRequirePlaySelections(definition, clause),
+  );
+  if (clauses.length === 0) return;
+  let cursor = 0;
+  for (const clause of clauses) {
+    const context = createBehaviorContext(game, playerId, cardId, null, []);
+    for (const selector of clause.selectors) {
+      const handler = handlers.get(selector.behaviorId);
+      if (!handler?.targets) {
+        throw new Error(`Behavior handler cannot project targets: ${selector.behaviorId}`);
+      }
+      const requirement = handler.targets(selector, context);
+      const selected = requirement.maximum === 0
+        ? requirement.legalIds
+        : selectedIds.slice(cursor, cursor + requirement.maximum);
+      if (requirement.maximum > 0) cursor += selected.length;
+      if (
+        selected.length < requirement.minimum ||
+        selected.some((id) => !requirement.legalIds.includes(id))
+      ) {
+        throw new Error("Selected targets do not satisfy linked requirements.");
+      }
+      const selectionKey = `${clause.id}:selectors:${selector.order}`;
+      context.selectedBySelector[selectionKey] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+    }
+  }
+  if (cursor !== selectedIds.length) {
+    throw new Error("Selected targets do not satisfy linked requirements.");
+  }
 }
 
 function hasPayableAlternateCost(

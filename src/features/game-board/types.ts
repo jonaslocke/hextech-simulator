@@ -88,6 +88,7 @@ export type BattlefieldData = {
   description: string;
   playerUnits: Card[];
   opponentUnits: Card[];
+  hasFacedownCard: boolean;
   img: HTMLImageElement["src"];
 };
 
