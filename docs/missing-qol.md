@@ -51,3 +51,4 @@
 [x] better game header
 [ ] concede in between games more dificult
 [ ] The Candlelit Sanctum - reorder + recycle better xp
+[ ] improve token placement UI - needs image of the locations and better UX for placement.
