@@ -261,7 +261,11 @@ export function projectGame(input: {
       contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
       card: view(battlefield.cardInstanceId),
       units: battlefield.units.map(view),
-      facedownCard: null,
+      facedownCard:
+        battlefield.facedownCardInstanceId &&
+        battlefield.facedownControllerPlayerId === input.viewerPlayerId
+          ? view(battlefield.facedownCardInstanceId)
+          : null,
     })),
     chain: input.game.state.chain
       ? {

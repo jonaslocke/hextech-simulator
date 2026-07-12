@@ -620,6 +620,57 @@ test("stun marks a unit once and clears at the next Ending Step", () => {
   assert.equal(game.state.cardStates.enemy?.stunned, false);
 });
 
+test("Hidden cards use an empty controlled facedown slot and play free next turn", () => {
+  const hiddenUnit = unit("HIDDEN", "Hidden Unit", [
+    clause("hidden", { keywords: [binding("keyword.hidden", 0)] }),
+  ]);
+  const { game, decks } = fixture([hiddenUnit, battlefield("BF", "Field")]);
+  decks[0]!.instances.push(instance("hidden", "p1", "HIDDEN"));
+  decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
+  game.state.players.p1!.zones.hand.push("hidden");
+  game.state.players.p1!.power.Rainbow = 1;
+  game.state.cardStates.hidden = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+
+  const hide = gameplayActions(game, "p1", decks).find(
+    (action) => action.label.startsWith("Hide Hidden Unit"),
+  );
+  assert.ok(hide);
+  const hidden = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: hide.id,
+    selectedIds: [],
+    decks,
+    now: "hide",
+  });
+  assert.equal(hidden.state.battlefields[0]?.facedownCardInstanceId, "hidden");
+  assert.equal(hidden.state.players.p1!.power.Rainbow, 0);
+
+  hidden.state.turn = { turnNumber: 2, activePlayerId: "p2", phase: "action" };
+  const playHidden = gameplayActions(hidden, "p1", decks).find(
+    (action) => action.label === "Play Hidden Hidden Unit",
+  );
+  assert.ok(playHidden);
+  const played = performGameplayAction({
+    game: hidden,
+    actorPlayerId: "p1",
+    actionId: playHidden.id,
+    selectedIds: [],
+    decks,
+    now: "play-hidden",
+  });
+  assert.deepEqual(played.state.battlefields[0]?.units, ["hidden"]);
+  assert.equal(played.state.battlefields[0]?.facedownCardInstanceId, null);
+});
+
 test("Temporary token dies at its controller's Beginning Phase", () => {
   const sprite = getTokenCatalogDefinition("OGN-274");
   assert.ok(sprite);

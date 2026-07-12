@@ -61,7 +61,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.ganking", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
+    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
     "keyword.temporary",
   ]) handlers.set(id, passive);
   handlers.set("choice.optional", {
@@ -137,11 +137,19 @@ export function createPrimitiveHandlers(
       context.event.subjectCardInstanceId === context.sourceCardInstanceId
   });
   handlers.set("trigger.on_death", {
-    matches: (binding, context) =>
-      context.event?.type === "unit.died" &&
-      context.event.subjectCardInstanceId === context.sourceCardInstanceId &&
-      (binding.parameters.subject === "source" ||
-        binding.parameters.subject === "event_subject"),
+    matches: (binding, context) => {
+      if (context.event?.type !== "unit.died" || !context.event.subjectCardInstanceId)
+        return false;
+      const deadId = context.event.subjectCardInstanceId;
+      const deadOwner = index.instances.get(deadId)?.ownerPlayerId;
+      const subject = binding.parameters.subject;
+      if (subject === "source" || subject === "event_subject")
+        return deadId === context.sourceCardInstanceId;
+      if (subject === "friendly_unit") return deadOwner === context.controllerPlayerId;
+      if (subject === "another_friendly_unit")
+        return deadOwner === context.controllerPlayerId && deadId !== context.sourceCardInstanceId;
+      return subject === "enemy_unit" && deadOwner !== context.controllerPlayerId;
+    },
   });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
@@ -405,6 +413,53 @@ export function createPrimitiveHandlers(
         })),
       );
     }
+  });
+  handlers.set("action.look", {
+    choice(binding, context) {
+      ensureMainDeck(context.game, context.controllerPlayerId, index);
+      const count = Math.max(0, optionalNumberParam(binding, "count", 1));
+      const cards = context.game.state.players[context.controllerPlayerId]!
+        .zones.mainDeck.slice(0, count);
+      return cards.length > 0
+        ? {
+            legalIds: cards,
+            minimum: 0,
+            maximum: 0,
+            prompt: `Look at the top ${cards.length} card${cards.length === 1 ? "" : "s"}.`,
+            sourceZone: "mainDeck",
+            presentation: "vision",
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const count = Math.max(0, optionalNumberParam(binding, "count", 1));
+      const cards = context.game.state.players[context.controllerPlayerId]!
+        .zones.mainDeck.slice(0, count);
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...cards.map((id) => ({
+          type: "card.lookedAt",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
+    },
+  });
+  handlers.set("action.reveal", {
+    execute(binding, context) {
+      const count = Math.max(0, optionalNumberParam(binding, "count", 1));
+      const cards = context.selectedIds.length > 0
+        ? context.selectedIds.slice(0, count || context.selectedIds.length)
+        : context.game.state.players[context.controllerPlayerId]!.zones.mainDeck.slice(0, count);
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...cards.map((id) => ({
+          type: "card.revealed",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
+    },
   });
   handlers.set("action.exhaust_cards", {
     execute(binding, context) {
@@ -1382,6 +1437,15 @@ function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "number") throw new Error(`Behavior parameter ${key} must be numeric.`);
   return value;
+}
+
+function optionalNumberParam(
+  binding: BehaviorBinding,
+  key: string,
+  fallback: number,
+) {
+  const value = binding.parameters[key];
+  return typeof value === "number" ? value : fallback;
 }
 function stringParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];

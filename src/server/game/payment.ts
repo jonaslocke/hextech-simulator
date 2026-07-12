@@ -23,6 +23,7 @@ export function buildPaymentPlan(
   energyCost: number,
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
+  additionalDomainPower = 0,
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   let remainingEnergy = energyCost;
@@ -33,7 +34,8 @@ export function buildPaymentPlan(
   remainingEnergy -= conditionalEnergy;
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
-  let remainingPower = definition.card.attributes.power ?? 0;
+  let remainingPower =
+    (definition.card.attributes.power ?? 0) + additionalDomainPower;
   const allowedDomains = definition.card.classification.domain.filter(
     (domain) => domain !== "Colorless",
   );
@@ -126,6 +128,7 @@ export function payCardCost(
   energyCost: number,
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
+  additionalDomainPower = 0,
 ) {
   const plan = buildPaymentPlan(
     game,
@@ -134,6 +137,7 @@ export function payCardCost(
     energyCost,
     index,
     additionalAnyPower,
+    additionalDomainPower,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
   const player = game.state.players[playerId]!;
@@ -177,6 +181,53 @@ export function availableAnyPowerAfterBaseCost(
     0,
   );
   return Math.max(0, pooledPower - basePowerFromPool);
+}
+
+export function canPayAnyPower(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  if (Object.values(player.power).some((amount) => amount > 0)) return true;
+  return player.zones.base.some((id) =>
+    definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+      clause.abilities.some(
+        (ability) => ability.behaviorId === "ability.recycle_for_power",
+      ),
+    ),
+  );
+}
+
+export function payAnyPower(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  const domain = Object.keys(player.power)
+    .filter((candidate) => (player.power[candidate] ?? 0) > 0)
+    .sort()[0];
+  if (domain) {
+    player.power[domain]! -= 1;
+    return;
+  }
+  const runeId = player.zones.base.find((id) =>
+    definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+      clause.abilities.some(
+        (ability) => ability.behaviorId === "ability.recycle_for_power",
+      ),
+    ),
+  );
+  if (!runeId) throw new Error("A Power cost cannot be paid.");
+  player.zones.base = player.zones.base.filter((id) => id !== runeId);
+  player.zones.runeDeck.push(runeId);
+  const state = game.state.cardStates[runeId];
+  if (state) {
+    state.damage = 0;
+    state.exhausted = false;
+  }
+  recomputeAllMight(game, index);
 }
 
 export function targetDeflectCost(

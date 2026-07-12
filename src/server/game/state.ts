@@ -40,6 +40,8 @@ export const playerStateSchema = z.object({
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
+  playedMainDeckCardIdsThisTurn: z.array(z.string().min(1)).optional(),
+  legionSatisfiedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   zones: playerZonesSchema,
 });
 
@@ -50,6 +52,9 @@ export const battlefieldStateSchema = z.object({
   controllerPlayerId: z.string().nullable().optional(),
   contestedByPlayerId: z.string().nullable().optional(),
   units: z.array(z.string()),
+  facedownCardInstanceId: z.string().min(1).nullable().optional(),
+  facedownControllerPlayerId: z.string().min(1).nullable().optional(),
+  hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
 });
 
 export const setupStateSchema = z.object({

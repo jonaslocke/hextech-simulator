@@ -176,6 +176,20 @@ The following further generic foundations are implemented and synchronized:
 - `action.stun_card` records the binary Stunned state, omits Stunned units'
   Might from combat damage, clears it at the next Ending Step, and exposes it
   in the card projection.
+- `keyword.hidden` now provides an empty facedown slot at a controlled
+  battlefield, pays one Power to hide from hand without opening a chain, and
+  permits a free Reaction play on the next player's turn. Hidden play targets
+  are constrained to its associated battlefield.
+- `keyword.accelerate` creates a distinct ready-entry play action that pays
+  one additional Energy and one additional Power matching the Unit's domain.
+- `keyword.legion` records prior Main Deck cards played this turn and gates
+  Legion clauses from the card's play-time state.
+- `trigger.on_death` now supports own, friendly, another-friendly, and enemy
+  death relationships. Existing named death replacements remain executable;
+  arbitrary `instead` and prevention models still require exact card-specific
+  replacement parameters before approval.
+- `action.look` exposes a private, non-moving top-deck inspection choice, and
+  `action.reveal` emits reveal events without moving the revealed cards.
 
 ## Manual Coverage to Reserve
 

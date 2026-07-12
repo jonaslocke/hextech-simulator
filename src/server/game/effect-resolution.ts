@@ -144,6 +144,14 @@ export function resumeEffectResolution(
   ).clauses.find((candidate) => candidate.id === frame.clauseId);
   if (!clause)
     throw new Error(`Behavior clause is unavailable: ${frame.clauseId}`);
+  if (
+    clause.keywords.some((binding) => binding.behaviorId === "keyword.legion") &&
+    !(game.state.players[frame.controllerPlayerId]
+      ?.legionSatisfiedCardIdsThisTurn ?? []).includes(frame.sourceCardInstanceId)
+  ) {
+    finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+    return true;
+  }
 
   const selectorContext = createBehaviorContext(
     game,

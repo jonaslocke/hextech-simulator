@@ -149,6 +149,9 @@ export function executeBehaviorClause(input: {
   allowUnavailableSelections?: boolean;
 }): { executed: boolean; delayed: boolean } {
   const { clause, context, handlers } = input;
+  if (!keywordsAllowClause(clause, context)) {
+    return { executed: false, delayed: false };
+  }
   if (!clause.triggers.every((binding) => matches(binding, context, handlers))) {
     return { executed: false, delayed: false };
   }
@@ -201,6 +204,19 @@ export function executeBehaviorClause(input: {
     handler.execute(binding, context);
   }
   return { executed: true, delayed: false };
+}
+
+function keywordsAllowClause(
+  clause: CompiledBehaviorClause,
+  context: BehaviorExecutionContext,
+) {
+  if (!clause.keywords.some((binding) => binding.behaviorId === "keyword.legion")) {
+    return true;
+  }
+  return (
+    context.game.state.players[context.controllerPlayerId]
+      ?.legionSatisfiedCardIdsThisTurn ?? []
+  ).includes(context.sourceCardInstanceId);
 }
 
 export function executeBehaviorEffects(

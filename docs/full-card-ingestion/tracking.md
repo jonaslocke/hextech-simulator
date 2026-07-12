@@ -213,4 +213,6 @@ Catalog-driven token resolution is implemented and synchronized. Generalized
 choice/cost processing and trigger/replacement processing remain in progress.
 The current executable subset includes optional binary decisions, explicit
 Energy/source-exhaustion activated costs, Beginning-Phase Temporary cleanup,
-own-death triggers, and selected-card recycle effects.
+own-death triggers, selected-card recycle effects, Hidden, Accelerate, Legion,
+and basic look/reveal flows. Arbitrary replacement and prevention text remains
+unapproved until its exact model has sufficient parameters.

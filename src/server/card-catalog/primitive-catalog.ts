@@ -87,7 +87,13 @@ export const playEventSubjectKinds = [
   "gear"
 ] as const;
 
-export const triggerSubjectKinds = ["source", "event_subject"] as const;
+export const triggerSubjectKinds = [
+  "source",
+  "event_subject",
+  "friendly_unit",
+  "another_friendly_unit",
+  "enemy_unit",
+] as const;
 
 export const delayedTimingKinds = [
   "endOfThisTurn",
@@ -442,6 +448,20 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)],
     listensToEvents: ["unit.died"],
     engineSupport: supported("Own-death triggers are queued after the unit leaves play.")
+  }),
+  "keyword.accelerate": primitiveSeed({
+    id: "keyword.accelerate",
+    family: "keyword",
+    name: "Accelerate",
+    description: "Allows a Unit to enter ready by paying 1 Energy and 1 Power of its domain as an optional additional cost.",
+    engineSupport: supported("A separate play action pays the additional domain cost and sets the entry state directly to ready."),
+  }),
+  "keyword.legion": primitiveSeed({
+    id: "keyword.legion",
+    family: "keyword",
+    name: "Legion",
+    description: "Applies its clause only after the controller has played another Main Deck card this turn.",
+    engineSupport: supported("The turn state records prior Main Deck cards and locks the condition at play time."),
   }),
   "trigger.end_of_turn": primitiveSeed({
     id: "trigger.end_of_turn",
@@ -800,7 +820,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Look at cards",
     description: "Lets a player look at hidden cards.",
-    parameters: [optional("count", "number", "The number of cards looked at.")]
+    parameters: [optional("count", "number", "The number of cards looked at.")],
+    engineSupport: supported("The controller receives a private top-deck inspection choice without moving the cards.")
   }),
   "action.vision": primitiveSeed({
     id: "action.vision",
@@ -815,7 +836,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Reveal cards",
     description: "Reveals hidden cards.",
     parameters: [optional("count", "number", "The number of cards revealed.")],
-    emitsEvents: ["card.revealed"]
+    emitsEvents: ["card.revealed"],
+    engineSupport: supported("Revealed cards retain their zone while emitting one event per revealed card.")
   }),
   "action.attach_equipment": primitiveSeed({
     id: "action.attach_equipment",

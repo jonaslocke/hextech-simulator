@@ -54,6 +54,8 @@ import {
 import {
   availableAnyPowerAfterBaseCost,
   buildPaymentPlan,
+  canPayAnyPower,
+  payAnyPower,
   payCardCost,
   targetDeflectCost,
 } from "./payment";
@@ -224,6 +226,7 @@ export function gameplayActions(
         index,
         currentTiming(game),
       );
+      addHiddenPlayActions(actions, game, actorPlayerId, decks, index);
       addAbilityActions(
         actions,
         game,
@@ -235,7 +238,10 @@ export function gameplayActions(
     }
     return actions;
   }
-  if (!canAct) return actions;
+  if (!canAct) {
+    addHiddenPlayActions(actions, game, actorPlayerId, decks, index);
+    return actions;
+  }
 
   actions.push(action(game, "endTurn", "End turn", null));
 
@@ -247,6 +253,7 @@ export function gameplayActions(
     index,
     "neutralOpen",
   );
+  addHiddenPlayActions(actions, game, actorPlayerId, decks, index);
   addAbilityActions(
     actions,
     game,
@@ -449,6 +456,36 @@ export function performGameplayAction(input: {
         index,
         handlers,
         input.decks,
+      );
+      break;
+    case "playAccelerated":
+      playCard(
+        game,
+        input.actorPlayerId,
+        source,
+        extra,
+        input.selectedIds,
+        index,
+        handlers,
+        input.decks,
+        true,
+      );
+      break;
+    case "hide":
+      hideCard(game, input.actorPlayerId, source, extra, index);
+      break;
+    case "playHidden":
+      playCard(
+        game,
+        input.actorPlayerId,
+        source,
+        extra,
+        input.selectedIds,
+        index,
+        handlers,
+        input.decks,
+        false,
+        true,
       );
       break;
     case "submitChoice":
@@ -665,6 +702,8 @@ function playCard(
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   decks: readonly DeckSnapshotDocument[],
+  accelerated = false,
+  ignoreBaseCost = false,
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
@@ -682,7 +721,10 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition, index);
+  const energyCost =
+    (ignoreBaseCost ? 0 : effectiveEnergyCost(game, playerId, definition, index)) +
+    (accelerated ? 1 : 0);
+  recordLegionStatus(game, playerId, cardId, index);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -693,17 +735,34 @@ function playCard(
     },
   };
   payOptionalPlayCosts(game, definition, selectedIds, index);
+  const paymentDefinition = ignoreBaseCost
+    ? {
+        ...definition,
+        card: {
+          ...definition.card,
+          attributes: { ...definition.card.attributes, power: 0 },
+        },
+      }
+    : definition;
   payCardCost(
     game,
     playerId,
-    definition,
+    paymentDefinition,
     energyCost,
     index,
     targetDeflectCost(playerId, selectedIds, index),
+    accelerated ? 1 : 0,
   );
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
+  for (const battlefield of game.state.battlefields) {
+    if (battlefield.facedownCardInstanceId === cardId) {
+      battlefield.facedownCardInstanceId = null;
+      battlefield.facedownControllerPlayerId = null;
+      battlefield.hiddenAtTurnNumber = null;
+    }
+  }
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
@@ -713,7 +772,7 @@ function playCard(
     ) {
       markBattlefieldContested(game, destinationId, playerId);
     }
-    game.state.cardStates[cardId]!.exhausted = true;
+    game.state.cardStates[cardId]!.exhausted = !accelerated;
     executeImmediateClauses(
       game,
       definition,
@@ -1068,6 +1127,10 @@ function completeEndTurn(
   const next = otherPlayer(game, actor);
   clearMarkedDamage(game);
   cleanupTurnModifiers(game, index);
+  for (const player of Object.values(game.state.players)) {
+    player.playedMainDeckCardIdsThisTurn = [];
+    player.legionSatisfiedCardIdsThisTurn = [];
+  }
   game.state.turn = {
     turnNumber: turn.turnNumber + 1,
     activePlayerId: next,
@@ -1276,6 +1339,9 @@ function addPlayableCardActions(
       cost,
       index,
     );
+    const acceleratedPaymentPlan = hasBehavior(definition, "keyword.accelerate")
+      ? buildPaymentPlan(game, playerId, definition, cost + 1, index, 0, 1)
+      : null;
     const targets = projectedTargets;
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
     const enabled = paymentPlan !== null && hasLegalTargets;
@@ -1339,9 +1405,139 @@ function addPlayableCardActions(
           costPreview,
         ),
       );
+      if (unitDestinations && hasBehavior(definition, "keyword.accelerate")) {
+        actions.push(
+          action(
+            game,
+            "playAccelerated",
+            `Play ${definition.card.name} ready to ${destination.name}`,
+            cardId,
+            acceleratedPaymentPlan !== null && hasLegalTargets,
+            !hasLegalTargets
+              ? "No legal targets are available."
+              : acceleratedPaymentPlan
+                ? null
+                : "Accelerate costs cannot be paid.",
+            destination.id,
+            targets,
+          ),
+        );
+      }
+    }
+    if (hasBehavior(definition, "keyword.hidden")) {
+      for (const battlefield of game.state.battlefields) {
+        const isControlled = battlefield.controllerPlayerId === playerId;
+        const isEmpty = !battlefield.facedownCardInstanceId;
+        actions.push(
+          action(
+            game,
+            "hide",
+            `Hide ${definition.card.name} at ${definitionForInstance(battlefield.cardInstanceId, index).card.name}`,
+            cardId,
+            isControlled && isEmpty && canPayAnyPower(game, playerId, index),
+            !isControlled
+              ? "You do not control this battlefield."
+              : !isEmpty
+                ? "That battlefield already has a facedown card."
+                : "A Power cost cannot be paid.",
+            battlefield.battlefieldId,
+          ),
+        );
+      }
     }
   }
   void decks;
+}
+
+function addHiddenPlayActions(
+  actions: ProjectedAction[],
+  game: GameDocument,
+  playerId: string,
+  decks: readonly DeckSnapshotDocument[],
+  index: RuntimeCardIndex,
+) {
+  const turn = game.state.turn;
+  if (!turn || turn.activePlayerId === playerId) return;
+  for (const battlefield of game.state.battlefields) {
+    const cardId = battlefield.facedownCardInstanceId;
+    if (
+      !cardId ||
+      battlefield.facedownControllerPlayerId !== playerId ||
+      battlefield.hiddenAtTurnNumber === turn.turnNumber
+    ) {
+      continue;
+    }
+    const definition = definitionForInstance(cardId, index);
+    if (!hasBehavior(definition, "keyword.hidden")) continue;
+    const isUnit = definition.card.classification.type === "Unit";
+    const handlers = createPrimitiveHandlers(index);
+    const hiddenTargets = compileBehaviorModel(
+      definition.behaviorModel,
+      handlers,
+    ).clauses
+      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
+      .flatMap((clause) =>
+        targetRequirementsForClause(
+          clause,
+          createBehaviorContext(game, playerId, cardId, null, []),
+          handlers,
+        ),
+      )
+      .map((requirement) => ({
+        ...requirement,
+        legalIds: requirement.legalIds.filter((id) =>
+          requirement.kind === "battlefield"
+            ? id === battlefield.battlefieldId
+            : battlefield.units.includes(id),
+        ),
+      }));
+    const hasLegalTargets = canSatisfyTargetRequirements(hiddenTargets);
+    actions.push(
+      action(
+        game,
+        "playHidden",
+        `Play Hidden ${definition.card.name}`,
+        cardId,
+        (!isUnit || isLegalUnitDestination(game, playerId, definition, battlefield.battlefieldId)) && hasLegalTargets,
+        !hasLegalTargets
+          ? "No legal targets are available at the associated battlefield."
+          : isUnit
+            ? "The associated battlefield is no longer a legal destination."
+            : null,
+        isUnit ? battlefield.battlefieldId : undefined,
+        hiddenTargets,
+      ),
+    );
+  }
+  void decks;
+}
+
+function hideCard(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  battlefieldId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === battlefieldId,
+  );
+  const definition = definitionForInstance(cardId, index);
+  if (
+    !battlefield ||
+    battlefield.controllerPlayerId !== playerId ||
+    battlefield.facedownCardInstanceId ||
+    !player.zones.hand.includes(cardId) ||
+    !hasBehavior(definition, "keyword.hidden")
+  ) {
+    throw new Error("Hidden card cannot be placed there.");
+  }
+  payAnyPower(game, playerId, index);
+  player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  battlefield.facedownCardInstanceId = cardId;
+  battlefield.facedownControllerPlayerId = playerId;
+  battlefield.hiddenAtTurnNumber = game.state.turn?.turnNumber ?? 1;
 }
 
 function canSatisfyTargetRequirements(
@@ -1600,6 +1796,22 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function recordLegionStatus(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  index: RuntimeCardIndex,
+) {
+  const instance = index.instances.get(cardId);
+  if (instance?.source !== "mainDeck") return;
+  const player = game.state.players[playerId]!;
+  const played = (player.playedMainDeckCardIdsThisTurn ??= []);
+  if (played.length > 0) {
+    (player.legionSatisfiedCardIdsThisTurn ??= []).push(cardId);
+  }
+  played.push(cardId);
 }
 
 function activatedAbilityCostStatus(

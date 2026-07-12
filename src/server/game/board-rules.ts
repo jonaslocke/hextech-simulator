@@ -39,6 +39,20 @@ export function cleanupBoard(
     ) {
       battlefield.contestedByPlayerId = null;
     }
+    if (
+      battlefield.facedownCardInstanceId &&
+      battlefield.facedownControllerPlayerId !== battlefield.controllerPlayerId
+    ) {
+      const owner = battlefield.facedownControllerPlayerId;
+      if (owner) {
+        game.state.players[owner]!.zones.trash.push(
+          battlefield.facedownCardInstanceId,
+        );
+      }
+      battlefield.facedownCardInstanceId = null;
+      battlefield.facedownControllerPlayerId = null;
+      battlefield.hiddenAtTurnNumber = null;
+    }
   }
 }
 
