@@ -1,4 +1,5 @@
 export * from "./canonical-card-repository";
+export * from "./official-errata";
 export * from "./behavior-suggestions";
 export * from "./behavior-definition-repository";
 export * from "./identity";

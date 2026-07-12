@@ -131,17 +131,14 @@ export function targetSelectionIsLegal(
   return (
     selectedIds.length >= requirement.minimum &&
     selectedIds.length <= requirement.maximum &&
-    new Set(selectedIds).size === selectedIds.length &&
     selectedIds.every((id) => requirement.legalIds.includes(id)) &&
-    requirement.requirements.every((individual) => {
-      const selectedCount = selectedIds.filter((id) =>
-        individual.legalIds.includes(id),
-      ).length;
-      return (
-        selectedCount >= individual.minimum &&
-        selectedCount <= individual.maximum
-      );
-    })
+    (new Set(selectedIds).size === selectedIds.length ||
+      requirementsShareLegalTargets(requirement.requirements)) &&
+    allocateTargetSelections(requirement.requirements, selectedIds).every(
+      (selected, index) =>
+        selected.length >= requirement.requirements[index]!.minimum &&
+        selected.length <= requirement.requirements[index]!.maximum,
+    )
   );
 }
 
@@ -150,9 +147,12 @@ export function targetSelectionCanAdd(
   selectedIds: readonly string[],
   candidateId: string,
 ): boolean {
+  if (!requirement.legalIds.includes(candidateId)) {
+    return false;
+  }
   if (
-    selectedIds.includes(candidateId) ||
-    !requirement.legalIds.includes(candidateId)
+    selectedIds.includes(candidateId) &&
+    !requirementsShareLegalTargets(requirement.requirements)
   ) {
     return false;
   }
@@ -160,12 +160,38 @@ export function targetSelectionCanAdd(
   const proposedIds = [...selectedIds, candidateId];
   return (
     proposedIds.length <= requirement.maximum &&
-    requirement.requirements.every(
-      (individual) =>
-        proposedIds.filter((id) => individual.legalIds.includes(id)).length <=
-        individual.maximum,
+    allocateTargetSelections(requirement.requirements, proposedIds).every(
+      (selected, index) =>
+        selected.length <= requirement.requirements[index]!.maximum,
     )
   );
+}
+
+function requirementsShareLegalTargets(requirements: ProjectedAction["targets"]) {
+  const first = requirements[0]?.legalIds;
+  return Boolean(first) && requirements.every(
+    (requirement) =>
+      requirement.legalIds.length === first.length &&
+      requirement.legalIds.every((id) => first.includes(id)),
+  );
+}
+
+function allocateTargetSelections(
+  requirements: ProjectedAction["targets"],
+  selectedIds: readonly string[],
+) {
+  let cursor = 0;
+  return requirements.map((individual) => {
+    const selected: string[] = [];
+    while (cursor < selectedIds.length && selected.length < individual.maximum) {
+      const candidate = selectedIds[cursor++]!;
+      if (!individual.legalIds.includes(candidate)) {
+        return Array.from({ length: individual.maximum + 1 }, () => candidate);
+      }
+      selected.push(candidate);
+    }
+    return selected;
+  });
 }
 
 export function moveSelectionTitle(

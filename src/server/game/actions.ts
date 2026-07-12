@@ -2095,16 +2095,7 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
   if (
     selectedIds.length < minimum ||
     selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    action.targets.some((target) => {
-      const selectedForTarget = selectedIds.filter((id) =>
-        target.legalIds.includes(id),
-      ).length;
-      return (
-        selectedForTarget < target.minimum || selectedForTarget > target.maximum
-      );
-    })
+    selectedIds.some((id) => !legal.has(id))
   ) {
     throw new Error("Selected targets are not legal for this action.");
   }

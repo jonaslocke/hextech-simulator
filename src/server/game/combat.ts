@@ -269,6 +269,7 @@ function resolveCombat(
     combat.defenderPlayerId,
     index
   );
+  let conqueredByAttacker = false;
   if (attackers.length && defenders.length) {
     battlefield.units = battlefield.units.filter(
       (id) => !attackers.includes(id)
@@ -279,15 +280,7 @@ function resolveCombat(
     const changed =
       battlefield.controllerPlayerId !== combat.attackerPlayerId;
     battlefield.controllerPlayerId = combat.attackerPlayerId;
-    if (changed) {
-      scoreBattlefield(
-        game,
-        combat.attackerPlayerId,
-        battlefield.battlefieldId,
-        "conquer",
-        decks
-      );
-    }
+    conqueredByAttacker = changed;
   } else if (defenders.length) {
     battlefield.controllerPlayerId = combat.defenderPlayerId;
   } else {
@@ -313,6 +306,15 @@ function resolveCombat(
   game.state.showdown = null;
   game.state.combat = null;
   cleanupBoard(game, index);
+  if (conqueredByAttacker) {
+    scoreBattlefield(
+      game,
+      combat.attackerPlayerId,
+      battlefield.battlefieldId,
+      "conquer",
+      decks,
+    );
+  }
 }
 
 function validateDamageAssignments(

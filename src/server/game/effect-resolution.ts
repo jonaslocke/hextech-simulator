@@ -2,6 +2,7 @@ import {
   clauseHasAutomaticAffectedGroup,
   compileBehaviorModel,
   createBehaviorContext,
+  allocateSelections,
   selectionRequirementsForClause,
 } from "./behavior-runtime";
 import type { BehaviorEvent } from "./behavior-runtime";
@@ -163,17 +164,22 @@ export function resumeEffectResolution(
     frame.behaviorEvent,
     [],
   );
-  for (const { binding, requirement } of selectionRequirementsForClause(
+  const selectorRequirements = selectionRequirementsForClause(
     clause,
     selectorContext,
     handlers,
-  )) {
+  );
+  const lockedSelectionsByRequirement = frame.targetsLocked
+    ? allocateSelections(
+        selectorRequirements.map(({ requirement }) => requirement),
+        frame.initialSelectedIds,
+      )
+    : null;
+  for (const [selectorIndex, { binding, requirement }] of selectorRequirements.entries()) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
     if (frame.targetsLocked) {
-      const lockedSelections = frame.initialSelectedIds
-        .filter((id) => requirement.legalIds.includes(id))
-        .slice(0, requirement.maximum);
+      const lockedSelections = lockedSelectionsByRequirement?.[selectorIndex] ?? [];
       if (lockedSelections.length < requirement.minimum) {
         finishResolutionFrame(game, frame.id, frame.delayedEffectId);
         return true;
@@ -257,10 +263,12 @@ export function resumeEffectResolution(
     for (const effect of clause.orderedEffects) {
       const selectionKey = effect.parameters.selectionKey;
       if (typeof selectionKey !== "string") continue;
-      context.selectedBySelector[selectionKey] =
-        frame.selectionsByBinding[
-          `${clause.id}:effects:${effect.order}`
-        ] ?? [];
+      const effectSelection = frame.selectionsByBinding[
+        `${clause.id}:effects:${effect.order}`
+      ];
+      if (effectSelection) {
+        context.selectedBySelector[selectionKey] = effectSelection;
+      }
     }
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)

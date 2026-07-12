@@ -1542,6 +1542,160 @@ test("deferred repeated targets can select the same unit for each hit", () => {
   assert.equal(next.state.cardStates.target?.damage, 6);
 });
 
+test("a repeated lethal target emits one death event", () => {
+  const sentry = unit("SENTRY", "Watchful Sentry");
+  sentry.card.attributes.might = 1;
+  const { game, decks } = fixture([sentry]);
+  decks[1]!.instances.push(instance("sentry", "p2", "SENTRY"));
+  game.state.players.p2!.zones.base.push("sentry");
+  game.state.cardStates.sentry = cardState(1);
+  const index = createRuntimeCardIndex(decks, game);
+
+  moveUnitToTrash(game, "sentry", index);
+  moveUnitToTrash(game, "sentry", index);
+
+  assert.deepEqual(game.state.queuedBehaviorEvents, [
+    {
+      type: "unit.died",
+      actorPlayerId: "p2",
+      subjectCardInstanceId: "sentry",
+      values: {},
+    },
+  ]);
+});
+
+test("repeated damage skips a target after its first lethal hit", () => {
+  const spell = unit("SPELL", "Repeated damage", [
+    clause("repeat-damage", {
+      selectors: [
+        binding("selector.unit", 0, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "firstTarget" }),
+        binding("selector.unit", 1, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "secondTarget" }),
+      ],
+      effects: [
+        binding("action.deal_damage", 2, { amount: 2, target: "unit", selectionKey: "firstTarget" }),
+        binding("action.deal_damage", 3, { amount: 2, target: "unit", selectionKey: "secondTarget" }),
+      ],
+    }),
+  ]);
+  const sentry = unit("SENTRY", "Watchful Sentry");
+  sentry.card.attributes.might = 1;
+  const { game, decks } = fixture([spell, sentry]);
+  decks[0]!.instances.push(instance("spell", "p1", "SPELL"));
+  decks[1]!.instances.push(instance("sentry", "p2", "SENTRY"));
+  game.state.players.p2!.zones.base.push("sentry");
+  game.state.cardStates.sentry = cardState(1);
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(spell.behaviorModel, handlers).clauses[0]!;
+
+  executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(game, "p1", "spell", null, ["sentry", "sentry"]),
+    handlers,
+  });
+
+  assert.equal(game.state.cardStates.sentry?.damage, 0);
+  assert.equal(game.state.players.p2!.zones.trash.includes("sentry"), true);
+  assert.equal(game.state.queuedBehaviorEvents?.filter((event) => event.type === "unit.died").length, 1);
+});
+
+test("six two-damage assignments deal six to each target chosen three times", () => {
+  const selectors = Array.from({ length: 6 }, (_, order) =>
+    binding("selector.unit", order, {
+      scope: "any",
+      area: "board",
+      locationRelation: "any",
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: `target-${order}`,
+    }),
+  );
+  const effects = Array.from({ length: 6 }, (_, index) =>
+    binding("action.deal_damage", index + 6, {
+      amount: 2,
+      target: "unit",
+      selectionKey: `target-${index}`,
+    }),
+  );
+  const spell = unit("RAIN", "Icathian Rain", [
+    clause("repeat-damage", { selectors, effects }),
+  ]);
+  const first = unit("FIRST", "First target");
+  first.card.attributes.might = 7;
+  const second = unit("SECOND", "Second target");
+  second.card.attributes.might = 7;
+  const { game, decks } = fixture([spell, first, second]);
+  decks[0]!.instances.push(instance("rain", "p1", "RAIN"));
+  decks[1]!.instances.push(
+    instance("first", "p2", "FIRST"),
+    instance("second", "p2", "SECOND"),
+  );
+  game.state.players.p2!.zones.base.push("first", "second");
+  game.state.cardStates.first = cardState(7);
+  game.state.cardStates.second = cardState(7);
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(spell.behaviorModel, handlers).clauses[0]!;
+
+  executeBehaviorClause({
+    clause: compiledClause,
+    context: createBehaviorContext(
+      game,
+      "p1",
+      "rain",
+      null,
+      ["first", "first", "first", "second", "second", "second"],
+    ),
+    handlers,
+  });
+
+  assert.equal(game.state.cardStates.first?.damage, 6);
+  assert.equal(game.state.cardStates.second?.damage, 6);
+});
+
+test("locked repeated targets route each damage instruction to its selected unit", () => {
+  const fallingStar = unit("FALLING_STAR", "Falling Star", [
+    clause("repeat-damage", {
+      selectors: [
+        binding("selector.unit", 0, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "firstTarget" }),
+        binding("selector.unit", 1, { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "secondTarget" }),
+      ],
+      effects: [
+        binding("action.deal_damage", 2, { amount: 3, target: "unit", selectionKey: "firstTarget" }),
+        binding("action.deal_damage", 3, { amount: 3, target: "unit", selectionKey: "secondTarget" }),
+      ],
+    }),
+  ]);
+  fallingStar.card.classification.type = "Spell";
+  const poro = unit("PORO", "Pouty Poro");
+  poro.card.attributes.might = 2;
+  const kaisa = unit("KAISA", "Kai'Sa");
+  kaisa.card.attributes.might = 4;
+  const { game, decks } = fixture([fallingStar, poro, kaisa]);
+  decks[0]!.instances.push(instance("falling-star", "p1", "FALLING_STAR"));
+  decks[1]!.instances.push(
+    instance("poro", "p2", "PORO"),
+    instance("kaisa", "p2", "KAISA"),
+  );
+  game.state.players.p2!.zones.base.push("poro", "kaisa");
+  game.state.cardStates.poro = cardState(2);
+  game.state.cardStates.kaisa = cardState(4);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "falling-star",
+    clauseId: "repeat-damage",
+    selectedIds: ["poro", "kaisa"],
+    targetsLocked: true,
+    decks,
+  }), true);
+
+  assert.equal(game.state.players.p2!.zones.trash.includes("poro"), true);
+  assert.equal(game.state.players.p2!.zones.base.includes("kaisa"), true);
+  assert.equal(game.state.cardStates.kaisa?.damage, 3);
+});
+
 test("Temporary token dies at its controller's Beginning Phase", () => {
   const sprite = getTokenCatalogDefinition("OGN-274");
   assert.ok(sprite);

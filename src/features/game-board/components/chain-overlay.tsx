@@ -284,8 +284,11 @@ function ChainCards({
             ownerLabel={entry.controllerName}
             ownerSeat={entry.controllerSeat}
             preserveOrientation
-            showMight={false}
             {...entry.card}
+            damage={undefined}
+            isExhausted={false}
+            isStunned={false}
+            showMight={false}
           />
 
           <div className="min-w-0 text-slate-300 text-xs">
@@ -307,11 +310,52 @@ function ChainCards({
             <div className="text-[11px] text-slate-500">
               {index === 0 ? "Resolves next" : `Resolves ${index + 1}`}
             </div>
+            {entry.targetLabels.length > 0 && <ChainTargetSummary entry={entry} />}
           </div>
         </div>
       ))}
     </div>
   );
+}
+
+function ChainTargetSummary({ entry }: { entry: ChainCardEntry }) {
+  const groups = groupChainTargets(entry);
+
+  return (
+    <div className="mt-2 border-white/10 bg-slate-950/30 px-2 py-1.5 border rounded">
+      <div className="mb-1 font-medium text-[10px] text-slate-400 uppercase tracking-wide">
+        Targets · {entry.targetLabels.length} {entry.targetLabels.length === 1 ? "assignment" : "assignments"}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {groups.map((group) => (
+          <span
+            className="inline-flex items-center gap-1 bg-cyan-300/10 px-1.5 py-0.5 border border-cyan-200/20 rounded text-[10px] text-cyan-50"
+            key={group.instanceId}
+          >
+            <span className="max-w-36 truncate">{group.label}</span>
+            <span className="font-semibold text-cyan-200">×{group.count}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function groupChainTargets(entry: ChainCardEntry) {
+  const groups = new Map<string, { instanceId: string; label: string; count: number }>();
+  entry.targetCardInstanceIds.forEach((instanceId, index) => {
+    const existing = groups.get(instanceId);
+    if (existing) {
+      existing.count += 1;
+      return;
+    }
+    groups.set(instanceId, {
+      instanceId,
+      label: entry.targetLabels[index] ?? "Unknown target",
+      count: 1,
+    });
+  });
+  return [...groups.values()];
 }
 
 function shouldIgnoreKeyShortcut(event: KeyboardEvent, key: string) {

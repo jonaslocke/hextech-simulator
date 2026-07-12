@@ -32,6 +32,52 @@ test("resolves one-on-one combat simultaneously and conquers with a survivor", (
   assert.equal(game.state.cardStates.attacker!.combatRole, null);
 });
 
+test("keeps conquer triggers after combat resolves", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 4,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  const battlefield = decks[1]!.snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [
+    {
+      id: "conquer",
+      sequence: 0,
+      sourceText: "When you conquer here, draw 1.",
+      normalizedText: "When you conquer here, draw 1.",
+      abilities: [],
+      triggers: [
+        {
+          behaviorId: "trigger.conquer_battlefield",
+          parameters: {},
+          confidence: "high",
+          order: 0,
+        },
+      ],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [
+        {
+          behaviorId: "action.draw_cards",
+          parameters: { player: "controller", count: 1 },
+          confidence: "high",
+          order: 1,
+        },
+      ],
+      keywords: [],
+    },
+  ];
+
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "battlefield");
+});
+
 test.skip("requires lethal Tank assignment before non-Tank combat damage", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 5,

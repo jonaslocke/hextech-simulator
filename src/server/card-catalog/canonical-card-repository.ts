@@ -4,6 +4,7 @@ import { cardSchema, type Card } from "../catalog";
 import { loadBehaviorDefinitions } from "./behavior-definition-repository";
 import { deriveCardCodeFromCard } from "./identity";
 import { hashCardRulesText } from "./import-preview";
+import type { AppliedErratum } from "./official-errata";
 import {
   combineSupportStatuses,
   validatePrimitiveAssignmentParameters,
@@ -39,6 +40,14 @@ export const approvedBehaviorClauseSchema = z.object({
 export const canonicalCardPublicationInputSchema = z.object({
   cardCode: z.string().min(1),
   card: cardSchema,
+  printedCard: cardSchema.optional(),
+  printedSourceTextHash: z.string().min(1).optional(),
+  appliedErrata: z.array(z.object({
+    releaseId: z.string().min(1),
+    effectiveFrom: z.string().date(),
+    sourceUrl: z.string().url(),
+    effectiveText: z.string().min(1),
+  }).strict()).optional(),
   sourceTextHash: z.string().min(1),
   modelingStatus: z.literal("approved"),
   clauses: z.array(approvedBehaviorClauseSchema),
@@ -81,6 +90,9 @@ export type CanonicalCardDocument = {
   id: string;
   cardCode: string;
   card: Card;
+  printedCard: Card;
+  printedSourceTextHash: string;
+  appliedErrata: AppliedErratum[];
   sourceTextHash: string;
   modelingStatus: "approved";
   runtimeSupportStatus: EngineSupportStatus;
@@ -126,6 +138,7 @@ export function buildCanonicalCardDocument(
 ): CanonicalCardDocument {
   const parsed = canonicalCardPublicationInputSchema.parse(input);
   const card = normalizeCanonicalCard(parsed.card);
+  const printedCard = normalizeCanonicalCard(parsed.printedCard ?? parsed.card);
   const derivedCardCode = deriveCardCodeFromCard(card);
 
   if (parsed.cardCode !== derivedCardCode) {
@@ -133,6 +146,10 @@ export function buildCanonicalCardDocument(
   }
   if (parsed.sourceTextHash !== hashCardRulesText(card)) {
     throw new Error("Card rules text changed after preview.");
+  }
+  const printedSourceTextHash = parsed.printedSourceTextHash ?? hashCardRulesText(printedCard);
+  if (printedSourceTextHash !== hashCardRulesText(printedCard)) {
+    throw new Error("Printed card rules text changed after preview.");
   }
 
   const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
@@ -237,6 +254,9 @@ export function buildCanonicalCardDocument(
     id: parsed.cardCode,
     cardCode: parsed.cardCode,
     card,
+    printedCard,
+    printedSourceTextHash,
+    appliedErrata: parsed.appliedErrata ?? [],
     sourceTextHash: parsed.sourceTextHash,
     modelingStatus: "approved",
     runtimeSupportStatus: combineSupportStatuses(runtimeSupportStatuses),

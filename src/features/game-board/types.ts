@@ -68,6 +68,7 @@ export type ChainCardEntry = {
   controllerName: string;
   sourceCardInstanceId: string | null;
   targetCardInstanceIds: string[];
+  targetLabels: string[];
 };
 
 export type ZoneData = {

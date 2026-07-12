@@ -15,7 +15,11 @@ import {
   playerWithTwoSetPoints,
 } from "./match-derivations";
 import { projectMatch } from "./match-projection";
-import type { DeckSnapshotDocument, GameRepositories } from "./repositories";
+import type {
+  DeckSnapshotDocument,
+  GameEventDocument,
+  GameRepositories,
+} from "./repositories";
 import { createGameRepositories } from "./repositories";
 import { gameplayActions, performGameplayTransition } from "./actions";
 import {
@@ -47,6 +51,7 @@ export class MatchServiceError extends Error {
 const deckSnapshotCache = new Map<string, DeckSnapshotDocument>();
 const matchDocumentCache = new Map<string, MatchDocument>();
 const gameDocumentCache = new Map<string, GameDocument>();
+const gameEventsCache = new Map<string, GameEventDocument[]>();
 
 type CreateMatchInput = {
   db: Db;
@@ -249,7 +254,7 @@ export async function getViewerState(
     matchId,
     playerToken,
   );
-  const events = await repositories.gameEvents.findByGameId(game.id);
+  const events = await loadGameEventsFromCache(repositories, game.id);
   return projectMatch({
     match,
     currentGame: game,
@@ -481,7 +486,8 @@ async function performGameAction(
       );
     }
 
-    const events = await repositories.gameEvents.findByGameId(
+    const events = await loadGameEventsFromCache(
+      repositories,
       saveResult.currentGame.id,
     );
     return projectMatch({
@@ -558,6 +564,9 @@ async function saveGameTransition(input: {
       }),
     ),
   );
+  // Game events are appended with every state transition. The next projection
+  // must reload the log once, while polling requests can reuse it safely.
+  gameEventsCache.delete(input.nextGame.id);
 
   if (nextMatch.currentGameId !== input.nextGame.id) {
     const loaded = await input.repositories.games.findById(nextMatch.currentGameId);
@@ -726,6 +735,9 @@ async function readyForNextGame(
       },
     });
 
+    gameEventsCache.delete(game.id);
+    gameEventsCache.delete(currentGame.id);
+
     cacheGameDocument(currentGame);
     cacheMatchDocument(nextMatch);
     return projectMatch({
@@ -733,7 +745,7 @@ async function readyForNextGame(
       currentGame,
       viewerPlayerId: seat.playerId,
       decks,
-      events: await repositories.gameEvents.findByGameId(currentGame.id),
+      events: await loadGameEventsFromCache(repositories, currentGame.id),
     });
   });
 }
@@ -918,6 +930,9 @@ async function submitDeckReconfiguration(
       },
     });
 
+    gameEventsCache.delete(game.id);
+    gameEventsCache.delete(currentGame.id);
+
     cacheGameDocument(currentGame);
     cacheMatchDocument(nextMatch);
     return projectMatch({
@@ -925,7 +940,7 @@ async function submitDeckReconfiguration(
       currentGame,
       viewerPlayerId: seat.playerId,
       decks,
-      events: await repositories.gameEvents.findByGameId(currentGame.id),
+      events: await loadGameEventsFromCache(repositories, currentGame.id),
     });
   });
 }
@@ -997,13 +1012,15 @@ async function concedeMatch(
       payload: { winnerPlayerId, concededByPlayerId: seat.playerId },
     });
 
+    gameEventsCache.delete(game.id);
+
     cacheMatchDocument(nextMatch);
     return projectMatch({
       match: nextMatch,
       currentGame: game,
       viewerPlayerId: seat.playerId,
       decks,
-      events: await repositories.gameEvents.findByGameId(game.id),
+      events: await loadGameEventsFromCache(repositories, game.id),
     });
   });
 }
@@ -1223,6 +1240,18 @@ async function loadDeckSnapshotFromCache(
   const deck = await repositories.deckSnapshots.findById(id);
   if (deck) deckSnapshotCache.set(id, deck);
   return deck;
+}
+
+async function loadGameEventsFromCache(
+  repositories: GameRepositories,
+  gameId: string,
+): Promise<GameEventDocument[]> {
+  const cached = gameEventsCache.get(gameId);
+  if (cached) return cached;
+
+  const events = await repositories.gameEvents.findByGameId(gameId);
+  gameEventsCache.set(gameId, events);
+  return events;
 }
 
 function cacheDeckSnapshots(decks: readonly DeckSnapshotDocument[]): void {

@@ -40,6 +40,7 @@ export function TargetSelectionPrompt({
   onSubmit,
   resetKey,
   selectedCount,
+  selectedTargetLabels = [],
   title,
 }: {
   helperText?: string;
@@ -65,6 +66,7 @@ export function TargetSelectionPrompt({
    */
   resetKey?: string | number;
   selectedCount: number;
+  selectedTargetLabels?: string[];
   title?: string;
 }) {
   const [position, setPosition] = useState<PanelPosition | null>(null);
@@ -259,6 +261,13 @@ export function TargetSelectionPrompt({
             {helperText && (
               <div className="mt-1 text-cyan-100/75 text-xs leading-snug">
                 {helperText}
+              </div>
+            )}
+            {selectedTargetLabels.length > 0 && (
+              <div className="mt-1 text-cyan-100/80 text-xs leading-snug">
+                Targets: {selectedTargetLabels.map((label, index) =>
+                  `${index + 1}. ${label}`,
+                ).join(" · ")}
               </div>
             )}
           </div>

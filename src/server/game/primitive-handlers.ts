@@ -642,7 +642,9 @@ export function createPrimitiveHandlers(
         index,
         targetScope: "controller_effect",
       });
-      const ids = damageTargets(binding, context, index);
+      const ids = damageTargets(binding, context, index).filter((id) =>
+        isUnitInPlay(context.game, id),
+      );
       let killed = false;
       for (const id of ids) {
         const state = context.game.state.cardStates[id];
@@ -1147,8 +1149,9 @@ function damageTargets(
   context: BehaviorExecutionContext,
   index: RuntimeCardIndex,
 ) {
-  const routed = selectionFor(binding, context);
-  if (routed.length > 0) return routed;
+  if (typeof binding.parameters.selectionKey === "string") {
+    return selectionFor(binding, context);
+  }
   if (binding.parameters.target === "enemy_unit") {
     const battlefieldIds = new Set(context.selectedIds);
     return context.game.state.battlefields
@@ -1514,6 +1517,7 @@ export function cleanupLethalDamage(game: GameDocument, ids: string[], index: Ru
   }
 }
 export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
+  if (!isUnitInPlay(game, id)) return;
   const replacementIndex = game.state.ongoingEffects.findIndex(
     (effect) =>
       effect.behaviorId === "replacement.recall_on_next_death" &&
@@ -1562,6 +1566,14 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     subjectCardInstanceId: id,
     values: {},
   });
+}
+
+function isUnitInPlay(game: GameDocument, id: string) {
+  return (
+    Object.values(game.state.players).some((player) =>
+      player.zones.base.includes(id),
+    ) || game.state.battlefields.some((battlefield) => battlefield.units.includes(id))
+  );
 }
 
 function isTokenInstance(id: string, index: RuntimeCardIndex) {

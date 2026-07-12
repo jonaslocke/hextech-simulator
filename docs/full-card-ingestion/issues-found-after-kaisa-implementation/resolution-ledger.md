@@ -28,6 +28,9 @@ close several rows only when every listed manual scenario has been replayed.
 | T3 | Payment lock and Deflect cost derivation | KAI-02, KAI-15 |
 | T4 | Zone movement and resolving-spell cleanup | KAI-16 |
 | T5 | Catalog/media correctness and player-facing projection | KAI-03, KAI-04, KAI-05, KAI-08, KAI-12 |
+| T6 | Combat completion and trigger-chain preservation | KAI-19 |
+| T7 | Match-event loading for polling projections | KAI-20 |
+| T8 | Repeated-effect damage, death events, and Chain presentation | KAI-21, KAI-22, KAI-23 |
 
 ## Resolution ledger
 
@@ -51,6 +54,11 @@ close several rows only when every listed manual scenario has been replayed.
 | KAI-16 | Time Warp exists in both Trash and Banishment. | T4 | Reported | Resolving spell zone cleanup places the source in exactly one destination. | Resolve Time Warp and inspect Trash and Banishment after the extra turn is queued. |
 | KAI-17 | Darius does not ready after the second Unit, though it works after a spell. | T1 | Accepted | Second-card trigger counts every Main Deck card type exactly once before trigger dispatch. | Validated by user. |
 | KAI-18 | Dr. Mundo permits zero selections and does not require the maximum legal recycle count. | T2 | Accepted | Mandatory bounded selection is omitted only for zero legal cards and otherwise requires `min(3, available)`. | Validated by user. |
+| KAI-19 | A combat conquer can clear battlefield and Unit conquer triggers before they enter the Chain. | T6 | Ready for retest | Combat completion clears its own state before it scores, preserving queued conquer triggers. | Conquer The Candlelit Sanctum with Kai'Sa, Survivor. An ordering choice must show both Candlelit Sanctum and Kai'Sa triggers; resolve Candlelit normally. |
+| KAI-20 | Repeated match polling spends about 630 ms reading the event log. | T7 | Ready for retest | Event logs are cached per game and invalidated after an event append. | Restart once, then leave a match open without acting. After the first GET, repeat polling GETs should no longer consistently take about 600 ms; make one action and observe only the next GET may reload the log. |
+| KAI-21 | Chain target descriptions become unreadable for repeated targets. | T8 | Ready for retest | Chain groups assignments by exact card instance and shows each target with a count badge. | Cast Icathian Rain with repeated targets. Verify compact chips such as `Watchful Sentry ×3`, not a long numbered sentence. |
+| KAI-22 | One Watchful Sentry death produces multiple Deathknell triggers when it receives repeated damage. | T8 | Ready for retest | A Unit can leave play and emit `unit.died` only once; later assignments to its now-invalid target fizzle. | Target the same Watchful Sentry with multiple Icathian Rain hits. It should create one Watchful Sentry Chain trigger only. |
+| KAI-23 | Chain source cards show mutable board-state badges such as damage and stun. | T8 | Ready for retest | Chain source previews show static card identity only, not current board damage/exhaust/stun state. | Put a damaged Unit ability on the Chain. Its Chain card must not show a red damage badge or board-status badge. |
 
 ## Resolution order
 
@@ -93,3 +101,31 @@ automated check and manual retest result before moving to the next group.
 - Focused tests cover decline, recycle-one, recycle-none plus reorder, and
   Mundo's zero-selection rejection. The behavior catalog and all Kai'Sa cards
   were synchronized after these contract changes.
+
+## T6/T7 implementation evidence
+
+- Combat now releases the combat/showdown choice state before it awards a
+  conquered battlefield. This prevents the cleanup from erasing the Chain or
+  trigger-order choice created by that battlefield's conquer event.
+- Match projections now cache immutable game-event logs between state changes.
+  The live query plan already uses the `(gameId, sequence)` index and executes
+  in under 1 ms at MongoDB; the observed ~630 ms was remote read latency paid
+  for every polling request. The cache is invalidated after each appended log
+  event, so a projection never serves an old log after an action.
+- `tests/game-combat.test.ts` asserts that a combat conquer keeps its trigger
+  on the Chain. `npm run typecheck` and `npm test` pass (200 tests, 5
+  intentionally skipped).
+
+## T8 implementation evidence
+
+- `moveUnitToTrash` now ignores a Unit that already left Base or a battlefield,
+  preventing later repeated assignments from emitting another death event.
+- Chain target assignments are grouped by exact target instance with an `×N`
+  badge, keeping repeated-effect targets readable without losing their count.
+- Chain source previews now suppress mutable board-state badges. Icathian Rain
+  follows its effective text: each of its six assignments deals 2; three hits
+  on each of two legal targets deal 6 to each, while a target that dies earlier
+  receives no later assignments.
+- `tests/game-token-placement.test.ts` asserts one death event for a repeated
+  lethal target, fizzling after that death, and 6 damage for each target chosen
+  three times from six 2-damage assignments.

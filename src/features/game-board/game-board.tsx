@@ -241,6 +241,9 @@ export const GameBoard: FC<GameBoardProps> = ({
             ...controllerDetails,
             sourceCardInstanceId: item.sourceCardInstanceId,
             targetCardInstanceIds: item.targetCardInstanceIds,
+            targetLabels: item.targetCardInstanceIds.map(
+              (id) => cardsByInstanceId[id]?.name ?? "Unknown target",
+            ),
           }));
         }
       }
@@ -257,6 +260,9 @@ export const GameBoard: FC<GameBoardProps> = ({
           ...controllerDetails,
           sourceCardInstanceId: item.sourceCardInstanceId,
           targetCardInstanceIds: item.targetCardInstanceIds,
+          targetLabels: item.targetCardInstanceIds.map(
+            (id) => cardsByInstanceId[id]?.name ?? "Unknown target",
+          ),
         },
       ];
     },
@@ -787,6 +793,9 @@ export const GameBoard: FC<GameBoardProps> = ({
             }}
             onSubmit={() => submitTargetedPlay()}
             selectedCount={targetSelection.selectedTargetIds.length}
+            selectedTargetLabels={targetSelection.selectedTargetIds.map(
+              (id) => cardsByInstanceId[id]?.name ?? "Unknown target",
+            )}
             cancelLabel={
               targetSelection.purpose === "move"
                 ? "Cancel move"

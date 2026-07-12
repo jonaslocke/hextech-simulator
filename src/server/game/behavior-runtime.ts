@@ -170,13 +170,14 @@ export function executeBehaviorClause(input: {
   } else {
     validateSelections(requirements, context.selectedIds);
   }
-  clause.selectors.forEach((binding) => {
+  const selections = allocateSelections(requirements, context.selectedIds);
+  clause.selectors.forEach((binding, selectorIndex) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) return;
     const requirement = handler.targets(binding, context);
     const selected = requirement.maximum === 0
       ? requirement.legalIds
-      : selectedForRequirement(requirement, context.selectedIds);
+      : selections[selectorIndex] ?? [];
     context.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
@@ -367,10 +368,20 @@ function validateSelections(requirements: ProjectedTargetRequirement[], selected
   const legal = new Set(requirements.flatMap((requirement) => requirement.legalIds));
   const minimum = requirements.reduce((sum, requirement) => sum + requirement.minimum, 0);
   const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
-  if (selectedIds.length < minimum || selectedIds.length > maximum || selectedIds.some((id) => !legal.has(id)) || new Set(selectedIds).size !== selectedIds.length) {
+  if (selectedIds.length < minimum || selectedIds.length > maximum || selectedIds.some((id) => !legal.has(id)) || !allocateSelections(requirements, selectedIds).every((selected, index) => selected.length >= requirements[index]!.minimum)) {
     throw new Error("Behavior selections do not satisfy selector requirements.");
   }
 }
-function selectedForRequirement(requirement: ProjectedTargetRequirement, selectedIds: string[]) {
-  return selectedIds.filter((id) => requirement.legalIds.includes(id)).slice(0, requirement.maximum);
+export function allocateSelections(requirements: ProjectedTargetRequirement[], selectedIds: string[]) {
+  let cursor = 0;
+  return requirements.map((requirement) => {
+    if (requirement.maximum === 0) return requirement.legalIds;
+    const selected: string[] = [];
+    while (cursor < selectedIds.length && selected.length < requirement.maximum) {
+      const candidate = selectedIds[cursor++]!;
+      if (requirement.legalIds.includes(candidate)) selected.push(candidate);
+      else return [];
+    }
+    return selected;
+  });
 }

@@ -79,10 +79,12 @@ export function useBoardTargetSelection({
       ))
     : undefined;
 
-  const selectedDeflectSources =
-    targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
-      targetSelection?.selectedTargetIds.includes(source.targetId),
-    ) ?? [];
+  const selectedDeflectSources = (targetSelection?.selectedTargetIds ?? [])
+    .flatMap((targetId) =>
+      targetSelectionAction?.costPreview?.targetAdditionalPower.filter(
+        (source) => source.targetId === targetId,
+      ) ?? [],
+    );
   const selectedDeflectPower = selectedDeflectSources.reduce(
     (total, source) => total + source.amount,
     0,
@@ -183,10 +185,7 @@ export function useBoardTargetSelection({
         return;
       }
 
-      const isSelected =
-        targetSelection.selectedTargetIds.includes(cardInstanceId);
       if (
-        !isSelected &&
         !targetSelectionCanAdd(
           targetSelection.requirement,
           targetSelection.selectedTargetIds,
@@ -195,11 +194,10 @@ export function useBoardTargetSelection({
       ) {
         return;
       }
-      const selectedTargetIds = isSelected
-        ? targetSelection.selectedTargetIds.filter(
-            (id) => id !== cardInstanceId,
-          )
-        : [...targetSelection.selectedTargetIds, cardInstanceId];
+      const selectedTargetIds = [
+        ...targetSelection.selectedTargetIds,
+        cardInstanceId,
+      ];
       const nextSelection = {
         ...targetSelection,
         selectedTargetIds,
@@ -309,8 +307,13 @@ function additionalPowerForTargets(
   targetIds: readonly string[],
 ) {
   return (
-    action?.costPreview?.targetAdditionalPower
-      .filter((source) => targetIds.includes(source.targetId))
-      .reduce((total, source) => total + source.amount, 0) ?? 0
+    targetIds.reduce(
+      (total, targetId) =>
+        total +
+        (action?.costPreview?.targetAdditionalPower.find(
+          (source) => source.targetId === targetId,
+        )?.amount ?? 0),
+      0,
+    )
   );
 }

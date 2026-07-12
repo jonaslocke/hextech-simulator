@@ -4,6 +4,8 @@ import { getMongoClient, getMongoDatabaseName } from "../src/server/db";
 import {
   buildCurrentBehaviorCatalog,
   hashCardRulesText,
+  applyOfficialErrata,
+  loadOfficialErrata,
   publishCanonicalCard,
   type CanonicalCardPublicationInput,
 } from "../src/server/card-catalog";
@@ -37,7 +39,6 @@ function repeatedDamageAssignments(count: number, amount: number): Assignment[] 
         minimumCount: 1,
         maximumCount: 1,
         selectionKey: `repeatTarget${index + 1}`,
-        deferred: true,
       },
     })),
     ...Array.from({ length: count }, (_, index) => ({
@@ -186,8 +187,8 @@ const MODELS: Record<string, Model> = {
   "OGN-029": {
     sourceText: "Do this twice:Deal 3 to a unit. (You can choose different units.)",
     assignments: [
-      { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "firstTarget", deferred: true } },
-      { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "secondTarget", deferred: true } },
+      { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "firstTarget" } },
+      { family: "selector", primitiveId: "selector.unit", parameters: { scope: "any", area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "secondTarget" } },
       { family: "action", primitiveId: "action.deal_damage", parameters: { amount: 3, target: "unit", selectionKey: "firstTarget" } },
       { family: "action", primitiveId: "action.deal_damage", parameters: { amount: 3, target: "unit", selectionKey: "secondTarget" } },
     ],
@@ -226,13 +227,17 @@ try {
   const cards = await loadCards();
   const catalog = await buildCurrentBehaviorCatalog();
   for (const [cardCode, model] of Object.entries(MODELS)) {
-    const card = cards.get(cardCode);
-    if (!card) throw new Error(`Missing local card data: ${cardCode}`);
+    const overlay = cards.get(cardCode);
+    if (!overlay) throw new Error(`Missing local card data: ${cardCode}`);
+    const card = overlay.effectiveCard;
     const document = await publishCanonicalCard(
       client.db(getMongoDatabaseName()),
       {
         adminNotes: "OGN Kai'Sa deck: exact executable batch.",
         card,
+        printedCard: overlay.printedCard,
+        printedSourceTextHash: hashCardRulesText(overlay.printedCard),
+        appliedErrata: overlay.appliedErrata,
         cardCode,
         modelingStatus: "approved",
         sourceTextHash: hashCardRulesText(card),
@@ -264,10 +269,17 @@ try {
 
 async function loadCards() {
   const raw = await readFile(path.join(process.cwd(), "data/sets/ogn.json"), "utf8");
+  const printedCards = cardSetFileSchema.parse(JSON.parse(raw));
+  const allPrintedCards = await Promise.all(
+    ["ogn", "ogs", "sfd", "unl"].map(async (set) =>
+      cardSetFileSchema.parse(JSON.parse(await readFile(path.join(process.cwd(), `data/sets/${set}.json`), "utf8"))),
+    ),
+  );
+  const releases = await loadOfficialErrata(allPrintedCards.flat());
   return new Map(
-    cardSetFileSchema.parse(JSON.parse(raw)).map((card: Card) => [
+    printedCards.map((card: Card) => [
       card.public_code.split("/")[0]!,
-      card,
+      applyOfficialErrata(card, releases),
     ]),
   );
 }
