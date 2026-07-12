@@ -5,6 +5,7 @@ import type {
 } from "@/shared/game";
 
 export type BoardCatalogCard = {
+  activeModifiers: NonNullable<ProjectedCardView["activeModifiers"]>;
   attributes: {
     energy: number | undefined;
     might: number | undefined;
@@ -345,6 +346,7 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
 
 function toCatalogCard(card: ProjectedCardView): BoardCatalogCard {
   return {
+    activeModifiers: card.activeModifiers ?? [],
     attributes: {
       energy: card.energy ?? undefined,
       might: card.might ?? undefined,

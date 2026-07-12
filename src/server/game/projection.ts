@@ -45,7 +45,10 @@ export function projectGame(input: {
       ),
     ],
   );
-  const view = (id: string): ProjectedCardView => {
+  const view = (
+    id: string,
+    includeActiveModifiers = true,
+  ): ProjectedCardView => {
     const instance = instances.get(id)!;
     const definition = definitions.get(instance.cardCode)!;
     const state = input.game.state.cardStates[id]!;
@@ -67,6 +70,14 @@ export function projectGame(input: {
       damage: state.damage,
       exhausted: state.exhausted,
       stunned: state.stunned ?? false,
+      activeModifiers: includeActiveModifiers
+        ? input.game.state.modifiers
+            .filter((modifier) => modifier.targetCardInstanceId === id)
+            .map((modifier) => ({
+              label: modifierLabel(modifier.attribute, modifier.operation, modifier.amount),
+              duration: modifierDurationLabel(modifier.duration),
+            }))
+        : [],
     };
   };
   const players = input.game.state.setup.playerIds.map((playerId) => {
@@ -90,7 +101,7 @@ export function projectGame(input: {
         kind,
         visibility,
         count: ids.length,
-        cards: visibility === "secret" ? [] : ids.map(view),
+        cards: visibility === "secret" ? [] : ids.map((id) => view(id)),
       };
     });
     return {
@@ -148,7 +159,7 @@ export function projectGame(input: {
       ),
       battlefieldPool: (
         input.game.state.setup.battlefieldPools[input.viewerPlayerId] ?? []
-      ).map(view),
+      ).map((id) => view(id)),
       waitingReason: waitingReason(input.game, input.viewerPlayerId),
     },
     turn: input.game.state.turn
@@ -195,7 +206,9 @@ export function projectGame(input: {
                 input.game.state.pendingChoice.playerId ===
                   input.viewerPlayerId &&
                 input.game.state.pendingChoice.presentation === "vision"
-                  ? input.game.state.pendingChoice.legalCardIds.map(view)
+                  ? input.game.state.pendingChoice.legalCardIds.map((id) =>
+                      view(id),
+                    )
                   : [],
               minimum: input.game.state.pendingChoice.minimum,
               maximum: input.game.state.pendingChoice.maximum,
@@ -261,7 +274,7 @@ export function projectGame(input: {
       controllerPlayerId: battlefield.controllerPlayerId ?? null,
       contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
       card: view(battlefield.cardInstanceId),
-      units: battlefield.units.map(view),
+      units: battlefield.units.map((id) => view(id)),
       facedownCard:
         battlefield.facedownCardInstanceId &&
         battlefield.facedownControllerPlayerId === input.viewerPlayerId
@@ -296,7 +309,7 @@ export function projectGame(input: {
 
 function projectChainItem(
   item: ChainItem,
-  view: (id: string) => ProjectedCardView,
+  view: (id: string, includeActiveModifiers?: boolean) => ProjectedCardView,
   definitions: Map<string, DeckSnapshotDocument["snapshot"]["cards"][number]>,
   instances: Map<string, DeckSnapshotDocument["instances"][number]>,
 ) {
@@ -312,8 +325,37 @@ function projectChainItem(
         : item.kind === "trigger"
           ? ("trigger" as const)
           : definitionKind(item.sourceCardInstanceId, definitions, instances),
-    card: item.sourceCardInstanceId ? view(item.sourceCardInstanceId) : null,
+    card: item.sourceCardInstanceId
+      ? view(item.sourceCardInstanceId, false)
+      : null,
   };
+}
+
+function modifierLabel(
+  attribute: string,
+  operation: "increase" | "reduce" | "multiply" | "set",
+  amount: number,
+) {
+  const label = attribute
+    .replace(/^keyword\./, "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+  if (attribute.startsWith("keyword.")) {
+    return amount > 1 ? `${label} ${amount}` : label;
+  }
+  if (operation === "increase") return `${label} +${amount}`;
+  if (operation === "reduce") return `${label} -${amount}`;
+  if (operation === "multiply") return `${label} ×${amount}`;
+  return `${label} ${amount}`;
+}
+
+function modifierDurationLabel(duration: string) {
+  if (duration === "thisTurn") return "This turn";
+  if (duration === "whileSourceOnBoard") return "While source is on board";
+  if (duration === "whileSourceAtBattlefield") {
+    return "While source is at this battlefield";
+  }
+  return duration.replace(/[._-]+/g, " ");
 }
 
 function waitingReason(

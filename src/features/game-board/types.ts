@@ -42,6 +42,7 @@ export interface GameScore {
 }
 
 export type Card = {
+  activeModifiers?: ProjectedCardView["activeModifiers"];
   domains?: string[];
   energy?: number;
   instanceId?: string;

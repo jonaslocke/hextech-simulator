@@ -29,6 +29,15 @@ export function ProjectedCard({
         <span>{[card.supertype, card.type].filter(Boolean).join(" · ")}</span>
       </div>
       {card.rulesText.trim() && <div className="mt-2 text-xs text-slate-300"><CardRulesText text={card.rulesText} /></div>}
+      {(card.activeModifiers?.length ?? 0) > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1 text-xs text-emerald-200">
+          {card.activeModifiers?.map((modifier) => (
+            <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-0.5" key={`${modifier.label}:${modifier.duration}`}>
+              {modifier.label} · {modifier.duration}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
         {card.computedMight !== null && <MightResource compact value={card.computedMight} />}
         {card.damage > 0 && <span>Damage {card.damage}</span>}

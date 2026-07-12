@@ -9,6 +9,8 @@ import {
   publishCanonicalCard,
   type CanonicalCardPublicationInput,
 } from "../src/server/card-catalog";
+import { selectPreferredPrinting } from "../src/server/card-catalog/printing-selection";
+import { deriveCardCodeFromCard } from "../src/server/card-catalog/identity";
 import { cardSetFileSchema, type Card } from "../src/server/catalog";
 
 if (!process.argv.includes("--confirm")) {
@@ -144,7 +146,7 @@ const MODELS: Record<string, Model> = {
       { family: "action", primitiveId: "action.deal_damage", parameters: { amount: 12, target: "unit" } },
     ],
   },
-  "OGN-299": {
+  "OGN-247": {
     sourceText: ":rb_exhaust:: [Reaction] â€” [Add] :rb_rune_rainbow:. Use only to play spells. (Abilities that add resources can't be reacted to.)",
     assignments: [
       { family: "ability", primitiveId: "ability.exhaust_for_resource", parameters: { resourceType: "power", amountSource: "constant", amount: 1, domain: "rainbow", usage: "spellsOnly" } },
@@ -276,10 +278,16 @@ async function loadCards() {
     ),
   );
   const releases = await loadOfficialErrata(allPrintedCards.flat());
+  const printingsByGameplayName = new Map<string, Card[]>();
+  for (const card of printedCards) {
+    const printings = printingsByGameplayName.get(card.name) ?? [];
+    printings.push(card);
+    printingsByGameplayName.set(card.name, printings);
+  }
   return new Map(
-    printedCards.map((card: Card) => [
-      card.public_code.split("/")[0]!,
-      applyOfficialErrata(card, releases),
-    ]),
+    [...printingsByGameplayName.values()].map((printings) => {
+      const card = selectPreferredPrinting(printings);
+      return [deriveCardCodeFromCard(card), applyOfficialErrata(card, releases)];
+    }),
   );
 }

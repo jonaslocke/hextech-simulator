@@ -547,7 +547,11 @@ export const GameBoard: FC<GameBoardProps> = ({
             isCombat={showdownPrompt.kind === "combat"}
             isFinalFocusPass={showdownPrompt.isFinalFocusPass}
             isSubmitting={isSubmittingAction}
-            onPassFocus={showdownPrompt.canPassFocus ? onPass : undefined}
+            onPassFocus={
+              showdownPrompt.canPassFocus && !targetSelection
+                ? onPass
+                : undefined
+            }
             priorityPlayerId={showdownPrompt.priorityPlayerId}
           />
         )}

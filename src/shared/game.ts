@@ -185,6 +185,14 @@ export const projectedCardViewSchema = z.object({
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
   stunned: z.boolean().optional(),
+  activeModifiers: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        duration: z.string().min(1),
+      }),
+    )
+    .optional(),
 });
 
 export const projectedZoneSchema = z.object({

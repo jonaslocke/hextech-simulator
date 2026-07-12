@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DeckSnapshotDocument } from "../src/server/game";
 import { gameplayActions, performGameplayAction, type GameDocument } from "../src/server/game";
+import type { GameCardDefinition } from "../src/server/game/schemas";
 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
   const { game: initial, decks } = fixture();
@@ -38,6 +39,92 @@ test("generates and validates generic turn, resource, movement, and priority act
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
   assert.equal(game.state.battlefields[0]!.contestedByPlayerId, null);
   assert.equal(game.state.players.p1!.points, 1);
+});
+
+test("exposes a ready Legend Add ability and grants spell-only Rainbow Power", () => {
+  const { game, decks } = fixture();
+  const baseLegend = definition("LEGEND", "Daughter of the Void", "Unit", 0, 0);
+  const legend = {
+    ...baseLegend,
+    behaviorModel: {
+      playTimings: [],
+      clauses: [
+        {
+          id: "add-rainbow-power",
+          sequence: 0,
+          sourceText: "[Reaction] — [Add] [Rainbow]. Use only to play spells.",
+          normalizedText:
+            "reaction add rainbow power use only to play spells",
+          abilities: [
+            {
+              behaviorId: "ability.exhaust_for_resource",
+              parameters: {
+                resourceType: "power",
+                amount: 1,
+                domain: "rainbow",
+                usage: "spellsOnly",
+              },
+              confidence: "high" as const,
+              order: 0,
+            },
+          ],
+          triggers: [],
+          conditions: [],
+          selectors: [],
+          choices: [],
+          costs: [],
+          timings: [
+            {
+              behaviorId: "timing.reaction",
+              parameters: {},
+              confidence: "high" as const,
+              order: 0,
+            },
+          ],
+          effects: [],
+          keywords: [],
+        },
+      ],
+    },
+    card: {
+      ...baseLegend.card,
+      classification: {
+        type: "Legend" as const,
+        supertype: null,
+        domain: ["Chaos"],
+      },
+    },
+  } satisfies GameCardDefinition;
+  decks[0]!.snapshot.cards.push(legend);
+  decks[0]!.instances.push({
+    instanceId: "p1:legend",
+    ownerPlayerId: "p1",
+    source: "legend",
+    cardCode: "LEGEND",
+  });
+  game.state.players.p1!.zones.legend = "p1:legend";
+  game.state.cardStates["p1:legend"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const addPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Add spell Power [rainbow]",
+  );
+  assert.ok(addPower);
+  assert.equal(addPower.enabled, true);
+
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "legend-add",
+  });
+  assert.equal(next.state.cardStates["p1:legend"]!.exhausted, true);
+  assert.deepEqual(next.state.players.p1!.conditionalPower, { Rainbow: 1 });
 });
 
 test.skip("plays a spell through priority resolution and advances the turn", () => {
@@ -231,6 +318,75 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   });
   assert.equal(next.state.players.p1!.power.Mind, 0);
   assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
+});
+
+test("a resolving Time Warp is banished instead of also entering Trash", () => {
+  const { game: initial, decks } = fixture();
+  const timeWarp = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "SPELL",
+  )!;
+  timeWarp.behaviorModel.playTimings = [{
+    behaviorId: "timing.action",
+    parameters: {},
+    confidence: "high",
+    order: 0,
+  }];
+  timeWarp.behaviorModel.clauses.push({
+    id: "time-warp",
+    sequence: 0,
+    sourceText: "Take a turn after this one. Banish this.",
+    normalizedText: "Take a turn after this one. Banish this.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [
+      {
+        behaviorId: "action.take_extra_turn",
+        parameters: {},
+        confidence: "high",
+        order: 0,
+      },
+      {
+        behaviorId: "action.banish_card",
+        parameters: { target: "source" },
+        confidence: "high",
+        order: 1,
+      },
+    ],
+    keywords: [],
+  });
+  const play = gameplayActions(initial, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  let game = performGameplayAction({
+    game: initial,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-time-warp",
+  });
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `resolve-time-warp-${playerId}`,
+    });
+  }
+
+  assert.deepEqual(game.state.extraTurnPlayerIds, ["p1"]);
+  assert.equal(game.state.players.p1!.zones.banishment.includes("p1:spell"), true);
+  assert.equal(game.state.players.p1!.zones.trash.includes("p1:spell"), false);
 });
 
 test("plays battlefield-scoped group damage with only the location selected", () => {

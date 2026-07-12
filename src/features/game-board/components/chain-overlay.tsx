@@ -19,6 +19,7 @@ import {
 } from "@/shared/components/tooltip";
 import { cn } from "@/shared/utils/cn";
 import type { ChainCardEntry } from "../types";
+import { BattlefieldCardDialog } from "./battlefield-card-dialog";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
 import { FloatingOverlayPanel } from "./floating-overlay-panel";
@@ -53,6 +54,12 @@ export function ChainOverlay({
 }) {
   const autoPassControlId = useId();
   const [passAllPriority, setPassAllPriority] = useState(false);
+  const [inspectedBattlefield, setInspectedBattlefield] = useState<{
+    controllerPlayerId: string;
+    description: string;
+    img: string;
+    name: string;
+  } | null>(null);
   const previousChainItemIdsRef = useRef<string[]>([]);
   const wasOpenRef = useRef(isOpen);
   const lastAutoPassWindowKeyRef = useRef<string | null>(null);
@@ -166,9 +173,20 @@ export function ChainOverlay({
           <ChainCards
             emptyLabel="The chain is empty."
             entries={chainCards}
+            onInspectBattlefield={setInspectedBattlefield}
             onItemPointerEnter={onItemPointerEnter}
             onItemPointerLeave={onItemPointerLeave}
           />
+
+          {inspectedBattlefield && (
+            <BattlefieldCardDialog
+              controllerPlayerId={inspectedBattlefield.controllerPlayerId}
+              description={inspectedBattlefield.description}
+              img={inspectedBattlefield.img}
+              name={inspectedBattlefield.name}
+              onClose={() => setInspectedBattlefield(null)}
+            />
+          )}
 
           {hasChainItems && (
             <div className="flex items-center gap-2">
@@ -240,11 +258,18 @@ export function ChainOverlay({
 function ChainCards({
   emptyLabel,
   entries,
+  onInspectBattlefield,
   onItemPointerEnter,
   onItemPointerLeave,
 }: {
   emptyLabel: string;
   entries: ChainCardEntry[];
+  onInspectBattlefield: (battlefield: {
+    controllerPlayerId: string;
+    description: string;
+    img: string;
+    name: string;
+  }) => void;
   onItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
   onItemPointerLeave?: () => void;
 }) {
@@ -288,6 +313,17 @@ function ChainCards({
             damage={undefined}
             isExhausted={false}
             isStunned={false}
+            onPrimaryAction={
+              entry.card.type === "Battlefield"
+                ? () =>
+                    onInspectBattlefield({
+                      controllerPlayerId: entry.controllerName,
+                      description: entry.card.rulesText ?? "",
+                      img: entry.card.img,
+                      name: entry.card.name,
+                    })
+                : undefined
+            }
             showMight={false}
           />
 

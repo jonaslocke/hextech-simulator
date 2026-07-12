@@ -253,6 +253,7 @@ export function buildCard(
 
   return [
     {
+      activeModifiers: card.activeModifiers,
       domains: card.classification.domain,
       damage: cardStates[cardInstanceId]?.damage,
       energy: card.attributes.energy ?? undefined,

@@ -78,6 +78,36 @@ test("keeps conquer triggers after combat resolves", () => {
   assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "battlefield");
 });
 
+test("projects a unit's temporary keyword modifier with its duration", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [],
+  });
+  game.state.modifiers.push({
+    id: "cleave:assault",
+    sourceCardInstanceId: "cleave",
+    controllerPlayerId: "p1",
+    targetCardInstanceId: "attacker",
+    targetScope: "unit",
+    attribute: "keyword.assault",
+    operation: "increase",
+    amount: 3,
+    minimum: null,
+    duration: "thisTurn",
+    createdAtTurn: 1,
+  });
+
+  const projection = projectGame({ game, viewerPlayerId: "p1", decks });
+  const attacker = projection.players
+    .find((player) => player.playerId === "p1")!
+    .zones.find((zone) => zone.kind === "base")!
+    .cards.find((card) => card.instanceId === "attacker");
+
+  assert.deepEqual(attacker?.activeModifiers, [
+    { label: "Assault 3", duration: "This turn" },
+  ]);
+});
+
 test.skip("requires lethal Tank assignment before non-Tank combat damage", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 5,

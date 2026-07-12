@@ -96,13 +96,19 @@ export function useGameBoardActions({
   );
 
   const onEndTurn = useCallback(
-    () => submitProjectedAction(endTurnAction?.id),
-    [endTurnAction?.id, submitProjectedAction],
+    () => {
+      if (targetSelection) return Promise.resolve(false);
+      return submitProjectedAction(endTurnAction?.id);
+    },
+    [endTurnAction?.id, submitProjectedAction, targetSelection],
   );
 
   const onPass = useCallback(
-    () => submitProjectedAction(passAction?.id),
-    [passAction?.id, submitProjectedAction],
+    () => {
+      if (targetSelection) return Promise.resolve(false);
+      return submitProjectedAction(passAction?.id);
+    },
+    [passAction?.id, submitProjectedAction, targetSelection],
   );
 
   const onConcede = useCallback(async () => {
@@ -395,8 +401,10 @@ export function useGameBoardActions({
     [actions],
   );
 
-  const canViewerEndTurn = Boolean(endTurnAction || passFocusAction);
-  const passTurnLabel = isChainLockedOpen
+  const canViewerEndTurn = !targetSelection && Boolean(endTurnAction || passFocusAction);
+  const passTurnLabel = targetSelection
+    ? "Choose targets or cancel"
+    : isChainLockedOpen
     ? "Resolve chain first"
     : passFocusAction
       ? "Pass Focus"

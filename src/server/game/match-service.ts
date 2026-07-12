@@ -757,6 +757,43 @@ async function submitDeckReconfiguration(
   configuration: MatchDocument["seats"][number]["currentDeckConfiguration"],
   now: string,
 ): Promise<MatchProjection> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await submitDeckReconfigurationAttempt(
+        db,
+        input,
+        betweenGamesId,
+        configuration,
+        now,
+      );
+    } catch (error) {
+      if (
+        attempt === 0 &&
+        error instanceof MatchServiceError &&
+        error.code === "match.betweenGamesChanged"
+      ) {
+        // A concurrent request may have refreshed this process's cache, but a
+        // retry must always re-read the committed intermission state.
+        matchDocumentCache.delete(input.matchId);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new MatchServiceError(
+    "match.betweenGamesChanged",
+    "Between-games state has changed.",
+  );
+}
+
+async function submitDeckReconfigurationAttempt(
+  db: Db,
+  input: { matchId: string; playerToken: string; stateVersion: number },
+  betweenGamesId: string,
+  configuration: MatchDocument["seats"][number]["currentDeckConfiguration"],
+  now: string,
+): Promise<MatchProjection> {
   return runInTransaction(db, async (repositories) => {
     const { match, game, seat, decks } = await loadContext(
       repositories,
@@ -769,12 +806,10 @@ async function submitDeckReconfiguration(
         "Deck reconfiguration is allowed only between games.",
       );
     }
-    if (match.stateVersion !== input.stateVersion) {
-      throw new MatchServiceError(
-        "match.betweenGamesChanged",
-        "Between-games state has changed.",
-      );
-    }
+    // Both players submit independent deck configurations. The intermission ID
+    // is the authoritative boundary: a stale match version caused only by the
+    // opponent's submission is safe to merge, while a different or completed
+    // intermission remains rejected below.
     if (match.betweenGames.id !== betweenGamesId) {
       throw new MatchServiceError(
         "match.betweenGamesChanged",

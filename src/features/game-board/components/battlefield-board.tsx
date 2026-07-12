@@ -8,7 +8,6 @@ import { motion } from "motion/react";
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type FC,
   type MouseEvent,
@@ -20,6 +19,7 @@ import type {
 } from "../drag-and-drop/location-drag-actions";
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import type { BattlefieldData, Card } from "../types";
+import { BattlefieldCardDialog } from "./battlefield-card-dialog";
 import { CardTile } from "./card-tile";
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
@@ -273,7 +273,6 @@ export const BattlefieldBoard: FC<Props> = ({
   stagedMovementCardInstanceIds,
 }) => {
   const [isBattlefieldCardOpen, setIsBattlefieldCardOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   const visualState = resolveBattlefieldVisualState({
     dropStatus,
@@ -291,7 +290,6 @@ export const BattlefieldBoard: FC<Props> = ({
 
   const setBattlefieldRootRef = useCallback(
     (node: HTMLDivElement | null) => {
-      rootRef.current = node;
       setNodeRef(node);
     },
     [setNodeRef],
@@ -312,23 +310,15 @@ export const BattlefieldBoard: FC<Props> = ({
       return;
     }
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsBattlefieldCardOpen(false);
-      }
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsBattlefieldCardOpen(false);
       }
     };
 
-    document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isBattlefieldCardOpen]);
@@ -405,14 +395,14 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         {isBattlefieldCardOpen && (
-          <div className="top-9 left-2 z-[120] absolute bg-slate-950/72 supports-backdrop-filter:bg-slate-950/56 shadow-2xl shadow-black/70 supports-backdrop-filter:backdrop-blur-md p-1 border border-white/12 rounded-lg ring-1 ring-cyan-300/10">
-            {/* eslint-disable-next-line @next/next/no-img-element -- Battlefield art comes from the catalog. */}
-            <img
-              alt={name}
-              className="block rounded-md w-80 max-w-[min(20rem,calc(50vw-2rem))] object-contain aspect-1038/744"
-              src={img}
-            />
-          </div>
+          <BattlefieldCardDialog
+            contestedByPlayerId={contestedByPlayerId}
+            controllerPlayerId={controllerPlayerId}
+            description={description}
+            img={img}
+            name={name}
+            onClose={() => setIsBattlefieldCardOpen(false)}
+          />
         )}
 
         {hasMightToShow && (

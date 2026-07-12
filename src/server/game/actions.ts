@@ -955,9 +955,11 @@ function passPriority(
                 decks,
               });
               if (definition.card.classification.type === "Spell") {
-                game.state.players[owner]!.zones.trash.push(
-                  item.sourceCardInstanceId,
-                );
+                if (!isCardInAnyZone(game, item.sourceCardInstanceId)) {
+                  game.state.players[owner]!.zones.trash.push(
+                    item.sourceCardInstanceId,
+                  );
+                }
                 dispatchBehaviorEvent(
                   game,
                   item.behaviorEvent?.type === "card.played"
@@ -1430,7 +1432,7 @@ function addPlayableCardActions(
           action(
             game,
             "playAccelerated",
-            `Play ${definition.card.name} ready to ${destination.name}`,
+            `Play accelerated ${definition.card.name} to ${destination.name}`,
             cardId,
             acceleratedPaymentPlan !== null && hasLegalTargets,
             !hasLegalTargets

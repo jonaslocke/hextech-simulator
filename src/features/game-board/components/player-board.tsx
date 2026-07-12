@@ -142,6 +142,7 @@ const BaseLine = ({
         <ZoneCards
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onCardPrimaryAction={onBoardCardPrimaryAction}
           zone={player.zones.legend}
         />
       </ZoneArea>

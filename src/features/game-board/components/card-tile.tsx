@@ -87,6 +87,7 @@ type CardTileProps = Card & {
 };
 
 export const CardTile: FC<CardTileProps> = ({
+  activeModifiers = [],
   domains = [],
   enableHoverPreview = false,
   enableZoneAnimation = true,
@@ -366,6 +367,7 @@ export const CardTile: FC<CardTileProps> = ({
         )}
       </motion.div>
       <CardHoverPreviewPortal
+        activeModifiers={activeModifiers}
         domains={domains}
         energy={energy}
         img={img}
@@ -387,6 +389,7 @@ export const CardTile: FC<CardTileProps> = ({
 };
 
 function CardHoverPreviewPortal({
+  activeModifiers,
   domains,
   energy,
   img,
@@ -403,6 +406,7 @@ function CardHoverPreviewPortal({
   supertype,
   type,
 }: {
+  activeModifiers: NonNullable<Card["activeModifiers"]>;
   domains: string[];
   energy?: number;
   img: string;
@@ -454,6 +458,7 @@ function CardHoverPreviewPortal({
         />
       </div>
       <CardSummary
+        activeModifiers={activeModifiers}
         domains={domains}
         energy={energy}
         might={might}
@@ -503,6 +508,7 @@ function inferCardOrientation({
 }
 
 function CardSummary({
+  activeModifiers,
   domains,
   energy,
   might,
@@ -516,6 +522,7 @@ function CardSummary({
   supertype,
   type,
 }: {
+  activeModifiers: NonNullable<Card["activeModifiers"]>;
   domains: string[];
   energy?: number;
   might?: number;
@@ -592,6 +599,19 @@ function CardSummary({
           <p className="text-slate-400">No rules text.</p>
         )}
       </div>
+      {activeModifiers.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeModifiers.map((modifier) => (
+            <span
+              className="inline-flex items-center gap-1 bg-emerald-300/10 px-2 py-0.5 border border-emerald-300/25 rounded-full text-[11px] text-emerald-100"
+              key={`${modifier.label}:${modifier.duration}`}
+            >
+              <strong>{modifier.label}</strong>
+              <span className="text-emerald-200/70">{modifier.duration}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {(setLabel || publicCode) && (
         <div className="mt-auto pt-2 border-white/10 border-t text-[11px] text-slate-500">
           {[setLabel, publicCode].filter(Boolean).join(" · ")}

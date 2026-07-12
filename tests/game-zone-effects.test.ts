@@ -98,6 +98,7 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
   const cost = targetDeflectCost("p1", ["unit"], index);
 
   assert.equal(cost, 1);
+  assert.equal(targetDeflectCost("p1", ["unit", "unit"], index), 2);
   assert.ok(
     buildPaymentPlan(
       game,
