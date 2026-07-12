@@ -90,6 +90,7 @@ export const turnStateSchema = z.object({
 
 export const cardStateSchema = z.object({
   exhausted: z.boolean(),
+  buffed: z.boolean().optional(),
   stunned: z.boolean().optional(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
@@ -513,6 +514,7 @@ export function createInitialGame(input: {
         instance.instanceId,
         {
           exhausted: false,
+          buffed: false,
           damage: 0,
           computedMight: cardByCode(deck, instance.cardCode).card.attributes
             .might,

@@ -344,6 +344,162 @@ test("move triggers can be limited to battlefield destinations", () => {
   );
 });
 
+test("a battlefield restriction removes moves to base from units there", () => {
+  const lair = card("LAIR", "Vilemaw's Lair", "Battlefield", [
+    clause("no-base-move", {
+      effects: [
+        binding("modifier.cannot_move_from_source_battlefield", 0, {
+          destination: "base",
+        }),
+      ],
+    }),
+  ], null);
+  const { game, decks } = fixture([unit("UNIT", "Trapped Unit"), lair]);
+  decks[0]!.instances.push(
+    instance("unit", "p1", "UNIT"),
+    instance("lair", "p1", "LAIR", "battlefield"),
+  );
+  game.state.battlefields.push({
+    battlefieldId: "lair-field",
+    cardInstanceId: "lair",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["unit"],
+  });
+  game.state.cardStates.unit = cardState(1);
+  game.state.cardStates.lair = cardState(null);
+
+  const move = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.label === "Move to Base" && action.sourceCardInstanceId === "unit",
+  );
+
+  assert.equal(move, undefined);
+});
+
+test("Gear plays ready to its controller's base and exposes its activated ability", () => {
+  const seal = card("SEAL", "Seal of Unity", "Gear", [
+    clause("add-order", {
+      abilities: [
+        binding("ability.exhaust_for_resource", 0, {
+          resourceType: "power",
+          amountSource: "constant",
+          amount: 1,
+          domain: "order",
+          usage: "unrestricted",
+        }),
+      ],
+      timings: [binding("timing.reaction", 1)],
+    }),
+  ], null);
+  const { game, decks } = fixture([seal]);
+  decks[0]!.instances.push(instance("seal", "p1", "SEAL"));
+  game.state.players.p1!.zones.hand.push("seal");
+  game.state.cardStates.seal = cardState(null);
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Seal of Unity",
+  );
+  assert.ok(play);
+  const played = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-gear",
+  });
+  assert.ok(played.state.players.p1!.zones.base.includes("seal"));
+  assert.equal(played.state.cardStates.seal?.exhausted, false);
+
+  const add = gameplayActions(played, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "seal" && action.enabled,
+  );
+  assert.ok(add);
+  const activated = performGameplayAction({
+    game: played,
+    actorPlayerId: "p1",
+    actionId: add.id,
+    selectedIds: [],
+    decks,
+    now: "activate-gear",
+  });
+  assert.equal(activated.state.players.p1!.power.Order, 1);
+  assert.equal(activated.state.cardStates.seal?.exhausted, true);
+});
+
+test("an optional Gear kill can target either player's Gear and still draws", () => {
+  const salvage = unit("SALVAGE", "Salvage", [
+    clause("salvage", {
+      selectors: [
+        binding("selector.gear", 0, {
+          minimumCount: 0,
+          maximumCount: 1,
+          selectionKey: "targetGear",
+        }),
+      ],
+      effects: [
+        binding("action.kill_permanent", 1, { selectionKey: "targetGear" }),
+        binding("action.draw_cards", 2, { player: "controller", count: 1 }),
+      ],
+    }),
+  ]);
+  const enemyGear = card("GEAR", "Enemy Gear", "Gear", [], null);
+  const draw = unit("DRAW", "Draw");
+  const { game, decks } = fixture([salvage, enemyGear, draw]);
+  decks[0]!.instances.push(
+    instance("salvage", "p1", "SALVAGE"),
+    instance("gear", "p2", "GEAR"),
+    instance("draw", "p1", "DRAW"),
+  );
+  game.state.players.p1!.zones.base.push("salvage");
+  game.state.players.p2!.zones.base.push("gear");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+  game.state.cardStates.salvage = cardState(1);
+  game.state.cardStates.gear = cardState(null);
+  game.state.cardStates.draw = cardState(1);
+
+  const handlers = createPrimitiveHandlers(createRuntimeCardIndex(decks, game));
+  executeBehaviorClause({
+    clause: compileBehaviorModel(salvage.behaviorModel, handlers).clauses[0]!,
+    context: createBehaviorContext(game, "p1", "salvage", null, ["gear"]),
+    handlers,
+  });
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("gear"));
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("a Buff adds one Might only once and clears when its Unit leaves the board", () => {
+  const source = unit("SOURCE", "Trifarian Gloryseeker", [
+    clause("buff", {
+      effects: [binding("action.buff_unit", 0, { target: "source" })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  const handlers = createPrimitiveHandlers(createRuntimeCardIndex(decks, game));
+  const clauseModel = compileBehaviorModel(source.behaviorModel, handlers).clauses[0]!;
+
+  executeBehaviorClause({
+    clause: clauseModel,
+    context: createBehaviorContext(game, "p1", "source", null, []),
+    handlers,
+  });
+  executeBehaviorClause({
+    clause: clauseModel,
+    context: createBehaviorContext(game, "p1", "source", null, []),
+    handlers,
+  });
+  assert.equal(game.state.cardStates.source?.buffed, true);
+  assert.equal(game.state.cardStates.source?.computedMight, 2);
+
+  moveUnitToTrash(game, "source", createRuntimeCardIndex(decks, game));
+  assert.equal(game.state.cardStates.source?.buffed, false);
+});
+
 test("optional choices branch effect resolution without exposing card targets", () => {
   const source = unit("SOURCE", "Optional Effect", [
     clause("optional", {
@@ -459,6 +615,64 @@ test("own-death triggers resolve after their source leaves play", () => {
   let resolved = passPriority(game, "p1", decks);
   resolved = passPriority(resolved, "p2", decks);
   assert.deepEqual(resolved.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("a selected unit's controller can draw after that unit is killed", () => {
+  const source = unit("SOURCE", "Hidden Blade", [
+    clause("kill-and-draw", {
+      selectors: [
+        binding("selector.unit", 0, {
+          scope: "any",
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "targetUnit",
+        }),
+      ],
+      effects: [
+        binding("action.kill_unit", 1, {
+          target: "unit",
+          selectionKey: "targetUnit",
+        }),
+        binding("action.draw_cards", 2, {
+          player: "selectedCardOwner",
+          count: 2,
+          selectionKey: "targetUnit",
+        }),
+      ],
+    }),
+  ]);
+  source.card.classification.type = "Spell";
+  const target = unit("TARGET", "Target");
+  const drawA = unit("DRAW_A", "Opponent Draw A");
+  const drawB = unit("DRAW_B", "Opponent Draw B");
+  const { game, decks } = fixture([source, target, drawA, drawB]);
+  decks[0]!.instances.push(
+    instance("source", "p1", "SOURCE"),
+    instance("target", "p2", "TARGET"),
+    instance("draw-a", "p2", "DRAW_A"),
+    instance("draw-b", "p2", "DRAW_B"),
+  );
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p2!.zones.base.push("target");
+  game.state.players.p2!.zones.mainDeck.push("draw-a", "draw-b");
+  game.state.cardStates.source = cardState(null);
+  game.state.cardStates.target = cardState(1);
+  game.state.cardStates["draw-a"] = cardState(1);
+  game.state.cardStates["draw-b"] = cardState(1);
+
+  executeBehaviorClause({
+    clause: compileBehaviorModel(
+      source.behaviorModel,
+      createPrimitiveHandlers(createRuntimeCardIndex(decks, game)),
+    ).clauses[0]!,
+    context: createBehaviorContext(game, "p1", "source", null, ["target"]),
+    handlers: createPrimitiveHandlers(createRuntimeCardIndex(decks, game)),
+  });
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("target"));
+  assert.deepEqual(game.state.players.p2!.zones.hand, ["draw-a", "draw-b"]);
 });
 
 test("recycle effects return selected cards to the matching deck", () => {
@@ -2075,7 +2289,7 @@ function battlefield(cardCode: string, name: string): GameCardDefinition {
 function card(
   cardCode: string,
   name: string,
-  type: "Battlefield" | "Unit",
+  type: "Battlefield" | "Gear" | "Unit",
   clauses: GameCardDefinition["behaviorModel"]["clauses"],
   might: number | null,
 ): GameCardDefinition {

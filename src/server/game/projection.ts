@@ -71,12 +71,17 @@ export function projectGame(input: {
       exhausted: state.exhausted,
       stunned: state.stunned ?? false,
       activeModifiers: includeActiveModifiers
-        ? input.game.state.modifiers
-            .filter((modifier) => modifier.targetCardInstanceId === id)
-            .map((modifier) => ({
-              label: modifierLabel(modifier.attribute, modifier.operation, modifier.amount),
-              duration: modifierDurationLabel(modifier.duration),
-            }))
+        ? [
+            ...(state.buffed
+              ? [{ label: "Buff +1", duration: "Until leaving board" }]
+              : []),
+            ...input.game.state.modifiers
+              .filter((modifier) => modifier.targetCardInstanceId === id)
+              .map((modifier) => ({
+                label: modifierLabel(modifier.attribute, modifier.operation, modifier.amount),
+                duration: modifierDurationLabel(modifier.duration),
+              })),
+          ]
         : [],
     };
   };

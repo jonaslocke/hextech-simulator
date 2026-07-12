@@ -62,7 +62,7 @@ export function createPrimitiveHandlers(
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
     "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit",
-    "keyword.temporary",
+    "keyword.temporary", "modifier.cannot_move_from_source_battlefield",
   ]) handlers.set(id, passive);
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
   // card enters play. It has no separate state mutation when the clause is
@@ -207,6 +207,12 @@ export function createPrimitiveHandlers(
     matches: (_binding, context) =>
       context.effectOutcomes.lastDamageKilled === true,
   });
+  handlers.set("condition.non_token", {
+    matches: (_binding, context) => {
+      const subjectId = context.event?.subjectCardInstanceId;
+      return Boolean(subjectId && !isTokenInstance(subjectId, index));
+    },
+  });
   handlers.set("condition.unit_presence", {
     matches(binding, context) {
       const units = unitsForPresenceCondition(binding, context, index);
@@ -306,9 +312,14 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.draw_cards", {
     execute(binding, context) {
-      const playerId = binding.parameters.player === "eachPlayer" ? null : context.controllerPlayerId;
       const count = numberParam(binding, "count");
-      const ids = playerId ? [playerId] : [...context.game.state.setup.playerIds];
+      const ids = binding.parameters.player === "eachPlayer"
+        ? [...context.game.state.setup.playerIds]
+        : binding.parameters.player === "currentTurnPlayer"
+          ? context.event?.actorPlayerId ? [context.event.actorPlayerId] : []
+          : binding.parameters.player === "selectedCardOwner"
+            ? [...new Set(selectionFor(binding, context).map((id) => index.instances.get(id)?.ownerPlayerId).filter((id): id is string => Boolean(id)))]
+            : [context.controllerPlayerId];
       for (const id of ids) {
         ensureMainDeck(context.game, id, index);
         draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
@@ -405,7 +416,11 @@ export function createPrimitiveHandlers(
   handlers.set("action.channel_runes", {
     execute(binding, context) {
       const count = numberParam(binding, "count");
-      const ids = binding.parameters.player === "eachPlayer" ? [...context.game.state.setup.playerIds] : [context.controllerPlayerId];
+      const ids = binding.parameters.player === "eachPlayer"
+        ? [...context.game.state.setup.playerIds]
+        : binding.parameters.player === "currentTurnPlayer"
+          ? context.event?.actorPlayerId ? [context.event.actorPlayerId] : []
+          : [context.controllerPlayerId];
       for (const id of ids) {
         const player = context.game.state.players[id]!;
         const moved = player.zones.runeDeck.splice(0, count);
@@ -461,6 +476,22 @@ export function createPrimitiveHandlers(
         })),
       );
     }
+  });
+  handlers.set("selector.gear", {
+    targets(binding, context) {
+      const legalIds = context.game.state.setup.playerIds
+        .flatMap((playerId) => context.game.state.players[playerId]!.zones.base)
+        .filter(
+          (id) => definitionForInstance(id, index).card.classification.type === "Gear",
+        );
+      return {
+        kind: "card" as const,
+        label: "gear",
+        legalIds,
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
+    },
   });
   handlers.set("action.look", {
     execute(binding, context) {
@@ -627,11 +658,13 @@ export function createPrimitiveHandlers(
           requireControlledDestination,
           sourceCardInstanceId: context.sourceCardInstanceId,
           tokenCardCode,
+          entryState: binding.parameters.entryState,
           index,
         });
       }
     },
   });
+  handlers.set("ability.play_token", handlers.get("action.play_token")!);
   handlers.set("action.deal_damage", {
     execute(binding, context) {
       const amount = effectiveNumericValue({
@@ -685,9 +718,39 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.kill_unit", {
     execute(binding, context) {
-      const ids = binding.parameters.target === "source" ? [context.sourceCardInstanceId] : context.selectedIds;
+      const ids = binding.parameters.target === "source"
+        ? [context.sourceCardInstanceId]
+        : selectionFor(binding, context).length > 0
+          ? selectionFor(binding, context)
+          : context.selectedIds;
       ids.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
+  });
+  handlers.set("action.kill_permanent", {
+    execute(binding, context) {
+      for (const id of selectionFor(binding, context)) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        removeFromAllLocations(context.game, id);
+        context.game.state.players[owner]!.zones.trash.push(id);
+        resetStateAfterLeavingBoard(context.game, id, index);
+      }
+    },
+  });
+  handlers.set("action.buff_unit", {
+    execute(binding, context) {
+      const ids = binding.parameters.target === "source"
+        ? [context.sourceCardInstanceId]
+        : selectionFor(binding, context).length > 0
+          ? selectionFor(binding, context)
+          : context.selectedIds;
+      for (const id of ids) {
+        const state = context.game.state.cardStates[id];
+        if (!state || state.buffed) continue;
+        state.buffed = true;
+        recomputeMight(context.game, id, index);
+      }
+    },
   });
   handlers.set("action.banish_card", {
     execute(binding, context) {
@@ -1274,6 +1337,7 @@ function playToken(
     requireControlledDestination: boolean;
     sourceCardInstanceId: string;
     tokenCardCode: string;
+    entryState: unknown;
     index: RuntimeCardIndex;
   },
 ) {
@@ -1297,7 +1361,8 @@ function playToken(
   (game.state.createdCardInstances ??= []).push(instance);
   input.index.instances.set(instanceId, instance);
   game.state.cardStates[instanceId] = {
-    exhausted: true,
+    exhausted: input.entryState !== "ready",
+    buffed: false,
     damage: 0,
     computedMight: definition.card.attributes.might,
     objectVersion: 0,
@@ -1462,6 +1527,7 @@ export function recomputeMight(
     targetCardInstanceId: id,
     targetScope: "source",
   });
+  if (game.state.cardStates[id]?.buffed) value += 1;
   const combatRole = game.state.cardStates[id]?.combatRole;
   if (combatRole === "attacker") {
     value += keywordAmount(game, id, "keyword.assault", index);
@@ -1633,10 +1699,19 @@ function resetStateAfterLeavingBoard(
   incrementObjectVersion(game, id);
   state.damage = 0;
   state.exhausted = false;
+  state.buffed = false;
   state.stunned = false;
   state.combatRole = null;
   state.lethalSuppressedDamage = null;
   state.lethalSuppressedMight = null;
+  game.state.modifiers = game.state.modifiers.filter(
+    (modifier) => modifier.targetCardInstanceId !== id,
+  );
+  game.state.ongoingEffects = game.state.ongoingEffects.filter(
+    (effect) =>
+      effect.sourceCardInstanceId !== id &&
+      !effect.targetCardInstanceIds.includes(id),
+  );
   if (
     index &&
     definitionForInstance(id, index).card.classification.type === "Unit"

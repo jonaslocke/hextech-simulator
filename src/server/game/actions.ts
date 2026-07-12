@@ -291,6 +291,7 @@ export function gameplayActions(
         continue;
       const state = game.state.cardStates[cardId];
       if (!state || state.exhausted) continue;
+      if (isMoveToBaseForbidden(game, cardId, index)) continue;
       actions.push(
         action(game, "move", "Move to Base", cardId, true, null, "base"),
       );
@@ -590,6 +591,9 @@ export function performGameplayAction(input: {
     case "move": {
       const cardId = source;
       if (extra === "base") {
+        if (isMoveToBaseForbidden(game, cardId, index)) {
+          throw new Error("This unit cannot move from its battlefield to base.");
+        }
         for (const battlefield of game.state.battlefields) {
           battlefield.units = battlefield.units.filter((id) => id !== cardId);
         }
@@ -714,6 +718,7 @@ function playCard(
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
   const isUnit = definition.card.classification.type === "Unit";
+  const isGear = definition.card.classification.type === "Gear";
   const showdownAtPlayStart = game.state.showdown;
   const destinationBattlefield =
     isUnit && destinationId !== "base"
@@ -769,7 +774,7 @@ function playCard(
       battlefield.hiddenAtTurnNumber = null;
     }
   }
-  if (isUnit) {
+  if (isUnit || isGear) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
     if (
@@ -778,7 +783,7 @@ function playCard(
     ) {
       markBattlefieldContested(game, destinationId, playerId);
     }
-    game.state.cardStates[cardId]!.exhausted = !accelerated;
+    game.state.cardStates[cardId]!.exhausted = isGear ? false : !accelerated;
     executeImmediateClauses(
       game,
       definition,
@@ -1335,7 +1340,7 @@ function addPlayableCardActions(
     ...(player.zones.champion ? [player.zones.champion] : []),
   ]) {
     const definition = definitionForInstance(cardId, index);
-    if (!["Unit", "Spell"].includes(definition.card.classification.type))
+    if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const timings = compiled.playTimings.map((binding) => binding.behaviorId);
@@ -2109,6 +2114,25 @@ function isCardPlayRestricted(game: GameDocument, playerId: string) {
       effect.controllerPlayerId !== playerId &&
       effect.duration === "thisTurn",
   );
+}
+
+function isMoveToBaseForbidden(
+  game: GameDocument,
+  cardId: string,
+  index: RuntimeCardIndex,
+) {
+  const battlefield = game.state.battlefields.find((candidate) =>
+    candidate.units.includes(cardId),
+  );
+  if (!battlefield) return false;
+  return definitionForInstance(battlefield.cardInstanceId, index)
+    .behaviorModel.clauses.some((clause) =>
+      clause.effects.some(
+        (effect) =>
+          effect.behaviorId === "modifier.cannot_move_from_source_battlefield" &&
+          effect.parameters.destination === "base",
+      ),
+    );
 }
 
 function isCardInAnyZone(game: GameDocument, cardId: string) {

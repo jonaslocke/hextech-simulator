@@ -705,7 +705,7 @@ test("catalogs Hidden as one fixed parameterless behavior", () => {
   assert.equal(findAssignments(windsinger, "keyword.hidden").length, 1);
   assert.deepEqual(catalogEntry.parameters, []);
   assert.equal(catalogEntry.fixedRules.length, 6);
-  assert.equal(catalogEntry.engineSupport.status, "requires_engine_support");
+  assert.equal(catalogEntry.engineSupport.status, "supported");
 });
 
 test("does not grant Hidden behavior to cards that only reference Hidden", () => {

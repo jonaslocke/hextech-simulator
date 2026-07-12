@@ -76,7 +76,8 @@ export const playerReferenceKinds = [
   "opponent",
   "eachPlayer",
   "anyPlayer",
-  "currentTurnPlayer"
+  "currentTurnPlayer",
+  "selectedCardOwner"
 ] as const;
 
 export const playEventSubjectKinds = [
@@ -225,6 +226,7 @@ export const numericModifierOperations = [
 
 export const behaviorDurationKinds = [
   "thisTurn",
+  "untilLeavesPlay",
   "whileSourceAtBattlefield",
   "whileSourceOnBoard"
 ] as const;
@@ -442,6 +444,23 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Creates an effect when the source defends.",
     listensToEvents: ["unit.defends"]
   }),
+  "ability.play_token": primitiveSeed({
+    id: "ability.play_token",
+    family: "ability",
+    name: "Activate to play token",
+    description: "Activates a permanent ability that creates a fixed number of tokens.",
+    parameters: [
+      required("tokenCardCode", "string", "The canonical source card code for the token."),
+      optional("tokenName", "string", "The player-facing token name.", tokenKinds),
+      required("count", "number", "The number of tokens."),
+      optional("placement", "string", "How the token destination is chosen.", [
+        "sourceLocation",
+        "base",
+        "chooseBaseOrControlledBattlefield"
+      ])
+    ],
+    engineSupport: supported("Activated token creation uses the same shared token placement runtime as other token effects.")
+  }),
   "trigger.defend_at_source_battlefield": primitiveSeed({
     id: "trigger.defend_at_source_battlefield",
     family: "trigger",
@@ -653,6 +672,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     targetingRequirements: ["target must be the selected token kind"]
   }),
+  "selector.gear": primitiveSeed({
+    id: "selector.gear",
+    family: "selector",
+    name: "Select gear",
+    description: "Selects Gear on the board.",
+    parameters: [
+      required("minimumCount", "number", "The minimum selection count."),
+      required("maximumCount", "number", "The maximum selection count."),
+      optional("selectionKey", "string", "Stable key used by later effects.")
+    ],
+    targetingRequirements: ["target must be Gear on the board"],
+    engineSupport: supported("Enumerates Gear in each player's Base.")
+  }),
   "action.draw_cards": primitiveSeed({
     id: "action.draw_cards",
     family: "action",
@@ -660,7 +692,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Moves cards from a player's main deck to hand.",
     parameters: [
       required("player", "player", "The player who draws cards."),
-      required("count", "number", "The number of cards drawn.")
+      required("count", "number", "The number of cards drawn."),
+      optional("selectionKey", "string", "Selected cards whose owner determines the drawing player.")
     ],
     emitsEvents: ["card.drawn"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -803,9 +836,35 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Kill unit",
     description: "Kills a unit and moves it through the appropriate game zones.",
-    parameters: [required("target", "target", "The unit to kill.")],
+    parameters: [
+      required("target", "target", "The unit to kill."),
+      optional("selectionKey", "string", "Selector key supplying the units to kill.")
+    ],
     emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
+  }),
+  "action.kill_permanent": primitiveSeed({
+    id: "action.kill_permanent",
+    family: "action",
+    name: "Kill permanent",
+    description: "Kills selected permanent cards and moves them to their owner's Trash.",
+    parameters: [optional("selectionKey", "string", "Selector key supplying the permanents to kill.")],
+    engineSupport: supported("Uses the shared board-to-Trash transition for non-Unit permanents.")
+  }),
+  "action.buff_unit": primitiveSeed({
+    id: "action.buff_unit",
+    family: "action",
+    name: "Buff unit",
+    description: "Places a Buff counter on a Unit that does not already have one.",
+    parameters: [
+      required("target", "target", "The Unit receiving the Buff."),
+      optional("selectionKey", "string", "Selector key supplying the Unit.")
+    ],
+    fixedRules: [
+      "A Unit can have at most one Buff counter.",
+      "A Buff counter contributes +1 Might while the Unit remains on the board."
+    ],
+    engineSupport: supported("Buff state is tracked on the Unit and cleared when it leaves the board.")
   }),
   "trigger.conquer_source": primitiveSeed({
     id: "trigger.conquer_source",
@@ -918,6 +977,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         "sourceLocation",
         "base",
         "chooseBaseOrControlledBattlefield"
+      ]),
+      optional("entryState", "string", "Whether the token enters ready or exhausted.", [
+        "ready",
+        "exhausted"
       ])
     ],
     emitsEvents: ["card.played"]
@@ -1036,6 +1099,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("destination", "string", "The additional destination kind.", ["openBattlefield"])
     ],
     engineSupport: requiresEngineSupport("Unit destination permissions require a generalized legality policy.")
+  }),
+  "modifier.cannot_move_from_source_battlefield": primitiveSeed({
+    id: "modifier.cannot_move_from_source_battlefield",
+    family: "modifier",
+    name: "Cannot move from source battlefield",
+    description: "Prevents units at the source battlefield from moving to the specified destination.",
+    parameters: [required("destination", "zone", "The prohibited movement destination.")],
+    engineSupport: supported("The shared board move policy checks active battlefield restrictions before projecting or executing a move.")
   }),
   "modifier.legion_energy_discount": primitiveSeed({
     id: "modifier.legion_energy_discount",
@@ -1240,6 +1311,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "replacement",
     name: "Instead replacement",
     description: "Replaces an event or result before it happens."
+  }),
+  "condition.non_token": primitiveSeed({
+    id: "condition.non_token",
+    family: "condition",
+    name: "Event subject is not a token",
+    description: "Requires the event's subject card not to be a token.",
+    fixedRules: [
+      "A token is identified from its canonical card supertype or runtime token source.",
+      "The condition is evaluated against the event subject before the clause enters the Chain."
+    ],
+    engineSupport: supported("Uses the shared runtime card identity for the event subject.")
   }),
   "modifier.cannot_play_cards": primitiveSeed({
     id: "modifier.cannot_play_cards",
