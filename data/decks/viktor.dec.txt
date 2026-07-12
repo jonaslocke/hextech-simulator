@@ -1,0 +1,40 @@
+Legend:
+1 Viktor - Herald of the Arcane
+
+Champion:
+1 Viktor, Leader
+
+MainDeck:
+3 Call to Glory
+3 Consult the Past
+3 Cull the Weak
+3 Faithful Manufactor
+1 Grand Strategem
+3 Hidden Blade
+2 Imperial Decree
+2 Machine Evangel
+2 Riptide Rex
+3 Seal of Unity
+2 Shen, Kinkou
+3 Singularity
+1 Spectral Matron
+2 Sprite Mother
+3 Trifarian Gloryseeker
+3 Vanguard Captain
+
+Battlefields:
+1 Obelisk of Power
+1 Trifarian War Camp
+1 Vilemaw's Lair
+
+Runes:
+6 Mind Rune
+6 Order Rune
+
+Sideboard:
+2 Facebreaker
+2 Salvage
+1 Sprite Mother
+1 Spectral Matron
+1 Vengeance
+1 Grand Strategem

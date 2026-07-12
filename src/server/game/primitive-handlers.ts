@@ -93,6 +93,22 @@ export function createPrimitiveHandlers(
     }
   });
   handlers.set("trigger.conquer_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.conquered" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.conquer_source", {
+    matches: (_binding, context) => {
+      if (
+        context.event?.type !== "battlefield.conquered" ||
+        context.event.actorPlayerId !== context.controllerPlayerId ||
+        !context.event.subjectCardInstanceId
+      ) {
+        return false;
+      }
+      return context.game.state.battlefields.some(
+        (battlefield) =>
+          battlefield.cardInstanceId === context.event?.subjectCardInstanceId &&
+          battlefield.units.includes(context.sourceCardInstanceId),
+      );
+    },
+  });
   handlers.set("trigger.conquer", {
     matches: (_binding, context) =>
       context.event?.type === "battlefield.conquered" &&

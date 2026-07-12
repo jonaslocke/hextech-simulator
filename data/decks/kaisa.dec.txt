@@ -1,0 +1,38 @@
+Legend:
+1 Kai'Sa - Daughter of the Void
+
+Champion:
+1 Kai'Sa, Survivor
+
+MainDeck:
+3 Noxus Hopeful
+3 Darius, Trifarian
+3 Pouty Poro
+3 Thousand-Tailed Watcher
+3 Void Seeker
+3 Ravenbloom Student
+3 Falling Star
+3 Stupefy
+1 Time Warp
+3 Smoke Screen
+3 Cleave
+3 Hextech Ray
+2 Retreat
+3 Watchful Sentry
+
+Battlefields:
+1 The Arena's Greatest
+1 The Candlelit Sanctum
+1 Reaver's Row
+
+Runes:
+7 Fury Rune
+5 Mind Rune
+
+Sideboard:
+2 Lecturing Yordle
+2 Brynhir Thundersong
+1 Unchecked Power
+1 Dr. Mundo, Expert
+1 Icathian Rain
+1 Time Warp

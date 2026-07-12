@@ -280,6 +280,25 @@ the next set.
 The commit must contain only the accepted milestone and the tracking updates
 that record its acceptance. Unrelated user changes must not be included.
 
+### 5.12 Blocker and validation handoff
+
+Codex must not merely report that work is blocked or that user input is needed.
+Every such handoff must state:
+
+1. the exact implementation step that cannot continue;
+2. the precise decision, source data, or manual validation required from the
+   user;
+3. the smallest concrete scenario to test, including the cards, action, and
+   expected result when manual validation is required;
+4. whether the result is a hard rule blocker, a regression check, or final
+   milestone acceptance; and
+5. the exact document and section the user should read before responding.
+
+When Codex creates or changes program documentation for a blocker, approval,
+or validation handoff, Codex must point the user to that file and section in
+the same response. A generic request to "validate" or "provide input" is not
+sufficient.
+
 ## 6. Engine Contracts the Corpus Must Preserve
 
 These contracts consolidate the durable outcomes of the Garen, BO3, and

@@ -781,6 +781,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
+  "trigger.conquer_source": primitiveSeed({
+    id: "trigger.conquer_source",
+    family: "trigger",
+    name: "Source conquer trigger",
+    description: "Creates an effect when the source unit is present at a battlefield its controller conquers.",
+    listensToEvents: ["battlefield.conquered"],
+    engineSupport: supported("The conquer event is matched against the source unit's current battlefield."),
+  }),
   "keyword.temporary": primitiveSeed({
     id: "keyword.temporary", family: "keyword", name: "Temporary",
     description: "Kills the permanent at the start of its controller's Beginning Phase before scoring.",

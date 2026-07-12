@@ -10,6 +10,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "timing.delayed": "executable",
   "trigger.on_play": "executable",
   "trigger.conquer_battlefield": "executable",
+  "trigger.conquer_source": "executable",
   "trigger.conquer": "executable",
   "trigger.hold_battlefield": "executable",
   "trigger.on_move": "executable",

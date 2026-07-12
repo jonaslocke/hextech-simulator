@@ -96,6 +96,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
+| OGN | 6 unique cards | Kai'Sa deck: Kai'Sa, Survivor; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat | Unit/Spell | 6 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Partial; remaining Kai'Sa cards still block deck synchronization | Added source-unit conquer trigger on 2026-07-12. |
 
 ## Token Coverage Ledger
 
@@ -113,8 +114,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/annie.dec.txt` | `annie` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
-| OGN | `docs/full-ingestion-decks/OGN/kaisa.dec.txt` | TBD | Valid against the full local source catalog | Pending catalog approval | No | No | Retains real Legend display name; permanent deck ID is not assigned yet | No |
-| OGN | `docs/full-ingestion-decks/OGN/viktor.dec.txt` | TBD | Valid against the full local source catalog | Pending catalog approval | No | No | Retains real Legend display name; permanent deck ID is not assigned yet | No |
+| OGN | `data/decks/kaisa.dec.txt` | Pending | Valid against the full local source catalog | Blocked by canonical approval | No | No | Permanent-source file staged; deck synchronization correctly rejects missing approved OGN card definitions | No |
+| OGN | `data/decks/viktor.dec.txt` | Pending | Valid against the full local source catalog | Blocked by canonical approval | No | No | Permanent-source file staged; deck synchronization remains gated until every referenced card is approved | No |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
 | VEN | `docs/full-ingestion-decks/VEN/` | TBD | No | No | No | No | Final JSON and deck files not provided | No |
