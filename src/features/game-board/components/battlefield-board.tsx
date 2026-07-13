@@ -254,7 +254,8 @@ export const BattlefieldBoard: FC<Props> = ({
     contestedByPlayerId,
     controllerPlayerId,
     description,
-    hasFacedownCard,
+    facedownCardCount,
+    facedownCards,
     id,
     name,
     opponentUnits,
@@ -417,16 +418,34 @@ export const BattlefieldBoard: FC<Props> = ({
           </div>
         )}
 
-        {hasFacedownCard && (
-          <div className="right-3 bottom-9 z-20 absolute flex items-center gap-1.5 bg-slate-950/75 shadow-lg px-1.5 py-1 border border-cyan-100/25 rounded-md backdrop-blur-sm pointer-events-none">
-            {/* eslint-disable-next-line @next/next/no-img-element -- Local card-back asset for a hidden card. */}
-            <img
-              alt="Facedown card"
-              className="shadow-sm border border-white/20 rounded-sm w-7 h-10 object-cover"
-              src={cardBackImage.src}
-            />
+        {facedownCardCount > 0 && (
+          <div className="right-3 bottom-9 z-20 absolute flex items-end gap-1.5 bg-slate-950/75 shadow-lg px-1.5 py-1 border border-cyan-100/25 rounded-md backdrop-blur-sm">
+            {facedownCards.length > 0 ? (
+              facedownCards.map((card) => (
+                <CardTile
+                  enableHoverPreview
+                  key={card.instanceId}
+                  onPrimaryAction={
+                    onCardPrimaryAction
+                      ? (event) => onCardPrimaryAction(card, event)
+                      : undefined
+                  }
+                  size="sm"
+                  {...card}
+                />
+              ))
+            ) : (
+              Array.from({ length: facedownCardCount }, (_, index) => (
+                <img
+                  alt="Facedown card"
+                  className="shadow-sm border border-white/20 rounded-sm w-7 h-10 object-cover"
+                  key={`facedown-${index}`}
+                  src={cardBackImage.src}
+                />
+              ))
+            )}
             <span className="font-mono font-semibold text-[9px] text-cyan-50 uppercase tracking-wide">
-              Facedown
+              Facedown {facedownCardCount > 1 ? `(${facedownCardCount})` : ""}
             </span>
           </div>
         )}

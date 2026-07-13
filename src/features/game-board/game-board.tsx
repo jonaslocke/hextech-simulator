@@ -804,6 +804,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             cancelLabel={
               targetSelection.purpose === "move"
                 ? "Cancel move"
+                : targetSelection.purpose === "hidePayment"
+                  ? "Cancel Hide"
                 : targetSelection.purpose === "choice"
                   ? targetSelection.minTargets === 0
                     ? "Decline"
@@ -817,6 +819,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   : "Pay normal cost"
                 : targetSelection.purpose === "move"
                   ? "Confirm move"
+                  : targetSelection.purpose === "hidePayment"
+                    ? "Hide card"
                   : targetSelection.purpose === "choice"
                     ? "Confirm"
                     : "Play"
@@ -831,6 +835,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   )
                 : targetSelection.purpose === "choice"
                   ? effectSelectionAction?.label
+                  : targetSelection.purpose === "hidePayment"
+                    ? "Choose Hide payment"
                   : targetSelectionIsChoosingOptionalCost(targetSelection)
                     ? optionalCostTitle(targetSelectionAction?.label)
                     : undefined
@@ -840,6 +846,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                 ? "Choose a card to pay the optional cost, or pay the normal cost."
                 : targetSelection.purpose === "move"
                   ? "Click additional units to include them, then confirm the move."
+                  : targetSelection.purpose === "hidePayment"
+                    ? "Choose the ready Rune or Power source to pay the Hide cost. This is not a card target."
                   : undefined
             }
           />

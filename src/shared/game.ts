@@ -231,6 +231,8 @@ export const projectedBattlefieldSchema = z.object({
   contestedByPlayerId: z.string().min(1).nullable(),
   card: projectedCardViewSchema,
   units: z.array(projectedCardViewSchema),
+  facedownCards: z.array(projectedCardViewSchema).default([]),
+  facedownCardCount: z.number().int().nonnegative().default(0),
   facedownCard: projectedCardViewSchema.nullable().default(null),
   hasFacedownCard: z.boolean().default(false),
 });

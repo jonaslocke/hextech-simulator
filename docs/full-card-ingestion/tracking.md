@@ -78,6 +78,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `modifier.modify_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Apply numeric modifier | None |
 | `modifier.play_unit_destination` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Play unit to extra destination | None |
 | `modifier.enter_ready` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Enter ready | None |
+| `modifier.facedown_capacity` | OGN M2 | Bandle Tree | Hidden Golden Rule | Executable | `tests/game-token-placement.test.ts` | Bandle Tree holds two independent facedown cards | Phase 1 Hidden foundation is ready for manual validation; Hide timing/payment and play-from-Hidden remain later phases |
 | `keyword.vision` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Vision keyword | None |
 | `keyword.assault` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Assault combat Might | None |
 | `keyword.shield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Shield combat Might | None |
@@ -97,7 +98,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
 | OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12; associated manual-test issues are closed in the resolution ledger. |
-| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | `approve-viktor-deck-foundation` published all exact Viktor models | Yes | Ready for manual validation | Adds linked target selection, optional Buff costs, player-owned choices, turn-scoped trigger sources, and Trash Unit play destinations alongside the foundation primitives. |
+| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | `approve-viktor-deck-foundation` published all exact Viktor models | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13; follow-on Hidden work is tracked separately in the facedown plan. |
 
 ## Token Coverage Ledger
 
@@ -116,7 +117,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | MVP | `data/decks/masteryi.dec.txt` | `master-yi` | Yes | Yes | Existing baseline | Existing baseline | None in M0 | Previously accepted |
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
 | OGN | `data/decks/kaisa.dec.txt` | `kaisa` | Yes | Yes | Automated catalog snapshot succeeds | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12 | Yes |
-| OGN | `data/decks/viktor.dec.txt` | `viktor` | Valid against the full local source catalog | Yes | Synchronized after behavior catalog refresh | Pending manual validation | All 24 canonical cards are published and deck persistence is enabled | No |
+| OGN | `data/decks/viktor.dec.txt` | `viktor` | Valid against the full local source catalog | Yes | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13 | Yes |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
 | VEN | `docs/full-ingestion-decks/VEN/` | TBD | No | No | No | No | Final JSON and deck files not provided | No |
@@ -140,6 +141,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | M2 foundation | Garen token regression | Recruit the Vanguard, Faithful Manufactor, and Noxian Drummer token placement | Passed | User manually confirmed token placement after catalog-driven token migration | Yes |
 | M2 foundation | Garen shared-choice regression | Target selection, choice flow, and Recruit placement after the binary-choice extension | Passed | User manually confirmed the focused shared-contract regression pass | Yes |
 | M2 | Kai'Sa full deck validation | Full Kai'Sa deck gameplay and all recorded manual-test scenarios | Accepted | User accepted the completed Kai'Sa validation on 2026-07-12; see the Kai'Sa resolution ledger | Yes |
+| M2 | Viktor full deck validation | Full Viktor deck gameplay and all recorded manual-test scenarios | Accepted | User accepted the completed Viktor validation on 2026-07-13; see the Viktor resolution ledger | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |

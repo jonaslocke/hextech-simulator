@@ -8,6 +8,7 @@ import type { DeckSnapshotDocument, GameEventDocument } from "./repositories";
 import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
+import { facedownCardsAt } from "./facedown-cards";
 import { victoryRequirement } from "./victory";
 import { getTokenCatalogDefinitions } from "./token-catalog";
 
@@ -273,20 +274,24 @@ export function projectGame(input: {
           defenderMight: input.game.state.combat.defenderMight,
         }
       : null,
-    battlefields: input.game.state.battlefields.map((battlefield) => ({
-      battlefieldId: battlefield.battlefieldId,
-      selectedByPlayerId: battlefield.selectedByPlayerId,
-      controllerPlayerId: battlefield.controllerPlayerId ?? null,
-      contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
-      card: view(battlefield.cardInstanceId),
-      units: battlefield.units.map((id) => view(id)),
-      facedownCard:
-        battlefield.facedownCardInstanceId &&
-        battlefield.facedownControllerPlayerId === input.viewerPlayerId
-          ? view(battlefield.facedownCardInstanceId)
-          : null,
-      hasFacedownCard: Boolean(battlefield.facedownCardInstanceId),
-    })),
+    battlefields: input.game.state.battlefields.map((battlefield) => {
+      const facedownCards = facedownCardsAt(battlefield);
+      const controllerCards = facedownCards
+        .filter((card) => card.controllerPlayerId === input.viewerPlayerId)
+        .map((card) => view(card.cardInstanceId));
+      return {
+        battlefieldId: battlefield.battlefieldId,
+        selectedByPlayerId: battlefield.selectedByPlayerId,
+        controllerPlayerId: battlefield.controllerPlayerId ?? null,
+        contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
+        card: view(battlefield.cardInstanceId),
+        units: battlefield.units.map((id) => view(id)),
+        facedownCards: controllerCards,
+        facedownCardCount: facedownCards.length,
+        facedownCard: controllerCards[0] ?? null,
+        hasFacedownCard: facedownCards.length > 0,
+      };
+    }),
     chain: input.game.state.chain
       ? {
           items: input.game.state.chain.items.map((item) =>

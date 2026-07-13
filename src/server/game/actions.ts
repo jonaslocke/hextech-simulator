@@ -73,6 +73,12 @@ import {
   isLegalUnitDestination,
   legalUnitDestinationIds,
 } from "./unit-destinations";
+import {
+  addFacedownCard,
+  facedownCardsAt,
+  hasFacedownCapacity,
+  removeFacedownCard,
+} from "./facedown-cards";
 import { applyStartOfTurn, isStartOfTurnPhase } from "./turns";
 
 // Non-standard rules override. Disable to require normal Action/Reaction timing.
@@ -793,11 +799,7 @@ function playCard(
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   for (const battlefield of game.state.battlefields) {
-    if (battlefield.facedownCardInstanceId === cardId) {
-      battlefield.facedownCardInstanceId = null;
-      battlefield.facedownControllerPlayerId = null;
-      battlefield.hiddenAtTurnNumber = null;
-    }
+    removeFacedownCard(battlefield, cardId);
   }
   if (isUnit || isGear) {
     if (destinationBattlefield) {
@@ -1503,8 +1505,8 @@ function addPlayableCardActions(
       );
       const hideTargets: ProjectedAction["targets"] = powerSourceIds.length > 0
         ? [{
-            kind: "card",
-            label: "Power source",
+          kind: "card",
+            label: "Hide payment source",
             legalIds: powerSourceIds,
             minimum: pooledPowerAvailable ? 0 : 1,
             maximum: 1,
@@ -1512,20 +1514,20 @@ function addPlayableCardActions(
         : [];
       for (const battlefield of game.state.battlefields) {
         const isControlled = battlefield.controllerPlayerId === playerId;
-        const isEmpty = !battlefield.facedownCardInstanceId;
+        const hasCapacity = hasFacedownCapacity(battlefield, index);
         actions.push(
           action(
             game,
             "hide",
             `Hide ${definition.card.name} at ${definitionForInstance(battlefield.cardInstanceId, index).card.name}`,
             cardId,
-            canHideThisTurn && isControlled && isEmpty && (pooledPowerAvailable || powerSourceIds.length > 0),
+            canHideThisTurn && isControlled && hasCapacity && (pooledPowerAvailable || powerSourceIds.length > 0),
             !canHideThisTurn
               ? "You can hide a card only on your turn."
               : !isControlled
               ? "You do not control this battlefield."
-              : !isEmpty
-                ? "That battlefield already has a facedown card."
+              : !hasCapacity
+                ? "That battlefield has no facedown capacity."
                 : "Choose a Power source or channel Power first.",
             battlefield.battlefieldId,
             hideTargets,
@@ -1548,49 +1550,50 @@ function addHiddenPlayActions(
   const turn = game.state.turn;
   if (!turn || turn.activePlayerId === playerId) return;
   for (const battlefield of game.state.battlefields) {
-    const cardId = battlefield.facedownCardInstanceId;
-    if (
-      !cardId ||
-      battlefield.facedownControllerPlayerId !== playerId ||
-      battlefield.hiddenAtTurnNumber === turn.turnNumber
-    ) {
-      continue;
-    }
-    const definition = definitionForInstance(cardId, index);
-    if (!hasBehavior(definition, "keyword.hidden")) continue;
-    const isUnit = definition.card.classification.type === "Unit";
-    const handlers = createPrimitiveHandlers(index);
-    const hiddenTargets = playSelectionRequirements(
-      definition,
-      compileBehaviorModel(definition.behaviorModel, handlers),
-      createBehaviorContext(game, playerId, cardId, null, []),
-      handlers,
-    )
-      .map((requirement) => ({
-        ...requirement,
-        legalIds: requirement.legalIds.filter((id) =>
-          requirement.kind === "battlefield"
-            ? id === battlefield.battlefieldId
-            : battlefield.units.includes(id),
+    for (const facedownCard of facedownCardsAt(battlefield)) {
+      const cardId = facedownCard.cardInstanceId;
+      if (
+        facedownCard.controllerPlayerId !== playerId ||
+        facedownCard.hiddenAtTurnNumber === turn.turnNumber
+      ) {
+        continue;
+      }
+      const definition = definitionForInstance(cardId, index);
+      if (!hasBehavior(definition, "keyword.hidden")) continue;
+      const isUnit = definition.card.classification.type === "Unit";
+      const handlers = createPrimitiveHandlers(index);
+      const hiddenTargets = playSelectionRequirements(
+        definition,
+        compileBehaviorModel(definition.behaviorModel, handlers),
+        createBehaviorContext(game, playerId, cardId, null, []),
+        handlers,
+      )
+        .map((requirement) => ({
+          ...requirement,
+          legalIds: requirement.legalIds.filter((id) =>
+            requirement.kind === "battlefield"
+              ? id === battlefield.battlefieldId
+              : battlefield.units.includes(id),
+          ),
+        }));
+      const hasLegalTargets = canSatisfyTargetRequirements(hiddenTargets);
+      actions.push(
+        action(
+          game,
+          "playHidden",
+          `Play Hidden ${definition.card.name}`,
+          cardId,
+          (!isUnit || isLegalUnitDestination(game, playerId, definition, battlefield.battlefieldId)) && hasLegalTargets,
+          !hasLegalTargets
+            ? "No legal targets are available at the associated battlefield."
+            : isUnit
+              ? "The associated battlefield is no longer a legal destination."
+              : null,
+          isUnit ? battlefield.battlefieldId : undefined,
+          hiddenTargets,
         ),
-      }));
-    const hasLegalTargets = canSatisfyTargetRequirements(hiddenTargets);
-    actions.push(
-      action(
-        game,
-        "playHidden",
-        `Play Hidden ${definition.card.name}`,
-        cardId,
-        (!isUnit || isLegalUnitDestination(game, playerId, definition, battlefield.battlefieldId)) && hasLegalTargets,
-        !hasLegalTargets
-          ? "No legal targets are available at the associated battlefield."
-          : isUnit
-            ? "The associated battlefield is no longer a legal destination."
-            : null,
-        isUnit ? battlefield.battlefieldId : undefined,
-        hiddenTargets,
-      ),
-    );
+      );
+    }
   }
   void decks;
 }
@@ -1611,7 +1614,7 @@ function hideCard(
   if (
     !battlefield ||
     battlefield.controllerPlayerId !== playerId ||
-    battlefield.facedownCardInstanceId ||
+    !hasFacedownCapacity(battlefield, index) ||
     !player.zones.hand.includes(cardId) ||
     !hasBehavior(definition, "keyword.hidden") ||
     game.state.turn?.activePlayerId !== playerId
@@ -1620,9 +1623,11 @@ function hideCard(
   }
   payHidePower(game, playerId, selectedIds, index);
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
-  battlefield.facedownCardInstanceId = cardId;
-  battlefield.facedownControllerPlayerId = playerId;
-  battlefield.hiddenAtTurnNumber = game.state.turn?.turnNumber ?? 1;
+  addFacedownCard(battlefield, {
+    cardInstanceId: cardId,
+    controllerPlayerId: playerId,
+    hiddenAtTurnNumber: game.state.turn?.turnNumber ?? 1,
+  });
 }
 
 function hidePowerSourceIds(
@@ -2417,7 +2422,9 @@ function isCardInAnyZone(game: GameDocument, cardId: string) {
       (battlefield) =>
         battlefield.cardInstanceId === cardId ||
         battlefield.units.includes(cardId) ||
-        battlefield.facedownCardInstanceId === cardId,
+        facedownCardsAt(battlefield).some(
+          (card) => card.cardInstanceId === cardId,
+        ),
     )
   );
 }

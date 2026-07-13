@@ -325,6 +325,20 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "Hidden requires facedown-zone state, play-origin context, conditional timing, cost replacement, and inherited targeting restrictions."
     )
   }),
+  "modifier.facedown_capacity": primitiveSeed({
+    id: "modifier.facedown_capacity",
+    family: "modifier",
+    name: "Facedown capacity",
+    description: "Increases the number of cards that may occupy this battlefield's facedown zone.",
+    parameters: [
+      required("amount", "number", "The number of additional facedown cards allowed."),
+    ],
+    fixedRules: [
+      "The default facedown capacity is one.",
+      "This modifier applies to the battlefield containing its source.",
+    ],
+    engineSupport: supported("The game evaluates facedown capacity from battlefield behavior bindings."),
+  }),
   "keyword.assault": primitiveSeed({
     id: "keyword.assault",
     family: "keyword",

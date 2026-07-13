@@ -24,8 +24,14 @@ import {
   applyStartOfTurn,
   gameplayActions,
   performGameplayAction,
+  projectGame,
   startCombat,
 } from "../src/server/game";
+import {
+  addFacedownCard,
+  facedownCapacity,
+  hasFacedownCapacity,
+} from "../src/server/game/facedown-cards";
 import {
   dispatchBehaviorEvent,
   dispatchSimultaneousBehaviorEvents,
@@ -1821,7 +1827,7 @@ test("Hidden cards use an empty controlled facedown slot and play free next turn
   assert.ok(hide);
   assert.deepEqual(hide.targets, [{
     kind: "card",
-    label: "Power source",
+    label: "Hide payment source",
     legalIds: ["rune"],
     minimum: 1,
     maximum: 1,
@@ -1835,6 +1841,11 @@ test("Hidden cards use an empty controlled facedown slot and play free next turn
     now: "hide",
   });
   assert.equal(hidden.state.battlefields[0]?.facedownCardInstanceId, "hidden");
+  assert.deepEqual(hidden.state.battlefields[0]?.facedownCards, [{
+    cardInstanceId: "hidden",
+    controllerPlayerId: "p1",
+    hiddenAtTurnNumber: 1,
+  }]);
   assert.equal(hidden.state.players.p1!.zones.runeDeck.includes("rune"), true);
 
   hidden.state.turn = { turnNumber: 2, activePlayerId: "p2", phase: "action" };
@@ -1852,6 +1863,62 @@ test("Hidden cards use an empty controlled facedown slot and play free next turn
   });
   assert.deepEqual(played.state.battlefields[0]?.units, ["hidden"]);
   assert.equal(played.state.battlefields[0]?.facedownCardInstanceId, null);
+  assert.deepEqual(played.state.battlefields[0]?.facedownCards, []);
+});
+
+test("facedown capacity comes from battlefield behavior and conceals identities from opponents", () => {
+  const hiddenCard = unit("HIDDEN", "Hidden Card", [
+    clause("hidden", { keywords: [binding("keyword.hidden", 0)] }),
+  ]);
+  const bandleTree = card("BANDLE", "Bandle Tree", "Battlefield", [
+    clause("additional-facedown-capacity", {
+      effects: [binding("modifier.facedown_capacity", 0, { amount: 1 })],
+    }),
+  ], null);
+  const { game, decks } = fixture([hiddenCard, bandleTree]);
+  decks[0]!.instances.push(
+    instance("hidden-one", "p1", "HIDDEN"),
+    instance("hidden-two", "p1", "HIDDEN"),
+    instance("bandle", "p1", "BANDLE", "battlefield"),
+  );
+  game.state.cardStates["hidden-one"] = cardState(1);
+  game.state.cardStates["hidden-two"] = cardState(1);
+  game.state.cardStates.bandle = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bandle",
+    cardInstanceId: "bandle",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+  const battlefieldState = game.state.battlefields[0]!;
+  const index = createRuntimeCardIndex(decks, game);
+
+  assert.equal(facedownCapacity(battlefieldState, index), 2);
+  addFacedownCard(battlefieldState, {
+    cardInstanceId: "hidden-one",
+    controllerPlayerId: "p1",
+    hiddenAtTurnNumber: 1,
+  });
+  assert.equal(hasFacedownCapacity(battlefieldState, index), true);
+  addFacedownCard(battlefieldState, {
+    cardInstanceId: "hidden-two",
+    controllerPlayerId: "p1",
+    hiddenAtTurnNumber: 2,
+  });
+  assert.equal(hasFacedownCapacity(battlefieldState, index), false);
+
+  const controllerProjection = projectGame({ game, viewerPlayerId: "p1", decks });
+  const opponentProjection = projectGame({ game, viewerPlayerId: "p2", decks });
+  assert.deepEqual(
+    controllerProjection.battlefields[0]?.facedownCards.map(
+      (card) => card.instanceId,
+    ),
+    ["hidden-one", "hidden-two"],
+  );
+  assert.equal(opponentProjection.battlefields[0]?.facedownCardCount, 2);
+  assert.deepEqual(opponentProjection.battlefields[0]?.facedownCards, []);
+  assert.equal(opponentProjection.battlefields[0]?.facedownCard, null);
 });
 
 test("automatic enemy-unit modifiers affect every enemy without a target choice", () => {

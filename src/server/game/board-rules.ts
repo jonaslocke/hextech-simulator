@@ -3,6 +3,7 @@ import {
   recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
+import { facedownCardsAt, setFacedownCards } from "./facedown-cards";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { scoreBattlefield } from "./scoring";
@@ -39,19 +40,21 @@ export function cleanupBoard(
     ) {
       battlefield.contestedByPlayerId = null;
     }
-    if (
-      battlefield.facedownCardInstanceId &&
-      battlefield.facedownControllerPlayerId !== battlefield.controllerPlayerId
-    ) {
-      const owner = battlefield.facedownControllerPlayerId;
-      if (owner) {
-        game.state.players[owner]!.zones.trash.push(
-          battlefield.facedownCardInstanceId,
+    const displacedFacedownCards = facedownCardsAt(battlefield).filter(
+      (card) => card.controllerPlayerId !== battlefield.controllerPlayerId,
+    );
+    if (displacedFacedownCards.length > 0) {
+      for (const card of displacedFacedownCards) {
+        game.state.players[card.controllerPlayerId]!.zones.trash.push(
+          card.cardInstanceId,
         );
       }
-      battlefield.facedownCardInstanceId = null;
-      battlefield.facedownControllerPlayerId = null;
-      battlefield.hiddenAtTurnNumber = null;
+      setFacedownCards(
+        battlefield,
+        facedownCardsAt(battlefield).filter(
+          (card) => card.controllerPlayerId === battlefield.controllerPlayerId,
+        ),
+      );
     }
   }
 }

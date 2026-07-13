@@ -13,6 +13,7 @@
     "catalog:reset-canonical-cards": "node --env-file=.env --import tsx scripts/reset-canonical-card-catalog.ts --confirm",
     "catalog:repair-garen-m1": "node --env-file=.env --import tsx scripts/repair-garen-m1-canonical-cards.ts --confirm",
     "catalog:approve-kaisa-batch": "node --env-file=.env --import tsx scripts/approve-kaisa-deck-batch.ts --confirm",
+    "catalog:approve-facedown-foundation": "node --env-file=.env --import tsx scripts/approve-facedown-foundation.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-decks": "node --env-file=.env --import tsx scripts/sync-deck-definitions.ts --confirm",
     "catalog:sync-sideboard-decks": "node --env-file=.env --import tsx scripts/sync-sideboard-validation-decks.ts --confirm",

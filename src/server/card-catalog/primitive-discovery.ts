@@ -383,6 +383,11 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "modifier.enter_ready", "modifier", { target: readGenericTarget(context.rulesText) }, "high")
       : null
   ),
+  primitive("modifier.facedown_capacity", "modifier", "Facedown capacity", "Increases the facedown-zone capacity at this battlefield.", ["amount"], (context) =>
+    /\bhide an additional card here\b/.test(context.rulesText)
+      ? assignment(context, "modifier.facedown_capacity", "modifier", { amount: 1 }, "high")
+      : null
+  ),
   primitive("modifier.targeting_restriction", "modifier", "Targeting restriction", "Change what can be chosen or targeted.", [], (context) =>
     /\bchoose me\b|\bchosen by\b|\bcan't be chosen\b|\bcannot be chosen\b/.test(context.rulesText)
       ? assignment(context, "modifier.targeting_restriction", "modifier", {}, "medium")

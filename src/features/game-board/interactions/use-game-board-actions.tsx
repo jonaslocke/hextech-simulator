@@ -27,6 +27,14 @@ import type { BoardTargetSelection } from "./use-board-target-selection";
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
 
+function unavailableMenuItem(cardInstanceId: string): CardActionMenuItem {
+  return {
+    disabled: true,
+    id: `${cardInstanceId}:not-playable`,
+    label: "Not Playable",
+  };
+}
+
 export type GameBoardUnitPlayChoice = {
   card: Card;
   modes: PaymentMode[];
@@ -180,6 +188,7 @@ export function useGameBoardActions({
         card.instanceId,
       );
       const actionToSubmit = stagedMoveAction ?? projectedAction;
+      const isHideAction = actionToSubmit.id.split(":")[3] === "hide";
       const targetKind = actionToSubmit.targets.some(
         (target) => target.kind === "card",
       )
@@ -193,7 +202,11 @@ export function useGameBoardActions({
           legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
-          purpose: stagedMoveAction ? "move" : "play",
+          purpose: stagedMoveAction
+            ? "move"
+            : isHideAction
+              ? "hidePayment"
+              : "play",
           requirement,
           selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
           targetKind,
@@ -283,28 +296,19 @@ export function useGameBoardActions({
       }
 
       const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+      const enabledModes = modes.filter((mode) => mode.enabled);
 
       openCardActionMenu(
         event,
-        modes.length > 0
-          ? modes.map((mode) => ({
+        enabledModes.length > 0
+          ? enabledModes.map((mode) => ({
               boardLocation: mode.boardLocation,
-              disabled: !mode.enabled,
+              disabled: false,
               id: mode.id,
-              label: mode.enabled
-                ? mode.label
-                : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
-              onSelect: mode.enabled
-                ? () => beginPlayOrTargetSelection(card, mode.id)
-                : undefined,
+              label: mode.label,
+              onSelect: () => beginPlayOrTargetSelection(card, mode.id),
             }))
-          : [
-              {
-                disabled: true,
-                id: `${card.instanceId}:not-playable`,
-                label: "Not playable",
-              },
-            ],
+          : [unavailableMenuItem(card.instanceId)],
       );
     },
     [beginPlayOrTargetSelection, openCardActionMenu, viewerState],
@@ -339,21 +343,26 @@ export function useGameBoardActions({
         return;
       }
       const cardActions = sourceActions(card.instanceId);
+      const enabledCardActions = cardActions.filter((action) => action.enabled);
       if (cardActions.length === 0) return;
-      const allActionsAddResources = cardActions.every((action) =>
+      if (enabledCardActions.length === 0) {
+        openCardActionMenu(event, [unavailableMenuItem(card.instanceId)]);
+        return;
+      }
+      const allActionsAddResources = enabledCardActions.every((action) =>
         /^(Add (?:spell )?(?:Energy|Power)|Add Energy and Power)/.test(
           action.label,
         ),
       );
       if (allActionsAddResources) {
-        const powerDomain = cardActions
+        const powerDomain = enabledCardActions
           .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
           .find((domain) => domain !== undefined);
         openCardActionMenu(
           event,
-          cardActions.map((action) => ({
+          enabledCardActions.map((action) => ({
             accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
-            disabled: !action.enabled,
+            disabled: false,
             id: action.id,
             label: runeActionMenuLabel(action, powerDomain),
             onSelect: () => submitRuneAction(action.id),
@@ -363,13 +372,11 @@ export function useGameBoardActions({
       }
       openCardActionMenu(
         event,
-        cardActions.map((action) => ({
+        enabledCardActions.map((action) => ({
           boardLocation: action.presentation.boardLocation,
-          disabled: !action.enabled,
+          disabled: false,
           id: action.id,
-          label: action.enabled
-            ? action.label
-            : `${action.label} (${action.disabledReason ?? "unavailable"})`,
+          label: action.label,
           onSelect: () => beginPlayOrTargetSelection(card, action.id),
         })),
       );
@@ -391,15 +398,20 @@ export function useGameBoardActions({
       }
 
       const runeActions = sourceActions(card.instanceId);
-      const powerDomain = runeActions
+      const enabledRuneActions = runeActions.filter((action) => action.enabled);
+      if (enabledRuneActions.length === 0) {
+        openCardActionMenu(event, [unavailableMenuItem(card.instanceId)]);
+        return;
+      }
+      const powerDomain = enabledRuneActions
         .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
         .find((domain) => domain !== undefined);
 
       openCardActionMenu(
         event,
-        runeActions.map((action) => ({
+        enabledRuneActions.map((action) => ({
           accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
-          disabled: !action.enabled,
+          disabled: false,
           id: action.id,
           label: runeActionMenuLabel(action, powerDomain),
           onSelect: () => submitRuneAction(action.id),

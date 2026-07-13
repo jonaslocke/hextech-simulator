@@ -168,6 +168,8 @@ test("keeps initiated battlefield card targets out of card selection prompts", (
       card: card("battlefield-card", "Battlefield"),
       contestedByPlayerId: null,
       controllerPlayerId: "player-2",
+      facedownCards: [],
+      facedownCardCount: 0,
       facedownCard: null,
       hasFacedownCard: false,
       selectedByPlayerId: "player-2",

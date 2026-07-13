@@ -21,7 +21,7 @@ export type BoardTargetSelection = {
   legalTargetIds: string[];
   maxTargets: number;
   minTargets: number;
-  purpose: "choice" | "move" | "play";
+  purpose: "choice" | "hidePayment" | "move" | "play";
   requirement: CombinedTargetRequirement;
   selectedTargetIds: string[];
   targetKind: "battlefield" | "card";

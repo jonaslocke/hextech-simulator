@@ -57,6 +57,15 @@ export const battlefieldStateSchema = z.object({
   facedownCardInstanceId: z.string().min(1).nullable().optional(),
   facedownControllerPlayerId: z.string().min(1).nullable().optional(),
   hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
+  facedownCards: z
+    .array(
+      z.object({
+        cardInstanceId: z.string().min(1),
+        controllerPlayerId: z.string().min(1),
+        hiddenAtTurnNumber: z.number().int().positive(),
+      }),
+    )
+    .optional(),
 });
 
 export const setupStateSchema = z.object({

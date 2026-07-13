@@ -230,7 +230,11 @@ function buildBattlefieldData({
     contestedByPlayerId: battlefield?.contestedByPlayerId ?? null,
     name: battlefieldCard?.name ?? "Battlefield",
     description: battlefieldCard?.text.plain ?? "No battlefield selected.",
-    hasFacedownCard: battlefield?.facedownSlot ?? false,
+    facedownCards: (battlefield?.facedownCardInstanceIds ?? []).flatMap(
+      (cardInstanceId) =>
+        buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
+    ),
+    facedownCardCount: battlefield?.facedownCardCount ?? 0,
     img: battlefieldCard?.media.image_url ?? "",
     playerUnits: unitCards
       .filter(({ ownerPlayerId }) => ownerPlayerId === viewerPlayerId)

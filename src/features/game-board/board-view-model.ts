@@ -148,7 +148,8 @@ export type BoardProjection = {
     contestedByPlayerId: string | null;
     cardInstanceId: string;
     units: string[];
-    facedownSlot: boolean;
+    facedownCardInstanceIds: string[];
+    facedownCardCount: number;
   }>;
   cardStates: Record<
     string,
@@ -180,7 +181,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
   const players: Record<string, BoardPlayerProjection> = Object.fromEntries(
     projection.players.map((player) => {
       const actions = projection.actions.filter(
-        (action) => action.sourceCardInstanceId !== null,
+        (action) => action.sourceCardInstanceId !== null && action.enabled,
       );
       const bySource = groupActionsBySource(actions);
       const zones = Object.fromEntries(
@@ -312,7 +313,10 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
-        facedownSlot: battlefield.hasFacedownCard,
+        facedownCardInstanceIds: battlefield.facedownCards.map(
+          (card) => card.instanceId,
+        ),
+        facedownCardCount: battlefield.facedownCardCount,
       })),
       cardStates,
     },
@@ -327,7 +331,7 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...projection.battlefields.flatMap((battlefield) => [
       battlefield.card,
       ...battlefield.units,
-      ...(battlefield.facedownCard ? [battlefield.facedownCard] : []),
+      ...battlefield.facedownCards,
     ]),
     ...(projection.chain?.items.flatMap((item) =>
       item.card ? [item.card] : [],

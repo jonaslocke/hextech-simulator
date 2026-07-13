@@ -179,6 +179,8 @@ test("describes the final combat Focus pass with live Might", () => {
         card("attacker", "p1", 5),
         card("defender", "p2", 3)
       ],
+      facedownCards: [],
+      facedownCardCount: 0,
       facedownCard: null,
       hasFacedownCard: false,
     }],
