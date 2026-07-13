@@ -131,6 +131,11 @@ export const chainItemSchema = z.object({
     })
     .nullable()
     .default(null),
+  // The showdown Focus to resume after this item and every descendant
+  // trigger has finished resolving.  It is deliberately carried by queued
+  // items because a trigger-order or target-selection prompt can outlive the
+  // Chain that originally established the continuation.
+  resumeFocusPlayerId: z.string().min(1).nullable().optional(),
 });
 
 const triggerOrderChoiceSchema = z.object({

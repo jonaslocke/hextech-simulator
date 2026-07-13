@@ -111,21 +111,27 @@ export function queueChainItemsForTargets(
   decks: readonly DeckSnapshotDocument[],
   options: { preserveOrder?: boolean } = {},
 ): void {
-  if (!options.preserveOrder && items.length > 1) {
-    const controllerPlayerId = items[0]?.controllerPlayerId;
+  const parentResumeFocusPlayerId = game.state.chain?.resumeFocusPlayerId ?? null;
+  const queuedItems = items.map((item) =>
+    item.resumeFocusPlayerId || !parentResumeFocusPlayerId
+      ? item
+      : { ...item, resumeFocusPlayerId: parentResumeFocusPlayerId },
+  );
+  if (!options.preserveOrder && queuedItems.length > 1) {
+    const controllerPlayerId = queuedItems[0]?.controllerPlayerId;
     if (controllerPlayerId) {
       game.state.queuedTriggerChoices.push({
         id: `choice:${game.stateVersion}:${controllerPlayerId}:triggers`,
         playerId: controllerPlayerId,
         type: "orderTriggers",
-        optionIds: items.map((item) => item.id),
-        pendingItems: items,
+        optionIds: queuedItems.map((item) => item.id),
+        pendingItems: queuedItems,
       });
     }
   }
   game.state.queuedChainItems = [
     ...(game.state.queuedChainItems ?? []),
-    ...items,
+    ...queuedItems,
   ];
   continueQueuedChainItems(game, decks);
 }
@@ -282,7 +288,8 @@ function appendChainItem(game: GameDocument, item: ChainItem) {
       [...game.state.setup.playerIds],
     priorityPlayerId: item.controllerPlayerId,
     passedPlayerIds: [],
-    resumeFocusPlayerId: game.state.showdown?.focusPlayerId ?? null,
+    resumeFocusPlayerId:
+      item.resumeFocusPlayerId ?? game.state.showdown?.focusPlayerId ?? null,
   };
   chain.items.push(item);
   chain.priorityPlayerId = item.controllerPlayerId;
@@ -421,7 +428,8 @@ function queueSimultaneousTriggerItems(
       items: [],
       relevantPlayerIds: [...game.state.setup.playerIds],
       priorityPlayerId: controllerPlayerId,
-      passedPlayerIds: []
+      passedPlayerIds: [],
+      resumeFocusPlayerId: game.state.showdown?.focusPlayerId ?? null,
     };
     chain.items.push(controlledItems[0]!);
     game.state.chain = chain;

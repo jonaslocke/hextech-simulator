@@ -270,6 +270,102 @@ test("triggered ability Chain priority resets to the trigger controller after sp
   assert.deepEqual(next.state.chain?.passedPlayerIds, []);
 });
 
+test("triggered items preserve a card play's showdown Focus continuation", () => {
+  const { decks, game } = fixture([battlefield("BF", "Battlefield")]);
+  game.state.showdown = {
+    kind: "combat",
+    battlefieldId: game.state.battlefields[0]!.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p2",
+    passedPlayerIds: [],
+  };
+
+  // The original card play was made by p2, so its normal showdown
+  // continuation is p1. A triggered item added during that Chain must retain
+  // this parent continuation even when p2 controls the triggered ability.
+  game.state.chain = {
+    items: [
+      {
+        id: "trigger:response",
+        kind: "trigger",
+        label: "Response trigger",
+        controllerPlayerId: "p2",
+        sourceCardInstanceId: null,
+        targetCardInstanceIds: [],
+        targetObjectVersions: {},
+        behaviorClauseId: null,
+        activatedBehaviorId: null,
+        behaviorEvent: null,
+      },
+    ],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p2",
+    passedPlayerIds: [],
+    resumeFocusPlayerId: "p1",
+  };
+
+  let next = passPriority(game, "p2", decks);
+  next = passPriority(next, "p1", decks);
+
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+  assert.deepEqual(next.state.showdown?.passedPlayerIds, []);
+});
+
+test("trigger-order choices retain their originating showdown Focus continuation", () => {
+  const { decks, game } = fixture([battlefield("BF", "Battlefield")]);
+  game.state.showdown = {
+    kind: "combat",
+    battlefieldId: game.state.battlefields[0]!.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    // The original p1 spell has resolved, so its normal continuation is p2.
+    focusPlayerId: "p2",
+    passedPlayerIds: [],
+  };
+  game.state.pendingChoice = {
+    id: "choice:trigger-order",
+    playerId: "p1",
+    type: "orderTriggers",
+    optionIds: ["trigger:first", "trigger:second"],
+    pendingItems: ["trigger:first", "trigger:second"].map((id) => ({
+      id,
+      kind: "trigger" as const,
+      label: id,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: null,
+      targetCardInstanceIds: [],
+      targetObjectVersions: {},
+      behaviorClauseId: null,
+      activatedBehaviorId: null,
+      behaviorEvent: null,
+      resumeFocusPlayerId: "p2",
+    })),
+  };
+
+  const submit = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Submit trigger order",
+  );
+  assert.ok(submit);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: submit.id,
+    selectedIds: ["trigger:first", "trigger:second"],
+    decks,
+    now: "submit-trigger-order",
+  });
+
+  assert.equal(next.state.chain?.resumeFocusPlayerId, "p2");
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.showdown?.focusPlayerId, "p2");
+  assert.deepEqual(next.state.showdown?.passedPlayerIds, []);
+});
+
 function passPriority(
   game: GameDocument,
   playerId: string,

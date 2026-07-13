@@ -871,6 +871,13 @@ function playCard(
       ],
       priorityPlayerId: playerId,
       passedPlayerIds: [],
+      resumeFocusPlayerId: game.state.showdown
+        ? nextRelevantPlayer(
+            game,
+            playerId,
+            game.state.showdown.relevantPlayerIds,
+          )
+        : null,
     };
   }
 }
@@ -1077,11 +1084,11 @@ function passPriority(
         game.state.chain = null;
         if (game.state.showdown) {
           game.state.showdown.focusPlayerId =
-            item?.kind === "trigger" && resumeFocusPlayerId
+            resumeFocusPlayerId
               ? resumeFocusPlayerId
               : item?.kind === "trigger"
                 ? item.controllerPlayerId
-              : nextRelevantPlayer(
+                : nextRelevantPlayer(
                   game,
                   game.state.showdown.focusPlayerId,
                   game.state.showdown.relevantPlayerIds,
@@ -1954,6 +1961,13 @@ function executeActivatedAbility(
     ],
     priorityPlayerId: actorPlayerId,
     passedPlayerIds: [],
+    resumeFocusPlayerId: game.state.showdown
+      ? nextRelevantPlayer(
+          game,
+          actorPlayerId,
+          game.state.showdown.relevantPlayerIds,
+        )
+      : null,
   };
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;

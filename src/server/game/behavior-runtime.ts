@@ -339,8 +339,18 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
     relevantPlayerIds: game.state.showdown?.relevantPlayerIds
       ?? [...game.state.setup.playerIds],
     priorityPlayerId: playerId,
-    passedPlayerIds: []
+    passedPlayerIds: [],
+    resumeFocusPlayerId:
+      pending.pendingItems[0]?.resumeFocusPlayerId ??
+      game.state.showdown?.focusPlayerId ??
+      null,
   };
+  if (!chain.resumeFocusPlayerId) {
+    chain.resumeFocusPlayerId =
+      pending.pendingItems[0]?.resumeFocusPlayerId ??
+      game.state.showdown?.focusPlayerId ??
+      null;
+  }
   chain.items.push(...orderedIds.map((id) => byId.get(id)!));
   chain.priorityPlayerId = playerId;
   chain.passedPlayerIds = [];
