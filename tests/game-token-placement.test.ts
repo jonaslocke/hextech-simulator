@@ -16,7 +16,7 @@ import {
   cleanupTurnModifiers,
   effectiveEnergyCost,
   moveUnitToTrash,
-  recordLegionStatus,
+  recordCardPlayed,
   recomputeMight,
 } from "../src/server/game/primitive-handlers";
 import { getTokenCatalogDefinition } from "../src/server/game/token-catalog";
@@ -2369,7 +2369,7 @@ test("the first-beginning trigger awards the active player once", () => {
   assert.equal(next.state.players.p1!.hasTakenBeginningPhase, true);
 });
 
-test("Legion cost reduction needs a previously played Main Deck card", () => {
+test("Legion cost reduction needs a previously played card", () => {
   const hopeful = unit("HOPEFUL", "Noxus Hopeful", [
     clause("legion-discount", {
       keywords: [binding("keyword.legion", 0)],
@@ -2381,7 +2381,7 @@ test("Legion cost reduction needs a previously played Main Deck card", () => {
   const index = createRuntimeCardIndex(decks, game);
 
   assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 3);
-  game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier-card"];
+  game.state.players.p1!.playedCardIdsThisTurn = ["earlier-card"];
   assert.equal(effectiveEnergyCost(game, "p1", hopeful, index), 1);
 });
 
@@ -2409,9 +2409,8 @@ test("Legion triggers are not placed on the Chain until the source has satisfied
   }, decks);
   assert.equal(game.state.chain, null);
 
-  const index = createRuntimeCardIndex(decks, game);
-  game.state.players.p1!.playedMainDeckCardIdsThisTurn = ["earlier"];
-  recordLegionStatus(game, "p1", "gloryseeker", index);
+  game.state.players.p1!.playedCardIdsThisTurn = ["earlier"];
+  recordCardPlayed(game, "p1", "gloryseeker");
   dispatchBehaviorEvent(game, {
     type: "card.played",
     actorPlayerId: "p1",
@@ -2529,6 +2528,52 @@ test("Darius triggers after a second Unit card is played", () => {
   next = passPriority(next, "p2", decks);
 
   assert.equal(next.state.cardStates.darius?.exhausted, false);
+  assert.equal(next.state.cardStates.darius?.computedMight, 3);
+});
+
+test("a Champion-zone play counts as the first card for second-card triggers", () => {
+  const darius = unit("DARIUS", "Darius, Trifarian", [
+    clause("second-card", {
+      triggers: [binding("trigger.second_card_played", 0)],
+      effects: [
+        binding("modifier.modify_numeric_value", 1, {
+          attribute: "might",
+          operation: "increase",
+          operand: "constant",
+          amount: 2,
+          target: "source",
+          duration: "thisTurn",
+        }),
+      ],
+    }),
+  ]);
+  const champion = unit("CHAMPION", "Chosen Champion");
+  const sentry = unit("SENTRY", "Watchful Sentry");
+  champion.card.attributes.energy = 0;
+  sentry.card.attributes.energy = 0;
+  const { game, decks } = fixture([darius, champion, sentry]);
+  decks[0]!.instances.push(
+    instance("darius", "p1", "DARIUS"),
+    instance("champion", "p1", "CHAMPION", "champion"),
+    instance("sentry", "p1", "SENTRY"),
+  );
+  game.state.players.p1!.zones.base.push("darius");
+  game.state.players.p1!.zones.champion = "champion";
+  game.state.players.p1!.zones.hand.push("sentry");
+  game.state.cardStates.darius = cardState(1);
+  game.state.cardStates.champion = cardState(1);
+  game.state.cardStates.sentry = cardState(1);
+
+  let next = playToBase(game, "p1", "champion", decks);
+  assert.deepEqual(next.state.players.p1?.playedCardIdsThisTurn, ["champion"]);
+  assert.equal(next.state.chain, null);
+
+  next = playToBase(next, "p1", "sentry", decks);
+  assert.deepEqual(next.state.players.p1?.playedCardIdsThisTurn, ["champion", "sentry"]);
+  assert.equal(next.state.chain?.items.length, 1);
+
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
   assert.equal(next.state.cardStates.darius?.computedMight, 3);
 });
 
@@ -3489,7 +3534,7 @@ function instance(
   instanceId: string,
   ownerPlayerId: string,
   cardCode: string,
-  source: "mainDeck" | "legend" | "battlefield" | "token" = "mainDeck",
+  source: "mainDeck" | "legend" | "champion" | "battlefield" | "token" = "mainDeck",
 ) {
   return { instanceId, ownerPlayerId, cardCode, source };
 }

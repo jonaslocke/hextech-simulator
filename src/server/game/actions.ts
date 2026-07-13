@@ -14,7 +14,7 @@ import {
   definitionForInstance,
   effectiveEnergyCost,
   placeUnitAtBattlefield,
-  recordLegionStatus,
+  recordCardPlayed,
   recomputeAllMight,
   recomputeMight,
   type RuntimeCardIndex,
@@ -794,7 +794,7 @@ function playCard(
     targetDeflectCost(playerId, selectedIds, index),
     accelerated ? 1 : 0,
   );
-  recordLegionStatus(game, playerId, cardId, index);
+  recordCardPlayed(game, playerId, cardId);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
@@ -1196,6 +1196,7 @@ function completeEndTurn(
   clearMarkedDamage(game);
   cleanupTurnModifiers(game, index);
   for (const player of Object.values(game.state.players)) {
+    player.playedCardIdsThisTurn = [];
     player.playedMainDeckCardIdsThisTurn = [];
     player.legionSatisfiedCardIdsThisTurn = [];
   }

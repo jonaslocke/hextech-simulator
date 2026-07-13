@@ -119,7 +119,7 @@ export function createPrimitiveHandlers(
       context.event?.type === "card.played" &&
       context.event.actorPlayerId === context.controllerPlayerId &&
       (context.game.state.players[context.controllerPlayerId]
-        ?.playedMainDeckCardIdsThisTurn?.length ?? 0) === 2,
+        ?.playedCardIdsThisTurn?.length ?? 0) === 2,
   });
   handlers.set("trigger.conquer", {
     matches: (_binding, context) =>
@@ -777,12 +777,7 @@ export function createPrimitiveHandlers(
         incrementObjectVersion(context.game, unitId);
       }
       recomputeMight(context.game, unitId, index);
-      recordLegionStatus(
-        context.game,
-        context.controllerPlayerId,
-        unitId,
-        index,
-      );
+      recordCardPlayed(context.game, context.controllerPlayerId, unitId);
       (context.game.state.queuedBehaviorEvents ??= []).push({
         type: "card.played",
         actorPlayerId: context.controllerPlayerId,
@@ -1237,10 +1232,11 @@ export function effectiveEnergyCost(
     index,
     targetScope: "controller_spell",
   });
-  const hasPriorMainDeckCard =
-    (game.state.players[controllerPlayerId]?.playedMainDeckCardIdsThisTurn
-      ?.length ?? 0) > 0;
-  const legionDiscount = hasPriorMainDeckCard
+  const hasPriorPlayedCard =
+    (game.state.players[controllerPlayerId]?.playedCardIdsThisTurn
+      ?? game.state.players[controllerPlayerId]?.playedMainDeckCardIdsThisTurn
+      ?? []).length > 0;
+  const legionDiscount = hasPriorPlayedCard
     ? definition.behaviorModel.clauses
         .filter((clause) =>
           clause.keywords.some(
@@ -1790,16 +1786,18 @@ export function keywordAmount(
   return printedAmount + grantedAmount;
 }
 
-export function recordLegionStatus(
+export function recordCardPlayed(
   game: GameDocument,
   playerId: string,
   cardId: string,
-  index: RuntimeCardIndex,
 ) {
-  const instance = index.instances.get(cardId);
-  if (instance?.source !== "mainDeck") return;
   const player = game.state.players[playerId]!;
-  const played = (player.playedMainDeckCardIdsThisTurn ??= []);
+  // Older in-progress games only have the Main Deck-specific history. Preserve
+  // that history when the generic counter is first used, then record every
+  // actual card play regardless of its zone of origin.
+  const played = (player.playedCardIdsThisTurn ??= [
+    ...(player.playedMainDeckCardIdsThisTurn ?? []),
+  ]);
   if (played.length > 0) {
     (player.legionSatisfiedCardIdsThisTurn ??= []).push(cardId);
   }

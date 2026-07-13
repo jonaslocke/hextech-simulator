@@ -43,6 +43,10 @@ export const playerStateSchema = z.object({
   conditionalEnergy: z.number().int().nonnegative(),
   conditionalPower: z.record(z.number().int().nonnegative()).optional(),
   power: z.record(z.number().int().nonnegative()),
+  playedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
+  // Retained for persisted-game compatibility. New gameplay uses the generic
+  // played-card history above, because cards can be played from more than the
+  // Main Deck (for example, the Champion zone).
   playedMainDeckCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   legionSatisfiedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   zones: playerZonesSchema,
