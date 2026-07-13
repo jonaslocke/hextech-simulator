@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DeckSnapshotDocument } from "../src/server/game";
-import { gameplayActions, performGameplayAction, type GameDocument } from "../src/server/game";
+import {
+  createRuntimeCardIndex,
+  gameplayActions,
+  performGameplayAction,
+  type GameDocument,
+} from "../src/server/game";
+import { availableAnyPowerAfterBaseCost, buildPaymentPlan } from "../src/server/game/payment";
 import type { GameCardDefinition } from "../src/server/game/schemas";
 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
@@ -279,6 +285,50 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
     damage: 0,
     computedMight: 1,
   };
+  const seal: GameCardDefinition = definition("SEAL", "Seal of Unity", "Gear", 0, 0);
+  seal.behaviorModel.clauses.push({
+    id: "add-power",
+    sequence: 0,
+    sourceText: "[Reaction] — [Add] Power.",
+    normalizedText: "reaction add power",
+    abilities: [{
+      behaviorId: "ability.exhaust_for_resource",
+      parameters: {
+        resourceType: "power",
+        amount: 1,
+        domain: "Mind",
+        usage: "unrestricted",
+      },
+      confidence: "high",
+      order: 0,
+    }],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [{
+      behaviorId: "timing.reaction",
+      parameters: {},
+      confidence: "high",
+      order: 0,
+    }],
+    effects: [],
+    keywords: [],
+  });
+  decks[0]!.snapshot.cards.push(seal);
+  decks[0]!.instances.push({
+    instanceId: "p1:seal",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "SEAL",
+  });
+  game.state.players.p1!.zones.base.push("p1:seal");
+  game.state.cardStates["p1:seal"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
 
   const play = gameplayActions(game, "p1", decks).find(
     (action) => action.sourceCardInstanceId === "p1:spell",
@@ -288,6 +338,7 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
     energy: 0,
     basePower: 0,
     availableAnyPower: 0,
+    reservedResourceSourceIds: [],
     targetAdditionalPower: [{ targetId: "p2:deflect", amount: 1 }],
   });
   assert.throws(
@@ -303,13 +354,27 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
     /costs cannot be paid/i,
   );
 
-  game.state.players.p1!.power.Mind = 1;
-  const payablePlay = gameplayActions(game, "p1", decks).find(
+  const sealPayment = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:seal" &&
+      action.label === "Add Power [Mind]",
+  );
+  assert.ok(sealPayment?.enabled);
+  const afterSealPayment = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: sealPayment.id,
+    selectedIds: [],
+    decks,
+    now: "deflect-seal-payment",
+  });
+  assert.equal(afterSealPayment.state.cardStates["p1:seal"]?.exhausted, true);
+  const payablePlay = gameplayActions(afterSealPayment, "p1", decks).find(
     (action) => action.sourceCardInstanceId === "p1:spell",
   )!;
   assert.equal(payablePlay.costPreview?.availableAnyPower, 1);
   const next = performGameplayAction({
-    game,
+    game: afterSealPayment,
     actorPlayerId: "p1",
     actionId: payablePlay.id,
     selectedIds: ["p2:deflect"],
@@ -317,7 +382,82 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
     now: "deflect-paid",
   });
   assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.equal(next.state.cardStates["p1:seal"]?.exhausted, true);
   assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
+});
+
+test("spell-only Power remains available for a Deflect surcharge after a Legend adds it", () => {
+  const { game, decks } = fixture();
+  const daughter: GameCardDefinition = definition("DAUGHTER", "Kai'Sa - Daughter of the Void", "Legend", 0, 0);
+  daughter.behaviorModel.clauses.push({
+    id: "add-rainbow-power",
+    sequence: 0,
+    sourceText: "[Reaction] — [Add] Rainbow Power. Use only to play spells.",
+    normalizedText: "reaction add rainbow power use only to play spells",
+    abilities: [{
+      behaviorId: "ability.exhaust_for_resource",
+      parameters: {
+        resourceType: "power",
+        amount: 1,
+        domain: "Rainbow",
+        usage: "spellsOnly",
+      },
+      confidence: "high",
+      order: 0,
+    }],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [{
+      behaviorId: "timing.reaction",
+      parameters: {},
+      confidence: "high",
+      order: 0,
+    }],
+    effects: [],
+    keywords: [],
+  });
+  decks[0]!.snapshot.cards.push(daughter);
+  decks[0]!.instances.push({
+    instanceId: "p1:daughter",
+    ownerPlayerId: "p1",
+    source: "legend",
+    cardCode: "DAUGHTER",
+  });
+  game.state.players.p1!.zones.legend = "p1:daughter";
+  game.state.cardStates["p1:daughter"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const addPower = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:daughter" &&
+      action.label === "Add spell Power [Rainbow]",
+  );
+  assert.ok(addPower?.enabled);
+  const afterPower = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "deflect-daughter-payment",
+  });
+  const spell = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "SPELL"
+  )!;
+  const plan = buildPaymentPlan(
+    afterPower,
+    "p1",
+    spell,
+    0,
+    createRuntimeCardIndex(decks, afterPower),
+  );
+  assert.equal(availableAnyPowerAfterBaseCost(afterPower, "p1", plan!), 1);
 });
 
 test("a resolving Time Warp is banished instead of also entering Trash", () => {
@@ -703,7 +843,14 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   return { game, decks };
 }
 
-function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Battlefield", energy: number, might: number, power = 0) {
+function definition(
+  code: string,
+  name: string,
+  type: "Rune" | "Unit" | "Spell" | "Battlefield" | "Gear" | "Legend",
+  energy: number,
+  might: number,
+  power = 0,
+) {
   const runeClauses = type === "Rune" ? [{
     id: "energy", sequence: 0, sourceText: "", normalizedText: "",
     abilities: [{ behaviorId: "ability.exhaust_for_resource", parameters: { resourceType: "energy", amountSource: "constant", amount: 1, usage: "unrestricted" }, confidence: "high" as const, order: 0 }],

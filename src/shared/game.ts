@@ -41,6 +41,7 @@ export const projectedActionSchema = z.object({
       energy: z.number().int().nonnegative(),
       basePower: z.number().int().nonnegative(),
       availableAnyPower: z.number().int().nonnegative(),
+      reservedResourceSourceIds: z.array(z.string().min(1)).default([]),
       targetAdditionalPower: z.array(
         z.object({
           targetId: z.string().min(1),

@@ -301,9 +301,9 @@ export function TargetSelectionPrompt({
             )}
             {costPreview.availableAnyPower < costPreview.additionalPower && (
               <div className="mt-2 font-medium">
-                Add{" "}
+                Activate a ready Rune or permanent to add{" "}
                 {costPreview.additionalPower - costPreview.availableAnyPower}{" "}
-                more Power to your Rune Pool before confirming.
+                more Power before confirming.
               </div>
             )}
           </div>

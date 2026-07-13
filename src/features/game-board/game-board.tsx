@@ -312,6 +312,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     setUnitPlayChoice,
     submitProjectedAction,
     targetSelection,
+    targetSelectionAction,
     viewerState,
   });
 

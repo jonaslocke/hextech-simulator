@@ -62,6 +62,7 @@ type UseGameBoardActionsArgs = {
   submitProjectedAction: SubmitProjectedAction;
   setUnitPlayChoice: Dispatch<SetStateAction<GameBoardUnitPlayChoice>>;
   targetSelection: BoardTargetSelection | null;
+  targetSelectionAction: GameProjection["actions"][number] | undefined;
   viewerState: BoardPlayerProjection | undefined;
 };
 
@@ -76,6 +77,7 @@ export function useGameBoardActions({
   setUnitPlayChoice,
   submitProjectedAction,
   targetSelection,
+  targetSelectionAction,
   viewerState,
 }: UseGameBoardActionsArgs) {
   const sourceActions = useCallback(
@@ -168,6 +170,57 @@ export function useGameBoardActions({
       submitProjectedAction(actionId);
     },
     [capturePendingAnimationSnapshot, submitProjectedAction],
+  );
+
+  const deflectPaymentIsPending = useMemo(() => {
+    if (!targetSelectionAction || !targetSelection) return false;
+    const additionalPower = targetSelection.selectedTargetIds.reduce(
+      (total, targetId) =>
+        total +
+        (targetSelectionAction.costPreview?.targetAdditionalPower.find(
+          (source) => source.targetId === targetId,
+        )?.amount ?? 0),
+      0,
+    );
+    return additionalPower > (targetSelectionAction.costPreview?.availableAnyPower ?? 0);
+  }, [targetSelection, targetSelectionAction]);
+
+  const manualDeflectPaymentActions = useCallback(
+    (cardInstanceId: string) => {
+      const reservedSourceIds = new Set(
+        targetSelectionAction?.costPreview?.reservedResourceSourceIds ?? [],
+      );
+      return sourceActions(cardInstanceId).filter(
+        (action) =>
+          action.enabled &&
+          !reservedSourceIds.has(cardInstanceId) &&
+          isPowerProducingResourceAction(action),
+      );
+    },
+    [sourceActions, targetSelectionAction],
+  );
+
+  const openResourceActionMenu = useCallback(
+    (
+      event: MouseEvent<HTMLElement>,
+      resourceActions: GameProjection["actions"],
+    ) => {
+      const powerDomain = resourceActions
+        .map((action) => action.label.match(/^Add (?:spell )?Power \[(.+)]$/)?.[1])
+        .find((domain) => domain !== undefined);
+
+      openCardActionMenu(
+        event,
+        resourceActions.map((action) => ({
+          accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
+          disabled: false,
+          id: action.id,
+          label: runeActionMenuLabel(action, powerDomain),
+          onSelect: () => submitRuneAction(action.id),
+        })),
+      );
+    },
+    [openCardActionMenu, submitRuneAction],
   );
 
   const beginPlayOrTargetSelection = useCallback(
@@ -334,12 +387,21 @@ export function useGameBoardActions({
 
   const handleBoardCardPrimaryAction = useCallback(
     (card: Card, event?: MouseEvent<HTMLElement>) => {
+      if (!card.instanceId) return;
       if (targetSelection) {
-        chooseBoardTarget(card.instanceId);
+        if (targetSelection.legalTargetIds.includes(card.instanceId)) {
+          chooseBoardTarget(card.instanceId);
+          return;
+        }
+        if (!deflectPaymentIsPending || !event) return;
+        const paymentActions = manualDeflectPaymentActions(card.instanceId);
+        if (paymentActions.length > 0) {
+          openResourceActionMenu(event, paymentActions);
+        }
         return;
       }
 
-      if (!card.instanceId || !event) {
+      if (!event) {
         return;
       }
       const cardActions = sourceActions(card.instanceId);
@@ -355,19 +417,7 @@ export function useGameBoardActions({
         ),
       );
       if (allActionsAddResources) {
-        const powerDomain = enabledCardActions
-          .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
-          .find((domain) => domain !== undefined);
-        openCardActionMenu(
-          event,
-          enabledCardActions.map((action) => ({
-            accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
-            disabled: false,
-            id: action.id,
-            label: runeActionMenuLabel(action, powerDomain),
-            onSelect: () => submitRuneAction(action.id),
-          })),
-        );
+        openResourceActionMenu(event, enabledCardActions);
         return;
       }
       openCardActionMenu(
@@ -384,9 +434,11 @@ export function useGameBoardActions({
     [
       beginPlayOrTargetSelection,
       chooseBoardTarget,
+      deflectPaymentIsPending,
+      manualDeflectPaymentActions,
       openCardActionMenu,
+      openResourceActionMenu,
       sourceActions,
-      submitRuneAction,
       targetSelection,
     ],
   );
@@ -398,27 +450,23 @@ export function useGameBoardActions({
       }
 
       const runeActions = sourceActions(card.instanceId);
-      const enabledRuneActions = runeActions.filter((action) => action.enabled);
+      const enabledRuneActions = runeActions.filter(
+        (action) =>
+          action.enabled &&
+          (!deflectPaymentIsPending || isPowerProducingResourceAction(action)),
+      );
       if (enabledRuneActions.length === 0) {
         openCardActionMenu(event, [unavailableMenuItem(card.instanceId)]);
         return;
       }
-      const powerDomain = enabledRuneActions
-        .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
-        .find((domain) => domain !== undefined);
-
-      openCardActionMenu(
-        event,
-        enabledRuneActions.map((action) => ({
-          accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
-          disabled: false,
-          id: action.id,
-          label: runeActionMenuLabel(action, powerDomain),
-          onSelect: () => submitRuneAction(action.id),
-        })),
-      );
+      openResourceActionMenu(event, enabledRuneActions);
     },
-    [openCardActionMenu, sourceActions, submitRuneAction],
+    [
+      deflectPaymentIsPending,
+      openCardActionMenu,
+      openResourceActionMenu,
+      sourceActions,
+    ],
   );
 
   const handleRunePrimaryAction = useCallback(
@@ -605,7 +653,7 @@ function runeActionMenuLabel(
         <EnergyResource compact value={1} />
       </span>
     );
-  } else if (action.label.startsWith("Add Power [") && powerDomain) {
+  } else if (/^Add (?:spell )?Power \[/.test(action.label) && powerDomain) {
     content = (
       <span className="inline-flex items-center gap-1.5">
         <span>Add</span>
@@ -639,9 +687,20 @@ function runeActionAccessibleLabel(
 ) {
   const domain = powerDomain ? formatDomain(powerDomain) : "Power";
   if (action.label === "Add Energy") return "Add 1 Energy";
-  if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;
+  if (/^Add (?:spell )?Power \[/.test(action.label)) {
+    return `Add 1 ${domain} Power`;
+  }
   if (action.label === "Add Energy and Power") {
     return `Add 1 Energy and 1 ${domain} Power`;
   }
   return action.label;
+}
+
+function isPowerProducingResourceAction(
+  action: GameProjection["actions"][number],
+) {
+  return (
+    /^Add (?:spell )?Power \[/.test(action.label) ||
+    action.label === "Add Energy and Power"
+  );
 }

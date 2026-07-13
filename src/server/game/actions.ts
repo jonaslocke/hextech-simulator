@@ -1441,6 +1441,13 @@ function addPlayableCardActions(
               playerId,
               paymentPlan,
             ),
+            reservedResourceSourceIds: [
+              ...new Set([
+                ...paymentPlan.energySourceIds,
+                ...paymentPlan.powerAbilityIds,
+                ...paymentPlan.powerRuneIds,
+              ]),
+            ],
             targetAdditionalPower,
           }
         : undefined;

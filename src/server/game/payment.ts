@@ -7,6 +7,7 @@ import {
 } from "./primitive-handlers";
 
 export type PaymentPlan = {
+  allowsConditionalResources: boolean;
   conditionalEnergy: number;
   pooledEnergy: number;
   energySourceIds: string[];
@@ -158,6 +159,7 @@ export function buildPaymentPlan(
   if (remainingEnergy > 0) return null;
 
   return {
+    allowsConditionalResources: definition.card.classification.type === "Spell",
     conditionalEnergy,
     pooledEnergy,
     energySourceIds,
@@ -236,7 +238,22 @@ export function availableAnyPowerAfterBaseCost(
     (total, amount) => total + amount,
     0,
   );
-  return Math.max(0, pooledPower - basePowerFromPool);
+  const conditionalPower = plan.allowsConditionalResources
+    ? Object.values(player.conditionalPower ?? {}).reduce(
+        (total, amount) => total + amount,
+        0,
+      )
+    : 0;
+  const baseConditionalPowerFromPool = plan.allowsConditionalResources
+    ? Object.values(plan.conditionalPowerFromPool).reduce(
+        (total, amount) => total + amount,
+        0,
+      )
+    : 0;
+  return Math.max(
+    0,
+    pooledPower - basePowerFromPool + conditionalPower - baseConditionalPowerFromPool,
+  );
 }
 
 export function canPayAnyPower(
