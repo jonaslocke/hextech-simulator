@@ -1736,24 +1736,28 @@ export function recomputeMight(
   id: string,
   index: RuntimeCardIndex,
 ) {
-  let value = effectiveNumericValue({
+  const state = game.state.cardStates[id]!;
+  const combatRole = state.combatRole;
+  const combatKeywordMight =
+    combatRole === "attacker"
+      ? keywordAmount(game, id, "keyword.assault", index)
+      : combatRole === "defender"
+        ? keywordAmount(game, id, "keyword.shield", index)
+        : 0;
+  const baseMight =
+    (definitionForInstance(id, index).card.attributes.might ?? 0) +
+    (state.buffed ? 1 : 0) +
+    combatKeywordMight;
+  const value = effectiveNumericValue({
     attribute: "might",
-    baseValue: definitionForInstance(id, index).card.attributes.might ?? 0,
+    baseValue: baseMight,
     controllerPlayerId: index.instances.get(id)?.ownerPlayerId,
     game,
     index,
     targetCardInstanceId: id,
     targetScope: "source",
   });
-  if (game.state.cardStates[id]?.buffed) value += 1;
-  const combatRole = game.state.cardStates[id]?.combatRole;
-  if (combatRole === "attacker") {
-    value += keywordAmount(game, id, "keyword.assault", index);
-  }
-  if (combatRole === "defender") {
-    value += keywordAmount(game, id, "keyword.shield", index);
-  }
-  game.state.cardStates[id]!.computedMight = Math.max(0, value);
+  state.computedMight = Math.max(0, value);
 }
 
 export function keywordAmount(

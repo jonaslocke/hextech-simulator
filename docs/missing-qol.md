@@ -53,3 +53,4 @@
 [ ] The Candlelit Sanctum - reorder + recycle better xp
 [ ] improve token placement UI - needs image of the locations and better UX for placement.
 [ ] Force non unit gears to be placed at left of base
+[ ] Client needs a queue of intents, to no discard subsequential intents.
