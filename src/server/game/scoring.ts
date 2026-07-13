@@ -29,14 +29,16 @@ export function scoreBattlefield(
   const scored = player.scoredBattlefieldIdsThisTurn ?? [];
   if (scored.includes(battlefieldId)) return;
   player.scoredBattlefieldIdsThisTurn = [...scored, battlefieldId];
+  const conquered = player.conqueredBattlefieldIdsThisTurn ?? [];
+  const isFirstConquerThisTurn =
+    method === "conquer" && conquered.length === 0;
+  if (method === "conquer") {
+    player.conqueredBattlefieldIdsThisTurn = [...conquered, battlefieldId];
+  }
   const points = player.points ?? 0;
   const requirement = victoryRequirement(game, decks);
   const isFinalPoint = points === requirement - 1;
-  const hasScoredEveryBattlefield = game.state.battlefields.every(
-    (battlefield) =>
-      player.scoredBattlefieldIdsThisTurn!.includes(battlefield.battlefieldId),
-  );
-  if (isFinalPoint && method === "conquer" && !hasScoredEveryBattlefield) {
+  if (isFinalPoint && isFirstConquerThisTurn) {
     drawOne(game, playerId);
   } else {
     player.points = points + 1;

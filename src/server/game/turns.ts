@@ -44,6 +44,7 @@ export function applyStartOfTurn(
         candidate.conditionalEnergy = 0;
       }
       player.scoredBattlefieldIdsThisTurn = [];
+      player.conqueredBattlefieldIdsThisTurn = [];
       const controlledBattlefieldUnits = game.state.battlefields
         .flatMap((battlefield) => battlefield.units)
         .filter(

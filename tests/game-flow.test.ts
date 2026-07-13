@@ -5,6 +5,7 @@ import {
   createRuntimeCardIndex,
   gameplayActions,
   performGameplayAction,
+  scoreBattlefield,
   type GameDocument,
 } from "../src/server/game";
 import { availableAnyPowerAfterBaseCost, buildPaymentPlan } from "../src/server/game/payment";
@@ -45,6 +46,46 @@ test("generates and validates generic turn, resource, movement, and priority act
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
   assert.equal(game.state.battlefields[0]!.contestedByPlayerId, null);
   assert.equal(game.state.players.p1!.points, 1);
+});
+
+test("replaces only the first final-point Conquer of a turn with a draw", () => {
+  const { game, decks } = fixture();
+  const secondBattlefieldId = "p1:bf-two";
+  game.state.battlefields.push({
+    battlefieldId: secondBattlefieldId,
+    cardInstanceId: secondBattlefieldId,
+    selectedByPlayerId: "p1",
+    units: [],
+  });
+  decks[0]!.instances.push({
+    instanceId: secondBattlefieldId,
+    ownerPlayerId: "p1",
+    source: "battlefield",
+    cardCode: "BF",
+  });
+  game.state.cardStates[secondBattlefieldId] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.players.p1!.points = 7;
+  const handBefore = game.state.players.p1!.zones.hand.length;
+
+  scoreBattlefield(game, "p1", "p1:bf", "conquer", decks);
+
+  assert.equal(game.state.players.p1!.points, 7);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
+  assert.deepEqual(game.state.players.p1!.conqueredBattlefieldIdsThisTurn, [
+    "p1:bf",
+  ]);
+  assert.equal(game.status, "in_progress");
+
+  scoreBattlefield(game, "p1", secondBattlefieldId, "conquer", decks);
+
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
 });
 
 test("exposes a ready Legend Add ability and grants spell-only Rainbow Power", () => {
