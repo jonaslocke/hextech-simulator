@@ -4,11 +4,13 @@ import {
   cleanupBoard,
   createRuntimeCardIndex,
   gameplayActions,
+  placeUnitAtBattlefield,
   performGameplayAction,
   performGameplayTransition,
   projectGame,
   type DeckSnapshotDocument,
   type BehaviorBinding,
+  type GameCardDefinition,
   type GameDocument
 } from "../src/server/game";
 
@@ -76,6 +78,182 @@ test("keeps conquer triggers after combat resolves", () => {
 
   assert.equal(game.state.chain?.items.length, 1);
   assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "battlefield");
+});
+
+test("combat damage emits unit-damaged events for ongoing triggers", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 3 }],
+  });
+  const imperialDecree = definition(
+    "IMPERIAL_DECREE",
+    "Imperial Decree",
+    "Unit",
+    0,
+  ) as GameCardDefinition;
+  imperialDecree.card.classification.type = "Spell";
+  imperialDecree.behaviorModel.clauses = [
+    {
+      id: "kill-damaged-unit",
+      sequence: 0,
+      sourceText: "When a unit takes damage, kill it.",
+      normalizedText: "When a unit takes damage, kill it.",
+      abilities: [],
+      triggers: [{
+        behaviorId: "trigger.on_damage",
+        parameters: { subject: "any_unit" },
+        confidence: "high",
+        order: 0,
+      }],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [{
+        behaviorId: "action.kill_unit",
+        parameters: { target: "event_subject" },
+        confidence: "high",
+        order: 1,
+      }],
+      keywords: [],
+    },
+  ];
+  decks[0]!.snapshot.cards.push(imperialDecree);
+  decks[0]!.instances.push({
+    instanceId: "imperial-decree",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "IMPERIAL_DECREE",
+  });
+  initial.state.players.p1!.zones.trash.push("imperial-decree");
+  initial.state.cardStates["imperial-decree"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+    combatRole: null,
+  };
+  initial.state.ongoingEffects.push({
+    id: "imperial-decree:this-turn",
+    behaviorId: "modifier.enable_source_triggers",
+    sourceCardInstanceId: "imperial-decree",
+    controllerPlayerId: "p1",
+    targetCardInstanceIds: [],
+    duration: "thisTurn",
+    createdAtTurn: 1,
+  });
+
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.chain?.items.length, 2);
+  assert.ok(
+    game.state.chain?.items.every(
+      (item) => item.sourceCardInstanceId === "imperial-decree",
+    ),
+  );
+});
+
+test("a Reaction Unit played into combat becomes a defender before Shield is calculated", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  const shen = definition(
+    "SHEN",
+    "Shen, Kinkou",
+    "Unit",
+    3,
+    false,
+    undefined,
+    2,
+  ) as GameCardDefinition;
+  shen.card.classification.domain = ["Order"];
+  shen.behaviorModel.playTimings = [{
+    behaviorId: "timing.reaction",
+    parameters: {},
+    confidence: "high",
+    order: 0,
+  }];
+  decks[1]!.snapshot.cards.push(shen);
+  decks[1]!.instances.push({
+    instanceId: "shen",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "SHEN",
+  });
+  initial.state.players.p2!.zones.hand.push("shen");
+  initial.state.cardStates.shen = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 3,
+    combatRole: null,
+  };
+
+  const showdown = moveAttacker(initial, decks);
+  const pass = gameplayActions(showdown, "p1", decks).find(
+    (action) => action.label === "Pass focus",
+  )!;
+  const defenderFocus = performGameplayAction({
+    game: showdown,
+    actorPlayerId: "p1",
+    actionId: pass.id,
+    selectedIds: [],
+    decks,
+    now: "pass-to-defender",
+  });
+  const play = gameplayActions(defenderFocus, "p2", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "shen" &&
+      action.label.includes("Arena") &&
+      action.enabled,
+  );
+  assert.ok(play, "Reaction Unit should be playable during combat focus.");
+
+  const played = performGameplayAction({
+    game: defenderFocus,
+    actorPlayerId: "p2",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-shen-as-defender",
+  });
+
+  assert.equal(played.state.cardStates.shen?.combatRole, "defender");
+  assert.equal(played.state.cardStates.shen?.computedMight, 5);
+  assert.ok(played.state.combat?.defenderUnitIds.includes("shen"));
+});
+
+test("shared battlefield placement assigns an attacker during an active combat", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  const reinforcement = definition("REINFORCEMENT", "Reinforcement", "Unit", 3);
+  decks[0]!.snapshot.cards.push(reinforcement);
+  decks[0]!.instances.push({
+    instanceId: "reinforcement",
+    ownerPlayerId: "p1",
+    source: "token",
+    cardCode: "REINFORCEMENT",
+  });
+  initial.state.cardStates.reinforcement = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 3,
+    combatRole: null,
+  };
+
+  const game = moveAttacker(initial, decks);
+  const index = createRuntimeCardIndex(decks, game);
+  placeUnitAtBattlefield(game, {
+    battlefieldId: "battlefield",
+    controllerPlayerId: "p1",
+    unitId: "reinforcement",
+    index,
+  });
+
+  assert.equal(game.state.cardStates.reinforcement?.combatRole, "attacker");
+  assert.ok(game.state.combat?.attackerUnitIds.includes("reinforcement"));
 });
 
 test("projects a unit's temporary keyword modifier with its duration", () => {

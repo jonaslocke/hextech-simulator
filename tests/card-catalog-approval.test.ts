@@ -99,6 +99,32 @@ test("allows multiple canonical cards to reference one reusable behavior", () =>
   assert.equal(second.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
 });
 
+test("publishes a Unit Reaction as a card play timing", () => {
+  const input = createPublicationInput();
+  input.card = {
+    ...input.card,
+    classification: {
+      ...input.card.classification,
+      type: "Unit",
+      supertype: "Champion",
+    },
+  };
+  input.sourceTextHash = hashCardRulesText(input.card);
+
+  const document = buildCanonicalCardDocument(
+    input,
+    buildPrimitiveCatalog(),
+    "a",
+    "b",
+  );
+
+  assert.deepEqual(
+    document.behaviorModel.playTimings.map((binding) => binding.behaviorId),
+    ["timing.reaction"],
+  );
+  assert.deepEqual(document.behaviorModel.clauses[0]?.timings, []);
+});
+
 test("rejects unsupported and ambiguous clauses before publication", () => {
   const unsupported = structuredClone(createPublicationInput());
   unsupported.clauses[0]!.unsupportedReason = "Manual behavior is incomplete.";

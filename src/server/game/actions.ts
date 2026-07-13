@@ -13,6 +13,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  placeUnitAtBattlefield,
   recordLegionStatus,
   recomputeAllMight,
   recomputeMight,
@@ -799,8 +800,14 @@ function playCard(
     }
   }
   if (isUnit || isGear) {
-    if (destinationBattlefield) destinationBattlefield.units.push(cardId);
-    else player.zones.base.push(cardId);
+    if (destinationBattlefield) {
+      placeUnitAtBattlefield(game, {
+        battlefieldId: destinationBattlefield.battlefieldId,
+        controllerPlayerId: playerId,
+        unitId: cardId,
+        index,
+      });
+    } else player.zones.base.push(cardId);
     if (
       destinationBattlefield &&
       destinationBattlefield.controllerPlayerId == null
@@ -1277,7 +1284,12 @@ function moveUnitsToBattlefield(
     for (const origin of game.state.battlefields) {
       origin.units = origin.units.filter((id) => id !== cardId);
     }
-    battlefield.units.push(cardId);
+    placeUnitAtBattlefield(game, {
+      battlefieldId,
+      controllerPlayerId: actorPlayerId,
+      unitId: cardId,
+      index,
+    });
     game.state.cardStates[cardId]!.exhausted = true;
   }
   markBattlefieldContested(game, battlefieldId, actorPlayerId);
@@ -1740,6 +1752,7 @@ function addAbilityActions(
           playerId,
           sourceId,
           clause,
+          index,
         );
         const hasLegalTargets = canSatisfyTargetRequirements(targets);
         const enabled =
@@ -1892,7 +1905,7 @@ function executeActivatedAbility(
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
-  payActivatedAbilityCosts(game, actorPlayerId, sourceId, clause);
+  payActivatedAbilityCosts(game, actorPlayerId, sourceId, clause, index);
   const resolvesImmediately = isAddResourceAbility(binding.behaviorId);
   if (resolvesImmediately) {
     handler.execute(
@@ -1938,6 +1951,7 @@ function activatedAbilityCostStatus(
   playerId: string,
   sourceId: string,
   clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+  index: RuntimeCardIndex,
 ): { enabled: boolean; reason: string | null } {
   let energyCost = 0;
   for (const cost of clause.costs) {
@@ -1967,8 +1981,19 @@ function activatedAbilityCostStatus(
     }
     energyCost += amount;
   }
-  if (game.state.players[playerId]!.energy < energyCost) {
-    return { enabled: false, reason: "Not enough Energy." };
+  const paymentDefinition = activatedAbilityPaymentDefinition(
+    definitionForInstance(sourceId, index),
+  );
+  if (
+    buildPaymentPlan(
+      game,
+      playerId,
+      paymentDefinition,
+      energyCost,
+      index,
+    ) === null
+  ) {
+    return { enabled: false, reason: "Ability costs cannot be paid." };
   }
   return { enabled: true, reason: null };
 }
@@ -1978,19 +2003,48 @@ function payActivatedAbilityCosts(
   playerId: string,
   sourceId: string,
   clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+  index: RuntimeCardIndex,
 ) {
-  const status = activatedAbilityCostStatus(game, playerId, sourceId, clause);
+  const status = activatedAbilityCostStatus(
+    game,
+    playerId,
+    sourceId,
+    clause,
+    index,
+  );
   if (!status.enabled) throw new Error(status.reason ?? "Ability costs cannot be paid.");
 
+  const energyCost = clause.costs.reduce(
+    (total, cost) =>
+      cost.behaviorId === "cost.pay" ? total + (cost.parameters.amount as number) : total,
+    0,
+  );
+  payCardCost(
+    game,
+    playerId,
+    activatedAbilityPaymentDefinition(definitionForInstance(sourceId, index)),
+    energyCost,
+    index,
+  );
   for (const cost of clause.costs) {
     if (cost.behaviorId === "cost.exhaust_source") {
       game.state.cardStates[sourceId]!.exhausted = true;
       continue;
     }
-    if (cost.behaviorId === "cost.pay") {
-      game.state.players[playerId]!.energy -= cost.parameters.amount as number;
-    }
   }
+}
+
+function activatedAbilityPaymentDefinition(definition: GameCardDefinition) {
+  return {
+    ...definition,
+    card: {
+      ...definition.card,
+      attributes: {
+        ...definition.card.attributes,
+        power: 0,
+      },
+    },
+  };
 }
 
 function isAddResourceAbility(behaviorId: string) {

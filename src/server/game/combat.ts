@@ -240,12 +240,27 @@ function applyAssignment(
     throw new Error("Player is not a participant in this combat.");
   }
   combat.defenderAssignments = assignments;
-  for (const assignment of [
-    ...combat.attackerAssignments,
-    ...combat.defenderAssignments
-  ]) {
+  const resolvedAssignments = [
+    ...combat.attackerAssignments.map((assignment) => ({
+      ...assignment,
+      actorPlayerId: combat.attackerPlayerId,
+    })),
+    ...combat.defenderAssignments.map((assignment) => ({
+      ...assignment,
+      actorPlayerId: combat.defenderPlayerId,
+    })),
+  ];
+  for (const assignment of resolvedAssignments) {
     game.state.cardStates[assignment.targetUnitId]!.damage += assignment.amount;
   }
+  (game.state.queuedBehaviorEvents ??= []).push(
+    ...resolvedAssignments.map((assignment) => ({
+      type: "unit.damaged" as const,
+      actorPlayerId: assignment.actorPlayerId,
+      subjectCardInstanceId: assignment.targetUnitId,
+      values: { amount: assignment.amount },
+    })),
+  );
   resolveCombat(game, index, decks);
 }
 

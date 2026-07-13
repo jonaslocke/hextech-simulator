@@ -745,7 +745,14 @@ export function createPrimitiveHandlers(
         return;
       }
       player.zones.trash = player.zones.trash.filter((id) => id !== unitId);
-      if (destination) destination.units.push(unitId);
+      if (destination) {
+        placeUnitAtBattlefield(context.game, {
+          battlefieldId: destination.battlefieldId,
+          controllerPlayerId: context.controllerPlayerId,
+          unitId,
+          index,
+        });
+      }
       else player.zones.base.push(unitId);
       const state = context.game.state.cardStates[unitId];
       if (state) {
@@ -1518,7 +1525,12 @@ function playToken(
     ) {
       throw new Error("Token destination is not controlled by the player.");
     }
-    battlefield.units.push(instanceId);
+    placeUnitAtBattlefield(game, {
+      battlefieldId: battlefield.battlefieldId,
+      controllerPlayerId: input.controllerPlayerId,
+      unitId: instanceId,
+      index: input.index,
+    });
   }
   if (
     game.state.ongoingEffects.some(
@@ -1540,6 +1552,45 @@ function playToken(
       "eventSubject.effectiveEnergyCost": 0,
     },
   });
+}
+
+export function placeUnitAtBattlefield(
+  game: GameDocument,
+  input: {
+    battlefieldId: string;
+    controllerPlayerId: string;
+    unitId: string;
+    index: RuntimeCardIndex;
+  },
+) {
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === input.battlefieldId,
+  );
+  if (!battlefield) throw new Error("Unit destination is unavailable.");
+  if (!battlefield.units.includes(input.unitId)) {
+    battlefield.units.push(input.unitId);
+  }
+
+  const combat = game.state.combat;
+  if (combat?.battlefieldId === input.battlefieldId) {
+    const combatRole =
+      combat.attackerPlayerId === input.controllerPlayerId
+        ? "attacker"
+        : combat.defenderPlayerId === input.controllerPlayerId
+          ? "defender"
+          : null;
+    if (combatRole) {
+      game.state.cardStates[input.unitId]!.combatRole = combatRole;
+      const combatUnitIds =
+        combatRole === "attacker"
+          ? combat.attackerUnitIds
+          : combat.defenderUnitIds;
+      if (!combatUnitIds.includes(input.unitId)) {
+        combatUnitIds.push(input.unitId);
+      }
+    }
+  }
+  recomputeMight(game, input.unitId, input.index);
 }
 
 function tokenDefinitionForBinding(

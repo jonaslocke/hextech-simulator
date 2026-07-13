@@ -38,9 +38,9 @@ export function buildPaymentPlan(
   remainingEnergy -= pooledEnergy;
   let remainingPower =
     (definition.card.attributes.power ?? 0) + additionalDomainPower;
-  const allowedDomains = definition.card.classification.domain.filter(
-    (domain) => domain !== "Colorless",
-  );
+  const allowedDomains = definition.card.classification.domain
+    .map(normalizePowerDomain)
+    .filter((domain) => domain !== "Colorless");
   if (remainingPower > 0 && allowedDomains.length === 0) return null;
   const conditionalPowerFromPool: Record<string, number> = {};
   const powerFromPool: Record<string, number> = {};
@@ -57,25 +57,38 @@ export function buildPaymentPlan(
   }
   const powerRuneIds: string[] = [];
   const powerAbilityIds: string[] = [];
-  for (const id of player.zones.base) {
-    if (remainingPower === 0) break;
-    if (hasAbility(id, "ability.recycle_for_power", index)) {
-      const runeDomain = definitionForInstance(id, index).card.classification
-        .domain[0];
-      if (!runeDomain || !allowedDomains.includes(runeDomain)) continue;
-      powerRuneIds.push(id);
-      remainingPower -= 1;
-      continue;
-    }
+  const resourceSourceIds = controlledResourceSourceIds(game, playerId, index);
+  const consumePowerAbility = (id: string) => {
+    if (remainingPower === 0) return;
     const ability = exhaustForPowerAbility(
       id,
       game,
       definition.card.classification.type,
       index,
     );
-    if (!ability || !allowedDomains.includes(ability.domain)) continue;
+    if (!ability || !canProvidePowerFor(ability.domain, allowedDomains)) return;
     powerAbilityIds.push(id);
     remainingPower = Math.max(0, remainingPower - ability.amount);
+  };
+
+  // A reusable Add Power permanent is consumed before a recyclable Rune. That
+  // preserves Runes for their Energy option and makes payment priority depend
+  // on the resource capability, rather than a card's name or board position.
+  for (const id of resourceSourceIds) {
+    if (hasAbility(id, "ability.recycle_for_power", index)) continue;
+    consumePowerAbility(id);
+  }
+  for (const id of resourceSourceIds) {
+    if (remainingPower === 0) break;
+    if (hasAbility(id, "ability.recycle_for_power", index)) {
+      const runeDomain = definitionForInstance(id, index).card.classification
+        .domain[0];
+      if (!runeDomain || !canProvidePowerFor(runeDomain, allowedDomains)) continue;
+      powerRuneIds.push(id);
+      remainingPower -= 1;
+      continue;
+    }
+    consumePowerAbility(id);
   }
   if (remainingPower > 0) return null;
   let remainingAnyPower = additionalAnyPower;
@@ -132,7 +145,7 @@ export function buildPaymentPlan(
       generatedConditionalEnergy += unusedEnergy;
     else generatedPooledEnergy += unusedEnergy;
   };
-  for (const id of player.zones.base) {
+  for (const id of resourceSourceIds) {
     const ability = exhaustForEnergyAbility(
       id,
       definition.card.classification.type,
@@ -141,7 +154,7 @@ export function buildPaymentPlan(
     if (ability?.usage === "spellsOnly") consumeEnergySource(id);
   }
   powerRuneIds.forEach(consumeEnergySource);
-  player.zones.base.forEach(consumeEnergySource);
+  resourceSourceIds.forEach(consumeEnergySource);
   if (remainingEnergy > 0) return null;
 
   return {
@@ -360,8 +373,42 @@ function exhaustForPowerAbility(
       ) {
         continue;
       }
-      return { amount, domain };
+      const resolvedDomain =
+        domain === "sourceDomain"
+          ? definitionForInstance(id, index).card.classification.domain[0] ??
+            "Rainbow"
+          : domain;
+      return { amount, domain: normalizePowerDomain(resolvedDomain) };
     }
   }
   return null;
+}
+
+function normalizePowerDomain(domain: string) {
+  if (domain === "sourceDomain") return domain;
+  return `${domain.slice(0, 1).toUpperCase()}${domain.slice(1)}`;
+}
+
+function canProvidePowerFor(
+  providedDomain: string,
+  allowedDomains: readonly string[],
+) {
+  return providedDomain === "Rainbow" || allowedDomains.includes(providedDomain);
+}
+
+function controlledResourceSourceIds(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  return [
+    ...(player.zones.legend ? [player.zones.legend] : []),
+    ...player.zones.base,
+    ...game.state.battlefields.flatMap((battlefield) =>
+      battlefield.units.filter(
+        (id) => index.instances.get(id)?.ownerPlayerId === playerId,
+      ),
+    ),
+  ];
 }

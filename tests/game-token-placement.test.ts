@@ -438,7 +438,7 @@ test("a ready Add Power permanent can pay a matching card cost", () => {
           resourceType: "power",
           amountSource: "constant",
           amount: 1,
-          domain: "Order",
+          domain: "order",
           usage: "unrestricted",
         }),
       ],
@@ -446,19 +446,28 @@ test("a ready Add Power permanent can pay a matching card cost", () => {
     }),
   ], null);
   seal.card.classification.domain = ["Order"];
+  const orderRune = unit("ORDER_RUNE", "Order Rune", [
+    clause("recycle-for-order", {
+      abilities: [binding("ability.recycle_for_power", 0)],
+    }),
+  ]);
+  orderRune.card.classification.type = "Rune";
+  orderRune.card.classification.domain = ["Order"];
   const spell = unit("SPELL", "Order Spell");
   spell.card.classification.type = "Spell";
   spell.card.classification.domain = ["Order"];
   spell.card.attributes.power = 1;
   spell.card.attributes.energy = 0;
-  const { game, decks } = fixture([seal, spell]);
+  const { game, decks } = fixture([seal, orderRune, spell]);
   decks[0]!.instances.push(
     instance("seal", "p1", "SEAL"),
+    instance("order-rune", "p1", "ORDER_RUNE"),
     instance("spell", "p1", "SPELL"),
   );
-  game.state.players.p1!.zones.base.push("seal");
+  game.state.players.p1!.zones.base.push("order-rune", "seal");
   game.state.players.p1!.zones.hand.push("spell");
   game.state.cardStates.seal = cardState(null);
+  game.state.cardStates["order-rune"] = cardState(null);
   game.state.cardStates.spell = cardState(null);
 
   const play = gameplayActions(game, "p1", decks).find(
@@ -474,8 +483,62 @@ test("a ready Add Power permanent can pay a matching card cost", () => {
     now: "pay-with-seal",
   });
   assert.equal(played.state.cardStates.seal?.exhausted, true);
+  assert.ok(played.state.players.p1!.zones.base.includes("order-rune"));
+  assert.ok(!played.state.players.p1!.zones.runeDeck.includes("order-rune"));
   assert.equal(played.state.players.p1!.zones.hand.includes("spell"), false);
   assert.equal(played.state.chain?.items.at(-1)?.sourceCardInstanceId, "spell");
+});
+
+test("prioritizes a spell-only Rainbow Power Legend before a matching Rune", () => {
+  const daughter = unit("DAUGHTER", "Kai'Sa - Daughter of the Void", [
+    clause("add-rainbow", {
+      abilities: [
+        binding("ability.exhaust_for_resource", 0, {
+          resourceType: "power",
+          amountSource: "constant",
+          amount: 1,
+          domain: "Rainbow",
+          usage: "spellsOnly",
+        }),
+      ],
+      timings: [binding("timing.reaction", 1)],
+    }),
+  ]);
+  daughter.card.classification.type = "Legend";
+  daughter.card.classification.domain = ["Fury", "Mind"];
+  const mindRune = unit("MIND_RUNE", "Mind Rune", [
+    clause("recycle-for-mind", {
+      abilities: [binding("ability.recycle_for_power", 0)],
+    }),
+  ]);
+  mindRune.card.classification.type = "Rune";
+  mindRune.card.classification.domain = ["Mind"];
+  const spell = unit("SPELL", "Mind Spell");
+  spell.card.classification.type = "Spell";
+  spell.card.classification.domain = ["Mind"];
+  spell.card.attributes.power = 1;
+  spell.card.attributes.energy = 0;
+  const { game, decks } = fixture([daughter, mindRune, spell]);
+  decks[0]!.instances.push(
+    instance("daughter", "p1", "DAUGHTER", "legend"),
+    instance("mind-rune", "p1", "MIND_RUNE"),
+    instance("spell", "p1", "SPELL"),
+  );
+  game.state.players.p1!.zones.legend = "daughter";
+  game.state.players.p1!.zones.base.push("mind-rune");
+  game.state.cardStates.daughter = cardState(null);
+  game.state.cardStates["mind-rune"] = cardState(null);
+  game.state.cardStates.spell = cardState(null);
+
+  const index = createRuntimeCardIndex(decks, game);
+  const plan = buildPaymentPlan(game, "p1", spell, 0, index);
+
+  assert.deepEqual(plan?.powerAbilityIds, ["daughter"]);
+  assert.deepEqual(plan?.powerRuneIds, []);
+  payCardCost(game, "p1", spell, 0, index);
+  assert.equal(game.state.cardStates.daughter?.exhausted, true);
+  assert.ok(game.state.players.p1!.zones.base.includes("mind-rune"));
+  assert.ok(!game.state.players.p1!.zones.runeDeck.includes("mind-rune"));
 });
 
 test("an optional Gear kill can target either player's Gear and still draws", () => {
@@ -639,6 +702,74 @@ test("activated abilities pay Energy and exhaust their source before resolving",
   assert.equal(activated.state.players.p1!.energy, 0);
   assert.equal(activated.state.cardStates.source?.exhausted, true);
   assert.equal(activated.state.chain?.items[0]?.kind, "activatedAbility");
+});
+
+test("activated abilities can automatically pay Energy with ready Runes", () => {
+  const herald = unit("HERALD", "Herald of the Arcane", [
+    clause("recruit", {
+      costs: [
+        binding("cost.pay", 0, { amount: 1, resource: "energy" }),
+        binding("cost.exhaust_source", 1),
+      ],
+      abilities: [binding("ability.play_token", 2, {
+        tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+        tokenName: "Recruit",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  herald.card.classification.type = "Legend";
+  const rune = unit("RUNE", "Energy Rune", [
+    clause("add-energy", {
+      abilities: [binding("ability.exhaust_for_resource", 0, {
+        resourceType: "energy",
+        amountSource: "constant",
+        amount: 1,
+        usage: "unrestricted",
+      })],
+    }),
+  ]);
+  rune.card.classification.type = "Rune";
+  const { game, decks } = fixture([herald, rune]);
+  decks[0]!.instances.push(
+    instance("herald", "p1", "HERALD", "legend"),
+    instance("rune", "p1", "RUNE"),
+  );
+  game.state.players.p1!.zones.legend = "herald";
+  game.state.players.p1!.zones.base.push("rune");
+  game.state.cardStates.herald = cardState(null);
+  game.state.cardStates.rune = cardState(null);
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "herald",
+  );
+  assert.ok(activate?.enabled);
+  const activated = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: [],
+    decks,
+    now: "activate-herald-with-rune",
+  });
+  assert.equal(activated.state.cardStates.herald?.exhausted, true);
+  assert.equal(activated.state.cardStates.rune?.exhausted, true);
+  assert.equal(activated.state.players.p1!.energy, 0);
+});
+
+test("Awakening readies the active player's Legend", () => {
+  const legend = unit("LEGEND", "Awakening Legend");
+  legend.card.classification.type = "Legend";
+  const { game, decks } = fixture([legend]);
+  decks[0]!.instances.push(instance("legend", "p1", "LEGEND", "legend"));
+  game.state.players.p1!.zones.legend = "legend";
+  game.state.cardStates.legend = cardState(null, true);
+  game.state.turn = { turnNumber: 2, activePlayerId: "p1", phase: "awaken" };
+
+  applyStartOfTurn(game, decks);
+
+  assert.equal(game.state.cardStates.legend?.exhausted, false);
 });
 
 test("own-death triggers resolve after their source leaves play", () => {

@@ -183,6 +183,12 @@ export function buildCanonicalCardDocument(
       effects: [],
       keywords: []
     };
+    const isUnitPlayTimingClause =
+      card.classification.type === "Unit" &&
+      !clause.assignments.some(
+        (assignment) =>
+          assignment.family === "ability" || assignment.family === "trigger",
+      );
 
     clause.assignments.forEach((assignment, order) => {
       const behavior = catalogById.get(assignment.primitiveId);
@@ -236,7 +242,7 @@ export function buildCanonicalCardDocument(
       runtimeSupportStatuses.push(behavior.engineSupport.status);
 
       if (
-        card.classification.type === "Spell" &&
+        (card.classification.type === "Spell" || isUnitPlayTimingClause) &&
         (assignment.primitiveId === "timing.action" ||
           assignment.primitiveId === "timing.reaction")
       ) {

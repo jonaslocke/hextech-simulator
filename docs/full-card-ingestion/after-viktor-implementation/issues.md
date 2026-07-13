@@ -15,3 +15,8 @@ error @ intercept-console-error.js:57" ![alt text](image-16.png)
 [ ] Facebreaker - went into stack with asking for targets. selector shows up to times, one for friendly another for enemy units right after resolution, it should appear before. ![alt text](image-18.png)
 [ ] Stunned tag should show on card preview as well. ![alt text](image-19.png)
 [ ] Vengence - Projection shows it as not playable. ![alt text](image-20.png)
+[ ] Shen Kinkou - coming into BF as a reaction shield keyword did not works. ![alt text](image-21.png)
+[ ] Legion - Playing the choosen champion do not counted to legion. played viktor leader, then Vanguard Captain, no legion trigger. ![alt text](image-22.png)
+[ ] Herald of the Arcane - wrong implementation of the verb play a unit, play a unit means that it can be placed in any location of the owner of the source, it means always base and any other BF controlled by him. currently his ability place the token on the base always. ![alt text](image-23.png)
+[ ] Moving unit to a BF - later implementations made a regression on this, I can click the same unit N times to send it to BF, the expected behavior would be to click once to add, click the second time to remove it if there's at least one other unit for attack. ![alt text](image-26.png)
+[ ] Cull the week - Playing cull the weak when player do not have any units but opponent does, spell resolves without asking opponent to kill one unit.

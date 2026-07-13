@@ -2,7 +2,7 @@
 
 import { CardRulesText } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
-import cardBackImage from "../../../assets/cardback.jpg";
+import cardBackImage from "../../../../assets/cardback.jpg";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Info } from "lucide-react";
 import { motion } from "motion/react";

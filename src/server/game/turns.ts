@@ -52,6 +52,7 @@ export function applyStartOfTurn(
             turn.activePlayerId,
         );
       for (const cardId of [
+        ...(player.zones.legend ? [player.zones.legend] : []),
         ...player.zones.base,
         ...controlledBattlefieldUnits,
       ]) {
