@@ -186,6 +186,21 @@ export function targetSelectionCanAdd(
   );
 }
 
+export function toggleMovementSelection(
+  selectedIds: readonly string[],
+  candidateId: string,
+  minimum: number,
+): string[] {
+  const uniqueSelectedIds = [...new Set(selectedIds)];
+  if (!uniqueSelectedIds.includes(candidateId)) {
+    return [...uniqueSelectedIds, candidateId];
+  }
+  if (uniqueSelectedIds.length <= minimum) {
+    return uniqueSelectedIds;
+  }
+  return uniqueSelectedIds.filter((id) => id !== candidateId);
+}
+
 function requirementsShareLegalTargets(requirements: ProjectedAction["targets"]) {
   const first = requirements[0]?.legalIds;
   return Boolean(first) && requirements.every(

@@ -13,6 +13,7 @@ import {
 } from "./numeric-modifiers";
 import { numericConditionMatches } from "./numeric-condition";
 import { getTokenCatalogDefinitions } from "./token-catalog";
+import { legalUnitDestinationIds } from "./unit-destinations";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -659,8 +660,13 @@ export function createPrimitiveHandlers(
         return null;
       }
       const definition = tokenDefinitionForBinding(binding, index);
-      const destinations = tokenPlacementDestinations(context.game, context.controllerPlayerId, index);
-      return destinations.length > 0
+      const destinations = unitPlacementDestinations(
+        context.game,
+        context.controllerPlayerId,
+        definition,
+        index,
+      );
+      return destinations.length > 1
         ? {
             kind: "tokenPlacement" as const,
             legalIds: destinations.map((destination) => destination.id),
@@ -677,7 +683,16 @@ export function createPrimitiveHandlers(
       const tokenCardCode = stringParam(binding, "tokenCardCode");
       const placements =
         binding.parameters.placement === "chooseBaseOrControlledBattlefield"
-          ? selectedTokenDestinations(context, count)
+          ? selectedTokenDestinations(
+              context,
+              count,
+              unitPlacementDestinations(
+                context.game,
+                context.controllerPlayerId,
+                tokenDefinitionForBinding(binding, index),
+                index,
+              ),
+            )
           : Array.from({ length: count }, () =>
               fixedTokenDestination(binding, context),
             );
@@ -1437,26 +1452,36 @@ function implicitModifierTargets(
     });
 }
 
-function tokenPlacementDestinations(
+function unitPlacementDestinations(
   game: GameDocument,
   controllerPlayerId: string,
+  definition: GameCardDefinition,
   index: RuntimeCardIndex,
 ) {
-  return [
-    { id: "base", label: "Base" },
-    ...game.state.battlefields
-      .filter((battlefield) => battlefield.controllerPlayerId === controllerPlayerId)
-      .map((battlefield) => ({
-        id: battlefield.battlefieldId,
-        label: definitionForInstance(battlefield.cardInstanceId, index).card.name,
-      })),
-  ];
+  return legalUnitDestinationIds(game, controllerPlayerId, definition).map(
+    (destinationId) => {
+      if (destinationId === "base") return { id: destinationId, label: "Base" };
+      const battlefield = game.state.battlefields.find(
+        (candidate) => candidate.battlefieldId === destinationId,
+      );
+      return {
+        id: destinationId,
+        label: battlefield
+          ? definitionForInstance(battlefield.cardInstanceId, index).card.name
+          : destinationId,
+      };
+    },
+  );
 }
 
 function selectedTokenDestinations(
   context: BehaviorExecutionContext,
   count: number,
+  legalDestinations: readonly { id: string }[],
 ) {
+  if (legalDestinations.length === 1) {
+    return Array.from({ length: count }, () => legalDestinations[0]!.id);
+  }
   if (context.selectedIds.length < count) {
     throw new Error("Token placement count does not match token count.");
   }

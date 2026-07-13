@@ -284,6 +284,7 @@ export const gameStateSchema = z.object({
       nextEffectIndex: z.number().int().nonnegative(),
       delayedEffectId: z.string().min(1).nullable(),
       endingPlayerId: z.string().min(1).nullable(),
+      activatedBehaviorId: z.string().min(1).nullable().optional(),
       initialSelectedIds: z.array(z.string()).default([]),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),

@@ -23,6 +23,7 @@ export function beginEffectResolution(input: {
   controllerPlayerId: string;
   sourceCardInstanceId: string;
   clauseId: string;
+  activatedBehaviorId?: string | null;
   delayedEffectId?: string;
   endingPlayerId?: string;
   selectedIds?: string[];
@@ -39,6 +40,7 @@ export function beginEffectResolution(input: {
     nextEffectIndex: 0,
     delayedEffectId: input.delayedEffectId ?? null,
     endingPlayerId: input.endingPlayerId ?? null,
+    activatedBehaviorId: input.activatedBehaviorId ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
@@ -216,8 +218,17 @@ export function resumeEffectResolution(
       throw new Error(`Locked selector was not initialized: ${bindingKey}`);
     }
     if (requirement.legalIds.length < requirement.minimum) {
-      finishResolutionFrame(game, frame.id, frame.delayedEffectId);
-      return true;
+      // An instruction that cannot be carried out is skipped, but later
+      // selectors in the same effect may still be possible (for example,
+      // each player choosing one of their own Units). Record the empty
+      // selection so this selector is not reconsidered when resolution
+      // resumes after a later player's choice.
+      frame.selectionsByBinding[bindingKey] = [];
+      selectorContext.selectedBySelector[bindingKey] = [];
+      if (typeof binding.parameters.selectionKey === "string") {
+        selectorContext.selectedBySelector[binding.parameters.selectionKey] = [];
+      }
+      continue;
     }
     game.state.pendingChoice = {
       id: `choice:${frame.id}:${binding.order}`,
@@ -241,6 +252,103 @@ export function resumeEffectResolution(
       targetRequirements: [requirement],
     };
     return false;
+  }
+
+  if (frame.activatedBehaviorId) {
+    const binding = clause.abilities.find(
+      (candidate) => candidate.behaviorId === frame.activatedBehaviorId,
+    );
+    const handler = binding ? handlers.get(binding.behaviorId) : null;
+    if (!binding || !handler?.execute) {
+      throw new Error("Activated ability is unavailable during resolution.");
+    }
+    const bindingKey = `${clause.id}:abilities:${binding.order}`;
+    const selectorSelections = clause.selectors.flatMap(
+      (selector) =>
+        frame.selectionsByBinding[
+          `${clause.id}:selectors:${selector.order}`
+        ] ?? [],
+    );
+    const context = createBehaviorContext(
+      game,
+      frame.controllerPlayerId,
+      frame.sourceCardInstanceId,
+      frame.behaviorEvent,
+      [
+        ...new Set([
+          ...frame.initialSelectedIds,
+          ...selectorSelections,
+          ...(frame.selectionsByBinding[bindingKey] ?? []),
+        ]),
+      ],
+      clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
+        ? { automaticTargets: true }
+        : {},
+    );
+    for (const selector of clause.selectors) {
+      const selected =
+        frame.selectionsByBinding[
+          `${clause.id}:selectors:${selector.order}`
+        ] ?? [];
+      context.selectedBySelector[`${clause.id}:selectors:${selector.order}`] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+    }
+    const requirement = handler.choice?.(binding, context) ?? null;
+    if (requirement && !frame.selectionsByBinding[bindingKey]) {
+      if (requirement.kind === "tokenPlacement") {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "tokenPlacement",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          tokenName: requirement.tokenName ?? "Token",
+          count: requirement.maximum,
+          legalDestinationIds: requirement.legalIds,
+          destinationLabels: Object.fromEntries(
+            (requirement.destinations ?? []).map((destination) => [
+              destination.id,
+              destination.label,
+            ]),
+          ),
+        };
+        return false;
+      }
+      if (requirement.kind === "binary") {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "binary",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          acceptLabel: requirement.acceptLabel ?? "Accept",
+          declineLabel: requirement.declineLabel ?? "Decline",
+        };
+        return false;
+      }
+      game.state.pendingChoice = {
+        id: `choice:${frame.id}:${binding.order}`,
+        playerId: frame.controllerPlayerId,
+        type: "effectSelection",
+        resolutionId: frame.id,
+        bindingKey,
+        prompt: requirement.prompt,
+        optionKind: requirement.kind === "battlefield" ? "battlefield" : "card",
+        sourceZone: requirement.sourceZone ?? null,
+        presentation: requirement.presentation ?? "cardSelection",
+        legalCardIds: requirement.legalIds,
+        minimum: requirement.minimum,
+        maximum: requirement.maximum,
+      };
+      return false;
+    }
+    handler.execute(binding, context);
+    finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+    return true;
   }
 
   for (const binding of clause.choices as import("./schemas").BehaviorBinding[]) {

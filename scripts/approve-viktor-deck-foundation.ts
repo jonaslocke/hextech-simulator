@@ -123,7 +123,7 @@ const MODELS: Record<string, Assignment[]> = {
   "OGN-265": [
     { family: "cost", primitiveId: "cost.pay", parameters: { amount: 1, resource: "energy" } },
     { family: "cost", primitiveId: "cost.exhaust_source", parameters: {} },
-    { family: "ability", primitiveId: "ability.play_token", parameters: { tokenCardCode: RECRUIT_TOKEN_CARD_CODE, tokenName: RECRUIT_TOKEN, count: 1, placement: "base" } },
+    { family: "ability", primitiveId: "ability.play_token", parameters: { tokenCardCode: RECRUIT_TOKEN_CARD_CODE, tokenName: RECRUIT_TOKEN, count: 1, placement: "chooseBaseOrControlledBattlefield" } },
   ],
   "OGN-284": [
     { family: "trigger", primitiveId: "trigger.first_beginning", parameters: {} },

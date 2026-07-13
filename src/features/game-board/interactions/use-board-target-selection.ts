@@ -11,6 +11,7 @@ import {
   activeTargetRequirement,
   targetSelectionCanAdd,
   targetSelectionIsLegal,
+  toggleMovementSelection,
   type CombinedTargetRequirement,
 } from "../model";
 import type { Card } from "../types";
@@ -186,7 +187,14 @@ export function useBoardTargetSelection({
         return;
       }
 
-      if (
+      const selectedTargetIds = targetSelection.purpose === "move"
+        ? toggleMovementSelection(
+            targetSelection.selectedTargetIds,
+            cardInstanceId,
+            targetSelection.minTargets,
+          )
+        : null;
+      if (selectedTargetIds === null &&
         !targetSelectionCanAdd(
           targetSelection.requirement,
           targetSelection.selectedTargetIds,
@@ -195,17 +203,17 @@ export function useBoardTargetSelection({
       ) {
         return;
       }
-      const selectedTargetIds = [
+      const nextSelectedTargetIds = selectedTargetIds ?? [
         ...targetSelection.selectedTargetIds,
         cardInstanceId,
       ];
       const nextSelection = {
         ...targetSelection,
-        selectedTargetIds,
+        selectedTargetIds: nextSelectedTargetIds,
         legalTargetIds:
           activeTargetRequirement(
             targetSelection.requirement,
-            selectedTargetIds,
+            nextSelectedTargetIds,
           )?.legalIds ?? [],
       };
 
@@ -214,9 +222,9 @@ export function useBoardTargetSelection({
       if (
         nextSelection.purpose === "play" &&
         nextSelection.minTargets === nextSelection.maxTargets &&
-        selectedTargetIds.length === nextSelection.maxTargets &&
-        targetSelectionIsLegal(nextSelection.requirement, selectedTargetIds) &&
-        additionalPowerForTargets(targetSelectionAction, selectedTargetIds) ===
+        nextSelectedTargetIds.length === nextSelection.maxTargets &&
+        targetSelectionIsLegal(nextSelection.requirement, nextSelectedTargetIds) &&
+        additionalPowerForTargets(targetSelectionAction, nextSelectedTargetIds) ===
           0
       ) {
         submitTargetedPlay(nextSelection);

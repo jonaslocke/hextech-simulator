@@ -927,25 +927,27 @@ function passPriority(
             definition.behaviorModel,
             handlers,
           ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
-          const binding = clause?.abilities.find(
-            (candidate) => candidate.behaviorId === item.activatedBehaviorId,
-          );
-          const handler = binding ? handlers.get(binding.behaviorId) : null;
-          if (!clause || !binding || !handler?.execute) {
+          if (!clause) {
             throw new Error(
               "Activated ability is unavailable during resolution.",
             );
           }
-          handler.execute(
-            binding,
-            createBehaviorContext(
+          beginEffectResolution({
+            game,
+            controllerPlayerId: controller,
+            sourceCardInstanceId: item.sourceCardInstanceId,
+            clauseId: clause.id,
+            activatedBehaviorId: item.activatedBehaviorId,
+            selectedIds: validLockedTargets(
               game,
+              clause,
+              item,
               controller,
-              item.sourceCardInstanceId,
-              null,
-              validLockedTargets(game, clause, item, controller, handlers),
+              handlers,
             ),
-          );
+            targetsLocked: true,
+            decks,
+          });
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(
             definition.behaviorModel,
@@ -2366,10 +2368,12 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     (sum, target) => sum + target.maximum,
     0,
   );
+  const actionKind = action.id.split(":")[3];
   if (
     selectedIds.length < minimum ||
     selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id))
+    selectedIds.some((id) => !legal.has(id)) ||
+    (actionKind === "moveMany" && new Set(selectedIds).size !== selectedIds.length)
   ) {
     throw new Error("Selected targets are not legal for this action.");
   }

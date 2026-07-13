@@ -10,7 +10,8 @@ import {
   showdownPromptState,
   simultaneousMoveAction,
   targetSelectionCanAdd,
-  targetSelectionIsLegal
+  targetSelectionIsLegal,
+  toggleMovementSelection,
 } from "../src/features/game-board/model";
 import { responsiveCardHeight } from "../src/features/game-board/card-sizing";
 import type { ProjectedAction } from "../src/shared/game";
@@ -273,6 +274,26 @@ test("stages a single-unit move through the simultaneous move action", () => {
       units: [{}]
     }]),
     "Move units to The Papertree"
+  );
+});
+
+test("movement selections toggle unique Units while preserving the minimum", () => {
+  assert.deepEqual(toggleMovementSelection([], "unit-a", 1), ["unit-a"]);
+  assert.deepEqual(
+    toggleMovementSelection(["unit-a"], "unit-a", 1),
+    ["unit-a"],
+  );
+  assert.deepEqual(
+    toggleMovementSelection(["unit-a"], "unit-b", 1),
+    ["unit-a", "unit-b"],
+  );
+  assert.deepEqual(
+    toggleMovementSelection(["unit-a", "unit-b"], "unit-a", 1),
+    ["unit-b"],
+  );
+  assert.deepEqual(
+    toggleMovementSelection(["unit-a", "unit-a"], "unit-a", 1),
+    ["unit-a"],
   );
 });
 

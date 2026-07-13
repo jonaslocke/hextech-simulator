@@ -758,6 +758,120 @@ test("activated abilities can automatically pay Energy with ready Runes", () => 
   assert.equal(activated.state.players.p1!.energy, 0);
 });
 
+test("activated effects that play a Unit choose from normal controlled destinations", () => {
+  const herald = unit("HERALD", "Herald of the Arcane", [
+    clause("recruit", {
+      abilities: [binding("ability.play_token", 0, {
+        tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+        tokenName: "Recruit",
+        count: 1,
+        placement: "chooseBaseOrControlledBattlefield",
+      })],
+    }),
+  ]);
+  herald.card.classification.type = "Legend";
+  const { game, decks } = fixture([herald, battlefield("BF", "Arcane Arena")]);
+  decks[0]!.instances.push(
+    instance("herald", "p1", "HERALD", "legend"),
+    instance("bf-card", "p1", "BF", "battlefield"),
+  );
+  game.state.players.p1!.zones.legend = "herald";
+  game.state.cardStates.herald = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+  game.state.cardStates["bf-card"] = cardState(null);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "herald",
+    clauseId: "recruit",
+    activatedBehaviorId: "ability.play_token",
+    targetsLocked: true,
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "tokenPlacement");
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "tokenPlacement"
+      ? game.state.pendingChoice.legalDestinationIds
+      : [],
+    ["base", "bf"],
+  );
+
+  submitTokenPlacement(game, "p1", [{ destinationId: "bf", count: 1 }], decks);
+  assert.equal(game.state.battlefields[0]!.units.length, 1);
+  assert.equal(game.state.players.p1!.zones.base.length, 0);
+});
+
+test("effects that play a Unit use Base automatically when it is the only legal destination", () => {
+  const source = unit("SOURCE", "Recruit Source", [
+    clause("recruit", {
+      effects: [binding("action.play_token", 0, {
+        tokenCardCode: RECRUIT_TOKEN_CARD_CODE,
+        tokenName: "Recruit",
+        count: 1,
+        placement: "chooseBaseOrControlledBattlefield",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "recruit",
+    decks,
+  }), true);
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.players.p1!.zones.base.length, 2);
+});
+
+test("move-many rejects duplicate Unit instances even when a forged payload is submitted", () => {
+  const mover = unit("MOVER", "Mover");
+  const { game, decks } = fixture([mover, battlefield("BF", "Movement Arena")]);
+  decks[0]!.instances.push(
+    instance("mover-a", "p1", "MOVER"),
+    instance("mover-b", "p1", "MOVER"),
+    instance("bf-card", "p1", "BF", "battlefield"),
+  );
+  game.state.players.p1!.zones.base.push("mover-a", "mover-b");
+  game.state.cardStates["mover-a"] = cardState(1);
+  game.state.cardStates["mover-b"] = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "bf",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+
+  const moveMany = gameplayActions(game, "p1", decks).find((action) =>
+    action.id.split(":")[3] === "moveMany",
+  );
+  assert.ok(moveMany);
+  assert.throws(
+    () => performGameplayAction({
+      game,
+      actorPlayerId: "p1",
+      actionId: moveMany.id,
+      selectedIds: ["mover-a", "mover-a"],
+      decks,
+      now: "reject-duplicate-move",
+    }),
+    /Selected targets are not legal/,
+  );
+});
+
 test("Awakening readies the active player's Legend", () => {
   const legend = unit("LEGEND", "Awakening Legend");
   legend.card.classification.type = "Legend";
@@ -1411,6 +1525,60 @@ test("each player can make their own deferred unit selection before both units a
 
   submitEffectSelection(game, "p2", ["opponent-unit"], decks);
   assert.equal(game.state.players.p1!.zones.trash.includes("controller-unit"), true);
+  assert.equal(game.state.players.p2!.zones.trash.includes("opponent-unit"), true);
+});
+
+test("an impossible deferred selector does not prevent another player from choosing", () => {
+  const cullTheWeak = unit("CULL_THE_WEAK", "Cull the Weak", [
+    clause("cull", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "controllerUnit",
+          selectionPlayer: "controller",
+        }),
+        binding("selector.enemy_unit", 1, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          selectionKey: "opponentUnit",
+          selectionPlayer: "opponent",
+        }),
+      ],
+      effects: [binding("action.kill_unit", 2, { target: "unit" })],
+    }),
+  ]);
+  cullTheWeak.card.classification.type = "Spell";
+  const { game, decks } = fixture([
+    cullTheWeak,
+    unit("OPPONENT_UNIT", "Opponent unit"),
+  ]);
+  decks[0]!.instances.push(instance("cull", "p1", "CULL_THE_WEAK"));
+  decks[1]!.instances.push(instance("opponent-unit", "p2", "OPPONENT_UNIT"));
+  game.state.players.p2!.zones.base.push("opponent-unit");
+  game.state.cardStates.cull = cardState(null);
+  game.state.cardStates["opponent-unit"] = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "cull",
+    clauseId: "cull",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.playerId, "p2");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected the opponent's unit choice.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["opponent-unit"]);
+
+  submitEffectSelection(game, "p2", ["opponent-unit"], decks);
   assert.equal(game.state.players.p2!.zones.trash.includes("opponent-unit"), true);
 });
 
