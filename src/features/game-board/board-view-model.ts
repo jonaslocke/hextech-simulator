@@ -130,6 +130,7 @@ export type BoardProjection = {
         title: string;
         waitingMessage: string;
         tokenName: string;
+        placementKind?: "token" | "unit";
         count: number;
         destinations: Array<{ id: string; label: string }>;
       }

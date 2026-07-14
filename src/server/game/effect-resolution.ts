@@ -308,6 +308,7 @@ export function resumeEffectResolution(
           bindingKey,
           prompt: requirement.prompt,
           tokenName: requirement.tokenName ?? "Token",
+          placementKind: requirement.placementKind ?? "token",
           count: requirement.maximum,
           legalDestinationIds: requirement.legalIds,
           destinationLabels: Object.fromEntries(
@@ -429,6 +430,7 @@ export function resumeEffectResolution(
           bindingKey,
           prompt: requirement.prompt,
           tokenName: requirement.tokenName ?? "Token",
+          placementKind: requirement.placementKind ?? "token",
           count: requirement.maximum,
           legalDestinationIds: requirement.legalIds,
           destinationLabels: Object.fromEntries(

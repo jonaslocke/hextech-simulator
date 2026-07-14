@@ -193,9 +193,10 @@ export function buildPlayerDecisionRequest({
       );
 
       if (action?.choice?.kind === "tokenPlacement") {
+        const isUnitPlacement = pendingChoice.placementKind === "unit";
         return {
           actionId: action.id,
-          confirmLabel: "Place tokens",
+          confirmLabel: isUnitPlacement ? "Play selected Unit" : "Place tokens",
           count: pendingChoice.count,
           decisionKey: createDecisionKey({
             actorPlayerId: pendingChoice.playerId,
@@ -211,6 +212,7 @@ export function buildPlayerDecisionRequest({
           description: pendingChoice.prompt,
           destinations: pendingChoice.destinations,
           kind: "tokenPlacement",
+          placementKind: pendingChoice.placementKind,
           title: pendingChoice.title,
           tokenName: pendingChoice.tokenName,
         };

@@ -1,6 +1,6 @@
 # Full Card Ingestion Tracking
 
-Snapshot: 2026-07-11
+Snapshot: 2026-07-13
 
 This file is the active tracking baseline for the full-card ingestion program.
 It follows `docs/full-card-ingestion/plan.md` and records the current milestone
@@ -12,7 +12,7 @@ gate without treating implementation checks as final user acceptance.
 |---|---|---|---|---|---|
 | M0 | Operating model and tracking baseline | Accepted | None | Open M1 | Accepted |
 | M1 | Garen Proving Grounds deck | Accepted | None | Open M2 | Accepted |
-| M2 | Origins full set | Primitive implementation in progress | Remaining corpus family review and manual family gates | Validate the top-deck inspection family, then continue by behavior family | Pending |
+| M2 | Origins full set | Primitive implementation in progress | Remaining OGN behavior families are still unclassified or unimplemented | Continue with the next approved M2 behavior family | Top-deck and effect-driven Trash-play families passed; full M2 pending |
 | M3 | Spiritforged full set | Not started | Need two user-provided Spiritforged decks under `docs/full-ingestion-decks/SFD/` | Wait for inputs after M2 acceptance | Pending |
 | M4 | Unleashed full set | Not started | Need two user-provided Unleashed decks under `docs/full-ingestion-decks/UNL/` | Wait for inputs after M3 acceptance | Pending |
 | M5 | Vendetta full set | Not started | Final `VEN` JSON is not present in `data/sets`; need two user-provided Vendetta decks | Wait for final data after M4 acceptance | Pending |
@@ -73,7 +73,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
 | `action.recycle_cards` | OGN M2 | Vi, Destructive and other recycle cards | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Recycle selected card from trash | Exact recycle cost/card models remain unapproved |
-| `action.take_to_hand` | OGN M2 | Stacked Deck | Covered by rules reference | Executable | `tests/game-zone-effects.test.ts` | Choose one card from the original private look group and move it to hand | First use is ready for manual validation |
+| `action.take_to_hand` | OGN M2 | Stacked Deck | Covered by rules reference | Executable | `tests/game-zone-effects.test.ts` | Choose one card from the original private look group and move it to hand | First use manually passed on 2026-07-13 |
+| `action.play_selected_unit` cost mode | OGN M2 | Soulgorger, The Harrowing | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Play a selected locked Trash Unit while paying only its Power cost | Effect-driven Trash-play family manually passed on 2026-07-14 |
 | `action.move_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move unit to base | None |
 | `action.play_token` | Garen M1 | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Fixed and chosen Recruit token placement | None |
 | `modifier.modify_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Apply numeric modifier | None |
@@ -100,7 +101,11 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
 | OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12; associated manual-test issues are closed in the resolution ledger. |
 | OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | `approve-viktor-deck-foundation` published all exact Viktor models | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13; follow-on Hidden work is tracked separately in the facedown plan. |
-| OGN | OGN-183 | Stacked Deck | Spell | 1 | `timing.action`, `action.look`, `action.take_to_hand`, `action.recycle_top_cards` | Yes | Not yet | Published as one sequential runtime clause after fixing the observed no-op; awaiting the top-deck family manual gate. |
+| OGN | OGN-183 | Stacked Deck | Spell | 1 | `timing.action`, `action.look`, `action.take_to_hand`, `action.recycle_top_cards` | Yes | Yes | Published as one sequential runtime clause after fixing the observed no-op; passed the top-deck family manual gate on 2026-07-13. |
+| OGN | OGN-165 | Cemetery Attendant | Unit | 1 | `trigger.on_play`, `selector.card`, `action.return_to_hand` | Yes | Yes | Public-Trash target lock passed with the effect-driven recovery/play family on 2026-07-14. |
+| OGN | OGN-170 | Morbid Return | Spell | 1 | `timing.action`, `selector.card`, `action.return_to_hand` | Yes | Yes | Public-Trash target lock passed with the effect-driven recovery/play family on 2026-07-14. |
+| OGN | OGN-196 | Soulgorger | Unit | 1 | `trigger.on_play`, `selector.card`, `action.play_selected_unit` | Yes | Yes | Locked target and Power-only nested play passed on 2026-07-14. |
+| OGN | OGN-198 | The Harrowing | Spell | 1 | `selector.card`, `action.play_selected_unit` | Yes | Yes | Locked target and Power-only nested play passed on 2026-07-14. |
 
 ## Token Coverage Ledger
 
@@ -120,7 +125,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | OGS/OGN/SFD | `data/decks/garen.dec.txt` | `garen` | Construction valid against full local set data; code-level runtime-catalog snapshot valid | Yes | Yes | Manual validation accepted | M1 manual defects fixed and accepted | Yes |
 | OGN | `data/decks/kaisa.dec.txt` | `kaisa` | Yes | Yes | Automated catalog snapshot succeeds | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12 | Yes |
 | OGN | `data/decks/viktor.dec.txt` | `viktor` | Valid against the full local source catalog | Yes | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13 | Yes |
-| OGN | `data/decks/annie-stacked-deck.dec.txt` | `annie-stacked-deck` | Yes | Yes | Yes | Not yet | Manual validation deck for Stacked Deck and Candlelit Sanctum | No |
+| OGN | `data/decks/annie-stacked-deck.dec.txt` | `annie-stacked-deck` | Yes | Yes | Yes | Yes | Manual validation deck for Stacked Deck and Candlelit Sanctum | Yes |
 | SFD | `docs/full-ingestion-decks/SFD/` | TBD | No | No | No | No | Deck files not provided | No |
 | UNL | `docs/full-ingestion-decks/UNL/` | TBD | No | No | No | No | Deck files not provided | No |
 | VEN | `docs/full-ingestion-decks/VEN/` | TBD | No | No | No | No | Final JSON and deck files not provided | No |
@@ -145,6 +150,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | M2 foundation | Garen shared-choice regression | Target selection, choice flow, and Recruit placement after the binary-choice extension | Passed | User manually confirmed the focused shared-contract regression pass | Yes |
 | M2 | Kai'Sa full deck validation | Full Kai'Sa deck gameplay and all recorded manual-test scenarios | Accepted | User accepted the completed Kai'Sa validation on 2026-07-12; see the Kai'Sa resolution ledger | Yes |
 | M2 | Viktor full deck validation | Full Viktor deck gameplay and all recorded manual-test scenarios | Accepted | User accepted the completed Viktor validation on 2026-07-13; see the Viktor resolution ledger | Yes |
+| M2 | Top-deck inspection family | Stacked Deck keep-one/recycle-rest flow; Candlelit Sanctum focused regression | Passed | User passed the manual family gate on 2026-07-13 | Yes |
+| M2 | Effect-driven Trash recovery/play family | Cemetery Attendant, Morbid Return, Soulgorger, The Harrowing, and Spectral Matron public-Trash targeting | Passed | User passed the locked-target timing and nested Unit-play flow in a new match on 2026-07-14 | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |

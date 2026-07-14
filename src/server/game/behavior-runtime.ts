@@ -34,6 +34,7 @@ export type BehaviorHandler = {
     maximum: number;
     prompt: string;
     tokenName?: string;
+    placementKind?: "token" | "unit";
     destinations?: Array<{ id: string; label: string }>;
     sourceZone?: "hand" | "trash" | "mainDeck";
     presentation?: "cardSelection" | "vision";

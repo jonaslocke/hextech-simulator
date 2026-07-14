@@ -74,6 +74,7 @@ export const projectedActionSchema = z.object({
         choiceId: z.string().min(1),
         prompt: z.string().min(1),
         tokenName: z.string().min(1),
+        placementKind: z.enum(["token", "unit"]).optional(),
         count: z.number().int().positive(),
         destinations: z.array(
           z.object({
@@ -160,6 +161,7 @@ export const deckIdSchema = z.enum([
   "master-yi-s",
   "garen-s",
   "annie-stacked-deck",
+  "annie-harrowing",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
@@ -355,6 +357,7 @@ export const gameProjectionSchema = z.object({
         title: z.string().min(1),
         waitingMessage: z.string().min(1),
         tokenName: z.string().min(1),
+        placementKind: z.enum(["token", "unit"]).optional(),
         count: z.number().int().positive(),
         destinations: z.array(
           z.object({

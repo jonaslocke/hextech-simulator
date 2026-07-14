@@ -46,7 +46,7 @@ const MODELS: Record<string, Assignment[]> = {
   "OGN-221": [],
   "OGN-226": [
     { family: "trigger", primitiveId: "trigger.on_play", parameters: { actor: "controller", subject: "source" } },
-    { family: "selector", primitiveId: "selector.card", parameters: { zone: "trash", cardType: "Unit", owner: "controller", minimumCount: 0, maximumCount: 1, maximumEnergy: 3, maximumPower: 1, deferred: true, selectionKey: "unitToPlay" } },
+    { family: "selector", primitiveId: "selector.card", parameters: { zone: "trash", cardType: "Unit", owner: "controller", minimumCount: 0, maximumCount: 1, maximumEnergy: 3, maximumPower: 1, selectionKey: "unitToPlay" } },
     { family: "action", primitiveId: "action.play_selected_unit", parameters: { sourceSelectionKey: "unitToPlay", selectionKey: "destination" } },
   ],
   "OGN-083": [

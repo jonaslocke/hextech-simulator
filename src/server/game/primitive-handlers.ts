@@ -13,7 +13,9 @@ import {
 } from "./numeric-modifiers";
 import { numericConditionMatches } from "./numeric-condition";
 import { getTokenCatalogDefinitions } from "./token-catalog";
-import { legalUnitDestinationIds } from "./unit-destinations";
+import { isLegalUnitDestination, legalUnitDestinationIds } from "./unit-destinations";
+import { buildPaymentPlan, payCardCost } from "./payment";
+import { markBattlefieldContested } from "./board-rules";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -309,7 +311,16 @@ export function createPrimitiveHandlers(
           (typeof binding.parameters.maximumPower !== "number" ||
             (attributes.power ?? 0) <= binding.parameters.maximumPower)
         );
-      });
+      }).filter((id) =>
+        binding.parameters.requiresPayablePowerCost !== true ||
+        buildPaymentPlan(
+          context.game,
+          context.controllerPlayerId,
+          definitionForInstance(id, index),
+          0,
+          index,
+        ) !== null,
+      );
       const maximum = numberParam(binding, "maximumCount");
       const minimum = binding.parameters.requireMaximumAvailable === true
         ? Math.min(maximum, legalIds.length)
@@ -727,6 +738,7 @@ export function createPrimitiveHandlers(
             maximum: numberParam(binding, "count"),
             prompt: `Choose where to play ${numberParam(binding, "count")} ${tokenDisplayName(binding, definition)} token${numberParam(binding, "count") === 1 ? "" : "s"}`,
             tokenName: tokenDisplayName(binding, definition),
+            placementKind: "token" as const,
             destinations,
           }
         : null;
@@ -769,25 +781,18 @@ export function createPrimitiveHandlers(
     choice(binding, context) {
       const unitId = selectionForSource(binding, context)[0];
       if (!unitId) return null;
-      const destinations = [
-        { id: "base", label: "Base" },
-        ...context.game.state.battlefields
-          .filter(
-            (battlefield) =>
-              battlefield.controllerPlayerId === context.controllerPlayerId,
-          )
-          .map((battlefield) => ({
-            id: battlefield.battlefieldId,
-            label: `Battlefield: ${definitionForInstance(
-              battlefield.cardInstanceId,
-              index,
-            ).card.name}`,
-          })),
-      ];
+      const definition = definitionForInstance(unitId, index);
+      const destinations = unitPlacementDestinations(
+        context.game,
+        context.controllerPlayerId,
+        definition,
+        index,
+      );
       return {
         kind: "tokenPlacement" as const,
         prompt: "Choose where to play the selected Unit.",
         tokenName: definitionForInstance(unitId, index).card.name,
+        placementKind: "unit" as const,
         legalIds: destinations.map((destination) => destination.id),
         minimum: 1,
         maximum: 1,
@@ -802,15 +807,33 @@ export function createPrimitiveHandlers(
       if (!player.zones.trash.includes(unitId)) return;
       const definition = definitionForInstance(unitId, index);
       if (definition.card.classification.type !== "Unit") return;
-      const destination =
-        destinationId === "base"
-          ? null
-          : context.game.state.battlefields.find(
-              (battlefield) => battlefield.battlefieldId === destinationId,
-            );
-      if (destinationId !== "base" &&
-        destination?.controllerPlayerId !== context.controllerPlayerId) {
-        return;
+      if (!isLegalUnitDestination(
+        context.game,
+        context.controllerPlayerId,
+        definition,
+        destinationId,
+      )) return;
+      const destination = destinationId === "base"
+        ? null
+        : context.game.state.battlefields.find(
+          (battlefield) => battlefield.battlefieldId === destinationId,
+        );
+      if (binding.parameters.costMode === "powerOnly") {
+        const paymentPlan = buildPaymentPlan(
+          context.game,
+          context.controllerPlayerId,
+          definition,
+          0,
+          index,
+        );
+        if (!paymentPlan) return;
+        payCardCost(
+          context.game,
+          context.controllerPlayerId,
+          definition,
+          0,
+          index,
+        );
       }
       player.zones.trash = player.zones.trash.filter((id) => id !== unitId);
       if (destination) {
@@ -820,6 +843,13 @@ export function createPrimitiveHandlers(
           unitId,
           index,
         });
+        if (destination.controllerPlayerId == null) {
+          markBattlefieldContested(
+            context.game,
+            destination.battlefieldId,
+            context.controllerPlayerId,
+          );
+        }
       }
       else player.zones.base.push(unitId);
       const state = context.game.state.cardStates[unitId];

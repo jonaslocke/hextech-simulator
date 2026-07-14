@@ -233,12 +233,18 @@ export function projectGame(input: {
                   id: input.game.state.pendingChoice.id,
                   playerId: input.game.state.pendingChoice.playerId,
                   prompt: input.game.state.pendingChoice.prompt,
-                  title: "Token placement",
+                  title:
+                    input.game.state.pendingChoice.placementKind === "unit"
+                      ? "Unit placement"
+                      : "Token placement",
                   waitingMessage:
                     input.game.state.pendingChoice.playerId === input.viewerPlayerId
                       ? input.game.state.pendingChoice.prompt
-                      : `Waiting for the other player to place ${input.game.state.pendingChoice.tokenName} tokens.`,
+                      : input.game.state.pendingChoice.placementKind === "unit"
+                        ? "Waiting for the other player to play their selected Unit."
+                        : `Waiting for the other player to place ${input.game.state.pendingChoice.tokenName} tokens.`,
                   tokenName: input.game.state.pendingChoice.tokenName,
+                  placementKind: input.game.state.pendingChoice.placementKind,
                   count: input.game.state.pendingChoice.count,
                   destinations:
                     input.game.state.pendingChoice.playerId ===

@@ -111,7 +111,9 @@ export function TokenPlacementPrompt({
 
           <footer className="flex justify-between items-center gap-2 pt-3 border-white/10 border-t">
             <span className="text-slate-400 text-sm">
-              {assigned}/{decision.count} placed
+              {decision.placementKind === "unit"
+                ? `${assigned}/${decision.count} destination selected`
+                : `${assigned}/${decision.count} placed`}
             </span>
             <GameActionButton
               actionSlot="primary"

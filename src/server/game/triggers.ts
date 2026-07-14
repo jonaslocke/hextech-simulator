@@ -2,7 +2,7 @@ import {
   compileBehaviorModel,
   collectTriggeredClauses,
   createBehaviorContext,
-  targetRequirementsForClause,
+  selectionRequirementsForClause,
   type BehaviorEvent
 } from "./behavior-runtime";
 import {
@@ -215,7 +215,7 @@ function continueQueuedChainItems(
       handlers,
     ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
     const requirements = clause
-      ? targetRequirementsForClause(
+      ? selectionRequirementsForClause(
           clause,
           createBehaviorContext(
             game,
@@ -226,6 +226,8 @@ function continueQueuedChainItems(
           ),
           handlers,
         )
+          .filter(({ binding }) => binding.parameters.deferred !== true)
+          .map(({ requirement }) => requirement)
       : [];
     if (
       requirements.length === 0 ||

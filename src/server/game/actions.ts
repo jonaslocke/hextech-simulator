@@ -2143,7 +2143,7 @@ function chainItemsNeedTargetSelection(
       handlers,
     ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
     if (!clause) return false;
-    const requirements = targetRequirementsForClause(
+    const requirements = selectionRequirementsForClause(
       clause,
       createBehaviorContext(
         game,
@@ -2153,7 +2153,9 @@ function chainItemsNeedTargetSelection(
         [],
       ),
       handlers,
-    );
+    )
+      .filter(({ binding }) => binding.parameters.deferred !== true)
+      .map(({ requirement }) => requirement);
     return requirements.some((requirement) => requirement.maximum > 0);
   });
 }
@@ -2273,7 +2275,8 @@ function playSelectionRequirements(
   return compiled.clauses.flatMap((clause) =>
     selectionRequirementsForClause(clause, context, handlers)
       .filter(({ binding }) =>
-        clauseCanRequirePlaySelections(definition, clause) ||
+        (binding.parameters.deferred !== true &&
+          clauseCanRequirePlaySelections(definition, clause)) ||
         binding.parameters.selectionPurpose === "optionalCost",
       )
       .map(({ requirement }) => requirement),
@@ -2297,6 +2300,7 @@ function validateLockedPlaySelections(
   for (const clause of clauses) {
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     for (const selector of clause.selectors) {
+      if (selector.parameters.deferred === true) continue;
       const handler = handlers.get(selector.behaviorId);
       if (!handler?.targets) {
         throw new Error(`Behavior handler cannot project targets: ${selector.behaviorId}`);

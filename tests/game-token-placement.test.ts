@@ -35,6 +35,7 @@ import {
 import {
   dispatchBehaviorEvent,
   dispatchSimultaneousBehaviorEvents,
+  submitChainTargetSelection,
 } from "../src/server/game/triggers";
 import { clearStunned } from "../src/server/game/board-rules";
 import { buildPaymentPlan, payCardCost } from "../src/server/game/payment";
@@ -1687,7 +1688,6 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
         maximumCount: 1,
         maximumEnergy: 3,
         maximumPower: 1,
-        deferred: true,
         selectionKey: "unitToPlay",
       })],
       effects: [binding("action.play_selected_unit", 2, {
@@ -1742,20 +1742,17 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
     controllerPlayerId: "p1",
     sourceCardInstanceId: "matron",
     clauseId: "play-from-trash",
+    selectedIds: ["eligible"],
+    targetsLocked: true,
     decks,
   }), false);
-  assert.equal(game.state.pendingChoice?.type, "effectSelection");
-  if (game.state.pendingChoice?.type !== "effectSelection") {
-    throw new Error("Expected the Unit selection from Trash.");
-  }
-  assert.deepEqual(game.state.pendingChoice.legalCardIds, ["eligible"]);
-  submitEffectSelection(game, "p1", ["eligible"], decks);
   const destinationChoice = game.state.pendingChoice as GameDocument["state"]["pendingChoice"];
   assert.equal(destinationChoice?.type, "tokenPlacement");
   if (destinationChoice?.type !== "tokenPlacement") {
     throw new Error("Expected the Unit destination choice.");
   }
   assert.deepEqual(destinationChoice.legalDestinationIds, ["base", "field"]);
+  assert.equal(destinationChoice.placementKind, "unit");
 
   submitTokenPlacement(game, "p1", [{ destinationId: "field", count: 1 }], decks);
   assert.equal(game.state.players.p1!.zones.trash.includes("eligible"), false);
@@ -1780,6 +1777,371 @@ test("a selected eligible Unit can be played from Trash to a chosen controlled b
     decks,
   }), true);
   assert.equal(game.state.cardStates.eligible?.buffed, true);
+});
+
+test("public Trash targets are selected and locked before a trigger enters the Chain", () => {
+  const spectralMatron = unit("SPECTRAL_MATRON", "Spectral Matron", [
+    clause("play-from-trash", {
+      triggers: [binding("trigger.on_play", 0, {
+        actor: "controller",
+        subject: "source",
+      })],
+      selectors: [binding("selector.card", 1, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 0,
+        maximumCount: 1,
+        maximumEnergy: 3,
+        maximumPower: 1,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 2, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+      })],
+    }),
+  ]);
+  const eligible = unit("ELIGIBLE", "Eligible Unit");
+  eligible.card.attributes.energy = 3;
+  eligible.card.attributes.power = 1;
+  const { game, decks } = fixture([spectralMatron, eligible]);
+  decks[0]!.instances.push(
+    instance("matron", "p1", "SPECTRAL_MATRON"),
+    instance("eligible", "p1", "ELIGIBLE"),
+  );
+  game.state.players.p1!.zones.base.push("matron");
+  game.state.players.p1!.zones.trash.push("eligible");
+  game.state.cardStates.matron = cardState(1);
+  game.state.cardStates.eligible = cardState(1);
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "matron",
+    values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.chainItem?.behaviorClauseId
+      : null,
+    "play-from-trash",
+  );
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["eligible"],
+  );
+
+  submitChainTargetSelection(game, "p1", ["eligible"], decks);
+  const chainItem = game.state.chain?.items.at(-1);
+  assert.equal(chainItem?.behaviorClauseId, "play-from-trash");
+  assert.deepEqual(chainItem?.targetCardInstanceIds, ["eligible"]);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "matron",
+    clauseId: "play-from-trash",
+    selectedIds: chainItem?.targetCardInstanceIds ?? [],
+    targetsLocked: true,
+    decks,
+  }), false);
+  const resolutionChoice = (game as GameDocument).state.pendingChoice;
+  assert.equal(resolutionChoice?.type, "tokenPlacement");
+});
+
+test("a public Trash target is selected and locked while casting a spell", () => {
+  const harrowing = spell("HARROWING", "The Harrowing", [
+    clause("play-from-trash", {
+      selectors: [binding("selector.card", 0, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 1, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+        costMode: "powerOnly",
+      })],
+    }),
+  ]);
+  const eligible = unit("ELIGIBLE", "Eligible Unit");
+  const { game, decks } = fixture([harrowing, eligible]);
+  decks[0]!.instances.push(
+    instance("harrowing", "p1", "HARROWING"),
+    instance("eligible", "p1", "ELIGIBLE"),
+  );
+  game.state.players.p1!.zones.hand.push("harrowing");
+  game.state.players.p1!.zones.trash.push("eligible");
+  game.state.cardStates.harrowing = cardState(null);
+  game.state.cardStates.eligible = cardState(1);
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "harrowing",
+  );
+  assert.deepEqual(play?.targets[0]?.legalIds, ["eligible"]);
+
+  const cast = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play!.id,
+    selectedIds: ["eligible"],
+    decks,
+    now: "cast-harrowing",
+  });
+
+  assert.equal(cast.state.pendingChoice, null);
+  assert.deepEqual(
+    cast.state.chain?.items.at(-1)?.targetCardInstanceIds,
+    ["eligible"],
+  );
+});
+
+test("an invalid locked public Trash target is not replaced during resolution", () => {
+  const recovery = unit("RECOVERY", "Recovery", [
+    clause("return-from-trash", {
+      triggers: [binding("trigger.on_play", 0, {
+        actor: "controller",
+        subject: "source",
+      })],
+      selectors: [binding("selector.card", 1, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "unitToReturn",
+      })],
+      effects: [binding("action.return_to_hand", 2, { target: "unit" })],
+    }),
+  ]);
+  const first = unit("FIRST", "First Unit");
+  const second = unit("SECOND", "Second Unit");
+  const { game, decks } = fixture([recovery, first, second]);
+  decks[0]!.instances.push(
+    instance("recovery", "p1", "RECOVERY"),
+    instance("first", "p1", "FIRST"),
+    instance("second", "p1", "SECOND"),
+  );
+  game.state.players.p1!.zones.base.push("recovery");
+  game.state.players.p1!.zones.trash.push("first", "second");
+  game.state.cardStates.recovery = cardState(1);
+  game.state.cardStates.first = cardState(1);
+  game.state.cardStates.second = cardState(1);
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "recovery",
+    values: {},
+  }, decks);
+  submitChainTargetSelection(game, "p1", ["first"], decks);
+  const chainItem = game.state.chain?.items.at(-1);
+  assert.deepEqual(chainItem?.targetCardInstanceIds, ["first"]);
+
+  game.state.players.p1!.zones.trash = ["second"];
+  game.state.players.p1!.zones.hand.push("first");
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "recovery",
+    clauseId: "return-from-trash",
+    selectedIds: chainItem?.targetCardInstanceIds ?? [],
+    targetsLocked: true,
+    decks,
+  }), true);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.players.p1!.zones.trash, ["second"]);
+});
+
+test("a failed locked power-only Unit play leaves its target in Trash", () => {
+  const source = unit("SOURCE", "Energy Waiver", [
+    clause("play-from-trash", {
+      selectors: [binding("selector.card", 0, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 1, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+        costMode: "powerOnly",
+      })],
+    }),
+  ]);
+  const payable = unit("PAYABLE", "Payable Unit");
+  payable.card.attributes.power = 1;
+  payable.card.classification.domain = ["Fury"];
+  const { game, decks } = fixture([source, payable]);
+  decks[0]!.instances.push(
+    instance("source", "p1", "SOURCE"),
+    instance("payable", "p1", "PAYABLE"),
+  );
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.trash.push("payable");
+  game.state.players.p1!.power.Fury = 1;
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.payable = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-from-trash",
+    selectedIds: ["payable"],
+    targetsLocked: true,
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "tokenPlacement");
+
+  game.state.players.p1!.power.Fury = 0;
+  submitTokenPlacement(game, "p1", [{ destinationId: "base", count: 1 }], decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.players.p1!.zones.trash, ["payable"]);
+  assert.equal(game.state.players.p1!.zones.base.includes("payable"), false);
+});
+
+test("power-only effect-driven Unit play filters unaffordable Trash Units and pays Power", () => {
+  const source = unit("SOURCE", "Energy Waiver", [
+    clause("play-from-trash-for-power", {
+      selectors: [binding("selector.card", 0, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        deferred: true,
+        requiresPayablePowerCost: true,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 1, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+        costMode: "powerOnly",
+      })],
+    }),
+  ]);
+  const payable = unit("PAYABLE", "Payable Unit");
+  payable.card.attributes.energy = 7;
+  payable.card.attributes.power = 1;
+  payable.card.classification.domain = ["Fury"];
+  const unaffordable = unit("UNAFFORDABLE", "Unaffordable Unit");
+  unaffordable.card.attributes.energy = 1;
+  unaffordable.card.attributes.power = 2;
+  unaffordable.card.classification.domain = ["Fury"];
+  const { game, decks } = fixture([source, payable, unaffordable]);
+  decks[0]!.instances.push(
+    instance("source", "p1", "SOURCE"),
+    instance("payable", "p1", "PAYABLE"),
+    instance("unaffordable", "p1", "UNAFFORDABLE"),
+  );
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.trash.push("payable", "unaffordable");
+  game.state.players.p1!.power.Fury = 1;
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates.payable = cardState(1);
+  game.state.cardStates.unaffordable = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-from-trash-for-power",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["payable"],
+  );
+
+  submitEffectSelection(game, "p1", ["payable"], decks);
+  assert.equal(game.state.pendingChoice?.type, "tokenPlacement");
+  submitTokenPlacement(game, "p1", [{ destinationId: "base", count: 1 }], decks);
+
+  assert.equal(game.state.players.p1!.power.Fury, 0);
+  assert.equal(game.state.players.p1!.zones.trash.includes("payable"), false);
+  assert.ok(game.state.players.p1!.zones.base.includes("payable"));
+  assert.equal(game.state.cardStates.payable?.exhausted, true);
+});
+
+test("effect-driven Unit play uses the selected Unit's normal placement permissions", () => {
+  const source = unit("SOURCE", "Recovery Effect", [
+    clause("play-from-trash", {
+      selectors: [binding("selector.card", 0, {
+        zone: "trash",
+        cardType: "Unit",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        deferred: true,
+        selectionKey: "unitToPlay",
+      })],
+      effects: [binding("action.play_selected_unit", 1, {
+        sourceSelectionKey: "unitToPlay",
+        selectionKey: "destination",
+      })],
+    }),
+  ]);
+  const openScout = unit("OPEN_SCOUT", "Open Scout", [
+    clause("open-battlefield", {
+      effects: [binding("modifier.play_unit_destination", 0, {
+        destination: "openBattlefield",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source, openScout, battlefield("FIELD", "Open Field")]);
+  decks[0]!.instances.push(
+    instance("source", "p1", "SOURCE"),
+    instance("open-scout", "p1", "OPEN_SCOUT"),
+    instance("field", "p1", "FIELD", "battlefield"),
+  );
+  game.state.players.p1!.zones.base.push("source");
+  game.state.players.p1!.zones.trash.push("open-scout");
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates["open-scout"] = cardState(1);
+  game.state.cardStates.field = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "field",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: null,
+    units: [],
+  });
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-from-trash",
+    decks,
+  });
+  submitEffectSelection(game, "p1", ["open-scout"], decks);
+  assert.equal(game.state.pendingChoice?.type, "tokenPlacement");
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "tokenPlacement"
+      ? game.state.pendingChoice.legalDestinationIds
+      : [],
+    ["base", "field"],
+  );
+
+  submitTokenPlacement(game, "p1", [{ destinationId: "field", count: 1 }], decks);
+  assert.deepEqual(game.state.battlefields[0]?.units, ["open-scout"]);
+  assert.equal(game.state.battlefields[0]?.contestedByPlayerId, "p1");
 });
 
 test("Hidden cards use an empty controlled facedown slot and play free next turn", () => {
@@ -3453,6 +3815,16 @@ function unit(
   return card(cardCode, name, "Unit", clauses, 1);
 }
 
+function spell(
+  cardCode: string,
+  name: string,
+  clauses: GameCardDefinition["behaviorModel"]["clauses"] = [],
+): GameCardDefinition {
+  const definition = card(cardCode, name, "Spell", clauses, null);
+  definition.behaviorModel.playTimings = [binding("timing.action", 0)];
+  return definition;
+}
+
 function battlefield(cardCode: string, name: string): GameCardDefinition {
   return card(cardCode, name, "Battlefield", [], null);
 }
@@ -3460,7 +3832,7 @@ function battlefield(cardCode: string, name: string): GameCardDefinition {
 function card(
   cardCode: string,
   name: string,
-  type: "Battlefield" | "Gear" | "Unit",
+  type: "Battlefield" | "Gear" | "Spell" | "Unit",
   clauses: GameCardDefinition["behaviorModel"]["clauses"],
   might: number | null,
 ): GameCardDefinition {

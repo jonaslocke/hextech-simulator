@@ -688,6 +688,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("maximumCount", "number", "The maximum selection count."),
       optional("maximumEnergy", "number", "Maximum printed Energy cost for legal cards."),
       optional("maximumPower", "number", "Maximum printed Power cost for legal cards."),
+      optional("requiresPayablePowerCost", "boolean", "Whether only cards whose base Power cost can currently be paid are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
       optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount.")
@@ -1055,12 +1056,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "action.play_selected_unit",
     family: "action",
     name: "Play selected Unit",
-    description: "Plays a selected Unit from a permitted zone without paying its normal cost.",
+    description: "Plays a selected Unit from a permitted zone, with a configurable base-cost treatment.",
     parameters: [
       required("sourceSelectionKey", "string", "Selector key containing the Unit to play."),
       required("selectionKey", "string", "Key storing the chosen destination."),
+      optional("costMode", "string", "How the selected Unit's base costs are handled.", ["ignoreAll", "powerOnly"]),
     ],
-    engineSupport: supported("Places the selected Unit at a legal Base or controlled battlefield destination."),
+    engineSupport: supported("Uses normal Unit placement and can either ignore all base costs or require only base Power."),
   }),
   "action.recycle_top_cards": primitiveSeed({
     id: "action.recycle_top_cards",

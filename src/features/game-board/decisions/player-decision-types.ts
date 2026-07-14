@@ -93,6 +93,7 @@ export type TokenPlacementDecisionRequest = DecisionInspectionCapability & {
   title: string;
   description?: string;
   tokenName: string;
+  placementKind?: "token" | "unit";
   count: number;
   destinations: Array<{ id: string; label: string }>;
   confirmLabel?: string;

@@ -1,6 +1,6 @@
 # OGN M2 Family: Top-Deck Inspection and Zone Transfer
 
-Status: Ready for Manual Validation
+Status: Manual Family Passed
 
 ## Reuse map
 
@@ -61,4 +61,10 @@ Status: Ready for Manual Validation
    one looked-at card and once recycling none; verify its remaining cards are
    ordered from the original looked-at group.
 
-Expected response: `Pass`, `Report defect`, or `Provide ruling`.
+## Manual validation result
+
+The user manually passed this family on 2026-07-13. The validation confirmed
+the private keep-one prompt, automatic recycling of the unkept looked-at cards,
+normal Chain completion, and the shared prompt title using the source card's
+name. The focused Candlelit Sanctum regression was also included in the manual
+validation deck.

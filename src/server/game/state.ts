@@ -198,6 +198,7 @@ const tokenPlacementChoiceSchema = z.object({
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
   tokenName: z.string().min(1),
+  placementKind: z.enum(["token", "unit"]).default("token"),
   count: z.number().int().positive(),
   legalDestinationIds: z.array(z.string().min(1)),
   destinationLabels: z.record(z.string().min(1)).default({}),
