@@ -1,13 +1,18 @@
 import type { DeckId } from "@/server/game";
+import type { DeckSnapshot } from "@/server/game/schemas";
 
 export type OnlineRoomStatus =
   | "waiting-for-opponent"
   | "game-created"
   | "closed";
 
+export type OnlineRoomDeck =
+  | { kind: "catalog"; deckId: DeckId; label: string }
+  | { kind: "temporary"; label: "Temporary test deck"; snapshot: DeckSnapshot };
+
 export type OnlineRoomSeat = {
   seat: "player1" | "player2";
-  deckId: DeckId;
+  deck: OnlineRoomDeck;
   displayName: string;
   onlineSessionId: string;
   socketId: string;
@@ -25,8 +30,8 @@ export type PublicOnlineRoom = {
   code: string;
   status: OnlineRoomStatus;
   seats: {
-    player1: { connected: boolean; deckId: DeckId; displayName: string };
-    player2: { connected: boolean; deckId?: DeckId; displayName?: string };
+    player1: { connected: boolean; deckLabel: string; displayName: string };
+    player2: { connected: boolean; deckLabel?: string; displayName?: string };
   };
   gameId?: string;
 };

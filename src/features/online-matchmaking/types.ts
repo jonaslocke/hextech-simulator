@@ -6,12 +6,12 @@ export type OnlineRoomView = {
   seats: {
     player1: {
       connected: boolean;
-      deckId: DeckId;
+      deckLabel: string;
       displayName: string;
     };
     player2: {
       connected: boolean;
-      deckId?: DeckId;
+      deckLabel?: string;
       displayName?: string;
     };
   };
@@ -25,6 +25,7 @@ export type OnlinePlayerCredentials = {
     playerId: string;
     seat: "player-1" | "player-2";
     deckId: DeckId;
+    deckLabel: string;
     displayName: string;
     playerToken: string;
   };

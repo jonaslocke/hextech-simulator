@@ -23,6 +23,7 @@ import type {
 } from "../types";
 
 type LobbyMode = "choose" | "create" | "join";
+type DeckInputMode = "catalog" | "temporary";
 
 export function OnlineMatchmakingLobby() {
   const socketRef = useRef<Socket | null>(null);
@@ -33,6 +34,8 @@ export function OnlineMatchmakingLobby() {
   const [mode, setMode] = useState<LobbyMode>("choose");
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
   const [deckId, setDeckId] = useState<DeckId | null>(null);
+  const [deckInputMode, setDeckInputMode] = useState<DeckInputMode>("catalog");
+  const [temporaryDeckText, setTemporaryDeckText] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [room, setRoom] = useState<OnlineRoomView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,8 +136,16 @@ export function OnlineMatchmakingLobby() {
   }
 
   function submitRoom() {
-    if (!deckId || !socketRef.current?.connected) {
-      setError("Select a deck and wait for the realtime connection.");
+    if (!socketRef.current?.connected) {
+      setError("Wait for the realtime connection.");
+      return;
+    }
+    if (deckInputMode === "catalog" && !deckId) {
+      setError("Select a deck.");
+      return;
+    }
+    if (deckInputMode === "temporary" && !temporaryDeckText.trim()) {
+      setError("Paste a temporary deck list or choose a deck file.");
       return;
     }
 
@@ -152,7 +163,10 @@ export function OnlineMatchmakingLobby() {
     saveOnlinePlayerName(displayName);
 
     const identity = {
-      deckId,
+      deck:
+        deckInputMode === "temporary"
+          ? { kind: "temporary" as const, sourceText: temporaryDeckText }
+          : { kind: "catalog" as const, deckId: deckId! },
       displayName,
       onlineSessionId: getOnlineSessionId(),
     };
@@ -277,13 +291,13 @@ export function OnlineMatchmakingLobby() {
 
         <div className="gap-3 grid mt-5">
           <SeatRow
-            deckId={room.seats.player1.deckId}
+            deckLabel={room.seats.player1.deckLabel}
             label={room.seats.player1.displayName || "Player 1"}
             ready
           />
 
           <SeatRow
-            deckId={room.seats.player2.deckId}
+            deckLabel={room.seats.player2.deckLabel}
             label={room.seats.player2.displayName || "Player 2"}
             ready={room.seats.player2.connected}
           />
@@ -346,6 +360,22 @@ export function OnlineMatchmakingLobby() {
             <span className="text-slate-300">Your deck</span>
             <select
               className="bg-slate-950 px-3 py-2 border border-white/10 rounded"
+              disabled={busy}
+              onChange={(event) =>
+                setDeckInputMode(event.target.value as DeckInputMode)
+              }
+              value={deckInputMode}
+            >
+              <option value="catalog">Saved deck</option>
+              <option value="temporary">Temporary test deck</option>
+            </select>
+          </label>
+
+          {deckInputMode === "catalog" ? (
+            <label className="gap-2 grid mt-4 text-sm">
+              <span className="text-slate-300">Saved deck</span>
+            <select
+              className="bg-slate-950 px-3 py-2 border border-white/10 rounded"
               disabled={busy || deckOptions.length === 0}
               onChange={(event) => setDeckId(event.target.value as DeckId)}
               value={deckId ?? ""}
@@ -356,7 +386,32 @@ export function OnlineMatchmakingLobby() {
                 </option>
               ))}
             </select>
-          </label>
+            </label>
+          ) : (
+            <div className="gap-2 grid mt-4 text-sm">
+              <span className="text-slate-300">Temporary deck list</span>
+              <textarea
+                className="bg-slate-950 px-3 py-2 border border-white/10 rounded min-h-48 font-mono text-xs"
+                disabled={busy}
+                onChange={(event) => setTemporaryDeckText(event.currentTarget.value)}
+                placeholder="Paste a .dec.txt deck list"
+                value={temporaryDeckText}
+              />
+              <input
+                accept=".txt,.dec"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (!file) return;
+                  void file.text().then(setTemporaryDeckText);
+                }}
+                type="file"
+              />
+              <span className="text-slate-500 text-xs">
+                Validated for this room only; it is not added to the saved deck list.
+              </span>
+            </div>
+          )}
 
           {mode === "join" && (
             <label className="gap-2 grid mt-4 text-sm">
@@ -379,7 +434,8 @@ export function OnlineMatchmakingLobby() {
               disabled={
                 busy ||
                 !connected ||
-                !deckId ||
+                (deckInputMode === "catalog" && !deckId) ||
+                (deckInputMode === "temporary" && !temporaryDeckText.trim()) ||
                 !normalizeOnlinePlayerName(playerName) ||
                 (mode === "join" && !roomCode.trim())
               }
@@ -420,11 +476,11 @@ function LobbyShell({ children }: { children: ReactNode }) {
 }
 
 function SeatRow({
-  deckId,
+  deckLabel,
   label,
   ready,
 }: {
-  deckId?: DeckId;
+  deckLabel?: string;
   label: string;
   ready: boolean;
 }) {
@@ -432,7 +488,7 @@ function SeatRow({
     <div className="flex justify-between bg-white/5 px-3 py-2 border border-white/10 rounded text-sm">
       <span>{label}</span>
       <span className={ready ? "text-emerald-300" : "text-slate-500"}>
-        {ready ? deckId : "Waiting"}
+        {ready ? deckLabel : "Waiting"}
       </span>
     </div>
   );

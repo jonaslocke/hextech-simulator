@@ -7,14 +7,14 @@ import {
 } from "../src/server/online-matchmaking";
 
 const PLAYER_1 = {
-  deckId: "lux" as const,
+  deck: { kind: "catalog" as const, deckId: "lux" as const, label: "lux" },
   onlineSessionId: "11111111-1111-4111-8111-111111111111",
   socketId: "socket-1",
   displayName: "Player 1",
 };
 
 const PLAYER_2 = {
-  deckId: "annie" as const,
+  deck: { kind: "catalog" as const, deckId: "annie" as const, label: "annie" },
   onlineSessionId: "22222222-2222-4222-8222-222222222222",
   socketId: "socket-2",
   displayName: "Player 2",
@@ -31,8 +31,25 @@ test("creates a shareable room and assigns independent seats", () => {
   assert.match(created.code, /^[A-Z2-9]{6}$/);
   assert.equal(joined.seat1.seat, "player1");
   assert.equal(joined.seat2?.seat, "player2");
-  assert.equal(joined.seat1.deckId, "lux");
-  assert.equal(joined.seat2?.deckId, "annie");
+  assert.equal(joined.seat1.deck.label, "lux");
+  assert.equal(joined.seat2?.deck.label, "annie");
+});
+
+test("only exposes a temporary deck label to the other player", () => {
+  const service = new OnlineRoomService(new OnlineRoomRegistry());
+  const room = service.create({
+    ...PLAYER_1,
+    deck: {
+      kind: "temporary",
+      label: "Temporary test deck",
+      snapshot: {} as never,
+    },
+  });
+
+  const publicRoom = service.toPublicRoom(room);
+
+  assert.equal(publicRoom.seats.player1.deckLabel, "Temporary test deck");
+  assert.equal("snapshot" in publicRoom.seats.player1, false);
 });
 
 test("rejects additional players and joining a started room", () => {
@@ -44,7 +61,7 @@ test("rejects additional players and joining a started room", () => {
     () =>
       service.join({
         code: created.code,
-        deckId: "lux",
+        deck: { kind: "catalog", deckId: "lux", label: "lux" },
         onlineSessionId: "session-3",
         socketId: "socket-3",
         displayName: "Player 3",
@@ -57,7 +74,7 @@ test("rejects additional players and joining a started room", () => {
     () =>
       service.join({
         code: created.code,
-        deckId: "lux",
+        deck: { kind: "catalog", deckId: "lux", label: "lux" },
         onlineSessionId: "session-4",
         socketId: "socket-4",
         displayName: "Player-4",

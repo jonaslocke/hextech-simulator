@@ -38,6 +38,7 @@ import {
   type GameDocument,
   type MatchDocument,
 } from "./state";
+import type { DeckSnapshot } from "./schemas";
 
 export class MatchServiceError extends Error {
   constructor(
@@ -60,6 +61,8 @@ type CreateMatchInput = {
   matchId?: string;
   rngSeed?: string;
   playerDecks?: { player1: DeckId; player2: DeckId };
+  deckTemplates?: [DeckSnapshot, DeckSnapshot];
+  playerDeckLabels?: { player1: string; player2: string };
   playerNames?: {
     player1?: string;
     player2?: string;
@@ -100,7 +103,7 @@ async function createMatchAttempt(input: CreateMatchInput) {
     player1: normalizePlayerDisplayName(input.playerNames?.player1, "Player 1"),
     player2: normalizePlayerDisplayName(input.playerNames?.player2, "Player 2"),
   };
-  const templates = await loadMatchDeckTemplates(input.db, selectedDecks);
+  const templates = input.deckTemplates ?? await loadMatchDeckTemplates(input.db, selectedDecks);
   const players = ["player-1", "player-2"] as const;
   const registeredDecks = players.map((id, index) =>
     createRuntimeDeckSnapshot(templates[index]!, id, `${matchId}:${id}:copy`),
@@ -201,12 +204,16 @@ async function createMatchAttempt(input: CreateMatchInput) {
         playerId: players[0],
         seat: "player-1" as const,
         deckId: selectedDecks.player1,
+        deckLabel: input.playerDeckLabels?.player1 ?? selectedDecks.player1,
+        displayName: selectedPlayerNames.player1,
         playerToken: tokens[0]!.token,
       },
       player2: {
         playerId: players[1],
         seat: "player-2" as const,
         deckId: selectedDecks.player2,
+        deckLabel: input.playerDeckLabels?.player2 ?? selectedDecks.player2,
+        displayName: selectedPlayerNames.player2,
         playerToken: tokens[1]!.token,
       },
     },

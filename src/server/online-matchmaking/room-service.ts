@@ -1,6 +1,5 @@
-import type { DeckId } from "@/server/game";
 import { OnlineRoomRegistry, normalizeRoomCode } from "./room-registry";
-import type { OnlineRoom, OnlineRoomSeat, PublicOnlineRoom } from "./types";
+import type { OnlineRoom, OnlineRoomDeck, OnlineRoomSeat, PublicOnlineRoom } from "./types";
 
 export class OnlineRoomError extends Error {
   constructor(
@@ -20,7 +19,7 @@ export class OnlineRoomService {
   constructor(private readonly registry: OnlineRoomRegistry) {}
 
   create(input: {
-    deckId: DeckId;
+    deck: OnlineRoomDeck;
     onlineSessionId: string;
     socketId: string;
     displayName: string;
@@ -33,7 +32,7 @@ export class OnlineRoomService {
 
   join(input: {
     code: string;
-    deckId: DeckId;
+    deck: OnlineRoomDeck;
     onlineSessionId: string;
     socketId: string;
     displayName: string;
@@ -131,13 +130,13 @@ export class OnlineRoomService {
       seats: {
         player1: {
           connected: true,
-          deckId: room.seat1.deckId,
+          deckLabel: room.seat1.deck.label,
           displayName: room.seat1.displayName,
         },
         player2: room.seat2
           ? {
               connected: true,
-              deckId: room.seat2.deckId,
+              deckLabel: room.seat2.deck.label,
               displayName: room.seat2.displayName,
             }
           : { connected: false },
@@ -158,7 +157,7 @@ export class OnlineRoomService {
 function createSeat(
   seat: OnlineRoomSeat["seat"],
   input: {
-    deckId: DeckId;
+    deck: OnlineRoomDeck;
     onlineSessionId: string;
     socketId: string;
     displayName: string;

@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io";
 import { getMongoDatabase } from "@/server/db";
-import { createGameRepositories, createMatch } from "@/server/game";
+import { buildDeckSnapshotFromSource, createGameRepositories, createMatch } from "@/server/game";
+import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import {
   createOnlineRoomSchema,
   joinOnlineRoomSchema,
@@ -15,12 +16,16 @@ export function registerOnlineMatchmakingHandlers(
   service: OnlineRoomService,
 ): void {
   io.on("connection", (socket) => {
-    socket.on("client:room:create", (payload: unknown) => {
+    socket.on("client:room:create", async (payload: unknown) => {
       const parsed = createOnlineRoomSchema.safeParse(payload);
       if (!parsed.success) return emitInvalidPayload(socket);
 
       try {
-        const room = service.create({ ...parsed.data, socketId: socket.id });
+        const room = service.create({
+          ...parsed.data,
+          deck: await prepareRoomDeck(parsed.data.deck),
+          socketId: socket.id,
+        });
         void socket.join(room.code);
         socket.emit("server:room:created", service.toPublicRoom(room));
       } catch (error) {
@@ -34,7 +39,11 @@ export function registerOnlineMatchmakingHandlers(
 
       let room;
       try {
-        room = service.join({ ...parsed.data, socketId: socket.id });
+        room = service.join({
+          ...parsed.data,
+          deck: await prepareRoomDeck(parsed.data.deck),
+          socketId: socket.id,
+        });
         await socket.join(room.code);
         socket.emit("server:room:joined", service.toPublicRoom(room));
         io.to(room.code).emit(
@@ -48,12 +57,20 @@ export function registerOnlineMatchmakingHandlers(
 
       try {
         const db = await getMongoDatabase();
+        const templates = await Promise.all(
+          [room.seat1.deck, room.seat2!.deck].map((deck) =>
+            deck.kind === "temporary"
+              ? deck.snapshot
+              : loadDeckSnapshot(db, deck.deckId),
+          ),
+        );
         const match = await createMatch({
           db,
           repositories: createGameRepositories(db),
-          playerDecks: {
-            player1: room.seat1.deckId,
-            player2: room.seat2!.deckId,
+          deckTemplates: [templates[0]!, templates[1]!],
+          playerDeckLabels: {
+            player1: room.seat1.deck.label,
+            player2: room.seat2!.deck.label,
           },
           playerNames: {
             player1: room.seat1.displayName,
@@ -130,6 +147,18 @@ export function registerOnlineMatchmakingHandlers(
       }
     });
   });
+}
+
+async function prepareRoomDeck(input: ReturnType<typeof createOnlineRoomSchema.parse>["deck"]) {
+  if (input.kind === "catalog") {
+    return { kind: "catalog" as const, deckId: input.deckId, label: input.deckId };
+  }
+  const db = await getMongoDatabase();
+  return {
+    kind: "temporary" as const,
+    label: "Temporary test deck" as const,
+    snapshot: await buildDeckSnapshotFromSource(db, input.sourceText),
+  };
 }
 
 function emitGameCreated(
