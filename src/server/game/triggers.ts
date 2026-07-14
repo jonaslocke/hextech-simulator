@@ -366,6 +366,7 @@ export function queueDelayedEffects(
     sourceCardInstanceId: effect.sourceCardInstanceId,
     targetCardInstanceIds: [],
     targetObjectVersions: {},
+    lockedSelectionsByBinding: {},
     behaviorClauseId: effect.clauseId,
     activatedBehaviorId: null,
     behaviorEvent: {

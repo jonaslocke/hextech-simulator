@@ -3811,6 +3811,7 @@ test("attack triggers return showdown focus to the trigger controller", () => {
         sourceCardInstanceId: "drake",
         targetCardInstanceIds: [],
         targetObjectVersions: {},
+        lockedSelectionsByBinding: {},
         behaviorClauseId: "attack-ready-enemy",
         activatedBehaviorId: null,
         behaviorEvent: {

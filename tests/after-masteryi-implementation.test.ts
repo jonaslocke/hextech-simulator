@@ -107,6 +107,70 @@ test("Meditation optional cost projects only ready friendly units with optional-
   assert.equal(action.targets[0]?.maximum, 1);
 });
 
+test("a paid optional play cost remains locked through Chain resolution", () => {
+  const meditation = spell("MEDITATION", "Meditation", [
+    clause("meditation", {
+      selectors: [
+        binding("selector.friendly_unit", 0, {
+          minimumCount: 0,
+          maximumCount: 1,
+          area: "board",
+          readyOnly: true,
+          selectionKey: "optionalCost",
+          selectionPurpose: "optionalCost",
+        }),
+      ],
+      costs: [
+        binding("cost.exhaust_selected_unit", 1, {
+          selectionKey: "optionalCost",
+          optional: true,
+        }),
+      ],
+      effects: [
+        binding("action.draw_by_optional_cost", 2, {
+          selectionKey: "optionalCost",
+          paidCount: 2,
+          unpaidCount: 1,
+        }),
+      ],
+    }),
+  ]);
+  const { decks, game } = fixture([
+    meditation,
+    unit("FRIENDLY", "Friendly", 2),
+    unit("DRAW_A", "Draw A", 1),
+    unit("DRAW_B", "Draw B", 1),
+    battlefield("BF", "Battlefield"),
+  ]);
+  game.state.players.p1!.zones.hand.push("meditation");
+  game.state.players.p1!.zones.base.push("friendly");
+  game.state.players.p1!.zones.mainDeck.push("draw-a", "draw-b");
+
+  const meditationAction = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "meditation",
+  );
+  assert.ok(meditationAction);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: meditationAction.id,
+    selectedIds: ["friendly"],
+    decks,
+    now: "play-meditation",
+  });
+
+  assert.equal(next.state.cardStates.friendly!.exhausted, true);
+  assert.deepEqual(
+    next.state.chain?.items[0]?.lockedSelectionsByBinding,
+    { "meditation:selectors:0": ["friendly"] },
+  );
+
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+
+  assert.deepEqual(next.state.players.p1!.zones.hand, ["draw-a", "draw-b"]);
+});
+
 test("targeted temporary Might reductions apply after Wuju Bladesman continuous bonuses", () => {
   const wuju = legend("WUJU", "Wuju", [
     clause("wuju", {
@@ -241,9 +305,10 @@ test("triggered ability Chain priority resets to the trigger controller after sp
         kind: "spell",
         label: "Expensive Spell",
         controllerPlayerId: "p1",
-          sourceCardInstanceId: "expensive",
+        sourceCardInstanceId: "expensive",
         targetCardInstanceIds: [],
         targetObjectVersions: {},
+        lockedSelectionsByBinding: {},
         behaviorClauseId: null,
         activatedBehaviorId: null,
         behaviorEvent: {
@@ -293,6 +358,7 @@ test("triggered items preserve a card play's showdown Focus continuation", () =>
         sourceCardInstanceId: null,
         targetCardInstanceIds: [],
         targetObjectVersions: {},
+        lockedSelectionsByBinding: {},
         behaviorClauseId: null,
         activatedBehaviorId: null,
         behaviorEvent: null,
@@ -335,6 +401,7 @@ test("trigger-order choices retain their originating showdown Focus continuation
       sourceCardInstanceId: null,
       targetCardInstanceIds: [],
       targetObjectVersions: {},
+      lockedSelectionsByBinding: {},
       behaviorClauseId: null,
       activatedBehaviorId: null,
       behaviorEvent: null,

@@ -122,6 +122,7 @@ export const chainItemSchema = z.object({
   sourceCardInstanceId: z.string().nullable(),
   targetCardInstanceIds: z.array(z.string()),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
+  lockedSelectionsByBinding: z.record(z.array(z.string())),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
   behaviorEvent: z
@@ -311,6 +312,8 @@ export const gameStateSchema = z.object({
       activatedBehaviorId: z.string().min(1).nullable().optional(),
       initialSelectedIds: z.array(z.string()).default([]),
       targetsLocked: z.boolean().optional(),
+      lockedSelectionsByBinding: z.record(z.array(z.string())),
+      targetObjectVersions: z.record(z.number().int().nonnegative()),
       selectionsByBinding: z.record(z.array(z.string())),
       behaviorEvent: z
         .object({

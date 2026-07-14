@@ -893,6 +893,10 @@ function playCard(
     sourceCardInstanceId: cardId,
     targetCardInstanceIds: selectedIds,
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
+    lockedSelectionsByBinding: lockedPlaySelectionsByBinding(
+      definition,
+      selectedIds,
+    ),
     behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
@@ -1026,16 +1030,21 @@ function passPriority(
                 controllerPlayerId: controller,
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
-                selectedIds: validLockedTargets(
-                  game,
-                  clause,
-                  item,
-                  controller,
-                  handlers,
-                ),
+                selectedIds:
+                  Object.keys(item.lockedSelectionsByBinding).length > 0
+                    ? item.targetCardInstanceIds
+                    : validLockedTargets(
+                        game,
+                        clause,
+                        item,
+                        controller,
+                        handlers,
+                      ),
                 targetsLocked: !clause.selectors.some(
                   (selector) => selector.parameters.deferred === true,
                 ),
+                lockedSelectionsByBinding: item.lockedSelectionsByBinding,
+                targetObjectVersions: item.targetObjectVersions,
                 behaviorEvent: item.behaviorEvent,
                 decks,
               });
@@ -1989,6 +1998,7 @@ function executeActivatedAbility(
     sourceCardInstanceId: sourceId,
     targetCardInstanceIds: selectedIds,
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
+    lockedSelectionsByBinding: {},
     behaviorClauseId: clauseId,
     activatedBehaviorId: behaviorId,
     behaviorEvent: null,
@@ -2302,6 +2312,39 @@ function preplaySelectionsByKey(
     }
   }
   return selectionsByKey;
+}
+
+function lockedPlaySelectionsByBinding(
+  definition: GameCardDefinition,
+  selectedIds: readonly string[],
+) {
+  const selectionsByBinding: Record<string, string[]> = {};
+  let cursor = 0;
+  for (const clause of definition.behaviorModel.clauses) {
+    for (const selector of clause.selectors) {
+      const isOptionalCost = selector.parameters.selectionPurpose === "optionalCost";
+      if (
+        selector.parameters.deferred === true ||
+        ((clause.triggers.length > 0 || clause.abilities.length > 0) &&
+          !isOptionalCost)
+      ) {
+        continue;
+      }
+      const automatic =
+        selector.parameters.automatic === true ||
+        (selector.parameters.scope === "each" &&
+          typeof selector.parameters.maximumCount !== "number");
+      if (automatic) continue;
+      const maximum =
+        typeof selector.parameters.maximumCount === "number"
+          ? selector.parameters.maximumCount
+          : 1;
+      const selected = selectedIds.slice(cursor, cursor + maximum);
+      cursor += selected.length;
+      selectionsByBinding[`${clause.id}:selectors:${selector.order}`] = selected;
+    }
+  }
+  return selectionsByBinding;
 }
 
 function playSelectionRequirements(

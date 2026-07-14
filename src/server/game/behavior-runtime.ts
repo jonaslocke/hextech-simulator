@@ -317,6 +317,7 @@ export function collectTriggeredClauses(input: {
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
       targetObjectVersions: {},
+      lockedSelectionsByBinding: {},
       behaviorClauseId: clause.id,
       activatedBehaviorId: null,
       behaviorEvent: input.event

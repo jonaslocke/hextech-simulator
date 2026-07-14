@@ -65,7 +65,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | `tests/game-token-placement.test.ts` | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
 | `action.channel_runes` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel runes | None |
 | `action.deal_damage` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deal damage to unit | None |
-| `action.draw_by_optional_cost` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Optional-cost draw branch | None |
+| `action.draw_by_optional_cost` | Existing | Meditation | Covered by rules reference | Executable for locked optional play-cost selections | `tests/after-masteryi-implementation.test.ts` | Draw the paid or declined optional-cost branch after Chain resolution | Optional play-cost family manually passed on 2026-07-14. |
 | `action.channel_or_draw` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel fallback draw | None |
 | `action.fight` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Two units fight | None |
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
@@ -90,7 +90,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `keyword.temporary` | OGN M2 | Sprite | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Kill at controller Beginning Phase before scoring | None |
 | `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | `tests/game-token-placement.test.ts` | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
 | `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Exhaust source before activation | None |
-| `cost.exhaust_selected_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Exhaust selected unit as cost | None |
+| `cost.exhaust_selected_unit` | Existing | Meditation | Covered by rules reference | Executable for a locked optional play-cost selection | `tests/after-masteryi-implementation.test.ts` | Exhaust a ready friendly Unit as a selected optional cost | Optional play-cost family manually passed on 2026-07-14. |
 | `replacement.recall_on_next_death` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Recall instead of next death | None |
 
 ## Card Coverage Ledger
@@ -154,6 +154,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | M2 | Viktor full deck validation | Full Viktor deck gameplay and all recorded manual-test scenarios | Accepted | User accepted the completed Viktor validation on 2026-07-13; see the Viktor resolution ledger | Yes |
 | M2 | Top-deck inspection family | Stacked Deck keep-one/recycle-rest flow; Candlelit Sanctum focused regression | Passed | User passed the manual family gate on 2026-07-13 | Yes |
 | M2 | Effect-driven Trash recovery/play family | Cemetery Attendant, Morbid Return, Soulgorger, The Harrowing, and Spectral Matron public-Trash targeting | Passed | User passed the locked-target timing and nested Unit-play flow in a new match on 2026-07-14 | Yes |
+| M2 | Optional play-cost family | Meditation optional exhaust cost and paid/declined draw branches | Passed | User manually validated Meditation on 2026-07-14 | Yes |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |

@@ -28,6 +28,8 @@ export function beginEffectResolution(input: {
   endingPlayerId?: string;
   selectedIds?: string[];
   targetsLocked?: boolean;
+  lockedSelectionsByBinding?: Record<string, string[]>;
+  targetObjectVersions?: Record<string, number>;
   behaviorEvent?: BehaviorEvent | null;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
@@ -43,6 +45,8 @@ export function beginEffectResolution(input: {
     activatedBehaviorId: input.activatedBehaviorId ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
+    lockedSelectionsByBinding: input.lockedSelectionsByBinding ?? {},
+    targetObjectVersions: input.targetObjectVersions ?? {},
     selectionsByBinding: {},
     behaviorEvent: input.behaviorEvent ?? null,
   });
@@ -495,11 +499,32 @@ function hydrateLockedSelectorSelections(
     const bindingKey = `${clause.id}:selectors:${selector.order}`;
     const selected = requirement.maximum === 0
       ? requirement.legalIds
-      : frame.initialSelectedIds.slice(cursor, cursor + requirement.maximum);
+      : frame.lockedSelectionsByBinding[bindingKey] ??
+        frame.initialSelectedIds.slice(cursor, cursor + requirement.maximum);
     if (requirement.maximum > 0) cursor += selected.length;
+    if (selector.parameters.selectionPurpose === "optionalCost") {
+      if (
+        selected.length < requirement.minimum ||
+        selected.length > requirement.maximum
+      ) {
+        return false;
+      }
+      frame.selectionsByBinding[bindingKey] = selected;
+      context.selectedBySelector[bindingKey] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+      continue;
+    }
     if (
       selected.length < requirement.minimum ||
-      selected.some((id) => !requirement.legalIds.includes(id))
+      selected.some(
+        (id) =>
+          !requirement.legalIds.includes(id) ||
+          (Object.hasOwn(frame.targetObjectVersions, id) &&
+            (context.game.state.cardStates[id]?.objectVersion ?? 0) !==
+              frame.targetObjectVersions[id]),
+      )
     ) {
       return false;
     }
