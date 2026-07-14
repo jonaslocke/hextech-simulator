@@ -44,6 +44,7 @@ test("maps Vision to card selection and keeps the top card with an empty selecti
       minimum: 0,
       playerId: "player-1",
       presentation: "vision",
+      visionAction: "recycle",
       prompt: "Choose cards to recycle.",
       revealedCards: [revealedCard],
       sourceZone: "mainDeck",
@@ -98,6 +99,69 @@ test("maps Vision to card selection and keeps the top card with an empty selecti
     actionId: "vision-action",
     selectedIds: [],
   });
+});
+
+test("maps keep-style Vision to a single keep choice", () => {
+  const revealedCards = [card("keep-1"), card("keep-2"), card("keep-3")];
+  const projection = projectionWith({
+    actions: [{
+      choice: {
+        choiceId: "keep-choice",
+        kind: "effectSelection",
+        prompt: "Choose a card to keep.",
+      },
+      disabledReason: null,
+      enabled: true,
+      id: "keep-action",
+      label: "Stacked Deck",
+      presentation: {
+        prompt: null,
+        style: "primary",
+        surface: "choice-dialog",
+      },
+      sourceCardInstanceId: null,
+      targets: [{
+        kind: "card",
+        legalIds: revealedCards.map((revealedCard) => revealedCard.instanceId),
+        maximum: 1,
+        minimum: 1,
+        sourceZone: "mainDeck",
+      }],
+    }],
+    pendingChoice: {
+      id: "keep-choice",
+      maximum: 1,
+      minimum: 1,
+      playerId: "player-1",
+      presentation: "vision",
+      visionAction: "keep",
+      prompt: "Choose a card to keep.",
+      revealedCards,
+      sourceZone: "mainDeck",
+      title: "Stacked Deck",
+      type: "effectSelection",
+      waitingMessage: "Waiting for Stacked Deck.",
+    },
+  });
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.equal(decision.title, "Stacked Deck");
+  assert.equal(decision.description, "Choose a card to keep. The other cards will be recycled.");
+  assert.equal(decision.selectionMode, "single");
+  assert.equal(decision.minSelected, 1);
+  assert.equal(decision.maxSelected, 1);
+  assert.equal(
+    typeof decision.confirmLabel === "function"
+      ? decision.confirmLabel(["keep-2"])
+      : decision.confirmLabel,
+    "Keep selected card",
+  );
 });
 
 test("builds combat damage intents without changing allocation payloads", () => {
@@ -348,6 +412,7 @@ function effectSelectionChoice(input: {
     ...input,
     playerId: "player-1",
     presentation: "cardSelection",
+    visionAction: "recycle",
     revealedCards: [],
     title: "Card selection",
     type: "effectSelection",

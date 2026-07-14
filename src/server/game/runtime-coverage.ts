@@ -54,6 +54,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.gain_points": "executable",
   "action.stun_card": "executable",
   "action.return_to_hand": "executable",
+  "action.take_to_hand": "executable",
   "action.recycle_cards": "executable",
   "action.move_unit": "executable",
   "action.play_token": "executable",

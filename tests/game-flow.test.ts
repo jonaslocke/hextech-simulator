@@ -212,6 +212,116 @@ test.skip("plays a spell through priority resolution and advances the turn", () 
   assert.equal(game.state.turn?.activePlayerId, "p2");
 });
 
+test("resolves a multi-step top-deck spell instead of dropping its Chain item", () => {
+  const { game: initial, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "SPELL",
+  )!;
+  spell.behaviorModel = {
+    playTimings: [binding("timing.action", {}, 0)],
+    clauses: [{
+      id: "stacked-deck-effect",
+      sequence: 0,
+      sourceText: "Look at the top 3 cards. Put 1 into your hand and recycle the rest.",
+      normalizedText: "look at the top 3 cards put 1 into your hand and recycle the rest",
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [
+        binding("action.look", { count: 3, selectionKey: "lookedCards" }, 0),
+        binding("action.take_to_hand", { sourceSelectionKey: "lookedCards", count: 1, selectionKey: "cardToHand" }, 1),
+        binding("action.recycle_top_cards", { count: 3, sourceSelectionKey: "lookedCards", recycleAllRemaining: true }, 2),
+      ],
+      keywords: [],
+    }],
+  };
+
+  for (const instanceId of ["p1:draw2", "p1:draw3", "p1:tail"]) {
+    decks[0]!.instances.push({
+      instanceId,
+      ownerPlayerId: "p1",
+      source: "mainDeck",
+      cardCode: "UNIT",
+    });
+    initial.state.cardStates[instanceId] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: 1,
+    };
+  }
+  initial.state.players.p1!.zones.mainDeck = [
+    "p1:draw",
+    "p1:draw2",
+    "p1:draw3",
+    "p1:tail",
+  ];
+
+  let game = initial;
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Spell",
+  );
+  assert.ok(play);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "stacked-deck-play",
+  });
+  assert.equal(game.state.chain?.items.at(-1)?.behaviorClauseId, "stacked-deck-effect");
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass);
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: "stacked-deck-pass",
+    });
+  }
+
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  if (game.state.pendingChoice?.type !== "effectSelection") {
+    throw new Error("Expected Stacked Deck to ask for a looked-at card.");
+  }
+  assert.deepEqual(game.state.pendingChoice.legalCardIds, [
+    "p1:draw",
+    "p1:draw2",
+    "p1:draw3",
+  ]);
+  const choose = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(choose);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: choose.id,
+    selectedIds: ["p1:draw2"],
+    decks,
+    now: "stacked-deck-choose",
+  });
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.ok(game.state.players.p1!.zones.hand.includes("p1:draw2"));
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, [
+    "p1:tail",
+    "p1:draw",
+    "p1:draw3",
+  ]);
+  assert.ok(game.state.players.p1!.zones.trash.includes("p1:spell"));
+});
+
 test("awakening readies only the new turn player's battlefield units", () => {
   const { game: initial, decks } = fixture();
   const game = structuredClone(initial);
@@ -849,6 +959,19 @@ test("playing a permitted Unit to an open battlefield starts a Showdown before C
   assert.equal(next.state.battlefields[0]!.contestedByPlayerId, null);
   assert.equal(next.state.players.p1!.points, 1);
 });
+
+function binding(
+  behaviorId: string,
+  parameters: Record<string, string | number | boolean | null>,
+  order: number,
+) {
+  return {
+    behaviorId,
+    parameters,
+    confidence: "high" as const,
+    order,
+  };
+}
 
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const cards = [

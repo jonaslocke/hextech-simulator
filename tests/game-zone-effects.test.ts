@@ -34,6 +34,54 @@ test("returns selected trash cards and moves battlefield units generically", () 
   assert.equal(game.state.cardStates.unit!.exhausted, true);
 });
 
+test("looked-at card transfer and recycle-all preserve the private source group", () => {
+  const game = fixture();
+  const index = cardIndex();
+  for (const id of ["top-a", "top-b", "top-c"]) {
+    index.instances.set(id, {
+      instanceId: id,
+      ownerPlayerId: "p1",
+      source: "mainDeck",
+      cardCode: "SPELL",
+    });
+    game.state.cardStates[id] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: null,
+      objectVersion: 0,
+    };
+  }
+  game.state.players.p1!.zones.mainDeck.push("top-a", "top-b", "top-c", "top-d");
+  const handlers = createPrimitiveHandlers(index);
+  const takeContext = createBehaviorContext(game, "p1", "source", null, []);
+  takeContext.selectedBySelector.lookedCards = ["top-a", "top-b", "top-c"];
+  const takeBinding = binding("action.take_to_hand", {
+    sourceSelectionKey: "lookedCards",
+    count: 1,
+    selectionKey: "cardToHand",
+  });
+  const takeRequirement = handlers.get("action.take_to_hand")!.choice!(takeBinding, takeContext);
+  assert.deepEqual(takeRequirement?.legalIds, ["top-a", "top-b", "top-c"]);
+  assert.equal(takeRequirement?.minimum, 1);
+  takeContext.selectedBySelector.cardToHand = ["top-b"];
+  handlers.get("action.take_to_hand")!.execute!(takeBinding, takeContext);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["top-b"]);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["top-a", "top-c", "top-d"]);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.addedToHand");
+
+  const recycleContext = createBehaviorContext(game, "p1", "source", null, []);
+  recycleContext.selectedBySelector.lookedCards = ["top-a", "top-b", "top-c"];
+  const recycleBinding = binding("action.recycle_top_cards", {
+    count: 3,
+    sourceSelectionKey: "lookedCards",
+    recycleAllRemaining: true,
+  });
+  const recycleRequirement = handlers.get("action.recycle_top_cards")!.choice!(recycleBinding, recycleContext);
+  assert.equal(recycleRequirement, null);
+  handlers.get("action.recycle_top_cards")!.execute!(recycleBinding, recycleContext);
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["top-d", "top-a", "top-c"]);
+});
+
 test("applies controller Bonus Damage and records whether it killed", () => {
   const game = fixture();
   const index = cardIndex();

@@ -82,6 +82,7 @@ export function buildPlayerDecisionRequest({
       );
 
       if (action && pendingChoice.presentation === "vision") {
+        const isKeepChoice = pendingChoice.visionAction === "keep";
         if (pendingChoice.minimum === pendingChoice.maximum && pendingChoice.minimum > 1) {
           return {
             actionId: action.id,
@@ -107,7 +108,8 @@ export function buildPlayerDecisionRequest({
         return {
           actionId: action.id,
           cards: pendingChoice.revealedCards.map(toDecisionCard),
-          confirmLabel: visionConfirmLabel,
+          confirmLabel: (selectedIds) =>
+            visionConfirmLabel(selectedIds, isKeepChoice),
           decisionKey: createDecisionKey({
             actorPlayerId: pendingChoice.playerId,
             decisionId: pendingChoice.id,
@@ -119,14 +121,17 @@ export function buildPlayerDecisionRequest({
             ),
             source: pendingChoice.presentation,
           }),
-          description:
-            "Choose cards to recycle. Unselected cards stay on top.",
+          description: isKeepChoice
+            ? "Choose a card to keep. The other cards will be recycled."
+            : "Choose cards to recycle. Unselected cards stay on top.",
           inspection: "publicGameState",
           kind: "cardSelection",
-          maxSelected: pendingChoice.revealedCards.length,
-          minSelected: 0,
-          selectionMode: "multiple",
-          title: "Vision",
+          maxSelected: isKeepChoice
+            ? pendingChoice.maximum
+            : pendingChoice.revealedCards.length,
+          minSelected: isKeepChoice ? pendingChoice.minimum : 0,
+          selectionMode: isKeepChoice ? "single" : "multiple",
+          title: pendingChoice.title,
         };
       }
 
@@ -510,7 +515,10 @@ function toDecisionCardFromSources(
   };
 }
 
-function visionConfirmLabel(selectedIds: string[]) {
+function visionConfirmLabel(selectedIds: string[], isKeepChoice: boolean) {
+  if (isKeepChoice) {
+    return "Keep selected card";
+  }
   if (selectedIds.length === 0) {
     return "Keep on top";
   }

@@ -20,6 +20,9 @@ export const SIDEBOARD_VALIDATION_DECK_IDS = [
   "master-yi-s",
   "garen-s",
 ] as const satisfies DeckId[];
+export const OPTIONAL_PLAYABLE_DECK_IDS = [
+  "annie-stacked-deck",
+] as const satisfies DeckId[];
 export const DECK_IDS = CORE_DECK_IDS;
 export const PLAYABLE_DECK_IDS = deckIdSchema.options;
 

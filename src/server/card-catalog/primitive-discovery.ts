@@ -318,6 +318,12 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "action.return_to_hand", "action", { target: readGenericTarget(context.rulesText) }, "high")
       : null
   ),
+  primitive("action.take_to_hand", "action", "Take looked-at card to hand", "Move a chosen privately looked-at card into hand.", ["sourceSelectionKey", "count", "selectionKey"], (context) =>
+    /\bput\b[^.]*\binto your hand\b/.test(context.rulesText) &&
+    (/\brecycle the rest\b/.test(context.rulesText) || /\blook at\b/.test(context.rulesText))
+      ? assignment(context, "action.take_to_hand", "action", { sourceSelectionKey: "lookedCards", count: readFirstNumber(context.rulesText) ?? 1, selectionKey: "cardToHand" }, "high")
+      : null
+  ),
   primitive("modifier.play_unit_destination", "modifier", "Play unit destination", "Adds a card-driven legal play destination.", ["destination"], (context) =>
     /\bplay me to an open battlefield\b/.test(context.rulesText)
       ? assignment(context, "modifier.play_unit_destination", "modifier", { destination: "openBattlefield" }, "high")

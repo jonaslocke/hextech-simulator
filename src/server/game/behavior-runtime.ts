@@ -37,6 +37,7 @@ export type BehaviorHandler = {
     destinations?: Array<{ id: string; label: string }>;
     sourceZone?: "hand" | "trash" | "mainDeck";
     presentation?: "cardSelection" | "vision";
+    visionAction?: "recycle" | "keep";
     acceptLabel?: string;
     declineLabel?: string;
   } | null;

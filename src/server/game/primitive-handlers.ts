@@ -548,23 +548,39 @@ export function createPrimitiveHandlers(
         0,
         numberParam(binding, "count"),
       );
-      return cards.length > 0
+      const availableCards = cards.filter((id) =>
+        context.game.state.players[context.controllerPlayerId]!.zones.mainDeck.includes(id),
+      );
+      const recycleAllRemaining = binding.parameters.recycleAllRemaining === true;
+      if (recycleAllRemaining) return null;
+      const minimum = recycleAllRemaining
+        ? availableCards.length
+        : typeof binding.parameters.minimumCount === "number"
+          ? binding.parameters.minimumCount
+          : 0;
+      const maximum = recycleAllRemaining
+        ? availableCards.length
+        : typeof binding.parameters.maximumCount === "number"
+          ? Math.min(binding.parameters.maximumCount, availableCards.length)
+          : availableCards.length;
+      return availableCards.length > 0
         ? {
-            legalIds: cards,
-            minimum: 0,
-            maximum: cards.length,
+            legalIds: availableCards,
+            minimum,
+            maximum,
             prompt: "Choose any looked-at cards to recycle.",
             sourceZone: "mainDeck" as const,
             presentation: "vision" as const,
+            visionAction: "recycle" as const,
           }
         : null;
     },
     execute(binding, context) {
       const player = context.game.state.players[context.controllerPlayerId]!;
       const eligible = new Set(lookedCardsFor(binding, context));
-      const selected = context.selectedIds.filter((id) =>
-        eligible.has(id) && player.zones.mainDeck.includes(id),
-      );
+      const selected = (binding.parameters.recycleAllRemaining === true
+        ? lookedCardsFor(binding, context).filter((id) => player.zones.mainDeck.includes(id))
+        : context.selectedIds.filter((id) => eligible.has(id) && player.zones.mainDeck.includes(id)));
       player.zones.mainDeck = player.zones.mainDeck.filter(
         (id) => !selected.includes(id),
       );
@@ -578,6 +594,43 @@ export function createPrimitiveHandlers(
           values: { count: selected.length },
         });
       }
+    },
+  });
+  handlers.set("action.take_to_hand", {
+    choice(binding, context) {
+      const cards = lookedCardsFor(binding, context).filter((id) =>
+        context.game.state.players[context.controllerPlayerId]!.zones.mainDeck.includes(id),
+      );
+      const count = numberParam(binding, "count");
+      return cards.length > 0
+        ? {
+            legalIds: cards,
+            minimum: Math.min(count, cards.length),
+            maximum: Math.min(count, cards.length),
+            prompt: "Choose a looked-at card to put into your hand.",
+            sourceZone: "mainDeck" as const,
+            presentation: "vision" as const,
+            visionAction: "keep" as const,
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const looked = new Set(lookedCardsFor(binding, context));
+      const selected = selectionFor(binding, context)
+        .filter((id) => looked.has(id) && player.zones.mainDeck.includes(id))
+        .slice(0, numberParam(binding, "count"));
+      if (selected.length === 0) return;
+      player.zones.mainDeck = player.zones.mainDeck.filter((id) => !selected.includes(id));
+      player.zones.hand.push(...selected);
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...selected.map((id) => ({
+          type: "card.addedToHand",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
     },
   });
   handlers.set("action.order_top_cards", {

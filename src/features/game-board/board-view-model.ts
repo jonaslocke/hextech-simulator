@@ -111,6 +111,7 @@ export type BoardProjection = {
         waitingMessage: string;
         sourceZone: "hand" | "trash" | "mainDeck" | null;
         presentation: "cardSelection" | "vision";
+        visionAction: "recycle" | "keep";
         revealedCards: ProjectedCardView[];
         minimum: number;
         maximum: number;

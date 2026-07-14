@@ -159,6 +159,7 @@ export const deckIdSchema = z.enum([
   "annie-s",
   "master-yi-s",
   "garen-s",
+  "annie-stacked-deck",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
@@ -341,6 +342,7 @@ export const gameProjectionSchema = z.object({
         waitingMessage: z.string().min(1),
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
         presentation: z.enum(["cardSelection", "vision"]),
+        visionAction: z.enum(["recycle", "keep"]),
         revealedCards: z.array(projectedCardViewSchema),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),

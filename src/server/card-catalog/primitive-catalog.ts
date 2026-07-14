@@ -130,6 +130,7 @@ export const gameEventKinds = [
   "card.drawn",
   "card.discarded",
   "card.recycled",
+  "card.addedToHand",
   "card.revealed",
   "card.banished",
   "card.returnedToHand",
@@ -952,6 +953,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [required("target", "target", "The card to return.")],
     emitsEvents: ["card.returnedToHand"]
   }),
+  "action.take_to_hand": primitiveSeed({
+    id: "action.take_to_hand",
+    family: "action",
+    name: "Take looked-at card to hand",
+    description: "Moves a chosen card from a private looked-at group into its controller's hand.",
+    parameters: [
+      required("sourceSelectionKey", "string", "The key containing the privately looked-at cards."),
+      required("count", "number", "The number of looked-at cards to take."),
+      optional("selectionKey", "string", "The key storing the chosen cards.")
+    ],
+    emitsEvents: ["card.addedToHand"],
+    engineSupport: supported("The controller chooses only from the original looked-at cards, and selected cards leave the Main Deck for hand.")
+  }),
   "action.recycle_cards": primitiveSeed({
     id: "action.recycle_cards",
     family: "action",
@@ -1057,6 +1071,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("count", "number", "How many top cards are eligible."),
       optional("sourceSelectionKey", "string", "Key containing the previously looked-at cards."),
       optional("selectionKey", "string", "Key storing the selected recycled cards."),
+      optional("recycleAllRemaining", "boolean", "Whether every looked-at card remaining in the deck must be recycled."),
     ],
     emitsEvents: ["card.recycled"],
     engineSupport: supported("Uses a private Main Deck selection during effect resolution."),

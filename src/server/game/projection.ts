@@ -201,13 +201,14 @@ export function projectGame(input: {
               id: input.game.state.pendingChoice.id,
               playerId: input.game.state.pendingChoice.playerId,
               prompt: input.game.state.pendingChoice.prompt,
-              title: "Card selection",
+              title: input.game.state.pendingChoice.title,
               waitingMessage:
                 input.game.state.pendingChoice.playerId === input.viewerPlayerId
                   ? input.game.state.pendingChoice.prompt
                   : `Waiting for the other player to complete: ${input.game.state.pendingChoice.prompt}`,
               sourceZone: input.game.state.pendingChoice.sourceZone,
               presentation: input.game.state.pendingChoice.presentation,
+              visionAction: input.game.state.pendingChoice.visionAction,
               revealedCards:
                 input.game.state.pendingChoice.playerId ===
                   input.viewerPlayerId &&

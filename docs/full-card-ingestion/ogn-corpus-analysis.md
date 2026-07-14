@@ -1,10 +1,10 @@
 # Origins M2 Corpus Analysis and Implementation Proposal
 
-Snapshot date: 2026-07-11
+Snapshot date: 2026-07-13
 
 This is the Phase 1 and Phase 2 record for Origins (`OGN`). It is a discovery
-and implementation proposal, not behavior approval. No OGN card has been
-approved or made gameplay-ready by this analysis.
+and implementation proposal, not behavior approval. Manual acceptance remains
+open for all remaining OGN cards.
 
 ## Input Readiness
 
@@ -190,6 +190,17 @@ The following further generic foundations are implemented and synchronized:
   replacement parameters before approval.
 - `action.look` exposes a private, non-moving top-deck inspection choice, and
   `action.reveal` emits reveal events without moving the revealed cards.
+- `action.take_to_hand` moves a chosen card from the original private look
+  group into hand, and `action.recycle_top_cards` can require all remaining
+  looked-at cards to be recycled. The first remaining family binding is
+  prepared for `Stacked Deck` in `scripts/approve-ogn-top-deck-family.ts`.
+
+The current remaining-card inventory is generated and checked by
+`scripts/ogn-m2-inventory.ts`: 242 gameplay-distinct definitions, 236 with
+rules text, and 298 clauses after accepted deck cards, equivalent printings,
+and represented token printings are excluded. See
+`ogn-m2-remaining-inventory.md` for the inventory contract and
+`ogn-m2-top-deck-family.md` for the first family reuse map and manual gate.
 
 ## Manual Coverage to Reserve
 

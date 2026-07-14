@@ -253,6 +253,7 @@ function continueQueuedChainItems(
       resolutionId: null,
       bindingKey: "chain-targets",
       prompt: `Choose targets for ${item.label}`,
+      title: item.label,
       optionKind: requirements.some(
         (requirement) => requirement.kind === "battlefield",
       )
@@ -261,6 +262,7 @@ function continueQueuedChainItems(
       sourceZone:
         sourceZones.size === 1 ? ([...sourceZones][0] ?? null) : null,
       presentation: "cardSelection",
+      visionAction: "recycle",
       legalCardIds: [
         ...new Set(requirements.flatMap((requirement) => requirement.legalIds)),
       ],
