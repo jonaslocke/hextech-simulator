@@ -56,11 +56,11 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `selector.unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select legal unit | None |
 | `selector.friendly_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select friendly unit | None |
 | `selector.enemy_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select enemy unit | None |
-| `selector.card` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select card from non-board zone | None |
+| `selector.card` | Existing | TBD | Covered by rules reference | Executable for controller and opponent Hand/Trash zones | `tests/game-token-placement.test.ts` | Select a legal card from a non-board zone, including a revealed opponent Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | `selector.battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select battlefield | None |
 | `action.draw_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Draw cards | None |
 | `action.vision` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Resolve Vision choice | None |
-| `action.discard_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Discard chosen cards | None |
+| `action.discard_cards` | Existing | TBD | Covered by rules reference | Executable for a direct choice or a previously selected card | `tests/game-token-placement.test.ts` | Discard the selected card | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | `action.ready_cards` | Existing | TBD | Covered by rules reference | Executable with `card.readied` event | `tests/game-token-placement.test.ts` | Ready selected exhausted card | Exact ready-trigger models remain unapproved |
 | `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | `tests/game-token-placement.test.ts` | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
 | `action.channel_runes` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel runes | None |
@@ -72,7 +72,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.banish_card` | OGN M2 | Time Warp, Portal Rescue | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Banish selected card to its owner's Banishment | Follow-up play-from-banishment model remains unapproved |
 | `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
-| `action.recycle_cards` | OGN M2 | Vi, Destructive and other recycle cards | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Recycle selected card from trash | Exact recycle cost/card models remain unapproved |
+| `action.recycle_cards` | OGN M2 | Vi, Destructive, Sabotage, and other recycle cards | Covered by rules reference | Executable for direct or keyed selection | `tests/game-token-placement.test.ts` | Recycle selected card from trash or revealed Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | `action.take_to_hand` | OGN M2 | Stacked Deck | Covered by rules reference | Executable | `tests/game-zone-effects.test.ts` | Choose one card from the original private look group and move it to hand | First use manually passed on 2026-07-13 |
 | `action.play_selected_unit` cost mode | OGN M2 | Soulgorger, The Harrowing | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Play a selected locked Trash Unit while paying only its Power cost | Effect-driven Trash-play family manually passed on 2026-07-14 |
 | `action.move_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move unit to base | None |
@@ -106,6 +106,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | OGN | OGN-170 | Morbid Return | Spell | 1 | `timing.action`, `selector.card`, `action.return_to_hand` | Yes | Yes | Public-Trash target lock passed with the effect-driven recovery/play family on 2026-07-14. |
 | OGN | OGN-196 | Soulgorger | Unit | 1 | `trigger.on_play`, `selector.card`, `action.play_selected_unit` | Yes | Yes | Locked target and Power-only nested play passed on 2026-07-14. |
 | OGN | OGN-198 | The Harrowing | Spell | 1 | `selector.card`, `action.play_selected_unit` | Yes | Yes | Locked target and Power-only nested play passed on 2026-07-14. |
+| OGN | OGN-156 | Sabotage | Spell | 1 | `timing.action`, `selector.card`, `action.recycle_cards` | Yes | Yes | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
+| OGN | OGN-192 | Mindsplitter | Unit | 1 | `trigger.on_play`, `selector.card`, `action.discard_cards` | Yes | Yes | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 
 ## Token Coverage Ledger
 

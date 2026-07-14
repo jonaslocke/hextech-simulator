@@ -179,6 +179,8 @@ const effectSelectionChoiceSchema = z.object({
       z.object({
         kind: z.enum(["card", "battlefield", "player"]),
         label: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
+        revealZone: z.boolean().optional(),
         selectionKey: z.string().min(1).optional(),
         selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),

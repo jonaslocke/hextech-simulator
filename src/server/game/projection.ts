@@ -122,6 +122,26 @@ export function projectGame(input: {
       zones,
     };
   });
+  const actions = (input.game.status === "setup_pending"
+    ? setupActions(input.game, input.viewerPlayerId)
+    : gameplayActions(input.game, input.viewerPlayerId, input.decks)
+  ).map((action) => {
+    if (!action.id.includes(":setup:lockBattlefield:")) return action;
+    const cardId = action.id.split(":").slice(4).join(":");
+    return { ...action, label: `Choose ${view(cardId).name}` };
+  });
+  const selectionCards = actions
+    .flatMap((action) => action.targets)
+    .filter((target) => target.kind === "card" && target.sourceZone === "hand")
+    .flatMap((target) => target.legalIds)
+    .map((id) => view(id));
+  const revealedCards = revealedCardsForPendingEffectSelection({
+    game: input.game,
+    instances,
+    viewerPlayerId: input.viewerPlayerId,
+    view,
+  });
+
   return gameProjectionSchema.parse({
     id: input.game.id,
     matchId: input.game.matchId,
@@ -132,6 +152,7 @@ export function projectGame(input: {
     activePlayerId: input.game.state.turn?.activePlayerId ?? null,
     winnerPlayerId: input.game.winnerPlayerId,
     victoryScore: victoryRequirement(input.game, input.decks),
+    selectionCards,
     players,
     setup: {
       playerIds: input.game.state.setup.playerIds,
@@ -209,14 +230,7 @@ export function projectGame(input: {
               sourceZone: input.game.state.pendingChoice.sourceZone,
               presentation: input.game.state.pendingChoice.presentation,
               visionAction: input.game.state.pendingChoice.visionAction,
-              revealedCards:
-                input.game.state.pendingChoice.playerId ===
-                  input.viewerPlayerId &&
-                input.game.state.pendingChoice.presentation === "vision"
-                  ? input.game.state.pendingChoice.legalCardIds.map((id) =>
-                      view(id),
-                    )
-                  : [],
+              revealedCards,
               minimum: input.game.state.pendingChoice.minimum,
               maximum: input.game.state.pendingChoice.maximum,
             }
@@ -309,20 +323,47 @@ export function projectGame(input: {
           passedPlayerIds: input.game.state.chain.passedPlayerIds,
         }
       : null,
-    actions: (input.game.status === "setup_pending"
-      ? setupActions(input.game, input.viewerPlayerId)
-      : gameplayActions(input.game, input.viewerPlayerId, input.decks)
-    ).map((action) => {
-      if (!action.id.includes(":setup:lockBattlefield:")) return action;
-      const cardId = action.id.split(":").slice(4).join(":");
-      return { ...action, label: `Choose ${view(cardId).name}` };
-    }),
+    actions,
     logEntries: (input.events ?? []).map((event) => ({
       id: event.id,
       message: event.message,
       createdAt: event.createdAt,
     })),
   });
+}
+
+function revealedCardsForPendingEffectSelection(input: {
+  game: GameDocument;
+  instances: Map<string, DeckSnapshotDocument["instances"][number]>;
+  viewerPlayerId: string;
+  view: (id: string, includeActiveModifiers?: boolean) => ProjectedCardView;
+}): ProjectedCardView[] {
+  const pending = input.game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "effectSelection" ||
+    pending.playerId !== input.viewerPlayerId
+  ) {
+    return [];
+  }
+  if (pending.presentation === "vision") {
+    return pending.legalCardIds.map((id) => input.view(id));
+  }
+  const revealedHandTarget = pending.targetRequirements?.find(
+    (target) =>
+      target.kind === "card" &&
+      target.sourceZone === "hand" &&
+      target.revealZone === true,
+  );
+  const ownerPlayerId = revealedHandTarget?.legalIds
+    .map((id) => input.instances.get(id)?.ownerPlayerId)
+    .find((id): id is string => Boolean(id));
+
+  return ownerPlayerId
+    ? input.game.state.players[ownerPlayerId]!.zones.hand.map((id) =>
+        input.view(id),
+      )
+    : [];
 }
 
 function projectChainItem(

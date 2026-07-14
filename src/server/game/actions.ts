@@ -708,15 +708,53 @@ export function performGameplayTransition(input: {
     input.decks,
   ).find((candidate) => candidate.id === input.actionId);
   const game = performGameplayAction(input);
+  const revealEvents = projected
+    ? publicZoneRevealEvents(input.game, projected, input.decks)
+    : [];
   return {
     game,
     events: projected
-      ? [
-          acceptedActionEvent(input.actorPlayerId, projected),
-          ...stateChangeEvents(input.game, game),
+        ? [
+            acceptedActionEvent(input.actorPlayerId, projected),
+            ...revealEvents,
+            ...stateChangeEvents(input.game, game),
         ]
       : [],
   };
+}
+
+function publicZoneRevealEvents(
+  game: GameDocument,
+  action: ProjectedAction,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const index = createRuntimeCardIndex(decks, game);
+  const revealedOwners = new Set<string>();
+  return action.targets.flatMap((target) => {
+    if (
+      target.kind !== "card" ||
+      target.sourceZone !== "hand" ||
+      target.revealZone !== true
+    ) {
+      return [];
+    }
+    const owner = target.legalIds
+      .map((id) => index.instances.get(id)?.ownerPlayerId)
+      .find((id): id is string => Boolean(id));
+    if (!owner || revealedOwners.has(owner)) return [];
+    revealedOwners.add(owner);
+    const hand = game.state.players[owner]?.zones.hand ?? [];
+    const cardNames = hand.map((id) => definitionForInstance(id, index).card.name);
+    return [{
+      type: "hand.revealed",
+      actorPlayerId: owner,
+      message: `${owner} revealed their Hand: ${cardNames.join(", ") || "(empty)"}.`,
+      payload: {
+        playerId: owner,
+        count: cardNames.length,
+      },
+    }];
+  });
 }
 
 function playCard(

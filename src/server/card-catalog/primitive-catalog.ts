@@ -682,7 +682,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Selects cards from a specified owner zone.",
     parameters: [
       required("zone", "zone", "The zone containing legal cards."),
-      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit"]),
+      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit", "nonUnit"]),
       required("owner", "player", "The required owner relationship."),
       required("minimumCount", "number", "The minimum selection count."),
       required("maximumCount", "number", "The maximum selection count."),
@@ -691,6 +691,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("requiresPayablePowerCost", "boolean", "Whether only cards whose base Power cost can currently be paid are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
+      optional("revealZone", "boolean", "Whether the selected owner zone is publicly revealed when this selection is made."),
       optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
@@ -750,7 +751,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Moves cards from hand to trash.",
     parameters: [
       required("player", "player", "The player who discards cards."),
-      required("count", "number", "The number of cards discarded.")
+      required("count", "number", "The number of cards discarded."),
+      optional("selectionKey", "string", "A previously selected card group to discard.")
     ],
     emitsEvents: ["card.discarded"]
   }),
@@ -974,7 +976,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Moves cards to the bottom of a deck.",
     parameters: [
       required("target", "target", "The cards to recycle."),
-      optional("count", "number", "The number of cards recycled.")
+      optional("count", "number", "The number of cards recycled."),
+      optional("selectionKey", "string", "A previously selected card group to recycle.")
     ],
     emitsEvents: ["card.recycled"],
     engineSupport: supported("Selected cards return to the bottom of their corresponding deck.")

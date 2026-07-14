@@ -346,6 +346,7 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...(projection.pendingChoice?.type === "effectSelection"
       ? projection.pendingChoice.revealedCards
       : []),
+    ...(projection.selectionCards ?? []),
   ];
   return [...new Map(cards.map((card) => [card.instanceId, card])).values()];
 }

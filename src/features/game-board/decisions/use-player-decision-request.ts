@@ -145,16 +145,21 @@ export function buildPlayerDecisionRequest({
         );
         const visibleCardById = visibleCardsById(sourceProjection);
         const legalIds = requirement?.legalIds ?? [];
+        const displayIds =
+          pendingChoice.revealedCards.length > 0
+            ? pendingChoice.revealedCards.map((card) => card.instanceId)
+            : legalIds;
 
         return {
           actionId: action.id,
-          cards: legalIds.map((id) =>
-            toDecisionCardFromSources(
+          cards: displayIds.map((id) => ({
+            ...toDecisionCardFromSources(
               id,
               visibleCardById.get(id),
               cardsByInstanceId[id],
             ),
-          ),
+            disabled: !legalIds.includes(id),
+          })),
           confirmLabel:
             pendingChoice.sourceZone === "hand"
               ? "Discard selected card"
@@ -423,7 +428,9 @@ function mapActiveNonBoardCardDecision({
       activeTargetSelection.minTargets > 0
         ? "single"
         : "multiple",
-    title: zoneKind ? selectionTitleForZone(zoneKind) : "Choose Cards",
+    title:
+      requirement?.title ??
+      (zoneKind ? selectionTitleForZone(zoneKind) : "Choose Cards"),
   };
 }
 

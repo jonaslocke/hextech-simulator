@@ -24,6 +24,7 @@ import {
   applyStartOfTurn,
   gameplayActions,
   performGameplayAction,
+  performGameplayTransition,
   projectGame,
   startCombat,
 } from "../src/server/game";
@@ -351,6 +352,183 @@ test("move triggers can be limited to battlefield destinations", () => {
     index.definitions.get(RECRUIT_TOKEN_CARD_CODE)?.card.name,
     "Recruit (NX)",
   );
+});
+
+test("Sabotage reveals and chooses a legal opponent Hand card while it resolves", () => {
+  const sabotage = spell("SABOTAGE", "Sabotage", [
+    clause("sabotage", {
+      selectors: [
+        binding("selector.card", 0, {
+          zone: "hand",
+          cardType: "nonUnit",
+          owner: "opponent",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          revealZone: true,
+          selectionKey: "cardToRecycle",
+        }),
+      ],
+      effects: [
+        binding("action.recycle_cards", 1, {
+          target: "selected",
+          selectionKey: "cardToRecycle",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([
+    sabotage,
+    unit("ENEMY_UNIT", "Enemy Unit"),
+    spell("ENEMY_SPELL", "Enemy Spell"),
+  ]);
+  decks[0]!.instances.push(instance("sabotage", "p1", "SABOTAGE"));
+  decks[1]!.instances.push(
+    instance("enemy-unit", "p2", "ENEMY_UNIT"),
+    instance("enemy-spell", "p2", "ENEMY_SPELL"),
+  );
+  game.state.players.p1!.zones.hand.push("sabotage");
+  game.state.players.p2!.zones.hand.push("enemy-unit", "enemy-spell");
+  game.state.cardStates.sabotage = cardState(null);
+  game.state.cardStates["enemy-unit"] = cardState(1);
+  game.state.cardStates["enemy-spell"] = cardState(null);
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "sabotage",
+  );
+  assert.ok(play);
+  assert.deepEqual(play.targets, []);
+
+  const transition = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "sabotage-cast",
+  });
+  let next = transition.game;
+  assert.deepEqual(next.state.chain?.items.at(-1)?.targetCardInstanceIds, []);
+
+  next = passPriority(next, "p1", decks);
+  next = passPriority(next, "p2", decks);
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    next.state.pendingChoice?.type === "effectSelection"
+      ? next.state.pendingChoice.legalCardIds
+      : [],
+    ["enemy-spell"],
+  );
+  const controllerProjection = projectGame({
+    game: next,
+    viewerPlayerId: "p1",
+    decks,
+  });
+  assert.deepEqual(
+    controllerProjection.pendingChoice?.type === "effectSelection"
+      ? controllerProjection.pendingChoice.revealedCards.map(
+          (card) => card.instanceId,
+        )
+      : [],
+    ["enemy-unit", "enemy-spell"],
+  );
+  const opponentProjection = projectGame({
+    game: next,
+    viewerPlayerId: "p2",
+    decks,
+  });
+  assert.deepEqual(
+    opponentProjection.pendingChoice?.type === "effectSelection"
+      ? opponentProjection.pendingChoice.revealedCards
+      : [],
+    [],
+  );
+  const choose = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(choose);
+  const resolved = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: choose.id,
+    selectedIds: ["enemy-spell"],
+    decks,
+    now: "sabotage-resolved",
+  });
+  assert.equal(
+    resolved.events.find((event) => event.type === "hand.revealed")?.message,
+    "p2 revealed their Hand: Enemy Unit, Enemy Spell.",
+  );
+  assert.ok(resolved.game.state.players.p2!.zones.mainDeck.includes("enemy-spell"));
+  assert.ok(resolved.game.state.players.p2!.zones.hand.includes("enemy-unit"));
+});
+
+test("Mindsplitter reveals and chooses an opponent Hand card while its trigger resolves", () => {
+  const mindsplitter = unit("MINDSPLITTER", "Mindsplitter", [
+    clause("mindsplitter", {
+      triggers: [binding("trigger.on_play", 0, { actor: "controller", subject: "source" })],
+      selectors: [
+        binding("selector.card", 1, {
+          zone: "hand",
+          cardType: "any",
+          owner: "opponent",
+          minimumCount: 1,
+          maximumCount: 1,
+          deferred: true,
+          revealZone: true,
+          selectionKey: "cardToDiscard",
+        }),
+      ],
+      effects: [
+        binding("action.discard_cards", 2, {
+          player: "selectedCardOwner",
+          count: 1,
+          selectionKey: "cardToDiscard",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([mindsplitter, spell("ENEMY_SPELL", "Enemy Spell")]);
+  decks[0]!.instances.push(instance("mindsplitter", "p1", "MINDSPLITTER"));
+  decks[1]!.instances.push(instance("enemy-spell", "p2", "ENEMY_SPELL"));
+  game.state.players.p1!.zones.base.push("mindsplitter");
+  game.state.players.p2!.zones.hand.push("enemy-spell");
+  game.state.cardStates.mindsplitter = cardState(1);
+  game.state.cardStates["enemy-spell"] = cardState(null);
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "mindsplitter",
+    values: {},
+  }, decks);
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.chain?.items.at(-1)?.label, "Mindsplitter");
+  assert.deepEqual(game.state.chain?.items.at(-1)?.targetCardInstanceIds, []);
+
+  let next = passPriority(game, "p1", decks);
+  next = passPriority(next, "p2", decks);
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    next.state.pendingChoice?.type === "effectSelection"
+      ? next.state.pendingChoice.legalCardIds
+      : [],
+    ["enemy-spell"],
+  );
+
+  const choose = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(choose);
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: choose.id,
+    selectedIds: ["enemy-spell"],
+    decks,
+    now: "mindsplitter-targeted",
+  });
+  assert.ok(next.state.players.p2!.zones.trash.includes("enemy-spell"));
 });
 
 test("a battlefield restriction removes moves to base from units there", () => {

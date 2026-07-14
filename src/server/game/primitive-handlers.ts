@@ -288,7 +288,20 @@ export function createPrimitiveHandlers(
   });
   handlers.set("selector.card", {
     targets(binding, context) {
-      const player = context.game.state.players[context.controllerPlayerId]!;
+      // Older approved models predate the explicit owner parameter. Preserve
+      // their controller-zone behavior while allowing public opponent zones.
+      const owner = typeof binding.parameters.owner === "string"
+        ? binding.parameters.owner
+        : "controller";
+      const ownerPlayerId = owner === "opponent"
+        ? context.game.state.setup.playerIds.find(
+            (id) => id !== context.controllerPlayerId,
+          )
+        : context.controllerPlayerId;
+      if (!ownerPlayerId) {
+        throw new Error("Card selector owner is unavailable.");
+      }
+      const player = context.game.state.players[ownerPlayerId]!;
       const zone = stringParam(binding, "zone");
       const zoneValue =
         player.zones[zone as keyof typeof player.zones];
@@ -301,6 +314,8 @@ export function createPrimitiveHandlers(
       const legalIds = ids.filter(
         (id) =>
           cardType === "any" ||
+          (cardType === "nonUnit" &&
+            definitionForInstance(id, index).card.classification.type !== "Unit") ||
           definitionForInstance(id, index).card.classification.type ===
             cardType,
       ).filter((id) => {
@@ -325,9 +340,19 @@ export function createPrimitiveHandlers(
       const minimum = binding.parameters.requireMaximumAvailable === true
         ? Math.min(maximum, legalIds.length)
         : numberParam(binding, "minimumCount");
+      const cardLabel = cardType === "any"
+        ? "card"
+        : cardType === "nonUnit"
+          ? "non-unit card"
+          : cardType.toLowerCase();
+      const ownerLabel = owner === "opponent" ? "opponent's " : "";
       return {
         kind: "card" as const,
-        label: `${cardType === "any" ? "card" : cardType.toLowerCase()} from ${zone}`,
+        label: `${cardLabel} from ${ownerLabel}${zone}`,
+        ...(owner === "opponent" && zone === "hand"
+          ? { title: "Choose from opponent's Hand" }
+          : {}),
+        ...(binding.parameters.revealZone === true ? { revealZone: true } : {}),
         sourceZone:
           zone === "hand" || zone === "trash" || zone === "mainDeck"
             ? zone
@@ -429,6 +454,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.discard_cards", {
     choice(binding, context) {
+      if (typeof binding.parameters.selectionKey === "string") return null;
       const hand =
         context.game.state.players[context.controllerPlayerId]!.zones.hand;
       const count = Math.min(numberParam(binding, "count"), hand.length);
@@ -443,15 +469,27 @@ export function createPrimitiveHandlers(
         : null;
     },
     execute(binding, context) {
-      const player =
-        context.game.state.players[context.controllerPlayerId]!;
-      const count = Math.min(numberParam(binding, "count"), player.zones.hand.length);
-      const selected = context.selectedIds.slice(0, count);
-      player.zones.hand = player.zones.hand.filter(
-        (id) => !selected.includes(id),
-      );
-      player.zones.trash.push(...selected);
-      selected.forEach((id) => incrementObjectVersion(context.game, id));
+      const selectedFromSelector = selectionFor(binding, context);
+      const selected = selectedFromSelector.length > 0
+        ? selectedFromSelector
+        : context.selectedIds.slice(
+            0,
+            Math.min(
+              numberParam(binding, "count"),
+              context.game.state.players[context.controllerPlayerId]!.zones.hand.length,
+            ),
+          );
+      for (const id of selected) {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        if (!owner) continue;
+        const hand = context.game.state.players[owner]!.zones.hand;
+        if (!hand.includes(id)) continue;
+        context.game.state.players[owner]!.zones.hand = hand.filter(
+          (candidate) => candidate !== id,
+        );
+        context.game.state.players[owner]!.zones.trash.push(id);
+        incrementObjectVersion(context.game, id);
+      }
     },
   });
   handlers.set("action.channel_runes", {
@@ -1065,7 +1103,9 @@ export function createPrimitiveHandlers(
       const candidates =
         binding.parameters.target === "source"
           ? [context.sourceCardInstanceId]
-          : context.selectedIds;
+          : selectionFor(binding, context).length > 0
+            ? selectionFor(binding, context)
+            : context.selectedIds;
       const ids =
         typeof requestedCount === "number"
           ? candidates.slice(0, requestedCount)

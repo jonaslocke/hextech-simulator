@@ -18,6 +18,8 @@ export const projectedTargetRequirementSchema = z
   .object({
     kind: z.enum(["card", "battlefield", "player"]),
     label: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
+    revealZone: z.boolean().optional(),
     selectionKey: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
     sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
@@ -270,6 +272,10 @@ export const gameProjectionSchema = z.object({
   activePlayerId: z.string().min(1).nullable(),
   winnerPlayerId: z.string().min(1).nullable(),
   victoryScore: z.number().int().positive(),
+  // Cards temporarily exposed solely because the viewer must make a legal
+  // selection (for example, an opponent's revealed hand). They are not part
+  // of a zone projection and must only be present in that viewer's response.
+  selectionCards: z.array(projectedCardViewSchema).optional(),
   setup: z.object({
     playerIds: z.tuple([z.string().min(1), z.string().min(1)]),
     startingPlayerChooserId: z.string().min(1),

@@ -325,6 +325,46 @@ test("maps pending non-board effect selections to the dialog", () => {
   );
 });
 
+test("shows all revealed Hand cards while disabling ineligible choices", () => {
+  const legalCard = card("legal-card", "Spell");
+  const ineligibleCard = card("ineligible-card", "Unit");
+  const action = effectSelectionAction(
+    "opponent-hand-choice",
+    "Choose non-unit card from opponent's hand",
+    [legalCard.instanceId],
+    "hand",
+  );
+  action.targets[0]!.revealZone = true;
+  const projection = projectionWith({
+    actions: [action],
+    pendingChoice: {
+      ...effectSelectionChoice({
+        id: "opponent-hand-choice",
+        maximum: 1,
+        minimum: 1,
+        prompt: "Choose non-unit card from opponent's hand",
+        sourceZone: "hand",
+      }),
+      revealedCards: [ineligibleCard, legalCard],
+    },
+  });
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.deepEqual(
+    decision.cards.map((item) => ({ id: item.id, disabled: item.disabled })),
+    [
+      { id: "ineligible-card", disabled: true },
+      { id: "legal-card", disabled: false },
+    ],
+  );
+});
+
 function projectionWith(
   overrides: Pick<GameProjection, "actions" | "pendingChoice">,
 ): GameProjection {
