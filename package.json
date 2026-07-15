@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "next build",
     "dev": "tsx server.ts --dev",
     "next:dev": "next dev",
-    "build": "next build",
     "catalog:build-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts",
     "catalog:check-mvp": "node --import tsx scripts/build-mvp-card-catalog.ts --check",
     "catalog:clear-validations": "node --env-file=.env --import tsx scripts/clear-card-behavior-validations.ts --confirm",
@@ -19,10 +19,15 @@
     "start": "tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\""
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@opennextjs/cloudflare": "^1.20.1",
     "@radix-ui/react-popover": "^1.1.17",
     "@radix-ui/react-select": "^2.3.1",
     "@radix-ui/react-slot": "^1.2.5",
@@ -57,6 +62,7 @@
     "@types/seedrandom": "^3.0.8",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.0.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "wrangler": "^4.111.0"
   }
 }
