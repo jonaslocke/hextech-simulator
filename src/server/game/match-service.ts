@@ -1270,12 +1270,19 @@ function runtimeDecksForGame(
   return Object.fromEntries(
     decks.map((deck) => {
       const seat = match.seats.find((item) => item.playerId === deck.playerId);
+      if (!seat) {
+        throw new MatchServiceError(
+          "match.invariantViolation",
+          `Seat is unavailable for player ${deck.playerId}.`,
+        );
+      }
       const chosenChampionRegisteredCardId =
-        seat?.currentDeckConfiguration.chosenChampionRegisteredCardId;
+        seat.currentDeckConfiguration.chosenChampionRegisteredCardId;
       return [
         deck.playerId,
         {
           template: deck.snapshot,
+          chosenChampionRegisteredCardId,
           instances: [
             ...deck.instances
               .filter(

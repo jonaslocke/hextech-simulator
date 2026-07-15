@@ -396,6 +396,7 @@ export type MatchDocument = z.infer<typeof matchDocumentSchema>;
 export type DeckRuntimeSnapshot = {
   template: DeckSnapshot;
   instances: CardInstance[];
+  chosenChampionRegisteredCardId: string;
 };
 
 export type ActiveGameDeck = {
@@ -439,7 +440,16 @@ export function createRuntimeDeckSnapshot(
       });
     }
   }
-  return { template, instances };
+  const chosenChampion = instances.find((instance) => instance.source === "champion");
+  if (!chosenChampion?.registeredCardId) {
+    throw new Error("Runtime deck must contain a chosen champion.");
+  }
+
+  return {
+    template,
+    instances,
+    chosenChampionRegisteredCardId: chosenChampion.registeredCardId,
+  };
 }
 
 export function createInitialGame(input: {

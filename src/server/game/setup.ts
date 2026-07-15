@@ -86,7 +86,12 @@ function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckR
     const deck = decks[playerId]!;
     const player = game.state.players[playerId]!;
     const legend = deck.instances.find((item) => item.source === "legend")!;
-    const champion = deck.instances.find((item) => item.source === "champion")!;
+    const champion = deck.instances.find(
+      (item) => item.registeredCardId === deck.chosenChampionRegisteredCardId,
+    );
+    if (!champion) {
+      throw new Error("Active deck is missing its chosen champion.");
+    }
     player.zones.legend = legend.instanceId;
     player.zones.champion = champion.instanceId;
     player.zones.mainDeck = deterministicShuffle(player.zones.mainDeck, `${game.id}:${playerId}:main`);
