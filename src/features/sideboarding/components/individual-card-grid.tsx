@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { SideboardingDraftAction } from "../sideboarding-draft-reducer";
 import type {
   SideboardingCardCopyView,
@@ -10,6 +11,7 @@ import { ChosenChampionAction } from "./chosen-champion-action";
 export function IndividualCardGrid({
   copies,
   disabled,
+  leadingItem,
   onDispatch,
   onInspect,
   source,
@@ -17,6 +19,7 @@ export function IndividualCardGrid({
 }: {
   copies: SideboardingCardCopyView[];
   disabled: boolean;
+  leadingItem?: ReactNode;
   onDispatch: (action: SideboardingDraftAction) => void;
   onInspect: (registeredCardId: string) => void;
   source: "mainDeck" | "sideboard";
@@ -28,7 +31,14 @@ export function IndividualCardGrid({
       : "moveSideboardCopyToMainDeck";
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(5.6rem,1fr))] gap-2.5 p-2.5">
+    <div
+      className="grid items-start justify-start gap-2 p-2"
+      style={{
+        gridTemplateColumns:
+          "repeat(8, minmax(0, var(--sideboarding-card-width)))",
+      }}
+    >
+      {leadingItem}
       {copies.map(({ card, copy }) => {
         const isCurrent =
           viewModel.chosenChampionRegisteredCardId === copy.registeredCardId;
@@ -38,7 +48,10 @@ export function IndividualCardGrid({
           );
 
         return (
-          <div className="relative" key={`${source}:${copy.registeredCardId}`}>
+          <div
+            className="relative min-w-0"
+            key={`${source}:${copy.registeredCardId}`}
+          >
             <button
               className="block w-full rounded-md text-left transition hover:scale-[1.015] focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
               disabled={disabled}
@@ -57,7 +70,7 @@ export function IndividualCardGrid({
             {isChampionUnit(card) && (
               <ChosenChampionAction
                 cardName={card.name}
-                className="absolute right-1 top-1"
+                className="absolute bottom-1 right-1"
                 disabled={disabled}
                 isCurrent={isCurrent}
                 isEligible={isEligible}
