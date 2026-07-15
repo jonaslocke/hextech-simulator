@@ -109,6 +109,100 @@ test("selectors cover unit ownership, zones, readiness, exclusions, and counts",
   assert.deepEqual(battlefieldRequirement.legalIds, ["middle"]);
 });
 
+test("selectors distinguish combat, source locations, references, and automatic groups", () => {
+  const { game, handlers } = matrixFixture([
+    card("SOURCE", "Unit", 4),
+    card("COMBAT_FRIEND", "Unit", 2),
+    card("COMBAT_ENEMY", "Unit", 3),
+    card("OTHER_BATTLEFIELD", "Unit", 2),
+    card("BASE_FRIEND", "Unit", 1),
+    card("BASE_ENEMY", "Unit", 1),
+    card("BATTLEFIELD_A", "Battlefield"),
+    card("BATTLEFIELD_B", "Battlefield"),
+  ], [
+    instance("source", "p1", "SOURCE", "mainDeck"),
+    instance("combat-friend", "p1", "COMBAT_FRIEND", "mainDeck"),
+    instance("combat-enemy", "p2", "COMBAT_ENEMY", "mainDeck"),
+    instance("other-battlefield", "p2", "OTHER_BATTLEFIELD", "mainDeck"),
+    instance("base-friend", "p1", "BASE_FRIEND", "mainDeck"),
+    instance("base-enemy", "p2", "BASE_ENEMY", "mainDeck"),
+    instance("battlefield-a", "p1", "BATTLEFIELD_A", "battlefield"),
+    instance("battlefield-b", "p1", "BATTLEFIELD_B", "battlefield"),
+  ]);
+  game.state.battlefields = [
+    {
+      battlefieldId: "bf-a",
+      cardInstanceId: "battlefield-a",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: ["source", "combat-friend", "combat-enemy"],
+    },
+    {
+      battlefieldId: "bf-b",
+      cardInstanceId: "battlefield-b",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      contestedByPlayerId: null,
+      units: ["other-battlefield"],
+    },
+  ];
+  game.state.players.p1!.zones.base = ["base-friend"];
+  game.state.players.p2!.zones.base = ["base-enemy"];
+  game.state.combat = {
+    battlefieldId: "bf-a",
+    stage: "showdown",
+    attackerPlayerId: "p1",
+    defenderPlayerId: "p2",
+    attackerUnitIds: ["source", "combat-friend"],
+    defenderUnitIds: ["combat-enemy"],
+    attackerMight: null,
+    defenderMight: null,
+    attackerAssignments: [],
+    defenderAssignments: [],
+  };
+
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+  const selector = handlers.get("selector.unit")!.targets!;
+  const requirement = (parameters: BehaviorBinding["parameters"]) =>
+    selector(binding("selector.unit", parameters), context).legalIds;
+
+  assert.deepEqual(requirement({ area: "combat", locationRelation: "any", excludesSource: true }), [
+    "combat-friend", "combat-enemy",
+  ]);
+  const battlefieldContext = createBehaviorContext(game, "p1", "battlefield-a", null, []);
+  assert.deepEqual(selector(binding("selector.unit", {
+    area: "battlefield", locationRelation: "sourceBattlefield", excludesSource: true,
+  }), battlefieldContext).legalIds, [
+    "source", "combat-friend", "combat-enemy",
+  ]);
+  assert.deepEqual(requirement({ area: "any", locationRelation: "sharedLocation", excludesSource: true }), [
+    "combat-friend", "combat-enemy",
+  ]);
+
+  context.selectedBySelector.anchor = ["other-battlefield"];
+  assert.deepEqual(
+    selector(binding("selector.unit", {
+      area: "any",
+      locationRelation: "selectedTargetLocation",
+      referenceSelectionKey: "anchor",
+    }), context).legalIds,
+    ["other-battlefield"],
+  );
+
+  const automatic = selector(binding("selector.unit", {
+    area: "any",
+    locationRelation: "any",
+    scope: "each",
+    automatic: true,
+  }), context);
+  assert.deepEqual(automatic.legalIds, [
+    "base-friend", "base-enemy", "source", "combat-friend", "combat-enemy", "other-battlefield",
+  ]);
+  assert.equal(automatic.minimum, 0);
+  assert.equal(automatic.maximum, 0);
+});
+
 test("zone operations move selected cards to their typed destinations and emit boundaries", () => {
   const { game, handlers } = matrixFixture([
     card("SOURCE", "Unit", 1),

@@ -652,7 +652,7 @@ test("catalogs Hidden as one fixed parameterless behavior", () => {
 
 test("does not grant Hidden behavior to cards that only reference Hidden", () => {
   const references = [
-    "Put a Teemo unit you own into your hand from your Champion Zone or the board if it has [Hidden].",
+    "Put a unit you own into your hand from your Champion Zone or the board if it has [Hidden].",
     "When you play a card from [Hidden], give me +2 :rb_might: this turn.",
     "Return another friendly gear, unit, or [Hidden] card to its owner's hand."
   ];

@@ -359,6 +359,39 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
   chain.passedPlayerIds = [];
   game.state.chain = chain;
   game.state.pendingChoice = null;
+  advanceQueuedTriggerOrders(game);
+}
+
+function advanceQueuedTriggerOrders(game: GameDocument): void {
+  let nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  while (nextChoice) {
+    const pendingItems = nextChoice.pendingItems;
+    if (pendingItems.length === 0) {
+      nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+      continue;
+    }
+    if (pendingItems.length > 1) {
+      game.state.pendingChoice = {
+        ...nextChoice,
+        optionIds: pendingItems.map((item) => item.id),
+        pendingItems,
+      };
+      return;
+    }
+    const item = pendingItems[0]!;
+    const nextChain = game.state.chain ?? {
+      items: [],
+      relevantPlayerIds: game.state.showdown?.relevantPlayerIds ?? [...game.state.setup.playerIds],
+      priorityPlayerId: item.controllerPlayerId,
+      passedPlayerIds: [],
+      resumeFocusPlayerId: item.resumeFocusPlayerId ?? game.state.showdown?.focusPlayerId ?? null,
+    };
+    nextChain.items.push(item);
+    nextChain.priorityPlayerId = item.controllerPlayerId;
+    nextChain.passedPlayerIds = [];
+    game.state.chain = nextChain;
+    nextChoice = game.state.queuedTriggerChoices.shift() ?? null;
+  }
 }
 
 export function createBehaviorContext(

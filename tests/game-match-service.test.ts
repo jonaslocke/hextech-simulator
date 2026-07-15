@@ -67,6 +67,36 @@ test("rejects invalid player tokens before loading match state", async () => {
   );
 });
 
+test("rejects missing matches and missing current games", async () => {
+  const missingMatch = memoryFixture();
+  await assert.rejects(
+    () => getViewerState(missingMatch.repositories, "missing-match", "token"),
+    (error) => error instanceof MatchServiceError && error.code === "match.notFound",
+  );
+
+  const seeded = await seededInProgressMatch("match-missing-game");
+  const missingGameRepositories = {
+    ...seeded.repositories,
+    matches: {
+      ...seeded.repositories.matches,
+      async findById() {
+        return { ...seeded.match, currentGameId: "missing-game-document" };
+      },
+    },
+    games: {
+      ...seeded.repositories.games,
+      async findById() {
+        return null;
+      },
+    },
+  } as GameRepositories;
+
+  await assert.rejects(
+    () => getViewerState(missingGameRepositories, "unloaded-match", seeded.tokens.player1),
+    (error) => error instanceof MatchServiceError && error.code === "match.notFound",
+  );
+});
+
 test("persists a setup action and rejects a stale gameplay version", async () => {
   const setupFixture = memoryFixture();
   const created = await createMatch({
@@ -102,6 +132,30 @@ test("persists a setup action and rejects a stale gameplay version", async () =>
       error instanceof MatchServiceError &&
       error.code === "state.gameVersionStale",
   );
+});
+
+test("rejects malformed gameplay actions without changing persistence", async () => {
+  const fixture = await seededInProgressMatch("match-malformed-action");
+  await assert.rejects(
+    () => performMatchAction(fixture.repositories, {
+      db: fixture.db,
+      matchId: fixture.match.id,
+      playerToken: fixture.tokens.player1,
+      stateVersion: fixture.game.stateVersion,
+      intent: {
+        type: "game.performAction",
+        payload: {
+          actionId: "game:1:action:not-a-real-action",
+          selectedIds: [],
+          allocations: [],
+          tokenPlacements: [],
+        },
+      },
+    }),
+    /Action is not legal for the current game state/,
+  );
+  assert.equal((await fixture.repositories.games.findById(fixture.game.id))?.stateVersion, fixture.game.stateVersion);
+  assert.deepEqual(await fixture.repositories.gameEvents.findByGameId(fixture.game.id), []);
 });
 
 test("projects between-games status, scores, remaining battlefields, and capabilities", async () => {
@@ -281,9 +335,53 @@ test("retries a sideboard submission after a match-version conflict", async () =
   assert.equal((await fixture.repositories.matches.findById(fixture.match.id))?.stateVersion, 4);
 });
 
-function memoryFixture(options: { failNextMatchUpdate?: boolean } = {}) {
+test("rejects a duplicate deck submission without appending another event", async () => {
+  const fixture = await seededBetweenGamesMatch("match-duplicate-submission", false);
+  const intent = {
+    type: "match.submitDeckReconfiguration" as const,
+    payload: {
+      betweenGamesId: fixture.match.betweenGames!.id,
+      configuration: fixture.match.seats[0]!.currentDeckConfiguration,
+    },
+  };
+  const first = await performMatchAction(fixture.repositories, {
+    db: fixture.db,
+    matchId: fixture.match.id,
+    playerToken: fixture.tokens.player1,
+    stateVersion: fixture.match.stateVersion,
+    intent,
+  });
+  const eventsAfterFirst = await fixture.repositories.gameEvents.findByGameId(fixture.game.id);
+
+  await assert.rejects(
+    () => performMatchAction(fixture.repositories, {
+      db: fixture.db,
+      matchId: fixture.match.id,
+      playerToken: fixture.tokens.player1,
+      stateVersion: first.stateVersion,
+      intent,
+    }),
+    (error) => error instanceof MatchServiceError && error.code === "match.alreadyReady",
+  );
+  assert.deepEqual(await fixture.repositories.gameEvents.findByGameId(fixture.game.id), eventsAfterFirst);
+});
+
+test("retries match creation after a duplicate-key allocation failure", async () => {
+  const fixture = memoryFixture({ failNextInsert: true });
+  const result = await createMatch({
+    db: fixture.db,
+    repositories: fixture.repositories,
+    deckTemplates: [syntheticDeck(), syntheticDeck()],
+  });
+
+  assert.ok(result.matchId.length > 0);
+  assert.equal((await fixture.repositories.matches.findById(result.matchId))?.id, result.matchId);
+});
+
+function memoryFixture(options: { failNextMatchUpdate?: boolean; failNextInsert?: boolean } = {}) {
   const collections = new Map<string, Map<string, Record<string, unknown>>>();
   let failNextMatchUpdate = options.failNextMatchUpdate ?? false;
+  let failNextInsert = options.failNextInsert ?? false;
   const db = {
     client: {
       startSession() {
@@ -303,6 +401,10 @@ function memoryFixture(options: { failNextMatchUpdate?: boolean } = {}) {
           return documents.get(filter._id) ?? null;
         },
         async insertOne(document: Record<string, unknown>) {
+          if (failNextInsert) {
+            failNextInsert = false;
+            throw { code: 11000 };
+          }
           const id = String(document._id);
           if (documents.has(id)) throw { code: 11000 };
           documents.set(id, structuredClone(document));
