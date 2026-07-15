@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-15T12:03:54.982Z",
+  "updatedAt": "2026-07-15T22:33:56.170Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -103,9 +103,9 @@
         },
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -147,9 +147,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-005:Disintegrate",
@@ -510,7 +517,7 @@
           "name": "Captain Farron"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-015",
         "approvedAt": "2026-07-15T12:03:52.540Z"
@@ -518,9 +525,9 @@
       "familyStatuses": [
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -549,9 +556,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-016:Dangerous Duo",
@@ -1737,7 +1751,7 @@
           "name": "Block"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-057",
         "approvedAt": "2026-07-15T12:03:52.826Z"
@@ -1745,9 +1759,9 @@
       "familyStatuses": [
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -1776,9 +1790,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-058:Discipline",
@@ -2171,7 +2192,7 @@
           "name": "Taric, Protector"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-074",
         "approvedAt": "2026-07-15T12:03:53.135Z"
@@ -2179,9 +2200,9 @@
       "familyStatuses": [
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -2210,9 +2231,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-075:Tasty Faefolk",
@@ -8754,7 +8782,7 @@
           "name": "Fortified Position"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-279",
         "approvedAt": "2026-07-15T12:03:53.424Z"
@@ -8762,9 +8790,9 @@
       "familyStatuses": [
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -8793,9 +8821,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-280:Grove of the GodWillow",
@@ -9400,7 +9435,7 @@
           "name": "Windswept Hillock"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-297",
         "approvedAt": "2026-07-15T12:03:53.706Z"
@@ -9408,9 +9443,9 @@
       "familyStatuses": [
         {
           "familyId": "keyword-grant-combat-role",
-          "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-15T12:03:54.982Z",
-          "note": "Published for manual validation"
+          "status": "accepted",
+          "updatedAt": "2026-07-15T22:33:56.170Z",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
       "history": [
@@ -9439,9 +9474,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "keyword-grant-combat-role",
           "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T22:33:56.170Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Keyword-grant/combat-role family manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T12:03:54.982Z"
+      "updatedAt": "2026-07-15T22:33:56.170Z"
     },
     {
       "gameplayIdentity": "OGN-298:Zaun Warrens",

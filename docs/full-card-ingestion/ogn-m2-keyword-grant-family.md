@@ -1,6 +1,6 @@
 # OGN M2 Family: Keyword Grants and Combat-Role Modifiers
 
-Status: Ready for Manual Validation
+Status: Accepted
 
 ## Reuse map
 
