@@ -69,6 +69,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.channel_or_draw` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel fallback draw | None |
 | `action.fight` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Two units fight | None |
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
+| `action.kill_on_next_damage` | OGN M2 | Noxian Guillotine | Local rules 151.2, 573-575 | Executable | `tests/game-token-placement.test.ts`, `tests/game-combat.test.ts` | Mark a locked Unit; consume the marker and kill it on its next damage, or kill immediately with Legion | Awaiting manual validation. |
 | `action.banish_card` | OGN M2 | Time Warp, Portal Rescue | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Banish selected card to its owner's Banishment | Follow-up play-from-banishment model remains unapproved |
 | `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
@@ -91,6 +92,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | `tests/game-token-placement.test.ts` | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
 | `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Exhaust source before activation | None |
 | `cost.exhaust_selected_unit` | Existing | Meditation | Covered by rules reference | Executable for a locked optional play-cost selection | `tests/after-masteryi-implementation.test.ts` | Exhaust a ready friendly Unit as a selected optional cost | Optional play-cost family manually passed on 2026-07-14. |
+| `ability.exhaust_for_resource` | OGN M2 | Hand of Noxus | Local rules: Add abilities cannot be reacted to | Executable for Legion activated Energy production | `tests/game-token-placement.test.ts` | After Legion, exhaust the source and immediately add Energy | Awaiting manual validation. |
 | `replacement.recall_on_next_death` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Recall instead of next death | None |
 
 ## Card Coverage Ledger
@@ -108,6 +110,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | OGN | OGN-198 | The Harrowing | Spell | 1 | `selector.card`, `action.play_selected_unit` | Yes | Yes | Locked target and Power-only nested play passed on 2026-07-14. |
 | OGN | OGN-156 | Sabotage | Spell | 1 | `timing.action`, `selector.card`, `action.recycle_cards` | Yes | Yes | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | OGN | OGN-192 | Mindsplitter | Unit | 1 | `trigger.on_play`, `selector.card`, `action.discard_cards` | Yes | Yes | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
+| OGN | OGN-253 | Hand of Noxus | Legend | 1 | `timing.reaction`, `keyword.legion`, `ability.exhaust_for_resource` | Yes | Darius validation deck available | Awaiting manual Legion Add Energy validation. |
+| OGN | OGN-254 | Noxian Guillotine | Spell | 1 | `timing.action`, `selector.unit`, `action.kill_on_next_damage` | Yes | Darius validation deck available | Awaiting manual next-damage, Legion, expiry, and death-replacement validation. |
 
 ## Token Coverage Ledger
 
@@ -155,6 +159,8 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | M2 | Top-deck inspection family | Stacked Deck keep-one/recycle-rest flow; Candlelit Sanctum focused regression | Passed | User passed the manual family gate on 2026-07-13 | Yes |
 | M2 | Effect-driven Trash recovery/play family | Cemetery Attendant, Morbid Return, Soulgorger, The Harrowing, and Spectral Matron public-Trash targeting | Passed | User passed the locked-target timing and nested Unit-play flow in a new match on 2026-07-14 | Yes |
 | M2 | Optional play-cost family | Meditation optional exhaust cost and paid/declined draw branches | Passed | User manually validated Meditation on 2026-07-14 | Yes |
+| M2 | Legion resource ability family | Hand of Noxus immediate Energy production | Pending | Automated Legion availability and immediate-resource test pass; manual validation pending | No |
+| M2 | Next-damage kill family | Noxian Guillotine delayed kill and Legion immediate replacement | Pending | Automated primitive and combat-path coverage pass; manual validation pending | No |
 | M1 | Garen vs Lux | Baseline interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Annie | Damage/removal interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |
 | M1 | Garen vs Master Yi | Combat modifier interaction | Superseded by accepted M1 manual validation | M1 accepted by user | Yes |

@@ -615,6 +615,57 @@ test("Gear plays ready to its controller's base and exposes its activated abilit
   assert.equal(activated.state.cardStates.seal?.exhausted, true);
 });
 
+test("a Legion Add Energy ability requires a previously played card", () => {
+  const handOfNoxus = unit("HAND_OF_NOXUS", "Hand of Noxus", [
+    clause("legion-add-energy", {
+      abilities: [binding("ability.exhaust_for_resource", 0, {
+        resourceType: "energy",
+        amountSource: "constant",
+        amount: 1,
+        usage: "unrestricted",
+      })],
+      timings: [binding("timing.reaction", 1)],
+      keywords: [binding("keyword.legion", 2)],
+    }),
+  ]);
+  handOfNoxus.card.classification.type = "Legend";
+  const cardToPayFor = spell("TARGET", "Card to pay for");
+  cardToPayFor.card.attributes.energy = 1;
+  const { game, decks } = fixture([handOfNoxus, cardToPayFor]);
+  decks[0]!.instances.push(instance("hand", "p1", "HAND_OF_NOXUS", "legend"));
+  game.state.players.p1!.zones.legend = "hand";
+  game.state.cardStates.hand = cardState(null);
+  const index = createRuntimeCardIndex(decks, game);
+
+  const unavailable = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "hand",
+  );
+  assert.ok(unavailable);
+  assert.equal(unavailable.enabled, false);
+  assert.equal(buildPaymentPlan(game, "p1", cardToPayFor, 1, index), null);
+
+  game.state.players.p1!.playedCardIdsThisTurn = ["earlier-card"];
+  assert.deepEqual(
+    buildPaymentPlan(game, "p1", cardToPayFor, 1, index)?.energySourceIds,
+    ["hand"],
+  );
+  const addEnergy = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "hand" && action.enabled,
+  );
+  assert.ok(addEnergy);
+  const activated = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addEnergy.id,
+    selectedIds: [],
+    decks,
+    now: "activate-hand-of-noxus",
+  });
+  assert.equal(activated.state.players.p1!.energy, 1);
+  assert.equal(activated.state.cardStates.hand?.exhausted, true);
+  assert.equal(activated.state.chain, null);
+});
+
 test("a ready Add Power permanent can pay a matching card cost", () => {
   const seal = card("SEAL", "Seal of Unity", "Gear", [
     clause("add-order", {
@@ -1849,6 +1900,95 @@ test("a turn-scoped ongoing trigger remains active after its source spell is in 
     decks,
   }), true);
   assert.equal(game.state.players.p2!.zones.trash.includes("target"), true);
+});
+
+test("next-damage kill markers consume on damage and Legion kills immediately", () => {
+  const guillotine = spell("GUILLOTINE", "Guillotine", [
+    clause("mark-next-damage", {
+      selectors: [binding("selector.unit", 0, {
+        scope: "any",
+        area: "board",
+        locationRelation: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "targetUnit",
+      })],
+      effects: [binding("action.kill_on_next_damage", 1, {
+        selectionKey: "targetUnit",
+        duration: "thisTurn",
+        immediateWhenLegion: true,
+      })],
+    }),
+  ]);
+  const damage = unit("DAMAGE", "Damage", [
+    clause("damage", {
+      selectors: [binding("selector.unit", 0, {
+        scope: "any",
+        area: "board",
+        locationRelation: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "targetUnit",
+      })],
+      effects: [binding("action.deal_damage", 0, {
+        amount: 1,
+        selectionKey: "targetUnit",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([guillotine, damage, unit("TARGET", "Target")]);
+  decks[0]!.instances.push(
+    instance("guillotine", "p1", "GUILLOTINE"),
+    instance("damage", "p1", "DAMAGE"),
+  );
+  decks[1]!.instances.push(instance("target", "p2", "TARGET"));
+  game.state.players.p2!.zones.base.push("target");
+  game.state.cardStates.guillotine = cardState(null);
+  game.state.cardStates.damage = cardState(1);
+  game.state.cardStates.target = cardState(2);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "guillotine",
+    clauseId: "mark-next-damage",
+    selectedIds: ["target"],
+    targetsLocked: true,
+    decks,
+  }), true);
+  assert.equal(game.state.ongoingEffects[0]?.behaviorId, "action.kill_on_next_damage");
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "damage",
+    clauseId: "damage",
+    selectedIds: ["target"],
+    targetsLocked: true,
+    decks,
+  }), true);
+  assert.equal(game.state.players.p2!.zones.trash.includes("target"), true);
+  assert.equal(game.state.ongoingEffects.length, 0);
+
+  const immediate = fixture([guillotine, unit("TARGET", "Target")]);
+  immediate.decks[0]!.instances.push(instance("guillotine", "p1", "GUILLOTINE"));
+  immediate.decks[1]!.instances.push(instance("target", "p2", "TARGET"));
+  immediate.game.state.players.p2!.zones.base.push("target");
+  immediate.game.state.players.p1!.legionSatisfiedCardIdsThisTurn = ["guillotine"];
+  immediate.game.state.cardStates.guillotine = cardState(null);
+  immediate.game.state.cardStates.target = cardState(2);
+
+  assert.equal(beginEffectResolution({
+    game: immediate.game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "guillotine",
+    clauseId: "mark-next-damage",
+    selectedIds: ["target"],
+    targetsLocked: true,
+    decks: immediate.decks,
+  }), true);
+  assert.equal(immediate.game.state.players.p2!.zones.trash.includes("target"), true);
+  assert.equal(immediate.game.state.ongoingEffects.length, 0);
 });
 
 test("a selected eligible Unit can be played from Trash to a chosen controlled battlefield", () => {

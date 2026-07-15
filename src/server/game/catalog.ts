@@ -29,8 +29,6 @@ import {
   type GameCardDefinition
 } from "./schemas";
 
-export const INITIAL_DECK_UNIQUE_CARD_COUNT = 21;
-
 type CanonicalCardStoredDocument = CanonicalCardDocument & { _id: string };
 type RuntimeBehaviorDefinition = Omit<PrimitiveCatalogEntry, "examples">;
 
@@ -76,12 +74,6 @@ export function buildDeckSnapshot(
   }
   const definitionsById = new Map(behaviorDefinitions.map((definition) => [definition.id, definition]));
   const issues: string[] = [];
-
-  if (expectedNames.length < INITIAL_DECK_UNIQUE_CARD_COUNT) {
-    issues.push(
-      `Deck must contain at least ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
-    );
-  }
 
   const cards = expectedNames.flatMap((name): GameCardDefinition[] => {
     const document = cardsByName.get(name);

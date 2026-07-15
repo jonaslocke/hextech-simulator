@@ -6,6 +6,7 @@ import {
 import { scoreBattlefield } from "./scoring";
 import {
   definitionForInstance,
+  killUnitsMarkedForNextDamage,
   recomputeMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
@@ -260,6 +261,11 @@ function applyAssignment(
       subjectCardInstanceId: assignment.targetUnitId,
       values: { amount: assignment.amount },
     })),
+  );
+  killUnitsMarkedForNextDamage(
+    game,
+    resolvedAssignments.map((assignment) => assignment.targetUnitId),
+    index,
   );
   resolveCombat(game, index, decks);
 }

@@ -64,6 +64,7 @@ export function buildPaymentPlan(
     const ability = exhaustForPowerAbility(
       id,
       game,
+      playerId,
       definition.card.classification.type,
       index,
     );
@@ -135,6 +136,8 @@ export function buildPaymentPlan(
     }
     const ability = exhaustForEnergyAbility(
       id,
+      game,
+      playerId,
       definition.card.classification.type,
       index,
     );
@@ -149,6 +152,8 @@ export function buildPaymentPlan(
   for (const id of resourceSourceIds) {
     const ability = exhaustForEnergyAbility(
       id,
+      game,
+      playerId,
       definition.card.classification.type,
       index,
     );
@@ -334,10 +339,13 @@ function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {
 
 function exhaustForEnergyAbility(
   id: string,
+  game: GameDocument,
+  playerId: string,
   cardType: string,
   index: RuntimeCardIndex,
 ): { amount: number; usage: string } | null {
   for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
+    if (!legionClauseSatisfied(game, playerId, clause)) continue;
     for (const ability of clause.abilities) {
       if (
         ability.behaviorId !== "ability.exhaust_for_resource" ||
@@ -364,11 +372,13 @@ function exhaustForEnergyAbility(
 function exhaustForPowerAbility(
   id: string,
   game: GameDocument,
+  playerId: string,
   cardType: string,
   index: RuntimeCardIndex,
 ): { amount: number; domain: string } | null {
   if (index.instances.get(id) == null) return null;
   for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
+    if (!legionClauseSatisfied(game, playerId, clause)) continue;
     for (const ability of clause.abilities) {
       if (
         ability.behaviorId !== "ability.exhaust_for_resource" ||
@@ -399,6 +409,17 @@ function exhaustForPowerAbility(
     }
   }
   return null;
+}
+
+function legionClauseSatisfied(
+  game: GameDocument,
+  playerId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+) {
+  if (!clause.keywords.some((binding) => binding.behaviorId === "keyword.legion")) {
+    return true;
+  }
+  return (game.state.players[playerId]?.playedCardIdsThisTurn ?? []).length > 0;
 }
 
 function normalizePowerDomain(domain: string) {

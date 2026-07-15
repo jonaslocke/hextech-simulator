@@ -1808,6 +1808,11 @@ function addAbilityActions(
       for (const ability of clause.abilities) {
         if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
+        const legionSatisfied = activatedAbilityLegionSatisfied(
+          game,
+          playerId,
+          clause,
+        );
         const targets = targetRequirementsForClause(
           clause,
           createBehaviorContext(game, playerId, sourceId, null, []),
@@ -1825,7 +1830,7 @@ function addAbilityActions(
         );
         const hasLegalTargets = canSatisfyTargetRequirements(targets);
         const enabled =
-          sourceReady && costStatus.enabled && hasLegalTargets;
+          legionSatisfied && sourceReady && costStatus.enabled && hasLegalTargets;
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
@@ -1847,7 +1852,9 @@ function addAbilityActions(
             enabled,
             enabled
               ? null
-              : !sourceReady
+              : !legionSatisfied
+                ? "Legion requires another card played this turn."
+                : !sourceReady
                 ? "Source is exhausted."
                 : !costStatus.enabled
                   ? costStatus.reason
@@ -1970,6 +1977,9 @@ function executeActivatedAbility(
     (item) => item.behaviorId === behaviorId,
   );
   if (!clause || !binding) throw new Error("Activated ability is unavailable.");
+  if (!activatedAbilityLegionSatisfied(game, actorPlayerId, clause)) {
+    throw new Error("Legion requires another card played this turn.");
+  }
   const handler = handlers.get(binding.behaviorId);
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
@@ -2289,6 +2299,17 @@ function payOptionalPlayCosts(
     }
   }
   return { ignoreBaseCost };
+}
+
+function activatedAbilityLegionSatisfied(
+  game: GameDocument,
+  playerId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+) {
+  if (!clause.keywords.some((binding) => binding.behaviorId === "keyword.legion")) {
+    return true;
+  }
+  return (game.state.players[playerId]?.playedCardIdsThisTurn ?? []).length > 0;
 }
 
 function preplaySelectionsByKey(

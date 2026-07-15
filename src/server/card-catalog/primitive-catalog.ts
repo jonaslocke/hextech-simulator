@@ -1294,6 +1294,22 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "candidate legality and count bounds come from selector primitives in the same behavior clause"
     ]
   }),
+  "action.kill_on_next_damage": primitiveSeed({
+    id: "action.kill_on_next_damage",
+    family: "action",
+    name: "Kill on next damage",
+    description: "Marks selected Units to be killed the next time they take damage this turn, with an optional immediate Legion replacement.",
+    parameters: [
+      required("selectionKey", "string", "Selected Unit selector key."),
+      required("duration", "duration", "How long the damage marker lasts."),
+      optional("immediateWhenLegion", "boolean", "Whether Legion kills the selected Unit immediately instead of creating a marker."),
+    ],
+    fixedRules: [
+      "The marker is consumed by the first later damage instance dealt to the selected object.",
+      "The resulting kill follows the ordinary death and replacement flow.",
+    ],
+    engineSupport: supported("Tracks a turn-scoped next-damage marker across effect, fight, and combat damage."),
+  }),
   "choice.choose_mode": primitiveSeed({
     id: "choice.choose_mode",
     family: "choice",

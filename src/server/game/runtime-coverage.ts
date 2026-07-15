@@ -47,6 +47,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.channel_or_draw": "executable",
   "action.fight": "executable",
   "action.kill_unit": "executable",
+  "action.kill_on_next_damage": "executable",
   "action.kill_permanent": "executable",
   "action.buff_unit": "executable",
   "action.banish_card": "executable",

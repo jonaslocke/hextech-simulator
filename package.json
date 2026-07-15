@@ -17,6 +17,8 @@
     "catalog:approve-ogn-top-deck-family": "node --env-file=.env --import tsx scripts/approve-ogn-top-deck-family.ts --confirm",
     "catalog:approve-ogn-effect-driven-play-family": "node --env-file=.env --import tsx scripts/approve-ogn-effect-driven-play-family.ts --confirm",
     "catalog:approve-ogn-opponent-hand-selection-family": "node --env-file=.env --import tsx scripts/approve-ogn-opponent-hand-selection-family.ts --confirm",
+    "catalog:approve-ogn-next-damage-kill-family": "node --env-file=.env --import tsx scripts/approve-ogn-next-damage-kill-family.ts --confirm",
+    "catalog:approve-ogn-darius-hand-of-noxus": "node --env-file=.env --import tsx scripts/approve-ogn-darius-hand-of-noxus.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-decks": "node --env-file=.env --import tsx scripts/sync-deck-definitions.ts --confirm",
     "catalog:sync-annie-stacked-deck": "node --env-file=.env --import tsx scripts/sync-annie-stacked-deck.ts --confirm",

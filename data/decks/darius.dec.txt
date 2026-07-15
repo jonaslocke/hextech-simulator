@@ -1,0 +1,30 @@
+Legend:
+1 Darius, Hand of Noxus
+
+Champion:
+1 Darius, Trifarian
+
+MainDeck:
+3 Cleave
+3 Disintegrate
+3 Hextech Ray
+3 Pouty Poro
+3 Void Seeker
+3 Daring Poro
+3 Noxian Guillotine
+3 Incinerate
+3 Blast of Power
+3 Recruit the Vanguard
+1 Firestorm
+2 Darius, Trifarian
+3 Annie, Fiery
+3 Garen, Commander
+
+Battlefields:
+1 Targon's Peak
+1 Trifarian War Camp
+1 The Papertree
+
+Runes:
+6 Fury Rune
+6 Order Rune

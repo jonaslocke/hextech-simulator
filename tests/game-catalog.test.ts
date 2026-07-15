@@ -13,18 +13,28 @@ import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
   buildDeckSnapshot,
-  GameCatalogError,
-  INITIAL_DECK_UNIQUE_CARD_COUNT
+  GameCatalogError
 } from "../src/server/game";
 
 test("builds an immutable snapshot for every unique initial-deck card", async () => {
   const fixture = await buildFixture();
   const snapshot = buildDeckSnapshot(fixture.sourceText, fixture.documents, fixture.definitions);
 
-  assert.equal(snapshot.cards.length, INITIAL_DECK_UNIQUE_CARD_COUNT);
+  assert.equal(
+    snapshot.cards.length,
+    new Set(parseDeckList(fixture.sourceText).entries.map((entry) => entry.name)).size,
+  );
   assert.equal(snapshot.entries.length, parseDeckList(fixture.sourceText).entries.length);
   assert.match(snapshot.catalogDigest, /^[a-f0-9]{64}$/);
   assert.ok(snapshot.cards.every((definition) => definition.behaviorModel));
+});
+
+test("does not impose a minimum unique-card count on deck snapshots", async () => {
+  const fixture = await buildFixture();
+  const sourceText = fixture.sourceText.replace(/^3 Stupefy\r?\n/m, "");
+  const snapshot = buildDeckSnapshot(sourceText, fixture.documents, fixture.definitions);
+
+  assert.equal(snapshot.cards.length, 20);
 });
 
 test("rejects missing, stale, unsynchronized, and uncovered canonical cards", async () => {

@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   cardSetFileSchema,
+  getDeckCardLookupCandidates,
   getDeckCardNameAliases,
   type Card,
   type CardCatalog,
@@ -15,13 +16,25 @@ test("keeps real Legend deck names while resolving their source JSON records", a
   const catalog = await loadLocalSetCatalog();
   const kaisaLegend = catalog.byName.get("Daughter of the Void");
   const kaisaChampion = catalog.byName.get("Kai'Sa, Survivor");
+  const dariusLegend = catalog.byName.get("Hand of Noxus");
 
   assert.ok(kaisaLegend);
   assert.ok(kaisaChampion);
+  assert.ok(dariusLegend);
   assert.deepEqual(getDeckCardNameAliases(kaisaLegend), [
     "Daughter of the Void",
     "Kai'Sa - Daughter of the Void",
+    "Kai'Sa, Daughter of the Void",
   ]);
+  assert.deepEqual(getDeckCardNameAliases(dariusLegend), [
+    "Hand of Noxus",
+    "Darius - Hand of Noxus",
+    "Darius, Hand of Noxus",
+  ]);
+  assert.deepEqual(
+    getDeckCardLookupCandidates("Darius, Hand of Noxus"),
+    ["Darius, Hand of Noxus", "Hand of Noxus"],
+  );
   assert.deepEqual(getDeckCardNameAliases(kaisaChampion), ["Kai'Sa, Survivor"]);
 
   for (const fileName of ["kaisa.dec.txt", "viktor.dec.txt"]) {

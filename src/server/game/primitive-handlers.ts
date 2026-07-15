@@ -938,6 +938,7 @@ export function createPrimitiveHandlers(
           values: { amount },
         })),
       );
+      killUnitsMarkedForNextDamage(context.game, ids, index);
       cleanupLethalDamage(context.game, ids, index);
       for (const id of ids) {
         const owner = index.instances.get(id)?.ownerPlayerId;
@@ -962,9 +963,24 @@ export function createPrimitiveHandlers(
       const secondMight = secondState?.computedMight ?? 0;
       if (firstState && secondMight > 0) firstState.damage += secondMight;
       if (secondState && firstMight > 0) secondState.damage += firstMight;
+      const damagedIds = [
+        ...(firstState && secondMight > 0 ? [first] : []),
+        ...(secondState && firstMight > 0 ? [second] : []),
+      ].filter((id): id is string => Boolean(id));
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...damagedIds.map((id) => ({
+          type: "unit.damaged" as const,
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {
+            amount: id === first ? secondMight : firstMight,
+          },
+        })),
+      );
+      killUnitsMarkedForNextDamage(context.game, damagedIds, index);
       cleanupLethalDamage(
         context.game,
-        [first, second].filter((id): id is string => Boolean(id)),
+        damagedIds,
         index,
       );
     },
@@ -981,6 +997,28 @@ export function createPrimitiveHandlers(
           : context.selectedIds;
       ids.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
+  });
+  handlers.set("action.kill_on_next_damage", {
+    execute(binding, context) {
+      const targets = selectionFor(binding, context);
+      const legionSatisfied = (
+        context.game.state.players[context.controllerPlayerId]
+          ?.legionSatisfiedCardIdsThisTurn ?? []
+      ).includes(context.sourceCardInstanceId);
+      if (binding.parameters.immediateWhenLegion === true && legionSatisfied) {
+        targets.forEach((id) => moveUnitToTrash(context.game, id, index));
+        return;
+      }
+      context.game.state.ongoingEffects.push({
+        id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+        behaviorId: binding.behaviorId,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        targetCardInstanceIds: targets,
+        duration: stringParam(binding, "duration"),
+        createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+      });
+    },
   });
   handlers.set("action.kill_permanent", {
     execute(binding, context) {
@@ -1995,6 +2033,23 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     subjectCardInstanceId: id,
     values: {},
   });
+}
+
+export function killUnitsMarkedForNextDamage(
+  game: GameDocument,
+  ids: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  for (const id of new Set(ids)) {
+    const effectIndex = game.state.ongoingEffects.findIndex(
+      (effect) =>
+        effect.behaviorId === "action.kill_on_next_damage" &&
+        effect.targetCardInstanceIds.includes(id),
+    );
+    if (effectIndex < 0) continue;
+    game.state.ongoingEffects.splice(effectIndex, 1);
+    moveUnitToTrash(game, id, index);
+  }
 }
 
 function isUnitInPlay(game: GameDocument, id: string) {

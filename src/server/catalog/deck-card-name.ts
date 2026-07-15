@@ -12,7 +12,11 @@ export function getDeckCardNameAliases(card: DeckNameCard): string[] {
     return [card.name];
   }
 
-  return [card.name, `${championTag} - ${card.name}`];
+  return [
+    card.name,
+    `${championTag} - ${card.name}`,
+    `${championTag}, ${card.name}`,
+  ];
 }
 
 export function getDeckCardLookupCandidates(name: string): string[] {
@@ -22,12 +26,12 @@ export function getDeckCardLookupCandidates(name: string): string[] {
 }
 
 function getLegendSourceNameFromDeckName(name: string): string | null {
-  const separator = " - ";
-  const separatorIndex = name.indexOf(separator);
-  if (separatorIndex <= 0) {
-    return null;
-  }
+  for (const separator of [" - ", ", "]) {
+    const separatorIndex = name.indexOf(separator);
+    if (separatorIndex <= 0) continue;
 
-  const sourceName = name.slice(separatorIndex + separator.length).trim();
-  return sourceName || null;
+    const sourceName = name.slice(separatorIndex + separator.length).trim();
+    if (sourceName) return sourceName;
+  }
+  return null;
 }
