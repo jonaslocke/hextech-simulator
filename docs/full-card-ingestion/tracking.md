@@ -42,57 +42,57 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `timing.delayed` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Resolve delayed effect | None |
 | `trigger.on_play` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Trigger after card is played | None |
 | `trigger.conquer_battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Conquer battlefield trigger | None |
-| `trigger.conquer` | Garen M1 | Might of Demacia - Starter | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Controller conquers any battlefield | None |
+| `trigger.conquer` | Garen M1 | Might of Demacia - Starter | Covered by rules reference | Executable | Manual validation | Controller conquers any battlefield | None |
 | `trigger.hold_battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Hold battlefield trigger | None |
 | `trigger.on_move` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move-triggered ability | None |
-| `trigger.on_death` | OGN M2 | Machine Evangel and Deathknell cards | Covered by rules reference | Executable for own-death clauses | `tests/game-token-placement.test.ts` | Deathknell resolves after source leaves play | Other-unit death filters remain unimplemented |
+| `trigger.on_death` | OGN M2 | Machine Evangel and Deathknell cards | Covered by rules reference | Executable for own-death clauses | Manual validation | Deathknell resolves after source leaves play | Other-unit death filters remain unimplemented |
 | `trigger.end_of_turn` | Existing | TBD | Covered by rules reference | Existing executable | Existing | End-turn trigger | None |
-| `trigger.beginning` | OGN M2 | Temporary tokens | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Temporary cleanup before scoring | None for own-controller Beginning triggers |
+| `trigger.beginning` | OGN M2 | Temporary tokens | Covered by rules reference | Executable | Manual validation | Temporary cleanup before scoring | None for own-controller Beginning triggers |
 | `trigger.attack` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Attack trigger | None |
 | `trigger.defend` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Defend trigger | None |
 | `condition.compare_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Numeric threshold condition | None |
 | `condition.effect_killed_target` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Damage kills target condition | None |
-| `condition.unit_presence` | Garen M1 | Might of Demacia - Starter, Dune Drake | Covered by rules reference and card text | Executable | `tests/game-token-placement.test.ts` | Count matching units at source/event location | None |
+| `condition.unit_presence` | Garen M1 | Might of Demacia - Starter, Dune Drake | Covered by rules reference and card text | Executable | Manual validation | Count matching units at source/event location | None |
 | `selector.unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select legal unit | None |
 | `selector.friendly_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select friendly unit | None |
 | `selector.enemy_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select enemy unit | None |
-| `selector.card` | Existing | TBD | Covered by rules reference | Executable for controller and opponent Hand/Trash zones | `tests/game-token-placement.test.ts` | Select a legal card from a non-board zone, including a revealed opponent Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
+| `selector.card` | Existing | TBD | Covered by rules reference | Executable for controller and opponent Hand/Trash zones | Manual validation | Select a legal card from a non-board zone, including a revealed opponent Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | `selector.battlefield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Select battlefield | None |
 | `action.draw_cards` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Draw cards | None |
 | `action.vision` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Resolve Vision choice | None |
-| `action.discard_cards` | Existing | TBD | Covered by rules reference | Executable for a direct choice or a previously selected card | `tests/game-token-placement.test.ts` | Discard the selected card | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
-| `action.ready_cards` | Existing | TBD | Covered by rules reference | Executable with `card.readied` event | `tests/game-token-placement.test.ts` | Ready selected exhausted card | Exact ready-trigger models remain unapproved |
-| `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | `tests/game-token-placement.test.ts` | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
+| `action.discard_cards` | Existing | TBD | Covered by rules reference | Executable for a direct choice or a previously selected card | Manual validation | Discard the selected card | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
+| `action.ready_cards` | Existing | TBD | Covered by rules reference | Executable with `card.readied` event | Manual validation | Ready selected exhausted card | Exact ready-trigger models remain unapproved |
+| `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | Manual validation | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
 | `action.channel_runes` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel runes | None |
 | `action.deal_damage` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deal damage to unit | None |
 | `action.draw_by_optional_cost` | Existing | Meditation | Covered by rules reference | Executable for locked optional play-cost selections | Manual validation | Draw the paid or declined optional-cost branch after Chain resolution | Optional play-cost family manually passed on 2026-07-14. |
 | `action.channel_or_draw` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel fallback draw | None |
 | `action.fight` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Two units fight | None |
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
-| `action.kill_on_next_damage` | OGN M2 | Noxian Guillotine | Local rules 151.2, 573-575 | Executable | `tests/game-token-placement.test.ts`, `tests/game-combat.test.ts` | Mark a locked Unit; consume the marker and kill it on its next damage, or kill immediately with Legion | Awaiting manual validation. |
-| `action.banish_card` | OGN M2 | Time Warp, Portal Rescue | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Banish selected card to its owner's Banishment | Follow-up play-from-banishment model remains unapproved |
-| `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
+| `action.kill_on_next_damage` | OGN M2 | Noxian Guillotine | Local rules 151.2, 573-575 | Executable | Manual validation | Mark a locked Unit; consume the marker and kill it on its next damage, or kill immediately with Legion | Awaiting manual validation. |
+| `action.banish_card` | OGN M2 | Time Warp, Portal Rescue | Covered by rules reference | Executable | Manual validation | Banish selected card to its owner's Banishment | Follow-up play-from-banishment model remains unapproved |
+| `action.stun_card` | OGN M2 | Leona, Determined and stun spells | Covered by rules reference | Executable | Manual validation | Stun selected unit; it has no combat Might until next Ending Step | Exact stun-trigger/card models remain unapproved |
 | `action.return_to_hand` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Return selected card to hand | None |
-| `action.recycle_cards` | OGN M2 | Vi, Destructive, Sabotage, and other recycle cards | Covered by rules reference | Executable for direct or keyed selection | `tests/game-token-placement.test.ts` | Recycle selected card from trash or revealed Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
+| `action.recycle_cards` | OGN M2 | Vi, Destructive, Sabotage, and other recycle cards | Covered by rules reference | Executable for direct or keyed selection | Manual validation | Recycle selected card from trash or revealed Hand | Opponent-Hand reveal/select family manually passed on 2026-07-14. |
 | `action.take_to_hand` | OGN M2 | Stacked Deck | Covered by rules reference | Executable | `tests/game-zone-effects.test.ts` | Choose one card from the original private look group and move it to hand | First use manually passed on 2026-07-13 |
-| `action.play_selected_unit` cost mode | OGN M2 | Soulgorger, The Harrowing | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Play a selected locked Trash Unit while paying only its Power cost | Effect-driven Trash-play family manually passed on 2026-07-14 |
+| `action.play_selected_unit` cost mode | OGN M2 | Soulgorger, The Harrowing | Covered by rules reference | Executable | Manual validation | Play a selected locked Trash Unit while paying only its Power cost | Effect-driven Trash-play family manually passed on 2026-07-14 |
 | `action.move_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Move unit to base | None |
-| `action.play_token` | Garen M1 | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Fixed and chosen Recruit token placement | None |
+| `action.play_token` | Garen M1 | Faithful Manufactor, Noxian Drummer, Recruit the Vanguard | Covered by rules reference | Executable | Manual validation | Fixed and chosen Recruit token placement | None |
 | `modifier.modify_numeric_value` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Apply numeric modifier | None |
 | `modifier.play_unit_destination` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Play unit to extra destination | None |
 | `modifier.enter_ready` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Enter ready | None |
-| `modifier.facedown_capacity` | OGN M2 | Bandle Tree | Hidden Golden Rule | Executable | `tests/game-token-placement.test.ts` | Bandle Tree holds two independent facedown cards | Phase 1 Hidden foundation is ready for manual validation; Hide timing/payment and play-from-Hidden remain later phases |
+| `modifier.facedown_capacity` | OGN M2 | Bandle Tree | Hidden Golden Rule | Executable | Manual validation | Bandle Tree holds two independent facedown cards | Phase 1 Hidden foundation is ready for manual validation; Hide timing/payment and play-from-Hidden remain later phases |
 | `keyword.vision` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Vision keyword | None |
 | `keyword.assault` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Assault combat Might | None |
 | `keyword.shield` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Shield combat Might | None |
 | `keyword.tank` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Tank combat damage assignment | None |
 | `keyword.deflect` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deflect targeting cost | None |
 | `keyword.ganking` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Battlefield-to-battlefield movement | None |
-| `keyword.temporary` | OGN M2 | Sprite | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Kill at controller Beginning Phase before scoring | None |
-| `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | `tests/game-token-placement.test.ts` | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
-| `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Exhaust source before activation | None |
+| `keyword.temporary` | OGN M2 | Sprite | Covered by rules reference | Executable | Manual validation | Kill at controller Beginning Phase before scoring | None |
+| `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | Manual validation | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
+| `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | Manual validation | Exhaust source before activation | None |
 | `cost.exhaust_selected_unit` | Existing | Meditation | Covered by rules reference | Executable for a locked optional play-cost selection | Manual validation | Exhaust a ready friendly Unit as a selected optional cost | Optional play-cost family manually passed on 2026-07-14. |
-| `ability.exhaust_for_resource` | OGN M2 | Hand of Noxus | Local rules: Add abilities cannot be reacted to | Executable for Legion activated Energy production | `tests/game-token-placement.test.ts` | After Legion, exhaust the source and immediately add Energy | Manual family passed on 2026-07-15; automatic payment also enforces Legion. |
+| `ability.exhaust_for_resource` | OGN M2 | Hand of Noxus | Local rules: Add abilities cannot be reacted to | Executable for Legion activated Energy production | Manual validation | After Legion, exhaust the source and immediately add Energy | Manual family passed on 2026-07-15; automatic payment also enforces Legion. |
 | `replacement.recall_on_next_death` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Recall instead of next death | None |
 
 ## Card Coverage Ledger
@@ -185,8 +185,8 @@ primitive discovery are complete. The user approved:
 Runtime implementation for both approved gates and the latest manual defect fixes
 is complete and verified by:
 
-- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts`
-- `node --import tsx --test tests/game-token-placement.test.ts`
+- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-primitive-contracts.test.ts`
+- `node --import tsx --test tests/game-primitive-contracts.test.ts`
 - `cmd /c npm run typecheck`
 - `cmd /c npm test`
 - `cmd /c npm run lint`

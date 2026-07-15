@@ -29,13 +29,9 @@ opponent-Hand targeting.
 
 ## Automated Checks
 
-`tests/game-token-placement.test.ts` covers:
-
-1. Sabotage entering the Chain without a target, then filtering Units out,
-   privately exposing the legal opponent Hand card to its controller at
-   resolution, and recycling that selected card.
-2. Mindsplitter entering the Chain without a target, then revealing the
-   opponent Hand and selecting exactly one card as the triggered ability resolves.
+Card-specific automated acceptance was intentionally removed. Generic primitive
+contracts are covered by `tests/game-primitive-contracts.test.ts`; the
+opponent-Hand family remains accepted through manual validation below.
 
 ## Manual Validation
 
