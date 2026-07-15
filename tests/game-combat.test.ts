@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  beginCombatDamage,
   cleanupBoard,
   createRuntimeCardIndex,
   gameplayActions,
@@ -373,6 +374,83 @@ test("cleanup clears a dead challenger's contest while preserving the controller
   assert.deepEqual(battlefield.units, ["defender"]);
   assert.equal(battlefield.controllerPlayerId, "p2");
   assert.equal(battlefield.contestedByPlayerId, null);
+});
+
+test("lethal cleanup locks simultaneous deaths before remaining units recalculate", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 1,
+    defenders: [
+      { id: "first-defender", might: 2, shield: 1 },
+      { id: "second-defender", might: 2, shield: 1 },
+    ],
+  });
+  const secondDefender = decks[1]!.snapshot.cards.find(
+    (card) => card.cardCode === "SECOND-DEFENDER",
+  )!;
+  secondDefender.behaviorModel.clauses.push({
+    id: "solo-defense-might",
+    sequence: 1,
+    sourceText: "While I defend alone, I have +2 Might.",
+    normalizedText: "While I defend alone, I have +2 Might.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [{
+      behaviorId: "modifier.modify_numeric_value",
+      parameters: {
+        target: "source",
+        attribute: "might",
+        operation: "increase",
+        amount: 2,
+        minimum: null,
+        duration: "whileSourceAtBattlefield",
+        condition: "sourceCombatsAlone",
+      },
+      confidence: "high",
+      order: 0,
+    }],
+    keywords: [],
+  });
+  game.state.cardStates["first-defender"]!.combatRole = "defender";
+  game.state.cardStates["second-defender"]!.combatRole = "defender";
+  game.state.cardStates["first-defender"]!.damage = 3;
+  game.state.cardStates["second-defender"]!.damage = 3;
+
+  cleanupBoard(game, createRuntimeCardIndex(decks));
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("first-defender"));
+  assert.ok(game.state.players.p2!.zones.trash.includes("second-defender"));
+});
+
+test("temporary Shield does not make a combat survivor die after combat ends", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 5,
+    defenders: [{ id: "defender", might: 5 }],
+  });
+  game.state.modifiers.push({
+    id: "temporary-shield",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p2",
+    targetCardInstanceId: "defender",
+    targetScope: "unit",
+    attribute: "keyword.shield",
+    operation: "increase",
+    amount: 2,
+    minimum: null,
+    duration: "thisCombat",
+    createdAtTurn: 1,
+  });
+
+  const showdown = moveAttacker(game, decks);
+  beginCombatDamage(showdown, createRuntimeCardIndex(decks), decks);
+
+  assert.ok(showdown.state.players.p1!.zones.trash.includes("attacker"));
+  assert.ok(!showdown.state.players.p2!.zones.trash.includes("defender"));
+  assert.ok(showdown.state.battlefields[0]!.units.includes("defender"));
 });
 
 test("clears surviving damage before temporary Might expires at end of turn", () => {

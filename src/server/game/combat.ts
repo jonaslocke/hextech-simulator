@@ -313,8 +313,8 @@ function resolveCombat(
   for (const state of Object.values(game.state.cardStates)) {
     state.combatRole = null;
   }
-  cleanupCombatModifiers(game, index);
   clearMarkedDamage(game);
+  cleanupCombatModifiers(game, index);
   for (const id of [
     ...combat.attackerUnitIds,
     ...combat.defenderUnitIds,

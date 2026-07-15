@@ -409,6 +409,7 @@ function modifierLabel(
 }
 
 function modifierDurationLabel(duration: string) {
+  if (duration === "thisCombat") return "This combat";
   if (duration === "thisTurn") return "This turn";
   if (duration === "whileSourceOnBoard") return "While source is on board";
   if (duration === "whileSourceAtBattlefield") {

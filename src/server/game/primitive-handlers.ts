@@ -1959,7 +1959,7 @@ export function recordCardPlayed(
   played.push(cardId);
 }
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
-  for (const id of ids) {
+  const lethalIds = [...new Set(ids)].filter((id) => {
     const state = game.state.cardStates[id];
     const might =
       state?.computedMight ??
@@ -1968,9 +1968,16 @@ export function cleanupLethalDamage(game: GameDocument, ids: string[], index: Ru
     const unchangedSuppressedDeath =
       state?.lethalSuppressedDamage === state?.damage &&
       state?.lethalSuppressedMight === might;
-    if (state && !unchangedSuppressedDeath && state.damage > 0 && state.damage >= might) {
-      moveUnitToTrash(game, id, index);
-    }
+    return Boolean(
+      state &&
+      !unchangedSuppressedDeath &&
+      state.damage > 0 &&
+      state.damage >= might,
+    );
+  });
+
+  for (const id of lethalIds) {
+    moveUnitToTrash(game, id, index);
   }
 }
 export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
