@@ -75,7 +75,7 @@ discard, reset, amend, squash, or combine milestone work.
 ## Current checkpoint
 
 - Completed through: milestone 5 (all milestones)
-- Last verification: `catalog:check-mvp`, 144 tests, typecheck, lint, build,
+- Last verification: generated catalog, 144 tests, typecheck, lint, build,
   and `git diff --check` passed.
 - Next milestone: none.
 

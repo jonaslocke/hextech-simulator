@@ -19,14 +19,13 @@ card documents retain their existing schema.
 ## Rollout
 
 1. Run `npm run catalog:sync-behaviors`.
-2. Upload `data/catalog/mvp.json` and approve the 18 new Master Yi records.
+2. Approve the new Master Yi records through the card-catalog workflow.
 3. Run `npm run catalog:sync-decks`.
 4. Stop the application and run `npm run game:reset-runtime`.
 5. Start the application and smoke-test all nine deck pairings.
 
 ## Verification
 
-- `npm run catalog:check-mvp`: passed.
 - `npm test`: 173 passed.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed.

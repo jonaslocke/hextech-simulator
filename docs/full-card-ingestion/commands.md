@@ -10,7 +10,6 @@ blocked by execution policy.
 
 | Purpose | Command | M0 result |
 |---|---|---|
-| MVP catalog generated-file check | `cmd /c npm run catalog:check-mvp` | Pass |
 | TypeScript typecheck | `cmd /c npm run typecheck` | Pass |
 | Test suite | `cmd /c npm test` | Pass |
 | Lint | `cmd /c npm run lint` | Pass |
@@ -42,7 +41,6 @@ of this baseline without explicit execution approval.
 | Reset canonical cards | `cmd /c npm run catalog:reset-canonical-cards` | Clears/rebuilds canonical card persistence. |
 | Clear behavior validations | `cmd /c npm run catalog:clear-validations` | Deletes validation records. |
 | Reset runtime matches | `cmd /c npm run game:reset-runtime` | Runtime cleanup only; not an ingestion milestone step. |
-| Rebuild MVP generated catalog | `cmd /c npm run catalog:build-mvp` | Writes `data/catalog/mvp.json` and generated TS catalog output. |
 
 ## Behavior Change Gate
 

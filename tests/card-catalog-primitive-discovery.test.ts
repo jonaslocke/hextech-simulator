@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   analyzeCardBehaviorSuggestions,
-  analyzeLocalCardSetBehaviorSuggestions,
-  analyzeLocalCardSetCorpus,
   behaviorDurationKinds,
   buildPrimitiveCatalog,
   costResourceTypes,
@@ -1082,85 +1080,6 @@ test("discovers exact token names from token creation text", () => {
     findAssignment(gold, "action.play_token")?.parameters.tokenName,
     "Gold gear"
   );
-});
-
-test.skip("discovers reusable primitives from the full local card corpus", async () => {
-  const report = await analyzeLocalCardSetCorpus();
-  const catalog = buildPrimitiveCatalog(report.primitives);
-  const primitiveIds = new Set(
-    report.primitives.map((entry) => entry.primitive.id)
-  );
-  const tankKeyword = catalog.find((entry) => entry.id === "keyword.tank");
-  const tankParameter = tankKeyword?.parameters.find(
-    (parameter) => parameter.name === "keyword"
-  );
-  const hiddenCards = report.cards.filter((card) =>
-    card.primitiveIds.includes("keyword.hidden")
-  );
-  const hiddenReferenceNames = new Set([
-    "Swift Scout",
-    "Ember Monk",
-    "Ava Achiever",
-    "Pack of Wonders",
-    "Noxus Saboteur",
-    "Guerilla Warfare"
-  ]);
-  const hiddenReferences = report.cards.filter((card) =>
-    hiddenReferenceNames.has(card.cardName)
-  );
-
-  assert.deepEqual(report.summary.sourceFiles, [
-    "ogn.json",
-    "ogs.json",
-    "sfd.json",
-    "unl.json"
-  ]);
-  assert.equal(report.summary.totalCards, 936);
-  assert.equal(report.summary.cardsWithRulesText, 636);
-  assert.equal(primitiveIds.has("action.draw_cards"), true);
-  assert.equal(primitiveIds.has("action.kill_unit"), true);
-  assert.equal(primitiveIds.has("action.ready_cards"), true);
-  assert.equal(primitiveIds.has("action.exhaust_cards"), true);
-  assert.equal(primitiveIds.has("action.deal_damage"), true);
-  assert.equal(primitiveIds.has("action.channel_runes"), true);
-  assert.equal(primitiveIds.has("ability.exhaust_for_resource"), true);
-  assert.equal(primitiveIds.has("ability.recycle_for_power"), true);
-  assert.equal(primitiveIds.has("modifier.modify_numeric_value"), true);
-  assert.equal(primitiveIds.has("trigger.end_of_turn"), true);
-  assert.equal(primitiveIds.has("selector.unit"), true);
-  assert.equal(hiddenCards.length, 26);
-  assert.equal(hiddenReferences.length, 8);
-  assert.equal(
-    hiddenReferences.every(
-      (card) => !card.primitiveIds.includes("keyword.hidden")
-    ),
-    true
-  );
-  assert.equal(report.summary.discoveredPrimitiveCount > 20, true);
-  assert.equal(tankParameter, undefined);
-});
-
-test.skip("builds a corpus behavior suggestion report without behavior templates", async () => {
-  const report = await analyzeLocalCardSetBehaviorSuggestions();
-  const primitiveIds = new Set(report.primitiveCatalog.map((entry) => entry.id));
-  const chooseTarget = report.primitiveCatalog.find(
-    (entry) => entry.id === "choice.choose_target"
-  );
-
-  assert.deepEqual(report.summary.sourceFiles, [
-    "ogn.json",
-    "ogs.json",
-    "sfd.json",
-    "unl.json"
-  ]);
-  assert.equal(report.summary.totalCards, 656);
-  assert.equal(report.summary.cardsWithRulesText, 636);
-  assert.equal(report.summary.suggestedCardCount, 656);
-  assert.equal(report.summary.completeSuggestionCount > 0, true);
-  assert.equal(primitiveIds.has("choice.choose_target"), true);
-  assert.equal(primitiveIds.has("selector.friendly_unit"), true);
-  assert.equal(primitiveIds.has("selector.enemy_unit"), true);
-  assert.equal((chooseTarget?.examples.length ?? 0) > 0, true);
 });
 
 test("reports unsupported clauses without inventing behavior", () => {

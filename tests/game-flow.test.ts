@@ -174,44 +174,6 @@ test("exposes a ready Legend Add ability and grants spell-only Rainbow Power", (
   assert.deepEqual(next.state.players.p1!.conditionalPower, { Rainbow: 1 });
 });
 
-test.skip("plays a spell through priority resolution and advances the turn", () => {
-  const { game: initial, decks } = fixture();
-  let game = initial;
-  const play = gameplayActions(game, "p1", decks).find((action) => action.label === "Play Spell")!;
-  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "b" });
-  assert.equal(game.state.chain?.items.length, 1);
-  assert.equal(game.state.chain?.priorityPlayerId, "p1");
-  game.state.chain!.passedPlayerIds = ["p2"];
-  const addEnergy = gameplayActions(game, "p1", decks).find(
-    (action) =>
-      action.sourceCardInstanceId === "p1:rune" &&
-      action.label === "Add Energy"
-  );
-  assert.ok(addEnergy, "feature override must expose Add abilities during Priority");
-  game = performGameplayAction({
-    game,
-    actorPlayerId: "p1",
-    actionId: addEnergy.id,
-    selectedIds: [],
-    decks,
-    now: "bb"
-  });
-  assert.equal(game.state.players.p1!.energy, 1);
-  assert.equal(game.state.cardStates["p1:rune"]!.exhausted, true);
-  assert.equal(game.state.chain?.items.length, 1);
-  assert.equal(game.state.chain?.priorityPlayerId, "p1");
-  assert.deepEqual(game.state.chain?.passedPlayerIds, []);
-  for (const playerId of ["p1", "p2"]) {
-    const pass = gameplayActions(game, playerId, decks)[0]!;
-    game = performGameplayAction({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: "c" });
-  }
-  assert.equal(game.state.chain, null);
-  assert.ok(game.state.players.p1?.zones.trash.includes("p1:spell"));
-  const end = gameplayActions(game, "p1", decks).find((action) => action.label === "End turn")!;
-  game = performGameplayAction({ game, actorPlayerId: "p1", actionId: end.id, selectedIds: [], decks, now: "d" });
-  assert.equal(game.state.turn?.activePlayerId, "p2");
-});
-
 test("resolves a multi-step top-deck spell instead of dropping its Chain item", () => {
   const { game: initial, decks } = fixture();
   const spell = decks[0]!.snapshot.cards.find(

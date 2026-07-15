@@ -193,12 +193,12 @@ The following further generic foundations are implemented and synchronized:
 - `action.take_to_hand` moves a chosen card from the original private look
   group into hand, and `action.recycle_top_cards` can require all remaining
   looked-at cards to be recycled. The first remaining family binding is
-  prepared for `Stacked Deck` in `scripts/approve-ogn-top-deck-family.ts`.
+  prepared for `Stacked Deck` during the completed ingestion pass.
 
-The current remaining-card inventory is generated and checked by
-`scripts/ogn-m2-inventory.ts`: 242 gameplay-distinct definitions, 236 with
-rules text, and 298 clauses after accepted deck cards, equivalent printings,
-and represented token printings are excluded. See
+The current remaining-card inventory snapshot contains 242
+gameplay-distinct definitions, 236 with rules text, and 298 clauses after
+accepted deck cards, equivalent printings, and represented token printings are
+excluded. See
 `ogn-m2-remaining-inventory.md` for the inventory contract and
 `ogn-m2-top-deck-family.md` for the first family reuse map and manual gate.
 

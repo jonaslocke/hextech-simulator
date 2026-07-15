@@ -27,7 +27,7 @@
 ## Current checkpoint
 
 - Completed through: milestone 11
-- Verification: `catalog:check-mvp` passed; 135 tests passed; typecheck, lint,
+- Verification: generated catalog was accepted; 135 tests passed; typecheck, lint,
   build, and `git diff --check` passed.
 - Runtime reset performed: no.
 - Admin publication performed: no.

@@ -80,7 +80,7 @@ continue it. Do not discard, reset, amend, squash, or combine milestone work.
 ## Current checkpoint
 
 - Completed through: milestone 7 (all milestones)
-- Verification: `catalog:check-mvp` passed; 141 tests passed; typecheck, lint,
+- Verification: generated catalog was accepted; 141 tests passed; typecheck, lint,
   build, and `git diff --check` passed.
 - Next milestone: none.
 

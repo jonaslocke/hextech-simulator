@@ -2,8 +2,8 @@
 
 Snapshot: 2026-07-13
 
-The executable inventory is generated from the current source catalog and the
-accepted deck lists by `scripts/ogn-m2-inventory.ts`. It excludes:
+This inventory snapshot was generated from the source catalog and accepted deck
+lists. It excludes:
 
 - accepted Garen, Kai'Sa, and Viktor deck cards, including sideboards;
 - equivalent printed variants, reduced to one preferred printing per clean name;
@@ -17,10 +17,6 @@ Current baseline:
 | Remaining gameplay-distinct definitions | 242 |
 | Definitions with rules text | 236 |
 | Executable clauses to review | 298 |
-
-Run `node --import tsx scripts/ogn-m2-inventory.ts` to print every definition,
-clause, discovery status, and derived behavior family. Run it with `--check` to
-verify that the inventory still covers the complete remaining corpus.
 
 The derived family buckets are analysis aids, not card-specific runtime paths:
 

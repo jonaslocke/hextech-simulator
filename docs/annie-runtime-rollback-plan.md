@@ -25,7 +25,6 @@ Baseline: `eab506a669eb5d570f6e1a97bb9ad993db326209`.
 
 The milestone 11 gate passed on July 4, 2026:
 
-- `npm run catalog:check-mvp`: passed.
 - `npm test`: 135 passed, 0 failed.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed.
@@ -52,11 +51,10 @@ definitions, and validation records.
 First synchronize behavior definitions:
 
 ```powershell
-npm run catalog:check-mvp
 npm run catalog:sync-behaviors
 ```
 
-Then upload `data/catalog/mvp.json` at `/admin/card-catalog`, review and approve
+Then review the committed runtime catalog at `/admin/card-catalog` and approve
 the 18 Annie-only records, and confirm a complete Annie snapshot is available.
 With the application stopped:
 

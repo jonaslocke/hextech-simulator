@@ -65,7 +65,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `action.exhaust_cards` | OGN M2 | Unchecked Power | Covered by rules reference | Executable with `card.exhausted` event | `tests/game-token-placement.test.ts` | Exhaust selected ready card | Exact exhaust-effect models remain unapproved |
 | `action.channel_runes` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel runes | None |
 | `action.deal_damage` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Deal damage to unit | None |
-| `action.draw_by_optional_cost` | Existing | Meditation | Covered by rules reference | Executable for locked optional play-cost selections | `tests/after-masteryi-implementation.test.ts` | Draw the paid or declined optional-cost branch after Chain resolution | Optional play-cost family manually passed on 2026-07-14. |
+| `action.draw_by_optional_cost` | Existing | Meditation | Covered by rules reference | Executable for locked optional play-cost selections | Manual validation | Draw the paid or declined optional-cost branch after Chain resolution | Optional play-cost family manually passed on 2026-07-14. |
 | `action.channel_or_draw` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Channel fallback draw | None |
 | `action.fight` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Two units fight | None |
 | `action.kill_unit` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Kill selected unit | None |
@@ -91,7 +91,7 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | `keyword.temporary` | OGN M2 | Sprite | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Kill at controller Beginning Phase before scoring | None |
 | `cost.pay` | OGN M2 | Activated abilities with Energy costs | Covered by rules reference | Executable for explicit Energy payment | `tests/game-token-placement.test.ts` | Pay Energy before activating ability | Power/domain and other non-standard costs remain unimplemented |
 | `cost.exhaust_source` | OGN M2 | Activated abilities with Exhaust costs | Covered by rules reference | Executable | `tests/game-token-placement.test.ts` | Exhaust source before activation | None |
-| `cost.exhaust_selected_unit` | Existing | Meditation | Covered by rules reference | Executable for a locked optional play-cost selection | `tests/after-masteryi-implementation.test.ts` | Exhaust a ready friendly Unit as a selected optional cost | Optional play-cost family manually passed on 2026-07-14. |
+| `cost.exhaust_selected_unit` | Existing | Meditation | Covered by rules reference | Executable for a locked optional play-cost selection | Manual validation | Exhaust a ready friendly Unit as a selected optional cost | Optional play-cost family manually passed on 2026-07-14. |
 | `ability.exhaust_for_resource` | OGN M2 | Hand of Noxus | Local rules: Add abilities cannot be reacted to | Executable for Legion activated Energy production | `tests/game-token-placement.test.ts` | After Legion, exhaust the source and immediately add Energy | Manual family passed on 2026-07-15; automatic payment also enforces Legion. |
 | `replacement.recall_on_next_death` | Existing | TBD | Covered by rules reference | Existing executable | Existing | Recall instead of next death | None |
 
@@ -100,9 +100,9 @@ Existing runtime coverage is read from `src/server/game/runtime-coverage.ts`.
 | Set | Card code | Name | Type | Behavior clauses | Primitive coverage | Executable | In deck validation | Notes |
 |---|---|---|---|---:|---|---|---|---|
 | MVP | Existing canonical scope | Lux, Annie, Master Yi playable deck cards | Mixed | TBD | Existing approved primitives | Yes | Existing selectable decks | M0 baseline only; detailed card ledger starts in M1. |
-| OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Exact M1 models certified in `tests/garen-m1-card-catalog.test.ts` | Yes in code-level snapshot validation | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
-| OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Exact models published by `catalog:approve-kaisa-batch` | Yes | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12; associated manual-test issues are closed in the resolution ledger. |
-| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | `approve-viktor-deck-foundation` published all exact Viktor models | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13; follow-on Hidden work is tracked separately in the facedown plan. |
+| OGS/OGN/SFD | 21 unique cards | Garen deck cards | Mixed | 18 cards with rules text | Manual validation | Yes | Garen selector code added | User reports all Garen card behaviors fixed and persisted. |
+| OGN | 21 unique cards | Kai'Sa deck: Kai'Sa - Daughter of the Void; Kai'Sa, Survivor; Darius, Trifarian; Noxus Hopeful; Watchful Sentry; Void Seeker; Hextech Ray; Smoke Screen; Retreat; Thousand-Tailed Watcher; Reaver's Row; Unchecked Power; Cleave; Dr. Mundo, Expert; Brynhir Thundersong; Falling Star; Icathian Rain; Time Warp; The Arena's Greatest; The Candlelit Sanctum | Legend/Unit/Spell/Battlefield | 21 | Manual validation | Yes | Accepted | Full Kai'Sa deck validation accepted on 2026-07-12; associated manual-test issues are closed in the resolution ledger. |
+| OGN | 24 unique cards | Viktor deck: Herald of the Arcane; Viktor, Leader; Call to Glory; Consult the Past; Cull the Weak; Faithful Manufactor; Grand Strategem; Hidden Blade; Imperial Decree; Machine Evangel; Riptide Rex; Seal of Unity; Shen, Kinkou; Singularity; Spectral Matron; Sprite Mother; Trifarian Gloryseeker; Vanguard Captain; Obelisk of Power; Trifarian War Camp; Vilemaw's Lair; Facebreaker; Salvage; Vengeance | Legend/Unit/Spell/Gear/Battlefield | 24 | Manual validation | Yes | Accepted | Full Viktor deck behavior validation accepted on 2026-07-13; follow-on Hidden work is tracked separately in the facedown plan. |
 | OGN | OGN-183 | Stacked Deck | Spell | 1 | `timing.action`, `action.look`, `action.take_to_hand`, `action.recycle_top_cards` | Yes | Yes | Published as one sequential runtime clause after fixing the observed no-op; passed the top-deck family manual gate on 2026-07-13. |
 | OGN | OGN-165 | Cemetery Attendant | Unit | 1 | `trigger.on_play`, `selector.card`, `action.return_to_hand` | Yes | Yes | Public-Trash target lock passed with the effect-driven recovery/play family on 2026-07-14. |
 | OGN | OGN-170 | Morbid Return | Spell | 1 | `timing.action`, `selector.card`, `action.return_to_hand` | Yes | Yes | Public-Trash target lock passed with the effect-driven recovery/play family on 2026-07-14. |
@@ -185,19 +185,16 @@ primitive discovery are complete. The user approved:
 Runtime implementation for both approved gates and the latest manual defect fixes
 is complete and verified by:
 
-- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts tests/garen-m1-card-catalog.test.ts`
+- `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts`
 - `node --import tsx --test tests/game-token-placement.test.ts`
-- `node --import tsx --test tests/garen-m1-card-catalog.test.ts`
-- `cmd /c npm run catalog:check-mvp`
 - `cmd /c npm run typecheck`
 - `cmd /c npm test`
 - `cmd /c npm run lint`
 - `cmd /c npm run build`
 
-Exact Garen behavior modeling and code-level runtime-catalog validation are
-complete. `tests/garen-m1-card-catalog.test.ts` certifies 21 unique Garen deck
-cards as approved, executable canonical models and builds a valid deck snapshot
-from those documents.
+Exact Garen behavior modeling and manual runtime-catalog validation are
+complete. Card behavior acceptance is manual; the remaining automated coverage
+is limited to reusable catalog and gameplay primitives.
 
 The user reports that all Garen card behaviors were fixed and all Garen deck
 cards are persisted in the canonical catalog. The code now adds `garen` to the
