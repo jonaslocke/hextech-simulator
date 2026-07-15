@@ -9,7 +9,7 @@ import {
 } from "../src/server/card-catalog";
 import type { Card } from "../src/server/catalog";
 
-test("builds an approved canonical card with a structured behavior model", () => {
+test("builds an approved catalog card with a structured behavior model", () => {
   const input = createPublicationInput();
   const document = buildCanonicalCardDocument(
     input,
@@ -18,8 +18,8 @@ test("builds an approved canonical card with a structured behavior model", () =>
     "2026-06-20T01:00:00.000Z"
   );
 
-  assert.equal(document.id, "OGN-095");
-  assert.equal(document.card.name, "Stupefy");
+  assert.equal(document.id, "SYN-001");
+  assert.equal(document.card.name, "Synthetic Reaction Spell");
   assert.equal(document.modelingStatus, "approved");
   assert.equal(document.runtimeSupportStatus, "supported");
   assert.equal(document.behaviorModel.playTimings[0]?.behaviorId, "timing.reaction");
@@ -33,7 +33,7 @@ test("builds an approved canonical card with a structured behavior model", () =>
   assert.equal(document.behaviorModel.clauses[0]?.selectors[0]?.order, 1);
 });
 
-test("rejects non-approved canonical publication", () => {
+test("rejects non-approved catalog publication", () => {
   assert.throws(() =>
     canonicalCardPublicationInputSchema.parse({
       ...createPublicationInput(),
@@ -175,7 +175,7 @@ function createPublicationInput(): CanonicalCardPublicationInput {
   const card = createCard();
 
   return {
-    cardCode: "OGN-095",
+    cardCode: "SYN-001",
     card,
     sourceTextHash: hashCardRulesText(card),
     modelingStatus: "approved",
@@ -231,9 +231,9 @@ function createPublicationInput(): CanonicalCardPublicationInput {
 
 function createCard(): Card {
   return {
-    id: "OGN-095/298",
-    name: "Stupefy",
-    public_code: "OGN-095/298",
+    id: "SYN-001/100",
+    name: "Synthetic Reaction Spell",
+    public_code: "SYN-001/100",
     attributes: { energy: 1, might: null, power: null },
     classification: {
       type: "Spell",
@@ -245,9 +245,9 @@ function createCard(): Card {
       plain:
         "[Reaction] Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:."
     },
-    set: { set_id: "OGN", label: "Origins" },
+    set: { set_id: "SYN", label: "Synthetic Set" },
     media: {},
     tags: [],
-    metadata: { clean_name: "Stupefy" }
+    metadata: { clean_name: "Synthetic Reaction Spell" }
   };
 }

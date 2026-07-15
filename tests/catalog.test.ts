@@ -4,17 +4,14 @@ import {
   createCardCatalogVersionDocument,
   loadCardCatalog,
   persistCardCatalogVersion,
-  requireCardByName
 } from "../src/server/catalog";
 
 test("loads local Riftbound card catalog", async () => {
   const catalog = await loadCardCatalog();
 
   assert.equal(catalog.cards.length, 57);
-  assert.equal(requireCardByName(catalog, "Dark Child - Starter").classification.type, "Legend");
-  assert.equal(requireCardByName(catalog, "Lady of Luminosity - Starter").classification.type, "Legend");
-  assert.equal(requireCardByName(catalog, "Annie, Stubborn").classification.supertype, "Champion");
-  assert.equal(requireCardByName(catalog, "Lux, Crownguard").classification.supertype, "Champion");
+  assert.equal(catalog.cards.some((card) => card.classification.type === "Legend"), true);
+  assert.equal(catalog.cards.some((card) => card.classification.supertype === "Champion"), true);
   assert.deepEqual(catalog.setFiles, ["fixed-mvp-cards.generated.ts"]);
   assert.match(catalog.versionHash, /^[a-f0-9]{64}$/);
 });

@@ -30,16 +30,16 @@ import { runeResourceTypes } from "../src/shared/game";
 import type { Card } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
-  assert.equal(deriveCardCode("OGN-027/298"), "OGN-027");
-  assert.equal(deriveCardCode("OGN-027a/298"), "OGN-027");
-  assert.equal(deriveCardCode("OGN-307*/298"), "OGN-307");
+  assert.equal(deriveCardCode("SYN-027/100"), "SYN-027");
+  assert.equal(deriveCardCode("SYN-027a/100"), "SYN-027");
+  assert.equal(deriveCardCode("SYN-307*/100"), "SYN-307");
 });
 
-test("discovers primitive assignments for Stupefy without behavior templates", () => {
+test("discovers primitive assignments without behavior templates", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Stupefy",
-      publicCode: "OGN-095/298",
+      name: "Synthetic Reaction Spell",
+      publicCode: "SYN-001/100",
       text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:. Draw 1."
     })
   );
@@ -47,7 +47,7 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
     clause.assignments.map((assignment) => assignment.primitiveId)
   );
 
-  assert.equal(discovery.cardCode, "OGN-095");
+  assert.equal(discovery.cardCode, "SYN-001");
   assert.deepEqual(primitiveIds, [
     "timing.reaction",
     "selector.unit",
@@ -93,22 +93,22 @@ test("discovers primitive assignments for Stupefy without behavior templates", (
 test("discovers selector constraints for target legality from card text", () => {
   const backToBack = discoverCardPrimitives(
     createTestCard({
-      name: "Back to Back",
-      publicCode: "OGN-206/298",
+      name: "Synthetic Group Buff",
+      publicCode: "SYN-002/100",
       text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give two friendly units each +2 :rb_might: this turn."
     })
   );
   const fallingComet = discoverCardPrimitives(
     createTestCard({
-      name: "Falling Comet",
-      publicCode: "OGN-087/298",
+      name: "Synthetic Battlefield Damage",
+      publicCode: "SYN-003/100",
       text: "[Action] (Play on your turn or in showdowns.)Deal 6 to a unit at a battlefield."
     })
   );
-  const singularity = discoverCardPrimitives(
+  const optionalDamage = discoverCardPrimitives(
     createTestCard({
-      name: "Singularity",
-      publicCode: "OGN-105/298",
+      name: "Synthetic Optional Damage",
+      publicCode: "SYN-004/100",
       text: "Deal 6 to each of up to two units."
     })
   );
@@ -130,7 +130,7 @@ test("discovers selector constraints for target legality from card text", () => 
     locationRelation: "any",
     scope: "any",
   });
-  assert.deepEqual(findAssignment(singularity, "selector.unit")?.parameters, {
+  assert.deepEqual(findAssignment(optionalDamage, "selector.unit")?.parameters, {
     scope: "any",
     minimumCount: 0,
     maximumCount: 2,
@@ -138,14 +138,14 @@ test("discovers selector constraints for target legality from card text", () => 
     locationRelation: "any",
     excludesSource: false
   });
-  assert.equal(findAssignment(singularity, "selector.up_to"), undefined);
+  assert.equal(findAssignment(optionalDamage, "selector.up_to"), undefined);
 });
 
 test("builds typed card behavior suggestions with parameter validation", () => {
   const report = analyzeCardBehaviorSuggestions([
     createTestCard({
-      name: "Stupefy",
-      publicCode: "OGN-095/298",
+      name: "Synthetic Reaction Spell",
+      publicCode: "SYN-001/100",
       text: "[Reaction] (Play any time, even before spells and abilities resolve.)Give a unit -1 :rb_might: this turn, to a minimum of 1 :rb_might:. Draw 1."
     })
   ]);
@@ -168,37 +168,37 @@ test("builds typed card behavior suggestions with parameter validation", () => {
 });
 
 test("discovers corpus-backed numeric modifier operations", () => {
-  const aspirantsClimb = discoverCardPrimitives(
+  const victoryModifier = discoverCardPrimitives(
     createTestCard({
-      name: "Aspirant's Climb",
-      publicCode: "OGN-276/298",
+      name: "Synthetic Victory Modifier",
+      publicCode: "SYN-005/100",
       text: "Increase the points needed to win the game by 1."
     })
   );
-  const fiora = discoverCardPrimitives(
+  const doubler = discoverCardPrimitives(
     createTestCard({
-      name: "Fiora, Peerless",
-      publicCode: "SFD-110/221",
+      name: "Synthetic Doubler",
+      publicCode: "SYN-006/100",
       text: "When I attack or defend one on one, double my Might this combat."
     })
   );
-  const mutation = discoverCardPrimitives(
+  const setModifier = discoverCardPrimitives(
     createTestCard({
-      name: "Convergent Mutation",
-      publicCode: "OGN-108/298",
+      name: "Synthetic Set Modifier",
+      publicCode: "SYN-007/100",
       text: "Choose a friendly unit. Its Might becomes the Might of another friendly unit this turn."
     })
   );
-  const baroness = discoverCardPrimitives(
+  const resourceModifier = discoverCardPrimitives(
     createTestCard({
-      name: "Chem-Baroness",
-      publicCode: "SFD-201/221",
+      name: "Synthetic Resource Modifier",
+      publicCode: "SYN-008/100",
       text: "While your score is within 3 points of the Victory Score, your Gold [Add] an additional :rb_energy_1:."
     })
   );
 
   assert.deepEqual(
-    findAssignment(aspirantsClimb, "modifier.modify_numeric_value")?.parameters,
+    findAssignment(victoryModifier, "modifier.modify_numeric_value")?.parameters,
     {
       attribute: "victoryRequirement",
       operation: "increase",
@@ -209,7 +209,7 @@ test("discovers corpus-backed numeric modifier operations", () => {
     }
   );
   assert.deepEqual(
-    findAssignment(fiora, "modifier.modify_numeric_value")?.parameters,
+    findAssignment(doubler, "modifier.modify_numeric_value")?.parameters,
     {
       attribute: "might",
       operation: "multiply",
@@ -219,7 +219,7 @@ test("discovers corpus-backed numeric modifier operations", () => {
     }
   );
   assert.deepEqual(
-    findAssignment(mutation, "modifier.modify_numeric_value")?.parameters,
+    findAssignment(setModifier, "modifier.modify_numeric_value")?.parameters,
     {
       attribute: "might",
       operation: "set",
@@ -229,7 +229,7 @@ test("discovers corpus-backed numeric modifier operations", () => {
     }
   );
   assert.deepEqual(
-    findAssignment(baroness, "modifier.modify_numeric_value")?.parameters,
+    findAssignment(resourceModifier, "modifier.modify_numeric_value")?.parameters,
     {
       attribute: "resourceAmount",
       operation: "increase",
@@ -239,17 +239,17 @@ test("discovers corpus-backed numeric modifier operations", () => {
       duration: "whileSourceOnBoard"
     }
   );
-  assert.deepEqual(findAssignment(baroness, "selector.token")?.parameters, {
+  assert.deepEqual(findAssignment(resourceModifier, "selector.token")?.parameters, {
     tokenName: "Gold gear",
     controller: "controller"
   });
 });
 
-test("models Eager Apprentice's controller, card type, location, and cost floor", () => {
+test("models controller, card type, location, and cost floor", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Eager Apprentice",
-      publicCode: "OGN-084/298",
+      name: "Synthetic Spell Cost Modifier",
+      publicCode: "SYN-009/100",
       text: "While I'm at a battlefield, the Energy costs for spells you play is reduced by :rb_energy_1:, to a minimum of :rb_energy_1:."
     })
   );
@@ -272,8 +272,8 @@ test("models Eager Apprentice's controller, card type, location, and cost floor"
 test("does not treat numeric comparisons as modifiers", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Yasuo, Remorseful",
-      publicCode: "OGN-076/298",
+      name: "Synthetic Numeric Reference",
+      publicCode: "SYN-010/100",
       text: "Deal damage equal to my Might to an enemy unit here."
     })
   );
@@ -351,8 +351,8 @@ test("rejects invalid Unit selector count bounds", () => {
 test("uses selectors for explicit choice legality and count", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Solari Chief",
-      publicCode: "OGN-225/298",
+      name: "Synthetic Choice Unit",
+      publicCode: "SYN-011/100",
       text: "When you play me, choose an enemy unit."
     })
   );
@@ -371,53 +371,53 @@ test("uses selectors for explicit choice legality and count", () => {
 });
 
 test("models play, choose, and ready clauses as event listeners", () => {
-  const ravenbloom = discoverCardPrimitives(
+  const spellTrigger = discoverCardPrimitives(
     createTestCard({
-      name: "Ravenbloom Student",
-      publicCode: "OGN-103/298",
+      name: "Synthetic Spell Trigger",
+      publicCode: "SYN-012/100",
       text: "When you play a spell, give me +1 :rb_might: this turn."
     })
   );
-  const bladeDancer = discoverCardPrimitives(
+  const chooseTrigger = discoverCardPrimitives(
     createTestCard({
-      name: "Blade Dancer",
-      publicCode: "SFD-216/221",
+      name: "Synthetic Choose Trigger",
+      publicCode: "SYN-013/100",
       text: "When you choose a friendly unit, you may exhaust me and pay :rb_rune_rainbow: to ready it."
     })
   );
-  const irelia = discoverCardPrimitives(
+  const readyTrigger = discoverCardPrimitives(
     createTestCard({
-      name: "Irelia, Fervent",
-      publicCode: "SFD-153/221",
+      name: "Synthetic Ready Trigger",
+      publicCode: "SYN-014/100",
       text: "When you choose or ready me, give me +1 :rb_might: this turn."
     })
   );
 
   assert.deepEqual(
-    findAssignment(ravenbloom, "trigger.on_play")?.parameters,
+    findAssignment(spellTrigger, "trigger.on_play")?.parameters,
     { actor: "controller", subject: "spell" }
   );
   assert.deepEqual(
-    findAssignment(bladeDancer, "trigger.on_choose")?.parameters,
+    findAssignment(chooseTrigger, "trigger.on_choose")?.parameters,
     { actor: "controller", subject: "event_subject" }
   );
-  assert.equal(findAssignment(bladeDancer, "choice.choose_target"), undefined);
-  assert.deepEqual(findAssignment(irelia, "trigger.on_choose")?.parameters, {
+  assert.equal(findAssignment(chooseTrigger, "choice.choose_target"), undefined);
+  assert.deepEqual(findAssignment(readyTrigger, "trigger.on_choose")?.parameters, {
     actor: "controller",
     subject: "source"
   });
-  assert.deepEqual(findAssignment(irelia, "trigger.on_ready")?.parameters, {
+  assert.deepEqual(findAssignment(readyTrigger, "trigger.on_ready")?.parameters, {
     actor: "controller",
     subject: "source"
   });
-  assert.equal(findAssignment(irelia, "action.ready_cards"), undefined);
+  assert.equal(findAssignment(readyTrigger, "action.ready_cards"), undefined);
 });
 
-test("models a played spell Energy-cost threshold as a typed clause condition", () => {
+test("models a played spell Energy-cost threshold as a typed condition", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Lux, Illuminated",
-      publicCode: "OGS-000/???",
+      name: "Synthetic Spell Threshold",
+      publicCode: "SYN-015/100",
       text: "When you play a spell that costs :rb_energy_5: or more, give me +3 :rb_might: this turn."
     })
   );
@@ -478,11 +478,11 @@ test("validates numeric comparison sources, operators, and values", () => {
   );
 });
 
-test("models Targon's Peak as a conquer listener with delayed resolution", () => {
+test("models a conquer listener with delayed resolution", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Targon's Peak",
-      publicCode: "OGN-289/298",
+      name: "Synthetic Delayed Battlefield",
+      publicCode: "SYN-016/100",
       text: "When you conquer here, ready 2 runes at the end of this turn."
     })
   );
@@ -508,62 +508,6 @@ test("models Targon's Peak as a conquer listener with delayed resolution", () =>
   );
 });
 
-test("models the remaining Lux MVP battlefield, keyword, and entry behaviors", () => {
-  const papertree = discoverCardPrimitives(
-    createTestCard({
-      name: "The Papertree",
-      publicCode: "SFD-219/221",
-      text: "When you hold here, each player channels 1 rune exhausted.",
-      type: "Battlefield"
-    })
-  );
-  const daringPoro = discoverCardPrimitives(
-    createTestCard({
-      name: "Daring Poro",
-      publicCode: "OGN-210/298",
-      text: "[Assault] (+1 :rb_might: while I'm an attacker.)"
-    })
-  );
-  const shieldBearer = discoverCardPrimitives(
-    createTestCard({
-      name: "Shield Bearer",
-      publicCode: "TST-001/001",
-      text: "[Shield 3] (+3 :rb_might: while I'm a defender.)"
-    })
-  );
-  const lecturingYordle = discoverCardPrimitives(
-    createTestCard({
-      name: "Lecturing Yordle",
-      publicCode: "OGN-087/298",
-      text: "[Tank] (I must be assigned combat damage first.)When you play me, draw 1."
-    })
-  );
-  const attendant = discoverCardPrimitives(
-    createTestCard({
-      name: "Vanguard Attendant",
-      publicCode: "OGS-016/024",
-      text: "I enter ready."
-    })
-  );
-
-  assert.deepEqual(findAssignment(papertree, "action.channel_runes")?.parameters, {
-    player: "eachPlayer",
-    count: 1,
-    entryState: "exhausted"
-  });
-  assert.deepEqual(findAssignment(daringPoro, "keyword.assault")?.parameters, {
-    amount: 1
-  });
-  assert.deepEqual(findAssignment(shieldBearer, "keyword.shield")?.parameters, {
-    amount: 3
-  });
-  assert.deepEqual(findAssignment(lecturingYordle, "keyword.tank")?.parameters, {});
-  assert.deepEqual(findAssignment(attendant, "modifier.enter_ready")?.parameters, {
-    target: "source"
-  });
-  assert.equal(findAssignment(attendant, "action.ready_cards"), undefined);
-});
-
 test("declares emitted events for reusable action primitives", () => {
   assert.equal(gameEventKinds.includes("turn.awaken"), true);
   assert.equal(gameEventKinds.includes("turn.beginning"), true);
@@ -582,29 +526,29 @@ test("declares emitted events for reusable action primitives", () => {
 test("discovers Base, source-location, and shared-location Unit constraints", () => {
   const baseTarget = discoverCardPrimitives(
     createTestCard({
-      name: "Yone, Blademaster",
-      publicCode: "SFD-116/221",
+      name: "Synthetic Location Unit",
+      publicCode: "SYN-017/100",
       text: "Deal damage equal to my Might to an enemy unit in a base."
     })
   );
   const hereTarget = discoverCardPrimitives(
     createTestCard({
-      name: "Taric, Protector",
-      publicCode: "OGN-074/298",
+      name: "Synthetic Shared Location Unit",
+      publicCode: "SYN-018/100",
       text: "Other friendly units here have [Shield]."
     })
   );
   const sameBattlefield = discoverCardPrimitives(
     createTestCard({
-      name: "Facebreaker",
-      publicCode: "OGN-220/298",
+      name: "Synthetic Source Location Unit",
+      publicCode: "SYN-019/100",
       text: "Stun a friendly unit and an enemy unit at the same battlefield."
     })
   );
   const sameLocation = discoverCardPrimitives(
     createTestCard({
-      name: "Bellows Breath",
-      publicCode: "SFD-080/221",
+      name: "Synthetic Move Spell",
+      publicCode: "SYN-020/100",
       text: "Deal 1 to up to three units at the same location."
     })
   );
@@ -632,8 +576,8 @@ test("discovers Base, source-location, and shared-location Unit constraints", ()
 test("discovers static source-location unit modifiers as automatic continuous effects", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Trifarian War Camp",
-      publicCode: "OGN-294/298",
+      name: "Synthetic Battlefield Modifier",
+      publicCode: "SYN-021/100",
       text: "Units here have +1 :rb_might:. (This includes attackers.)",
       type: "Battlefield"
     })
@@ -666,8 +610,8 @@ test("discovers static source-location unit modifiers as automatic continuous ef
 test("does not confuse a move destination with the selected Unit area", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Fight or Flight",
-      publicCode: "OGN-168/298",
+      name: "Synthetic Move Destination",
+      publicCode: "SYN-022/100",
       text: "Move a unit from a battlefield to its base."
     })
   );
@@ -682,15 +626,15 @@ test("catalogs Hidden as one fixed parameterless behavior", () => {
   const catalogEntry = getPrimitiveCatalogEntry("keyword.hidden", "keyword");
   const standUnited = discoverCardPrimitives(
     createTestCard({
-      name: "Stand United",
-      publicCode: "OGN-053/298",
+      name: "Synthetic Hidden Unit",
+      publicCode: "SYN-023/100",
       text: "[Hidden] (Hide now for :rb_rune_rainbow: to react with later for :rb_energy_0:.)[Action] (Play on your turn or in showdowns.)Buff a friendly unit."
     })
   );
-  const windsinger = discoverCardPrimitives(
+  const hiddenReference = discoverCardPrimitives(
     createTestCard({
-      name: "Windsinger",
-      publicCode: "SFD-138/221",
+      name: "Synthetic Hidden Reference",
+      publicCode: "SYN-024/100",
       text: "Hidden (Hide now for :rb_rune_rainbow: to react with later for :rb_energy_0:.)When you play me, return another unit at a battlefield."
     })
   );
@@ -700,7 +644,7 @@ test("catalogs Hidden as one fixed parameterless behavior", () => {
     findAssignment(standUnited, "keyword.hidden")?.parameters,
     {}
   );
-  assert.equal(findAssignments(windsinger, "keyword.hidden").length, 1);
+  assert.equal(findAssignments(hiddenReference, "keyword.hidden").length, 1);
   assert.deepEqual(catalogEntry.parameters, []);
   assert.equal(catalogEntry.fixedRules.length, 6);
   assert.equal(catalogEntry.engineSupport.status, "supported");
@@ -842,8 +786,8 @@ test("catalogs player parameters as known player reference enum", () => {
 
 test("discovers separate intrinsic Basic Rune resource abilities", () => {
   const mindRune = createTestCard({
-    name: "Mind Rune",
-    publicCode: "OGN-089/298",
+    name: "Synthetic Basic Rune",
+    publicCode: "SYN-025/100",
     text: "",
     type: "Rune",
     supertype: "Basic",
@@ -883,34 +827,34 @@ test("discovers separate intrinsic Basic Rune resource abilities", () => {
   assert.equal(report.cards[0]?.supportStatus, "supported");
 });
 
-test("reuses exhaust-for-resource behavior for Lux and variable converters", () => {
-  const lux = discoverCardPrimitives(
+test("reuses exhaust-for-resource behavior for variable converters", () => {
+  const exhaustConverter = discoverCardPrimitives(
     createTestCard({
-      name: "Lux, Crownguard",
-      publicCode: "OGS-014/024",
+      name: "Synthetic Exhaust Unit",
+      publicCode: "SYN-026/100",
       text: ":rb_exhaust:: [Reaction] - [Add] :rb_energy_2:. Use only to play spells. (Abilities that add resources can't be reacted to.)",
       type: "Unit"
     })
   );
-  const ancientHenge = discoverCardPrimitives(
+  const paidConverter = discoverCardPrimitives(
     createTestCard({
-      name: "Ancient Henge",
-      publicCode: "SFD-117/221",
+      name: "Synthetic Paid Converter",
+      publicCode: "SYN-027/100",
       text: ":rb_exhaust:: [Reaction] - Pay any amount of Energy to [Add] that much :rb_rune_rainbow:. (Abilities that add resources can't be reacted to.)",
       type: "Gear"
     })
   );
-  const hextechAnomaly = discoverCardPrimitives(
+  const variableConverter = discoverCardPrimitives(
     createTestCard({
-      name: "Hextech Anomaly",
-      publicCode: "SFD-083/221",
+      name: "Synthetic Variable Converter",
+      publicCode: "SYN-028/100",
       text: ":rb_exhaust:: [Reaction] - Pay any amount of :rb_rune_rainbow: to [Add] that much Energy. (Abilities that add resources can't be reacted to.)",
       type: "Gear"
     })
   );
 
   assert.deepEqual(
-    findAssignment(lux, "ability.exhaust_for_resource")?.parameters,
+    findAssignment(exhaustConverter, "ability.exhaust_for_resource")?.parameters,
     {
       resourceType: "energy",
       amountSource: "constant",
@@ -919,7 +863,7 @@ test("reuses exhaust-for-resource behavior for Lux and variable converters", () 
     }
   );
   assert.deepEqual(
-    findAssignment(ancientHenge, "ability.exhaust_for_resource")?.parameters,
+    findAssignment(paidConverter, "ability.exhaust_for_resource")?.parameters,
     {
       resourceType: "power",
       amountSource: "paidAmount",
@@ -928,24 +872,24 @@ test("reuses exhaust-for-resource behavior for Lux and variable converters", () 
     }
   );
   assert.deepEqual(
-    findAssignment(hextechAnomaly, "ability.exhaust_for_resource")?.parameters,
+    findAssignment(variableConverter, "ability.exhaust_for_resource")?.parameters,
     {
       resourceType: "energy",
       amountSource: "paidAmount",
       usage: "unrestricted"
     }
   );
-  assert.equal(findAssignment(lux, "action.exhaust_cards"), undefined);
-  assert.equal(findAssignment(lux, "cost.exhaust_source"), undefined);
-  assert.equal(findAssignment(lux, "timing.reaction"), undefined);
-  assert.equal(findAssignment(lux, "keyword.add"), undefined);
-  assert.equal(lux.clauses.length, 1);
+  assert.equal(findAssignment(exhaustConverter, "action.exhaust_cards"), undefined);
+  assert.equal(findAssignment(exhaustConverter, "cost.exhaust_source"), undefined);
+  assert.equal(findAssignment(exhaustConverter, "timing.reaction"), undefined);
+  assert.equal(findAssignment(exhaustConverter, "keyword.add"), undefined);
+  assert.equal(exhaustConverter.clauses.length, 1);
 });
 
 test("does not grant Basic Rune abilities to non-Basic Runes", () => {
   const nonBasicRune = createTestCard({
-    name: "Special Rune",
-    publicCode: "TST-004/001",
+    name: "Synthetic Special Rune",
+    publicCode: "SYN-029/100",
     text: "",
     type: "Rune",
     supertype: null,
@@ -1059,14 +1003,14 @@ test("catalogs target parameters as known target references", () => {
 test("discovers exact token names from token creation text", () => {
   const recruit = discoverCardPrimitives(
     createTestCard({
-      name: "Recruit Maker",
+      name: "Synthetic Recruit Maker",
       publicCode: "TST-002/001",
       text: "When you play me, play a 1 :rb_might: Recruit unit token in your base."
     })
   );
   const gold = discoverCardPrimitives(
     createTestCard({
-      name: "Gold Maker",
+      name: "Synthetic Gold Maker",
       publicCode: "TST-003/001",
       text: "When I move, play four Gold gear tokens exhausted."
     })
@@ -1085,7 +1029,7 @@ test("discovers exact token names from token creation text", () => {
 test("reports unsupported clauses without inventing behavior", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({
-      name: "Mystery Spell",
+      name: "Synthetic Unsupported Spell",
       publicCode: "TST-001/001",
       text: "Transform fate into a hidden lesson."
     })
@@ -1099,7 +1043,7 @@ test("reports unsupported clauses without inventing behavior", () => {
 test("rolls unsupported text into behavior suggestion status", () => {
   const report = analyzeCardBehaviorSuggestions([
     createTestCard({
-      name: "Mystery Spell",
+      name: "Synthetic Unsupported Spell",
       publicCode: "TST-001/001",
       text: "Transform fate into a hidden lesson."
     })

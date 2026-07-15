@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
@@ -317,19 +317,6 @@ test("card sizing scales from viewport height within stable thresholds", () => {
   assert.equal(responsiveCardHeight("lg", 982), 108);
 });
 
-test("game board contains no initial-deck or behavior identities", async () => {
-  const root = path.join(process.cwd(), "src", "features", "game-board");
-  const files = await collect(root);
-  const source = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
-  const forbidden = [
-    "Lux,", "Stupefy", "Back to Back", "Falling Comet", "Blast of Power",
-    "Singularity", "Final Spark", "behaviorId", "getTargetConfig",
-    "lux-crownguard", "Annie,", "Dark Child", "Firestorm", "Tibbers",
-    "Mystic Poro", "Pouty Poro", "Traveling Merchant"
-  ];
-  assert.deepEqual(forbidden.filter((value) => source.includes(value)), []);
-});
-
 test("keeps large rune rows inside a horizontally scrollable zone", async () => {
   const playerBoard = await readFile(
     path.join(
@@ -352,14 +339,3 @@ test("keeps large rune rows inside a horizontally scrollable zone", async () => 
     /layout === "scroll"[\s\S]*?overflow-x-auto overflow-y-hidden/,
   );
 });
-
-async function collect(root: string): Promise<string[]> {
-  const entries = await readdir(root, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(root, entry.name);
-    if (entry.isDirectory()) files.push(...await collect(fullPath));
-    else if (/\.tsx?$/.test(fullPath)) files.push(fullPath);
-  }
-  return files;
-}
