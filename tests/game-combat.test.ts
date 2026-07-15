@@ -85,14 +85,14 @@ test("combat damage emits unit-damaged events for ongoing triggers", () => {
     attackerMight: 2,
     defenders: [{ id: "defender", might: 3 }],
   });
-  const imperialDecree = definition(
-    "IMPERIAL_DECREE",
-    "Imperial Decree",
+  const damageTrigger = definition(
+    "DAMAGE_TRIGGER",
+    "Synthetic Damage Trigger",
     "Unit",
     0,
   ) as GameCardDefinition;
-  imperialDecree.card.classification.type = "Spell";
-  imperialDecree.behaviorModel.clauses = [
+  damageTrigger.card.classification.type = "Spell";
+  damageTrigger.behaviorModel.clauses = [
     {
       id: "kill-damaged-unit",
       sequence: 0,
@@ -119,24 +119,24 @@ test("combat damage emits unit-damaged events for ongoing triggers", () => {
       keywords: [],
     },
   ];
-  decks[0]!.snapshot.cards.push(imperialDecree);
+  decks[0]!.snapshot.cards.push(damageTrigger);
   decks[0]!.instances.push({
-    instanceId: "imperial-decree",
+    instanceId: "damage-trigger",
     ownerPlayerId: "p1",
     source: "mainDeck",
-    cardCode: "IMPERIAL_DECREE",
+    cardCode: "DAMAGE_TRIGGER",
   });
-  initial.state.players.p1!.zones.trash.push("imperial-decree");
-  initial.state.cardStates["imperial-decree"] = {
+  initial.state.players.p1!.zones.trash.push("damage-trigger");
+  initial.state.cardStates["damage-trigger"] = {
     exhausted: false,
     damage: 0,
     computedMight: null,
     combatRole: null,
   };
   initial.state.ongoingEffects.push({
-    id: "imperial-decree:this-turn",
+    id: "damage-trigger:this-turn",
     behaviorId: "modifier.enable_source_triggers",
-    sourceCardInstanceId: "imperial-decree",
+    sourceCardInstanceId: "damage-trigger",
     controllerPlayerId: "p1",
     targetCardInstanceIds: [],
     duration: "thisTurn",
@@ -148,41 +148,41 @@ test("combat damage emits unit-damaged events for ongoing triggers", () => {
   assert.equal(game.state.chain?.items.length, 2);
   assert.ok(
     game.state.chain?.items.every(
-      (item) => item.sourceCardInstanceId === "imperial-decree",
+      (item) => item.sourceCardInstanceId === "damage-trigger",
     ),
   );
 });
 
-test("a Reaction Unit played into combat becomes a defender before Shield is calculated", () => {
+test("a reaction-timed Unit played into combat becomes a defender before Shield is calculated", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 2,
     defenders: [{ id: "defender", might: 2 }],
   });
-  const shen = definition(
-    "SHEN",
-    "Shen, Kinkou",
+  const reactionUnit = definition(
+    "REACTION_UNIT",
+    "Reaction Unit",
     "Unit",
     3,
     false,
     undefined,
     2,
   ) as GameCardDefinition;
-  shen.card.classification.domain = ["Order"];
-  shen.behaviorModel.playTimings = [{
+  reactionUnit.card.classification.domain = ["Order"];
+  reactionUnit.behaviorModel.playTimings = [{
     behaviorId: "timing.reaction",
     parameters: {},
     confidence: "high",
     order: 0,
   }];
-  decks[1]!.snapshot.cards.push(shen);
+  decks[1]!.snapshot.cards.push(reactionUnit);
   decks[1]!.instances.push({
-    instanceId: "shen",
+    instanceId: "reaction-unit",
     ownerPlayerId: "p2",
     source: "mainDeck",
-    cardCode: "SHEN",
+    cardCode: "REACTION_UNIT",
   });
-  initial.state.players.p2!.zones.hand.push("shen");
-  initial.state.cardStates.shen = {
+  initial.state.players.p2!.zones.hand.push("reaction-unit");
+  initial.state.cardStates["reaction-unit"] = {
     exhausted: false,
     damage: 0,
     computedMight: 3,
@@ -203,11 +203,11 @@ test("a Reaction Unit played into combat becomes a defender before Shield is cal
   });
   const play = gameplayActions(defenderFocus, "p2", decks).find(
     (action) =>
-      action.sourceCardInstanceId === "shen" &&
+      action.sourceCardInstanceId === "reaction-unit" &&
       action.label.includes("Arena") &&
       action.enabled,
   );
-  assert.ok(play, "Reaction Unit should be playable during combat focus.");
+  assert.ok(play, "Synthetic reaction Unit should be playable during combat focus.");
 
   const played = performGameplayAction({
     game: defenderFocus,
@@ -215,12 +215,12 @@ test("a Reaction Unit played into combat becomes a defender before Shield is cal
     actionId: play.id,
     selectedIds: [],
     decks,
-    now: "play-shen-as-defender",
+    now: "play-reaction-unit-as-defender",
   });
 
-  assert.equal(played.state.cardStates.shen?.combatRole, "defender");
-  assert.equal(played.state.cardStates.shen?.computedMight, 5);
-  assert.ok(played.state.combat?.defenderUnitIds.includes("shen"));
+  assert.equal(played.state.cardStates["reaction-unit"]?.combatRole, "defender");
+  assert.equal(played.state.cardStates["reaction-unit"]?.computedMight, 5);
+  assert.ok(played.state.combat?.defenderUnitIds.includes("reaction-unit"));
 });
 
 test("shared battlefield placement assigns an attacker during an active combat", () => {
@@ -228,7 +228,7 @@ test("shared battlefield placement assigns an attacker during an active combat",
     attackerMight: 2,
     defenders: [{ id: "defender", might: 2 }],
   });
-  const reinforcement = definition("REINFORCEMENT", "Reinforcement", "Unit", 3);
+  const reinforcement = definition("REINFORCEMENT", "Synthetic Reinforcement", "Unit", 3);
   decks[0]!.snapshot.cards.push(reinforcement);
   decks[0]!.instances.push({
     instanceId: "reinforcement",

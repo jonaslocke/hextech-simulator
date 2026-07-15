@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import {
-  analyzeCardBehaviorSuggestions,
   buildBehaviorDefinitionDocument,
   buildCanonicalCardDocument,
   buildCurrentBehaviorCatalog,
   hashCardRulesText,
-  type CanonicalCardDocument
+  type CanonicalCardDocument,
 } from "../src/server/card-catalog";
-import { loadCardCatalog } from "../src/server/catalog";
+import type { Card } from "../src/server/catalog";
 import { parseDeckList } from "../src/server/deck";
 import {
   buildDeckSnapshot,
@@ -31,10 +29,10 @@ test("builds an immutable snapshot for every unique initial-deck card", async ()
 
 test("does not impose a minimum unique-card count on deck snapshots", async () => {
   const fixture = await buildFixture();
-  const sourceText = fixture.sourceText.replace(/^3 Stupefy\r?\n/m, "");
+  const sourceText = fixture.sourceText.replace(/^3 Synthetic Unit\r?\n/m, "");
   const snapshot = buildDeckSnapshot(sourceText, fixture.documents, fixture.definitions);
 
-  assert.equal(snapshot.cards.length, 20);
+  assert.equal(snapshot.cards.length, 5);
 });
 
 test("rejects missing, stale, unsynchronized, and uncovered canonical cards", async () => {
@@ -70,34 +68,87 @@ test("rejects missing, stale, unsynchronized, and uncovered canonical cards", as
 });
 
 async function buildFixture() {
-  const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
-  const localCatalog = await loadCardCatalog();
-  const parsed = parseDeckList(sourceText);
-  const cards = [...new Set(parsed.entries.map((entry) => entry.name))]
-    .map((name) => localCatalog.byName.get(name)!);
+  const sourceText = [
+    "Legend:",
+    "1 Synthetic Legend",
+    "Champion:",
+    "1 Synthetic Champion",
+    "MainDeck:",
+    "3 Synthetic Unit",
+    "1 Synthetic Spell",
+    "Runes:",
+    "2 Synthetic Rune",
+    "Battlefields:",
+    "2 Synthetic Battlefield",
+    "",
+  ].join("\n");
+  const cards = [
+    syntheticCard("SYN-001", "Synthetic Legend", "Legend"),
+    syntheticCard("SYN-002", "Synthetic Champion", "Unit"),
+    syntheticCard("SYN-003", "Synthetic Unit", "Unit"),
+    syntheticCard("SYN-004", "Synthetic Spell", "Spell"),
+    syntheticCard("SYN-005", "Synthetic Rune", "Rune"),
+    syntheticCard("SYN-006", "Synthetic Battlefield", "Battlefield"),
+  ];
   const behaviorCatalog = await buildCurrentBehaviorCatalog();
-  const suggestions = analyzeCardBehaviorSuggestions(cards, [], behaviorCatalog);
-  const suggestionByCode = new Map(suggestions.cards.map((item) => [item.cardCode, item]));
-  const documents: CanonicalCardDocument[] = cards.map((card) => {
-    const cardCode = card.public_code.split("/")[0]!;
-    const suggestion = suggestionByCode.get(cardCode)!;
-    return buildCanonicalCardDocument({
-      cardCode,
+  const documents: CanonicalCardDocument[] = cards.map((card) =>
+    buildCanonicalCardDocument({
+      cardCode: card.public_code.split("/")[0]!,
       card,
       sourceTextHash: hashCardRulesText(card),
       modelingStatus: "approved",
       adminNotes: "fixture",
-      clauses: suggestion.clauses.map((clause) => ({
-        id: clause.id,
-        sourceText: clause.sourceText,
-        normalizedText: clause.normalizedText,
-        unsupportedReason: clause.unsupportedReason,
-        assignments: clause.assignments.map(({ assignment }) => assignment)
-      }))
-    }, behaviorCatalog, "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-  });
+      clauses: card.name === "Synthetic Spell"
+        ? [{
+            id: "synthetic-draw",
+            sourceText: "Draw 1.",
+            normalizedText: "draw 1",
+            unsupportedReason: null,
+            assignments: [
+              {
+                primitiveId: "trigger.on_play",
+                family: "trigger" as const,
+                sourceText: "When played, draw 1.",
+                parameters: { actor: "controller", subject: "spell" },
+                confidence: "high" as const,
+              },
+              {
+                primitiveId: "action.draw_cards",
+                family: "action" as const,
+                sourceText: "Draw 1.",
+                parameters: { player: "controller", count: 1 },
+                confidence: "high" as const,
+              },
+            ],
+          }]
+        : [],
+    }, behaviorCatalog, "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z"),
+  );
   const definitions = behaviorCatalog.map((entry) =>
     buildBehaviorDefinitionDocument(entry, "2026-01-01T00:00:00.000Z")
   );
   return { sourceText, documents, definitions };
+}
+
+function syntheticCard(
+  code: string,
+  name: string,
+  type: Card["classification"]["type"],
+): Card {
+  return {
+    id: code,
+    name,
+    public_code: `${code}/001`,
+    attributes: { energy: 0, might: 0, power: null },
+    classification: {
+      type,
+      supertype: type === "Rune" ? "Basic" : null,
+      domain: ["Mind"],
+    },
+    text: { plain: "" },
+    set: { set_id: "SYNTHETIC", label: "Synthetic" },
+    media: {},
+    tags: [],
+    metadata: {},
+  };
 }

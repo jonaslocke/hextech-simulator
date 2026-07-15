@@ -90,7 +90,7 @@ test("replaces only the first final-point Conquer of a turn with a draw", () => 
 
 test("exposes a ready Legend Add ability and grants spell-only Rainbow Power", () => {
   const { game, decks } = fixture();
-  const baseLegend = definition("LEGEND", "Daughter of the Void", "Unit", 0, 0);
+  const baseLegend = definition("LEGEND", "Synthetic Legend", "Unit", 0, 0);
   const legend = {
     ...baseLegend,
     behaviorModel: {
@@ -398,7 +398,7 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
     damage: 0,
     computedMight: 1,
   };
-  const seal: GameCardDefinition = definition("SEAL", "Seal of Unity", "Gear", 0, 0);
+  const seal: GameCardDefinition = definition("SEAL", "Synthetic Gear", "Gear", 0, 0);
   seal.behaviorModel.clauses.push({
     id: "add-power",
     sequence: 0,
@@ -501,7 +501,7 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
 
 test("spell-only Power remains available for a Deflect surcharge after a Legend adds it", () => {
   const { game, decks } = fixture();
-  const daughter: GameCardDefinition = definition("DAUGHTER", "Kai'Sa - Daughter of the Void", "Legend", 0, 0);
+  const daughter: GameCardDefinition = definition("DAUGHTER", "Synthetic Rainbow Legend", "Legend", 0, 0);
   daughter.behaviorModel.clauses.push({
     id: "add-rainbow-power",
     sequence: 0,
@@ -573,7 +573,7 @@ test("spell-only Power remains available for a Deflect surcharge after a Legend 
   assert.equal(availableAnyPowerAfterBaseCost(afterPower, "p1", plan!), 1);
 });
 
-test("a resolving Time Warp is banished instead of also entering Trash", () => {
+test("a resolving source effect is banished instead of also entering Trash", () => {
   const { game: initial, decks } = fixture();
   const timeWarp = decks[0]!.snapshot.cards.find(
     (definition) => definition.cardCode === "SPELL",
@@ -621,7 +621,7 @@ test("a resolving Time Warp is banished instead of also entering Trash", () => {
     actionId: play.id,
     selectedIds: [],
     decks,
-    now: "play-time-warp",
+    now: "play-banish-source",
   });
   for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActions(game, playerId, decks).find(
@@ -633,7 +633,7 @@ test("a resolving Time Warp is banished instead of also entering Trash", () => {
       actionId: pass.id,
       selectedIds: [],
       decks,
-      now: `resolve-time-warp-${playerId}`,
+      now: `resolve-banish-source-${playerId}`,
     });
   }
 

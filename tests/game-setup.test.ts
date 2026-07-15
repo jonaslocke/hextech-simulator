@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { test } from "node:test";
-import { loadCardCatalog } from "../src/server/catalog";
-import { analyzeCardBehaviorSuggestions, buildBehaviorDefinitionDocument, buildCanonicalCardDocument, buildCurrentBehaviorCatalog, hashCardRulesText } from "../src/server/card-catalog";
-import { parseDeckList } from "../src/server/deck";
-import { buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot, performSetupAction, projectGame, setupActions } from "../src/server/game";
+import {
+  createInitialGame,
+  createRuntimeDeckSnapshot,
+  performSetupAction,
+  projectGame,
+  setupActions,
+  type DeckSnapshot,
+  type GameCardDefinition,
+} from "../src/server/game";
 
 test("completes setup through projected opaque actions", async () => {
   const template = await fixtureSnapshot();
@@ -39,15 +43,54 @@ test("completes setup through projected opaque actions", async () => {
 });
 
 async function fixtureSnapshot() {
-  const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
-  const catalog = await loadCardCatalog();
-  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => entry.name))].map((name) => catalog.byName.get(name)!);
-  const primitives = await buildCurrentBehaviorCatalog();
-  const report = analyzeCardBehaviorSuggestions(cards, [], primitives);
-  const docs = cards.map((card) => {
-    const code = card.public_code.split("/")[0]!;
-    const suggestion = report.cards.find((item) => item.cardCode === code)!;
-    return buildCanonicalCardDocument({ cardCode: code, card, sourceTextHash: hashCardRulesText(card), modelingStatus: "approved", adminNotes: "", clauses: suggestion.clauses.map((clause) => ({ id: clause.id, sourceText: clause.sourceText, normalizedText: clause.normalizedText, unsupportedReason: clause.unsupportedReason, assignments: clause.assignments.map((item) => item.assignment) })) }, primitives, "a", "b");
-  });
-  return buildDeckSnapshot(sourceText, docs, primitives.map((item) => buildBehaviorDefinitionDocument(item, "a")));
+  const cards = [
+    syntheticCard("LEGEND", "Synthetic Legend", "Legend", 0, 0),
+    syntheticCard("CHAMPION", "Synthetic Champion", "Unit", 3, 3),
+    syntheticCard("UNIT", "Synthetic Unit", "Unit", 1, 1),
+    syntheticCard("RUNE", "Synthetic Rune", "Rune", 0, 0),
+    syntheticCard("BATTLEFIELD", "Synthetic Battlefield", "Battlefield", 0, 0),
+  ];
+  const entries: DeckSnapshot["entries"] = [
+    { section: "Legend", quantity: 1, cardCode: "LEGEND" },
+    { section: "Champion", quantity: 1, cardCode: "CHAMPION" },
+    { section: "MainDeck", quantity: 8, cardCode: "UNIT" },
+    { section: "Runes", quantity: 8, cardCode: "RUNE" },
+    { section: "Battlefields", quantity: 2, cardCode: "BATTLEFIELD" },
+  ];
+  return {
+    sourceText: "synthetic setup deck",
+    catalogDigest: "synthetic-setup",
+    entries,
+    cards,
+  };
+}
+
+function syntheticCard(
+  code: string,
+  name: string,
+  type: GameCardDefinition["card"]["classification"]["type"],
+  energy: number,
+  might: number,
+): GameCardDefinition {
+  return {
+    cardCode: code,
+    sourceTextHash: `${code}:hash`,
+    behaviorModel: { playTimings: [], clauses: [] },
+    card: {
+      id: code,
+      name,
+      public_code: `${code}/1`,
+      attributes: { energy, might, power: null },
+      classification: {
+        type,
+        supertype: type === "Rune" ? "Basic" : null,
+        domain: ["Mind"],
+      },
+      text: { plain: "" },
+      set: { set_id: "SYNTHETIC", label: "Synthetic" },
+      media: {},
+      tags: [],
+      metadata: {},
+    },
+  };
 }
