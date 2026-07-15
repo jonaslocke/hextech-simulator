@@ -1,0 +1,5671 @@
+{
+  "schemaVersion": 1,
+  "setCode": "SFD",
+  "updatedAt": "2026-07-15T11:23:36.035Z",
+  "cards": [
+    {
+      "gameplayIdentity": "SFD-001:Against the Odds",
+      "name": "Against the Odds",
+      "cleanName": "Against the Odds",
+      "printingCodes": [
+        "SFD-001"
+      ],
+      "sourceCardIds": [
+        "8f0af435-d0f5-4a40-ad2b-20a90de30d77"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8f0af435-d0f5-4a40-ad2b-20a90de30d77",
+          "cardCode": "SFD-001",
+          "name": "Against the Odds"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-002:Armed Assailant",
+      "name": "Armed Assailant",
+      "cleanName": "Armed Assailant",
+      "printingCodes": [
+        "SFD-002"
+      ],
+      "sourceCardIds": [
+        "e95aabc4-9fad-4891-903d-019b9cdad903"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "e95aabc4-9fad-4891-903d-019b9cdad903",
+          "cardCode": "SFD-002",
+          "name": "Armed Assailant"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-003:Blood Rush",
+      "name": "Blood Rush",
+      "cleanName": "Blood Rush",
+      "printingCodes": [
+        "SFD-003"
+      ],
+      "sourceCardIds": [
+        "c31d7b60-e460-458d-9faf-cfdfe08a666e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c31d7b60-e460-458d-9faf-cfdfe08a666e",
+          "cardCode": "SFD-003",
+          "name": "Blood Rush"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-004:Bushwhack",
+      "name": "Bushwhack",
+      "cleanName": "Bushwhack",
+      "printingCodes": [
+        "SFD-004"
+      ],
+      "sourceCardIds": [
+        "bbf6efe3-8f5c-4418-af52-aac4a632923f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "bbf6efe3-8f5c-4418-af52-aac4a632923f",
+          "cardCode": "SFD-004",
+          "name": "Bushwhack"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-005:Detonate",
+      "name": "Detonate",
+      "cleanName": "Detonate",
+      "printingCodes": [
+        "SFD-005"
+      ],
+      "sourceCardIds": [
+        "7b239b2e-2d62-4a95-b4f0-a2877e3af358"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7b239b2e-2d62-4a95-b4f0-a2877e3af358",
+          "cardCode": "SFD-005",
+          "name": "Detonate"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-006:Eager Drakehound",
+      "name": "Eager Drakehound",
+      "cleanName": "Eager Drakehound",
+      "printingCodes": [
+        "SFD-006"
+      ],
+      "sourceCardIds": [
+        "4934de4d-ac8f-4bb6-a171-d1861ac4a7ab"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "4934de4d-ac8f-4bb6-a171-d1861ac4a7ab",
+          "cardCode": "SFD-006",
+          "name": "Eager Drakehound"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-007:Gem Jammer",
+      "name": "Gem Jammer",
+      "cleanName": "Gem Jammer",
+      "printingCodes": [
+        "SFD-007"
+      ],
+      "sourceCardIds": [
+        "c778df68-0821-4312-8963-253ba7c91db7"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c778df68-0821-4312-8963-253ba7c91db7",
+          "cardCode": "SFD-007",
+          "name": "Gem Jammer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-008:Sentinel Adept",
+      "name": "Sentinel Adept",
+      "cleanName": "Sentinel Adept",
+      "printingCodes": [
+        "SFD-008"
+      ],
+      "sourceCardIds": [
+        "b2b23e5e-7838-46f7-899b-786f3b91a932"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b2b23e5e-7838-46f7-899b-786f3b91a932",
+          "cardCode": "SFD-008",
+          "name": "Sentinel Adept"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-009:Serrated Dirk",
+      "name": "Serrated Dirk",
+      "cleanName": "Serrated Dirk",
+      "printingCodes": [
+        "SFD-009"
+      ],
+      "sourceCardIds": [
+        "ac5921ce-c657-44fc-957d-4ec505bdd764"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "ac5921ce-c657-44fc-957d-4ec505bdd764",
+          "cardCode": "SFD-009",
+          "name": "Serrated Dirk"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-010:Void Drone",
+      "name": "Void Drone",
+      "cleanName": "Void Drone",
+      "printingCodes": [
+        "SFD-010"
+      ],
+      "sourceCardIds": [
+        "a743a88c-2d6c-44f1-a8ae-2e1dff35e629"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a743a88c-2d6c-44f1-a8ae-2e1dff35e629",
+          "cardCode": "SFD-010",
+          "name": "Void Drone"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-011:Angle Shot",
+      "name": "Angle Shot",
+      "cleanName": "Angle Shot",
+      "printingCodes": [
+        "SFD-011"
+      ],
+      "sourceCardIds": [
+        "3547c3a4-feb6-487b-b242-ca5723248d97"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3547c3a4-feb6-487b-b242-ca5723248d97",
+          "cardCode": "SFD-011",
+          "name": "Angle Shot"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-012:Battering Ram",
+      "name": "Battering Ram",
+      "cleanName": "Battering Ram",
+      "printingCodes": [
+        "SFD-012"
+      ],
+      "sourceCardIds": [
+        "f85d0d34-8967-465a-a529-03bc8394b2e1"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "f85d0d34-8967-465a-a529-03bc8394b2e1",
+          "cardCode": "SFD-012",
+          "name": "Battering Ram"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-013:Blast Corps Cadet",
+      "name": "Blast Corps Cadet",
+      "cleanName": "Blast Corps Cadet",
+      "printingCodes": [
+        "SFD-013"
+      ],
+      "sourceCardIds": [
+        "1a7ed732-b173-4215-8a69-f060a6b740c9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1a7ed732-b173-4215-8a69-f060a6b740c9",
+          "cardCode": "SFD-013",
+          "name": "Blast Corps Cadet"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-014:Minotaur Reckoner",
+      "name": "Minotaur Reckoner",
+      "cleanName": "Minotaur Reckoner",
+      "printingCodes": [
+        "SFD-014"
+      ],
+      "sourceCardIds": [
+        "050f04af-5509-440e-87e1-de1251c17b22"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "050f04af-5509-440e-87e1-de1251c17b22",
+          "cardCode": "SFD-014",
+          "name": "Minotaur Reckoner"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-015:Perched Grimwyrm",
+      "name": "Perched Grimwyrm",
+      "cleanName": "Perched Grimwyrm",
+      "printingCodes": [
+        "SFD-015"
+      ],
+      "sourceCardIds": [
+        "e2260a9d-f105-4074-b589-c1145a1c94d6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "e2260a9d-f105-4074-b589-c1145a1c94d6",
+          "cardCode": "SFD-015",
+          "name": "Perched Grimwyrm"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-016:Recurve Bow",
+      "name": "Recurve Bow",
+      "cleanName": "Recurve Bow",
+      "printingCodes": [
+        "SFD-016"
+      ],
+      "sourceCardIds": [
+        "8ac80146-7993-4646-b5c5-f60fac84f531"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8ac80146-7993-4646-b5c5-f60fac84f531",
+          "cardCode": "SFD-016",
+          "name": "Recurve Bow"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-017:Sudden Storm",
+      "name": "Sudden Storm",
+      "cleanName": "Sudden Storm",
+      "printingCodes": [
+        "SFD-017"
+      ],
+      "sourceCardIds": [
+        "1e9c2ef6-738a-4da8-a2c8-76f00448aa09"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1e9c2ef6-738a-4da8-a2c8-76f00448aa09",
+          "cardCode": "SFD-017",
+          "name": "Sudden Storm"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-018:Void Hatchling",
+      "name": "Void Hatchling",
+      "cleanName": "Void Hatchling",
+      "printingCodes": [
+        "SFD-018"
+      ],
+      "sourceCardIds": [
+        "bb03a3ee-b577-4984-8588-b34cdd1bac01"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "bb03a3ee-b577-4984-8588-b34cdd1bac01",
+          "cardCode": "SFD-018",
+          "name": "Void Hatchling"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-019:Assembly Rig",
+      "name": "Assembly Rig",
+      "cleanName": "Assembly Rig",
+      "printingCodes": [
+        "SFD-019"
+      ],
+      "sourceCardIds": [
+        "7a8bf6c4-1ff6-4c73-860a-65d8712bcd23"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7a8bf6c4-1ff6-4c73-860a-65d8712bcd23",
+          "cardCode": "SFD-019",
+          "name": "Assembly Rig"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-020:Draven Vanquisher",
+      "name": "Draven, Vanquisher",
+      "cleanName": "Draven Vanquisher",
+      "printingCodes": [
+        "SFD-020"
+      ],
+      "sourceCardIds": [
+        "533f4bd4-2c3f-4700-b32c-c02dd39dc95d",
+        "ef77da29-ceea-48a7-8463-9372fe317dc8"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "533f4bd4-2c3f-4700-b32c-c02dd39dc95d",
+          "cardCode": "SFD-020",
+          "name": "Draven, Vanquisher"
+        },
+        {
+          "sourceCardId": "ef77da29-ceea-48a7-8463-9372fe317dc8",
+          "cardCode": "SFD-020",
+          "name": "Draven, Vanquisher"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-021:Ferrous Forerunner",
+      "name": "Ferrous Forerunner",
+      "cleanName": "Ferrous Forerunner",
+      "printingCodes": [
+        "SFD-021"
+      ],
+      "sourceCardIds": [
+        "9d73e694-c619-446c-affb-699ebda1bdf2"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9d73e694-c619-446c-affb-699ebda1bdf2",
+          "cardCode": "SFD-021",
+          "name": "Ferrous Forerunner"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-022:Long Sword",
+      "name": "Long Sword",
+      "cleanName": "Long Sword",
+      "printingCodes": [
+        "SFD-022"
+      ],
+      "sourceCardIds": [
+        "6d0e9f19-f1ed-4b83-bb42-0f5a74efa168"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6d0e9f19-f1ed-4b83-bb42-0f5a74efa168",
+          "cardCode": "SFD-022",
+          "name": "Long Sword"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-023:Piercing Light",
+      "name": "Piercing Light",
+      "cleanName": "Piercing Light",
+      "printingCodes": [
+        "SFD-023"
+      ],
+      "sourceCardIds": [
+        "057815b6-9dfb-44e7-9200-0f15bb7fede1"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "057815b6-9dfb-44e7-9200-0f15bb7fede1",
+          "cardCode": "SFD-023",
+          "name": "Piercing Light"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-024:Rell Magnetic",
+      "name": "Rell, Magnetic",
+      "cleanName": "Rell Magnetic",
+      "printingCodes": [
+        "SFD-024"
+      ],
+      "sourceCardIds": [
+        "20434ff2-3e8c-43be-8cf5-e9254f1a256f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "20434ff2-3e8c-43be-8cf5-e9254f1a256f",
+          "cardCode": "SFD-024",
+          "name": "Rell, Magnetic"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-025:Rengar Pouncing",
+      "name": "Rengar, Pouncing",
+      "cleanName": "Rengar Pouncing",
+      "printingCodes": [
+        "SFD-025"
+      ],
+      "sourceCardIds": [
+        "fc839a13-d2ed-4827-9e3d-4e6b81aaf23d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "fc839a13-d2ed-4827-9e3d-4e6b81aaf23d",
+          "cardCode": "SFD-025",
+          "name": "Rengar, Pouncing"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-026:Rumble Hotheaded",
+      "name": "Rumble, Hotheaded",
+      "cleanName": "Rumble Hotheaded",
+      "printingCodes": [
+        "SFD-026"
+      ],
+      "sourceCardIds": [
+        "078b3777-2faf-4e27-b0fc-267ceffe9edd",
+        "d4ca0af4-f534-41a9-9cb9-ff6618c3d9e1"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "078b3777-2faf-4e27-b0fc-267ceffe9edd",
+          "cardCode": "SFD-026",
+          "name": "Rumble, Hotheaded"
+        },
+        {
+          "sourceCardId": "d4ca0af4-f534-41a9-9cb9-ff6618c3d9e1",
+          "cardCode": "SFD-026",
+          "name": "Rumble, Hotheaded"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-027:Dunebreaker",
+      "name": "Dunebreaker",
+      "cleanName": "Dunebreaker",
+      "printingCodes": [
+        "SFD-027"
+      ],
+      "sourceCardIds": [
+        "b798f981-49a7-4625-93e4-391079048db9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b798f981-49a7-4625-93e4-391079048db9",
+          "cardCode": "SFD-027",
+          "name": "Dunebreaker"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-028:Lucian Gunslinger",
+      "name": "Lucian, Gunslinger",
+      "cleanName": "Lucian Gunslinger",
+      "printingCodes": [
+        "SFD-028"
+      ],
+      "sourceCardIds": [
+        "b1853992-af10-42a9-a6fa-5752819df2cd",
+        "c8980b20-dd1e-491c-ae1a-5245bd99aba6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b1853992-af10-42a9-a6fa-5752819df2cd",
+          "cardCode": "SFD-028",
+          "name": "Lucian, Gunslinger"
+        },
+        {
+          "sourceCardId": "c8980b20-dd1e-491c-ae1a-5245bd99aba6",
+          "cardCode": "SFD-028",
+          "name": "Lucian, Gunslinger"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-029:RekSai Breacher",
+      "name": "Rek'Sai, Breacher",
+      "cleanName": "RekSai Breacher",
+      "printingCodes": [
+        "SFD-029"
+      ],
+      "sourceCardIds": [
+        "3bd9114e-2a12-487b-8dea-f775078c4ea2",
+        "4b9a40b2-8562-4d29-be1e-98ff592394ac"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3bd9114e-2a12-487b-8dea-f775078c4ea2",
+          "cardCode": "SFD-029",
+          "name": "Rek'Sai, Breacher"
+        },
+        {
+          "sourceCardId": "4b9a40b2-8562-4d29-be1e-98ff592394ac",
+          "cardCode": "SFD-029",
+          "name": "Rek'Sai, Breacher"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-030:Skyfall of Areion",
+      "name": "Skyfall of Areion",
+      "cleanName": "Skyfall of Areion",
+      "printingCodes": [
+        "SFD-030"
+      ],
+      "sourceCardIds": [
+        "0b9d8849-1f53-4964-8f2d-6c1adbdea267"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0b9d8849-1f53-4964-8f2d-6c1adbdea267",
+          "cardCode": "SFD-030",
+          "name": "Skyfall of Areion"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-031:Deserts Call",
+      "name": "Desert's Call",
+      "cleanName": "Deserts Call",
+      "printingCodes": [
+        "SFD-031"
+      ],
+      "sourceCardIds": [
+        "14d302bb-237f-4605-bd09-6838257044f1"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "14d302bb-237f-4605-bd09-6838257044f1",
+          "cardCode": "SFD-031",
+          "name": "Desert's Call"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-032:Disarming Rake",
+      "name": "Disarming Rake",
+      "cleanName": "Disarming Rake",
+      "printingCodes": [
+        "SFD-032"
+      ],
+      "sourceCardIds": [
+        "743053e3-09a6-40ee-8f99-29101cd50375"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "743053e3-09a6-40ee-8f99-29101cd50375",
+          "cardCode": "SFD-032",
+          "name": "Disarming Rake"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-033:Dorans Shield",
+      "name": "Doran's Shield",
+      "cleanName": "Dorans Shield",
+      "printingCodes": [
+        "SFD-033"
+      ],
+      "sourceCardIds": [
+        "e4e333b3-6f51-4837-a5b2-8538417babfa"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "e4e333b3-6f51-4837-a5b2-8538417babfa",
+          "cardCode": "SFD-033",
+          "name": "Doran's Shield"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-034:Feral Strength",
+      "name": "Feral Strength",
+      "cleanName": "Feral Strength",
+      "printingCodes": [
+        "SFD-034"
+      ],
+      "sourceCardIds": [
+        "6f85c980-37c0-46ed-8c49-0e4ec5ca1c51"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6f85c980-37c0-46ed-8c49-0e4ec5ca1c51",
+          "cardCode": "SFD-034",
+          "name": "Feral Strength"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-035:Guardian of the Passage",
+      "name": "Guardian of the Passage",
+      "cleanName": "Guardian of the Passage",
+      "printingCodes": [
+        "SFD-035"
+      ],
+      "sourceCardIds": [
+        "2957ce36-9fc0-439d-bf8b-9a483e322ce7"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2957ce36-9fc0-439d-bf8b-9a483e322ce7",
+          "cardCode": "SFD-035",
+          "name": "Guardian of the Passage"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-036:Lonely Poro",
+      "name": "Lonely Poro",
+      "cleanName": "Lonely Poro",
+      "printingCodes": [
+        "SFD-036"
+      ],
+      "sourceCardIds": [
+        "081b4fb1-4368-487d-a6f4-b5ad0881ff87"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "081b4fb1-4368-487d-a6f4-b5ad0881ff87",
+          "cardCode": "SFD-036",
+          "name": "Lonely Poro"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-037:Navori Scout",
+      "name": "Navori Scout",
+      "cleanName": "Navori Scout",
+      "printingCodes": [
+        "SFD-037"
+      ],
+      "sourceCardIds": [
+        "7e2a422f-c1bf-47b3-aff2-39e96dc8f4bf"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7e2a422f-c1bf-47b3-aff2-39e96dc8f4bf",
+          "cardCode": "SFD-037",
+          "name": "Navori Scout"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-038:Ribbon Dancer",
+      "name": "Ribbon Dancer",
+      "cleanName": "Ribbon Dancer",
+      "printingCodes": [
+        "SFD-038"
+      ],
+      "sourceCardIds": [
+        "7f0e0f62-d134-4b85-aac1-0def3535a383"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7f0e0f62-d134-4b85-aac1-0def3535a383",
+          "cardCode": "SFD-038",
+          "name": "Ribbon Dancer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-039:Royal Entourage",
+      "name": "Royal Entourage",
+      "cleanName": "Royal Entourage",
+      "printingCodes": [
+        "SFD-039"
+      ],
+      "sourceCardIds": [
+        "2cd141e4-4fa3-4361-a594-0f8019da23cf"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2cd141e4-4fa3-4361-a594-0f8019da23cf",
+          "cardCode": "SFD-039",
+          "name": "Royal Entourage"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-040:Thwonk",
+      "name": "Thwonk!",
+      "cleanName": "Thwonk",
+      "printingCodes": [
+        "SFD-040"
+      ],
+      "sourceCardIds": [
+        "5206aa7e-2a1d-46c2-a8c3-d8de824b4a6c"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5206aa7e-2a1d-46c2-a8c3-d8de824b4a6c",
+          "cardCode": "SFD-040",
+          "name": "Thwonk!"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-041:Apprentice Smith",
+      "name": "Apprentice Smith",
+      "cleanName": "Apprentice Smith",
+      "printingCodes": [
+        "SFD-041"
+      ],
+      "sourceCardIds": [
+        "0aff0c6f-7e9e-4249-b364-ea508dbb2949"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0aff0c6f-7e9e-4249-b364-ea508dbb2949",
+          "cardCode": "SFD-041",
+          "name": "Apprentice Smith"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-042:Brutalizer",
+      "name": "Brutalizer",
+      "cleanName": "Brutalizer",
+      "printingCodes": [
+        "SFD-042"
+      ],
+      "sourceCardIds": [
+        "81db2e11-ee65-48e2-b8cd-59c6faa04254"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "81db2e11-ee65-48e2-b8cd-59c6faa04254",
+          "cardCode": "SFD-042",
+          "name": "Brutalizer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-043:Emperors Divide",
+      "name": "Emperor's Divide",
+      "cleanName": "Emperors Divide",
+      "printingCodes": [
+        "SFD-043"
+      ],
+      "sourceCardIds": [
+        "6f3ac2be-be07-4275-984c-91971a342f5d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6f3ac2be-be07-4275-984c-91971a342f5d",
+          "cardCode": "SFD-043",
+          "name": "Emperor's Divide"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-044:Legion Quartermaster",
+      "name": "Legion Quartermaster",
+      "cleanName": "Legion Quartermaster",
+      "printingCodes": [
+        "SFD-044"
+      ],
+      "sourceCardIds": [
+        "94ae49c8-d870-4881-8906-950a3e002be9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "94ae49c8-d870-4881-8906-950a3e002be9",
+          "cardCode": "SFD-044",
+          "name": "Legion Quartermaster"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-045:Not So Fast",
+      "name": "Not So Fast",
+      "cleanName": "Not So Fast",
+      "printingCodes": [
+        "SFD-045"
+      ],
+      "sourceCardIds": [
+        "92ccf312-f43f-429c-800f-c371a55d36ab"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "92ccf312-f43f-429c-800f-c371a55d36ab",
+          "cardCode": "SFD-045",
+          "name": "Not So Fast"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-046:Poro Snax",
+      "name": "Poro Snax",
+      "cleanName": "Poro Snax",
+      "printingCodes": [
+        "SFD-046"
+      ],
+      "sourceCardIds": [
+        "fd6dccac-7ced-46ca-bcef-beb9de690165"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "fd6dccac-7ced-46ca-bcef-beb9de690165",
+          "cardCode": "SFD-046",
+          "name": "Poro Snax"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-047:Simian Ancestor",
+      "name": "Simian Ancestor",
+      "cleanName": "Simian Ancestor",
+      "printingCodes": [
+        "SFD-047"
+      ],
+      "sourceCardIds": [
+        "b90eabae-c9f2-475f-89ef-63bec869a4b5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b90eabae-c9f2-475f-89ef-63bec869a4b5",
+          "cardCode": "SFD-047",
+          "name": "Simian Ancestor"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-048:Stellacorn Herder",
+      "name": "Stellacorn Herder",
+      "cleanName": "Stellacorn Herder",
+      "printingCodes": [
+        "SFD-048"
+      ],
+      "sourceCardIds": [
+        "9de26fa7-5c22-4bb6-b887-9716913d8d19"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9de26fa7-5c22-4bb6-b887-9716913d8d19",
+          "cardCode": "SFD-048",
+          "name": "Stellacorn Herder"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-049:Aphelios Exalted",
+      "name": "Aphelios, Exalted",
+      "cleanName": "Aphelios Exalted",
+      "printingCodes": [
+        "SFD-049",
+        "SFD-224"
+      ],
+      "sourceCardIds": [
+        "3b2df98a-de47-489f-bad0-daddc4abceed",
+        "b0251710-4cd9-43c5-998d-71f0564a3fa8",
+        "c0f1f6ae-104d-4a28-94bb-b392d5ecfec8"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3b2df98a-de47-489f-bad0-daddc4abceed",
+          "cardCode": "SFD-049",
+          "name": "Aphelios, Exalted"
+        },
+        {
+          "sourceCardId": "b0251710-4cd9-43c5-998d-71f0564a3fa8",
+          "cardCode": "SFD-224",
+          "name": "Aphelios, Exalted"
+        },
+        {
+          "sourceCardId": "c0f1f6ae-104d-4a28-94bb-b392d5ecfec8",
+          "cardCode": "SFD-224",
+          "name": "Aphelios, Exalted"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-050:Azir Ascendant",
+      "name": "Azir, Ascendant",
+      "cleanName": "Azir Ascendant",
+      "printingCodes": [
+        "SFD-050"
+      ],
+      "sourceCardIds": [
+        "1296335b-6dba-48c4-a719-e5edad54e092",
+        "7ec2b77e-46f5-4e9e-a3a4-cd472e168128"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1296335b-6dba-48c4-a719-e5edad54e092",
+          "cardCode": "SFD-050",
+          "name": "Azir, Ascendant"
+        },
+        {
+          "sourceCardId": "7ec2b77e-46f5-4e9e-a3a4-cd472e168128",
+          "cardCode": "SFD-050",
+          "name": "Azir, Ascendant"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-051:Guardian Angel",
+      "name": "Guardian Angel",
+      "cleanName": "Guardian Angel",
+      "printingCodes": [
+        "SFD-051"
+      ],
+      "sourceCardIds": [
+        "012e677e-c89d-4031-bddd-098ecc40c729"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "012e677e-c89d-4031-bddd-098ecc40c729",
+          "cardCode": "SFD-051",
+          "name": "Guardian Angel"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-052:Heart of Dark Ice",
+      "name": "Heart of Dark Ice",
+      "cleanName": "Heart of Dark Ice",
+      "printingCodes": [
+        "SFD-052"
+      ],
+      "sourceCardIds": [
+        "828ae93a-32bd-48a6-aba8-a6b53bef500a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "828ae93a-32bd-48a6-aba8-a6b53bef500a",
+          "cardCode": "SFD-052",
+          "name": "Heart of Dark Ice"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-053:Janna Savior",
+      "name": "Janna, Savior",
+      "cleanName": "Janna Savior",
+      "printingCodes": [
+        "SFD-053"
+      ],
+      "sourceCardIds": [
+        "1ddd6384-18ab-4a10-9b4c-d331d5d56706"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1ddd6384-18ab-4a10-9b4c-d331d5d56706",
+          "cardCode": "SFD-053",
+          "name": "Janna, Savior"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-054:Jax Unmatched",
+      "name": "Jax, Unmatched",
+      "cleanName": "Jax Unmatched",
+      "printingCodes": [
+        "SFD-054"
+      ],
+      "sourceCardIds": [
+        "26843c61-3d3f-454c-9910-2af7b1027acb",
+        "63e30274-c44b-4fd8-b494-f4ce4f8b5851"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "26843c61-3d3f-454c-9910-2af7b1027acb",
+          "cardCode": "SFD-054",
+          "name": "Jax, Unmatched"
+        },
+        {
+          "sourceCardId": "63e30274-c44b-4fd8-b494-f4ce4f8b5851",
+          "cardCode": "SFD-054",
+          "name": "Jax, Unmatched"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-055:Needlessly Large Yordle",
+      "name": "Needlessly Large Yordle",
+      "cleanName": "Needlessly Large Yordle",
+      "printingCodes": [
+        "SFD-055"
+      ],
+      "sourceCardIds": [
+        "ac046510-8770-4446-a16d-f636e870f5ad"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "ac046510-8770-4446-a16d-f636e870f5ad",
+          "cardCode": "SFD-055",
+          "name": "Needlessly Large Yordle"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-056:Steraks Gage",
+      "name": "Sterak's Gage",
+      "cleanName": "Steraks Gage",
+      "printingCodes": [
+        "SFD-056"
+      ],
+      "sourceCardIds": [
+        "645c3ced-f5de-409a-90c1-c98414d3bc7b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "645c3ced-f5de-409a-90c1-c98414d3bc7b",
+          "cardCode": "SFD-056",
+          "name": "Sterak's Gage"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-057:Irelia Fervent",
+      "name": "Irelia, Fervent",
+      "cleanName": "Irelia Fervent",
+      "printingCodes": [
+        "SFD-057",
+        "SFD-225"
+      ],
+      "sourceCardIds": [
+        "798be38b-9c98-4cfb-b42a-9a7cc4f1c6f7",
+        "7e2a0378-53a3-43ab-8f5f-81cdff6eb54a",
+        "dffb8d6b-f06d-4d2f-98b6-e6864af458f9",
+        "f9a48946-49ac-4f20-9ec8-1b656958682b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "798be38b-9c98-4cfb-b42a-9a7cc4f1c6f7",
+          "cardCode": "SFD-057",
+          "name": "Irelia, Fervent"
+        },
+        {
+          "sourceCardId": "7e2a0378-53a3-43ab-8f5f-81cdff6eb54a",
+          "cardCode": "SFD-057",
+          "name": "Irelia, Fervent"
+        },
+        {
+          "sourceCardId": "dffb8d6b-f06d-4d2f-98b6-e6864af458f9",
+          "cardCode": "SFD-225",
+          "name": "Irelia, Fervent"
+        },
+        {
+          "sourceCardId": "f9a48946-49ac-4f20-9ec8-1b656958682b",
+          "cardCode": "SFD-225",
+          "name": "Irelia, Fervent"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-058:Ornn Blacksmith",
+      "name": "Ornn, Blacksmith",
+      "cleanName": "Ornn Blacksmith",
+      "printingCodes": [
+        "SFD-058"
+      ],
+      "sourceCardIds": [
+        "92abdf1a-b2e8-4e74-bc2b-885c7ee8304d",
+        "c5d8f9ee-732b-4318-a087-ae4e99497aed"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "92abdf1a-b2e8-4e74-bc2b-885c7ee8304d",
+          "cardCode": "SFD-058",
+          "name": "Ornn, Blacksmith"
+        },
+        {
+          "sourceCardId": "c5d8f9ee-732b-4318-a087-ae4e99497aed",
+          "cardCode": "SFD-058",
+          "name": "Ornn, Blacksmith"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-059:Svellsongur",
+      "name": "Svellsongur",
+      "cleanName": "Svellsongur",
+      "printingCodes": [
+        "SFD-059"
+      ],
+      "sourceCardIds": [
+        "8320aad5-a5ec-404d-9962-42f34b8173ce"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8320aad5-a5ec-404d-9962-42f34b8173ce",
+          "cardCode": "SFD-059",
+          "name": "Svellsongur"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-060:Tianna Crownguard",
+      "name": "Tianna Crownguard",
+      "cleanName": "Tianna Crownguard",
+      "printingCodes": [
+        "SFD-060"
+      ],
+      "sourceCardIds": [
+        "97dc3286-47ac-4740-8b5d-e1a18ac3b7bd"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "97dc3286-47ac-4740-8b5d-e1a18ac3b7bd",
+          "cardCode": "SFD-060",
+          "name": "Tianna Crownguard"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-061:Aspiring Engineer",
+      "name": "Aspiring Engineer",
+      "cleanName": "Aspiring Engineer",
+      "printingCodes": [
+        "SFD-061"
+      ],
+      "sourceCardIds": [
+        "98454abe-9d6d-458f-ae0b-768c6fa2c748"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "98454abe-9d6d-458f-ae0b-768c6fa2c748",
+          "cardCode": "SFD-061",
+          "name": "Aspiring Engineer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-062:Bubble Bot",
+      "name": "Bubble Bot",
+      "cleanName": "Bubble Bot",
+      "printingCodes": [
+        "SFD-062"
+      ],
+      "sourceCardIds": [
+        "44d419ab-0fcd-48ff-91e4-e5df36ad6c0e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "44d419ab-0fcd-48ff-91e4-e5df36ad6c0e",
+          "cardCode": "SFD-062",
+          "name": "Bubble Bot"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-063:Chemtech Cask",
+      "name": "Chemtech Cask",
+      "cleanName": "Chemtech Cask",
+      "printingCodes": [
+        "SFD-063"
+      ],
+      "sourceCardIds": [
+        "df3fcbf2-d20e-4684-99a9-977116140921"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "df3fcbf2-d20e-4684-99a9-977116140921",
+          "cardCode": "SFD-063",
+          "name": "Chemtech Cask"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-064:Cloth Armor",
+      "name": "Cloth Armor",
+      "cleanName": "Cloth Armor",
+      "printingCodes": [
+        "SFD-064"
+      ],
+      "sourceCardIds": [
+        "39c2bbd8-dee9-4175-bcd0-62152547a091"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "39c2bbd8-dee9-4175-bcd0-62152547a091",
+          "cardCode": "SFD-064",
+          "name": "Cloth Armor"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-065:Forecaster",
+      "name": "Forecaster",
+      "cleanName": "Forecaster",
+      "printingCodes": [
+        "SFD-065"
+      ],
+      "sourceCardIds": [
+        "644e411e-4014-4ac0-8eb2-696db03765f0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "644e411e-4014-4ac0-8eb2-696db03765f0",
+          "cardCode": "SFD-065",
+          "name": "Forecaster"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-066:Frigid Touch",
+      "name": "Frigid Touch",
+      "cleanName": "Frigid Touch",
+      "printingCodes": [
+        "SFD-066"
+      ],
+      "sourceCardIds": [
+        "ec036067-dd42-4c3e-8112-41c9a08af73e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "ec036067-dd42-4c3e-8112-41c9a08af73e",
+          "cardCode": "SFD-066",
+          "name": "Frigid Touch"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-067:Frostcoat Cub",
+      "name": "Frostcoat Cub",
+      "cleanName": "Frostcoat Cub",
+      "printingCodes": [
+        "SFD-067"
+      ],
+      "sourceCardIds": [
+        "561bfabd-81f1-4658-9247-59aa512d3913"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "561bfabd-81f1-4658-9247-59aa512d3913",
+          "cardCode": "SFD-067",
+          "name": "Frostcoat Cub"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-068:Gearhead",
+      "name": "Gearhead",
+      "cleanName": "Gearhead",
+      "printingCodes": [
+        "SFD-068"
+      ],
+      "sourceCardIds": [
+        "d2c7e0af-f36f-482f-a69c-35ca3a28bac6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "d2c7e0af-f36f-482f-a69c-35ca3a28bac6",
+          "cardCode": "SFD-068",
+          "name": "Gearhead"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-069:Plundering Poro",
+      "name": "Plundering Poro",
+      "cleanName": "Plundering Poro",
+      "printingCodes": [
+        "SFD-069"
+      ],
+      "sourceCardIds": [
+        "25dda924-c51c-4001-b7d0-25ecd12ad992"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "25dda924-c51c-4001-b7d0-25ecd12ad992",
+          "cardCode": "SFD-069",
+          "name": "Plundering Poro"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-070:Wages of Pain",
+      "name": "Wages of Pain",
+      "cleanName": "Wages of Pain",
+      "printingCodes": [
+        "SFD-070"
+      ],
+      "sourceCardIds": [
+        "b872bafe-f732-49b9-b658-d6ab96344256"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b872bafe-f732-49b9-b658-d6ab96344256",
+          "cardCode": "SFD-070",
+          "name": "Wages of Pain"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-071:Breakneck Mech",
+      "name": "Breakneck Mech",
+      "cleanName": "Breakneck Mech",
+      "printingCodes": [
+        "SFD-071"
+      ],
+      "sourceCardIds": [
+        "bb9574b3-5276-4fa8-aae7-f0fcfc83e128"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "bb9574b3-5276-4fa8-aae7-f0fcfc83e128",
+          "cardCode": "SFD-071",
+          "name": "Breakneck Mech"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-072:Dropboarder",
+      "name": "Dropboarder",
+      "cleanName": "Dropboarder",
+      "printingCodes": [
+        "SFD-072"
+      ],
+      "sourceCardIds": [
+        "f187583b-45d5-4fa4-b260-b54a7323963c"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "f187583b-45d5-4fa4-b260-b54a7323963c",
+          "cardCode": "SFD-072",
+          "name": "Dropboarder"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-073:Experimental Hexplate",
+      "name": "Experimental Hexplate",
+      "cleanName": "Experimental Hexplate",
+      "printingCodes": [
+        "SFD-073"
+      ],
+      "sourceCardIds": [
+        "449f9ec3-42d2-415f-9271-b9cd125aed60"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "449f9ec3-42d2-415f-9271-b9cd125aed60",
+          "cardCode": "SFD-073",
+          "name": "Experimental Hexplate"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-074:Pickpocket",
+      "name": "Pickpocket",
+      "cleanName": "Pickpocket",
+      "printingCodes": [
+        "SFD-074"
+      ],
+      "sourceCardIds": [
+        "8b0f5d65-c80e-48a7-b417-323dcde78840"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8b0f5d65-c80e-48a7-b417-323dcde78840",
+          "cardCode": "SFD-074",
+          "name": "Pickpocket"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-075:Prize of Progress",
+      "name": "Prize of Progress",
+      "cleanName": "Prize of Progress",
+      "printingCodes": [
+        "SFD-075"
+      ],
+      "sourceCardIds": [
+        "9367ea53-ba7f-40d3-9cfd-f1f012876066"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9367ea53-ba7f-40d3-9cfd-f1f012876066",
+          "cardCode": "SFD-075",
+          "name": "Prize of Progress"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-076:Production Surge",
+      "name": "Production Surge",
+      "cleanName": "Production Surge",
+      "printingCodes": [
+        "SFD-076"
+      ],
+      "sourceCardIds": [
+        "5dfdaadd-abcf-47fc-8c85-af1cd3f835a2"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5dfdaadd-abcf-47fc-8c85-af1cd3f835a2",
+          "cardCode": "SFD-076",
+          "name": "Production Surge"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-077:Rocket Barrage",
+      "name": "Rocket Barrage",
+      "cleanName": "Rocket Barrage",
+      "printingCodes": [
+        "SFD-077"
+      ],
+      "sourceCardIds": [
+        "5d100019-35b4-450e-b4b7-c3bbd460b802"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5d100019-35b4-450e-b4b7-c3bbd460b802",
+          "cardCode": "SFD-077",
+          "name": "Rocket Barrage"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-078:Temporal Portal",
+      "name": "Temporal Portal",
+      "cleanName": "Temporal Portal",
+      "printingCodes": [
+        "SFD-078"
+      ],
+      "sourceCardIds": [
+        "146605b9-3930-4863-9a40-e0a426bb770a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "146605b9-3930-4863-9a40-e0a426bb770a",
+          "cardCode": "SFD-078",
+          "name": "Temporal Portal"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-079:Bard Mercurial",
+      "name": "Bard, Mercurial",
+      "cleanName": "Bard Mercurial",
+      "printingCodes": [
+        "SFD-079"
+      ],
+      "sourceCardIds": [
+        "f8b37791-19e2-4ca6-8069-92d254df96f5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "f8b37791-19e2-4ca6-8069-92d254df96f5",
+          "cardCode": "SFD-079",
+          "name": "Bard, Mercurial"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-080:Bellows Breath",
+      "name": "Bellows Breath",
+      "cleanName": "Bellows Breath",
+      "printingCodes": [
+        "SFD-080"
+      ],
+      "sourceCardIds": [
+        "c29dddfa-3809-4168-a501-5284dfbd8cf0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c29dddfa-3809-4168-a501-5284dfbd8cf0",
+          "cardCode": "SFD-080",
+          "name": "Bellows Breath"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-081:Card Sharp",
+      "name": "Card Sharp",
+      "cleanName": "Card Sharp",
+      "printingCodes": [
+        "SFD-081"
+      ],
+      "sourceCardIds": [
+        "4d4abbb2-aff4-44d5-bd22-f8d2339c3d52"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "4d4abbb2-aff4-44d5-bd22-f8d2339c3d52",
+          "cardCode": "SFD-081",
+          "name": "Card Sharp"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-082:Ezreal Dashing",
+      "name": "Ezreal, Dashing",
+      "cleanName": "Ezreal Dashing",
+      "printingCodes": [
+        "SFD-082"
+      ],
+      "sourceCardIds": [
+        "288637fc-29c0-4b87-8f2b-ffc063ef82f5",
+        "79a1ccd2-57d3-44eb-b770-0330a0f96217"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "288637fc-29c0-4b87-8f2b-ffc063ef82f5",
+          "cardCode": "SFD-082",
+          "name": "Ezreal, Dashing"
+        },
+        {
+          "sourceCardId": "79a1ccd2-57d3-44eb-b770-0330a0f96217",
+          "cardCode": "SFD-082",
+          "name": "Ezreal, Dashing"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-083:Hextech Anomaly",
+      "name": "Hextech Anomaly",
+      "cleanName": "Hextech Anomaly",
+      "printingCodes": [
+        "SFD-083"
+      ],
+      "sourceCardIds": [
+        "0458e235-22e6-4346-91e1-54efa8e46f7b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0458e235-22e6-4346-91e1-54efa8e46f7b",
+          "cardCode": "SFD-083",
+          "name": "Hextech Anomaly"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-084:Jayce Man of Progress",
+      "name": "Jayce, Man of Progress",
+      "cleanName": "Jayce Man of Progress",
+      "printingCodes": [
+        "SFD-084"
+      ],
+      "sourceCardIds": [
+        "d5792e8f-cbc4-4980-8ae7-017951c3af04"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "d5792e8f-cbc4-4980-8ae7-017951c3af04",
+          "cardCode": "SFD-084",
+          "name": "Jayce, Man of Progress"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-085:Ornn Forge God",
+      "name": "Ornn, Forge God",
+      "cleanName": "Ornn Forge God",
+      "printingCodes": [
+        "SFD-085"
+      ],
+      "sourceCardIds": [
+        "551f4e6c-c355-4cad-8db9-6f234c879296",
+        "c8ff4eca-c408-458a-8933-76bbbe97971c"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "551f4e6c-c355-4cad-8db9-6f234c879296",
+          "cardCode": "SFD-085",
+          "name": "Ornn, Forge God"
+        },
+        {
+          "sourceCardId": "c8ff4eca-c408-458a-8933-76bbbe97971c",
+          "cardCode": "SFD-085",
+          "name": "Ornn, Forge God"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-086:World Atlas",
+      "name": "World Atlas",
+      "cleanName": "World Atlas",
+      "printingCodes": [
+        "SFD-086"
+      ],
+      "sourceCardIds": [
+        "a08bb081-f544-4807-82b4-b24680463208"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a08bb081-f544-4807-82b4-b24680463208",
+          "cardCode": "SFD-086",
+          "name": "World Atlas"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-087:Premonition",
+      "name": "Premonition",
+      "cleanName": "Premonition",
+      "printingCodes": [
+        "SFD-087"
+      ],
+      "sourceCardIds": [
+        "39a7ccaa-70f1-49f0-a897-058730529856"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "39a7ccaa-70f1-49f0-a897-058730529856",
+          "cardCode": "SFD-087",
+          "name": "Premonition"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-088:Renata Glasc Mastermind",
+      "name": "Renata Glasc, Mastermind",
+      "cleanName": "Renata Glasc Mastermind",
+      "printingCodes": [
+        "SFD-088"
+      ],
+      "sourceCardIds": [
+        "1c7a32a1-8c0f-4894-a428-b291f9bb56c2",
+        "cd7c14e5-cef0-4ce8-b911-51743b57e1bd"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1c7a32a1-8c0f-4894-a428-b291f9bb56c2",
+          "cardCode": "SFD-088",
+          "name": "Renata Glasc, Mastermind"
+        },
+        {
+          "sourceCardId": "cd7c14e5-cef0-4ce8-b911-51743b57e1bd",
+          "cardCode": "SFD-088",
+          "name": "Renata Glasc, Mastermind"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-089:Rumble Scrapper",
+      "name": "Rumble, Scrapper",
+      "cleanName": "Rumble Scrapper",
+      "printingCodes": [
+        "SFD-089"
+      ],
+      "sourceCardIds": [
+        "90e7297b-7eeb-432d-8e70-e42eb790fdeb",
+        "97872486-944d-4fa4-aad1-9d542580ce69"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "90e7297b-7eeb-432d-8e70-e42eb790fdeb",
+          "cardCode": "SFD-089",
+          "name": "Rumble, Scrapper"
+        },
+        {
+          "sourceCardId": "97872486-944d-4fa4-aad1-9d542580ce69",
+          "cardCode": "SFD-089",
+          "name": "Rumble, Scrapper"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-090:The Zero Drive",
+      "name": "The Zero Drive",
+      "cleanName": "The Zero Drive",
+      "printingCodes": [
+        "SFD-090"
+      ],
+      "sourceCardIds": [
+        "565fa461-cc9d-4179-b6fa-7f43743ca71e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "565fa461-cc9d-4179-b6fa-7f43743ca71e",
+          "cardCode": "SFD-090",
+          "name": "The Zero Drive"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-091:Buhru Captain",
+      "name": "Buhru Captain",
+      "cleanName": "Buhru Captain",
+      "printingCodes": [
+        "SFD-091"
+      ],
+      "sourceCardIds": [
+        "7829e0fb-3238-4f02-92ac-927ceec3e439"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7829e0fb-3238-4f02-92ac-927ceec3e439",
+          "cardCode": "SFD-091",
+          "name": "Buhru Captain"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-092:Combat Chef",
+      "name": "Combat Chef",
+      "cleanName": "Combat Chef",
+      "printingCodes": [
+        "SFD-092"
+      ],
+      "sourceCardIds": [
+        "0b80500a-428d-488d-9356-ba2135c9f7ab"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0b80500a-428d-488d-9356-ba2135c9f7ab",
+          "cardCode": "SFD-092",
+          "name": "Combat Chef"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-093:Dauntless Vanguard",
+      "name": "Dauntless Vanguard",
+      "cleanName": "Dauntless Vanguard",
+      "printingCodes": [
+        "SFD-093"
+      ],
+      "sourceCardIds": [
+        "9207cb11-7558-4c3c-8664-1646f9caeb8b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9207cb11-7558-4c3c-8664-1646f9caeb8b",
+          "cardCode": "SFD-093",
+          "name": "Dauntless Vanguard"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-094:Direwing",
+      "name": "Direwing",
+      "cleanName": "Direwing",
+      "printingCodes": [
+        "SFD-094"
+      ],
+      "sourceCardIds": [
+        "25362f4d-2e84-4158-9b08-b66ad6826d36"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "25362f4d-2e84-4158-9b08-b66ad6826d36",
+          "cardCode": "SFD-094",
+          "name": "Direwing"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-095:Dorans Blade",
+      "name": "Doran's Blade",
+      "cleanName": "Dorans Blade",
+      "printingCodes": [
+        "SFD-095"
+      ],
+      "sourceCardIds": [
+        "8033ae3c-a962-4fcf-8725-c3a8376a85ac"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8033ae3c-a962-4fcf-8725-c3a8376a85ac",
+          "cardCode": "SFD-095",
+          "name": "Doran's Blade"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-096:Laurent Bladekeeper",
+      "name": "Laurent Bladekeeper",
+      "cleanName": "Laurent Bladekeeper",
+      "printingCodes": [
+        "SFD-096"
+      ],
+      "sourceCardIds": [
+        "05724a05-dca3-45e1-b1b4-f72b275186e4"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "05724a05-dca3-45e1-b1b4-f72b275186e4",
+          "cardCode": "SFD-096",
+          "name": "Laurent Bladekeeper"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-097:Punch First",
+      "name": "Punch First",
+      "cleanName": "Punch First",
+      "printingCodes": [
+        "SFD-097"
+      ],
+      "sourceCardIds": [
+        "1f1eef82-a716-43c1-b7ab-1ae2b0c8d994"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1f1eef82-a716-43c1-b7ab-1ae2b0c8d994",
+          "cardCode": "SFD-097",
+          "name": "Punch First"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-098:Sea Monkey",
+      "name": "Sea Monkey",
+      "cleanName": "Sea Monkey",
+      "printingCodes": [
+        "SFD-098"
+      ],
+      "sourceCardIds": [
+        "6c8b8544-f8dd-4ea2-adf9-c8605308eed9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6c8b8544-f8dd-4ea2-adf9-c8605308eed9",
+          "cardCode": "SFD-098",
+          "name": "Sea Monkey"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-099:Veteran Poro",
+      "name": "Veteran Poro",
+      "cleanName": "Veteran Poro",
+      "printingCodes": [
+        "SFD-099"
+      ],
+      "sourceCardIds": [
+        "c68a61dd-74cf-407e-9049-1ce44e46d268"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c68a61dd-74cf-407e-9049-1ce44e46d268",
+          "cardCode": "SFD-099",
+          "name": "Veteran Poro"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-100:Yordle Explorer",
+      "name": "Yordle Explorer",
+      "cleanName": "Yordle Explorer",
+      "printingCodes": [
+        "SFD-100"
+      ],
+      "sourceCardIds": [
+        "5f3d12c8-03bd-49ba-b432-e83199b537b8"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5f3d12c8-03bd-49ba-b432-e83199b537b8",
+          "cardCode": "SFD-100",
+          "name": "Yordle Explorer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-101:Fae Dragon",
+      "name": "Fae Dragon",
+      "cleanName": "Fae Dragon",
+      "printingCodes": [
+        "SFD-101"
+      ],
+      "sourceCardIds": [
+        "536a5f4c-8248-4656-ae1d-9a8c3203806b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "536a5f4c-8248-4656-ae1d-9a8c3203806b",
+          "cardCode": "SFD-101",
+          "name": "Fae Dragon"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-102:Hexdrinker",
+      "name": "Hexdrinker",
+      "cleanName": "Hexdrinker",
+      "printingCodes": [
+        "SFD-102"
+      ],
+      "sourceCardIds": [
+        "b4f95e51-d3b2-444b-8b88-47239084e17b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b4f95e51-d3b2-444b-8b88-47239084e17b",
+          "cardCode": "SFD-102",
+          "name": "Hexdrinker"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-103:JaullFish",
+      "name": "Jaull-Fish",
+      "cleanName": "JaullFish",
+      "printingCodes": [
+        "SFD-103"
+      ],
+      "sourceCardIds": [
+        "39c8daec-d4d6-439a-a589-6158d4d04d0b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "39c8daec-d4d6-439a-a589-6158d4d04d0b",
+          "cardCode": "SFD-103",
+          "name": "Jaull-Fish"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-104:Petricite Monument",
+      "name": "Petricite Monument",
+      "cleanName": "Petricite Monument",
+      "printingCodes": [
+        "SFD-104"
+      ],
+      "sourceCardIds": [
+        "f422a33b-7a41-4232-b00b-21c65edaf26f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "f422a33b-7a41-4232-b00b-21c65edaf26f",
+          "cardCode": "SFD-104",
+          "name": "Petricite Monument"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-105:Ruin Runner",
+      "name": "Ruin Runner",
+      "cleanName": "Ruin Runner",
+      "printingCodes": [
+        "SFD-105"
+      ],
+      "sourceCardIds": [
+        "5a3b2f96-09de-4b8d-8da0-ebb49df405ce"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5a3b2f96-09de-4b8d-8da0-ebb49df405ce",
+          "cardCode": "SFD-105",
+          "name": "Ruin Runner"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-106:Show of Strength",
+      "name": "Show of Strength",
+      "cleanName": "Show of Strength",
+      "printingCodes": [
+        "SFD-106"
+      ],
+      "sourceCardIds": [
+        "cd5b3001-e7b4-4f23-bbb3-c5b14333255a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "cd5b3001-e7b4-4f23-bbb3-c5b14333255a",
+          "cardCode": "SFD-106",
+          "name": "Show of Strength"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-107:Strike Down",
+      "name": "Strike Down",
+      "cleanName": "Strike Down",
+      "printingCodes": [
+        "SFD-107"
+      ],
+      "sourceCardIds": [
+        "ade6e0b9-f601-4973-9ca2-57cdd66695ef"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "ade6e0b9-f601-4973-9ca2-57cdd66695ef",
+          "cardCode": "SFD-107",
+          "name": "Strike Down"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-108:Warmogs Armor",
+      "name": "Warmog's Armor",
+      "cleanName": "Warmogs Armor",
+      "printingCodes": [
+        "SFD-108"
+      ],
+      "sourceCardIds": [
+        "8bf402c3-0863-44e9-8efa-da660665467e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8bf402c3-0863-44e9-8efa-da660665467e",
+          "cardCode": "SFD-108",
+          "name": "Warmog's Armor"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-109:Akshan Mischievous",
+      "name": "Akshan, Mischievous",
+      "cleanName": "Akshan Mischievous",
+      "printingCodes": [
+        "SFD-109"
+      ],
+      "sourceCardIds": [
+        "06278663-bd9f-4570-a6cb-c5f7075991bd"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "06278663-bd9f-4570-a6cb-c5f7075991bd",
+          "cardCode": "SFD-109",
+          "name": "Akshan, Mischievous"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-110:Fiora Peerless",
+      "name": "Fiora, Peerless",
+      "cleanName": "Fiora Peerless",
+      "printingCodes": [
+        "SFD-110"
+      ],
+      "sourceCardIds": [
+        "564aa873-d96f-4488-ae69-83521711f6cf",
+        "9714a0b2-5b28-4385-8cc0-9baee10a09f2"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "564aa873-d96f-4488-ae69-83521711f6cf",
+          "cardCode": "SFD-110",
+          "name": "Fiora, Peerless"
+        },
+        {
+          "sourceCardId": "9714a0b2-5b28-4385-8cc0-9baee10a09f2",
+          "cardCode": "SFD-110",
+          "name": "Fiora, Peerless"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-111:Here to Help",
+      "name": "Here to Help",
+      "cleanName": "Here to Help",
+      "printingCodes": [
+        "SFD-111"
+      ],
+      "sourceCardIds": [
+        "4999f448-ebb1-4f2a-9bf8-0123c5d32207"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "4999f448-ebb1-4f2a-9bf8-0123c5d32207",
+          "cardCode": "SFD-111",
+          "name": "Here to Help"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-112:Kato the Arm",
+      "name": "Kato the Arm",
+      "cleanName": "Kato the Arm",
+      "printingCodes": [
+        "SFD-112"
+      ],
+      "sourceCardIds": [
+        "8aeec2ed-ca29-4e29-9ca4-cca3a397bbd1"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8aeec2ed-ca29-4e29-9ca4-cca3a397bbd1",
+          "cardCode": "SFD-112",
+          "name": "Kato the Arm"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-113:Lucian Merciless",
+      "name": "Lucian, Merciless",
+      "cleanName": "Lucian Merciless",
+      "printingCodes": [
+        "SFD-113"
+      ],
+      "sourceCardIds": [
+        "4784dbc1-ebea-4dba-bb08-1bd6cfc9582b",
+        "83b71618-970d-43f5-acc3-8faba31feaf5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "4784dbc1-ebea-4dba-bb08-1bd6cfc9582b",
+          "cardCode": "SFD-113",
+          "name": "Lucian, Merciless"
+        },
+        {
+          "sourceCardId": "83b71618-970d-43f5-acc3-8faba31feaf5",
+          "cardCode": "SFD-113",
+          "name": "Lucian, Merciless"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-114:Marching Orders",
+      "name": "Marching Orders",
+      "cleanName": "Marching Orders",
+      "printingCodes": [
+        "SFD-114"
+      ],
+      "sourceCardIds": [
+        "9cad6229-736b-4388-8170-6556d7ccdfd5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9cad6229-736b-4388-8170-6556d7ccdfd5",
+          "cardCode": "SFD-114",
+          "name": "Marching Orders"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-115:Trinity Force",
+      "name": "Trinity Force",
+      "cleanName": "Trinity Force",
+      "printingCodes": [
+        "SFD-115"
+      ],
+      "sourceCardIds": [
+        "cb89aefa-51f3-4502-a6c8-85e6f37d2e88"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "cb89aefa-51f3-4502-a6c8-85e6f37d2e88",
+          "cardCode": "SFD-115",
+          "name": "Trinity Force"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-116:Yone Blademaster",
+      "name": "Yone, Blademaster",
+      "cleanName": "Yone Blademaster",
+      "printingCodes": [
+        "SFD-116",
+        "SFD-233"
+      ],
+      "sourceCardIds": [
+        "102ed88f-5334-4831-893b-f24fe89828a6",
+        "484b023c-cad3-4c1b-b784-67fd3f4004cd",
+        "b3b3a484-47a4-42ba-b9a9-c2a40a158125"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "102ed88f-5334-4831-893b-f24fe89828a6",
+          "cardCode": "SFD-233",
+          "name": "Yone, Blademaster"
+        },
+        {
+          "sourceCardId": "484b023c-cad3-4c1b-b784-67fd3f4004cd",
+          "cardCode": "SFD-116",
+          "name": "Yone, Blademaster"
+        },
+        {
+          "sourceCardId": "b3b3a484-47a4-42ba-b9a9-c2a40a158125",
+          "cardCode": "SFD-233",
+          "name": "Yone, Blademaster"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-117:Ancient Henge",
+      "name": "Ancient Henge",
+      "cleanName": "Ancient Henge",
+      "printingCodes": [
+        "SFD-117"
+      ],
+      "sourceCardIds": [
+        "b8da645a-8b05-46d3-85c5-4a10ca571ece"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b8da645a-8b05-46d3-85c5-4a10ca571ece",
+          "cardCode": "SFD-117",
+          "name": "Ancient Henge"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-118:Boneshiver",
+      "name": "Boneshiver",
+      "cleanName": "Boneshiver",
+      "printingCodes": [
+        "SFD-118"
+      ],
+      "sourceCardIds": [
+        "8d31b787-b3d1-4e5d-b730-424582e52f55"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8d31b787-b3d1-4e5d-b730-424582e52f55",
+          "cardCode": "SFD-118",
+          "name": "Boneshiver"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-119:Jax Unrelenting",
+      "name": "Jax, Unrelenting",
+      "cleanName": "Jax Unrelenting",
+      "printingCodes": [
+        "SFD-119"
+      ],
+      "sourceCardIds": [
+        "0557994b-f591-4721-a962-7f0e696b3e1a",
+        "848996c4-16a2-4004-8a39-5bb1a0f9e36d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0557994b-f591-4721-a962-7f0e696b3e1a",
+          "cardCode": "SFD-119",
+          "name": "Jax, Unrelenting"
+        },
+        {
+          "sourceCardId": "848996c4-16a2-4004-8a39-5bb1a0f9e36d",
+          "cardCode": "SFD-119",
+          "name": "Jax, Unrelenting"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-120:Sivir Ambitious",
+      "name": "Sivir, Ambitious",
+      "cleanName": "Sivir Ambitious",
+      "printingCodes": [
+        "SFD-120"
+      ],
+      "sourceCardIds": [
+        "2f880a8f-9a7b-49b0-8192-cd3b150397bf",
+        "de05374d-8f41-4b2d-9363-44e4bdbdff93"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2f880a8f-9a7b-49b0-8192-cd3b150397bf",
+          "cardCode": "SFD-120",
+          "name": "Sivir, Ambitious"
+        },
+        {
+          "sourceCardId": "de05374d-8f41-4b2d-9363-44e4bdbdff93",
+          "cardCode": "SFD-120",
+          "name": "Sivir, Ambitious"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-121:Black Market Broker",
+      "name": "Black Market Broker",
+      "cleanName": "Black Market Broker",
+      "printingCodes": [
+        "SFD-121"
+      ],
+      "sourceCardIds": [
+        "dfe5b335-2b6c-494f-88e0-25f566946399"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "dfe5b335-2b6c-494f-88e0-25f566946399",
+          "cardCode": "SFD-121",
+          "name": "Black Market Broker"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-122:Called Shot",
+      "name": "Called Shot",
+      "cleanName": "Called Shot",
+      "printingCodes": [
+        "SFD-122"
+      ],
+      "sourceCardIds": [
+        "c55d5e5e-71fa-4154-b3c9-2a99aa71e634"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c55d5e5e-71fa-4154-b3c9-2a99aa71e634",
+          "cardCode": "SFD-122",
+          "name": "Called Shot"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-123:Corrupt Enforcer",
+      "name": "Corrupt Enforcer",
+      "cleanName": "Corrupt Enforcer",
+      "printingCodes": [
+        "SFD-123"
+      ],
+      "sourceCardIds": [
+        "57392cd5-4aa1-4cd8-8c44-28806e5cb60d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "57392cd5-4aa1-4cd8-8c44-28806e5cb60d",
+          "cardCode": "SFD-123",
+          "name": "Corrupt Enforcer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-124:Dorans Ring",
+      "name": "Doran's Ring",
+      "cleanName": "Dorans Ring",
+      "printingCodes": [
+        "SFD-124"
+      ],
+      "sourceCardIds": [
+        "0fc02e2e-da3f-4a06-ae43-e89f77ab5710"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0fc02e2e-da3f-4a06-ae43-e89f77ab5710",
+          "cardCode": "SFD-124",
+          "name": "Doran's Ring"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-125:Fae Porter",
+      "name": "Fae Porter",
+      "cleanName": "Fae Porter",
+      "printingCodes": [
+        "SFD-125"
+      ],
+      "sourceCardIds": [
+        "8738fe69-8d7c-4680-bfb5-1ada19a86d2b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8738fe69-8d7c-4680-bfb5-1ada19a86d2b",
+          "cardCode": "SFD-125",
+          "name": "Fae Porter"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-126:Loyal Pup",
+      "name": "Loyal Pup",
+      "cleanName": "Loyal Pup",
+      "printingCodes": [
+        "SFD-126"
+      ],
+      "sourceCardIds": [
+        "93a5ca41-5bb0-4485-959c-a482bb08f4ac"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "93a5ca41-5bb0-4485-959c-a482bb08f4ac",
+          "cardCode": "SFD-126",
+          "name": "Loyal Pup"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-127:Master Bingwen",
+      "name": "Master Bingwen",
+      "cleanName": "Master Bingwen",
+      "printingCodes": [
+        "SFD-127"
+      ],
+      "sourceCardIds": [
+        "a012349e-371d-4790-96c0-56fda150a135"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a012349e-371d-4790-96c0-56fda150a135",
+          "cardCode": "SFD-127",
+          "name": "Master Bingwen"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-128:Overzealous Fan",
+      "name": "Overzealous Fan",
+      "cleanName": "Overzealous Fan",
+      "printingCodes": [
+        "SFD-128"
+      ],
+      "sourceCardIds": [
+        "550e3819-f973-4750-93ca-1fb1fa65299b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "550e3819-f973-4750-93ca-1fb1fa65299b",
+          "cardCode": "SFD-128",
+          "name": "Overzealous Fan"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-129:Temptation",
+      "name": "Temptation",
+      "cleanName": "Temptation",
+      "printingCodes": [
+        "SFD-129"
+      ],
+      "sourceCardIds": [
+        "fcfe0279-b115-4b36-87af-a5e95332cb0a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "fcfe0279-b115-4b36-87af-a5e95332cb0a",
+          "cardCode": "SFD-129",
+          "name": "Temptation"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-130:Treasure Hunter",
+      "name": "Treasure Hunter",
+      "cleanName": "Treasure Hunter",
+      "printingCodes": [
+        "SFD-130"
+      ],
+      "sourceCardIds": [
+        "46d472dd-6483-4d0b-9b6f-1f41592a246f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "46d472dd-6483-4d0b-9b6f-1f41592a246f",
+          "cardCode": "SFD-130",
+          "name": "Treasure Hunter"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-131:Ancient Warmonger",
+      "name": "Ancient Warmonger",
+      "cleanName": "Ancient Warmonger",
+      "printingCodes": [
+        "SFD-131"
+      ],
+      "sourceCardIds": [
+        "113cd9fd-8304-431e-bc4b-7ed2dcdd6e87"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "113cd9fd-8304-431e-bc4b-7ed2dcdd6e87",
+          "cardCode": "SFD-131",
+          "name": "Ancient Warmonger"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-132:Beast Below",
+      "name": "Beast Below",
+      "cleanName": "Beast Below",
+      "printingCodes": [
+        "SFD-132"
+      ],
+      "sourceCardIds": [
+        "0b41462b-318b-4d57-89b3-f72f32820623"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0b41462b-318b-4d57-89b3-f72f32820623",
+          "cardCode": "SFD-132",
+          "name": "Beast Below"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-133:Boots of Swiftness",
+      "name": "Boots of Swiftness",
+      "cleanName": "Boots of Swiftness",
+      "printingCodes": [
+        "SFD-133"
+      ],
+      "sourceCardIds": [
+        "319cba62-4e74-4dcd-a85b-c7a8d792650f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "319cba62-4e74-4dcd-a85b-c7a8d792650f",
+          "cardCode": "SFD-133",
+          "name": "Boots of Swiftness"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-134:Cull",
+      "name": "Cull",
+      "cleanName": "Cull",
+      "printingCodes": [
+        "SFD-134"
+      ],
+      "sourceCardIds": [
+        "87a475d6-3f29-4960-ad2a-311343022c72"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "87a475d6-3f29-4960-ad2a-311343022c72",
+          "cardCode": "SFD-134",
+          "name": "Cull"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-135:Factory Recall",
+      "name": "Factory Recall",
+      "cleanName": "Factory Recall",
+      "printingCodes": [
+        "SFD-135"
+      ],
+      "sourceCardIds": [
+        "530f73c0-a317-4a16-9d53-4a49fc40ed64"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "530f73c0-a317-4a16-9d53-4a49fc40ed64",
+          "cardCode": "SFD-135",
+          "name": "Factory Recall"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-136:Hard Bargain",
+      "name": "Hard Bargain",
+      "cleanName": "Hard Bargain",
+      "printingCodes": [
+        "SFD-136"
+      ],
+      "sourceCardIds": [
+        "a7d45f0d-623b-49d3-9da5-ecb599d5f239"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a7d45f0d-623b-49d3-9da5-ecb599d5f239",
+          "cardCode": "SFD-136",
+          "name": "Hard Bargain"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-137:Harpoon Squad",
+      "name": "Harpoon Squad",
+      "cleanName": "Harpoon Squad",
+      "printingCodes": [
+        "SFD-137"
+      ],
+      "sourceCardIds": [
+        "867a69a3-86c2-429a-96c5-05978f743e04"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "867a69a3-86c2-429a-96c5-05978f743e04",
+          "cardCode": "SFD-137",
+          "name": "Harpoon Squad"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-138:Windsinger",
+      "name": "Windsinger",
+      "cleanName": "Windsinger",
+      "printingCodes": [
+        "SFD-138"
+      ],
+      "sourceCardIds": [
+        "af8caa7d-05d1-463e-97de-3efcf30157e0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "af8caa7d-05d1-463e-97de-3efcf30157e0",
+          "cardCode": "SFD-138",
+          "name": "Windsinger"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-139:Edge of Night",
+      "name": "Edge of Night",
+      "cleanName": "Edge of Night",
+      "printingCodes": [
+        "SFD-139"
+      ],
+      "sourceCardIds": [
+        "a924d5cd-6cdb-4325-8314-250d41c42971"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a924d5cd-6cdb-4325-8314-250d41c42971",
+          "cardCode": "SFD-139",
+          "name": "Edge of Night"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-140:Fizz Trickster",
+      "name": "Fizz, Trickster",
+      "cleanName": "Fizz Trickster",
+      "printingCodes": [
+        "SFD-140"
+      ],
+      "sourceCardIds": [
+        "7683e2b5-44b0-4ffc-8adf-d8005325549c"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7683e2b5-44b0-4ffc-8adf-d8005325549c",
+          "cardCode": "SFD-140",
+          "name": "Fizz, Trickster"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-141:Irelia Graceful",
+      "name": "Irelia, Graceful",
+      "cleanName": "Irelia Graceful",
+      "printingCodes": [
+        "SFD-141"
+      ],
+      "sourceCardIds": [
+        "10d896da-708d-4d75-9b7a-b35f02c17a46",
+        "5505d2f1-eb36-49fe-8bf6-5b579aaaad3e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "10d896da-708d-4d75-9b7a-b35f02c17a46",
+          "cardCode": "SFD-141",
+          "name": "Irelia, Graceful"
+        },
+        {
+          "sourceCardId": "5505d2f1-eb36-49fe-8bf6-5b579aaaad3e",
+          "cardCode": "SFD-141",
+          "name": "Irelia, Graceful"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-142:Jae Medarda",
+      "name": "Jae Medarda",
+      "cleanName": "Jae Medarda",
+      "printingCodes": [
+        "SFD-142"
+      ],
+      "sourceCardIds": [
+        "14c7b868-d1ad-4178-be19-06486db380e0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "14c7b868-d1ad-4178-be19-06486db380e0",
+          "cardCode": "SFD-142",
+          "name": "Jae Medarda"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-143:Sivir Mercenary",
+      "name": "Sivir, Mercenary",
+      "cleanName": "Sivir Mercenary",
+      "printingCodes": [
+        "SFD-143"
+      ],
+      "sourceCardIds": [
+        "08febcfe-b909-4e3b-a93f-f5d4a328dc59",
+        "8f75c732-bb19-4f78-9bbc-7e09a110b4e9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "08febcfe-b909-4e3b-a93f-f5d4a328dc59",
+          "cardCode": "SFD-143",
+          "name": "Sivir, Mercenary"
+        },
+        {
+          "sourceCardId": "8f75c732-bb19-4f78-9bbc-7e09a110b4e9",
+          "cardCode": "SFD-143",
+          "name": "Sivir, Mercenary"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-144:Spirit Wheel",
+      "name": "Spirit Wheel",
+      "cleanName": "Spirit Wheel",
+      "printingCodes": [
+        "SFD-144"
+      ],
+      "sourceCardIds": [
+        "74ac6eb9-0700-4411-a9fa-70e042464658"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "74ac6eb9-0700-4411-a9fa-70e042464658",
+          "cardCode": "SFD-144",
+          "name": "Spirit Wheel"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-145:Switcheroo",
+      "name": "Switcheroo",
+      "cleanName": "Switcheroo",
+      "printingCodes": [
+        "SFD-145"
+      ],
+      "sourceCardIds": [
+        "2613a0cc-2a04-4152-b550-867628e2f226"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2613a0cc-2a04-4152-b550-867628e2f226",
+          "cardCode": "SFD-145",
+          "name": "Switcheroo"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-146:Vex Cheerless",
+      "name": "Vex, Cheerless",
+      "cleanName": "Vex Cheerless",
+      "printingCodes": [
+        "SFD-146"
+      ],
+      "sourceCardIds": [
+        "54f4b92f-4793-4e12-a75c-af77d0bb016f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "54f4b92f-4793-4e12-a75c-af77d0bb016f",
+          "cardCode": "SFD-146",
+          "name": "Vex, Cheerless"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-147:Downwell",
+      "name": "Downwell",
+      "cleanName": "Downwell",
+      "printingCodes": [
+        "SFD-147"
+      ],
+      "sourceCardIds": [
+        "993b1a7d-8490-4fb3-8255-c2d27cfa86be"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "993b1a7d-8490-4fb3-8255-c2d27cfa86be",
+          "cardCode": "SFD-147",
+          "name": "Downwell"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-148:Draven Audacious",
+      "name": "Draven, Audacious",
+      "cleanName": "Draven Audacious",
+      "printingCodes": [
+        "SFD-148"
+      ],
+      "sourceCardIds": [
+        "17a5b780-b093-45c5-8089-ea31b1aadbd0",
+        "229a6af7-4259-4260-b77c-e2b84120ad37"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "17a5b780-b093-45c5-8089-ea31b1aadbd0",
+          "cardCode": "SFD-148",
+          "name": "Draven, Audacious"
+        },
+        {
+          "sourceCardId": "229a6af7-4259-4260-b77c-e2b84120ad37",
+          "cardCode": "SFD-148",
+          "name": "Draven, Audacious"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-149:Ezreal Prodigy",
+      "name": "Ezreal, Prodigy",
+      "cleanName": "Ezreal Prodigy",
+      "printingCodes": [
+        "SFD-149"
+      ],
+      "sourceCardIds": [
+        "8c402561-031f-4f82-a0b4-918a6b4b6136",
+        "8e98bc9e-ecaa-4938-b5c6-096d38040f4e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8c402561-031f-4f82-a0b4-918a6b4b6136",
+          "cardCode": "SFD-149",
+          "name": "Ezreal, Prodigy"
+        },
+        {
+          "sourceCardId": "8e98bc9e-ecaa-4938-b5c6-096d38040f4e",
+          "cardCode": "SFD-149",
+          "name": "Ezreal, Prodigy"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-150:Last Rites",
+      "name": "Last Rites",
+      "cleanName": "Last Rites",
+      "printingCodes": [
+        "SFD-150"
+      ],
+      "sourceCardIds": [
+        "cd478c64-818a-4ad1-ab36-b51b0703f07a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "cd478c64-818a-4ad1-ab36-b51b0703f07a",
+          "cardCode": "SFD-150",
+          "name": "Last Rites"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-151:Bonds of Strength",
+      "name": "Bonds of Strength",
+      "cleanName": "Bonds of Strength",
+      "printingCodes": [
+        "SFD-151"
+      ],
+      "sourceCardIds": [
+        "6ed2a908-9e67-448b-a558-267812b500cb"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6ed2a908-9e67-448b-a558-267812b500cb",
+          "cardCode": "SFD-151",
+          "name": "Bonds of Strength"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-152:Eminent Benefactor",
+      "name": "Eminent Benefactor",
+      "cleanName": "Eminent Benefactor",
+      "printingCodes": [
+        "SFD-152"
+      ],
+      "sourceCardIds": [
+        "2bb91b68-437e-48e9-a531-14ae75639246"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2bb91b68-437e-48e9-a531-14ae75639246",
+          "cardCode": "SFD-152",
+          "name": "Eminent Benefactor"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-153:Eye of the Herald",
+      "name": "Eye of the Herald",
+      "cleanName": "Eye of the Herald",
+      "printingCodes": [
+        "SFD-153"
+      ],
+      "sourceCardIds": [
+        "51bc6955-25e3-4f44-a98e-394e5ebe5b79"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "51bc6955-25e3-4f44-a98e-394e5ebe5b79",
+          "cardCode": "SFD-153",
+          "name": "Eye of the Herald"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-154:Guards",
+      "name": "Guards!",
+      "cleanName": "Guards",
+      "printingCodes": [
+        "SFD-154"
+      ],
+      "sourceCardIds": [
+        "aea892c6-aa11-4429-b66b-793d57dccacc"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "aea892c6-aa11-4429-b66b-793d57dccacc",
+          "cardCode": "SFD-154",
+          "name": "Guards!"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-155:Honest Broker",
+      "name": "Honest Broker",
+      "cleanName": "Honest Broker",
+      "printingCodes": [
+        "SFD-155"
+      ],
+      "sourceCardIds": [
+        "371729b3-519c-4ae4-8605-92944adbac13"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "371729b3-519c-4ae4-8605-92944adbac13",
+          "cardCode": "SFD-155",
+          "name": "Honest Broker"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-156:Laurent Duelist",
+      "name": "Laurent Duelist",
+      "cleanName": "Laurent Duelist",
+      "printingCodes": [
+        "SFD-156"
+      ],
+      "sourceCardIds": [
+        "78356549-59f7-4b9d-853a-1f269e8595c4"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "78356549-59f7-4b9d-853a-1f269e8595c4",
+          "cardCode": "SFD-156",
+          "name": "Laurent Duelist"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-157:Royal Guard",
+      "name": "Royal Guard",
+      "cleanName": "Royal Guard",
+      "printingCodes": [
+        "SFD-157"
+      ],
+      "sourceCardIds": [
+        "8a22effa-f897-4a95-86d7-86d1d32007c0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8a22effa-f897-4a95-86d7-86d1d32007c0",
+          "cardCode": "SFD-157",
+          "name": "Royal Guard"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-158:Sandshifter",
+      "name": "Sandshifter",
+      "cleanName": "Sandshifter",
+      "printingCodes": [
+        "SFD-158"
+      ],
+      "sourceCardIds": [
+        "5bc98fc6-3ca7-4ce6-8184-5a1953881d3a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5bc98fc6-3ca7-4ce6-8184-5a1953881d3a",
+          "cardCode": "SFD-158",
+          "name": "Sandshifter"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-159:Trusty Ramhound",
+      "name": "Trusty Ramhound",
+      "cleanName": "Trusty Ramhound",
+      "printingCodes": [
+        "SFD-159"
+      ],
+      "sourceCardIds": [
+        "e1e7f317-f568-40eb-9fcc-a9555eb9c375"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "e1e7f317-f568-40eb-9fcc-a9555eb9c375",
+          "cardCode": "SFD-159",
+          "name": "Trusty Ramhound"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-160:Zaun Punk",
+      "name": "Zaun Punk",
+      "cleanName": "Zaun Punk",
+      "printingCodes": [
+        "SFD-160"
+      ],
+      "sourceCardIds": [
+        "c8d66fd6-3d08-4271-a01d-77f34ff54f32"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c8d66fd6-3d08-4271-a01d-77f34ff54f32",
+          "cardCode": "SFD-160",
+          "name": "Zaun Punk"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-161:BF Sword",
+      "name": "B.F. Sword",
+      "cleanName": "BF Sword",
+      "printingCodes": [
+        "SFD-161"
+      ],
+      "sourceCardIds": [
+        "c13ac91a-119c-4f02-9d69-b1a54446a196"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "c13ac91a-119c-4f02-9d69-b1a54446a196",
+          "cardCode": "SFD-161",
+          "name": "B.F. Sword"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-162:Blood Money",
+      "name": "Blood Money",
+      "cleanName": "Blood Money",
+      "printingCodes": [
+        "SFD-162"
+      ],
+      "sourceCardIds": [
+        "eb507afc-5f20-4716-95f1-3c4280a825a5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "eb507afc-5f20-4716-95f1-3c4280a825a5",
+          "cardCode": "SFD-162",
+          "name": "Blood Money"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-163:Deathgrip",
+      "name": "Deathgrip",
+      "cleanName": "Deathgrip",
+      "printingCodes": [
+        "SFD-163"
+      ],
+      "sourceCardIds": [
+        "0ac0e9cc-be67-4f4c-a193-10919cd1d7d0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0ac0e9cc-be67-4f4c-a193-10919cd1d7d0",
+          "cardCode": "SFD-163",
+          "name": "Deathgrip"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-164:Drag Under",
+      "name": "Drag Under",
+      "cleanName": "Drag Under",
+      "printingCodes": [
+        "SFD-164"
+      ],
+      "sourceCardIds": [
+        "b153208c-b254-44ff-b7e9-f30a014c5c9a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b153208c-b254-44ff-b7e9-f30a014c5c9a",
+          "cardCode": "SFD-164",
+          "name": "Drag Under"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-165:Glasc Mixologist",
+      "name": "Glasc Mixologist",
+      "cleanName": "Glasc Mixologist",
+      "printingCodes": [
+        "SFD-165"
+      ],
+      "sourceCardIds": [
+        "844ad06e-a2e6-4d4b-b351-c8e0704c845e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "844ad06e-a2e6-4d4b-b351-c8e0704c845e",
+          "cardCode": "SFD-165",
+          "name": "Glasc Mixologist"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-166:Rally the Troops",
+      "name": "Rally the Troops",
+      "cleanName": "Rally the Troops",
+      "printingCodes": [
+        "SFD-166"
+      ],
+      "sourceCardIds": [
+        "0703f01f-5bc2-4ff4-b742-f9982bd387e9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0703f01f-5bc2-4ff4-b742-f9982bd387e9",
+          "cardCode": "SFD-166",
+          "name": "Rally the Troops"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-167:Unsung Hero",
+      "name": "Unsung Hero",
+      "cleanName": "Unsung Hero",
+      "printingCodes": [
+        "SFD-167"
+      ],
+      "sourceCardIds": [
+        "d06e2b61-073b-4636-9129-66c431279260"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "d06e2b61-073b-4636-9129-66c431279260",
+          "cardCode": "SFD-167",
+          "name": "Unsung Hero"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-168:Vanguard Armory",
+      "name": "Vanguard Armory",
+      "cleanName": "Vanguard Armory",
+      "printingCodes": [
+        "SFD-168"
+      ],
+      "sourceCardIds": [
+        "a1ad2a3b-1d6b-4b94-aaa9-5e7e65bff5df"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a1ad2a3b-1d6b-4b94-aaa9-5e7e65bff5df",
+          "cardCode": "SFD-168",
+          "name": "Vanguard Armory"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-169:Altar of Memories",
+      "name": "Altar of Memories",
+      "cleanName": "Altar of Memories",
+      "printingCodes": [
+        "SFD-169"
+      ],
+      "sourceCardIds": [
+        "7609c890-3ae7-4266-bf57-e2b86cf1c52d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7609c890-3ae7-4266-bf57-e2b86cf1c52d",
+          "cardCode": "SFD-169",
+          "name": "Altar of Memories"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-170:RekSai Swarm Queen",
+      "name": "Rek'Sai, Swarm Queen",
+      "cleanName": "RekSai Swarm Queen",
+      "printingCodes": [
+        "SFD-170"
+      ],
+      "sourceCardIds": [
+        "56b90cc2-503d-4e59-a793-31e5918b24a1",
+        "d215227d-4785-41da-90cc-1f3856faef2e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "56b90cc2-503d-4e59-a793-31e5918b24a1",
+          "cardCode": "SFD-170",
+          "name": "Rek'Sai, Swarm Queen"
+        },
+        {
+          "sourceCardId": "d215227d-4785-41da-90cc-1f3856faef2e",
+          "cardCode": "SFD-170",
+          "name": "Rek'Sai, Swarm Queen"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-171:Renata Glasc Industrialist",
+      "name": "Renata Glasc, Industrialist",
+      "cleanName": "Renata Glasc Industrialist",
+      "printingCodes": [
+        "SFD-171"
+      ],
+      "sourceCardIds": [
+        "b08c3404-b545-43fa-a27d-216bc88bc5c0",
+        "c40816f2-3712-49da-b41e-ab64c0f3a99f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b08c3404-b545-43fa-a27d-216bc88bc5c0",
+          "cardCode": "SFD-171",
+          "name": "Renata Glasc, Industrialist"
+        },
+        {
+          "sourceCardId": "c40816f2-3712-49da-b41e-ab64c0f3a99f",
+          "cardCode": "SFD-171",
+          "name": "Renata Glasc, Industrialist"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-172:Sacred Shears",
+      "name": "Sacred Shears",
+      "cleanName": "Sacred Shears",
+      "printingCodes": [
+        "SFD-172"
+      ],
+      "sourceCardIds": [
+        "dc46cdd1-102b-477a-af9b-b86369a55dc3"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "dc46cdd1-102b-477a-af9b-b86369a55dc3",
+          "cardCode": "SFD-172",
+          "name": "Sacred Shears"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-173:Soraka Wanderer",
+      "name": "Soraka, Wanderer",
+      "cleanName": "Soraka Wanderer",
+      "printingCodes": [
+        "SFD-173",
+        "SFD-239"
+      ],
+      "sourceCardIds": [
+        "6a679cac-4f3f-4941-87a0-aee11e71ecdc",
+        "711de270-d889-4b3c-94ba-05db53a405b2",
+        "be789689-689d-4e4c-874d-b2da6200fcb6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6a679cac-4f3f-4941-87a0-aee11e71ecdc",
+          "cardCode": "SFD-173",
+          "name": "Soraka, Wanderer"
+        },
+        {
+          "sourceCardId": "711de270-d889-4b3c-94ba-05db53a405b2",
+          "cardCode": "SFD-239",
+          "name": "Soraka, Wanderer"
+        },
+        {
+          "sourceCardId": "be789689-689d-4e4c-874d-b2da6200fcb6",
+          "cardCode": "SFD-239",
+          "name": "Soraka, Wanderer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-174:Trove Golem",
+      "name": "Trove Golem",
+      "cleanName": "Trove Golem",
+      "printingCodes": [
+        "SFD-174"
+      ],
+      "sourceCardIds": [
+        "8a7704b3-022e-4819-b62a-96c509adce04"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "8a7704b3-022e-4819-b62a-96c509adce04",
+          "cardCode": "SFD-174",
+          "name": "Trove Golem"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-175:Undertitan",
+      "name": "Undertitan",
+      "cleanName": "Undertitan",
+      "printingCodes": [
+        "SFD-175"
+      ],
+      "sourceCardIds": [
+        "5c5da9a2-ec48-4d72-9f88-c33b12ac21b3"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5c5da9a2-ec48-4d72-9f88-c33b12ac21b3",
+          "cardCode": "SFD-175",
+          "name": "Undertitan"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-176:Xin Zhao Vigilant",
+      "name": "Xin Zhao, Vigilant",
+      "cleanName": "Xin Zhao Vigilant",
+      "printingCodes": [
+        "SFD-176"
+      ],
+      "sourceCardIds": [
+        "d11f128e-a0ef-43cb-9187-d65f2cd7b0a0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "d11f128e-a0ef-43cb-9187-d65f2cd7b0a0",
+          "cardCode": "SFD-176",
+          "name": "Xin Zhao, Vigilant"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-177:Azir Sovereign",
+      "name": "Azir, Sovereign",
+      "cleanName": "Azir Sovereign",
+      "printingCodes": [
+        "SFD-177"
+      ],
+      "sourceCardIds": [
+        "04bc108a-ae92-404d-9534-9996549837e1",
+        "7ea1d205-a94b-4ba6-a796-afd3381df2d6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "04bc108a-ae92-404d-9534-9996549837e1",
+          "cardCode": "SFD-177",
+          "name": "Azir, Sovereign"
+        },
+        {
+          "sourceCardId": "7ea1d205-a94b-4ba6-a796-afd3381df2d6",
+          "cardCode": "SFD-177",
+          "name": "Azir, Sovereign"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-178:Blade of the Ruined King",
+      "name": "Blade of the Ruined King",
+      "cleanName": "Blade of the Ruined King",
+      "printingCodes": [
+        "SFD-178"
+      ],
+      "sourceCardIds": [
+        "208881e6-9193-443d-92aa-9cc376f3d324"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "208881e6-9193-443d-92aa-9cc376f3d324",
+          "cardCode": "SFD-178",
+          "name": "Blade of the Ruined King"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-179:Corina Veraza",
+      "name": "Corina Veraza",
+      "cleanName": "Corina Veraza",
+      "printingCodes": [
+        "SFD-179"
+      ],
+      "sourceCardIds": [
+        "a1575f66-0a62-4adb-a356-f63af10052ee"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a1575f66-0a62-4adb-a356-f63af10052ee",
+          "cardCode": "SFD-179",
+          "name": "Corina Veraza"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-180:Fiora Worthy",
+      "name": "Fiora, Worthy",
+      "cleanName": "Fiora Worthy",
+      "printingCodes": [
+        "SFD-180"
+      ],
+      "sourceCardIds": [
+        "9532f6cf-c5ad-4620-bf3b-d6df86b85f60",
+        "e9434995-83e2-4c5c-a274-496b31d18a1d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9532f6cf-c5ad-4620-bf3b-d6df86b85f60",
+          "cardCode": "SFD-180",
+          "name": "Fiora, Worthy"
+        },
+        {
+          "sourceCardId": "e9434995-83e2-4c5c-a274-496b31d18a1d",
+          "cardCode": "SFD-180",
+          "name": "Fiora, Worthy"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-181:Mechanized Menace",
+      "name": "Mechanized Menace",
+      "cleanName": "Mechanized Menace",
+      "printingCodes": [
+        "SFD-181",
+        "SFD-240"
+      ],
+      "sourceCardIds": [
+        "9065ed98-ee70-4f40-9eea-5dd65dfa9ea4",
+        "acf8e1a0-806d-4bbc-b9c7-e8d9348249c5"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9065ed98-ee70-4f40-9eea-5dd65dfa9ea4",
+          "cardCode": "SFD-240",
+          "name": "Mechanized Menace"
+        },
+        {
+          "sourceCardId": "acf8e1a0-806d-4bbc-b9c7-e8d9348249c5",
+          "cardCode": "SFD-181",
+          "name": "Mechanized Menace"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-182:Danger Zone",
+      "name": "Danger Zone",
+      "cleanName": "Danger Zone",
+      "printingCodes": [
+        "SFD-182"
+      ],
+      "sourceCardIds": [
+        "5e79536b-47a7-4ce5-9c98-e7e895295c89"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5e79536b-47a7-4ce5-9c98-e7e895295c89",
+          "cardCode": "SFD-182",
+          "name": "Danger Zone"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-183:Purifier",
+      "name": "Purifier",
+      "cleanName": "Purifier",
+      "printingCodes": [
+        "SFD-183",
+        "SFD-241"
+      ],
+      "sourceCardIds": [
+        "09a29316-408f-4c23-8940-06b749b2c209",
+        "9c785fd5-3cd3-4f6b-b495-10ce82914cb3"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "09a29316-408f-4c23-8940-06b749b2c209",
+          "cardCode": "SFD-241",
+          "name": "Purifier"
+        },
+        {
+          "sourceCardId": "9c785fd5-3cd3-4f6b-b495-10ce82914cb3",
+          "cardCode": "SFD-183",
+          "name": "Purifier"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-184:Relentless Pursuit",
+      "name": "Relentless Pursuit",
+      "cleanName": "Relentless Pursuit",
+      "printingCodes": [
+        "SFD-184"
+      ],
+      "sourceCardIds": [
+        "848ec481-6a6a-4b9b-828a-b05e24646419"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "848ec481-6a6a-4b9b-828a-b05e24646419",
+          "cardCode": "SFD-184",
+          "name": "Relentless Pursuit"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-185:Glorious Executioner",
+      "name": "Glorious Executioner",
+      "cleanName": "Glorious Executioner",
+      "printingCodes": [
+        "SFD-185",
+        "SFD-242"
+      ],
+      "sourceCardIds": [
+        "0d825f61-ee0c-4b5f-8b1a-87a0faed3088",
+        "3f591ddb-d046-47a6-a9f6-af4486428e78"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0d825f61-ee0c-4b5f-8b1a-87a0faed3088",
+          "cardCode": "SFD-242",
+          "name": "Glorious Executioner"
+        },
+        {
+          "sourceCardId": "3f591ddb-d046-47a6-a9f6-af4486428e78",
+          "cardCode": "SFD-185",
+          "name": "Glorious Executioner"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-186:Spinning Axe",
+      "name": "Spinning Axe",
+      "cleanName": "Spinning Axe",
+      "printingCodes": [
+        "SFD-186"
+      ],
+      "sourceCardIds": [
+        "0c0f90d8-83f4-4bb1-a4a7-04445d084234"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0c0f90d8-83f4-4bb1-a4a7-04445d084234",
+          "cardCode": "SFD-186",
+          "name": "Spinning Axe"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-187:Void Burrower",
+      "name": "Void Burrower",
+      "cleanName": "Void Burrower",
+      "printingCodes": [
+        "SFD-187",
+        "SFD-243"
+      ],
+      "sourceCardIds": [
+        "466fc01d-205c-457e-888b-3923c4dafbb6",
+        "b77895d5-34ed-4edb-b4ee-4a198ed1f9e6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "466fc01d-205c-457e-888b-3923c4dafbb6",
+          "cardCode": "SFD-243",
+          "name": "Void Burrower"
+        },
+        {
+          "sourceCardId": "b77895d5-34ed-4edb-b4ee-4a198ed1f9e6",
+          "cardCode": "SFD-187",
+          "name": "Void Burrower"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-188:Void Rush",
+      "name": "Void Rush",
+      "cleanName": "Void Rush",
+      "printingCodes": [
+        "SFD-188"
+      ],
+      "sourceCardIds": [
+        "84795003-865b-4c75-9543-8aadcc939965"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "84795003-865b-4c75-9543-8aadcc939965",
+          "cardCode": "SFD-188",
+          "name": "Void Rush"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-189:Fire Below the Mountain",
+      "name": "Fire Below the Mountain",
+      "cleanName": "Fire Below the Mountain",
+      "printingCodes": [
+        "SFD-189",
+        "SFD-244"
+      ],
+      "sourceCardIds": [
+        "3f2bf419-d73a-4d97-957c-51c609d1a74b",
+        "5b535805-0799-4239-a858-3915b19b469e"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3f2bf419-d73a-4d97-957c-51c609d1a74b",
+          "cardCode": "SFD-189",
+          "name": "Fire Below the Mountain"
+        },
+        {
+          "sourceCardId": "5b535805-0799-4239-a858-3915b19b469e",
+          "cardCode": "SFD-244",
+          "name": "Fire Below the Mountain"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-190:Forgefire Cape",
+      "name": "Forgefire Cape",
+      "cleanName": "Forgefire Cape",
+      "printingCodes": [
+        "SFD-190"
+      ],
+      "sourceCardIds": [
+        "43c1ffbf-f071-494c-bd44-256b2167084b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "43c1ffbf-f071-494c-bd44-256b2167084b",
+          "cardCode": "SFD-190",
+          "name": "Forgefire Cape"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-191:Rabadons Deathcrown",
+      "name": "Rabadon's Deathcrown",
+      "cleanName": "Rabadons Deathcrown",
+      "printingCodes": [
+        "SFD-191"
+      ],
+      "sourceCardIds": [
+        "58b7c153-89d7-4336-bf67-10616212102b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "58b7c153-89d7-4336-bf67-10616212102b",
+          "cardCode": "SFD-191",
+          "name": "Rabadon's Deathcrown"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-192:Shurelyas Requiem",
+      "name": "Shurelya's Requiem",
+      "cleanName": "Shurelyas Requiem",
+      "printingCodes": [
+        "SFD-192"
+      ],
+      "sourceCardIds": [
+        "467fafb7-a7dd-4730-94b0-35cd2c3f7716"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "467fafb7-a7dd-4730-94b0-35cd2c3f7716",
+          "cardCode": "SFD-192",
+          "name": "Shurelya's Requiem"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-193:Grandmaster at Arms",
+      "name": "Grandmaster at Arms",
+      "cleanName": "Grandmaster at Arms",
+      "printingCodes": [
+        "SFD-193",
+        "SFD-245"
+      ],
+      "sourceCardIds": [
+        "61207b72-669d-4150-be02-f71aae0d9a5a",
+        "6532bcda-d92c-45a4-ae31-babf9b34b26b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "61207b72-669d-4150-be02-f71aae0d9a5a",
+          "cardCode": "SFD-245",
+          "name": "Grandmaster at Arms"
+        },
+        {
+          "sourceCardId": "6532bcda-d92c-45a4-ae31-babf9b34b26b",
+          "cardCode": "SFD-193",
+          "name": "Grandmaster at Arms"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-194:Counter Strike",
+      "name": "Counter Strike",
+      "cleanName": "Counter Strike",
+      "printingCodes": [
+        "SFD-194"
+      ],
+      "sourceCardIds": [
+        "657a2a93-49ca-4f8a-98c2-8a53e32fe06f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "657a2a93-49ca-4f8a-98c2-8a53e32fe06f",
+          "cardCode": "SFD-194",
+          "name": "Counter Strike"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-195:Blade Dancer",
+      "name": "Blade Dancer",
+      "cleanName": "Blade Dancer",
+      "printingCodes": [
+        "SFD-195",
+        "SFD-246"
+      ],
+      "sourceCardIds": [
+        "3ad2ebba-6d5d-4d96-8c7d-c0b42a099628",
+        "c2ee6dd8-e042-4fe6-ac45-6923931d76b0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3ad2ebba-6d5d-4d96-8c7d-c0b42a099628",
+          "cardCode": "SFD-195",
+          "name": "Blade Dancer"
+        },
+        {
+          "sourceCardId": "c2ee6dd8-e042-4fe6-ac45-6923931d76b0",
+          "cardCode": "SFD-246",
+          "name": "Blade Dancer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-196:Defiant Dance",
+      "name": "Defiant Dance",
+      "cleanName": "Defiant Dance",
+      "printingCodes": [
+        "SFD-196"
+      ],
+      "sourceCardIds": [
+        "92e89fe4-7601-4be8-a8bf-36ab5483c558"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "92e89fe4-7601-4be8-a8bf-36ab5483c558",
+          "cardCode": "SFD-196",
+          "name": "Defiant Dance"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-197:Emperor of the Sands",
+      "name": "Emperor of the Sands",
+      "cleanName": "Emperor of the Sands",
+      "printingCodes": [
+        "SFD-197",
+        "SFD-247"
+      ],
+      "sourceCardIds": [
+        "2e0d9890-b74d-4cac-bc2e-6eea959f2fa4",
+        "eb443232-e716-47be-b642-2230680628b2"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2e0d9890-b74d-4cac-bc2e-6eea959f2fa4",
+          "cardCode": "SFD-247",
+          "name": "Emperor of the Sands"
+        },
+        {
+          "sourceCardId": "eb443232-e716-47be-b642-2230680628b2",
+          "cardCode": "SFD-197",
+          "name": "Emperor of the Sands"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-198:Arise",
+      "name": "Arise!",
+      "cleanName": "Arise",
+      "printingCodes": [
+        "SFD-198"
+      ],
+      "sourceCardIds": [
+        "f5c2fc0a-a825-4585-9835-914ae34ad802"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "f5c2fc0a-a825-4585-9835-914ae34ad802",
+          "cardCode": "SFD-198",
+          "name": "Arise!"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-199:Prodigal Explorer",
+      "name": "Prodigal Explorer",
+      "cleanName": "Prodigal Explorer",
+      "printingCodes": [
+        "SFD-199",
+        "SFD-248"
+      ],
+      "sourceCardIds": [
+        "0ff50e98-f731-4147-8365-951186f6c11c",
+        "40ca8a81-e716-4488-809a-1228112d2a47"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0ff50e98-f731-4147-8365-951186f6c11c",
+          "cardCode": "SFD-199",
+          "name": "Prodigal Explorer"
+        },
+        {
+          "sourceCardId": "40ca8a81-e716-4488-809a-1228112d2a47",
+          "cardCode": "SFD-248",
+          "name": "Prodigal Explorer"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-200:Arcane Shift",
+      "name": "Arcane Shift",
+      "cleanName": "Arcane Shift",
+      "printingCodes": [
+        "SFD-200"
+      ],
+      "sourceCardIds": [
+        "74502e9b-4358-4333-9746-f76b2e8aead9"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "74502e9b-4358-4333-9746-f76b2e8aead9",
+          "cardCode": "SFD-200",
+          "name": "Arcane Shift"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-201:ChemBaroness",
+      "name": "Chem-Baroness",
+      "cleanName": "ChemBaroness",
+      "printingCodes": [
+        "SFD-201",
+        "SFD-249"
+      ],
+      "sourceCardIds": [
+        "00d4a50f-a907-4670-b85f-1347ab982d88",
+        "8b750fe9-da2d-4e91-912c-52ee893e8c2d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "00d4a50f-a907-4670-b85f-1347ab982d88",
+          "cardCode": "SFD-201",
+          "name": "Chem-Baroness"
+        },
+        {
+          "sourceCardId": "8b750fe9-da2d-4e91-912c-52ee893e8c2d",
+          "cardCode": "SFD-249",
+          "name": "Chem-Baroness"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-202:Hostile Takeover",
+      "name": "Hostile Takeover",
+      "cleanName": "Hostile Takeover",
+      "printingCodes": [
+        "SFD-202"
+      ],
+      "sourceCardIds": [
+        "41e59733-e4bd-482c-907a-08175680213f"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "41e59733-e4bd-482c-907a-08175680213f",
+          "cardCode": "SFD-202",
+          "name": "Hostile Takeover"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-203:Battle Mistress",
+      "name": "Battle Mistress",
+      "cleanName": "Battle Mistress",
+      "printingCodes": [
+        "SFD-203",
+        "SFD-250"
+      ],
+      "sourceCardIds": [
+        "3b28efa8-1f11-46a0-8058-34516fa17500",
+        "c6ee9c3b-43c2-49ad-a80e-3449c734cbba"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "3b28efa8-1f11-46a0-8058-34516fa17500",
+          "cardCode": "SFD-250",
+          "name": "Battle Mistress"
+        },
+        {
+          "sourceCardId": "c6ee9c3b-43c2-49ad-a80e-3449c734cbba",
+          "cardCode": "SFD-203",
+          "name": "Battle Mistress"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-204:On the Hunt",
+      "name": "On the Hunt",
+      "cleanName": "On the Hunt",
+      "printingCodes": [
+        "SFD-204"
+      ],
+      "sourceCardIds": [
+        "d4ba7a3b-7c14-4157-a303-8edd0538ab5c"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "d4ba7a3b-7c14-4157-a303-8edd0538ab5c",
+          "cardCode": "SFD-204",
+          "name": "On the Hunt"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-205:Grand Duelist",
+      "name": "Grand Duelist",
+      "cleanName": "Grand Duelist",
+      "printingCodes": [
+        "SFD-205",
+        "SFD-251"
+      ],
+      "sourceCardIds": [
+        "312d1793-1a6c-4f47-a577-cce37b211bd6",
+        "8003f1ae-f164-4d79-af8b-61f2cf630aac"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "312d1793-1a6c-4f47-a577-cce37b211bd6",
+          "cardCode": "SFD-251",
+          "name": "Grand Duelist"
+        },
+        {
+          "sourceCardId": "8003f1ae-f164-4d79-af8b-61f2cf630aac",
+          "cardCode": "SFD-205",
+          "name": "Grand Duelist"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-206:Riposte",
+      "name": "Riposte",
+      "cleanName": "Riposte",
+      "printingCodes": [
+        "SFD-206"
+      ],
+      "sourceCardIds": [
+        "16b28b46-41c3-4bde-89f8-32f45cba4aa4"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "16b28b46-41c3-4bde-89f8-32f45cba4aa4",
+          "cardCode": "SFD-206",
+          "name": "Riposte"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-207:Emperors Dais",
+      "name": "Emperor's Dais",
+      "cleanName": "Emperors Dais",
+      "printingCodes": [
+        "SFD-207"
+      ],
+      "sourceCardIds": [
+        "29d87f95-af5d-49d4-ab99-366372bc19f6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "29d87f95-af5d-49d4-ab99-366372bc19f6",
+          "cardCode": "SFD-207",
+          "name": "Emperor's Dais"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-208:Forge of the Fluft",
+      "name": "Forge of the Fluft",
+      "cleanName": "Forge of the Fluft",
+      "printingCodes": [
+        "SFD-208"
+      ],
+      "sourceCardIds": [
+        "5b352e20-83b2-4c75-98c3-36130a98b105"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5b352e20-83b2-4c75-98c3-36130a98b105",
+          "cardCode": "SFD-208",
+          "name": "Forge of the Fluft"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-209:Forgotten Monument",
+      "name": "Forgotten Monument",
+      "cleanName": "Forgotten Monument",
+      "printingCodes": [
+        "SFD-209"
+      ],
+      "sourceCardIds": [
+        "7d0a7ad8-8688-4e70-886c-ad7a7cb3807b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7d0a7ad8-8688-4e70-886c-ad7a7cb3807b",
+          "cardCode": "SFD-209",
+          "name": "Forgotten Monument"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-210:Hall of Legends",
+      "name": "Hall of Legends",
+      "cleanName": "Hall of Legends",
+      "printingCodes": [
+        "SFD-210"
+      ],
+      "sourceCardIds": [
+        "55236964-97c2-4bd4-98d3-78053a1dd47b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "55236964-97c2-4bd4-98d3-78053a1dd47b",
+          "cardCode": "SFD-210",
+          "name": "Hall of Legends"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-211:Marai Spire",
+      "name": "Marai Spire",
+      "cleanName": "Marai Spire",
+      "printingCodes": [
+        "SFD-211"
+      ],
+      "sourceCardIds": [
+        "1518f047-8ad6-4520-8954-8b36685dcb72"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "1518f047-8ad6-4520-8954-8b36685dcb72",
+          "cardCode": "SFD-211",
+          "name": "Marai Spire"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-212:Minefield",
+      "name": "Minefield",
+      "cleanName": "Minefield",
+      "printingCodes": [
+        "SFD-212"
+      ],
+      "sourceCardIds": [
+        "7c79b9e6-624e-430e-8f1f-8df0507b03e6"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7c79b9e6-624e-430e-8f1f-8df0507b03e6",
+          "cardCode": "SFD-212",
+          "name": "Minefield"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-213:Ornns Forge",
+      "name": "Ornn's Forge",
+      "cleanName": "Ornns Forge",
+      "printingCodes": [
+        "SFD-213"
+      ],
+      "sourceCardIds": [
+        "323503b3-b79d-4814-8925-941e24e58dba"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "323503b3-b79d-4814-8925-941e24e58dba",
+          "cardCode": "SFD-213",
+          "name": "Ornn's Forge"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-214:Power Nexus",
+      "name": "Power Nexus",
+      "cleanName": "Power Nexus",
+      "printingCodes": [
+        "SFD-214"
+      ],
+      "sourceCardIds": [
+        "b0bfe36c-9891-404f-9c37-b91f27b75fa4"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b0bfe36c-9891-404f-9c37-b91f27b75fa4",
+          "cardCode": "SFD-214",
+          "name": "Power Nexus"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-215:Ravenbloom Conservatory",
+      "name": "Ravenbloom Conservatory",
+      "cleanName": "Ravenbloom Conservatory",
+      "printingCodes": [
+        "SFD-215"
+      ],
+      "sourceCardIds": [
+        "74614dc2-86a0-4e1e-911f-e7e65ed84429"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "74614dc2-86a0-4e1e-911f-e7e65ed84429",
+          "cardCode": "SFD-215",
+          "name": "Ravenbloom Conservatory"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-216:Rockfall Path",
+      "name": "Rockfall Path",
+      "cleanName": "Rockfall Path",
+      "printingCodes": [
+        "SFD-216"
+      ],
+      "sourceCardIds": [
+        "b2255ff3-fda4-407c-ae11-be8ef03de81b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b2255ff3-fda4-407c-ae11-be8ef03de81b",
+          "cardCode": "SFD-216",
+          "name": "Rockfall Path"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-217:Seat of Power",
+      "name": "Seat of Power",
+      "cleanName": "Seat of Power",
+      "printingCodes": [
+        "SFD-217"
+      ],
+      "sourceCardIds": [
+        "7dd3ce40-baf7-4de4-80fd-d104813a277a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "7dd3ce40-baf7-4de4-80fd-d104813a277a",
+          "cardCode": "SFD-217",
+          "name": "Seat of Power"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-218:Sunken Temple",
+      "name": "Sunken Temple",
+      "cleanName": "Sunken Temple",
+      "printingCodes": [
+        "SFD-218"
+      ],
+      "sourceCardIds": [
+        "9297a55e-5aa0-405e-bea6-b95d929f6f96"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "9297a55e-5aa0-405e-bea6-b95d929f6f96",
+          "cardCode": "SFD-218",
+          "name": "Sunken Temple"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-219:The Papertree",
+      "name": "The Papertree",
+      "cleanName": "The Papertree",
+      "printingCodes": [
+        "SFD-219"
+      ],
+      "sourceCardIds": [
+        "5a154988-9666-452e-8d9b-afbbebf0bb87"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5a154988-9666-452e-8d9b-afbbebf0bb87",
+          "cardCode": "SFD-219",
+          "name": "The Papertree"
+        }
+      ],
+      "status": "accepted",
+      "canonicalModel": {
+        "cardCode": "SFD-219",
+        "approvedAt": "2026-06-23T09:24:30.573Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "accepted-deck-garen",
+          "status": "accepted",
+          "updatedAt": "2026-07-15T11:23:36.035Z",
+          "note": "garen deck manual validation accepted."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-06-23T09:24:30.573Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model SFD-219 approved."
+        },
+        {
+          "at": "2026-07-15T11:19:28.199Z",
+          "event": "family_status_updated",
+          "status": "accepted",
+          "familyId": "accepted-deck-garen",
+          "note": "garen deck manual validation accepted."
+        }
+      ],
+      "updatedAt": "2026-07-15T11:23:36.035Z"
+    },
+    {
+      "gameplayIdentity": "SFD-220:Treasure Hoard",
+      "name": "Treasure Hoard",
+      "cleanName": "Treasure Hoard",
+      "printingCodes": [
+        "SFD-220"
+      ],
+      "sourceCardIds": [
+        "a2c77355-581c-4fa1-a97a-1f95d36dcdd0"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a2c77355-581c-4fa1-a97a-1f95d36dcdd0",
+          "cardCode": "SFD-220",
+          "name": "Treasure Hoard"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-221:Veiled Temple",
+      "name": "Veiled Temple",
+      "cleanName": "Veiled Temple",
+      "printingCodes": [
+        "SFD-221"
+      ],
+      "sourceCardIds": [
+        "5975b423-2e08-497a-9f96-07f25399ab9b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5975b423-2e08-497a-9f96-07f25399ab9b",
+          "cardCode": "SFD-221",
+          "name": "Veiled Temple"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-222:Seal of Rage",
+      "name": "Seal of Rage",
+      "cleanName": "Seal of Rage",
+      "printingCodes": [
+        "SFD-222"
+      ],
+      "sourceCardIds": [
+        "63b6f77b-e1d9-4630-bb6e-0eb6d6423f58"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "63b6f77b-e1d9-4630-bb6e-0eb6d6423f58",
+          "cardCode": "SFD-222",
+          "name": "Seal of Rage"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-223:Vayne Hunter",
+      "name": "Vayne, Hunter",
+      "cleanName": "Vayne Hunter",
+      "printingCodes": [
+        "SFD-223"
+      ],
+      "sourceCardIds": [
+        "0a66c309-ca2b-48c8-8e3f-b7672115a83c",
+        "81eb0d7f-29d1-4c87-bdd7-03b69b81d126"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "0a66c309-ca2b-48c8-8e3f-b7672115a83c",
+          "cardCode": "SFD-223",
+          "name": "Vayne, Hunter"
+        },
+        {
+          "sourceCardId": "81eb0d7f-29d1-4c87-bdd7-03b69b81d126",
+          "cardCode": "SFD-223",
+          "name": "Vayne, Hunter"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-226:Seal of Focus",
+      "name": "Seal of Focus",
+      "cleanName": "Seal of Focus",
+      "printingCodes": [
+        "SFD-226"
+      ],
+      "sourceCardIds": [
+        "5c5b90f8-5dff-464b-af29-14ae34f6fd28"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5c5b90f8-5dff-464b-af29-14ae34f6fd28",
+          "cardCode": "SFD-226",
+          "name": "Seal of Focus"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-227:Ahri Inquisitive",
+      "name": "Ahri, Inquisitive",
+      "cleanName": "Ahri Inquisitive",
+      "printingCodes": [
+        "SFD-227"
+      ],
+      "sourceCardIds": [
+        "a3ce7b81-fa98-4602-bfa8-f2b54e8307bb",
+        "a80aabd5-cecc-4881-9d52-217c01a90842"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a3ce7b81-fa98-4602-bfa8-f2b54e8307bb",
+          "cardCode": "SFD-227",
+          "name": "Ahri, Inquisitive"
+        },
+        {
+          "sourceCardId": "a80aabd5-cecc-4881-9d52-217c01a90842",
+          "cardCode": "SFD-227",
+          "name": "Ahri, Inquisitive"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-229:Seal of Insight",
+      "name": "Seal of Insight",
+      "cleanName": "Seal of Insight",
+      "printingCodes": [
+        "SFD-229"
+      ],
+      "sourceCardIds": [
+        "86311337-f8e0-4d1e-a378-4ac222943d0b"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "86311337-f8e0-4d1e-a378-4ac222943d0b",
+          "cardCode": "SFD-229",
+          "name": "Seal of Insight"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-231:Seal of Strength",
+      "name": "Seal of Strength",
+      "cleanName": "Seal of Strength",
+      "printingCodes": [
+        "SFD-231"
+      ],
+      "sourceCardIds": [
+        "6eb5dcad-5c9c-48a8-b722-78cf98e23abc"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "6eb5dcad-5c9c-48a8-b722-78cf98e23abc",
+          "cardCode": "SFD-231",
+          "name": "Seal of Strength"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-232:Sett Brawler",
+      "name": "Sett, Brawler",
+      "cleanName": "Sett Brawler",
+      "printingCodes": [
+        "SFD-232"
+      ],
+      "sourceCardIds": [
+        "4b61b96b-865e-4f49-9b4e-a2154b5bd71f",
+        "a48a595a-5a76-4bf9-b3e1-23d90fc5c158"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "4b61b96b-865e-4f49-9b4e-a2154b5bd71f",
+          "cardCode": "SFD-232",
+          "name": "Sett, Brawler"
+        },
+        {
+          "sourceCardId": "a48a595a-5a76-4bf9-b3e1-23d90fc5c158",
+          "cardCode": "SFD-232",
+          "name": "Sett, Brawler"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-234:Seal of Discord",
+      "name": "Seal of Discord",
+      "cleanName": "Seal of Discord",
+      "printingCodes": [
+        "SFD-234"
+      ],
+      "sourceCardIds": [
+        "2ce8597a-3015-4954-987b-5ef47046edcf"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "2ce8597a-3015-4954-987b-5ef47046edcf",
+          "cardCode": "SFD-234",
+          "name": "Seal of Discord"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-236:Darius Executioner",
+      "name": "Darius, Executioner",
+      "cleanName": "Darius Executioner",
+      "printingCodes": [
+        "SFD-236"
+      ],
+      "sourceCardIds": [
+        "5be393b4-e251-4ce3-b97a-0f6aeeace2bf",
+        "cfe48d2f-1872-4efa-b101-591be4787fbb"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "5be393b4-e251-4ce3-b97a-0f6aeeace2bf",
+          "cardCode": "SFD-236",
+          "name": "Darius, Executioner"
+        },
+        {
+          "sourceCardId": "cfe48d2f-1872-4efa-b101-591be4787fbb",
+          "cardCode": "SFD-236",
+          "name": "Darius, Executioner"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-238:Seal of Unity",
+      "name": "Seal of Unity",
+      "cleanName": "Seal of Unity",
+      "printingCodes": [
+        "SFD-238"
+      ],
+      "sourceCardIds": [
+        "e5652a0f-bf42-4a15-b9c4-7346f41d76e4"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "e5652a0f-bf42-4a15-b9c4-7346f41d76e4",
+          "cardCode": "SFD-238",
+          "name": "Seal of Unity"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    },
+    {
+      "gameplayIdentity": "SFD-T03:Gold",
+      "name": "Gold",
+      "cleanName": "Gold",
+      "printingCodes": [
+        "SFD-T03"
+      ],
+      "sourceCardIds": [
+        "b412d54d-4a96-4b88-bb74-d40281331f8d"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "b412d54d-4a96-4b88-bb74-d40281331f8d",
+          "cardCode": "SFD-T03",
+          "name": "Gold"
+        }
+      ],
+      "status": "unreviewed",
+      "canonicalModel": null,
+      "familyStatuses": [],
+      "history": [],
+      "updatedAt": "2026-07-15T11:11:21.144Z"
+    }
+  ]
+}

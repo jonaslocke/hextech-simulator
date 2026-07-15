@@ -4,6 +4,10 @@ import { cardSchema, type Card } from "../catalog";
 import { loadBehaviorDefinitions } from "./behavior-definition-repository";
 import { deriveCardCodeFromCard } from "./identity";
 import { hashCardRulesText } from "./import-preview";
+import {
+  hasImplementationStatusLedgerSource,
+  synchronizeImplementationStatusLedger,
+} from "./implementation-status-ledger";
 import type { AppliedErratum } from "./official-errata";
 import {
   combineSupportStatuses,
@@ -127,6 +131,10 @@ export async function publishCanonicalCard(
     { $set: { ...mutableFields, id }, $setOnInsert: { _id: id, createdAt } },
     { upsert: true }
   );
+  const setCode = document.cardCode.split("-", 1)[0];
+  if (setCode && await hasImplementationStatusLedgerSource(setCode)) {
+    await synchronizeImplementationStatusLedger(db, setCode, now);
+  }
   return document;
 }
 

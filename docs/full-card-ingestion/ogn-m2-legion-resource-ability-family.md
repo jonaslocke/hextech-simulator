@@ -1,6 +1,6 @@
 # OGN M2 Legion Resource Ability Family
 
-Status: Awaiting manual validation.
+Status: Manual family passed (2026-07-15).
 
 ## Shared Contract
 
@@ -27,3 +27,10 @@ immediately; an Add ability does not enter the Chain and cannot be reacted to.
 2. After playing another card, activate it. It exhausts and adds exactly 1
    Energy immediately, without entering the Chain.
 3. It cannot be activated again while exhausted.
+
+## Manual validation result
+
+Passed on 2026-07-15. Hand of Noxus remained unavailable before Legion,
+including as an automatic-payment source for the first card played that turn.
+After another card was played, it correctly exhausted to add exactly 1 Energy
+without entering the Chain.
