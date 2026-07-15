@@ -7,6 +7,7 @@ import {
   type GameCardDefinition,
   type GameDocument,
 } from "../src/server/game";
+import { submitBinaryChoice } from "../src/server/game/effect-resolution";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 
@@ -25,6 +26,39 @@ test("resolves a delayed effect through the chain and removes its pending record
   assert.equal(fixture.game.state.chain?.items[0]?.id, "delayed-trigger:delayed:draw");
   assert.equal(beginDelayedEffectResolution(fixture.game, "delayed:draw", fixture.decks, "p1"), true);
   assert.deepEqual(fixture.game.state.players.p1!.zones.mainDeck, []);
+  assert.deepEqual(fixture.game.state.players.p1!.zones.hand, ["draw"]);
+  assert.deepEqual(fixture.game.state.delayedEffects, []);
+  assert.deepEqual(fixture.game.state.effectResolutions, []);
+});
+
+test("pauses a delayed effect for an interactive choice and resumes its effects", () => {
+  const fixture = triggerFixture();
+  const source = fixture.decks[0]!.snapshot.cards.find((definition) => definition.cardCode === "SOURCE")!;
+  source.behaviorModel.clauses[0]!.choices = [binding("choice.optional", { prompt: "Use delayed effect?" })];
+  fixture.game.state.delayedEffects = [{
+    id: "delayed:optional-draw",
+    point: "endOfThisTurn",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "draw-clause",
+    selectedIds: [],
+  }];
+
+  assert.equal(beginDelayedEffectResolution(fixture.game, "delayed:optional-draw", fixture.decks, "p1"), false);
+  const pending = fixture.game.state.pendingChoice;
+  assert.equal(pending?.type, "binary");
+  if (!pending || pending.type !== "binary") throw new Error("Expected a delayed binary choice.");
+  assert.equal(pending.playerId, "p1");
+  assert.deepEqual(fixture.game.state.players.p1!.zones.hand, []);
+
+  assert.throws(
+    () => submitBinaryChoice(fixture.game, "p2", ["accept"], fixture.decks),
+    /Optional choice is invalid/,
+  );
+  assert.equal(fixture.game.state.pendingChoice?.type, "binary");
+
+  assert.equal(submitBinaryChoice(fixture.game, "p1", ["accept"], fixture.decks), true);
+  assert.equal(fixture.game.state.pendingChoice, null);
   assert.deepEqual(fixture.game.state.players.p1!.zones.hand, ["draw"]);
   assert.deepEqual(fixture.game.state.delayedEffects, []);
   assert.deepEqual(fixture.game.state.effectResolutions, []);

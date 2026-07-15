@@ -203,6 +203,77 @@ test("selectors distinguish combat, source locations, references, and automatic 
   assert.equal(automatic.maximum, 0);
 });
 
+test("card selectors cover zones, types, printed costs, and payable power", () => {
+  const handPayable = card("HAND_PAYABLE", "Spell");
+  handPayable.card.attributes.power = 1;
+  handPayable.card.classification.domain = ["Fire"];
+  const handTooExpensive = card("HAND_TOO_EXPENSIVE", "Spell");
+  handTooExpensive.card.attributes.energy = 3;
+  handTooExpensive.card.attributes.power = 2;
+  handTooExpensive.card.classification.domain = ["Fire"];
+
+  const { game, handlers } = matrixFixture([
+    card("SOURCE", "Unit"),
+    handPayable,
+    handTooExpensive,
+    card("HAND_UNIT", "Unit"),
+    card("TRASH_SPELL", "Spell"),
+    card("DECK_GEAR", "Gear"),
+    card("RUNE_CARD", "Rune"),
+  ], [
+    instance("source", "p1", "SOURCE", "mainDeck"),
+    instance("hand-payable", "p1", "HAND_PAYABLE", "mainDeck"),
+    instance("hand-too-expensive", "p1", "HAND_TOO_EXPENSIVE", "mainDeck"),
+    instance("hand-unit", "p1", "HAND_UNIT", "mainDeck"),
+    instance("trash-spell", "p1", "TRASH_SPELL", "mainDeck"),
+    instance("deck-gear", "p1", "DECK_GEAR", "mainDeck"),
+    instance("rune-card", "p1", "RUNE_CARD", "runeDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.zones.hand = ["hand-payable", "hand-too-expensive", "hand-unit"];
+  game.state.players.p1!.zones.trash = ["trash-spell"];
+  game.state.players.p1!.zones.mainDeck = ["deck-gear"];
+  game.state.players.p1!.zones.runeDeck = ["rune-card"];
+  game.state.players.p1!.power = { Fire: 1 };
+
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+  const selector = handlers.get("selector.card")!.targets!;
+  const select = (parameters: BehaviorBinding["parameters"]) =>
+    selector(binding("selector.card", parameters), context);
+
+  assert.deepEqual(select({ zone: "hand", cardType: "any", minimumCount: 0, maximumCount: 3 }).legalIds, [
+    "hand-payable", "hand-too-expensive", "hand-unit",
+  ]);
+  assert.deepEqual(select({ zone: "hand", cardType: "nonUnit", minimumCount: 0, maximumCount: 3 }).legalIds, [
+    "hand-payable", "hand-too-expensive",
+  ]);
+  assert.deepEqual(select({ zone: "trash", cardType: "Spell", minimumCount: 1, maximumCount: 1 }).legalIds, [
+    "trash-spell",
+  ]);
+  assert.deepEqual(select({ zone: "mainDeck", cardType: "Gear", minimumCount: 1, maximumCount: 1 }).legalIds, [
+    "deck-gear",
+  ]);
+  assert.deepEqual(select({ zone: "runeDeck", cardType: "Rune", minimumCount: 1, maximumCount: 1 }).legalIds, [
+    "rune-card",
+  ]);
+  assert.deepEqual(select({ zone: "base", cardType: "Unit", minimumCount: 1, maximumCount: 1 }).legalIds, [
+    "source",
+  ]);
+
+  assert.deepEqual(select({
+    zone: "hand", cardType: "Spell", minimumCount: 0, maximumCount: 2,
+    maximumEnergy: 1, maximumPower: 1,
+  }).legalIds, ["hand-payable"]);
+  assert.deepEqual(select({
+    zone: "hand", cardType: "Spell", minimumCount: 1, maximumCount: 1,
+    requiresPayablePowerCost: true,
+  }).legalIds, ["hand-payable"]);
+  assert.equal(select({
+    zone: "hand", cardType: "Spell", minimumCount: 0, maximumCount: 2,
+    requiresPayablePowerCost: true,
+  }).minimum, 0);
+});
+
 test("zone operations move selected cards to their typed destinations and emit boundaries", () => {
   const { game, handlers } = matrixFixture([
     card("SOURCE", "Unit", 1),
