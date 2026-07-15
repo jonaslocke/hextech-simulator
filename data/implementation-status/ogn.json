@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-15T11:23:36.997Z",
+  "updatedAt": "2026-07-15T12:03:54.982Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -92,7 +92,7 @@
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGN-004",
-        "approvedAt": "2026-07-12T17:20:03.773Z"
+        "approvedAt": "2026-07-15T12:03:52.249Z"
       },
       "familyStatuses": [
         {
@@ -100,6 +100,12 @@
           "status": "accepted",
           "updatedAt": "2026-07-15T11:23:36.081Z",
           "note": "kaisa deck manual validation accepted."
+        },
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
         }
       ],
       "history": [
@@ -115,9 +121,35 @@
           "status": "accepted",
           "familyId": "accepted-deck-kaisa",
           "note": "kaisa deck manual validation accepted."
+        },
+        {
+          "at": "2026-07-15T11:59:55.671Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-004 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:52.249Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-004 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
         }
       ],
-      "updatedAt": "2026-07-15T11:23:36.081Z"
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-005:Disintegrate",
@@ -478,11 +510,48 @@
           "name": "Captain Farron"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-015",
+        "approvedAt": "2026-07-15T12:03:52.540Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T11:59:55.960Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-015 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:52.540Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-015 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        }
+      ],
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-016:Dangerous Duo",
@@ -1668,11 +1737,48 @@
           "name": "Block"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-057",
+        "approvedAt": "2026-07-15T12:03:52.826Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T11:59:56.200Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-057 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:52.826Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-057 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        }
+      ],
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-058:Discipline",
@@ -2065,11 +2171,48 @@
           "name": "Taric, Protector"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-074",
+        "approvedAt": "2026-07-15T12:03:53.135Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T11:59:56.459Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-074 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:53.135Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-074 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        }
+      ],
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-075:Tasty Faefolk",
@@ -8611,11 +8754,48 @@
           "name": "Fortified Position"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-279",
+        "approvedAt": "2026-07-15T12:03:53.424Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T11:59:56.707Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-279 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:53.424Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-279 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        }
+      ],
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-280:Grove of the GodWillow",
@@ -9220,11 +9400,48 @@
           "name": "Windswept Hillock"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-297",
+        "approvedAt": "2026-07-15T12:03:53.706Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "keyword-grant-combat-role",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T12:03:54.982Z",
+          "note": "Published for manual validation"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T11:59:56.952Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-297 approved."
+        },
+        {
+          "at": "2026-07-15T12:01:31.096Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        },
+        {
+          "at": "2026-07-15T12:03:53.706Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-297 approved."
+        },
+        {
+          "at": "2026-07-15T12:03:54.982Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "keyword-grant-combat-role",
+          "note": "Published for manual validation"
+        }
+      ],
+      "updatedAt": "2026-07-15T12:03:54.982Z"
     },
     {
       "gameplayIdentity": "OGN-298:Zaun Warrens",

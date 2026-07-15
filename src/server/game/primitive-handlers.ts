@@ -11,11 +11,14 @@ import {
   effectiveNumericValue,
   isContinuousDuration,
 } from "./numeric-modifiers";
+import { keywordAmount } from "./keyword-evaluation";
 import { numericConditionMatches } from "./numeric-condition";
 import { getTokenCatalogDefinitions } from "./token-catalog";
 import { isLegalUnitDestination, legalUnitDestinationIds } from "./unit-destinations";
 import { buildPaymentPlan, payCardCost } from "./payment";
 import { markBattlefieldContested } from "./board-rules";
+
+export { hasKeyword, keywordAmount } from "./keyword-evaluation";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -1278,6 +1281,9 @@ export function createPrimitiveHandlers(
   });
   handlers.set("modifier.grant_keyword", {
     execute(binding, context) {
+      if (isContinuousDuration(binding.parameters.duration)) {
+        return;
+      }
       const keywordId = stringParam(binding, "keywordId");
       const targets = selectionFor(binding, context);
       const selectedTargets = targets.length > 0 ? targets : context.selectedIds;
@@ -1426,6 +1432,20 @@ export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex
   game.state.modifiers = game.state.modifiers.filter((item) => item.duration !== "thisTurn");
   game.state.ongoingEffects = game.state.ongoingEffects.filter(
     (item) => item.duration !== "thisTurn",
+  );
+  affected.forEach((id) => recomputeMight(game, id, index));
+  cleanupLethalDamage(game, [...new Set(affected)], index);
+}
+
+export function cleanupCombatModifiers(game: GameDocument, index: RuntimeCardIndex) {
+  const affected = game.state.modifiers
+    .filter((item) => item.duration === "thisCombat" && item.targetCardInstanceId)
+    .map((item) => item.targetCardInstanceId!);
+  game.state.modifiers = game.state.modifiers.filter(
+    (item) => item.duration !== "thisCombat",
+  );
+  game.state.ongoingEffects = game.state.ongoingEffects.filter(
+    (item) => item.duration !== "thisCombat",
   );
   affected.forEach((id) => recomputeMight(game, id, index));
   cleanupLethalDamage(game, [...new Set(affected)], index);
@@ -1919,36 +1939,6 @@ export function recomputeMight(
     targetScope: "source",
   });
   state.computedMight = Math.max(0, value);
-}
-
-export function keywordAmount(
-  game: GameDocument,
-  cardInstanceId: string,
-  behaviorId: string,
-  index: RuntimeCardIndex,
-) {
-  const printedAmount = definitionForInstance(
-    cardInstanceId,
-    index,
-  ).behaviorModel.clauses
-    .flatMap((clause) => clause.keywords)
-    .filter((binding) => binding.behaviorId === behaviorId)
-    .reduce(
-      (sum, binding) =>
-        sum +
-        (typeof binding.parameters.amount === "number"
-          ? binding.parameters.amount
-          : 1),
-      0,
-    );
-  const grantedAmount = game.state.modifiers
-    .filter(
-      (modifier) =>
-        modifier.targetCardInstanceId === cardInstanceId &&
-        modifier.attribute === behaviorId,
-    )
-    .reduce((sum, modifier) => sum + modifier.amount, 0);
-  return printedAmount + grantedAmount;
 }
 
 export function recordCardPlayed(

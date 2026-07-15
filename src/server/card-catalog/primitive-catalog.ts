@@ -230,6 +230,7 @@ export const numericModifierOperations = [
 
 export const behaviorDurationKinds = [
   "thisTurn",
+  "thisCombat",
   "untilLeavesPlay",
   "whileSourceAtBattlefield",
   "whileSourceOnBoard"
@@ -1194,14 +1195,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "modifier.grant_keyword",
     family: "modifier",
     name: "Grant keyword",
-    description: "Grants a keyword amount to selected units for a defined duration.",
+    description: "Grants a keyword amount to selected units or a continuous unit scope for a defined duration.",
     parameters: [
       required("keywordId", "string", "The granted keyword behavior id."),
       optional("amount", "number", "The keyword amount."),
       required("target", "target", "The units receiving the keyword."),
+      optional("selectionKey", "string", "Selector key supplying selected recipients."),
+      optional("locationRelation", "locationRelation", "How recipients relate to the source location."),
+      optional("excludesSource", "boolean", "Whether the source card is excluded from recipients."),
       required("duration", "duration", "How long the granted keyword lasts."),
     ],
-    engineSupport: supported("Temporary keyword grants use the shared modifier lifecycle."),
+    engineSupport: supported("Temporary and static source-location keyword grants use the shared keyword evaluator and modifier lifecycle."),
   }),
   "condition.if": primitiveSeed({
     id: "condition.if",

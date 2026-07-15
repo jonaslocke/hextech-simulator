@@ -2,6 +2,7 @@ import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import {
   definitionForInstance,
+  keywordAmount,
   recomputeAllMight,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -309,6 +310,7 @@ export function payAnyPower(
 }
 
 export function targetDeflectCost(
+  game: GameDocument,
   playerId: string,
   selectedIds: readonly string[],
   index: RuntimeCardIndex,
@@ -316,17 +318,7 @@ export function targetDeflectCost(
   return selectedIds.reduce((total, id) => {
     const instance = index.instances.get(id);
     if (!instance || instance.ownerPlayerId === playerId) return total;
-    const amount = definitionForInstance(id, index).behaviorModel.clauses
-      .flatMap((clause) => clause.keywords)
-      .filter((binding) => binding.behaviorId === "keyword.deflect")
-      .reduce(
-        (sum, binding) =>
-          sum +
-          (typeof binding.parameters.amount === "number"
-            ? binding.parameters.amount
-            : 1),
-        0,
-      );
+    const amount = keywordAmount(game, id, "keyword.deflect", index);
     return total + amount;
   }, 0);
 }

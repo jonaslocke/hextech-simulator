@@ -126,3 +126,26 @@ Avoid:
 - making everything a Client Component;
 - creating abstractions before they are needed;
 - deeply importing unrelated feature internals.
+
+## Rules Authority
+
+For game rules, use only the repository’s local rules documentation and card corpus.
+Do not browse or use online sources to determine, validate, or supplement rules.
+If the local rules do not answer a question, stop and ask the user for direction.
+
+## Gameplay Validation and Tests
+
+Manual in-game validation is the authoritative acceptance gate for gameplay behavior.
+Do not create, update, repair, or expand automated gameplay integration,
+end-to-end, or regression tests for card behavior changes.
+
+Automated tests are permitted only while building a reusable gameplay primitive,
+where they directly validate that primitive's isolated contract. Do not treat
+those tests as evidence that a card or behavior family is accepted.
+
+For ordinary gameplay work, run only structural verification such as typecheck
+and lint. Do not run the full automated test suite by default.
+
+If an existing gameplay integration or regression test fails, do not spend time
+repairing it. Skip or remove it unless the user explicitly requests automated
+test work.

@@ -13,6 +13,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  hasKeyword,
   placeUnitAtBattlefield,
   recordCardPlayed,
   recomputeAllMight,
@@ -305,7 +306,7 @@ export function gameplayActions(
         action(game, "move", "Move to Base", cardId, true, null, "base"),
       );
       if (
-        hasBehavior(definitionForInstance(cardId, index), "keyword.ganking")
+        hasKeyword(game, cardId, "keyword.ganking", index)
       ) {
         for (const destination of orderedBattlefields) {
           if (destination.battlefieldId === battlefield.battlefieldId) continue;
@@ -339,7 +340,7 @@ export function gameplayActions(
         (id) =>
           index.instances.get(id)?.ownerPlayerId === actorPlayerId &&
           !game.state.cardStates[id]?.exhausted &&
-          hasBehavior(definitionForInstance(id, index), "keyword.ganking"),
+          hasKeyword(game, id, "keyword.ganking", index),
       );
     const movableUnits = [...readyBaseUnits, ...readyGankingUnits];
     if (movableUnits.length < 1) continue;
@@ -829,7 +830,7 @@ function playCard(
     paymentDefinition,
     energyCost,
     index,
-    targetDeflectCost(playerId, selectedIds, index),
+    targetDeflectCost(game, playerId, selectedIds, index),
     accelerated ? 1 : 0,
   );
   recordCardPlayed(game, playerId, cardId);
@@ -1483,7 +1484,7 @@ function addPlayableCardActions(
       .filter((id, position, ids) => ids.indexOf(id) === position)
       .map((targetId) => ({
         targetId,
-        amount: targetDeflectCost(playerId, [targetId], index),
+        amount: targetDeflectCost(game, playerId, [targetId], index),
       }))
       .filter((entry) => entry.amount > 0);
     const costPreview =

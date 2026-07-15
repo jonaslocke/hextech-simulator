@@ -14,6 +14,7 @@ export * from "./bo3-match-config";
 export * from "./actions";
 export * from "./behavior-runtime";
 export * from "./primitive-handlers";
+export * from "./keyword-evaluation";
 export * from "./triggers";
 export * from "./victory";
 export * from "./scoring";

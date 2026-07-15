@@ -19,6 +19,7 @@
     "catalog:approve-ogn-opponent-hand-selection-family": "node --env-file=.env --import tsx scripts/approve-ogn-opponent-hand-selection-family.ts --confirm",
     "catalog:approve-ogn-next-damage-kill-family": "node --env-file=.env --import tsx scripts/approve-ogn-next-damage-kill-family.ts --confirm",
     "catalog:approve-ogn-darius-hand-of-noxus": "node --env-file=.env --import tsx scripts/approve-ogn-darius-hand-of-noxus.ts --confirm",
+    "catalog:approve-ogn-keyword-grant-family": "node --env-file=.env --import tsx scripts/approve-ogn-keyword-grant-family.ts --confirm",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-implementation-status": "node --env-file=.env --import tsx scripts/sync-implementation-status-ledgers.ts",
     "catalog:check-implementation-status": "node --env-file=.env --import tsx scripts/sync-implementation-status-ledgers.ts --check",

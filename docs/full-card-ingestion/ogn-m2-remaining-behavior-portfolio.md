@@ -72,7 +72,7 @@ family-status history for a future dashboard.
 Canonical card publication synchronizes the corresponding set ledger
 automatically and promotes that identity to at least `implemented`. After a
 manual family result, update the selected cards with
-`npm run catalog:update-implementation-status -- OGN manual_family_passed OGN-001,OGN-002 family-id "note"`; the initial historical deck and family
+`npm run catalog:update-implementation-status -- OGN manual_family_passed "OGN-001,OGN-002" family-id "note"`; the initial historical deck and family
 results are seeded by `catalog:seed-implementation-status`. Use
 `catalog:check-implementation-status` to confirm that every source-card
 identity and printing remains represented.

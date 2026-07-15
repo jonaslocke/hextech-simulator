@@ -5,7 +5,9 @@ import {
 } from "./board-rules";
 import { scoreBattlefield } from "./scoring";
 import {
+  cleanupCombatModifiers,
   definitionForInstance,
+  hasKeyword,
   killUnitsMarkedForNextDamage,
   recomputeMight,
   type RuntimeCardIndex
@@ -181,7 +183,7 @@ export function combatChoiceTargets(
   return choice.targetUnitIds.map((unitId) => ({
     unitId,
     lethalAmount: lethalAmount(game, unitId),
-    hasTank: hasKeyword(unitId, "keyword.tank", index)
+    hasTank: hasKeyword(game, unitId, "keyword.tank", index)
   }));
 }
 
@@ -311,6 +313,7 @@ function resolveCombat(
   for (const state of Object.values(game.state.cardStates)) {
     state.combatRole = null;
   }
+  cleanupCombatModifiers(game, index);
   clearMarkedDamage(game);
   for (const id of [
     ...combat.attackerUnitIds,
@@ -358,8 +361,21 @@ function validateDamageAssignments(
   if (assignments.reduce((sum, entry) => sum + entry.amount, 0) !== totalDamage) {
     throw new Error("All available combat damage must be assigned.");
   }
+  const unassignedTargetIds = targetUnitIds.filter((id) =>
+    !assignments.some((entry) => entry.targetUnitId === id)
+  );
+  if (
+    unassignedTargetIds.length > 0 &&
+    assignments.some((entry) =>
+      entry.amount > lethalAmount(game, entry.targetUnitId)
+    )
+  ) {
+    throw new Error(
+      "A unit cannot be assigned more than lethal damage while another unit can receive combat damage."
+    );
+  }
   const tankIds = targetUnitIds.filter((id) =>
-    hasKeyword(id, "keyword.tank", index)
+    hasKeyword(game, id, "keyword.tank", index)
   );
   const firstNonTank = assignments.findIndex(
     (entry) => !tankIds.includes(entry.targetUnitId)
@@ -401,18 +417,6 @@ function totalCombatMight(
 function lethalAmount(game: GameDocument, unitId: string) {
   const state = game.state.cardStates[unitId]!;
   return Math.max(1, (state.computedMight ?? 0) - state.damage);
-}
-
-function hasKeyword(
-  unitId: string,
-  behaviorId: string,
-  index: RuntimeCardIndex
-) {
-  return definitionForInstance(unitId, index).behaviorModel.clauses.some(
-    (clause) => clause.keywords.some(
-      (binding) => binding.behaviorId === behaviorId
-    )
-  );
 }
 
 function controlledUnits(

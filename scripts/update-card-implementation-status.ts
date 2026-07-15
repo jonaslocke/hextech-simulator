@@ -10,7 +10,7 @@ const note = argumentValue("--note") ?? positionalArguments[4];
 
 if (!setCode || !statusValue || !cardCodesValue) {
   throw new Error(
-    "Usage: --set OGN --status manual_family_passed --cards OGN-001,OGN-002 [--family id] [--note text]",
+    "Usage: --set OGN --status manual_family_passed --cards \"OGN-001,OGN-002\" [--family id] [--note text]",
   );
 }
 

@@ -139,10 +139,14 @@ export function CombatDamageDialog({
       return;
     }
 
-    setAmounts((currentAmounts) => ({
-      ...currentAmounts,
-      [unitId]: clamp((currentAmounts[unitId] ?? 0) + 1, 0, choice.totalDamage),
-    }));
+    setAmounts((currentAmounts) =>
+      nextDamageAmounts({
+        currentAmounts,
+        target,
+        targets,
+        totalDamage: choice.totalDamage,
+      }),
+    );
     setAssignmentOrder((currentOrder) =>
       currentOrder.includes(unitId) ? currentOrder : [...currentOrder, unitId],
     );
@@ -251,8 +255,8 @@ export function CombatDamageDialog({
               Assign damage
             </h2>
             <p className="mt-1 max-w-2xl text-slate-400 text-sm leading-5">
-              Left click +1. Right click -1. Assign lethal before moving to
-              another unit.
+              Left click +1. Right click -1. Assign lethal to each available
+              unit before assigning extra damage.
               {hasTankTargets ? " Tank first." : ""}
               {hasBacklineTargets ? " Backline last." : ""}
             </p>
@@ -491,6 +495,20 @@ function validateDamagePlan({
     (allocation) => allocation.amount > 0,
   );
 
+  if (
+    visibleAllocations.length < targetById.size &&
+    visibleAllocations.some((allocation) => {
+      const target = targetById.get(allocation.targetUnitId);
+      return target && allocation.amount > target.lethalAmount;
+    })
+  ) {
+    return {
+      isValid: false,
+      message:
+        "Assign lethal to every available unit before assigning extra damage.",
+    };
+  }
+
   for (let index = 0; index < visibleAllocations.length - 1; index += 1) {
     const allocation = visibleAllocations[index];
     const target = targetById.get(allocation.targetUnitId);
@@ -566,6 +584,47 @@ function canAssignDamage({
   }
 
   return true;
+}
+
+function nextDamageAmounts({
+  currentAmounts,
+  target,
+  targets,
+  totalDamage,
+}: {
+  currentAmounts: Record<string, number>;
+  target: DamageTargetViewModel;
+  targets: DamageTargetViewModel[];
+  totalDamage: number;
+}) {
+  const currentAmount = currentAmounts[target.unitId] ?? 0;
+  const assignedDamage = Object.values(currentAmounts).reduce(
+    (sum, amount) => sum + amount,
+    0,
+  );
+  if (assignedDamage >= totalDamage) {
+    return currentAmounts;
+  }
+
+  const anotherTargetNeedsLethalDamage = targets.some(
+    (candidate) =>
+      candidate.unitId !== target.unitId &&
+      (currentAmounts[candidate.unitId] ?? 0) < candidate.lethalAmount,
+  );
+  const maximumForTarget = anotherTargetNeedsLethalDamage
+    ? target.lethalAmount
+    : totalDamage;
+  const nextAmount = Math.min(
+    currentAmount + 1,
+    maximumForTarget,
+    currentAmount + totalDamage - assignedDamage,
+  );
+
+  if (nextAmount === currentAmount) {
+    return currentAmounts;
+  }
+
+  return { ...currentAmounts, [target.unitId]: nextAmount };
 }
 
 function getLastAssignedTarget({

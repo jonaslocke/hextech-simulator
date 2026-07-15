@@ -3,7 +3,10 @@ import { test } from "node:test";
 import {
   createBehaviorContext,
   buildPaymentPlan,
+  cleanupCombatModifiers,
   createPrimitiveHandlers,
+  hasKeyword,
+  keywordAmount,
   legalUnitDestinationIds,
   recomputeMight,
   type BehaviorBinding,
@@ -143,10 +146,10 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
     keywords: [binding("keyword.deflect", { amount: 1 })],
   });
   game.state.players.p1!.power = { Fury: 1 };
-  const cost = targetDeflectCost("p1", ["unit"], index);
+  const cost = targetDeflectCost(game, "p1", ["unit"], index);
 
   assert.equal(cost, 1);
-  assert.equal(targetDeflectCost("p1", ["unit", "unit"], index), 2);
+  assert.equal(targetDeflectCost(game, "p1", ["unit", "unit"], index), 2);
   assert.ok(
     buildPaymentPlan(
       game,
@@ -196,6 +199,82 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
     null,
     "Deflect cannot auto-recycle a rune that was not manually added to the pool",
   );
+});
+
+test("temporary keyword grants affect combat values and targeting costs until combat ends", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const handlers = createPrimitiveHandlers(index);
+  game.state.cardStates.unit!.combatRole = "defender";
+
+  handlers.get("modifier.grant_keyword")!.execute!(
+    binding("modifier.grant_keyword", {
+      keywordId: "keyword.shield",
+      amount: 3,
+      target: "unit",
+      duration: "thisCombat",
+    }),
+    createBehaviorContext(game, "p1", "spell", null, ["unit"]),
+  );
+  handlers.get("modifier.grant_keyword")!.execute!(
+    binding("modifier.grant_keyword", {
+      keywordId: "keyword.deflect",
+      amount: 2,
+      target: "unit",
+      duration: "thisCombat",
+    }),
+    createBehaviorContext(game, "p1", "spell", null, ["unit"]),
+  );
+  handlers.get("modifier.grant_keyword")!.execute!(
+    binding("modifier.grant_keyword", {
+      keywordId: "keyword.tank",
+      target: "unit",
+      duration: "thisCombat",
+    }),
+    createBehaviorContext(game, "p1", "spell", null, ["unit"]),
+  );
+
+  assert.equal(game.state.cardStates.unit?.computedMight, 5);
+  assert.equal(keywordAmount(game, "unit", "keyword.deflect", index), 2);
+  assert.equal(targetDeflectCost(game, "p1", ["unit"], index), 2);
+  assert.equal(hasKeyword(game, "unit", "keyword.tank", index), true);
+
+  cleanupCombatModifiers(game, index);
+
+  assert.equal(game.state.cardStates.unit?.computedMight, 2);
+  assert.equal(keywordAmount(game, "unit", "keyword.deflect", index), 0);
+  assert.equal(hasKeyword(game, "unit", "keyword.tank", index), false);
+});
+
+test("static source-location keyword grants apply without a selection", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const battlefield = index.definitions.get("BF")!;
+  battlefield.behaviorModel.clauses.push({
+    id: "ganking-location",
+    sequence: 0,
+    sourceText: "Units here have [Ganking].",
+    normalizedText: "Units here have ganking",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    keywords: [],
+    effects: [binding("modifier.grant_keyword", {
+      keywordId: "keyword.ganking",
+      target: "unit",
+      locationRelation: "sourceLocation",
+      duration: "whileSourceAtBattlefield",
+    })],
+  });
+
+  assert.equal(hasKeyword(game, "unit", "keyword.ganking", index), true);
+  game.state.players.p2!.zones.base.push("unit");
+  game.state.battlefields[0]!.units = [];
+  assert.equal(hasKeyword(game, "unit", "keyword.ganking", index), false);
 });
 
 test("adds open battlefields only through a card destination permission", () => {
