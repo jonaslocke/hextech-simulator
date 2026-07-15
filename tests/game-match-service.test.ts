@@ -134,6 +134,16 @@ test("projects between-games status, scores, remaining battlefields, and capabil
   assert.equal(projection.betweenGames?.viewerStatus, "pending");
   assert.equal(projection.betweenGames?.opponentStatus, "submitted");
   assert.equal(projection.betweenGames?.capabilities.canConcedeMatch, true);
+  assert.equal(projection.betweenGames?.capabilities.canSubmitDeckReconfiguration, true);
+  assert.equal(
+    projection.betweenGames?.sideboardingSession?.expectedIntermissionVersion,
+    fixture.match.stateVersion,
+  );
+  assert.equal(projection.betweenGames?.sideboardingSession?.registeredCardPool.length, 58);
+  assert.deepEqual(
+    projection.betweenGames?.sideboardingSession?.eligibleChosenChampionRegisteredCardIds,
+    ["match-projection:player-1:champion:CHAMPION:1"],
+  );
 });
 
 test("concedes a between-games match and persists the winner", async () => {
@@ -189,8 +199,91 @@ test("creates the next game when both players are ready between games", async ()
   );
 });
 
-function memoryFixture() {
+test("records a completed game concession as a between-games match state", async () => {
+  const fixture = await seededInProgressMatch("match-game-complete");
+  const projection = await getViewerState(
+    fixture.repositories,
+    fixture.match.id,
+    fixture.tokens.player1,
+  );
+  const concedeGame = projection.currentGame.actions.find(
+    (action) => action.label === "Concede Game",
+  )!;
+
+  const result = await performMatchAction(fixture.repositories, {
+    db: fixture.db,
+    matchId: fixture.match.id,
+    playerToken: fixture.tokens.player1,
+    stateVersion: fixture.game.stateVersion,
+    actionId: concedeGame.id,
+    selectedIds: [],
+    now: "2026-07-15T00:00:04.000Z",
+  });
+
+  assert.equal(result.status, "between_games");
+  assert.equal(result.completedGames[0]?.winnerPlayerId, "player-2");
+  assert.equal(result.completedGames[0]?.completionReason, "game_concession");
+  assert.equal(result.betweenGames?.previousGameLoserPlayerId, "player-1");
+  assert.equal((await fixture.repositories.games.findById(fixture.game.id))?.status, "complete");
+});
+
+test("closes the match when the completed game grants the second set point", async () => {
+  const fixture = await seededFinalGameMatch("match-final-game");
+  const projection = await getViewerState(
+    fixture.repositories,
+    fixture.match.id,
+    fixture.tokens.player2,
+  );
+  const concedeGame = projection.currentGame.actions.find(
+    (action) => action.label === "Concede Game",
+  )!;
+
+  const result = await performMatchAction(fixture.repositories, {
+    db: fixture.db,
+    matchId: fixture.match.id,
+    playerToken: fixture.tokens.player2,
+    stateVersion: fixture.game.stateVersion,
+    actionId: concedeGame.id,
+    selectedIds: [],
+    now: "2026-07-15T00:00:05.000Z",
+  });
+
+  assert.equal(result.status, "complete");
+  assert.equal(result.winnerPlayerId, "player-1");
+  assert.equal(result.completionReason, "two_set_points");
+  assert.equal(result.betweenGames, null);
+});
+
+test("retries a sideboard submission after a match-version conflict", async () => {
+  const fixture = await seededBetweenGamesMatch(
+    "match-retry",
+    false,
+    { failNextMatchUpdate: true },
+  );
+  const result = await performMatchAction(fixture.repositories, {
+    db: fixture.db,
+    matchId: fixture.match.id,
+    playerToken: fixture.tokens.player1,
+    stateVersion: fixture.match.stateVersion,
+    intent: {
+      type: "match.submitDeckReconfiguration",
+      payload: {
+        betweenGamesId: fixture.match.betweenGames!.id,
+        configuration: fixture.match.seats[0].currentDeckConfiguration,
+      },
+    },
+    now: "2026-07-15T00:00:06.000Z",
+  });
+
+  assert.equal(result.status, "between_games");
+  assert.equal(result.betweenGames?.viewerStatus, "submitted");
+  assert.equal(result.betweenGames?.opponentStatus, "pending");
+  assert.equal((await fixture.repositories.matches.findById(fixture.match.id))?.stateVersion, 4);
+});
+
+function memoryFixture(options: { failNextMatchUpdate?: boolean } = {}) {
   const collections = new Map<string, Map<string, Record<string, unknown>>>();
+  let failNextMatchUpdate = options.failNextMatchUpdate ?? false;
   const db = {
     client: {
       startSession() {
@@ -219,6 +312,10 @@ function memoryFixture() {
           update: { $set: Record<string, unknown> },
           options?: { upsert?: boolean },
         ) {
+          if (name === "matches" && failNextMatchUpdate) {
+            failNextMatchUpdate = false;
+            return { modifiedCount: 0 };
+          }
           const existing = documents.get(filter._id);
           if (filter.stateVersion !== undefined && existing?.stateVersion !== filter.stateVersion) {
             return { modifiedCount: 0 };
@@ -338,14 +435,19 @@ async function seededInProgressMatch(id: string) {
   game.status = "in_progress";
   game.stateVersion = 2;
   game.state.setup.startingPlayerId = "player-1";
+  game.state.setup.battlefieldChoices = battlefieldChoices(id);
   game.state.turn = { turnNumber: 1, activePlayerId: "player-1", phase: "action" };
   const match = matchFor(id, game.id, seats, 0);
   await seedMatch(fixture.repositories, match, game, decks);
   return { ...fixture, match, game, decks, tokens };
 }
 
-async function seededBetweenGamesMatch(id: string) {
-  const fixture = memoryFixture();
+async function seededBetweenGamesMatch(
+  id: string,
+  opponentSubmitted = true,
+  options: { failNextMatchUpdate?: boolean } = {},
+) {
+  const fixture = memoryFixture(options);
   const tokens = { player1: "player-1-token", player2: "player-2-token" };
   const decks = runtimeDeckDocuments(id);
   const seats = seatsFor(decks, tokens);
@@ -386,11 +488,52 @@ async function seededBetweenGamesMatch(id: string) {
     nextStartingPlayerChooserId: "player-2",
     submissionsByPlayerId: {
       "player-1": { status: "pending", configuration: null, submittedAt: null },
-      "player-2": { status: "submitted", configuration: seats[1]!.currentDeckConfiguration, submittedAt: "later" },
+      "player-2": opponentSubmitted
+        ? { status: "submitted", configuration: seats[1]!.currentDeckConfiguration, submittedAt: "later" }
+        : { status: "pending", configuration: null, submittedAt: null },
     },
   };
   await seedMatch(fixture.repositories, match, game, decks);
   return { ...fixture, match, game, decks, tokens };
+}
+
+async function seededFinalGameMatch(id: string) {
+  const fixture = await seededBetweenGamesMatch(id);
+  fixture.match.status = "playing";
+  fixture.match.stateVersion = 3;
+  fixture.match.currentGameId = `${id}:game:2`;
+  fixture.match.gameIds = [fixture.game.id, `${id}:game:2`];
+  fixture.match.betweenGames = null;
+
+  const game = structuredClone(fixture.game);
+  game.id = `${id}:game:2`;
+  game.gameNumber = 2;
+  game.stateVersion = 2;
+  game.status = "in_progress";
+  game.state.setup.startingPlayerId = "player-2";
+  game.state.setup.battlefieldChoices = {
+    "player-1": { status: "revealed", cardInstanceId: `${id}:player-1:battlefield:BATTLEFIELD-2:1` },
+    "player-2": { status: "revealed", cardInstanceId: `${id}:player-2:battlefield:BATTLEFIELD-2:1` },
+  };
+  game.state.players["player-1"]!.points = 0;
+  game.state.players["player-2"]!.points = 0;
+
+  await fixture.repositories.matches.upsert(fixture.match);
+  await fixture.repositories.games.insert(game);
+  return { ...fixture, game };
+}
+
+function battlefieldChoices(id: string) {
+  return {
+    "player-1": {
+      status: "revealed" as const,
+      cardInstanceId: `${id}:player-1:battlefield:BATTLEFIELD-1:1`,
+    },
+    "player-2": {
+      status: "revealed" as const,
+      cardInstanceId: `${id}:player-2:battlefield:BATTLEFIELD-1:1`,
+    },
+  };
 }
 
 function runtimeDeckDocuments(id: string): DeckSnapshotDocument[] {
