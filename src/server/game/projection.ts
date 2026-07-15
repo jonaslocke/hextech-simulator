@@ -11,6 +11,9 @@ import type { ChainItem, GameDocument } from "./state";
 import { facedownCardsAt } from "./facedown-cards";
 import { victoryRequirement } from "./victory";
 import { getTokenCatalogDefinitions } from "./token-catalog";
+import { activeStaticKeywordGrants } from "./keyword-evaluation";
+import { createRuntimeCardIndex } from "./primitive-handlers";
+import type { GameCardDefinition } from "./schemas";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -46,6 +49,7 @@ export function projectGame(input: {
       ),
     ],
   );
+  const runtimeIndex = createRuntimeCardIndex(input.decks, input.game);
   const view = (
     id: string,
     includeActiveModifiers = true,
@@ -82,6 +86,15 @@ export function projectGame(input: {
                 label: modifierLabel(modifier.attribute, modifier.operation, modifier.amount),
                 duration: modifierDurationLabel(modifier.duration),
               })),
+            ...activeStaticKeywordGrants(input.game, id, runtimeIndex).map(
+              (grant) => ({
+                label: staticKeywordGrantLabel(grant.keywordId, grant.amount),
+                duration: staticKeywordGrantDurationLabel(
+                  grant.duration,
+                  cardNameForInstance(grant.sourceCardInstanceId, instances, definitions),
+                ),
+              }),
+            ),
           ]
         : [],
     };
@@ -416,6 +429,33 @@ function modifierDurationLabel(duration: string) {
     return "While source is at this battlefield";
   }
   return duration.replace(/[._-]+/g, " ");
+}
+
+function staticKeywordGrantLabel(keywordId: string, amount: number) {
+  const keyword = keywordId
+    .replace(/^keyword\./, "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+  return `${keyword} ${amount}`;
+}
+
+function staticKeywordGrantDurationLabel(duration: string, sourceName: string) {
+  if (duration === "whileSourceAtBattlefield") {
+    return `While ${sourceName} is here`;
+  }
+  if (duration === "whileSourceOnBoard") {
+    return `While ${sourceName} is on board`;
+  }
+  return modifierDurationLabel(duration);
+}
+
+function cardNameForInstance(
+  instanceId: string,
+  instances: Map<string, { cardCode: string }>,
+  definitions: Map<string, GameCardDefinition>,
+) {
+  const instance = instances.get(instanceId);
+  return instance ? definitions.get(instance.cardCode)?.card.name ?? "source" : "source";
 }
 
 function waitingReason(

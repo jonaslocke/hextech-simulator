@@ -2,6 +2,13 @@ import { isContinuousDuration } from "./numeric-modifiers";
 import type { RuntimeCardIndex } from "./primitive-handlers";
 import type { GameDocument } from "./state";
 
+export type ActiveStaticKeywordGrant = {
+  keywordId: string;
+  amount: number;
+  sourceCardInstanceId: string;
+  duration: string;
+};
+
 export function keywordAmount(
   game: GameDocument,
   cardInstanceId: string,
@@ -21,12 +28,13 @@ export function keywordAmount(
     )
     .reduce((sum, modifier) => sum + modifier.amount, 0);
 
-  return printedAmount + grantedAmount + continuousKeywordAmount(
+  return printedAmount + grantedAmount + activeStaticKeywordGrants(
     game,
     cardInstanceId,
-    behaviorId,
     index,
-  );
+  )
+    .filter((grant) => grant.keywordId === behaviorId)
+    .reduce((sum, grant) => sum + grant.amount, 0);
 }
 
 export function hasKeyword(
@@ -38,13 +46,12 @@ export function hasKeyword(
   return keywordAmount(game, cardInstanceId, behaviorId, index) > 0;
 }
 
-function continuousKeywordAmount(
+export function activeStaticKeywordGrants(
   game: GameDocument,
   targetCardInstanceId: string,
-  behaviorId: string,
   index: RuntimeCardIndex,
 ) {
-  let amount = 0;
+  const grants: ActiveStaticKeywordGrant[] = [];
   for (const sourceCardInstanceId of activeSourceIds(game)) {
     const source = index.instances.get(sourceCardInstanceId);
     if (!source) continue;
@@ -55,7 +62,6 @@ function continuousKeywordAmount(
       for (const binding of clause.effects) {
         if (
           binding.behaviorId !== "modifier.grant_keyword" ||
-          binding.parameters.keywordId !== behaviorId ||
           !isContinuousDuration(binding.parameters.duration) ||
           !sourceIsActive(game, sourceCardInstanceId, binding.parameters.duration) ||
           !continuousGrantAppliesToTarget(
@@ -69,11 +75,21 @@ function continuousKeywordAmount(
         ) {
           continue;
         }
-        amount += keywordBindingAmount(binding.parameters.amount);
+        const keywordId = binding.parameters.keywordId;
+        const duration = binding.parameters.duration;
+        if (typeof keywordId !== "string" || typeof duration !== "string") {
+          continue;
+        }
+        grants.push({
+          keywordId,
+          amount: keywordBindingAmount(binding.parameters.amount),
+          sourceCardInstanceId,
+          duration,
+        });
       }
     }
   }
-  return amount;
+  return grants;
 }
 
 function continuousGrantAppliesToTarget(

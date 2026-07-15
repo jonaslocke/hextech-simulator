@@ -18,12 +18,12 @@ MainDeck:
 1 Firestorm
 2 Darius, Trifarian
 3 Annie, Fiery
-3 Garen, Commander
+3 Captain Farron
 
 Battlefields:
-1 Targon's Peak
+1 Fortified Position
 1 Trifarian War Camp
-1 The Papertree
+1 Windswept Hillock
 
 Runes:
 6 Fury Rune
