@@ -5,8 +5,8 @@ import type {
 } from "../sideboarding-view-model";
 import type { SideboardingEditorMode } from "../sideboarding-types";
 import { CardGrid } from "./card-grid";
+import { ChosenChampionEntry } from "./chosen-champion-entry";
 import { CompactCardList } from "./compact-card-list";
-import { IndividualCardGrid } from "./individual-card-grid";
 
 export function MainDeckEditor({
   disabled,
@@ -25,37 +25,43 @@ export function MainDeckEditor({
 }) {
   return (
     <section className="flex min-h-0 flex-col rounded-md border border-white/10 bg-slate-950/75">
-      <header className="flex items-center justify-between border-white/10 border-b px-2.5 py-1.5">
+      <header className="flex items-center justify-between border-b border-white/10 px-2.5 py-1.5">
         <div>
-          <h2 className="font-semibold text-slate-100 text-sm">Main Deck</h2>
-          <p className="text-slate-500 text-xs">
+          <h2 className="text-sm font-semibold text-slate-100">Main Deck</h2>
+          <p className="text-xs text-slate-500">
             {viewModel.counts.mainDeck} editable cards
           </p>
         </div>
       </header>
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         {mode === "compact" ? (
-          <CompactCardList
-            disabled={disabled}
-            groups={groups}
-            onDispatch={onDispatch}
-            onInspect={onInspect}
-            source="mainDeck"
-            viewModel={viewModel}
-          />
-        ) : mode === "grid" ? (
+          <>
+            <ChosenChampionEntry
+              mode={mode}
+              onInspect={onInspect}
+              viewModel={viewModel}
+            />
+            <CompactCardList
+              disabled={disabled}
+              groups={groups}
+              onDispatch={onDispatch}
+              onInspect={onInspect}
+              source="mainDeck"
+              viewModel={viewModel}
+            />
+          </>
+        ) : (
           <CardGrid
             disabled={disabled}
             groups={groups}
-            onDispatch={onDispatch}
-            onInspect={onInspect}
-            source="mainDeck"
-            viewModel={viewModel}
-          />
-        ) : (
-          <IndividualCardGrid
-            copies={viewModel.mainDeckCopies}
-            disabled={disabled}
+            leadingItem={
+              <ChosenChampionEntry
+                mode={mode}
+                onInspect={onInspect}
+                viewModel={viewModel}
+              />
+            }
             onDispatch={onDispatch}
             onInspect={onInspect}
             source="mainDeck"

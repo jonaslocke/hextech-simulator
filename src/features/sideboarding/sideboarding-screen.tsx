@@ -16,13 +16,11 @@ import type {
 import { buildSideboardingViewModel } from "./sideboarding-view-model";
 import { useSideboardingDraft } from "./use-sideboarding-draft";
 import { useSideboardingValidation } from "./use-sideboarding-validation";
-import { CardInspector } from "./components/card-inspector";
-import { DeckIdentityPanel } from "./components/deck-identity-panel";
-import { EditorToolbar } from "./components/editor-toolbar";
-import { MainDeckEditor } from "./components/main-deck-editor";
-import { SideboardEditor } from "./components/sideboard-editor";
-import { SideboardingActions } from "./components/sideboarding-actions";
+import { FixedDeckPanel } from "./components/fixed-deck-panel";
+import { SideboardingEditorWorkspace } from "./components/sideboarding-editor-workspace";
 import { SideboardingHeader } from "./components/sideboarding-header";
+import { SideboardingLayout } from "./components/sideboarding-layout";
+import { SideboardingRightRail } from "./components/sideboarding-right-rail";
 import { SideboardingWaitingState } from "./components/sideboarding-waiting-state";
 
 export function SideboardingScreen({
@@ -68,9 +66,11 @@ export function SideboardingScreen({
 
   function dispatchAndTrack(action: SideboardingDraftAction) {
     dispatch(action);
+
     if ("registeredCardId" in action) {
       setSelectedRegisteredCardId(action.registeredCardId);
     }
+
     if (action.type === "resetToRegisteredDeck") {
       setSelectedRegisteredCardId(
         session.originalRegisteredDeck.chosenChampionRegisteredCardId,
@@ -88,6 +88,7 @@ export function SideboardingScreen({
       const result = await onIntent(
         buildDeckReconfigurationIntent({ draft, session }),
       );
+
       if (result.accepted) {
         setSubmitted(true);
       } else {
@@ -111,55 +112,37 @@ export function SideboardingScreen({
   }
 
   return (
-    <main className="flex h-screen min-h-0 flex-col overflow-hidden bg-slate-950 text-slate-100 tabletop-background">
-      <SideboardingHeader
-        projection={projection}
-        session={session}
-      />
-      <DeckIdentityPanel viewModel={viewModel} />
+    <main className="tabletop-background flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-950 text-slate-100">
+      <SideboardingHeader projection={projection} session={session} />
+
       {submissionError && (
-        <div className="border-red-400/30 border-b bg-red-950/80 px-4 py-2 text-red-100 text-sm">
+        <div className="border-b border-red-400/30 bg-red-950/80 px-4 py-2 text-sm text-red-100">
           {submissionError}
         </div>
       )}
-      <section
-        className={[
-          "grid min-h-0 flex-1 gap-3 p-3",
-          editorMode === "allCards"
-            ? "lg:grid-cols-1"
-            : "lg:grid-cols-[minmax(0,1fr)_18rem]",
-        ].join(" ")}
-      >
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-md border border-white/10 bg-slate-950/60">
-          <EditorToolbar mode={editorMode} onModeChange={setEditorMode} />
-          <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.65fr)]">
-            <MainDeckEditor
-              disabled={editingDisabled}
-              groups={viewModel.mainDeckGroups}
-              mode={editorMode}
-              onDispatch={dispatchAndTrack}
-              onInspect={setSelectedRegisteredCardId}
-              viewModel={viewModel}
-            />
-            <SideboardEditor
-              disabled={editingDisabled}
-              groups={viewModel.sideboardGroups}
-              mode={editorMode}
-              onDispatch={dispatchAndTrack}
-              onInspect={setSelectedRegisteredCardId}
-              viewModel={viewModel}
-            />
-          </div>
-        </div>
-        {editorMode !== "allCards" && <CardInspector card={viewModel.selectedCard} />}
-      </section>
-      <SideboardingActions
-        disabled={editingDisabled}
-        isSubmitting={isSubmitting}
-        onDispatch={dispatchAndTrack}
-        onSubmit={submit}
-        validation={validation}
-        viewModel={viewModel}
+
+      <SideboardingLayout
+        center={
+          <SideboardingEditorWorkspace
+            disabled={editingDisabled}
+            mode={editorMode}
+            onDispatch={dispatchAndTrack}
+            onInspect={setSelectedRegisteredCardId}
+            onModeChange={setEditorMode}
+            viewModel={viewModel}
+          />
+        }
+        left={<FixedDeckPanel viewModel={viewModel} />}
+        right={
+          <SideboardingRightRail
+            disabled={editingDisabled}
+            isSubmitting={isSubmitting}
+            onDispatch={dispatchAndTrack}
+            onSubmit={submit}
+            validation={validation}
+            viewModel={viewModel}
+          />
+        }
       />
     </main>
   );

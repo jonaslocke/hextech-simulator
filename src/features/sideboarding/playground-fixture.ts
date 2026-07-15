@@ -51,7 +51,9 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   for (const entry of parsedDeck.entries) {
     const card = cardsByName.get(entry.name);
     if (!card) {
-      throw new Error(`Playground card is missing from the catalog: ${entry.name}`);
+      throw new Error(
+        `Playground card is missing from the catalog: ${entry.name}`,
+      );
     }
 
     const cardCode = deriveCardCodeFromCard(card);
@@ -80,17 +82,22 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   const currentDeckConfiguration = {
     chosenChampionRegisteredCardId:
       originalRegisteredDeck.chosenChampionRegisteredCardId,
-    mainDeckRegisteredCardIds: [...originalRegisteredDeck.mainDeckRegisteredCardIds],
+    mainDeckRegisteredCardIds: [
+      ...originalRegisteredDeck.mainDeckRegisteredCardIds,
+    ],
     sideboardRegisteredCardIds: [
       ...originalRegisteredDeck.sideboardRegisteredCardIds,
     ],
   };
 
-  const legendCard = cardsByCode[
-    registeredCardPool.find(
-      (copy) => copy.registeredCardId === originalRegisteredDeck.legendRegisteredCardId,
-    )!.cardCode
-  ]!;
+  const legendCard =
+    cardsByCode[
+      registeredCardPool.find(
+        (copy) =>
+          copy.registeredCardId ===
+          originalRegisteredDeck.legendRegisteredCardId,
+      )!.cardCode
+    ]!;
   const eligibleChosenChampionRegisteredCardIds = registeredCardPool
     .filter((copy) => {
       const card = cardsByCode[copy.cardCode];
@@ -130,7 +137,10 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   };
 }
 
-function toSideboardingCardView(card: Card, cardCode: string): SideboardingCardView {
+function toSideboardingCardView(
+  card: Card,
+  cardCode: string,
+): SideboardingCardView {
   return {
     cardCode,
     canonicalName: canonicalName(card),
@@ -251,14 +261,54 @@ function createPlaygroundPlayer(
     conditionalEnergy: 0,
     power: {},
     zones: [
-      { kind: "legend" as const, visibility: "public" as const, count: 0, cards: [] },
-      { kind: "champion" as const, visibility: "public" as const, count: 0, cards: [] },
-      { kind: "mainDeck" as const, visibility: "secret" as const, count: 0, cards: [] },
-      { kind: "runeDeck" as const, visibility: "secret" as const, count: 0, cards: [] },
-      { kind: "hand" as const, visibility: isViewer ? "private" as const : "secret" as const, count: 0, cards: [] },
-      { kind: "trash" as const, visibility: "public" as const, count: 0, cards: [] },
-      { kind: "banishment" as const, visibility: "public" as const, count: 0, cards: [] },
-      { kind: "base" as const, visibility: "public" as const, count: 0, cards: [] },
+      {
+        kind: "legend" as const,
+        visibility: "public" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "champion" as const,
+        visibility: "public" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "mainDeck" as const,
+        visibility: "secret" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "runeDeck" as const,
+        visibility: "secret" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "hand" as const,
+        visibility: isViewer ? ("private" as const) : ("secret" as const),
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "trash" as const,
+        visibility: "public" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "banishment" as const,
+        visibility: "public" as const,
+        count: 0,
+        cards: [],
+      },
+      {
+        kind: "base" as const,
+        visibility: "public" as const,
+        count: 0,
+        cards: [],
+      },
     ],
   };
 }

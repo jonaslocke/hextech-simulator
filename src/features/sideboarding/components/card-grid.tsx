@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { SideboardingDraftAction } from "../sideboarding-draft-reducer";
 import {
   isChampionUnit,
@@ -10,6 +11,7 @@ import { ChosenChampionAction } from "./chosen-champion-action";
 export function CardGrid({
   disabled,
   groups,
+  leadingItem,
   onDispatch,
   onInspect,
   source,
@@ -17,13 +19,21 @@ export function CardGrid({
 }: {
   disabled: boolean;
   groups: SideboardingCardGroup[];
+  leadingItem?: ReactNode;
   onDispatch: (action: SideboardingDraftAction) => void;
   onInspect: (registeredCardId: string) => void;
   source: "mainDeck" | "sideboard";
   viewModel: SideboardingViewModel;
 }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(5.8rem,1fr))] gap-2.5 p-2.5">
+    <div
+      className="grid items-start justify-start gap-2 p-2"
+      style={{
+        gridTemplateColumns:
+          "repeat(8, minmax(0, var(--sideboarding-card-width)))",
+      }}
+    >
+      {leadingItem}
       {groups.map((group) => {
         const firstCopy = group.copies[0]!;
         const moveAction =
@@ -39,7 +49,10 @@ export function CardGrid({
           );
 
         return (
-          <div className="relative" key={`${source}:${group.canonicalName}`}>
+          <div
+            className="relative min-w-0"
+            key={`${source}:${group.canonicalName}`}
+          >
             <button
               className="block w-full rounded-md text-left transition hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
               disabled={disabled}
@@ -54,14 +67,14 @@ export function CardGrid({
               type="button"
             >
               <CardFace card={group.card} />
-              <span className="absolute right-1 top-1 rounded bg-slate-950/90 px-2 py-1 text-xs font-semibold text-cyan-100">
+              <span className="absolute right-1 top-1 rounded bg-slate-950/90 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-100">
                 x{group.quantity}
               </span>
             </button>
             {isChampionUnit(group.card) && (
               <ChosenChampionAction
                 cardName={group.card.name}
-                className="absolute right-1 top-1"
+                className="absolute bottom-1 right-1"
                 disabled={disabled}
                 isCurrent={isCurrent}
                 isEligible={isEligible}
