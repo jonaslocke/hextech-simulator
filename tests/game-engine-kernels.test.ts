@@ -6,8 +6,10 @@ import {
   currentTiming,
   nextRelevantPlayer,
   relevantPlayers,
+  applyHoldScoring,
   scoreBattlefield,
   stateChangeEvents,
+  victoryRequirement,
   type GameDocument,
 } from "../src/server/game";
 import { effectiveNumericValue } from "../src/server/game/numeric-modifiers";
@@ -117,6 +119,180 @@ test("numeric conditions compare event values and numeric modifiers compose", ()
   }), 4);
 });
 
+test("numeric conditions cover every comparison operator and value source", () => {
+  const game = engineGame();
+  const rune = {
+    instanceId: "rune",
+    ownerPlayerId: "p1",
+    source: "runeDeck" as const,
+    cardCode: "RUNE",
+  };
+  const index = {
+    definitions: new Map([[
+      "RUNE",
+      {
+        ...scoreDeck().snapshot.cards[0]!,
+        cardCode: "RUNE",
+        card: {
+          ...scoreDeck().snapshot.cards[0]!.card,
+          id: "RUNE",
+          public_code: "RUNE",
+          classification: {
+            ...scoreDeck().snapshot.cards[0]!.card.classification,
+            type: "Rune" as const,
+          },
+        },
+      },
+    ]]),
+    instances: new Map([[rune.instanceId, rune]]),
+  };
+  game.state.players.p1!.zones.base = [rune.instanceId];
+
+  const operators = [
+    ["equal", true],
+    ["notEqual", false],
+    ["greaterThan", false],
+    ["greaterThanOrEqual", true],
+    ["lessThan", false],
+    ["lessThanOrEqual", true],
+  ] as const;
+  for (const [operator, expected] of operators) {
+    assert.equal(
+      numericConditionMatches({
+        binding: {
+          behaviorId: "condition.compare_numeric_value",
+          parameters: {
+            valueSource: "event.value",
+            operator,
+            comparisonValue: 5,
+          },
+          confidence: "high",
+          order: 0,
+        },
+        controllerPlayerId: "p1",
+        eventValues: { "event.value": 5 },
+        game,
+        index: index as never,
+      }),
+      expected,
+      operator,
+    );
+  }
+
+  assert.equal(
+    numericConditionMatches({
+      binding: {
+        behaviorId: "condition.compare_numeric_value",
+        parameters: {
+          valueSource: "controller.boardRuneCount",
+          operator: "equal",
+          comparisonValue: 1,
+        },
+        confidence: "high",
+        order: 0,
+      },
+      controllerPlayerId: "p1",
+      game,
+      index: index as never,
+    }),
+    true,
+  );
+  assert.equal(
+    numericConditionMatches({
+      binding: {
+        behaviorId: "condition.compare_numeric_value",
+        parameters: {
+          valueSource: "event.value",
+          operator: "equal",
+          comparisonValue: 5,
+        },
+        confidence: "high",
+        order: 0,
+      },
+      controllerPlayerId: "p1",
+      eventValues: { "event.value": "not-a-number" },
+      game,
+      index: index as never,
+    }),
+    false,
+  );
+});
+
+test("numeric modifiers apply every operation, floors, and target ownership", () => {
+  const operations = [
+    ["increase", 7],
+    ["reduce", 3],
+    ["multiply", 10],
+    ["set", 4],
+  ] as const;
+  for (const [operation, expected] of operations) {
+    const game = engineGame();
+    game.state.modifiers = [{
+      id: "modifier",
+      sourceCardInstanceId: null,
+      controllerPlayerId: "p1",
+      targetCardInstanceId: null,
+      attribute: "might",
+      targetScope: "unit",
+      operation,
+      amount: operation === "multiply" ? 2 : operation === "set" ? 4 : 2,
+      minimum: null,
+      duration: "thisTurn",
+      createdAtTurn: 1,
+    }];
+    assert.equal(effectiveNumericValue({
+      attribute: "might",
+      baseValue: 5,
+      controllerPlayerId: "p1",
+      game,
+      targetScope: "unit",
+    }), expected, operation);
+  }
+
+  const floored = engineGame();
+  floored.state.modifiers = [{
+    id: "floor",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p1",
+    targetCardInstanceId: null,
+    attribute: "might",
+    targetScope: "unit",
+    operation: "reduce",
+    amount: 10,
+    minimum: 2,
+    duration: "thisTurn",
+    createdAtTurn: 1,
+  }];
+  assert.equal(effectiveNumericValue({
+    attribute: "might",
+    baseValue: 5,
+    controllerPlayerId: "p1",
+    game: floored,
+    targetScope: "unit",
+  }), 2);
+
+  floored.state.modifiers.push({
+    id: "other-controller",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p2",
+    targetCardInstanceId: null,
+    attribute: "might",
+    targetScope: "unit",
+    operation: "increase",
+    amount: 20,
+    minimum: null,
+    duration: "thisTurn",
+    createdAtTurn: 1,
+  });
+  assert.equal(effectiveNumericValue({
+    attribute: "might",
+    baseValue: 5,
+    controllerPlayerId: "p1",
+    game: floored,
+    targetScope: "unit",
+  }), 2);
+});
+
 test("transition events describe action acceptance and state boundaries", () => {
   const before = engineGame();
   before.state.battlefields = [{
@@ -191,6 +367,68 @@ test("scoring is once per battlefield per turn", () => {
 
   assert.equal(game.state.players.p1!.points, 1);
   assert.deepEqual(game.state.players.p1!.scoredBattlefieldIdsThisTurn, ["battlefield"]);
+});
+
+test("hold scoring scores every controlled battlefield once", () => {
+  const game = engineGame();
+  game.state.battlefields = [
+    battlefield("one", "p1"),
+    battlefield("two", "p1"),
+    battlefield("three", "p2"),
+  ];
+  game.state.players.p1!.points = 0;
+
+  applyHoldScoring(game, "p1", [scoreDeck()]);
+
+  assert.equal(game.state.players.p1!.points, 2);
+  assert.equal(game.winnerPlayerId, null);
+  assert.deepEqual(game.state.players.p1!.scoredBattlefieldIdsThisTurn, ["one", "two"]);
+});
+
+test("hold scoring completes on a final hold without drawing", () => {
+  const game = engineGame();
+  game.state.battlefields = [battlefield("one", "p1"), battlefield("other", "p2")];
+  game.state.players.p1!.points = 7;
+  game.state.players.p1!.zones.hand = ["existing-card"];
+  game.state.modifiers = [{
+    id: "victory-floor",
+    sourceCardInstanceId: null,
+    controllerPlayerId: "p1",
+    targetCardInstanceId: null,
+    attribute: "victoryRequirement",
+    targetScope: "game",
+    operation: "set",
+    amount: 8,
+    minimum: null,
+    duration: "thisGame",
+    createdAtTurn: 1,
+  }];
+
+  applyHoldScoring(game, "p1", [scoreDeck()]);
+
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
+  assert.deepEqual(game.state.players.p1!.scoredBattlefieldIdsThisTurn, ["one"]);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["existing-card"]);
+  assert.equal(victoryRequirement(game, [scoreDeck()]), 8);
+});
+
+test("a final first Conquer replaces the point with a draw, while later Conquer wins", () => {
+  const game = engineGame();
+  game.state.battlefields = [battlefield("one", "p1"), battlefield("two", "p1")];
+  game.state.players.p1!.points = 7;
+  game.state.players.p1!.zones.mainDeck = ["draw-card"];
+
+  scoreBattlefield(game, "p1", "one", "conquer", [scoreDeck()]);
+  assert.equal(game.state.players.p1!.points, 7);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["draw-card"]);
+  assert.equal(game.winnerPlayerId, null);
+
+  scoreBattlefield(game, "p1", "two", "conquer", [scoreDeck()]);
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
 });
 
 function engineGame(): GameDocument {
@@ -298,5 +536,16 @@ function scoreDeck() {
         behaviorModel: { playTimings: [], clauses: [] },
       }],
     },
+  };
+}
+
+function battlefield(id: string, controllerPlayerId: string) {
+  return {
+    battlefieldId: id,
+    cardInstanceId: "battlefield-card",
+    selectedByPlayerId: controllerPlayerId,
+    controllerPlayerId,
+    contestedByPlayerId: null,
+    units: [],
   };
 }
