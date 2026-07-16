@@ -178,6 +178,13 @@ export function createMatchGame(input: CreateMatchGameInput): GameDocument {
       players,
       battlefields: [],
       cardStates,
+      turnHistory: {
+        discardedCardIdsByPlayerId: {},
+        diedCardIdsByPlayerId: {},
+        movedCardIdsByPlayerId: {},
+        readiedCardIdsByPlayerId: {},
+        recycledCardIdsByPlayerId: {},
+      },
       createdCardInstances: [],
       createdCardDefinitions: [],
       turn: null,

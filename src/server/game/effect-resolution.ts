@@ -1,4 +1,6 @@
 import {
+  applyChoiceSelections,
+  bindingChoiceGateMatches,
   clauseHasAutomaticAffectedGroup,
   compileBehaviorModel,
   createBehaviorContext,
@@ -47,7 +49,11 @@ export function beginEffectResolution(input: {
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     lockedSelectionsByBinding: input.lockedSelectionsByBinding ?? {},
     targetObjectVersions: input.targetObjectVersions ?? {},
-    selectionsByBinding: {},
+    selectionsByBinding: Object.fromEntries(
+      Object.entries(input.lockedSelectionsByBinding ?? {}).filter(([key]) =>
+        key.includes(":choices:"),
+      ),
+    ),
     behaviorEvent: input.behaviorEvent ?? null,
   });
   return resumeEffectResolution(input.game, id, input.decks);
@@ -135,6 +141,32 @@ export function submitBinaryChoice(game: GameDocument, playerId: string, selecte
   return resumeEffectResolution(game, frame.id, decks);
 }
 
+export function submitModeChoice(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: string[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "mode" ||
+    !pending.resolutionId ||
+    pending.playerId !== playerId ||
+    selectedIds.length !== 1 ||
+    !pending.options.some((option) => option.id === selectedIds[0])
+  ) {
+    throw new Error("Mode choice is invalid.");
+  }
+  const frame = game.state.effectResolutions.find(
+    (item) => item.id === pending.resolutionId,
+  );
+  if (!frame) throw new Error("Effect resolution is unavailable.");
+  frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
+  game.state.pendingChoice = null;
+  return resumeEffectResolution(game, frame.id, decks);
+}
+
 export function resumeEffectResolution(
   game: GameDocument,
   resolutionId: string,
@@ -185,6 +217,7 @@ export function resumeEffectResolution(
     frame.behaviorEvent,
     [],
   );
+  applyChoiceSelections(clause, frame.selectionsByBinding, selectorContext);
   if (
     frame.targetsLocked &&
     !hydrateLockedSelectorSelections(
@@ -260,7 +293,10 @@ export function resumeEffectResolution(
     return false;
   }
 
-  if (frame.activatedBehaviorId) {
+  if (
+    frame.activatedBehaviorId &&
+    frame.activatedBehaviorId !== "ability.activate"
+  ) {
     const binding = clause.abilities.find(
       (candidate) => candidate.behaviorId === frame.activatedBehaviorId,
     );
@@ -291,6 +327,7 @@ export function resumeEffectResolution(
         ? { automaticTargets: true }
         : {},
     );
+    applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
       const selected =
         frame.selectionsByBinding[
@@ -364,8 +401,22 @@ export function resumeEffectResolution(
     const bindingKey = `${clause.id}:choices:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
     const requirement = handlers.get(binding.behaviorId)?.choice?.(binding, selectorContext);
-    if (!requirement || requirement.kind !== "binary") continue;
-    game.state.pendingChoice = { id: `choice:${frame.id}:${binding.order}`, playerId: frame.controllerPlayerId, type: "binary", resolutionId: frame.id, bindingKey, prompt: requirement.prompt, acceptLabel: requirement.acceptLabel ?? "Accept", declineLabel: requirement.declineLabel ?? "Decline" };
+    if (!requirement || (requirement.kind !== "binary" && requirement.kind !== "mode")) continue;
+    game.state.pendingChoice = requirement.kind === "binary"
+      ? { id: `choice:${frame.id}:${binding.order}`, playerId: frame.controllerPlayerId, type: "binary", resolutionId: frame.id, bindingKey, prompt: requirement.prompt, acceptLabel: requirement.acceptLabel ?? "Accept", declineLabel: requirement.declineLabel ?? "Decline" }
+      : {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "mode",
+          resolutionId: frame.id,
+          prompt: requirement.prompt,
+          options: requirement.options ?? [],
+          sourceCardInstanceId: frame.sourceCardInstanceId,
+          clauseId: clause.id,
+          behaviorId: binding.behaviorId,
+          bindingKey,
+          selectionKey: String(binding.parameters.selectionKey),
+        };
     return false;
   }
 
@@ -395,6 +446,7 @@ export function resumeEffectResolution(
         ? { automaticTargets: true }
         : {},
     );
+    applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
       const selected =
         frame.selectionsByBinding[
@@ -418,8 +470,7 @@ export function resumeEffectResolution(
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
-    const requiredChoiceKey = binding.parameters.requiresChoiceKey;
-    if (typeof requiredChoiceKey === "string" && frame.selectionsByBinding[requiredChoiceKey]?.[0] !== "accept") {
+    if (!bindingChoiceGateMatches(binding, context)) {
       frame.nextEffectIndex += 1;
       continue;
     }
@@ -491,6 +542,7 @@ function hydrateLockedSelectorSelections(
 ) {
   let cursor = 0;
   for (const selector of clause.selectors) {
+    if (!bindingChoiceGateMatches(selector, context)) continue;
     const handler = handlers.get(selector.behaviorId);
     if (!handler?.targets) {
       throw new Error(`Behavior handler cannot project targets: ${selector.behaviorId}`);

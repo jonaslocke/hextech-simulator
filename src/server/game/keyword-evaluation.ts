@@ -1,4 +1,5 @@
 import { isContinuousDuration } from "./numeric-modifiers";
+import { conditionMatches } from "./condition-evaluation";
 import type { RuntimeCardIndex } from "./primitive-handlers";
 import type { GameDocument } from "./state";
 
@@ -59,6 +60,15 @@ export function activeStaticKeywordGrants(
     if (!definition) continue;
 
     for (const clause of definition.behaviorModel.clauses) {
+      if (!clause.conditions.every((condition) => conditionMatches(condition, {
+        game,
+        index,
+        controllerPlayerId: source.ownerPlayerId,
+        sourceCardInstanceId,
+        event: null,
+      }))) {
+        continue;
+      }
       for (const binding of clause.effects) {
         if (
           binding.behaviorId !== "modifier.grant_keyword" ||

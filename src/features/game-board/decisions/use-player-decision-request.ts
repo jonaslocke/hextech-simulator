@@ -232,6 +232,23 @@ export function buildPlayerDecisionRequest({
       }
     }
 
+    if (pendingChoice.type === "mode") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "mode" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+      if (action?.choice?.kind === "mode") {
+        return {
+          actionId: action.id,
+          decisionKey: pendingChoice.id,
+          kind: "optionDecision",
+          options: pendingChoice.options,
+          title: pendingChoice.prompt,
+        };
+      }
+    }
+
     if (pendingChoice.type === "orderTriggers") {
       const action = sourceProjection.actions.find(
         (candidate) =>

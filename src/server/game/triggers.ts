@@ -10,6 +10,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance
 } from "./primitive-handlers";
+import { recordTurnEvent } from "./condition-evaluation";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { ChainItem, GameDocument } from "./state";
 import { beginEffectResolution } from "./effect-resolution";
@@ -19,6 +20,14 @@ export function dispatchBehaviorEvent(
   event: BehaviorEvent,
   decks: readonly DeckSnapshotDocument[]
 ): void {
+  const index = createRuntimeCardIndex(decks, game);
+  recordTurnEvent(
+    game,
+    event,
+    event.subjectCardInstanceId
+      ? index.instances.get(event.subjectCardInstanceId)?.ownerPlayerId ?? null
+      : null,
+  );
   for (const { items } of collectBehaviorEventItems(
     game,
     [event],
@@ -33,6 +42,16 @@ export function dispatchSimultaneousBehaviorEvents(
   events: readonly BehaviorEvent[],
   decks: readonly DeckSnapshotDocument[],
 ): void {
+  const index = createRuntimeCardIndex(decks, game);
+  for (const event of events) {
+    recordTurnEvent(
+      game,
+      event,
+      event.subjectCardInstanceId
+        ? index.instances.get(event.subjectCardInstanceId)?.ownerPlayerId ?? null
+        : null,
+    );
+  }
   for (const { items } of collectBehaviorEventItems(game, events, decks)) {
     queueChainItemsForTargets(game, items, decks);
   }

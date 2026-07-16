@@ -1,5 +1,6 @@
 import type { ProjectedAction } from "../../shared/game";
 import {
+  applyChoiceSelections,
   compileBehaviorModel,
   createBehaviorContext,
   executeBehaviorClause,
@@ -67,6 +68,7 @@ import {
   beginEffectResolution,
   submitEffectSelection,
   submitBinaryChoice,
+  submitModeChoice,
   submitTokenPlacement,
   type TokenPlacement,
 } from "./effect-resolution";
@@ -181,6 +183,33 @@ export function gameplayActions(
     }
     if (pendingChoice.type === "binary") {
       actions.push(action(game, "submitChoice", pendingChoice.prompt, null, true, null, undefined, [{ kind: "card", label: pendingChoice.prompt, legalIds: ["accept", "decline"], minimum: 1, maximum: 1 }], { kind: "binary", choiceId: pendingChoice.id, prompt: pendingChoice.prompt, acceptLabel: pendingChoice.acceptLabel, declineLabel: pendingChoice.declineLabel }));
+      return actions;
+    }
+    if (pendingChoice.type === "mode") {
+      actions.push(
+        action(
+          game,
+          "submitChoice",
+          pendingChoice.prompt,
+          null,
+          true,
+          null,
+          undefined,
+          [{
+            kind: "card",
+            label: pendingChoice.prompt,
+            legalIds: pendingChoice.options.map((option) => option.id),
+            minimum: 1,
+            maximum: 1,
+          }],
+          {
+            kind: "mode",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+            options: pendingChoice.options,
+          },
+        ),
+      );
       return actions;
     }
     actions.push(
@@ -539,6 +568,21 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+      } else if (
+        game.state.pendingChoice?.type === "effectSelection" &&
+        game.state.pendingChoice.activation
+      ) {
+        submitActivatedModeTargetSelection(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          index,
+        );
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "tokenPlacement") {
         submitTokenPlacement(
           game,
@@ -553,6 +597,28 @@ export function performGameplayAction(input: {
         finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "binary") {
         submitBinaryChoice(game, input.actorPlayerId, input.selectedIds, input.decks);
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (game.state.pendingChoice?.type === "mode") {
+        if (game.state.pendingChoice.resolutionId) {
+          submitModeChoice(
+            game,
+            input.actorPlayerId,
+            input.selectedIds,
+            input.decks,
+          );
+        } else {
+          submitActivatedModeChoice(
+            game,
+            input.actorPlayerId,
+            input.selectedIds,
+            index,
+            handlers,
+          );
+        }
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);
@@ -611,6 +677,9 @@ export function performGameplayAction(input: {
         if (isMoveToBaseForbidden(game, cardId, index)) {
           throw new Error("This unit cannot move from its battlefield to base.");
         }
+        const originBattlefieldId = game.state.battlefields.find(
+          (battlefield) => battlefield.units.includes(cardId),
+        )?.battlefieldId ?? null;
         for (const battlefield of game.state.battlefields) {
           battlefield.units = battlefield.units.filter((id) => id !== cardId);
         }
@@ -623,7 +692,7 @@ export function performGameplayAction(input: {
             type: "unit.moved",
             actorPlayerId: input.actorPlayerId,
             subjectCardInstanceId: cardId,
-            values: { destination: "base" },
+            values: { destination: "base", originBattlefieldId },
           },
           input.decks,
         );
@@ -806,6 +875,11 @@ function playCard(
   const energyCost =
     (ignoresBaseCost ? 0 : effectiveEnergyCost(game, playerId, definition, index)) +
     (accelerated ? 1 : 0);
+  const wasHidden = game.state.battlefields.some((battlefield) =>
+    facedownCardsAt(battlefield).some(
+      (entry) => entry.cardInstanceId === cardId && entry.controllerPlayerId === playerId,
+    ),
+  );
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -813,6 +887,7 @@ function playCard(
     values: {
       "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0,
       "eventSubject.effectiveEnergyCost": energyCost,
+      "eventSubject.wasHidden": wasHidden,
     },
   };
   const paymentDefinition = ignoresBaseCost
@@ -998,6 +1073,8 @@ function passPriority(
               handlers,
             ),
             targetsLocked: true,
+            lockedSelectionsByBinding: item.lockedSelectionsByBinding,
+            targetObjectVersions: item.targetObjectVersions,
             decks,
           });
         } else if (item.behaviorClauseId) {
@@ -1247,11 +1324,19 @@ function completeEndTurn(
     player.playedCardIdsThisTurn = [];
     player.playedMainDeckCardIdsThisTurn = [];
     player.legionSatisfiedCardIdsThisTurn = [];
+    player.chosenModesThisTurn = {};
   }
   game.state.turn = {
     turnNumber: turn.turnNumber + 1,
     activePlayerId: next,
     phase: "awaken",
+  };
+  game.state.turnHistory = {
+    discardedCardIdsByPlayerId: {},
+    diedCardIdsByPlayerId: {},
+    movedCardIdsByPlayerId: {},
+    readiedCardIdsByPlayerId: {},
+    recycledCardIdsByPlayerId: {},
   };
   applyStartOfTurn(game, decks, index);
 }
@@ -1339,6 +1424,13 @@ function moveUnitsToBattlefield(
   );
   if (!battlefield) throw new Error("Battlefield is unavailable.");
   const player = game.state.players[actorPlayerId]!;
+  const originBattlefieldIds = new Map(
+    cardIds.map((cardId) => [
+      cardId,
+      game.state.battlefields.find((battlefield) => battlefield.units.includes(cardId))
+        ?.battlefieldId ?? null,
+    ]),
+  );
   for (const cardId of cardIds) {
     player.zones.base = player.zones.base.filter((id) => id !== cardId);
     for (const origin of game.state.battlefields) {
@@ -1361,7 +1453,10 @@ function moveUnitsToBattlefield(
         type: "unit.moved",
         actorPlayerId,
         subjectCardInstanceId: cardId,
-        values: { destination: battlefieldId },
+        values: {
+          destination: battlefieldId,
+          originBattlefieldId: originBattlefieldIds.get(cardId) ?? null,
+        },
       },
       decks,
     );
@@ -1814,13 +1909,26 @@ function addAbilityActions(
           playerId,
           clause,
         );
-        const targets = targetRequirementsForClause(
+        const modeChoice = availableActivatedModes(
+          game,
+          playerId,
+          sourceId,
           clause,
-          createBehaviorContext(game, playerId, sourceId, null, []),
           handlers,
         );
+        const targets = modeChoice
+          ? []
+          : targetRequirementsForClause(
+              clause,
+              createBehaviorContext(game, playerId, sourceId, null, []),
+              handlers,
+            );
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
+          ability.behaviorId === "ability.exhaust_for_resource" ||
+          !clause.costs.some(
+            (cost) => cost.behaviorId === "cost.exhaust_source",
+          ) ||
           !game.state.cardStates[sourceId]!.exhausted;
         const costStatus = activatedAbilityCostStatus(
           game,
@@ -1829,7 +1937,9 @@ function addAbilityActions(
           clause,
           index,
         );
-        const hasLegalTargets = canSatisfyTargetRequirements(targets);
+        const hasLegalTargets = modeChoice
+          ? modeChoice.options.length > 0
+          : canSatisfyTargetRequirements(targets);
         const enabled =
           legionSatisfied && sourceReady && costStatus.enabled && hasLegalTargets;
         const label =
@@ -1985,12 +2095,198 @@ function executeActivatedAbility(
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
+  const compiledClause = compileBehaviorModel(
+    definition.behaviorModel,
+    handlers,
+  ).clauses.find((candidate) => candidate.id === clauseId);
+  const modeChoice = compiledClause && availableActivatedModes(
+    game,
+    actorPlayerId,
+    sourceId,
+    compiledClause,
+    handlers,
+  );
+  if (modeChoice) {
+    if (modeChoice.options.length === 0) {
+      throw new Error("No legal mode is available for this ability.");
+    }
+    game.state.pendingChoice = {
+      id: `mode:${game.stateVersion + 1}:${sourceId}:${clauseId}`,
+      playerId: actorPlayerId,
+      type: "mode",
+      resolutionId: null,
+      prompt: modeChoice.prompt,
+      options: modeChoice.options,
+      sourceCardInstanceId: sourceId,
+      clauseId,
+      behaviorId,
+      bindingKey: `${clause.id}:choices:${modeChoice.binding.order}`,
+      selectionKey: modeChoice.selectionKey,
+    };
+    return;
+  }
+  finalizeActivatedAbility(game, actorPlayerId, sourceId, clause, binding, selectedIds, index);
+}
+
+function submitActivatedModeChoice(
+  game: GameDocument,
+  actorPlayerId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "mode" ||
+    pending.playerId !== actorPlayerId ||
+    selectedIds.length !== 1
+  ) {
+    throw new Error("Mode choice is unavailable.");
+  }
+  const selectedModeId = selectedIds[0]!;
+  if (!pending.options.some((option) => option.id === selectedModeId)) {
+    throw new Error("Selected mode is unavailable.");
+  }
+  const definition = definitionForInstance(pending.sourceCardInstanceId, index);
+  const clause = definition.behaviorModel.clauses.find(
+    (candidate) => candidate.id === pending.clauseId,
+  );
+  const ability = clause?.abilities.find(
+    (candidate) => candidate.behaviorId === pending.behaviorId,
+  );
+  if (!clause || !ability) throw new Error("Activated ability is unavailable.");
+  const context = createBehaviorContext(
+    game,
+    actorPlayerId,
+    pending.sourceCardInstanceId,
+    null,
+    [],
+  );
+  context.selectedBySelector[pending.selectionKey] = [selectedModeId];
+  const compiledClause = compileBehaviorModel(
+    definition.behaviorModel,
+    handlers,
+  ).clauses.find((candidate) => candidate.id === pending.clauseId);
+  if (!compiledClause) throw new Error("Activated ability is unavailable.");
+  const selectorRequirements = selectionRequirementsForClause(
+    compiledClause,
+    context,
+    handlers,
+  );
+  if (selectorRequirements.length > 1) {
+    throw new Error("This modal ability requires unsupported multiple target groups.");
+  }
+  const memoryKey = modeMemoryKey(game, pending.sourceCardInstanceId, pending.selectionKey);
+  const chosenModes = (game.state.players[actorPlayerId]!.chosenModesThisTurn ??= {});
+  chosenModes[memoryKey] = [...new Set([...(chosenModes[memoryKey] ?? []), selectedModeId])];
+  game.state.pendingChoice = null;
+  if (selectorRequirements.length === 0) {
+    finalizeActivatedAbility(
+      game,
+      actorPlayerId,
+      pending.sourceCardInstanceId,
+      clause,
+      ability,
+      [],
+      index,
+      { [pending.bindingKey]: [selectedModeId] },
+    );
+    return;
+  }
+  const { binding: targetBinding, requirement } = selectorRequirements[0]!;
+  game.state.pendingChoice = {
+    id: `mode-target:${game.stateVersion + 1}:${pending.sourceCardInstanceId}:${pending.clauseId}`,
+    playerId: actorPlayerId,
+    type: "effectSelection",
+    resolutionId: null,
+    bindingKey: `${clause.id}:selectors:${targetBinding.order}`,
+    prompt: requirement.label ? `Choose ${requirement.label}` : "Choose effect target",
+    title: definition.card.name,
+    optionKind: requirement.kind === "battlefield" ? "battlefield" : "card",
+    sourceZone: requirement.sourceZone ?? null,
+    presentation: "cardSelection",
+    visionAction: "recycle",
+    legalCardIds: requirement.legalIds,
+    minimum: requirement.minimum,
+    maximum: requirement.maximum,
+    targetRequirements: [requirement],
+    activation: {
+      sourceCardInstanceId: pending.sourceCardInstanceId,
+      clauseId: pending.clauseId,
+      behaviorId: pending.behaviorId,
+      modeBindingKey: pending.bindingKey,
+      modeSelectionKey: pending.selectionKey,
+      selectedModeId,
+    },
+  };
+}
+
+function submitActivatedModeTargetSelection(
+  game: GameDocument,
+  actorPlayerId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "effectSelection" ||
+    pending.playerId !== actorPlayerId ||
+    !pending.activation ||
+    selectedIds.length < pending.minimum ||
+    selectedIds.length > pending.maximum ||
+    new Set(selectedIds).size !== selectedIds.length ||
+    selectedIds.some((id) => !pending.legalCardIds.includes(id))
+  ) {
+    throw new Error("Effect selection does not satisfy its requirements.");
+  }
+  const activation = pending.activation;
+  const definition = definitionForInstance(activation.sourceCardInstanceId, index);
+  const clause = definition.behaviorModel.clauses.find(
+    (candidate) => candidate.id === activation.clauseId,
+  );
+  const ability = clause?.abilities.find(
+    (candidate) => candidate.behaviorId === activation.behaviorId,
+  );
+  if (!clause || !ability) throw new Error("Activated ability is unavailable.");
+  game.state.pendingChoice = null;
+  finalizeActivatedAbility(
+    game,
+    actorPlayerId,
+    activation.sourceCardInstanceId,
+    clause,
+    ability,
+    [...selectedIds],
+    index,
+    {
+      [activation.modeBindingKey]: [activation.selectedModeId],
+      [pending.bindingKey]: [...selectedIds],
+    },
+  );
+}
+
+function finalizeActivatedAbility(
+  game: GameDocument,
+  actorPlayerId: string,
+  sourceId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+  binding: GameCardDefinition["behaviorModel"]["clauses"][number]["abilities"][number],
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+  lockedSelectionsByBinding: Record<string, string[]> = {},
+) {
+  const definition = definitionForInstance(sourceId, index);
+  const handler = createPrimitiveHandlers(index).get(binding.behaviorId);
+  if (!handler?.execute) {
+    throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
+  }
   payActivatedAbilityCosts(game, actorPlayerId, sourceId, clause, index);
   const resolvesImmediately = isAddResourceAbility(binding.behaviorId);
   if (resolvesImmediately) {
     handler.execute(
       binding,
-      createBehaviorContext(game, actorPlayerId, sourceId, null, selectedIds),
+      createBehaviorContext(game, actorPlayerId, sourceId, null, [...selectedIds]),
     );
     if (game.state.chain) {
       game.state.chain.priorityPlayerId = actorPlayerId;
@@ -2002,16 +2298,16 @@ function executeActivatedAbility(
     return;
   }
   const item = {
-    id: `ability:${game.stateVersion + 1}:${sourceId}:${clauseId}`,
+    id: `ability:${game.stateVersion + 1}:${sourceId}:${clause.id}`,
     kind: "activatedAbility" as const,
     label: definition.card.name,
     controllerPlayerId: actorPlayerId,
     sourceCardInstanceId: sourceId,
-    targetCardInstanceIds: selectedIds,
+    targetCardInstanceIds: [...selectedIds],
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
-    lockedSelectionsByBinding: {},
-    behaviorClauseId: clauseId,
-    activatedBehaviorId: behaviorId,
+    lockedSelectionsByBinding,
+    behaviorClauseId: clause.id,
+    activatedBehaviorId: binding.behaviorId,
     behaviorEvent: null,
   };
   game.state.chain = game.state.chain ?? {
@@ -2034,6 +2330,53 @@ function executeActivatedAbility(
   game.state.chain.passedPlayerIds = [];
 }
 
+function availableActivatedModes(
+  game: GameDocument,
+  playerId: string,
+  sourceId: string,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const binding = clause.choices.find(
+    (choice) => choice.behaviorId === "choice.choose_mode",
+  );
+  if (!binding) return null;
+  const selectionKey = binding.parameters.selectionKey;
+  if (typeof selectionKey !== "string") {
+    throw new Error("Mode choice selection key is unavailable.");
+  }
+  const requirement = handlers.get(binding.behaviorId)?.choice?.(
+    binding,
+    createBehaviorContext(game, playerId, sourceId, null, []),
+  );
+  if (!requirement || requirement.kind !== "mode") {
+    throw new Error("Mode choice is unavailable.");
+  }
+  const chosen = game.state.players[playerId]?.chosenModesThisTurn?.[
+    modeMemoryKey(game, sourceId, selectionKey)
+  ] ?? [];
+  return {
+    binding,
+    prompt: requirement.prompt,
+    selectionKey,
+    options: (requirement.options ?? []).filter((option) => {
+      if (chosen.includes(option.id)) return false;
+      const context = createBehaviorContext(game, playerId, sourceId, null, []);
+      context.selectedBySelector[selectionKey] = [option.id];
+      const targets = targetRequirementsForClause(clause, context, handlers);
+      return targets.length <= 1 && canSatisfyTargetRequirements(targets);
+    }),
+  };
+}
+
+function modeMemoryKey(
+  game: GameDocument,
+  sourceId: string,
+  selectionKey: string,
+) {
+  return `${sourceId}:${game.state.cardStates[sourceId]?.objectVersion ?? 0}:${selectionKey}`;
+}
+
 function activatedAbilityCostStatus(
   game: GameDocument,
   playerId: string,
@@ -2046,6 +2389,12 @@ function activatedAbilityCostStatus(
     if (cost.behaviorId === "cost.exhaust_source") {
       if (game.state.cardStates[sourceId]?.exhausted) {
         return { enabled: false, reason: "Source is exhausted." };
+      }
+      continue;
+    }
+    if (cost.behaviorId === "cost.spend_source_buff") {
+      if (game.state.cardStates[sourceId]?.buffed !== true) {
+        return { enabled: false, reason: "Source does not have a Buff to spend." };
       }
       continue;
     }
@@ -2118,6 +2467,10 @@ function payActivatedAbilityCosts(
     if (cost.behaviorId === "cost.exhaust_source") {
       game.state.cardStates[sourceId]!.exhausted = true;
       continue;
+    }
+    if (cost.behaviorId === "cost.spend_source_buff") {
+      game.state.cardStates[sourceId]!.buffed = false;
+      recomputeMight(game, sourceId, index);
     }
   }
 }
@@ -2466,16 +2819,18 @@ function validLockedTargets(
   controllerPlayerId: string,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
+  const context = createBehaviorContext(
+    game,
+    controllerPlayerId,
+    item.sourceCardInstanceId!,
+    item.behaviorEvent,
+    [],
+  );
+  applyChoiceSelections(clause, item.lockedSelectionsByBinding, context);
   const currentlyLegal = new Set(
     targetRequirementsForClause(
       clause,
-      createBehaviorContext(
-        game,
-        controllerPlayerId,
-        item.sourceCardInstanceId!,
-        item.behaviorEvent,
-        [],
-      ),
+      context,
       handlers,
     ).flatMap((requirement) => requirement.legalIds),
   );

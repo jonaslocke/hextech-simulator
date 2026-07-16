@@ -1,7 +1,7 @@
 import type { BehaviorBinding, BehaviorClause } from "./schemas";
 import type { RuntimeCardIndex } from "./primitive-handlers";
 import type { GameDocument } from "./state";
-import { numericConditionMatches } from "./numeric-condition";
+import { conditionMatches } from "./condition-evaluation";
 
 type NumericValueInput = {
   attribute: string;
@@ -64,18 +64,13 @@ export function effectiveNumericValue(input: NumericValueInput): number {
         sourceId,
       )
     ) continue;
-    if (
-      conditions.some(
-        (condition) =>
-          condition.behaviorId !== "condition.compare_numeric_value" ||
-          !numericConditionMatches({
-            binding: condition,
-            controllerPlayerId,
-            game: input.game,
-            index: input.index!,
-          }),
-      )
-    ) {
+    if (!conditions.every((condition) => conditionMatches(condition, {
+      game: input.game,
+      index: input.index!,
+      controllerPlayerId,
+      sourceCardInstanceId: sourceId,
+      event: null,
+    }))) {
       continue;
     }
     value = applyNumericOperation(value, {

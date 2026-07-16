@@ -28,7 +28,7 @@ export type BehaviorHandler = {
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,
   ): {
-    kind?: "card" | "battlefield" | "tokenPlacement" | "binary";
+    kind?: "card" | "battlefield" | "tokenPlacement" | "binary" | "mode";
     legalIds: string[];
     minimum: number;
     maximum: number;
@@ -41,6 +41,7 @@ export type BehaviorHandler = {
     visionAction?: "recycle" | "keep";
     acceptLabel?: string;
     declineLabel?: string;
+    options?: Array<{ id: string; label: string }>;
   } | null;
 };
 
@@ -98,7 +99,9 @@ export function selectionRequirementsForClause(
   binding: BehaviorBinding;
   requirement: ProjectedTargetRequirement;
 }> {
-  const requirements = clause.selectors.map((binding) => {
+  const requirements = clause.selectors.filter((binding) =>
+    bindingChoiceGateMatches(binding, context),
+  ).map((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
     return { binding, requirement: handler.targets(binding, context) };
@@ -138,10 +141,37 @@ export function clauseHasAutomaticAffectedGroup(
   handlers: BehaviorHandlerRegistry,
 ): boolean {
   return clause.selectors.some((binding) => {
+    if (!bindingChoiceGateMatches(binding, context)) return false;
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) return false;
     return handler.targets(binding, context).maximum === 0;
   });
+}
+
+export function applyChoiceSelections(
+  clause: CompiledBehaviorClause,
+  selectionsByBinding: Record<string, string[]>,
+  context: BehaviorExecutionContext,
+) {
+  for (const choice of clause.choices) {
+    const selectionKey = choice.parameters.selectionKey;
+    if (typeof selectionKey !== "string") continue;
+    const selected = selectionsByBinding[`${clause.id}:choices:${choice.order}`] ?? [];
+    context.selectedBySelector[selectionKey] = selected;
+  }
+}
+
+export function bindingChoiceGateMatches(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const choiceKey = binding.parameters.requiresChoiceKey;
+  if (typeof choiceKey !== "string") return true;
+  const selected = context.selectedBySelector[choiceKey] ?? [];
+  const requiredValue = binding.parameters.requiresChoiceValue;
+  return typeof requiredValue === "string"
+    ? selected.includes(requiredValue)
+    : selected.includes("accept");
 }
 
 export function executeBehaviorClause(input: {

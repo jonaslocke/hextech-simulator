@@ -49,7 +49,16 @@ export const playerStateSchema = z.object({
   // Main Deck (for example, the Champion zone).
   playedMainDeckCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   legionSatisfiedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
+  chosenModesThisTurn: z.record(z.array(z.string().min(1))).optional(),
   zones: playerZonesSchema,
+});
+
+const turnHistorySchema = z.object({
+  discardedCardIdsByPlayerId: z.record(z.array(z.string().min(1))),
+  diedCardIdsByPlayerId: z.record(z.array(z.string().min(1))),
+  movedCardIdsByPlayerId: z.record(z.array(z.string().min(1))),
+  readiedCardIdsByPlayerId: z.record(z.array(z.string().min(1))),
+  recycledCardIdsByPlayerId: z.record(z.array(z.string().min(1))),
 });
 
 export const battlefieldStateSchema = z.object({
@@ -175,6 +184,17 @@ const effectSelectionChoiceSchema = z.object({
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative(),
   chainItem: chainItemSchema.nullable().optional(),
+  activation: z
+    .object({
+      sourceCardInstanceId: z.string().min(1),
+      clauseId: z.string().min(1),
+      behaviorId: z.string().min(1),
+      modeBindingKey: z.string().min(1),
+      modeSelectionKey: z.string().min(1),
+      selectedModeId: z.string().min(1),
+    })
+    .nullable()
+    .optional(),
   targetRequirements: z
     .array(
       z.object({
@@ -213,6 +233,25 @@ const binaryChoiceSchema = z.object({
   acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
 });
 
+const modeChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("mode"),
+  resolutionId: z.string().min(1).nullable(),
+  prompt: z.string().min(1),
+  options: z.array(
+    z.object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+    }),
+  ).min(1),
+  sourceCardInstanceId: z.string().min(1),
+  clauseId: z.string().min(1),
+  behaviorId: z.string().min(1),
+  bindingKey: z.string().min(1),
+  selectionKey: z.string().min(1),
+});
+
 const damageAssignmentSchema = z.object({
   targetUnitId: z.string().min(1),
   amount: z.number().int().positive(),
@@ -223,6 +262,7 @@ export const gameStateSchema = z.object({
   players: z.record(playerStateSchema),
   battlefields: z.array(battlefieldStateSchema),
   cardStates: z.record(cardStateSchema),
+  turnHistory: turnHistorySchema,
   extraTurnPlayerIds: z.array(z.string().min(1)).optional(),
   createdCardInstances: z.array(cardInstanceSchema).default([]).optional(),
   createdCardDefinitions: z
@@ -333,6 +373,7 @@ export const gameStateSchema = z.object({
       effectSelectionChoiceSchema,
       tokenPlacementChoiceSchema,
       binaryChoiceSchema,
+      modeChoiceSchema,
     ])
     .nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema),

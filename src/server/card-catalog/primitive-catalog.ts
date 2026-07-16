@@ -258,6 +258,18 @@ export const tokenKinds = [
 type PrimitiveCatalogSeed = Omit<PrimitiveCatalogEntry, "examples">;
 
 const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
+  "ability.activate": primitiveSeed({
+    id: "ability.activate",
+    family: "ability",
+    name: "Activated ability",
+    description:
+      "Declares a non-resource activated ability whose selected modes and targets resolve from its clause effects.",
+    fixedRules: [
+      "Modes and targets are chosen before the ability is finalized and put on the Chain.",
+      "The ability's clause costs are paid only after all required declaration choices are made.",
+    ],
+    engineSupport: supported("Uses the shared activated-ability declaration and resolution flow."),
+  }),
   "ability.exhaust_for_resource": primitiveSeed({
     id: "ability.exhaust_for_resource",
     family: "ability",
@@ -508,6 +520,18 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     listensToEvents: ["unit.damaged"],
     engineSupport: supported("Matches the shared Unit-damage event."),
   }),
+  "trigger.event": primitiveSeed({
+    id: "trigger.event",
+    family: "trigger",
+    name: "Typed event trigger",
+    description: "Creates an effect when a matching typed card or unit event occurs.",
+    parameters: [
+      required("eventType", "string", "The event that fires the trigger.", gameEventKinds),
+      required("subject", "string", "The event subject relationship.", ["source", "friendly_card", "enemy_card", "friendly_unit", "enemy_unit", "any_unit"]),
+    ],
+    listensToEvents: ["card.discarded", "card.readied", "card.recycled", "unit.stunned"],
+    engineSupport: supported("Matches shared queued game events against source and controller relationships."),
+  }),
   "trigger.second_card_played": primitiveSeed({
     id: "trigger.second_card_played",
     family: "trigger",
@@ -626,6 +650,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ,optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target.")
       ,optional("selectionPlayer", "player", "Player who makes this selection.", selectionPlayerKinds)
       ,optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
+      ,optional("requiresChoiceKey", "string", "Choice key that enables this selector.")
+      ,optional("requiresChoiceValue", "string", "Chosen value required to enable this selector.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a unit"]
@@ -649,7 +675,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target."),
       optional("selectionPlayer", "player", "Player who makes this selection.", selectionPlayerKinds),
-      optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
+      optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"]),
+      optional("requiresChoiceKey", "string", "Choice key that enables this selector."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this selector.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
@@ -727,7 +755,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("minimumCount", "number", "The minimum selection count."),
       required("maximumCount", "number", "The maximum selection count."),
-      optional("selectionKey", "string", "Stable key used by later effects.")
+      optional("selectionKey", "string", "Stable key used by later effects."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this selector."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this selector.")
     ],
     targetingRequirements: ["target must be Gear on the board"],
     engineSupport: supported("Enumerates Gear in each player's Base.")
@@ -740,7 +770,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The player who draws cards."),
       required("count", "number", "The number of cards drawn."),
-      optional("selectionKey", "string", "Selected cards whose owner determines the drawing player.")
+      optional("selectionKey", "string", "Selected cards whose owner determines the drawing player."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect.")
     ],
     emitsEvents: ["card.drawn"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -777,7 +809,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The controller of the cards to ready."),
       required("target", "target", "The cards to ready."),
-      optional("count", "number", "The number of cards to ready.")
+      optional("count", "number", "The number of cards to ready."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect."),
     ],
     emitsEvents: ["card.readied"],
     engineSupport: supported("Selected readyable cards become ready and emit card.readied events.")
@@ -802,10 +836,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The player who channels runes."),
       required("count", "number", "The number of runes channeled."),
-      optional("entryState", "string", "Whether channeled runes use the default entry state or enter exhausted.", runeEntryStates)
+      optional("entryState", "string", "Whether channeled runes use the default entry state or enter exhausted.", runeEntryStates),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect."),
     ],
     emitsEvents: ["rune.channeled"],
-    engineSupport: requiresEngineSupport("Channel effects are recurring in the corpus and need generalized card-driven execution.")
+    engineSupport: supported("The shared action handler channels the requested runes and applies their declared entry state.")
   }),
   "action.add_rune_resource": primitiveSeed({
     id: "action.add_rune_resource",
@@ -835,6 +871,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         unitTargetReferenceKinds
       ),
       optional("selectionKey", "string", "Selector key supplying affected units.")
+      ,optional("requiresChoiceKey", "string", "Choice key that enables this effect.")
+      ,optional("requiresChoiceValue", "string", "Chosen value required to enable this effect.")
     ],
     emitsEvents: ["unit.damaged"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -896,7 +934,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Kill permanent",
     description: "Kills selected permanent cards and moves them to their owner's Trash.",
-    parameters: [optional("selectionKey", "string", "Selector key supplying the permanents to kill.")],
+    parameters: [
+      optional("selectionKey", "string", "Selector key supplying the permanents to kill."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect."),
+    ],
     engineSupport: supported("Uses the shared board-to-Trash transition for non-Unit permanents.")
   }),
   "action.buff_unit": primitiveSeed({
@@ -906,7 +948,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Places a Buff counter on a Unit that does not already have one.",
     parameters: [
       required("target", "target", "The Unit receiving the Buff."),
-      optional("selectionKey", "string", "Selector key supplying the Unit.")
+      optional("selectionKey", "string", "Selector key supplying the Unit."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect.")
     ],
     fixedRules: [
       "A Unit can have at most one Buff counter.",
@@ -1052,7 +1096,11 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Stun card",
     description: "Applies stun to a card.",
-    parameters: [required("target", "target", "The card to stun.")],
+    parameters: [
+      required("target", "target", "The card to stun."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect."),
+    ],
     emitsEvents: ["unit.stunned"],
     engineSupport: supported("Stunned units do not contribute Might in combat and clear at the next Ending Step.")
   }),
@@ -1121,6 +1169,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ),
       optional("amount", "number", "The constant operand when operand is constant."),
       required("target", "target", "The object or game value being modified."),
+      optional("appliesToSourcePlay", "boolean", "Whether this modifier changes only the source card's cost while it is being played."),
       optional("selectionKey", "string", "Selector key supplying affected units."),
       optional("locationRelation", "locationRelation", "How affected units relate to the source location."),
       optional("excludesSource", "boolean", "Whether the source card is excluded from affected units."),
@@ -1204,6 +1253,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("locationRelation", "locationRelation", "How recipients relate to the source location."),
       optional("excludesSource", "boolean", "Whether the source card is excluded from recipients."),
       required("duration", "duration", "How long the granted keyword lasts."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this effect."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this effect."),
     ],
     engineSupport: supported("Temporary and static source-location keyword grants use the shared keyword evaluator and modifier lifecycle."),
   }),
@@ -1243,6 +1294,58 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: requiresEngineSupport(
       "The runtime evaluates typed numeric clause guards for event values and continuous Board Rune counts."
     )
+  }),
+  "condition.state": primitiveSeed({
+    id: "condition.state",
+    family: "condition",
+    name: "Compare game state",
+    description: "Guards a clause by comparing a controller, opponent, or source state value.",
+    parameters: [
+      required("subject", "string", "The state owner or source.", ["controller", "opponent", "source"]),
+      required("property", "string", "The state value to compare.", ["score", "scoreDistanceToVictory", "handCount", "facedownCount", "taggedUnitCount", "buffed", "atBattlefield"]),
+      required("operator", "string", "The comparison applied to the state value.", numericComparisonOperators),
+      required("comparisonValue", "number", "The constant value used by the comparison."),
+      optional("tag", "string", "Required card tag when comparing tagged-unit count."),
+    ],
+    engineSupport: supported("Typed controller, opponent, and source state conditions are evaluated by the shared condition runtime."),
+  }),
+  "action.win_game": primitiveSeed({
+    id: "action.win_game",
+    family: "action",
+    name: "Win game",
+    description: "Makes the effect controller win the game immediately.",
+    engineSupport: supported("Sets the winner and completes the game."),
+  }),
+  "condition.turn_event_count": primitiveSeed({
+    id: "condition.turn_event_count",
+    family: "condition",
+    name: "Compare this-turn event count",
+    description: "Guards a clause by comparing recorded events from the current turn.",
+    parameters: [
+      required("eventType", "string", "The recorded event category.", ["discarded", "died", "moved", "readied", "recycled"]),
+      required("subject", "string", "Whose matching events are counted.", ["controller", "opponent", "source"]),
+      required("operator", "string", "The comparison applied to the event count.", numericComparisonOperators),
+      required("comparisonValue", "number", "The constant value used by the comparison."),
+    ],
+    engineSupport: supported("The game state records typed event histories that reset at the beginning of each turn."),
+  }),
+  "condition.event_value": primitiveSeed({
+    id: "condition.event_value",
+    family: "condition",
+    name: "Compare event boolean",
+    description: "Guards a clause by requiring a boolean value recorded on its triggering event.",
+    parameters: [
+      required("key", "string", "The event value key to evaluate."),
+      required("expectedBoolean", "boolean", "The boolean value required for the clause."),
+    ],
+    engineSupport: supported("Shared event metadata is evaluated when the trigger is collected."),
+  }),
+  "condition.event_origin_source_location": primitiveSeed({
+    id: "condition.event_origin_source_location",
+    family: "condition",
+    name: "Event originated at source location",
+    description: "Guards a clause when the moved event subject left the source battlefield.",
+    engineSupport: supported("Unit-move events retain their origin battlefield for location-based triggers."),
   }),
   "condition.effect_killed_target": primitiveSeed({
     id: "condition.effect_killed_target",
@@ -1319,8 +1422,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "choice",
     name: "Choose mode",
     description: "Prompts a player to choose one available mode from a modal effect.",
-    parameters: [required("player", "player", "The player who chooses the mode.")],
-    engineSupport: requiresEngineSupport("Mode choice support requires explicit option modeling and per-effect memory where applicable.")
+    parameters: [
+      required("player", "player", "The player who chooses the mode."),
+      required("selectionKey", "string", "Stable key read by the mode-gated selections and effects."),
+      required("optionIds", "string", "Pipe-delimited stable identifiers for the available modes."),
+      required("optionLabels", "string", "Pipe-delimited player-facing labels for the available modes."),
+      optional("prompt", "string", "The mode-selection prompt."),
+    ],
+    engineSupport: supported("Modal activated abilities use the shared declaration choice and source-object turn-memory contract.")
   }),
   "choice.optional": primitiveSeed({
     id: "choice.optional",
@@ -1417,6 +1526,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("ignoreBaseCost", "boolean", "Whether paying this cost ignores the card's normal cost."),
     ],
     engineSupport: supported("Paid during the card-play process before resolution."),
+  }),
+  "cost.spend_source_buff": primitiveSeed({
+    id: "cost.spend_source_buff",
+    family: "cost",
+    name: "Spend source Buff cost",
+    description: "Removes a Buff from the activating source as an ability cost.",
+    fixedRules: [
+      "The source must have a Buff when the ability is declared.",
+      "The Buff is removed only after all required modes and targets are chosen.",
+    ],
+    engineSupport: supported("The shared activated-ability cost flow validates and spends the source Buff."),
   }),
   "condition.non_token": primitiveSeed({
     id: "condition.non_token",

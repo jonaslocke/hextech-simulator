@@ -13,6 +13,7 @@ import {
 } from "./numeric-modifiers";
 import { keywordAmount } from "./keyword-evaluation";
 import { numericConditionMatches } from "./numeric-condition";
+import { conditionMatches } from "./condition-evaluation";
 import { getTokenCatalogDefinitions } from "./token-catalog";
 import { isLegalUnitDestination, legalUnitDestinationIds } from "./unit-destinations";
 import { buildPaymentPlan, payCardCost } from "./payment";
@@ -81,6 +82,30 @@ export function createPrimitiveHandlers(
         acceptLabel: "Accept", declineLabel: "Decline" };
     },
   });
+  handlers.set("choice.choose_mode", {
+    choice(binding) {
+      const optionIds = pipeSeparatedParameter(binding, "optionIds");
+      const optionLabels = pipeSeparatedParameter(binding, "optionLabels");
+      if (optionIds.length === 0 || optionIds.length !== optionLabels.length) {
+        throw new Error("Mode choices require matching option ids and labels.");
+      }
+      return {
+        kind: "mode",
+        legalIds: optionIds,
+        minimum: 1,
+        maximum: 1,
+        prompt:
+          typeof binding.parameters.prompt === "string"
+            ? binding.parameters.prompt
+            : "Choose one mode",
+        options: optionIds.map((id, index) => ({
+          id,
+          label: optionLabels[index]!,
+        })),
+      };
+    },
+  });
+  handlers.set("ability.activate", { execute() {} });
   handlers.set("modifier.play_unit_destination", {
     execute() {
       // The permission is consumed by the unit destination policy.
@@ -219,6 +244,28 @@ export function createPrimitiveHandlers(
         : subject === "enemy_unit" && owner !== context.controllerPlayerId;
     },
   });
+  handlers.set("trigger.event", {
+    matches(binding, context) {
+      const event = context.event;
+      const subjectCardInstanceId = event?.subjectCardInstanceId;
+      if (
+        !event ||
+        event.type !== binding.parameters.eventType ||
+        !subjectCardInstanceId
+      ) {
+        return false;
+      }
+      const subject = binding.parameters.subject;
+      if (subject === "source") {
+        return subjectCardInstanceId === context.sourceCardInstanceId;
+      }
+      if (subject === "any_unit") return true;
+      const ownerPlayerId = index.instances.get(subjectCardInstanceId)?.ownerPlayerId;
+      return subject === "friendly_unit" || subject === "friendly_card"
+        ? ownerPlayerId === context.controllerPlayerId
+        : (subject === "enemy_unit" || subject === "enemy_card") && ownerPlayerId !== context.controllerPlayerId;
+    },
+  });
   handlers.set("condition.compare_numeric_value", {
     matches(binding, context) {
       return numericConditionMatches({
@@ -229,6 +276,45 @@ export function createPrimitiveHandlers(
         index,
       });
     }
+  });
+  handlers.set("condition.state", {
+    matches(binding, context) {
+      return conditionMatches(binding, {
+        game: context.game,
+        index,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        event: context.event,
+      });
+    },
+  });
+  handlers.set("condition.turn_event_count", {
+    matches(binding, context) {
+      return conditionMatches(binding, {
+        game: context.game,
+        index,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        event: context.event,
+      });
+    },
+  });
+  handlers.set("condition.event_value", {
+    matches(binding, context) {
+      return context.event?.values[binding.parameters.key as string] ===
+        binding.parameters.expectedBoolean;
+    },
+  });
+  handlers.set("condition.event_origin_source_location", {
+    matches(_binding, context) {
+      const sourceBattlefieldId = context.game.state.battlefields.find(
+        (battlefield) => battlefield.cardInstanceId === context.sourceCardInstanceId,
+      )?.battlefieldId;
+      return (
+        sourceBattlefieldId !== undefined &&
+        context.event?.values.originBattlefieldId === sourceBattlefieldId
+      );
+    },
   });
   handlers.set("condition.effect_killed_target", {
     matches: (_binding, context) =>
@@ -492,6 +578,12 @@ export function createPrimitiveHandlers(
         );
         context.game.state.players[owner]!.zones.trash.push(id);
         incrementObjectVersion(context.game, id);
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "card.discarded",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        });
       }
     },
   });
@@ -536,6 +628,10 @@ export function createPrimitiveHandlers(
     execute(binding, context) {
       const ids = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
+        : binding.parameters.target === "event_subject"
+          ? context.event?.subjectCardInstanceId
+            ? [context.event.subjectCardInstanceId]
+            : []
         : binding.parameters.target === "runes"
         ? context.selectedIds.length > 0
           ? context.selectedIds
@@ -1038,9 +1134,15 @@ export function createPrimitiveHandlers(
     execute(binding, context) {
       const ids = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
+        : binding.parameters.target === "event_subject"
+          ? context.event?.subjectCardInstanceId
+            ? [context.event.subjectCardInstanceId]
+            : []
         : selectionFor(binding, context).length > 0
           ? selectionFor(binding, context)
-          : context.selectedIds;
+          : context.selectedIds.length > 0
+            ? context.selectedIds
+            : implicitModifierTargets(binding, context, index);
       for (const id of ids) {
         const state = context.game.state.cardStates[id];
         if (!state || state.buffed) continue;
@@ -1103,6 +1205,12 @@ export function createPrimitiveHandlers(
         context.game.winnerPlayerId = playerId;
         context.game.status = "complete";
       }
+    },
+  });
+  handlers.set("action.win_game", {
+    execute(_binding, context) {
+      context.game.winnerPlayerId = context.controllerPlayerId;
+      context.game.status = "complete";
     },
   });
   handlers.set("action.stun_card", {
@@ -1188,6 +1296,9 @@ export function createPrimitiveHandlers(
       for (const id of context.selectedIds) {
         const owner = index.instances.get(id)?.ownerPlayerId;
         if (!owner) continue;
+        const originBattlefieldId = context.game.state.battlefields.find(
+          (battlefield) => battlefield.units.includes(id),
+        )?.battlefieldId ?? null;
         for (const player of Object.values(context.game.state.players)) {
           player.zones.base = player.zones.base.filter(
             (candidate) => candidate !== id,
@@ -1204,7 +1315,7 @@ export function createPrimitiveHandlers(
           type: "unit.moved",
           actorPlayerId: context.controllerPlayerId,
           subjectCardInstanceId: id,
-          values: { destination: "base" },
+          values: { destination: "base", originBattlefieldId },
         });
       }
     },
@@ -1228,6 +1339,9 @@ export function createPrimitiveHandlers(
   });
   handlers.set("modifier.modify_numeric_value", {
     execute(binding, context) {
+      if (binding.parameters.appliesToSourcePlay === true) {
+        return;
+      }
       if (isContinuousDuration(binding.parameters.duration)) {
         return;
       }
@@ -1235,6 +1349,10 @@ export function createPrimitiveHandlers(
       const routedTargets = selectionFor(binding, context);
       const targets = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]
+        : binding.parameters.target === "event_subject"
+          ? context.event?.subjectCardInstanceId
+            ? [context.event.subjectCardInstanceId]
+            : []
         : binding.parameters.target === "game" || binding.parameters.target === "controller_spell"
           ? [null]
           : routedTargets.length > 0
@@ -1285,7 +1403,9 @@ export function createPrimitiveHandlers(
         return;
       }
       const keywordId = stringParam(binding, "keywordId");
-      const targets = selectionFor(binding, context);
+      const targets = binding.parameters.target === "source"
+        ? [context.sourceCardInstanceId]
+        : selectionFor(binding, context);
       const selectedTargets = targets.length > 0 ? targets : context.selectedIds;
       for (const targetCardInstanceId of selectedTargets) {
         context.game.state.modifiers.push({
@@ -1390,7 +1510,7 @@ export function effectiveEnergyCost(
   definition: GameCardDefinition,
   index?: RuntimeCardIndex,
 ): number {
-  const baseCost = effectiveNumericValue({
+  let baseCost = effectiveNumericValue({
     attribute: "energyCost",
     baseValue: definition.card.attributes.energy ?? 0,
     cardType: definition.card.classification.type,
@@ -1399,6 +1519,35 @@ export function effectiveEnergyCost(
     index,
     targetScope: "controller_spell",
   });
+  if (index) {
+    for (const clause of definition.behaviorModel.clauses) {
+      if (!clause.conditions.every((condition) => conditionMatches(condition, {
+        game,
+        index,
+        controllerPlayerId,
+        sourceCardInstanceId: "",
+        event: null,
+      }))) {
+        continue;
+      }
+      for (const binding of clause.effects) {
+        if (
+          binding.behaviorId !== "modifier.modify_numeric_value" ||
+          binding.parameters.attribute !== "energyCost" ||
+          binding.parameters.target !== "controller_spell" ||
+          binding.parameters.appliesToSourcePlay !== true ||
+          typeof binding.parameters.amount !== "number"
+        ) {
+          continue;
+        }
+        baseCost = applyCostOperation(
+          baseCost,
+          binding.parameters.operation,
+          binding.parameters.amount,
+        );
+      }
+    }
+  }
   const hasPriorPlayedCard =
     (game.state.players[controllerPlayerId]?.playedCardIdsThisTurn
       ?? game.state.players[controllerPlayerId]?.playedMainDeckCardIdsThisTurn
@@ -1425,6 +1574,20 @@ export function effectiveEnergyCost(
         )
     : 0;
   return Math.max(0, baseCost - legionDiscount);
+}
+
+function applyCostOperation(
+  value: number,
+  operation: unknown,
+  amount: number,
+) {
+  switch (operation) {
+    case "increase": return value + amount;
+    case "reduce": return value - amount;
+    case "multiply": return value * amount;
+    case "set": return amount;
+    default: throw new Error("Unsupported Energy-cost modifier operation.");
+  }
 }
 
 export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {
@@ -1581,6 +1744,12 @@ function selectionFor(
   return typeof key === "string"
     ? context.selectedBySelector[key] ?? []
     : [];
+}
+
+function pipeSeparatedParameter(binding: BehaviorBinding, name: string) {
+  const value = binding.parameters[name];
+  if (typeof value !== "string") return [];
+  return value.split("|").map((item) => item.trim()).filter(Boolean);
 }
 
 function implicitModifierTargets(

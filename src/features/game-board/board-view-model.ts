@@ -141,6 +141,14 @@ export type BoardProjection = {
         prompt: string;
         acceptLabel: string;
         declineLabel: string;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "mode";
+        prompt: string;
+        waitingMessage: string;
+        options: Array<{ id: string; label: string }>;
       };
   players: Record<string, BoardPlayerProjection>;
   battlefields: Array<{

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-15T22:33:56.170Z",
+  "updatedAt": "2026-07-16T00:47:59.897Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -653,11 +653,35 @@
           "name": "Raging Soul"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-019",
+        "approvedAt": "2026-07-16T00:46:46.114Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:50.446Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-019 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-020:Scrapyard Champion",
@@ -699,11 +723,35 @@
           "name": "Sun Disc"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-021",
+        "approvedAt": "2026-07-16T00:46:46.251Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:50.585Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-021 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-022:Thermo Beam",
@@ -1467,11 +1515,35 @@
           "name": "Find Your Center"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-047",
+        "approvedAt": "2026-07-16T00:46:46.386Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:50.721Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-047 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-048:Meditation",
@@ -1728,11 +1800,35 @@
           "name": "Adaptatron"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-056",
+        "approvedAt": "2026-07-16T00:46:46.540Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:50.863Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-056 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-057:Block",
@@ -1841,11 +1937,35 @@
           "name": "Eclipse Herald"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-059",
+        "approvedAt": "2026-07-16T00:46:46.680Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:50.998Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-059 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-060:Mask of Foresight",
@@ -1887,11 +2007,35 @@
           "name": "Poro Herder"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-061",
+        "approvedAt": "2026-07-16T00:46:46.814Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.131Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-061 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-062:Reinforce",
@@ -1979,11 +2123,35 @@
           "name": "Wizened Elder"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-065",
+        "approvedAt": "2026-07-16T00:46:46.946Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.282Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-065 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-066:Ahri Alluring",
@@ -3106,11 +3274,35 @@
           "name": "Mushroom Pouch"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-101",
+        "approvedAt": "2026-07-16T00:46:47.075Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.415Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-101 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-102:Portal Rescue",
@@ -3874,11 +4066,35 @@
           "name": "Bilgewater Bully"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-125",
+        "approvedAt": "2026-07-16T00:46:47.206Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.549Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-125 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-126:Body Rune",
@@ -4454,11 +4670,35 @@
           "name": "Pirate's Haven"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-143",
+        "approvedAt": "2026-07-16T00:46:47.345Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.683Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-143 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-144:Spoils of War",
@@ -4477,11 +4717,35 @@
           "name": "Spoils of War"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-144",
+        "approvedAt": "2026-07-16T00:46:47.475Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:45:51.816Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-144 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-145:Unyielding Spirit",
@@ -4736,11 +5000,35 @@
           "name": "Qiyana, Victorious"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-155",
+        "approvedAt": "2026-07-16T00:46:47.604Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:47.604Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-155 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-156:Sabotage",
@@ -4806,11 +5094,48 @@
           "name": "Udyr, Wildman"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-157",
+        "approvedAt": "2026-07-15T23:24:16.888Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T23:24:53.821Z",
+          "note": "Published for manual validation of optional decisions, modal activated abilities, and source-object turn memory."
+        },
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T23:24:16.888Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-157 approved."
+        },
+        {
+          "at": "2026-07-15T23:24:53.821Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "conditions-choices-modes-turn-memory",
+          "note": "Published for manual validation of optional decisions, modal activated abilities, and source-object turn memory."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-158:Volibear Imposing",
@@ -4933,11 +5258,35 @@
           "name": "Miss Fortune, Captain"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-162",
+        "approvedAt": "2026-07-16T00:46:47.734Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:47.734Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-162 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-163:Seal of Strength",
@@ -5094,11 +5443,35 @@
           "name": "Ember Monk"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-167",
+        "approvedAt": "2026-07-16T00:46:47.865Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:47.865Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-167 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-168:Fight or Flight",
@@ -6097,11 +6470,35 @@
           "name": "Jinx, Rebel"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-202",
+        "approvedAt": "2026-07-16T00:46:47.997Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:47.997Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-202 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-203:Possession",
@@ -6982,11 +7379,35 @@
           "name": "Peak Guardian"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-223",
+        "approvedAt": "2026-07-16T00:46:48.129Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:48.129Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-223 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-224:Salvage",
@@ -7354,11 +7775,35 @@
           "name": "Karma, Channeler"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-235",
+        "approvedAt": "2026-07-16T00:46:48.263Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:48.263Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-235 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-236:Karthus Eternal",
@@ -7929,11 +8374,35 @@
           "name": "Loose Cannon"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-251",
+        "approvedAt": "2026-07-16T00:46:48.398Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:48.398Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-251 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-252:Super Mega Death Rocket",
@@ -8726,11 +9195,35 @@
           "name": "Back-Alley Bar"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-277",
+        "approvedAt": "2026-07-16T00:46:48.533Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:48.533Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-277 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-278:Bandle Tree",
@@ -9081,11 +9574,48 @@
           "name": "Startipped Peak"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-288",
+        "approvedAt": "2026-07-15T23:24:16.507Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-15T23:24:53.821Z",
+          "note": "Published for manual validation of optional decisions, modal activated abilities, and source-object turn memory."
+        },
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-15T23:24:16.507Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-288 approved."
+        },
+        {
+          "at": "2026-07-15T23:24:53.821Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "conditions-choices-modes-turn-memory",
+          "note": "Published for manual validation of optional decisions, modal activated abilities, and source-object turn memory."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-289:Targons Peak",
@@ -9268,11 +9798,35 @@
           "name": "The Grand Plaza"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
-      "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "status": "ready_for_manual_validation",
+      "canonicalModel": {
+        "cardCode": "OGN-293",
+        "approvedAt": "2026-07-16T00:46:48.665Z"
+      },
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-16T00:47:59.897Z",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-07-16T00:46:48.665Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-293 approved."
+        },
+        {
+          "at": "2026-07-16T00:47:59.897Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
+          "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        }
+      ],
+      "updatedAt": "2026-07-16T00:47:59.897Z"
     },
     {
       "gameplayIdentity": "OGN-294:Trifarian War Camp",

@@ -295,6 +295,21 @@ export function projectGame(input: {
                   prompt: input.game.state.pendingChoice.prompt, acceptLabel: input.game.state.pendingChoice.acceptLabel,
                   declineLabel: input.game.state.pendingChoice.declineLabel,
                 }
+              : input.game.state.pendingChoice?.type === "mode"
+                ? {
+                    type: "mode",
+                    id: input.game.state.pendingChoice.id,
+                    playerId: input.game.state.pendingChoice.playerId,
+                    prompt: input.game.state.pendingChoice.prompt,
+                    waitingMessage:
+                      input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                        ? input.game.state.pendingChoice.prompt
+                        : "Waiting for the other player to choose a mode.",
+                    options:
+                      input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                        ? input.game.state.pendingChoice.options
+                        : [],
+                  }
             : null,
     combat: input.game.state.combat
       ? {
