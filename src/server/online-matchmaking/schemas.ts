@@ -6,6 +6,7 @@ export const onlineRoomDeckRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("temporary"),
     sourceText: z.string().trim().min(1).max(20_000),
+    allowCrossDomainCards: z.boolean().optional().default(false),
   }),
 ]);
 

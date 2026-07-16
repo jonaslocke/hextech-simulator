@@ -36,6 +36,7 @@ export function OnlineMatchmakingLobby() {
   const [deckId, setDeckId] = useState<DeckId | null>(null);
   const [deckInputMode, setDeckInputMode] = useState<DeckInputMode>("catalog");
   const [temporaryDeckText, setTemporaryDeckText] = useState("");
+  const [allowCrossDomainCards, setAllowCrossDomainCards] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [room, setRoom] = useState<OnlineRoomView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -165,7 +166,11 @@ export function OnlineMatchmakingLobby() {
     const identity = {
       deck:
         deckInputMode === "temporary"
-          ? { kind: "temporary" as const, sourceText: temporaryDeckText }
+          ? {
+              kind: "temporary" as const,
+              sourceText: temporaryDeckText,
+              allowCrossDomainCards,
+            }
           : { kind: "catalog" as const, deckId: deckId! },
       displayName,
       onlineSessionId: getOnlineSessionId(),
@@ -407,6 +412,21 @@ export function OnlineMatchmakingLobby() {
                 }}
                 type="file"
               />
+              <label className="flex items-start gap-2 text-slate-300 text-xs">
+                <input
+                  checked={allowCrossDomainCards}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setAllowCrossDomainCards(event.currentTarget.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>
+                  Experimental test deck: allow cards from any domain. Champion,
+                  Legend, deck size, card type, copy-limit, and Signature checks
+                  still apply.
+                </span>
+              </label>
               <span className="text-slate-500 text-xs">
                 Validated for this room only; it is not added to the saved deck list.
               </span>

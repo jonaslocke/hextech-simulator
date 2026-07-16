@@ -161,7 +161,10 @@ function buildSideboardingSession(input: {
     ),
     currentDeckConfiguration: input.viewerSeat.currentDeckConfiguration,
     eligibleChosenChampionRegisteredCardIds:
-      eligibleChosenChampionRegisteredCardIds(input.viewerDeck),
+      eligibleChosenChampionRegisteredCardIds(
+        input.viewerDeck,
+        input.viewerSeat.allowCrossDomainCards,
+      ),
     registeredCardPool: input.viewerDeck.instances.flatMap((copy) => {
       if (!copy.registeredCardId) return [];
       const card = input.viewerDeck.snapshot.cards.find(
@@ -213,6 +216,7 @@ function buildSideboardingSession(input: {
 
 function eligibleChosenChampionRegisteredCardIds(
   deck: DeckSnapshotDocument,
+  allowCrossDomainCards: boolean,
 ): string[] {
   const definitionsByCode = new Map(
     deck.snapshot.cards.map((definition) => [definition.cardCode, definition]),
@@ -240,9 +244,9 @@ function eligibleChosenChampionRegisteredCardIds(
         card.classification.type === "Unit" &&
         card.classification.supertype === "Champion";
       const matchesLegendTag = card.tags.some((tag) => legendTags.has(tag));
-      const matchesLegendDomains = card.classification.domain.every((domain) =>
-        legendDomains.has(domain),
-      );
+      const matchesLegendDomains =
+        allowCrossDomainCards ||
+        card.classification.domain.every((domain) => legendDomains.has(domain));
 
       return isChampionUnit && matchesLegendTag && matchesLegendDomains;
     })

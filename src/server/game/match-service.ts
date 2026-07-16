@@ -63,6 +63,7 @@ type CreateMatchInput = {
   playerDecks?: { player1: DeckId; player2: DeckId };
   deckTemplates?: [DeckSnapshot, DeckSnapshot];
   playerDeckLabels?: { player1: string; player2: string };
+  allowCrossDomainCardsByPlayer?: { player1: boolean; player2: boolean };
   playerNames?: {
     player1?: string;
     player2?: string;
@@ -127,6 +128,8 @@ async function createMatchAttempt(input: CreateMatchInput) {
       tokenHash: tokens[0]!.tokenHash,
       registeredDeckSnapshotId: deckDocuments[0].id,
       displayName: selectedPlayerNames.player1,
+      allowCrossDomainCards:
+        input.allowCrossDomainCardsByPlayer?.player1 ?? false,
       currentDeckConfiguration: createInitialDeckConfiguration(
         deckDocuments[0].instances,
       ),
@@ -137,6 +140,8 @@ async function createMatchAttempt(input: CreateMatchInput) {
       tokenHash: tokens[1]!.tokenHash,
       registeredDeckSnapshotId: deckDocuments[1].id,
       displayName: selectedPlayerNames.player2,
+      allowCrossDomainCards:
+        input.allowCrossDomainCardsByPlayer?.player2 ?? false,
       currentDeckConfiguration: createInitialDeckConfiguration(
         deckDocuments[1].instances,
       ),
@@ -146,6 +151,7 @@ async function createMatchAttempt(input: CreateMatchInput) {
     assertLegalRegisteredDeckConfiguration({
       registeredDeck: deck,
       configuration: seats[index]!.currentDeckConfiguration,
+      allowCrossDomainCards: seats[index]!.allowCrossDomainCards,
     });
   });
   const registeredDecksByPlayerId = Object.fromEntries(
@@ -844,6 +850,7 @@ async function submitDeckReconfigurationAttempt(
       assertLegalRegisteredDeckConfiguration({
         registeredDeck,
         configuration,
+        allowCrossDomainCards: seat.allowCrossDomainCards,
       });
     } catch (error) {
       throw new MatchServiceError(

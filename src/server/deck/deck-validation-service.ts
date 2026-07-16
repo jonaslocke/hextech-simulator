@@ -59,6 +59,7 @@ export function buildDeckValidationRequest(input: {
 export function validateRegisteredDeckCandidate(input: {
   registeredDeck: DeckSnapshotDocument;
   request: DeckValidationRequest;
+  allowCrossDomainCards?: boolean;
 }): DeckValidationResponse {
   const request = deckValidationRequestSchema.parse(input.request);
   const fingerprint = fingerprintDeckValidationRequest(request);
@@ -128,7 +129,9 @@ export function validateRegisteredDeckCandidate(input: {
   validateCounts(sections, reasons);
   validateTypePlacement(resolved, reasons);
   validateChampionCompatibility(resolved, reasons);
-  validateDomainIdentity(resolved, reasons);
+  if (!input.allowCrossDomainCards) {
+    validateDomainIdentity(resolved, reasons);
+  }
   const signatureCount = validateSignatureCards(resolved, reasons);
   validateCopyLimits(resolved, reasons);
 
@@ -148,10 +151,12 @@ export function validateRegisteredDeckCandidate(input: {
 export function assertLegalRegisteredDeckConfiguration(input: {
   registeredDeck: DeckSnapshotDocument;
   configuration: DeckConfiguration;
+  allowCrossDomainCards?: boolean;
 }): DeckValidationResponse {
   const response = validateRegisteredDeckCandidate({
     registeredDeck: input.registeredDeck,
     request: buildDeckValidationRequest(input),
+    allowCrossDomainCards: input.allowCrossDomainCards,
   });
   if (!response.legal) {
     throw new Error(

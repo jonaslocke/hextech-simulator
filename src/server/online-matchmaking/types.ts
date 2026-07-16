@@ -7,8 +7,18 @@ export type OnlineRoomStatus =
   | "closed";
 
 export type OnlineRoomDeck =
-  | { kind: "catalog"; deckId: DeckId; label: string }
-  | { kind: "temporary"; label: "Temporary test deck"; snapshot: DeckSnapshot };
+  | {
+      kind: "catalog";
+      deckId: DeckId;
+      label: string;
+      allowCrossDomainCards: false;
+    }
+  | {
+      kind: "temporary";
+      label: "Temporary test deck";
+      snapshot: DeckSnapshot;
+      allowCrossDomainCards: boolean;
+    };
 
 export type OnlineRoomSeat = {
   seat: "player1" | "player2";

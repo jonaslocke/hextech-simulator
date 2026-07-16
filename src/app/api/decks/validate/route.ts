@@ -38,10 +38,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const match = registeredDeck.matchId
+      ? await repositories.matches.findById(registeredDeck.matchId)
+      : null;
+    const seat = match?.seats.find(
+      (candidate) => candidate.playerId === registeredDeck.playerId,
+    );
+
     return NextResponse.json(
       validateRegisteredDeckCandidate({
         registeredDeck,
         request: parsed.data,
+        allowCrossDomainCards: seat?.allowCrossDomainCards,
       }),
     );
   } catch (error) {

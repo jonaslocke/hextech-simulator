@@ -465,6 +465,7 @@ export const matchSeatSchema = z.object({
   tokenHash: z.string().min(1),
   displayName: z.string().min(1),
   registeredDeckSnapshotId: z.string().min(1),
+  allowCrossDomainCards: z.boolean().default(false),
   currentDeckConfiguration: deckConfigurationSchema,
 });
 

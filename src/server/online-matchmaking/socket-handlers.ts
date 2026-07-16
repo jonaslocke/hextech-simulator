@@ -72,6 +72,10 @@ export function registerOnlineMatchmakingHandlers(
             player1: room.seat1.deck.label,
             player2: room.seat2!.deck.label,
           },
+          allowCrossDomainCardsByPlayer: {
+            player1: room.seat1.deck.allowCrossDomainCards,
+            player2: room.seat2!.deck.allowCrossDomainCards,
+          },
           playerNames: {
             player1: room.seat1.displayName,
             player2: room.seat2!.displayName,
@@ -151,12 +155,18 @@ export function registerOnlineMatchmakingHandlers(
 
 async function prepareRoomDeck(input: ReturnType<typeof createOnlineRoomSchema.parse>["deck"]) {
   if (input.kind === "catalog") {
-    return { kind: "catalog" as const, deckId: input.deckId, label: input.deckId };
+    return {
+      kind: "catalog" as const,
+      deckId: input.deckId,
+      label: input.deckId,
+      allowCrossDomainCards: false as const,
+    };
   }
   const db = await getMongoDatabase();
   return {
     kind: "temporary" as const,
     label: "Temporary test deck" as const,
+    allowCrossDomainCards: input.allowCrossDomainCards,
     snapshot: await buildDeckSnapshotFromSource(db, input.sourceText),
   };
 }
