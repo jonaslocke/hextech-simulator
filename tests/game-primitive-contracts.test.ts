@@ -10,6 +10,7 @@ import {
   performGameplayAction,
   performGameplayTransition,
   applyStartOfTurn,
+  bindingChoiceGateMatches,
   dispatchBehaviorEvent,
   effectiveEnergyCost,
   type BehaviorEvent,
@@ -1034,6 +1035,73 @@ test("optional targeted resolution accepts a legal target or declines", () => {
     gameDocumentSchema.parse(resolved);
   }
 });
+test("Gear selector returns only base-zone Gear across players", () => {
+  const { game, handlers } = fixture([
+    card("SYN-GEAR-SOURCE", "Unit", 1),
+    card("SYN-GEAR", "Gear"),
+    card("SYN-NON-GEAR", "Unit", 1),
+    card("SYN-BATTLEFIELD", "Battlefield"),
+  ], [
+    instance("source", "p1", "SYN-GEAR-SOURCE", "mainDeck"),
+    instance("friendly-gear", "p1", "SYN-GEAR", "mainDeck"),
+    instance("enemy-gear", "p2", "SYN-GEAR", "mainDeck"),
+    instance("field-gear", "p1", "SYN-GEAR", "mainDeck"),
+    instance("unit", "p1", "SYN-NON-GEAR", "mainDeck"),
+    instance("battlefield", "p1", "SYN-BATTLEFIELD", "battlefield"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "friendly-gear", "unit"];
+  game.state.players.p2!.zones.base = ["enemy-gear"];
+  game.state.battlefields = [{
+    battlefieldId: "location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: ["field-gear"],
+  }];
+  const requirement = handlers.get("selector.gear")!.targets!(
+    bindingFor("selector.gear", {
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "gear",
+    }),
+    createBehaviorContext(game, "p1", "source", null, []),
+  );
+
+  assert.deepEqual(requirement.legalIds, ["friendly-gear", "enemy-gear"]);
+  assert.equal(requirement.minimum, 1);
+  assert.equal(requirement.maximum, 1);
+  assert.equal(requirement.selectionKey, "gear");
+});
+
+test("choice gates accept implicit and explicit branch values", () => {
+  const { game } = fixture([]);
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+
+  for (const example of [
+    { selected: ["accept"], requiredValue: null, expected: true },
+    { selected: ["decline"], requiredValue: null, expected: false },
+    { selected: ["alpha"], requiredValue: "alpha", expected: true },
+    { selected: ["beta"], requiredValue: "alpha", expected: false },
+    { selected: [], requiredValue: "alpha", expected: false },
+  ]) {
+    context.selectedBySelector.branch = example.selected;
+    assert.equal(
+      bindingChoiceGateMatches(bindingFor("synthetic.effect", {
+        requiresChoiceKey: "branch",
+        ...(example.requiredValue
+          ? { requiresChoiceValue: example.requiredValue }
+          : {}),
+      }), context),
+      example.expected,
+    );
+  }
+  assert.equal(
+    bindingChoiceGateMatches(bindingFor("synthetic.effect"), context),
+    true,
+  );
+});
+
 test("deferred selectors choose from the legal set at effect resolution", () => {
   const source = card("SYN-DEFERRED-SOURCE", "Gear");
   source.behaviorModel.clauses = [{
