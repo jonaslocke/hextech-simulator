@@ -10,6 +10,7 @@ import {
   performGameplayAction,
   performGameplayTransition,
   applyStartOfTurn,
+  applyHoldScoring,
   dispatchBehaviorEvent,
   effectiveEnergyCost,
   type BehaviorEvent,
@@ -1041,6 +1042,147 @@ test("source-location unit presence counts units at a battlefield source", () =>
     ),
     true,
   );
+});
+
+test("an automatic source-location group affects every other friendly unit there", () => {
+  const source = card("SYN-AUTOMATIC-GROUP-SOURCE", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "buff-source-and-neighbors",
+    sequence: 0,
+    sourceText: "When you play me, buff me, then buff all other friendly Units here.",
+    normalizedText: "When you play me, buff me, then buff all other friendly Units here.",
+    abilities: [],
+    triggers: [binding("trigger.on_play", { subject: "source" })],
+    conditions: [],
+    selectors: [binding("selector.friendly_unit", {
+      scope: "each",
+      automatic: true,
+      excludesSource: true,
+      locationRelation: "sourceLocation",
+      selectionKey: "neighbors",
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [
+      binding("action.buff_unit", { target: "source" }),
+      {
+        ...binding("action.buff_unit", {
+          target: "friendly_unit",
+          selectionKey: "neighbors",
+        }),
+        order: 1,
+      },
+    ],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    source,
+    card("SYN-GROUP-BATTLEFIELD", "Battlefield"),
+    card("SYN-OTHER-BATTLEFIELD", "Battlefield"),
+    card("SYN-FRIENDLY-UNIT", "Unit", 1),
+    card("SYN-ENEMY-UNIT", "Unit", 1),
+  ], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("battlefield", "p1", "SYN-GROUP-BATTLEFIELD", "battlefield"),
+    instance("other-battlefield", "p2", "SYN-OTHER-BATTLEFIELD", "battlefield"),
+    instance("friendly-here", "p1", "SYN-FRIENDLY-UNIT", "mainDeck"),
+    instance("friendly-elsewhere", "p1", "SYN-FRIENDLY-UNIT", "mainDeck"),
+    instance("enemy-here", "p2", "SYN-ENEMY-UNIT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.hand = ["source"];
+  game.state.players.p2!.zones.base = ["enemy-here"];
+  game.state.battlefields = [
+    {
+      battlefieldId: "source-location",
+      cardInstanceId: "battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: ["friendly-here"],
+    },
+    {
+      battlefieldId: "other-location",
+      cardInstanceId: "other-battlefield",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      contestedByPlayerId: null,
+      units: ["friendly-elsewhere"],
+    },
+  ];
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "source" &&
+      action.label === "Play Synthetic SYN-AUTOMATIC-GROUP-SOURCE to Synthetic SYN-GROUP-BATTLEFIELD" &&
+      action.enabled,
+  );
+  assert.ok(play, "Expected the synthetic Unit to be playable at the battlefield.");
+  let next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-automatic-group-source",
+  }).game;
+  assert.equal(next.state.pendingChoice, null);
+  next = passCurrentChain(next, decks);
+
+  assert.equal(next.state.cardStates.source!.buffed, true);
+  assert.equal(next.state.cardStates["friendly-here"]!.buffed, true);
+  assert.notEqual(next.state.cardStates["friendly-elsewhere"]!.buffed, true);
+  assert.notEqual(next.state.cardStates["enemy-here"]!.buffed, true);
+  gameDocumentSchema.parse(next);
+});
+
+test("a source-location unit-count trigger wins only at its minimum boundary", () => {
+  for (const unitCount of [6, 7]) {
+    const source = card("SYN-WIN-BATTLEFIELD", "Battlefield");
+    source.behaviorModel.clauses = [{
+      id: "win-at-minimum-unit-count",
+      sequence: 0,
+      sourceText: "When you hold here, if you have 7 or more Units here, win the game.",
+      normalizedText: "When you hold here, if you have 7 or more Units here, win the game.",
+      abilities: [],
+      triggers: [binding("trigger.hold_battlefield")],
+      conditions: [binding("condition.unit_presence", {
+        controller: "controller",
+        locationRelation: "sourceLocation",
+        minimumCount: 7,
+      })],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [binding("action.win_game")],
+      keywords: [],
+    }];
+    const unitIds = Array.from({ length: unitCount }, (_, index) => `unit-${index}`);
+    const { game, decks } = fixture([
+      source,
+      card("SYN-WIN-UNIT", "Unit", 1),
+    ], [
+      instance("battlefield", "p1", source.cardCode, "battlefield"),
+      ...unitIds.map((id) => instance(id, "p1", "SYN-WIN-UNIT", "mainDeck")),
+    ]);
+    game.state.battlefields = [{
+      battlefieldId: "held-location",
+      cardInstanceId: "battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: unitIds,
+    }];
+
+    applyHoldScoring(game, "p1", decks);
+    const next = game.state.chain ? passCurrentChain(game, decks) : game;
+
+    assert.equal(next.state.players.p1!.points, 1);
+    assert.equal(next.winnerPlayerId, unitCount === 7 ? "p1" : null);
+    assert.equal(next.status, unitCount === 7 ? "complete" : "in_progress");
+    gameDocumentSchema.parse(next);
+  }
 });
 
 test("vision exposes only the top card and recycles the selected card", () => {
