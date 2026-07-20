@@ -187,6 +187,38 @@ such as `Synthetic Draw Spell`. Keep the fixture to the smallest state needed
 for the contract. A test must not be interpreted as evidence that a card or
 card family is gameplay-approved.
 
+### Synthetic fixtures are not renamed card tests
+
+Changing a canonical card's name and code to `SYN-*` does not make its test a
+primitive test. A test is still card-specific when it reproduces the card's
+complete trigger, conditions, selectors, effects, thresholds, and outcome in
+one scenario. Do not create synthetic equivalents of complete card rules text.
+
+Decompose the behavior by engine responsibility. Test these independently when
+they are the contracts at risk:
+
+- an event producer emits the correct event type, subject, actor, and metadata;
+- a trigger routes matching event types and subject relationships and rejects
+  non-matches;
+- a condition evaluates operators, ownership, locations, and boundary values;
+- a selector returns exactly the eligible objects, including exclusion rules;
+- an effect mutates only its supplied or routed targets;
+- turn history records the event under the correct subject owner;
+- a one-shot permission is consumed once by its matching engine operation;
+- chain priority, simultaneous batching, or decision cleanup follows its engine
+  contract.
+
+Use a production transition only when the transition boundary itself is the
+primitive under test, such as card play consuming a seeded permission, movement
+emitting origin metadata, or Awakening batching ready events. Do not add a
+triggered reward to an event-producer test merely to prove that a complete card
+composition works. Handler-level execution is preferred for an isolated
+selector, condition, cost, or effect contract.
+
+Before keeping a test, ask: **Would this test remain useful if the card that
+revealed the problem were removed from the game?** If not, delete or decompose
+it and validate the full card manually.
+
 ### When a gameplay change touches a primitive
 
 A card implementation may expose a missing or broken reusable primitive. In
@@ -240,13 +272,18 @@ For a durable automated test:
    cards and anonymous metadata.
 3. Build a schema-valid `GameDocument`; do not use an unchecked cast to hide
    missing state fields.
-4. Obtain the action through `gameplayActions` and execute the intent through
-   `performGameplayTransition` or `performGameplayAction`.
-5. Drive priority, choices, and deferred selections through their public game
-   actions instead of invoking effect handlers directly.
-6. Assert the intended observable state delta, important non-mutations, and
+4. Classify the failed responsibility: producer, routing, condition, selector,
+   effect, history, permission consumption, chain, or decision orchestration.
+5. Test an isolated condition, selector, cost, or effect through its primitive
+   handler. Use `gameplayActions` plus `performGameplayTransition` or
+   `performGameplayAction` only when action availability or the transition
+   boundary is the contract under test.
+6. When chain priority, choices, or deferred selections are the contract, drive
+   them through public game actions; otherwise do not add those subsystems to
+   the fixture.
+7. Assert the intended observable state delta, important non-mutations, and
    resolution cleanup. Do not snapshot the entire game document.
-7. Keep the test only when it protects a reusable primitive contract. The
+8. Keep the test only when it protects a reusable primitive contract. The
    reported card remains subject to manual in-game validation.
 
 Debug bundles capture only the current persisted version. If the failure is
