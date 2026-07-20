@@ -27,5 +27,4 @@ MainDeck:
 2 Annie, Fiery
 3 Maddened Marauder
 3 Firestorm
-2 Sai Scout
-1 Tibbers
+3 Sai Scout
