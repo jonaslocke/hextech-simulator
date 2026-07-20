@@ -388,7 +388,10 @@ export function CardSelectionPrompt({
                 onSelect={selectOption}
                 options={
                   selectionMode === "ordered"
-                    ? sortOptions(options, orderedIds)
+                    ? sortOptions(
+                        options,
+                        reconcileOrderedDraft(orderedIds, enabledOptionIds),
+                      )
                     : options
                 }
                 orderedIds={orderedIds}

@@ -10,6 +10,7 @@ import {
 } from "./behavior-runtime";
 import {
   cleanupTurnModifiers,
+  consumeEnterReadyEffect,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   definitionForInstance,
@@ -940,13 +941,7 @@ function playCard(
       selectedIds,
       handlers,
     );
-    if (
-      game.state.ongoingEffects.some(
-        (effect) =>
-          effect.behaviorId === "modifier.enter_ready" &&
-          effect.controllerPlayerId === playerId,
-      )
-    ) {
+    if (isUnit && consumeEnterReadyEffect(game, playerId)) {
       game.state.cardStates[cardId]!.exhausted = false;
     }
     dispatchBehaviorEvent(game, playEvent, decks);

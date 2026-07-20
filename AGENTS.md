@@ -221,3 +221,35 @@ npm run lint
 Run `npm test` only when explicitly requested or when a broad non-gameplay change
 requires full-suite verification. Manual in-game validation remains the final
 acceptance gate for all gameplay behavior.
+
+## Gameplay Debug Requests
+
+When a user reports an in-game gameplay issue, ask for the JSON produced by the
+match simulator's **Copy debug data** button when it is not already included.
+Treat that bundle as debugging evidence, not as a permanent test fixture.
+
+The bundle contains the authoritative current game document, both deck
+snapshots, and persisted events. It excludes player tokens and token hashes.
+Use it to identify the smallest reusable primitive contract that failed.
+
+For a durable automated test:
+
+1. Reduce the reported state to the minimum synthetic state that reproduces the
+   primitive failure.
+2. Replace canonical codes, names, definitions, and deck contents with `SYN-*`
+   cards and anonymous metadata.
+3. Build a schema-valid `GameDocument`; do not use an unchecked cast to hide
+   missing state fields.
+4. Obtain the action through `gameplayActions` and execute the intent through
+   `performGameplayTransition` or `performGameplayAction`.
+5. Drive priority, choices, and deferred selections through their public game
+   actions instead of invoking effect handlers directly.
+6. Assert the intended observable state delta, important non-mutations, and
+   resolution cleanup. Do not snapshot the entire game document.
+7. Keep the test only when it protects a reusable primitive contract. The
+   reported card remains subject to manual in-game validation.
+
+Debug bundles capture only the current persisted version. If the failure is
+about an action that has not yet been submitted, copy the data before submitting
+it. If it has already happened, copy immediately and describe the exact action,
+selected targets, observed result, and expected result.

@@ -5,6 +5,7 @@ import { test } from "node:test";
 import {
   actionsForSource,
   chainOverlayOpen,
+  chainAutoPassShouldReset,
   combineTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
@@ -13,6 +14,27 @@ import {
   targetSelectionIsLegal,
   toggleMovementSelection,
 } from "../src/features/game-board/model";
+
+test("auto-pass resets synchronously when a new chain item appears", () => {
+  assert.equal(
+    chainAutoPassShouldReset({
+      currentChainItemIds: ["existing"],
+      isOpen: true,
+      previousChainItemIds: ["existing"],
+      wasOpen: true,
+    }),
+    false,
+  );
+  assert.equal(
+    chainAutoPassShouldReset({
+      currentChainItemIds: ["existing", "new-trigger"],
+      isOpen: true,
+      previousChainItemIds: ["existing"],
+      wasOpen: true,
+    }),
+    true,
+  );
+});
 import { responsiveCardHeight } from "../src/features/game-board/card-sizing";
 import type { ProjectedAction } from "../src/shared/game";
 

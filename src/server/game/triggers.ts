@@ -140,7 +140,7 @@ export function queueChainItemsForTargets(
     const controllerPlayerId = queuedItems[0]?.controllerPlayerId;
     if (controllerPlayerId) {
       game.state.queuedTriggerChoices.push({
-        id: `choice:${game.stateVersion}:${controllerPlayerId}:triggers`,
+        id: `choice:${queuedItems[0]!.id}:order`,
         playerId: controllerPlayerId,
         type: "orderTriggers",
         optionIds: queuedItems.map((item) => item.id),

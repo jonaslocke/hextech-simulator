@@ -4,7 +4,10 @@ import {
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import { applyHoldScoring } from "./scoring";
-import { dispatchBehaviorEvent } from "./triggers";
+import {
+  dispatchBehaviorEvent,
+  dispatchSimultaneousBehaviorEvents,
+} from "./triggers";
 import type { GameDocument } from "./state";
 
 type StartOfTurnPhase = "awaken" | "beginning" | "channel" | "draw";
@@ -64,15 +67,17 @@ export function applyStartOfTurn(
         }
       }
       turn.phase = "beginning";
-      if (decks.length > 0) {
-        for (const cardId of readiedCardIds) {
-          dispatchBehaviorEvent(game, {
+      if (decks.length > 0 && readiedCardIds.length > 0) {
+        dispatchSimultaneousBehaviorEvents(
+          game,
+          readiedCardIds.map((cardId) => ({
             type: "card.readied",
             actorPlayerId: turn.activePlayerId,
             subjectCardInstanceId: cardId,
             values: {},
-          }, decks);
-        }
+          })),
+          decks,
+        );
       }
       continue;
     }

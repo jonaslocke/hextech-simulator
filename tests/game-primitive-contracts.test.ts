@@ -7,6 +7,7 @@ import {
   createRuntimeCardIndex,
   gameplayActions,
   performGameplayAction,
+  performGameplayTransition,
   applyStartOfTurn,
   dispatchBehaviorEvent,
   effectiveEnergyCost,
@@ -14,12 +15,12 @@ import {
   type BehaviorBinding,
   type GameCardDefinition,
   type GameDocument,
+  gameDocumentSchema,
 } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import {
   beginEffectResolution,
-  submitEffectSelection,
 } from "../src/server/game/effect-resolution";
 
 test("registers a handler for every executable behavior", () => {
@@ -33,7 +34,7 @@ test("registers a handler for every executable behavior", () => {
   }
 });
 
-test("a Legion activated ability makes the next Unit enter ready", () => {
+test("a Legion enter-ready effect is consumed by the next Unit play", () => {
   const source = card("SOURCE", "Gear");
   source.behaviorModel.clauses = [{
     id: "ready-next-unit",
@@ -55,13 +56,15 @@ test("a Legion activated ability makes the next Unit enter ready", () => {
   }];
   const { game, decks } = fixture([
     source,
-    card("UNIT", "Unit", 2),
+    card("FIRST_UNIT", "Unit", 2),
+    card("SECOND_UNIT", "Unit", 2),
   ], [
     instance("source", "p1", "SOURCE", "mainDeck"),
-    instance("unit", "p1", "UNIT", "mainDeck"),
+    instance("first-unit", "p1", "FIRST_UNIT", "mainDeck"),
+    instance("second-unit", "p1", "SECOND_UNIT", "mainDeck"),
   ]);
   game.state.players.p1!.zones.base = ["source"];
-  game.state.players.p1!.zones.hand = ["unit"];
+  game.state.players.p1!.zones.hand = ["first-unit", "second-unit"];
   game.state.players.p1!.playedCardIdsThisTurn = ["earlier-card"];
 
   let next = performGameplayAction({
@@ -89,7 +92,7 @@ test("a Legion activated ability makes the next Unit enter ready", () => {
   }
 
   const play = gameplayActions(next, "p1", decks).find(
-    (action) => action.sourceCardInstanceId === "unit" && action.enabled,
+    (action) => action.sourceCardInstanceId === "first-unit" && action.enabled,
   );
   assert.ok(play, "Synthetic Unit should be playable after resolving Legion.");
   next = performGameplayAction({
@@ -101,10 +104,26 @@ test("a Legion activated ability makes the next Unit enter ready", () => {
     now: "play-unit",
   });
 
-  assert.equal(next.state.cardStates.unit!.exhausted, false);
+  assert.equal(next.state.cardStates["first-unit"]!.exhausted, false);
+  assert.deepEqual(next.state.ongoingEffects, []);
+
+  const secondPlay = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "second-unit" && action.enabled,
+  );
+  assert.ok(secondPlay, "A second synthetic Unit should remain playable.");
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: secondPlay.id,
+    selectedIds: [],
+    decks,
+    now: "play-second-unit",
+  });
+
+  assert.equal(next.state.cardStates["second-unit"]!.exhausted, true);
 });
 
-test("Awakening emits a ready event for each exhausted controlled card", () => {
+test("Awakening batches ready events into one trigger-order decision", () => {
   const trigger = card("TRIGGER", "Gear");
   trigger.behaviorModel.clauses = [{
     id: "friendly-card-readied",
@@ -133,36 +152,49 @@ test("Awakening emits a ready event for each exhausted controlled card", () => {
   }];
   const { game, decks } = fixture([
     trigger,
-    card("EXHAUSTED_UNIT", "Unit", 2),
-    card("READY_UNIT", "Unit", 2),
+    card("EXHAUSTED_UNIT_A", "Unit", 2),
+    card("EXHAUSTED_UNIT_B", "Unit", 2),
     card("EXHAUSTED_RUNE", "Rune"),
   ], [
-    instance("trigger", "p1", "TRIGGER", "mainDeck"),
-    instance("exhausted-unit", "p1", "EXHAUSTED_UNIT", "mainDeck"),
-    instance("ready-unit", "p1", "READY_UNIT", "mainDeck"),
+    instance("trigger-a", "p1", "TRIGGER", "mainDeck"),
+    instance("trigger-b", "p1", "TRIGGER", "mainDeck"),
+    instance("exhausted-unit-a", "p1", "EXHAUSTED_UNIT_A", "mainDeck"),
+    instance("exhausted-unit-b", "p1", "EXHAUSTED_UNIT_B", "mainDeck"),
     instance("exhausted-rune", "p1", "EXHAUSTED_RUNE", "runeDeck"),
   ]);
   game.state.players.p1!.zones.base = [
-    "trigger",
-    "exhausted-unit",
-    "ready-unit",
+    "trigger-a",
+    "trigger-b",
+    "exhausted-unit-a",
+    "exhausted-unit-b",
     "exhausted-rune",
   ];
-  game.state.cardStates["exhausted-unit"]!.exhausted = true;
+  game.state.cardStates["exhausted-unit-a"]!.exhausted = true;
+  game.state.cardStates["exhausted-unit-b"]!.exhausted = true;
   game.state.cardStates["exhausted-rune"]!.exhausted = true;
   game.state.turn!.phase = "awaken";
 
   applyStartOfTurn(game, decks);
 
-  assert.equal(game.state.cardStates["exhausted-unit"]!.exhausted, false);
+  assert.equal(game.state.cardStates["exhausted-unit-a"]!.exhausted, false);
+  assert.equal(game.state.cardStates["exhausted-unit-b"]!.exhausted, false);
   assert.equal(game.state.turn!.phase, "beginning");
-  assert.equal(game.state.chain?.items.length, 1);
-  assert.deepEqual(game.state.chain?.items[0]?.behaviorEvent, {
-    type: "card.readied",
-    actorPlayerId: "p1",
-    subjectCardInstanceId: "exhausted-unit",
-    values: {},
-  });
+  assert.equal(game.state.chain, null);
+  assert.equal(game.state.pendingChoice?.type, "orderTriggers");
+  assert.equal(game.state.pendingChoice?.optionIds.length, 4);
+  assert.deepEqual(
+    game.state.pendingChoice?.pendingItems.map((item) =>
+      item.behaviorEvent?.subjectCardInstanceId,
+    ),
+    [
+      "exhausted-unit-a",
+      "exhausted-unit-a",
+      "exhausted-unit-b",
+      "exhausted-unit-b",
+    ],
+  );
+  assert.deepEqual(game.state.queuedTriggerChoices, []);
+  assert.deepEqual(game.state.queuedChainItems, []);
 });
 
 test("typed death events satisfy opponent this-turn cost conditions", () => {
@@ -228,14 +260,17 @@ test("typed death events satisfy opponent this-turn cost conditions", () => {
 });
 
 test("an optional targeted effect lets the player choose a target or decline", () => {
-  const source = card("SOURCE", "Unit", 2);
+  const source = card("SYN-OPTIONAL-SOURCE", "Unit", 2);
   source.behaviorModel.clauses = [{
     id: "optional-followup",
     sequence: 0,
     sourceText: "You may ready another exhausted friendly card.",
     normalizedText: "You may ready another exhausted friendly card.",
     abilities: [],
-    triggers: [],
+    triggers: [binding("trigger.event", {
+      eventType: "card.played",
+      subject: "friendly_card",
+    })],
     conditions: [],
     selectors: [binding("selector.friendly_card", {
       minimumCount: 1,
@@ -259,61 +294,105 @@ test("an optional targeted effect lets the player choose a target or decline", (
     })],
     keywords: [],
   }];
-  const { game, decks } = fixture([
-    source,
-    card("EXHAUSTED_GEAR", "Gear"),
-  ], [
-    instance("source", "p1", "SOURCE", "mainDeck"),
-    instance("exhausted-gear", "p1", "EXHAUSTED_GEAR", "mainDeck"),
-  ]);
-  game.state.players.p1!.zones.base = ["source", "exhausted-gear"];
-  game.state.cardStates["exhausted-gear"]!.exhausted = true;
+  function scenario() {
+    const result = fixture([
+      source,
+      card("SYN-OPTIONAL-TARGET", "Gear"),
+      card("SYN-EVENT-PRODUCER", "Spell"),
+    ], [
+      instance("source", "p1", "SYN-OPTIONAL-SOURCE", "mainDeck"),
+      instance("target", "p1", "SYN-OPTIONAL-TARGET", "mainDeck"),
+      instance("event-producer", "p1", "SYN-EVENT-PRODUCER", "mainDeck"),
+    ]);
+    result.game.state.players.p1!.energy = 1;
+    result.game.state.players.p1!.zones.hand = ["event-producer"];
+    result.game.state.players.p1!.zones.base = ["source", "target"];
+    result.game.state.cardStates.target!.exhausted = true;
+    return result;
+  }
 
-  assert.equal(beginEffectResolution({
-    game,
-    controllerPlayerId: "p1",
-    sourceCardInstanceId: "source",
-    clauseId: "optional-followup",
-    decks,
-  }), false);
-  assert.equal(game.state.pendingChoice?.type, "effectSelection");
-  assert.equal(
-    game.state.pendingChoice?.type === "effectSelection" &&
-      game.state.pendingChoice.allowDecline,
-    true,
-  );
-  assert.deepEqual(
-    game.state.pendingChoice?.type === "effectSelection"
-      ? game.state.pendingChoice.legalCardIds
-      : [],
-    ["exhausted-gear"],
-  );
+  function reachChoice() {
+    const { game, decks } = scenario();
+    const play = gameplayActions(game, "p1", decks).filter(
+      (action) =>
+        action.sourceCardInstanceId === "event-producer" && action.enabled,
+    );
+    assert.equal(play.length, 1, "Expected one enabled source play action.");
+    let next = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: play[0]!.id,
+      selectedIds: [],
+      decks,
+      now: "activate",
+    }).game;
 
-  assert.equal(submitEffectSelection(game, "p1", ["exhausted-gear"], decks), true);
-  assert.equal(game.state.cardStates["exhausted-gear"]!.exhausted, false);
+    for (let passCount = 0; passCount < 8 && !next.state.pendingChoice; passCount += 1) {
+      const availablePasses = (["p1", "p2"] as const).flatMap(
+        (actorPlayerId) =>
+          gameplayActions(next, actorPlayerId, decks)
+            .filter((action) => action.label === "Pass priority" && action.enabled)
+            .map((action) => ({ action, actorPlayerId })),
+      );
+      assert.equal(availablePasses.length, 1, "Expected exactly one priority pass.");
+      const { action, actorPlayerId } = availablePasses[0]!;
+      next = performGameplayTransition({
+        game: next,
+        actorPlayerId,
+        actionId: action.id,
+        selectedIds: [],
+        decks,
+        now: `pass-${passCount}`,
+      }).game;
+    }
 
-  game.state.cardStates["exhausted-gear"]!.exhausted = true;
-  assert.equal(beginEffectResolution({
-    game,
-    controllerPlayerId: "p1",
-    sourceCardInstanceId: "source",
-    clauseId: "optional-followup",
-    decks,
-  }), false);
-  assert.equal(game.state.pendingChoice?.type, "effectSelection");
-  const declineAction = gameplayActions(game, "p1", decks).find(
-    (action) => action.choice?.kind === "effectSelection",
-  );
-  assert.ok(declineAction);
-  const declined = performGameplayAction({
-    game,
-    actorPlayerId: "p1",
-    actionId: declineAction.id,
-    selectedIds: [],
-    decks,
-    now: "decline-optional-target",
-  });
-  assert.equal(declined.state.cardStates["exhausted-gear"]!.exhausted, true);
+    assert.equal(
+      next.state.pendingChoice?.type,
+      "effectSelection",
+      JSON.stringify({
+        chain: next.state.chain,
+        pendingChoice: next.state.pendingChoice,
+        target: next.state.cardStates.target,
+      }),
+    );
+    assert.equal(
+      next.state.pendingChoice?.type === "effectSelection" &&
+        next.state.pendingChoice.allowDecline,
+      true,
+    );
+    assert.deepEqual(
+      next.state.pendingChoice?.type === "effectSelection"
+        ? next.state.pendingChoice.legalCardIds
+        : [],
+      ["target"],
+    );
+    return { game: next, decks };
+  }
+
+  for (const example of [
+    { label: "accept", selectedIds: ["target"], expectedExhausted: false },
+    { label: "decline", selectedIds: [], expectedExhausted: true },
+  ]) {
+    const { game, decks } = reachChoice();
+    const choices = gameplayActions(game, "p1", decks).filter(
+      (action) => action.choice?.kind === "effectSelection" && action.enabled,
+    );
+    assert.equal(choices.length, 1, `Expected one ${example.label} choice action.`);
+    const resolved = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: choices[0]!.id,
+      selectedIds: example.selectedIds,
+      decks,
+      now: example.label,
+    }).game;
+
+    assert.equal(resolved.state.cardStates.target!.exhausted, example.expectedExhausted);
+    assert.deepEqual(resolved.state.players.p1!.zones.trash, ["event-producer"]);
+    assert.equal(resolved.state.pendingChoice, null);
+    assert.deepEqual(resolved.state.effectResolutions, []);
+    gameDocumentSchema.parse(resolved);
+  }
 });
 
 test("a targetless optional effect retains its accept or decline prompt", () => {
@@ -668,7 +747,7 @@ function fixture(
       instances: instances.filter((instance) => instance.ownerPlayerId === "p2"),
     },
   ];
-  const game = {
+  const game = gameDocumentSchema.parse({
     id: "game",
     matchId: "match",
     createdAt: "now",
@@ -715,7 +794,7 @@ function fixture(
       pendingChoice: null,
       queuedTriggerChoices: [],
     },
-  } as unknown as GameDocument;
+  });
   const index = createRuntimeCardIndex(decks, game);
   return { game, decks, handlers: createPrimitiveHandlers(index) };
 }

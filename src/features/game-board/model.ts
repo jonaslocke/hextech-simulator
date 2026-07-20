@@ -14,6 +14,31 @@ export function chainOverlayOpen(
   return isOpen;
 }
 
+export function chainAutoPassShouldReset(input: {
+  currentChainItemIds: readonly string[];
+  isOpen: boolean;
+  previousChainItemIds: readonly string[];
+  wasOpen: boolean;
+}): boolean {
+  const opened = input.isOpen && !input.wasOpen;
+  const chainStarted =
+    input.currentChainItemIds.length > 0 &&
+    input.previousChainItemIds.length === 0;
+  const chainBecameEmpty =
+    input.currentChainItemIds.length === 0 &&
+    input.previousChainItemIds.length > 0;
+  const newItemAdded = input.currentChainItemIds.some(
+    (id) => !input.previousChainItemIds.includes(id),
+  );
+  return (
+    !input.isOpen ||
+    opened ||
+    chainStarted ||
+    chainBecameEmpty ||
+    newItemAdded
+  );
+}
+
 export function actionsForSource(
   actions: readonly ProjectedAction[],
   sourceCardInstanceId: string | null

@@ -23,6 +23,7 @@ import {
 import { buildBattlefieldSelectionModel } from "../battlefield-selection";
 import type { AcceptedMatch, DeckOption, SeatKey } from "../types";
 import { BetweenGamesScreen } from "./between-games-screen";
+import { DebugBundleButton } from "./debug-bundle-button";
 import { GameResultDialog } from "./game-result-dialog";
 import { MatchResultDialog } from "./match-result-dialog";
 
@@ -481,6 +482,7 @@ export function MatchSimulator({
             gameState={projection.currentGame.stateVersion}
             matchId={match.matchId}
             matchState={projection.stateVersion}
+            playerToken={viewer.playerToken}
             onlineMatch={Boolean(onlineMatch)}
             onSeatChange={setViewerSeat}
             viewerSeat={viewerSeat}
@@ -520,6 +522,7 @@ export function MatchSimulator({
             gameState={projection.currentGame.stateVersion}
             matchId={match.matchId}
             matchState={projection.stateVersion}
+            playerToken={viewer.playerToken}
             onlineMatch={Boolean(onlineMatch)}
             onSeatChange={setViewerSeat}
             viewerSeat={viewerSeat}
@@ -547,6 +550,7 @@ export function MatchSimulator({
           gameState={projection.currentGame.stateVersion}
           matchId={match.matchId}
           matchState={projection.stateVersion}
+          playerToken={viewer.playerToken}
           onlineMatch={Boolean(onlineMatch)}
           onSeatChange={setViewerSeat}
           viewerSeat={viewerSeat}
@@ -579,6 +583,7 @@ export function MatchSimulator({
           gameState={projection.currentGame.stateVersion}
           matchId={match.matchId}
           matchState={projection.stateVersion}
+          playerToken={viewer.playerToken}
           onlineMatch={Boolean(onlineMatch)}
           onSeatChange={setViewerSeat}
           viewerSeat={viewerSeat}
@@ -644,6 +649,7 @@ export function MatchSimulator({
         gameState={gameProjection.stateVersion}
         matchId={match.matchId}
         matchState={projection.stateVersion}
+        playerToken={viewer.playerToken}
         onlineMatch={Boolean(onlineMatch)}
         onSeatChange={setViewerSeat}
         viewerSeat={viewerSeat}
@@ -869,6 +875,7 @@ function ViewerControls({
   gameState,
   matchId,
   matchState,
+  playerToken,
   onlineMatch,
   onSeatChange,
   viewerSeat,
@@ -878,6 +885,7 @@ function ViewerControls({
   gameState: number;
   matchId: string;
   matchState: number;
+  playerToken: string;
   onlineMatch: boolean;
   onSeatChange: (seat: SeatKey) => void;
   viewerSeat: SeatKey;
@@ -915,6 +923,9 @@ function ViewerControls({
       <span className="text-slate-400">
         Game {gameNumber} - G{gameState} / M{matchState}
       </span>
+      {process.env.NODE_ENV !== "production" && (
+        <DebugBundleButton matchId={matchId} playerToken={playerToken} />
+      )}
     </div>
   );
 }

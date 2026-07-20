@@ -19,6 +19,7 @@ import {
 } from "@/shared/components/tooltip";
 import { cn } from "@/shared/utils/cn";
 import type { ChainCardEntry } from "../types";
+import { chainAutoPassShouldReset } from "../model";
 import { BattlefieldCardDialog } from "./battlefield-card-dialog";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
@@ -71,28 +72,24 @@ export function ChainOverlay({
 
   const chainItemKey = chainItemIds.join("|");
   const hasChainItems = chainItemIds.length > 0;
+  const resetsAutoPassThisRender = chainAutoPassShouldReset({
+    currentChainItemIds: chainItemIds,
+    isOpen,
+    previousChainItemIds: previousChainItemIdsRef.current,
+    wasOpen: wasOpenRef.current,
+  });
   const canTogglePassAll =
     isOpen && hasChainItems && !interactionSuspended;
 
   useEffect(() => {
-    const previousChainItemIds = previousChainItemIdsRef.current;
-    const opened = isOpen && !wasOpenRef.current;
-    const chainStarted =
-      chainItemIds.length > 0 && previousChainItemIds.length === 0;
-    const chainBecameEmpty =
-      chainItemIds.length === 0 && previousChainItemIds.length > 0;
-    const newItemAdded = chainItemIds.some(
-      (chainItemId) => !previousChainItemIds.includes(chainItemId),
-    );
-
-    if (!isOpen || opened || chainStarted || chainBecameEmpty || newItemAdded) {
+    if (resetsAutoPassThisRender) {
       setPassAllPriority(false);
       lastAutoPassWindowKeyRef.current = null;
     }
 
     previousChainItemIdsRef.current = chainItemIds;
     wasOpenRef.current = isOpen;
-  }, [chainItemIds, isOpen]);
+  }, [chainItemIds, isOpen, resetsAutoPassThisRender]);
 
   useEffect(() => {
     if (!canTogglePassAll) {
@@ -119,6 +116,7 @@ export function ChainOverlay({
   useEffect(() => {
     if (
       interactionSuspended ||
+      resetsAutoPassThisRender ||
       !passAllPriority ||
       !canPassPriority ||
       !hasChainItems ||
@@ -145,6 +143,7 @@ export function ChainOverlay({
     onPassPriority,
     passAllPriority,
     priorityWindowKey,
+    resetsAutoPassThisRender,
   ]);
 
   const handlePassAllPriorityChange = useCallback(

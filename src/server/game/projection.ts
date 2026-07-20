@@ -14,6 +14,7 @@ import { getTokenCatalogDefinitions } from "./token-catalog";
 import { activeStaticKeywordGrants } from "./keyword-evaluation";
 import { createRuntimeCardIndex } from "./primitive-handlers";
 import type { GameCardDefinition } from "./schemas";
+import { activeContinuousNumericModifiers } from "./numeric-modifiers";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -86,6 +87,23 @@ export function projectGame(input: {
                 label: modifierLabel(modifier.attribute, modifier.operation, modifier.amount),
                 duration: modifierDurationLabel(modifier.duration),
               })),
+            ...activeContinuousNumericModifiers({
+              attribute: "might",
+              baseValue: card.attributes.might ?? 0,
+              cardType: card.classification.type,
+              controllerPlayerId: instance.ownerPlayerId,
+              game: input.game,
+              index: runtimeIndex,
+              targetCardInstanceId: id,
+              targetScope: "source",
+            }).map((modifier) => ({
+              label: modifierLabel(
+                modifier.attribute,
+                modifier.operation,
+                modifier.amount,
+              ),
+              duration: modifierDurationLabel(modifier.duration),
+            })),
             ...activeStaticKeywordGrants(input.game, id, runtimeIndex).map(
               (grant) => ({
                 label: staticKeywordGrantLabel(grant.keywordId, grant.amount),

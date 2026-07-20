@@ -87,6 +87,46 @@ test("revealed hand selection is private to the player who must choose", () => {
 
 test("projects public modifiers and event log entries consistently for both viewers", () => {
   const fixture = projectionFixture();
+  const unitDefinition = fixture.decks[0]!.snapshot.cards.find(
+    (definition) => definition.cardCode === "UNIT",
+  )!;
+  unitDefinition.behaviorModel.clauses = [{
+    id: "conditional-continuous-might",
+    sequence: 0,
+    sourceText: "While this synthetic Unit is buffed, it has +1 Might.",
+    normalizedText: "While this synthetic Unit is buffed, it has +1 Might.",
+    abilities: [],
+    triggers: [],
+    conditions: [{
+      behaviorId: "condition.state",
+      parameters: {
+        subject: "source",
+        property: "buffed",
+        operator: "equal",
+        comparisonValue: 1,
+      },
+      confidence: "high",
+      order: 0,
+    }],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [{
+      behaviorId: "modifier.modify_numeric_value",
+      parameters: {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 1,
+        target: "source",
+        duration: "whileSourceOnBoard",
+      },
+      confidence: "high",
+      order: 1,
+    }],
+    keywords: [],
+  }];
   fixture.game.state.cardStates["p1-unit"]!.buffed = true;
   fixture.game.state.modifiers = [{
     id: "modifier:public",
@@ -121,6 +161,7 @@ test("projects public modifiers and event log entries consistently for both view
   assert.deepEqual(p1Unit.activeModifiers, [
     { label: "Buff +1", duration: "Until leaving board" },
     { label: "Might +2", duration: "This turn" },
+    { label: "Might +1", duration: "While source is on board" },
   ]);
   assert.deepEqual(p2Unit.activeModifiers, p1Unit.activeModifiers);
   assert.deepEqual(p1.logEntries, [{ id: "event:public", message: "A public unit was damaged.", createdAt: "now" }]);

@@ -30,57 +30,8 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     value = applyNumericOperation(value, modifier);
   }
 
-  for (const { binding, conditions, controllerPlayerId, sourceId } of input.index
-    ? activeContinuousBindings(input.game, input.index)
-    : []) {
-    const targetsCandidate =
-      binding.parameters.target === input.targetScope ||
-      (binding.parameters.target === "unit" &&
-        input.targetScope === "source" &&
-        input.targetCardInstanceId) ||
-      (binding.parameters.target === "friendly_unit" &&
-        input.targetScope === "source" &&
-        input.targetCardInstanceId &&
-        input.controllerPlayerId === controllerPlayerId);
-    if (
-      binding.parameters.attribute !== input.attribute ||
-      !targetsCandidate ||
-      (input.controllerPlayerId &&
-        controllerPlayerId !== input.controllerPlayerId &&
-        binding.parameters.target !== "unit") ||
-      (input.targetScope === "controller_spell" &&
-        input.cardType !== "Spell") ||
-      (binding.parameters.target === "source" &&
-        input.targetScope === "source" &&
-        input.targetCardInstanceId !== sourceId)
-    ) {
-      continue;
-    }
-    if (
-      !continuousConditionApplies(
-        binding,
-        input,
-        controllerPlayerId,
-        sourceId,
-      )
-    ) continue;
-    if (!conditions.every((condition) => conditionMatches(condition, {
-      game: input.game,
-      index: input.index!,
-      controllerPlayerId,
-      sourceCardInstanceId: sourceId,
-      event: null,
-    }))) {
-      continue;
-    }
-    value = applyNumericOperation(value, {
-      amount: modifierOperandAmount(binding, input.game, controllerPlayerId),
-      minimum:
-        typeof binding.parameters.minimum === "number"
-          ? binding.parameters.minimum
-          : null,
-      operation: stringParameter(binding, "operation"),
-    });
+  for (const modifier of activeContinuousNumericModifiers(input)) {
+    value = applyNumericOperation(value, modifier);
   }
 
   for (const modifier of input.game.state.modifiers) {
@@ -95,6 +46,75 @@ export function effectiveNumericValue(input: NumericValueInput): number {
   }
 
   return Math.max(0, value);
+}
+
+export type ActiveContinuousNumericModifier = {
+  amount: number;
+  attribute: string;
+  duration: string;
+  minimum: number | null;
+  operation: "increase" | "reduce" | "multiply" | "set";
+  sourceCardInstanceId: string;
+};
+
+export function activeContinuousNumericModifiers(
+  input: NumericValueInput,
+): ActiveContinuousNumericModifier[] {
+  if (!input.index) return [];
+
+  return activeContinuousBindings(input.game, input.index).flatMap(
+    ({ binding, conditions, controllerPlayerId, sourceId }) => {
+      const targetsCandidate =
+        binding.parameters.target === input.targetScope ||
+        (binding.parameters.target === "unit" &&
+          input.targetScope === "source" &&
+          input.targetCardInstanceId) ||
+        (binding.parameters.target === "friendly_unit" &&
+          input.targetScope === "source" &&
+          input.targetCardInstanceId &&
+          input.controllerPlayerId === controllerPlayerId);
+      if (
+        binding.parameters.attribute !== input.attribute ||
+        !targetsCandidate ||
+        (input.controllerPlayerId &&
+          controllerPlayerId !== input.controllerPlayerId &&
+          binding.parameters.target !== "unit") ||
+        (input.targetScope === "controller_spell" && input.cardType !== "Spell") ||
+        (binding.parameters.target === "source" &&
+          input.targetScope === "source" &&
+          input.targetCardInstanceId !== sourceId) ||
+        !continuousConditionApplies(
+          binding,
+          input,
+          controllerPlayerId,
+          sourceId,
+        ) ||
+        !conditions.every((condition) =>
+          conditionMatches(condition, {
+            game: input.game,
+            index: input.index!,
+            controllerPlayerId,
+            sourceCardInstanceId: sourceId,
+            event: null,
+          }),
+        )
+      ) {
+        return [];
+      }
+
+      return [{
+        amount: modifierOperandAmount(binding, input.game, controllerPlayerId),
+        attribute: stringParameter(binding, "attribute"),
+        duration: stringParameter(binding, "duration"),
+        minimum:
+          typeof binding.parameters.minimum === "number"
+            ? binding.parameters.minimum
+            : null,
+        operation: numericOperationParameter(binding),
+        sourceCardInstanceId: sourceId,
+      }];
+    },
+  );
 }
 
 function shouldDeferTargetModifier(
@@ -374,4 +394,17 @@ function stringParameter(binding: BehaviorBinding, key: string) {
   if (typeof value !== "string")
     throw new Error(`Behavior parameter ${key} must be text.`);
   return value;
+}
+
+function numericOperationParameter(binding: BehaviorBinding) {
+  const operation = stringParameter(binding, "operation");
+  if (
+    operation !== "increase" &&
+    operation !== "reduce" &&
+    operation !== "multiply" &&
+    operation !== "set"
+  ) {
+    throw new Error("Numeric modifier operation is unavailable.");
+  }
+  return operation;
 }

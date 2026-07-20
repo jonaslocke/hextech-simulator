@@ -1792,6 +1792,20 @@ function selectionFor(
     : [];
 }
 
+export function consumeEnterReadyEffect(
+  game: GameDocument,
+  controllerPlayerId: string,
+): boolean {
+  const effectIndex = game.state.ongoingEffects.findIndex(
+    (effect) =>
+      effect.behaviorId === "modifier.enter_ready" &&
+      effect.controllerPlayerId === controllerPlayerId,
+  );
+  if (effectIndex < 0) return false;
+  game.state.ongoingEffects.splice(effectIndex, 1);
+  return true;
+}
+
 function pipeSeparatedParameter(binding: BehaviorBinding, name: string) {
   const value = binding.parameters[name];
   if (typeof value !== "string") return [];
@@ -1949,13 +1963,7 @@ function playToken(
       index: input.index,
     });
   }
-  if (
-    game.state.ongoingEffects.some(
-      (effect) =>
-        effect.behaviorId === "modifier.enter_ready" &&
-        effect.controllerPlayerId === input.controllerPlayerId,
-    )
-  ) {
+  if (consumeEnterReadyEffect(game, input.controllerPlayerId)) {
     game.state.cardStates[instanceId]!.exhausted = false;
   }
   recomputeMight(game, instanceId, input.index);
