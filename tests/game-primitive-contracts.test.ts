@@ -276,6 +276,293 @@ test("a typed ready event routes its subject through the complete trigger contra
   gameDocumentSchema.parse(next);
 });
 
+test("a moved event preserves its origin for source-location trigger routing", () => {
+  for (const example of [
+    { origin: "source-location", expectedMight: 4 },
+    { origin: "other-location", expectedMight: 3 },
+  ] as const) {
+    const source = card("SYN-MOVE-TRIGGER", "Battlefield");
+    source.behaviorModel.clauses = [{
+      id: "modify-unit-moved-from-here",
+      sequence: 0,
+      sourceText: "When a Unit moves from here, give it +1 Might this turn.",
+      normalizedText: "When a Unit moves from here, give it +1 Might this turn.",
+      abilities: [],
+      triggers: [binding("trigger.event", {
+        eventType: "unit.moved",
+        subject: "any_unit",
+      })],
+      conditions: [binding("condition.event_origin_source_location")],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [binding("modifier.modify_numeric_value", {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 1,
+        target: "event_subject",
+        duration: "thisTurn",
+      })],
+      keywords: [],
+    }];
+    const { game, decks } = fixture([
+      source,
+      card("SYN-OTHER-BATTLEFIELD", "Battlefield"),
+      card("SYN-MOVING-UNIT", "Unit", 3),
+    ], [
+      instance("source", "p1", "SYN-MOVE-TRIGGER", "battlefield"),
+      instance("other", "p2", "SYN-OTHER-BATTLEFIELD", "battlefield"),
+      instance("moving-unit", "p1", "SYN-MOVING-UNIT", "mainDeck"),
+    ]);
+    game.state.battlefields = [
+      {
+        battlefieldId: "source-location",
+        cardInstanceId: "source",
+        selectedByPlayerId: "p1",
+        controllerPlayerId: "p1",
+        contestedByPlayerId: null,
+        units: example.origin === "source-location" ? ["moving-unit"] : [],
+      },
+      {
+        battlefieldId: "other-location",
+        cardInstanceId: "other",
+        selectedByPlayerId: "p2",
+        controllerPlayerId: "p2",
+        contestedByPlayerId: null,
+        units: example.origin === "other-location" ? ["moving-unit"] : [],
+      },
+    ];
+
+    const move = gameplayActions(game, "p1", decks).find(
+      (action) =>
+        action.sourceCardInstanceId === "moving-unit" &&
+        action.label === "Move to Base" &&
+        action.enabled,
+    );
+    assert.ok(move, `Expected a move action for ${example.origin}.`);
+    let next = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: move.id,
+      selectedIds: [],
+      decks,
+      now: `move-${example.origin}`,
+    }).game;
+
+    if (example.origin === "source-location") {
+      assert.equal(next.state.chain?.items.length, 1);
+      assert.equal(next.state.chain?.priorityPlayerId, "p1");
+      assert.equal(
+        next.state.chain?.items[0]?.behaviorEvent?.values.originBattlefieldId,
+        "source-location",
+      );
+      next = passCurrentChain(next, decks);
+    } else {
+      assert.equal(next.state.chain, null);
+    }
+
+    assert.deepEqual(next.state.players.p1!.zones.base, ["moving-unit"]);
+    assert.equal(
+      next.state.cardStates["moving-unit"]!.computedMight,
+      example.expectedMight,
+    );
+    assert.deepEqual(next.state.turnHistory.movedCardIdsByPlayerId, {
+      p1: ["moving-unit"],
+    });
+    assert.equal(next.state.modifiers.length, example.expectedMight === 4 ? 1 : 0);
+    gameDocumentSchema.parse(next);
+  }
+});
+
+test("a stun effect emits a typed event that reaches only matching triggers", () => {
+  const producer = card("SYN-STUN-PRODUCER", "Gear");
+  producer.behaviorModel.clauses = [{
+    id: "stun-selected-unit",
+    sequence: 0,
+    sourceText: "Stun an enemy Unit.",
+    normalizedText: "Stun an enemy Unit.",
+    abilities: [binding("ability.activate")],
+    triggers: [],
+    conditions: [],
+    selectors: [binding("selector.enemy_unit", {
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("action.stun_card", {
+      target: "enemy_unit",
+      selectionKey: "target",
+    })],
+    keywords: [],
+  }];
+  const matchingTrigger = typedEventCounter(
+    "SYN-STUN-TRIGGER",
+    "unit.stunned",
+    "enemy_unit",
+  );
+  const nonmatchingTrigger = typedEventCounter(
+    "SYN-DISCARD-TRIGGER",
+    "card.discarded",
+    "enemy_card",
+  );
+  const { game, decks } = fixture([
+    producer,
+    matchingTrigger,
+    nonmatchingTrigger,
+    card("SYN-STUN-TARGET", "Unit", 4),
+  ], [
+    instance("producer", "p1", "SYN-STUN-PRODUCER", "mainDeck"),
+    instance("matching-trigger", "p1", "SYN-STUN-TRIGGER", "mainDeck"),
+    instance("nonmatching-trigger", "p1", "SYN-DISCARD-TRIGGER", "mainDeck"),
+    instance("target", "p2", "SYN-STUN-TARGET", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = [
+    "producer",
+    "matching-trigger",
+    "nonmatching-trigger",
+  ];
+  game.state.players.p2!.zones.base = ["target"];
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "producer" && action.enabled,
+  );
+  assert.ok(activate, "Expected the synthetic stun ability to be available.");
+  let next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: ["target"],
+    decks,
+    now: "activate-stun",
+  }).game;
+  next = passCurrentChain(next, decks);
+
+  assert.equal(next.state.cardStates.target!.stunned, true);
+  assert.equal(next.state.cardStates["matching-trigger"]!.computedMight, 1);
+  assert.equal(next.state.cardStates["nonmatching-trigger"]!.computedMight, 0);
+  assert.deepEqual(
+    next.state.modifiers.map((modifier) => modifier.targetCardInstanceId),
+    ["matching-trigger"],
+  );
+  gameDocumentSchema.parse(next);
+});
+
+test("discard and recycle effects route distinct typed card events", () => {
+  for (const example of [
+    {
+      label: "discard",
+      eventType: "card.discarded",
+      originZone: "hand",
+      destinationZone: "trash",
+      effect: binding("action.discard_cards", {
+        count: 1,
+        selectionKey: "target",
+      }),
+    },
+    {
+      label: "recycle",
+      eventType: "card.recycled",
+      originZone: "trash",
+      destinationZone: "mainDeck",
+      effect: binding("action.recycle_cards", {
+        target: "selected_card",
+        count: 1,
+        selectionKey: "target",
+      }),
+    },
+  ] as const) {
+    const producer = card(`SYN-${example.label.toUpperCase()}-PRODUCER`, "Gear");
+    producer.behaviorModel.clauses = [{
+      id: `produce-${example.label}-event`,
+      sequence: 0,
+      sourceText: `Move a selected card from ${example.originZone}.`,
+      normalizedText: `Move a selected card from ${example.originZone}.`,
+      abilities: [binding("ability.activate")],
+      triggers: [],
+      conditions: [],
+      selectors: [binding("selector.card", {
+        owner: "controller",
+        zone: example.originZone,
+        cardType: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "target",
+      })],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [example.effect],
+      keywords: [],
+    }];
+    const matchingTrigger = typedEventCounter(
+      "SYN-MATCHING-CARD-EVENT",
+      example.eventType,
+      "friendly_card",
+    );
+    const otherEventType = example.eventType === "card.discarded"
+      ? "card.recycled"
+      : "card.discarded";
+    const nonmatchingTrigger = typedEventCounter(
+      "SYN-NONMATCHING-CARD-EVENT",
+      otherEventType,
+      "friendly_card",
+    );
+    const targetCode = `SYN-${example.label.toUpperCase()}-TARGET`;
+    const { game, decks } = fixture([
+      producer,
+      matchingTrigger,
+      nonmatchingTrigger,
+      card(targetCode, "Spell"),
+    ], [
+      instance("producer", "p1", producer.cardCode, "mainDeck"),
+      instance("matching-trigger", "p1", matchingTrigger.cardCode, "mainDeck"),
+      instance("nonmatching-trigger", "p1", nonmatchingTrigger.cardCode, "mainDeck"),
+      instance("target", "p1", targetCode, "mainDeck"),
+    ]);
+    game.state.players.p1!.zones.base = [
+      "producer",
+      "matching-trigger",
+      "nonmatching-trigger",
+    ];
+    game.state.players.p1!.zones[example.originZone] = ["target"];
+
+    const activate = gameplayActions(game, "p1", decks).find(
+      (action) => action.sourceCardInstanceId === "producer" && action.enabled,
+    );
+    assert.ok(activate, `Expected the synthetic ${example.label} ability.`);
+    let next = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: activate.id,
+      selectedIds: ["target"],
+      decks,
+      now: `activate-${example.label}`,
+    }).game;
+    next = passCurrentChain(next, decks);
+
+    assert.deepEqual(next.state.players.p1!.zones[example.originZone], []);
+    assert.deepEqual(next.state.players.p1!.zones[example.destinationZone], ["target"]);
+    assert.deepEqual(
+      example.eventType === "card.discarded"
+        ? next.state.turnHistory.discardedCardIdsByPlayerId
+        : next.state.turnHistory.recycledCardIdsByPlayerId,
+      { p1: ["target"] },
+    );
+    assert.equal(next.state.cardStates["matching-trigger"]!.computedMight, 1);
+    assert.equal(next.state.cardStates["nonmatching-trigger"]!.computedMight, 0);
+    assert.deepEqual(
+      next.state.modifiers.map((modifier) => modifier.targetCardInstanceId),
+      ["matching-trigger"],
+    );
+    gameDocumentSchema.parse(next);
+  }
+});
+
 test("typed death events satisfy opponent this-turn cost conditions", () => {
   const spell = card("CONDITIONAL_SPELL", "Spell");
   spell.card.attributes.energy = 4;
@@ -930,6 +1217,37 @@ function card(
   };
 }
 
+function typedEventCounter(
+  cardCode: string,
+  eventType: string,
+  subject: string,
+): GameCardDefinition {
+  const definition = card(cardCode, "Unit", 0);
+  definition.behaviorModel.clauses = [{
+    id: "count-matching-event",
+    sequence: 0,
+    sourceText: "When the matching event occurs, this gets +1 Might this turn.",
+    normalizedText: "When the matching event occurs, this gets +1 Might this turn.",
+    abilities: [],
+    triggers: [binding("trigger.event", { eventType, subject })],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.modify_numeric_value", {
+      attribute: "might",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "source",
+      duration: "thisTurn",
+    })],
+    keywords: [],
+  }];
+  return definition;
+}
+
 function instance(
   instanceId: string,
   ownerPlayerId: string,
@@ -965,4 +1283,31 @@ function bindingFor(
   parameters: Record<string, string | number | boolean | null> = {},
 ) {
   return binding(behaviorId, parameters);
+}
+
+function passCurrentChain(
+  game: GameDocument,
+  decks: DeckSnapshotDocument[],
+): GameDocument {
+  let next = game;
+  for (let passCount = 0; next.state.chain && passCount < 8; passCount += 1) {
+    const availablePasses = next.state.setup.playerIds.flatMap(
+      (actorPlayerId) =>
+        gameplayActions(next, actorPlayerId, decks)
+          .filter((action) => action.label === "Pass priority" && action.enabled)
+          .map((action) => ({ action, actorPlayerId })),
+    );
+    assert.equal(availablePasses.length, 1, "Expected exactly one priority pass.");
+    const { action, actorPlayerId } = availablePasses[0]!;
+    next = performGameplayTransition({
+      game: next,
+      actorPlayerId,
+      actionId: action.id,
+      selectedIds: [],
+      decks,
+      now: `pass-chain-${passCount}`,
+    }).game;
+  }
+  assert.equal(next.state.chain, null, "Expected the chain to resolve.");
+  return next;
 }
