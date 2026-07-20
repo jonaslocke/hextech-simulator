@@ -70,6 +70,7 @@ export const projectedActionSchema = z.object({
         kind: z.literal("effectSelection"),
         choiceId: z.string().min(1),
         prompt: z.string().min(1),
+        allowDecline: z.boolean().optional(),
       }),
       z.object({
         kind: z.literal("tokenPlacement"),
@@ -360,6 +361,7 @@ export const gameProjectionSchema = z.object({
         revealedCards: z.array(projectedCardViewSchema),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
+        allowDecline: z.boolean().optional(),
       }),
       z.object({
         type: z.literal("tokenPlacement"),
@@ -388,7 +390,10 @@ export const gameProjectionSchema = z.object({
         playerId: z.string().min(1),
         prompt: z.string().min(1),
         waitingMessage: z.string().min(1),
-        options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).min(1),
+        // A non-choosing player sees an empty list while the choice is kept
+        // private, but still needs the pending-choice metadata to render the
+        // waiting state.
+        options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })),
       }),
       z.object({
         type: z.literal("assignCombatDamage"),

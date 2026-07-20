@@ -5,6 +5,11 @@ import {
   createBehaviorContext,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  gameplayActions,
+  performGameplayAction,
+  applyStartOfTurn,
+  dispatchBehaviorEvent,
+  effectiveEnergyCost,
   type BehaviorEvent,
   type BehaviorBinding,
   type GameCardDefinition,
@@ -12,6 +17,10 @@ import {
 } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
+import {
+  beginEffectResolution,
+  submitEffectSelection,
+} from "../src/server/game/effect-resolution";
 
 test("registers a handler for every executable behavior", () => {
   const { handlers } = fixture([]);
@@ -22,6 +31,361 @@ test("registers a handler for every executable behavior", () => {
       `Missing runtime handler for ${behaviorId}`,
     );
   }
+});
+
+test("a Legion activated ability makes the next Unit enter ready", () => {
+  const source = card("SOURCE", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "ready-next-unit",
+    sequence: 0,
+    sourceText: "Exhaust: Legion — The next Unit you play this turn enters ready.",
+    normalizedText: "Exhaust: Legion — The next Unit you play this turn enters ready.",
+    abilities: [binding("ability.activate")],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [binding("cost.exhaust_source")],
+    timings: [],
+    effects: [binding("modifier.enter_ready", {
+      target: "controller_units",
+      duration: "thisTurn",
+    })],
+    keywords: [binding("keyword.legion")],
+  }];
+  const { game, decks } = fixture([
+    source,
+    card("UNIT", "Unit", 2),
+  ], [
+    instance("source", "p1", "SOURCE", "mainDeck"),
+    instance("unit", "p1", "UNIT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.zones.hand = ["unit"];
+  game.state.players.p1!.playedCardIdsThisTurn = ["earlier-card"];
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: gameplayActions(game, "p1", decks).find(
+      (action) => action.sourceCardInstanceId === "source" && action.enabled,
+    )!.id,
+    selectedIds: [],
+    decks,
+    now: "activate-legion",
+  });
+
+  for (const actorPlayerId of ["p1", "p2"] as const) {
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId,
+      actionId: gameplayActions(next, actorPlayerId, decks).find(
+        (action) => action.label === "Pass priority",
+      )!.id,
+      selectedIds: [],
+      decks,
+      now: `pass-${actorPlayerId}`,
+    });
+  }
+
+  const play = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "unit" && action.enabled,
+  );
+  assert.ok(play, "Synthetic Unit should be playable after resolving Legion.");
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-unit",
+  });
+
+  assert.equal(next.state.cardStates.unit!.exhausted, false);
+});
+
+test("Awakening emits a ready event for each exhausted controlled card", () => {
+  const trigger = card("TRIGGER", "Gear");
+  trigger.behaviorModel.clauses = [{
+    id: "friendly-card-readied",
+    sequence: 0,
+    sourceText: "When a friendly Unit readies, it gets +1 Might this turn.",
+    normalizedText: "When a friendly Unit readies, it gets +1 Might this turn.",
+    abilities: [],
+    triggers: [binding("trigger.event", {
+      eventType: "card.readied",
+      subject: "friendly_unit",
+    })],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.modify_numeric_value", {
+      attribute: "might",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "event_subject",
+      duration: "thisTurn",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    trigger,
+    card("EXHAUSTED_UNIT", "Unit", 2),
+    card("READY_UNIT", "Unit", 2),
+    card("EXHAUSTED_RUNE", "Rune"),
+  ], [
+    instance("trigger", "p1", "TRIGGER", "mainDeck"),
+    instance("exhausted-unit", "p1", "EXHAUSTED_UNIT", "mainDeck"),
+    instance("ready-unit", "p1", "READY_UNIT", "mainDeck"),
+    instance("exhausted-rune", "p1", "EXHAUSTED_RUNE", "runeDeck"),
+  ]);
+  game.state.players.p1!.zones.base = [
+    "trigger",
+    "exhausted-unit",
+    "ready-unit",
+    "exhausted-rune",
+  ];
+  game.state.cardStates["exhausted-unit"]!.exhausted = true;
+  game.state.cardStates["exhausted-rune"]!.exhausted = true;
+  game.state.turn!.phase = "awaken";
+
+  applyStartOfTurn(game, decks);
+
+  assert.equal(game.state.cardStates["exhausted-unit"]!.exhausted, false);
+  assert.equal(game.state.turn!.phase, "beginning");
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.deepEqual(game.state.chain?.items[0]?.behaviorEvent, {
+    type: "card.readied",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "exhausted-unit",
+    values: {},
+  });
+});
+
+test("typed death events satisfy opponent this-turn cost conditions", () => {
+  const spell = card("CONDITIONAL_SPELL", "Spell");
+  spell.card.attributes.energy = 4;
+  spell.behaviorModel.clauses = [{
+    id: "opponent-death-discount",
+    sequence: 0,
+    sourceText: "If an opponent Unit died this turn, this costs 2 less.",
+    normalizedText: "If an opponent Unit died this turn, this costs 2 less.",
+    abilities: [],
+    triggers: [],
+    conditions: [binding("condition.turn_event_count", {
+      eventType: "died",
+      subject: "opponent",
+      operator: "greaterThanOrEqual",
+      comparisonValue: 1,
+    })],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.modify_numeric_value", {
+      attribute: "energyCost",
+      operation: "reduce",
+      operand: "constant",
+      amount: 2,
+      target: "controller_spell",
+      appliesToSourcePlay: true,
+      duration: "thisTurn",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    spell,
+    card("OPPONENT_UNIT", "Unit", 2),
+  ], [
+    instance("spell", "p1", "CONDITIONAL_SPELL", "mainDeck"),
+    instance("opponent-unit", "p2", "OPPONENT_UNIT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.hand = ["spell"];
+  game.state.players.p2!.zones.base = ["opponent-unit"];
+  game.state.turnHistory = {
+    discardedCardIdsByPlayerId: {},
+    diedCardIdsByPlayerId: {},
+    movedCardIdsByPlayerId: {},
+    readiedCardIdsByPlayerId: {},
+    recycledCardIdsByPlayerId: {},
+  };
+
+  dispatchBehaviorEvent(game, {
+    type: "unit.died",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "opponent-unit",
+    values: {},
+  }, decks);
+
+  const index = createRuntimeCardIndex(decks, game);
+  assert.deepEqual(game.state.turnHistory.diedCardIdsByPlayerId, {
+    p2: ["opponent-unit"],
+  });
+  assert.equal(effectiveEnergyCost(game, "p1", spell, index), 2);
+});
+
+test("an optional targeted effect lets the player choose a target or decline", () => {
+  const source = card("SOURCE", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "optional-followup",
+    sequence: 0,
+    sourceText: "You may ready another exhausted friendly card.",
+    normalizedText: "You may ready another exhausted friendly card.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [binding("selector.friendly_card", {
+      minimumCount: 1,
+      maximumCount: 1,
+      excludesSource: true,
+      exhaustedOnly: true,
+      selectionKey: "target",
+      requiresChoiceKey: "useEffect",
+    })],
+    choices: [binding("choice.optional", {
+      selectionKey: "useEffect",
+      prompt: "Use the optional effect?",
+    })],
+    costs: [],
+    timings: [],
+    effects: [binding("action.ready_cards", {
+      player: "controller",
+      target: "friendly_card",
+      selectionKey: "target",
+      requiresChoiceKey: "useEffect",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    source,
+    card("EXHAUSTED_GEAR", "Gear"),
+  ], [
+    instance("source", "p1", "SOURCE", "mainDeck"),
+    instance("exhausted-gear", "p1", "EXHAUSTED_GEAR", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "exhausted-gear"];
+  game.state.cardStates["exhausted-gear"]!.exhausted = true;
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "optional-followup",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    game.state.pendingChoice?.type === "effectSelection" &&
+      game.state.pendingChoice.allowDecline,
+    true,
+  );
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["exhausted-gear"],
+  );
+
+  assert.equal(submitEffectSelection(game, "p1", ["exhausted-gear"], decks), true);
+  assert.equal(game.state.cardStates["exhausted-gear"]!.exhausted, false);
+
+  game.state.cardStates["exhausted-gear"]!.exhausted = true;
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "optional-followup",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  const declineAction = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(declineAction);
+  const declined = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: declineAction.id,
+    selectedIds: [],
+    decks,
+    now: "decline-optional-target",
+  });
+  assert.equal(declined.state.cardStates["exhausted-gear"]!.exhausted, true);
+});
+
+test("a targetless optional effect retains its accept or decline prompt", () => {
+  const source = card("SOURCE", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "targetless-optional",
+    sequence: 0,
+    sourceText: "You may do a thing.",
+    normalizedText: "You may do a thing.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [binding("choice.optional", {
+      selectionKey: "doThing",
+      prompt: "Do the thing?",
+    })],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source], [
+    instance("source", "p1", "SOURCE", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "targetless-optional",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "binary");
+});
+
+test("source-location unit presence counts units at a battlefield source", () => {
+  const unitIds = Array.from({ length: 7 }, (_, index) => `unit-${index + 1}`);
+  const { game, handlers } = fixture(
+    [card("SOURCE", "Battlefield"), card("UNIT", "Unit", 1)],
+    [
+      instance("source", "p1", "SOURCE", "battlefield"),
+      ...unitIds.map((id) => instance(id, "p1", "UNIT", "mainDeck")),
+    ],
+  );
+  game.state.battlefields = [{
+    battlefieldId: "source-battlefield",
+    cardInstanceId: "source",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: unitIds,
+  }];
+
+  const context = createBehaviorContext(game, "p1", "source", {
+    type: "battlefield.held",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "source",
+    values: {},
+  }, []);
+  assert.equal(
+    handlers.get("condition.unit_presence")!.matches!(
+      bindingFor("condition.unit_presence", {
+        controller: "controller",
+        locationRelation: "sourceLocation",
+        minimumCount: 7,
+      }),
+      context,
+    ),
+    true,
+  );
 });
 
 test("vision exposes only the top card and recycles the selected card", () => {
@@ -331,6 +695,13 @@ function fixture(
       cardStates: Object.fromEntries(
         instances.map((instance) => [instance.instanceId, cardState(instance, definitions)]),
       ),
+      turnHistory: {
+        discardedCardIdsByPlayerId: {},
+        diedCardIdsByPlayerId: {},
+        movedCardIdsByPlayerId: {},
+        readiedCardIdsByPlayerId: {},
+        recycledCardIdsByPlayerId: {},
+      },
       createdCardInstances: [],
       createdCardDefinitions: [],
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },

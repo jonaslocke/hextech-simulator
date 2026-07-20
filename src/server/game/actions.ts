@@ -149,6 +149,7 @@ export function gameplayActions(
             kind: "effectSelection",
             choiceId: pendingChoice.id,
             prompt: pendingChoice.prompt,
+            allowDecline: pendingChoice.allowDecline,
           },
         ),
       );
@@ -1119,7 +1120,9 @@ function passPriority(
                         handlers,
                       ),
                 targetsLocked: !clause.selectors.some(
-                  (selector) => selector.parameters.deferred === true,
+                  (selector) =>
+                    selector.parameters.deferred === true ||
+                    typeof selector.parameters.requiresChoiceKey === "string",
                 ),
                 lockedSelectionsByBinding: item.lockedSelectionsByBinding,
                 targetObjectVersions: item.targetObjectVersions,
@@ -2091,6 +2094,13 @@ function executeActivatedAbility(
   if (!activatedAbilityLegionSatisfied(game, actorPlayerId, clause)) {
     throw new Error("Legion requires another card played this turn.");
   }
+  if (clause.keywords.some((item) => item.behaviorId === "keyword.legion")) {
+    const legionSatisfied = (game.state.players[actorPlayerId]!
+      .legionSatisfiedCardIdsThisTurn ??= []);
+    if (!legionSatisfied.includes(sourceId)) {
+      legionSatisfied.push(sourceId);
+    }
+  }
   const handler = handlers.get(binding.behaviorId);
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
@@ -2858,11 +2868,17 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     0,
   );
   const actionKind = action.id.split(":")[3];
+  const canDeclineTargetedOptionalEffect =
+    action.choice?.kind === "effectSelection" &&
+    action.choice.allowDecline === true &&
+    selectedIds.length === 0;
   if (
-    selectedIds.length < minimum ||
-    selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    (actionKind === "moveMany" && new Set(selectedIds).size !== selectedIds.length)
+    !canDeclineTargetedOptionalEffect &&
+    (selectedIds.length < minimum ||
+      selectedIds.length > maximum ||
+      selectedIds.some((id) => !legal.has(id)) ||
+      (actionKind === "moveMany" &&
+        new Set(selectedIds).size !== selectedIds.length))
   ) {
     throw new Error("Selected targets are not legal for this action.");
   }

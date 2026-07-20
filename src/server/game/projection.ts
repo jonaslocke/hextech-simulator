@@ -246,6 +246,7 @@ export function projectGame(input: {
               revealedCards,
               minimum: input.game.state.pendingChoice.minimum,
               maximum: input.game.state.pendingChoice.maximum,
+              allowDecline: input.game.state.pendingChoice.allowDecline,
             }
           : input.game.state.pendingChoice?.type === "assignCombatDamage"
             ? {

@@ -11,6 +11,7 @@ import type {
 export type PlayerDecisionRequestInput = {
   activeTargetSelection?: {
     actionId: string;
+    canDecline: boolean;
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
@@ -416,6 +417,7 @@ function mapActiveNonBoardCardDecision({
   return {
     actionId: action.id,
     canCancel: true,
+    cancelLabel: activeTargetSelection.canDecline ? "Decline" : "Cancel",
     cards: activeTargetSelection.legalTargetIds.map((id) => {
       const location = cardLocationById.get(id)!;
 

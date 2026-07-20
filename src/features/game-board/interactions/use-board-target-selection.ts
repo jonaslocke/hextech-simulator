@@ -18,6 +18,7 @@ import type { Card } from "../types";
 
 export type BoardTargetSelection = {
   actionId: string;
+  canDecline: boolean;
   legalTargetIds: string[];
   maxTargets: number;
   minTargets: number;
@@ -50,6 +51,7 @@ export function useBoardTargetSelection({
 }: UseBoardTargetSelectionArgs): {
   chooseBoardTarget: (cardInstanceId: string | undefined) => void;
   clearSubmittedTargetHighlights: () => void;
+  declineTargetedChoice: () => Promise<boolean>;
   displayedHighlightedCardInstanceIds: Set<string>;
   handleTargetClickCapture: (event: MouseEvent<HTMLElement>) => void;
   handleTargetPointerEnter: (card: Card) => void;
@@ -177,6 +179,26 @@ export function useBoardTargetSelection({
     ],
   );
 
+  const declineTargetedChoice = useCallback(async (): Promise<boolean> => {
+    if (
+      !targetSelection ||
+      targetSelection.purpose !== "choice" ||
+      !targetSelection.canDecline
+    ) {
+      return false;
+    }
+
+    const accepted = await submitProjectedAction(
+      targetSelectionAction?.id ?? targetSelection.actionId,
+      [],
+    );
+    if (!accepted) return false;
+
+    setHoveredTargetCardInstanceId(null);
+    setTargetSelection(null);
+    return true;
+  }, [submitProjectedAction, targetSelection, targetSelectionAction]);
+
   const chooseBoardTarget = useCallback(
     (cardInstanceId: string | undefined) => {
       if (!targetSelection || !cardInstanceId) {
@@ -292,6 +314,7 @@ export function useBoardTargetSelection({
   return {
     chooseBoardTarget,
     clearSubmittedTargetHighlights,
+    declineTargetedChoice,
     displayedHighlightedCardInstanceIds,
     handleTargetClickCapture,
     handleTargetPointerEnter,

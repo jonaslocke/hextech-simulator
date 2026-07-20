@@ -3,6 +3,11 @@ import { ZodError } from "zod";
 import { cardSetFileSchema, type Card } from "../catalog";
 import { analyzeCardBehaviorSuggestions, type CardBehaviorSuggestion } from "./behavior-suggestions";
 import { deriveCardCodeFromCard } from "./identity";
+import {
+  applyOfficialErrata,
+  loadOfficialErrata,
+  type AppliedErratum,
+} from "./official-errata";
 import type { PrimitiveCatalogEntry } from "./primitive-catalog";
 import type {
   ExistingCanonicalCardLookup,
@@ -16,6 +21,9 @@ export type ExistingCardCatalogState =
 
 export type CardCatalogImportPreviewCard = {
   card: Card;
+  printedCard: Card;
+  printedSourceTextHash: string;
+  appliedErrata: AppliedErratum[];
   cardCode: string;
   publicCode: string;
   name: string;
@@ -65,20 +73,28 @@ export async function previewCardCatalogImport(input: {
   behaviorCatalog: PrimitiveCatalogEntry[];
   existingCardLookup?: ExistingCanonicalCardLookup;
 }): Promise<CardCatalogImportPreviewResult> {
-  const cards = parseUploadedCardSetJson(input.rawJson);
+  const printedCards = parseUploadedCardSetJson(input.rawJson);
+  const releases = await loadOfficialErrata(printedCards);
+  const cards = printedCards.map((printedCard) =>
+    applyOfficialErrata(printedCard, releases),
+  );
   const suggestionReport = analyzeCardBehaviorSuggestions(
-    cards,
+    cards.map((card) => card.effectiveCard),
     [input.sourceLabel],
     input.behaviorCatalog
   );
   const suggestionsByCardCode = new Map(
     suggestionReport.cards.map((suggestion) => [suggestion.cardCode, suggestion])
   );
-  const previewCardsWithoutExistingState = cards.map((card) => {
+  const previewCardsWithoutExistingState = cards.map((overlay) => {
+    const card = overlay.effectiveCard;
     const cardCode = deriveCardCodeFromCard(card);
 
     return {
       card,
+      printedCard: overlay.printedCard,
+      printedSourceTextHash: hashCardRulesText(overlay.printedCard),
+      appliedErrata: overlay.appliedErrata,
       cardCode,
       sourceTextHash: hashCardRulesText(card)
     };
@@ -89,12 +105,22 @@ export async function previewCardCatalogImport(input: {
     ) ?? Promise.resolve(new Map<string, PersistedCanonicalCardSummary>());
   const existingCardsByCode = await existingCards;
   const previewCards = previewCardsWithoutExistingState.map(
-    ({ card, cardCode, sourceTextHash }) => {
+    ({
+      card,
+      printedCard,
+      printedSourceTextHash,
+      appliedErrata,
+      cardCode,
+      sourceTextHash,
+    }) => {
       const persisted = existingCardsByCode.get(cardCode) ?? null;
       const suggestion = suggestionsByCardCode.get(cardCode) ?? null;
 
       return {
         card,
+        printedCard,
+        printedSourceTextHash,
+        appliedErrata,
         cardCode,
         publicCode: card.public_code,
         name: card.name,

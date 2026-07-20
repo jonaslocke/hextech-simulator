@@ -682,6 +682,24 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
   }),
+  "selector.friendly_card": primitiveSeed({
+    id: "selector.friendly_card",
+    family: "selector",
+    name: "Select friendly card",
+    description: "Selects a controlled non-battlefield card on the board.",
+    parameters: [
+      required("minimumCount", "number", "The minimum number of friendly cards in the selection."),
+      required("maximumCount", "number", "The maximum number of friendly cards in the selection."),
+      optional("excludesSource", "boolean", "Whether the selected card cannot be the behavior source."),
+      optional("exhaustedOnly", "boolean", "Whether only exhausted cards are legal."),
+      optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("requiresChoiceKey", "string", "Choice key that enables this selector."),
+      optional("requiresChoiceValue", "string", "Chosen value required to enable this selector."),
+    ],
+    engineSupport: supported("Enumerates controlled Units, Gear, and Runes on the board."),
+    targetingRequirements: ["target must be a controlled non-battlefield card"]
+  }),
   "selector.enemy_unit": primitiveSeed({
     id: "selector.enemy_unit",
     family: "selector",

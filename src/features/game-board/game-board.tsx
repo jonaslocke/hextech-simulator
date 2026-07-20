@@ -162,6 +162,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   const {
     chooseBoardTarget,
     clearSubmittedTargetHighlights,
+    declineTargetedChoice,
     displayedHighlightedCardInstanceIds,
     handleTargetClickCapture,
     handleTargetPointerEnter,
@@ -401,6 +402,9 @@ export const GameBoard: FC<GameBoardProps> = ({
         ? current
         : {
             actionId: effectSelectionAction.id,
+            canDecline:
+              effectSelectionAction.choice?.kind === "effectSelection" &&
+              effectSelectionAction.choice.allowDecline === true,
             legalTargetIds: requirement.legalIds,
             maxTargets: requirement.maximum,
             minTargets: requirement.minimum,
@@ -496,7 +500,13 @@ export const GameBoard: FC<GameBoardProps> = ({
         interactionSuspended={decisionInspection.isInspecting}
         isPromptVisible={!decisionInspection.isInspecting}
         isSubmitting={isSubmittingAction}
-        onCancel={() => setTargetSelection(null)}
+        onCancel={() => {
+          if (targetSelection?.canDecline) {
+            void declineTargetedChoice();
+            return;
+          }
+          setTargetSelection(null);
+        }}
         onInspect={
           decisionInspection.canInspect
             ? decisionInspection.inspectBoard
@@ -787,12 +797,16 @@ export const GameBoard: FC<GameBoardProps> = ({
             onCancel={() => {
               if (
                 targetSelection.purpose === "choice" &&
-                targetSelection.minTargets === 0
+                (targetSelection.canDecline || targetSelection.minTargets === 0)
               ) {
-                void submitTargetedPlay({
-                  ...targetSelection,
-                  selectedTargetIds: [],
-                });
+                if (targetSelection.canDecline) {
+                  void declineTargetedChoice();
+                } else {
+                  void submitTargetedPlay({
+                    ...targetSelection,
+                    selectedTargetIds: [],
+                  });
+                }
                 return;
               }
               setTargetSelection(null);
@@ -808,7 +822,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                 : targetSelection.purpose === "hidePayment"
                   ? "Cancel Hide"
                 : targetSelection.purpose === "choice"
-                  ? targetSelection.minTargets === 0
+                  ? targetSelection.canDecline || targetSelection.minTargets === 0
                     ? "Decline"
                     : "Close"
                   : "Cancel"
@@ -869,7 +883,13 @@ export const GameBoard: FC<GameBoardProps> = ({
           isOpen
           isSubmitting={isSubmittingAction}
           isVisible={!decisionInspection.isInspecting}
-          onCancel={() => setTargetSelection(null)}
+          onCancel={() => {
+            if (targetSelection.canDecline) {
+              void declineTargetedChoice();
+              return;
+            }
+            setTargetSelection(null);
+          }}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({
               ...targetSelection,

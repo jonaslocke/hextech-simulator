@@ -35,6 +35,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "selector.friendly_unit": "executable",
   "selector.enemy_unit": "executable",
   "selector.card": "executable",
+  "selector.friendly_card": "executable",
   "selector.gear": "executable",
   "selector.battlefield": "executable",
   "action.draw_cards": "executable",

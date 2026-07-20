@@ -76,11 +76,16 @@ export function submitEffectSelection(
   if (!pending.resolutionId) {
     throw new Error("Effect resolution is unavailable.");
   }
+  const isDecliningOptionalTarget =
+    pending.allowDecline &&
+    Boolean(pending.optionalChoiceBindingKey) &&
+    selectedIds.length === 0;
   if (
-    selectedIds.length < pending.minimum ||
-    selectedIds.length > pending.maximum ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    selectedIds.some((id) => !pending.legalCardIds.includes(id))
+    !isDecliningOptionalTarget &&
+    (selectedIds.length < pending.minimum ||
+      selectedIds.length > pending.maximum ||
+      new Set(selectedIds).size !== selectedIds.length ||
+      selectedIds.some((id) => !pending.legalCardIds.includes(id)))
   ) {
     throw new Error("Effect selection does not satisfy its requirements.");
   }
@@ -88,6 +93,11 @@ export function submitEffectSelection(
     (candidate) => candidate.id === pending.resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
+  if (pending.optionalChoiceBindingKey) {
+    frame.selectionsByBinding[pending.optionalChoiceBindingKey] = [
+      isDecliningOptionalTarget ? "decline" : "accept",
+    ];
+  }
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
   game.state.pendingChoice = null;
   return resumeEffectResolution(game, frame.id, decks);
@@ -293,6 +303,38 @@ export function resumeEffectResolution(
     return false;
   }
 
+  const optionalTargetSelection = nextOptionalTargetSelection(
+    clause,
+    frame,
+    selectorContext,
+    handlers,
+  );
+  if (optionalTargetSelection) {
+    const { binding, choiceBindingKey, requirement } = optionalTargetSelection;
+    game.state.pendingChoice = {
+      id: `choice:${frame.id}:${binding.order}`,
+      playerId: selectorChoicePlayerId(game, frame.controllerPlayerId, binding),
+      type: "effectSelection",
+      resolutionId: frame.id,
+      bindingKey: `${clause.id}:selectors:${binding.order}`,
+      prompt: requirement.label
+        ? `Choose ${requirement.label}, or decline.`
+        : "Choose effect target, or decline.",
+      title: definition.card.name,
+      optionKind: requirement.kind === "battlefield" ? "battlefield" : "card",
+      sourceZone: requirement.sourceZone ?? null,
+      presentation: "cardSelection",
+      visionAction: "recycle",
+      legalCardIds: requirement.legalIds,
+      minimum: requirement.minimum,
+      maximum: requirement.maximum,
+      allowDecline: true,
+      optionalChoiceBindingKey: choiceBindingKey,
+      targetRequirements: [requirement],
+    };
+    return false;
+  }
+
   if (
     frame.activatedBehaviorId &&
     frame.activatedBehaviorId !== "ability.activate"
@@ -400,6 +442,12 @@ export function resumeEffectResolution(
   for (const binding of clause.choices as import("./schemas").BehaviorBinding[]) {
     const bindingKey = `${clause.id}:choices:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
+    if (
+      binding.behaviorId === "choice.optional" &&
+      optionalChoiceHasTargetSelector(clause, binding, selectorContext, handlers)
+    ) {
+      continue;
+    }
     const requirement = handlers.get(binding.behaviorId)?.choice?.(binding, selectorContext);
     if (!requirement || (requirement.kind !== "binary" && requirement.kind !== "mode")) continue;
     game.state.pendingChoice = requirement.kind === "binary"
@@ -532,6 +580,71 @@ export function resumeEffectResolution(
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);
   return true;
+}
+
+function nextOptionalTargetSelection(
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  frame: GameDocument["state"]["effectResolutions"][number],
+  context: ReturnType<typeof createBehaviorContext>,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  if (frame.targetsLocked) return null;
+
+  for (const choice of clause.choices) {
+    if (choice.behaviorId !== "choice.optional") continue;
+    const choiceBindingKey = `${clause.id}:choices:${choice.order}`;
+    if (frame.selectionsByBinding[choiceBindingKey]) continue;
+    const selectionKey = choice.parameters.selectionKey;
+    if (typeof selectionKey !== "string") continue;
+
+    const acceptedContext = {
+      ...context,
+      selectedBySelector: {
+        ...context.selectedBySelector,
+        [selectionKey]: ["accept"],
+      },
+    };
+    const target = selectionRequirementsForClause(
+      clause,
+      acceptedContext,
+      handlers,
+    ).find(
+      ({ binding }) => binding.parameters.requiresChoiceKey === selectionKey,
+    );
+    if (!target) continue;
+
+    if (target.requirement.legalIds.length < target.requirement.minimum) {
+      frame.selectionsByBinding[choiceBindingKey] = ["decline"];
+      continue;
+    }
+
+    return {
+      ...target,
+      choiceBindingKey,
+    };
+  }
+
+  return null;
+}
+
+function optionalChoiceHasTargetSelector(
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  choice: import("./schemas").BehaviorBinding,
+  context: ReturnType<typeof createBehaviorContext>,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const selectionKey = choice.parameters.selectionKey;
+  if (typeof selectionKey !== "string") return false;
+  const acceptedContext = {
+    ...context,
+    selectedBySelector: {
+      ...context.selectedBySelector,
+      [selectionKey]: ["accept"],
+    },
+  };
+  return selectionRequirementsForClause(clause, acceptedContext, handlers).some(
+    ({ binding }) => binding.parameters.requiresChoiceKey === selectionKey,
+  );
 }
 
 function hydrateLockedSelectorSelections(

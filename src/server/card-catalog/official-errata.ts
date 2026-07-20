@@ -62,9 +62,9 @@ export async function loadOfficialErrata(cards: readonly Card[]) {
           !card.metadata.overnumbered &&
           !card.metadata.signature,
       ) ?? knownCardsByKey.get(cardKey)?.[0];
-      if (!printed) {
-        throw new Error(`Official errata card is absent from the printed corpus: ${cardKey}`);
-      }
+      // Imports can contain an individual set or a partial correction batch.
+      // Errata for cards outside that upload are irrelevant to its overlay.
+      if (!printed) continue;
       if (normalizeName(printed.name) !== normalizeName(erratum.cardName)) {
         throw new Error(`Official errata name does not match ${cardKey}: ${erratum.cardName}`);
       }

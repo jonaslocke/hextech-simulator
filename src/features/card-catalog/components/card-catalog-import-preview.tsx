@@ -150,6 +150,9 @@ export function CardCatalogImportPreview() {
       const response = await approveCardCatalogBehavior({
         cardCode: card.cardCode,
         card: card.card,
+        printedCard: card.printedCard,
+        printedSourceTextHash: card.printedSourceTextHash,
+        appliedErrata: card.appliedErrata,
         sourceTextHash: card.sourceTextHash,
         modelingStatus: "approved",
         clauses: draft.clauses,

@@ -68,7 +68,9 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion", "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source", "cost.exhaust_selected_unit", "cost.spend_buff",
+    "keyword.ganking", "keyword.hidden", "keyword.accelerate", "keyword.legion",
+    "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source",
+    "cost.exhaust_selected_unit", "cost.spend_buff", "cost.spend_source_buff",
     "keyword.temporary", "modifier.cannot_move_from_source_battlefield",
   ]) handlers.set(id, passive);
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
@@ -259,11 +261,21 @@ export function createPrimitiveHandlers(
       if (subject === "source") {
         return subjectCardInstanceId === context.sourceCardInstanceId;
       }
-      if (subject === "any_unit") return true;
       const ownerPlayerId = index.instances.get(subjectCardInstanceId)?.ownerPlayerId;
-      return subject === "friendly_unit" || subject === "friendly_card"
-        ? ownerPlayerId === context.controllerPlayerId
-        : (subject === "enemy_unit" || subject === "enemy_card") && ownerPlayerId !== context.controllerPlayerId;
+      const isUnit =
+        index.definitions.get(index.instances.get(subjectCardInstanceId)?.cardCode ?? "")
+          ?.card.classification.type === "Unit";
+      if (subject === "any_unit") return isUnit;
+      if (subject === "friendly_unit") {
+        return isUnit && ownerPlayerId === context.controllerPlayerId;
+      }
+      if (subject === "enemy_unit") {
+        return isUnit && ownerPlayerId !== context.controllerPlayerId;
+      }
+      if (subject === "friendly_card") {
+        return ownerPlayerId === context.controllerPlayerId;
+      }
+      return subject === "enemy_card" && ownerPlayerId !== context.controllerPlayerId;
     },
   });
   handlers.set("condition.compare_numeric_value", {
@@ -360,6 +372,40 @@ export function createPrimitiveHandlers(
         context.selectedIds,
       );
     }
+  });
+  handlers.set("selector.friendly_card", {
+    targets(binding, context) {
+      const legalIds = [
+        ...context.game.state.players[context.controllerPlayerId]!.zones.base,
+        ...context.game.state.battlefields.flatMap((battlefield) =>
+          battlefield.units.filter(
+            (id) =>
+              index.instances.get(id)?.ownerPlayerId ===
+              context.controllerPlayerId,
+          ),
+        ),
+      ].filter((id) =>
+        definitionForInstance(id, index).card.classification.type !== "Battlefield",
+      ).filter(
+        (id) =>
+          binding.parameters.exhaustedOnly !== true ||
+          context.game.state.cardStates[id]?.exhausted === true,
+      ).filter(
+        (id) =>
+          binding.parameters.excludesSource !== true ||
+          id !== context.sourceCardInstanceId,
+      );
+      return {
+        kind: "card" as const,
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
+        label: "friendly card",
+        legalIds,
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
+    },
   });
   handlers.set("selector.enemy_unit", {
     targets(binding, context) {
@@ -2070,8 +2116,10 @@ function unitsAtPresenceLocation(
     );
     return battlefield?.units ?? [];
   }
-  const sourceBattlefield = context.game.state.battlefields.find((candidate) =>
-    candidate.units.includes(context.sourceCardInstanceId),
+  const sourceBattlefield = context.game.state.battlefields.find(
+    (candidate) =>
+      candidate.cardInstanceId === context.sourceCardInstanceId ||
+      candidate.units.includes(context.sourceCardInstanceId),
   );
   if (sourceBattlefield) return sourceBattlefield.units;
   return context.game.state.players[context.controllerPlayerId]?.zones.base ?? [];

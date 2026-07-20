@@ -52,16 +52,28 @@ export function applyStartOfTurn(
             index?.instances.get(cardId)?.ownerPlayerId ===
             turn.activePlayerId,
         );
+      const readiedCardIds: string[] = [];
       for (const cardId of [
         ...(player.zones.legend ? [player.zones.legend] : []),
         ...player.zones.base,
         ...controlledBattlefieldUnits,
       ]) {
-        if (game.state.cardStates[cardId]) {
+        if (game.state.cardStates[cardId]?.exhausted) {
           game.state.cardStates[cardId]!.exhausted = false;
+          readiedCardIds.push(cardId);
         }
       }
       turn.phase = "beginning";
+      if (decks.length > 0) {
+        for (const cardId of readiedCardIds) {
+          dispatchBehaviorEvent(game, {
+            type: "card.readied",
+            actorPlayerId: turn.activePlayerId,
+            subjectCardInstanceId: cardId,
+            values: {},
+          }, decks);
+        }
+      }
       continue;
     }
 

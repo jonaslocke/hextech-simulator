@@ -183,6 +183,8 @@ const effectSelectionChoiceSchema = z.object({
   legalCardIds: z.array(z.string().min(1)),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative(),
+  allowDecline: z.boolean().optional(),
+  optionalChoiceBindingKey: z.string().min(1).optional(),
   chainItem: chainItemSchema.nullable().optional(),
   activation: z
     .object({

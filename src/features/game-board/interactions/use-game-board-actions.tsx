@@ -252,6 +252,7 @@ export function useGameBoardActions({
       if (requirement && requirement.maximum > 0) {
         setTargetSelection({
           actionId: actionToSubmit.id,
+          canDecline: false,
           legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
@@ -298,6 +299,9 @@ export function useGameBoardActions({
       const kind = action.id.split(":")[3];
       setTargetSelection({
         actionId: action.id,
+        canDecline:
+          action.choice?.kind === "effectSelection" &&
+          action.choice.allowDecline === true,
         legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
         maxTargets: requirement.maximum,
         minTargets: requirement.minimum,
@@ -540,6 +544,7 @@ export function useGameBoardActions({
 
         setTargetSelection({
           actionId: stagedMoveAction.id,
+          canDecline: false,
           legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
@@ -590,6 +595,7 @@ export function useGameBoardActions({
       if (requirement && requirement.maximum > 0) {
         setTargetSelection({
           actionId: action.id,
+          canDecline: false,
           legalTargetIds: activeTargetRequirement(requirement, [])?.legalIds ?? [],
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,

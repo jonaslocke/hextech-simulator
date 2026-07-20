@@ -5,11 +5,12 @@ Champion:
 1 Jinx, Rebel
 
 Runes:
-3 Fury Rune
-3 Calm Rune
+2 Fury Rune
+2 Calm Rune
 2 Mind Rune
 2 Body Rune
 2 Chaos Rune
+2 Order Rune
 
 Battlefields:
 1 Back-Alley Bar

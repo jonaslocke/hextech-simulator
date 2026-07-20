@@ -138,14 +138,19 @@ function turnEventCount(
 
 function historyRecordFor(eventType: unknown, game: GameDocument) {
   switch (eventType) {
+    case "card.discarded":
     case "discarded":
       return game.state.turnHistory.discardedCardIdsByPlayerId;
+    case "unit.died":
     case "died":
       return game.state.turnHistory.diedCardIdsByPlayerId;
+    case "unit.moved":
     case "moved":
       return game.state.turnHistory.movedCardIdsByPlayerId;
+    case "card.readied":
     case "readied":
       return game.state.turnHistory.readiedCardIdsByPlayerId;
+    case "card.recycled":
     case "recycled":
       return game.state.turnHistory.recycledCardIdsByPlayerId;
     default:
