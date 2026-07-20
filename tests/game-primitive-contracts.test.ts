@@ -197,6 +197,85 @@ test("Awakening batches ready events into one trigger-order decision", () => {
   assert.deepEqual(game.state.queuedChainItems, []);
 });
 
+test("a typed ready event routes its subject through the complete trigger contract", () => {
+  const trigger = card("SYN-READY-TRIGGER", "Gear");
+  trigger.behaviorModel.clauses = [{
+    id: "modify-readied-subject",
+    sequence: 0,
+    sourceText: "When a friendly Unit readies, it gets +1 Might this turn.",
+    normalizedText: "When a friendly Unit readies, it gets +1 Might this turn.",
+    abilities: [],
+    triggers: [binding("trigger.event", {
+      eventType: "card.readied",
+      subject: "friendly_unit",
+    })],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.modify_numeric_value", {
+      attribute: "might",
+      operation: "increase",
+      operand: "constant",
+      amount: 1,
+      target: "event_subject",
+      duration: "thisTurn",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    trigger,
+    card("SYN-READIED-UNIT", "Unit", 3),
+    card("SYN-UNCHANGED-UNIT", "Unit", 5),
+  ], [
+    instance("trigger", "p1", "SYN-READY-TRIGGER", "mainDeck"),
+    instance("readied-unit", "p1", "SYN-READIED-UNIT", "mainDeck"),
+    instance("unchanged-unit", "p1", "SYN-UNCHANGED-UNIT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = [
+    "trigger",
+    "readied-unit",
+    "unchanged-unit",
+  ];
+  game.state.cardStates["readied-unit"]!.exhausted = true;
+  game.state.turn!.phase = "awaken";
+
+  applyStartOfTurn(game, decks);
+
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.equal(game.state.chain?.priorityPlayerId, "p1");
+  assert.equal(
+    game.state.chain?.items[0]?.behaviorEvent?.subjectCardInstanceId,
+    "readied-unit",
+  );
+
+  let next = game;
+  for (const actorPlayerId of ["p1", "p2"] as const) {
+    const pass = gameplayActions(next, actorPlayerId, decks).find(
+      (action) => action.label === "Pass priority" && action.enabled,
+    );
+    assert.ok(pass, `Expected ${actorPlayerId} to receive chain priority.`);
+    next = performGameplayTransition({
+      game: next,
+      actorPlayerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `pass-${actorPlayerId}`,
+    }).game;
+  }
+
+  assert.equal(next.state.chain, null);
+  assert.deepEqual(
+    next.state.modifiers.map((modifier) => modifier.targetCardInstanceId),
+    ["readied-unit"],
+  );
+  assert.equal(next.state.cardStates["readied-unit"]!.computedMight, 4);
+  assert.equal(next.state.cardStates["unchanged-unit"]!.computedMight, 5);
+  gameDocumentSchema.parse(next);
+});
+
 test("typed death events satisfy opponent this-turn cost conditions", () => {
   const spell = card("CONDITIONAL_SPELL", "Spell");
   spell.card.attributes.energy = 4;
