@@ -934,6 +934,102 @@ test("optional targeted resolution accepts a legal target or declines", () => {
     gameDocumentSchema.parse(resolved);
   }
 });
+test("deferred selectors choose from the legal set at effect resolution", () => {
+  const source = card("SYN-DEFERRED-SOURCE", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "deferred-selection",
+    sequence: 0,
+    sourceText: "After a synthetic event, choose a target during resolution.",
+    normalizedText: "After a synthetic event, choose a target during resolution.",
+    abilities: [],
+    triggers: [binding("trigger.event", {
+      eventType: "synthetic.deferred",
+      subject: "friendly_card",
+    })],
+    conditions: [],
+    selectors: [binding("selector.friendly_unit", {
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+      deferred: true,
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("action.buff_unit", {
+      target: "friendly_unit",
+      selectionKey: "target",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    source,
+    card("SYN-DEFERRED-UNIT", "Unit", 2),
+    card("SYN-DEFERRED-EVENT", "Spell"),
+  ], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("initial-target", "p1", "SYN-DEFERRED-UNIT", "mainDeck"),
+    instance("late-target", "p1", "SYN-DEFERRED-UNIT", "mainDeck"),
+    instance("event-subject", "p1", "SYN-DEFERRED-EVENT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "initial-target"];
+  game.state.players.p1!.zones.hand = ["late-target"];
+
+  dispatchBehaviorEvent(game, {
+    type: "synthetic.deferred",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "event-subject",
+    values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.deepEqual(game.state.chain?.items[0]?.targetCardInstanceIds, []);
+  game.state.players.p1!.zones.hand = [];
+  game.state.players.p1!.zones.base.push("late-target");
+
+  let next = game;
+  for (const actorPlayerId of ["p1", "p2"] as const) {
+    const pass = gameplayActions(next, actorPlayerId, decks).find(
+      (action) => action.label === "Pass priority" && action.enabled,
+    );
+    assert.ok(pass);
+    next = performGameplayTransition({
+      game: next,
+      actorPlayerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `deferred-pass-${actorPlayerId}`,
+    }).game;
+  }
+
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    next.state.pendingChoice?.type === "effectSelection"
+      ? next.state.pendingChoice.legalCardIds
+      : [],
+    ["initial-target", "late-target"],
+  );
+  const submit = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection" && action.enabled,
+  );
+  assert.ok(submit);
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: submit.id,
+    selectedIds: ["late-target"],
+    decks,
+    now: "select-late-target",
+  }).game;
+
+  assert.equal(next.state.cardStates["initial-target"]!.buffed, undefined);
+  assert.equal(next.state.cardStates["late-target"]!.buffed, true);
+  assert.equal(next.state.pendingChoice, null);
+  assert.deepEqual(next.state.effectResolutions, []);
+});
+
 test("a targetless optional effect retains its accept or decline prompt", () => {
   const source = card("SOURCE", "Unit", 2);
   source.behaviorModel.clauses = [{
