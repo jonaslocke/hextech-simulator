@@ -6,6 +6,7 @@ import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   gameplayActions,
+  hasKeyword,
   performGameplayAction,
   performGameplayTransition,
   applyStartOfTurn,
@@ -17,6 +18,7 @@ import {
   type GameDocument,
   gameDocumentSchema,
 } from "../src/server/game";
+import { effectiveNumericValue } from "../src/server/game/numeric-modifiers";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import {
@@ -623,6 +625,214 @@ test("typed death events satisfy opponent this-turn cost conditions", () => {
     p2: ["opponent-unit"],
   });
   assert.equal(effectiveEnergyCost(game, "p1", spell, index), 2);
+});
+
+test("state conditions gate continuous numeric effects across boundary states", () => {
+  const examples = [
+    {
+      label: "low hand",
+      parameters: {
+        subject: "controller",
+        property: "handCount",
+        operator: "lessThanOrEqual",
+        comparisonValue: 1,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.players.p1!.zones.hand = ["support-a"];
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.players.p1!.zones.hand = ["support-a", "support-b"];
+      },
+    },
+    {
+      label: "facedown presence",
+      parameters: {
+        subject: "controller",
+        property: "facedownCount",
+        operator: "greaterThanOrEqual",
+        comparisonValue: 1,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.battlefields[0]!.facedownCards = [{
+          cardInstanceId: "support-a",
+          controllerPlayerId: "p1",
+          hiddenAtTurnNumber: 1,
+        }];
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.battlefields[0]!.facedownCards = [];
+      },
+    },
+    {
+      label: "tagged unit presence",
+      parameters: {
+        subject: "controller",
+        property: "taggedUnitCount",
+        tag: "SyntheticTag",
+        operator: "greaterThanOrEqual",
+        comparisonValue: 1,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.players.p1!.zones.base.push("tagged-unit");
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.players.p1!.zones.base = ["source"];
+      },
+    },
+    {
+      label: "source buff state",
+      parameters: {
+        subject: "source",
+        property: "buffed",
+        operator: "equal",
+        comparisonValue: 1,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.cardStates.source!.buffed = true;
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.cardStates.source!.buffed = false;
+      },
+    },
+    {
+      label: "score distance",
+      parameters: {
+        subject: "opponent",
+        property: "scoreDistanceToVictory",
+        operator: "lessThanOrEqual",
+        comparisonValue: 3,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.players.p2!.points = 5;
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.players.p2!.points = 4;
+      },
+    },
+    {
+      label: "source battlefield presence",
+      parameters: {
+        subject: "source",
+        property: "atBattlefield",
+        operator: "equal",
+        comparisonValue: 1,
+      },
+      arrangeTrue(game: GameDocument) {
+        game.state.players.p1!.zones.base = [];
+        game.state.battlefields[0]!.units = ["source"];
+      },
+      arrangeFalse(game: GameDocument) {
+        game.state.battlefields[0]!.units = [];
+        game.state.players.p1!.zones.base = ["source"];
+      },
+    },
+  ];
+
+  for (const example of examples) {
+    const source = card("SYN-CONDITIONAL-SOURCE", "Unit", 2);
+    source.behaviorModel.clauses = [{
+      id: "conditional-continuous-might",
+      sequence: 0,
+      sourceText: `While the ${example.label} condition is true, this has +1 Might.`,
+      normalizedText: `While the ${example.label} condition is true, this has +1 Might.`,
+      abilities: [],
+      triggers: [],
+      conditions: [binding("condition.state", example.parameters)],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [binding("modifier.modify_numeric_value", {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 1,
+        target: "source",
+        duration: "whileSourceOnBoard",
+      })],
+      keywords: [],
+    }];
+    const taggedUnit = card("SYN-TAGGED-UNIT", "Unit", 1);
+    taggedUnit.card.tags = ["SyntheticTag"];
+    const { game, decks } = fixture([
+      source,
+      card("SYN-BATTLEFIELD", "Battlefield"),
+      card("SYN-SUPPORT-A", "Spell"),
+      card("SYN-SUPPORT-B", "Spell"),
+      taggedUnit,
+    ], [
+      instance("source", "p1", "SYN-CONDITIONAL-SOURCE", "mainDeck"),
+      instance("battlefield", "p1", "SYN-BATTLEFIELD", "battlefield"),
+      instance("support-a", "p1", "SYN-SUPPORT-A", "mainDeck"),
+      instance("support-b", "p1", "SYN-SUPPORT-B", "mainDeck"),
+      instance("tagged-unit", "p1", "SYN-TAGGED-UNIT", "mainDeck"),
+    ]);
+    game.state.players.p1!.zones.base = ["source"];
+    game.state.battlefields = [{
+      battlefieldId: "battlefield",
+      cardInstanceId: "battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: [],
+      facedownCards: [],
+    }];
+    const index = createRuntimeCardIndex(decks, game);
+    const value = () => effectiveNumericValue({
+      attribute: "might",
+      baseValue: 2,
+      controllerPlayerId: "p1",
+      game,
+      index,
+      targetCardInstanceId: "source",
+      targetScope: "source",
+    });
+
+    example.arrangeTrue(game);
+    assert.equal(value(), 3, `${example.label} should enable the modifier.`);
+    example.arrangeFalse(game);
+    assert.equal(value(), 2, `${example.label} should disable the modifier.`);
+  }
+});
+
+test("a state condition gates a continuous keyword grant", () => {
+  const source = card("SYN-CONDITIONAL-KEYWORD", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "conditional-keyword",
+    sequence: 0,
+    sourceText: "While this is buffed, it has a synthetic keyword.",
+    normalizedText: "While this is buffed, it has a synthetic keyword.",
+    abilities: [],
+    triggers: [],
+    conditions: [binding("condition.state", {
+      subject: "source",
+      property: "buffed",
+      operator: "equal",
+      comparisonValue: 1,
+    })],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.grant_keyword", {
+      keywordId: "keyword.quick_action",
+      amount: 1,
+      target: "source",
+      duration: "whileSourceOnBoard",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  const index = createRuntimeCardIndex(decks, game);
+
+  assert.equal(hasKeyword(game, "source", "keyword.quick_action", index), false);
+  game.state.cardStates.source!.buffed = true;
+  assert.equal(hasKeyword(game, "source", "keyword.quick_action", index), true);
+  game.state.cardStates.source!.buffed = false;
+  assert.equal(hasKeyword(game, "source", "keyword.quick_action", index), false);
 });
 
 test("an optional targeted effect lets the player choose a target or decline", () => {
