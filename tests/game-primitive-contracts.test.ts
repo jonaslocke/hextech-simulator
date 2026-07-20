@@ -1731,6 +1731,120 @@ test("recall replacement registers a turn-scoped ongoing effect", () => {
   }]);
 });
 
+test("turn completion clears turn-scoped state and preserves longer durations", () => {
+  const { game, decks } = fixture([
+    card("SYN-TURN-UNIT", "Unit", 2),
+  ], [
+    instance("unit", "p1", "SYN-TURN-UNIT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["unit"];
+  for (const player of Object.values(game.state.players)) {
+    player.playedCardIdsThisTurn = ["played"];
+    player.playedMainDeckCardIdsThisTurn = ["played-main"];
+    player.legionSatisfiedCardIdsThisTurn = ["permission-source"];
+    player.chosenModesThisTurn = { "source:0:mode": ["alpha"] };
+  }
+  game.state.turnHistory = {
+    discardedCardIdsByPlayerId: { p1: ["unit"] },
+    diedCardIdsByPlayerId: { p2: ["unit"] },
+    movedCardIdsByPlayerId: { p1: ["unit"] },
+    readiedCardIdsByPlayerId: { p1: ["unit"] },
+    recycledCardIdsByPlayerId: { p2: ["unit"] },
+  };
+  game.state.cardStates.unit!.damage = 2;
+  game.state.cardStates.unit!.stunned = true;
+  game.state.modifiers = [
+    {
+      id: "modifier:turn",
+      sourceCardInstanceId: "unit",
+      controllerPlayerId: "p1",
+      targetCardInstanceId: "unit",
+      targetScope: "source",
+      attribute: "might",
+      operation: "increase",
+      amount: 1,
+      minimum: null,
+      duration: "thisTurn",
+      createdAtTurn: 1,
+    },
+    {
+      id: "modifier:persistent",
+      sourceCardInstanceId: "unit",
+      controllerPlayerId: "p1",
+      targetCardInstanceId: "unit",
+      targetScope: "source",
+      attribute: "might",
+      operation: "increase",
+      amount: 2,
+      minimum: null,
+      duration: "whileSourceOnBoard",
+      createdAtTurn: 1,
+    },
+  ];
+  game.state.ongoingEffects = [
+    {
+      id: "permission:turn",
+      behaviorId: "modifier.enter_ready",
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "unit",
+      targetCardInstanceIds: [],
+      duration: "thisTurn",
+      createdAtTurn: 1,
+    },
+    {
+      id: "permission:persistent",
+      behaviorId: "synthetic.permission",
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "unit",
+      targetCardInstanceIds: [],
+      duration: "whileSourceOnBoard",
+      createdAtTurn: 1,
+    },
+  ];
+
+  const endTurn = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "End turn" && action.enabled,
+  );
+  assert.ok(endTurn);
+  const next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: endTurn.id,
+    selectedIds: [],
+    decks,
+    now: "end-turn",
+  }).game;
+
+  assert.deepEqual(next.state.turnHistory, {
+    discardedCardIdsByPlayerId: {},
+    diedCardIdsByPlayerId: {},
+    movedCardIdsByPlayerId: {},
+    readiedCardIdsByPlayerId: {},
+    recycledCardIdsByPlayerId: {},
+  });
+  for (const player of Object.values(next.state.players)) {
+    assert.deepEqual(player.playedCardIdsThisTurn, []);
+    assert.deepEqual(player.playedMainDeckCardIdsThisTurn, []);
+    assert.deepEqual(player.legionSatisfiedCardIdsThisTurn, []);
+    assert.deepEqual(player.chosenModesThisTurn, {});
+  }
+  assert.deepEqual(
+    next.state.modifiers.map((modifier) => modifier.id),
+    ["modifier:persistent"],
+  );
+  assert.deepEqual(
+    next.state.ongoingEffects.map((effect) => effect.id),
+    ["permission:persistent"],
+  );
+  assert.equal(next.state.cardStates.unit!.damage, 0);
+  assert.equal(next.state.cardStates.unit!.stunned, false);
+  assert.equal(next.state.cardStates.unit!.computedMight, 4);
+  assert.equal(next.state.turn?.turnNumber, 2);
+  assert.equal(next.state.turn?.activePlayerId, "p2");
+  assert.equal(next.state.turn?.phase, "action");
+  gameDocumentSchema.parse(next);
+});
+
 function fixture(
   definitions: GameCardDefinition[],
   instances: CardInstance[] = [],
