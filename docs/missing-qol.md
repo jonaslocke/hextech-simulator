@@ -54,3 +54,4 @@
 [ ] improve token placement UI - needs image of the locations and better UX for placement.
 [ ] Force non unit gears to be placed at left of base
 [ ] Client needs a queue of intents, to no discard subsequential intents.
+[ ] Choose mode needs inspect board feature. ![alt text](image-8.png)
