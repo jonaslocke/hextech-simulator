@@ -1561,48 +1561,146 @@ test("optional-cost draw branches on whether the optional selection was paid", (
   assert.deepEqual(game.state.players.p1!.zones.hand, ["a", "b", "c"]);
 });
 
-test("source and battlefield trigger contracts distinguish ownership and location", () => {
+test("beginning triggers route controller ownership and first-phase metadata", () => {
   const { game, handlers } = fixture([
-    card("SOURCE", "Unit", 1),
-    card("BATTLEFIELD", "Battlefield"),
+    card("SYN-BEGINNING-SOURCE", "Gear"),
   ], [
-    instance("source", "p1", "SOURCE", "mainDeck"),
-    instance("battlefield", "p1", "BATTLEFIELD", "battlefield"),
+    instance("source", "p1", "SYN-BEGINNING-SOURCE", "mainDeck"),
   ]);
-  game.state.battlefields = [{
-    battlefieldId: "battlefield",
-    cardInstanceId: "battlefield",
-    selectedByPlayerId: "p1",
-    controllerPlayerId: "p1",
-    contestedByPlayerId: null,
-    units: ["source"],
-  }];
-  const sourceContext = (event: BehaviorEvent) =>
-    createBehaviorContext(game, "p1", "source", event, []);
+  const beginning = handlers.get("trigger.beginning")!.matches!;
+  const firstBeginning = handlers.get("trigger.first_beginning")!.matches!;
+  const context = (actorPlayerId: string, isFirstBeginningPhase: boolean) =>
+    createBehaviorContext(game, "p1", "source", {
+      type: "turn.beginning",
+      actorPlayerId,
+      subjectCardInstanceId: null,
+      values: { isFirstBeginningPhase },
+    }, []);
 
-  const conquerSource = handlers.get("trigger.conquer_source")!.matches!;
-  assert.equal(conquerSource(bindingFor("trigger.conquer_source"), sourceContext({
-    type: "battlefield.conquered",
-    actorPlayerId: "p1",
-    subjectCardInstanceId: "battlefield",
-    values: {},
-  })), true);
-  assert.equal(conquerSource(bindingFor("trigger.conquer_source"), sourceContext({
-    type: "battlefield.conquered",
-    actorPlayerId: "p2",
-    subjectCardInstanceId: "battlefield",
-    values: {},
-  })), false);
-
-  const hold = handlers.get("trigger.hold_battlefield")!.matches!;
-  assert.equal(hold(bindingFor("trigger.hold_battlefield"), sourceContext({
-    type: "battlefield.held",
-    actorPlayerId: "p1",
-    subjectCardInstanceId: "source",
-    values: {},
-  })), true);
+  assert.equal(beginning(
+    bindingFor("trigger.beginning", { player: "controller" }),
+    context("p1", false),
+  ), true);
+  assert.equal(beginning(
+    bindingFor("trigger.beginning", { player: "controller" }),
+    context("p2", false),
+  ), false);
+  assert.equal(beginning(
+    bindingFor("trigger.beginning", { player: "any" }),
+    context("p2", false),
+  ), true);
+  assert.equal(firstBeginning(
+    bindingFor("trigger.first_beginning"),
+    context("p1", true),
+  ), true);
+  assert.equal(firstBeginning(
+    bindingFor("trigger.first_beginning"),
+    context("p1", false),
+  ), false);
 });
 
+test("hold and conquer triggers route battlefield identity, ownership, and location", () => {
+  const { game, handlers } = fixture([
+    card("SYN-UNIT-SOURCE", "Unit", 1),
+    card("SYN-SOURCE-BATTLEFIELD", "Battlefield"),
+    card("SYN-OTHER-BATTLEFIELD", "Battlefield"),
+  ], [
+    instance("unit-source", "p1", "SYN-UNIT-SOURCE", "mainDeck"),
+    instance("source-battlefield", "p1", "SYN-SOURCE-BATTLEFIELD", "battlefield"),
+    instance("other-battlefield", "p2", "SYN-OTHER-BATTLEFIELD", "battlefield"),
+  ]);
+  game.state.battlefields = [
+    {
+      battlefieldId: "source-location",
+      cardInstanceId: "source-battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: ["unit-source"],
+    },
+    {
+      battlefieldId: "other-location",
+      cardInstanceId: "other-battlefield",
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p2",
+      contestedByPlayerId: null,
+      units: [],
+    },
+  ];
+  const event = (
+    type: string,
+    actorPlayerId: string,
+    subjectCardInstanceId: string,
+  ): BehaviorEvent => ({
+    type,
+    actorPlayerId,
+    subjectCardInstanceId,
+    values: {},
+  });
+  const battlefieldContext = (behaviorEvent: BehaviorEvent) =>
+    createBehaviorContext(
+      game,
+      "p1",
+      "source-battlefield",
+      behaviorEvent,
+      [],
+    );
+  const unitContext = (behaviorEvent: BehaviorEvent) =>
+    createBehaviorContext(game, "p1", "unit-source", behaviorEvent, []);
+
+  const hold = handlers.get("trigger.hold_battlefield")!.matches!;
+  assert.equal(hold(
+    bindingFor("trigger.hold_battlefield"),
+    battlefieldContext(event("battlefield.held", "p1", "source-battlefield")),
+  ), true);
+  assert.equal(hold(
+    bindingFor("trigger.hold_battlefield"),
+    battlefieldContext(event("battlefield.held", "p1", "other-battlefield")),
+  ), false);
+
+  const conquerBattlefield =
+    handlers.get("trigger.conquer_battlefield")!.matches!;
+  assert.equal(conquerBattlefield(
+    bindingFor("trigger.conquer_battlefield"),
+    battlefieldContext(event(
+      "battlefield.conquered",
+      "p1",
+      "source-battlefield",
+    )),
+  ), true);
+  assert.equal(conquerBattlefield(
+    bindingFor("trigger.conquer_battlefield"),
+    battlefieldContext(event(
+      "battlefield.conquered",
+      "p1",
+      "other-battlefield",
+    )),
+  ), false);
+
+  const conquer = handlers.get("trigger.conquer")!.matches!;
+  assert.equal(conquer(
+    bindingFor("trigger.conquer"),
+    unitContext(event("battlefield.conquered", "p1", "source-battlefield")),
+  ), true);
+  assert.equal(conquer(
+    bindingFor("trigger.conquer"),
+    unitContext(event("battlefield.conquered", "p2", "source-battlefield")),
+  ), false);
+
+  const conquerSource = handlers.get("trigger.conquer_source")!.matches!;
+  assert.equal(conquerSource(
+    bindingFor("trigger.conquer_source"),
+    unitContext(event("battlefield.conquered", "p1", "source-battlefield")),
+  ), true);
+  assert.equal(conquerSource(
+    bindingFor("trigger.conquer_source"),
+    unitContext(event("battlefield.conquered", "p1", "other-battlefield")),
+  ), false);
+  assert.equal(conquerSource(
+    bindingFor("trigger.conquer_source"),
+    unitContext(event("battlefield.conquered", "p2", "source-battlefield")),
+  ), false);
+});
 test("recall replacement registers a turn-scoped ongoing effect", () => {
   const { game, handlers } = fixture([
     card("SOURCE", "Unit", 1),
