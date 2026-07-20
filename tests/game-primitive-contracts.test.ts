@@ -291,6 +291,106 @@ test("move-to-base emits subject and origin metadata", () => {
   });
 });
 
+test("card play events distinguish hand and Facedown origins", () => {
+  for (const fromFacedown of [false, true]) {
+    const observer = card("SYN-PLAY-OBSERVER", "Gear");
+    observer.behaviorModel.clauses = [{
+      id: "observe-play",
+      sequence: 0,
+      sourceText: "Observe a friendly card play event.",
+      normalizedText: "Observe a friendly card play event.",
+      abilities: [],
+      triggers: [binding("trigger.event", {
+        eventType: "card.played",
+        subject: "friendly_card",
+      })],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [],
+      keywords: [],
+    }];
+    const played = card("SYN-PLAYED-CARD", "Gear");
+    played.card.attributes.energy = 3;
+    played.behaviorModel.clauses = [{
+      id: "hidden-permission",
+      sequence: 0,
+      sourceText: "This card may be played from Facedown.",
+      normalizedText: "This card may be played from Facedown.",
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [],
+      keywords: [binding("keyword.hidden")],
+    }];
+    const { game, decks } = fixture([
+      observer,
+      played,
+      card("SYN-HIDDEN-BATTLEFIELD", "Battlefield"),
+    ], [
+      instance("observer", "p1", observer.cardCode, "mainDeck"),
+      instance("played", "p1", played.cardCode, "mainDeck"),
+      instance("battlefield", "p1", "SYN-HIDDEN-BATTLEFIELD", "battlefield"),
+    ]);
+    game.state.players.p1!.zones.base = ["observer"];
+    game.state.players.p1!.energy = 3;
+    game.state.battlefields = [{
+      battlefieldId: "hidden-location",
+      cardInstanceId: "battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: [],
+      facedownCards: fromFacedown ? [{
+        cardInstanceId: "played",
+        controllerPlayerId: "p1",
+        hiddenAtTurnNumber: 1,
+      }] : [],
+    }];
+    if (fromFacedown) {
+      game.state.turn = {
+        turnNumber: 2,
+        activePlayerId: "p2",
+        phase: "action",
+      };
+    } else {
+      game.state.players.p1!.zones.hand = ["played"];
+    }
+
+    const play = gameplayActions(game, "p1", decks).find(
+      (action) =>
+        action.sourceCardInstanceId === "played" &&
+        action.label.includes(fromFacedown ? "Play Hidden" : "Play Synthetic") &&
+        action.enabled,
+    );
+    assert.ok(play);
+    const next = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: play.id,
+      selectedIds: [],
+      decks,
+      now: fromFacedown ? "play-facedown" : "play-hand",
+    }).game;
+    const event = next.state.chain?.items[0]?.behaviorEvent;
+
+    assert.equal(event?.type, "card.played");
+    assert.equal(event?.subjectCardInstanceId, "played");
+    assert.equal(event?.values["eventSubject.wasHidden"], fromFacedown);
+    assert.equal(event?.values["eventSubject.printedEnergyCost"], 3);
+    assert.equal(
+      event?.values["eventSubject.effectiveEnergyCost"],
+      fromFacedown ? 0 : 3,
+    );
+  }
+});
+
 test("event-origin condition compares metadata with the source battlefield", () => {
   const { game, handlers } = fixture([
     card("SYN-ORIGIN-SOURCE", "Battlefield"),
