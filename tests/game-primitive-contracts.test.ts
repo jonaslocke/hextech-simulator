@@ -692,6 +692,166 @@ test("a state condition gates a continuous keyword grant", () => {
   assert.equal(hasKeyword(game, "source", "keyword.quick_action", index), false);
 });
 
+test("resolution-time mode choice executes only the selected branch", () => {
+  for (const example of [
+    { selectedMode: "small", expectedDrawCount: 1 },
+    { selectedMode: "large", expectedDrawCount: 2 },
+  ]) {
+    const source = card("SYN-RESOLUTION-MODE", "Gear");
+    source.behaviorModel.clauses = [{
+      id: "resolution-mode",
+      sequence: 0,
+      sourceText: "Choose one synthetic branch.",
+      normalizedText: "Choose one synthetic branch.",
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [],
+      choices: [binding("choice.choose_mode", {
+        selectionKey: "mode",
+        optionIds: "small|large",
+        optionLabels: "Small|Large",
+      })],
+      costs: [],
+      timings: [],
+      effects: [
+        binding("action.draw_cards", {
+          count: 1,
+          player: "controller",
+          requiresChoiceKey: "mode",
+          requiresChoiceValue: "small",
+        }),
+        {
+          ...binding("action.draw_cards", {
+            count: 2,
+            player: "controller",
+            requiresChoiceKey: "mode",
+            requiresChoiceValue: "large",
+          }),
+          order: 1,
+        },
+      ],
+      keywords: [],
+    }];
+    const { game, decks } = fixture([
+      source,
+      card("SYN-DRAW", "Spell"),
+    ], [
+      instance("source", "p1", source.cardCode, "mainDeck"),
+      instance("draw-a", "p1", "SYN-DRAW", "mainDeck"),
+      instance("draw-b", "p1", "SYN-DRAW", "mainDeck"),
+    ]);
+    game.state.players.p1!.zones.base = ["source"];
+    game.state.players.p1!.zones.mainDeck = ["draw-a", "draw-b"];
+
+    assert.equal(beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "source",
+      clauseId: "resolution-mode",
+      decks,
+    }), false);
+    assert.equal(game.state.pendingChoice?.type, "mode");
+    const submit = gameplayActions(game, "p1", decks).find(
+      (action) => action.choice?.kind === "mode" && action.enabled,
+    );
+    assert.ok(submit);
+    const resolved = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: submit.id,
+      selectedIds: [example.selectedMode],
+      decks,
+      now: `mode-${example.selectedMode}`,
+    }).game;
+
+    assert.equal(
+      resolved.state.players.p1!.zones.hand.length,
+      example.expectedDrawCount,
+    );
+    assert.equal(resolved.state.pendingChoice, null);
+    assert.deepEqual(resolved.state.effectResolutions, []);
+  }
+});
+
+test("activated mode memory excludes choices already used by the source object", () => {
+  const source = card("SYN-ACTIVATED-MODE", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "remember-mode",
+    sequence: 0,
+    sourceText: "Activate and choose a synthetic mode.",
+    normalizedText: "Activate and choose a synthetic mode.",
+    abilities: [binding("ability.activate")],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [binding("choice.choose_mode", {
+      selectionKey: "mode",
+      optionIds: "alpha|beta",
+      optionLabels: "Alpha|Beta",
+    })],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "source" && action.enabled,
+  );
+  assert.ok(activate);
+  let next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: [],
+    decks,
+    now: "activate-alpha",
+  }).game;
+  assert.deepEqual(
+    next.state.pendingChoice?.type === "mode"
+      ? next.state.pendingChoice.options.map((option) => option.id)
+      : [],
+    ["alpha", "beta"],
+  );
+  const chooseAlpha = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "mode" && action.enabled,
+  );
+  assert.ok(chooseAlpha);
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseAlpha.id,
+    selectedIds: ["alpha"],
+    decks,
+    now: "choose-alpha",
+  }).game;
+  next = resolveCurrentChain(next, decks);
+
+  const activateAgain = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "source" && action.enabled,
+  );
+  assert.ok(activateAgain);
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: activateAgain.id,
+    selectedIds: [],
+    decks,
+    now: "activate-again",
+  }).game;
+  assert.deepEqual(
+    next.state.pendingChoice?.type === "mode"
+      ? next.state.pendingChoice.options.map((option) => option.id)
+      : [],
+    ["beta"],
+  );
+});
+
 test("optional targeted resolution accepts a legal target or declines", () => {
   const source = card("SYN-OPTIONAL-SOURCE", "Unit", 2);
   source.behaviorModel.clauses = [{
@@ -1382,4 +1542,30 @@ function bindingFor(
   parameters: Record<string, string | number | boolean | null> = {},
 ) {
   return binding(behaviorId, parameters);
+}
+
+function resolveCurrentChain(
+  game: GameDocument,
+  decks: DeckSnapshotDocument[],
+): GameDocument {
+  let next = game;
+  for (let passCount = 0; next.state.chain && passCount < 8; passCount += 1) {
+    const availablePasses = next.state.setup.playerIds.flatMap(
+      (actorPlayerId) => gameplayActions(next, actorPlayerId, decks)
+        .filter((action) => action.label === "Pass priority" && action.enabled)
+        .map((action) => ({ action, actorPlayerId })),
+    );
+    assert.equal(availablePasses.length, 1);
+    const { action, actorPlayerId } = availablePasses[0]!;
+    next = performGameplayTransition({
+      game: next,
+      actorPlayerId,
+      actionId: action.id,
+      selectedIds: [],
+      decks,
+      now: `pass-${passCount}`,
+    }).game;
+  }
+  assert.equal(next.state.chain, null);
+  return next;
 }
