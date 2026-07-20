@@ -19,6 +19,7 @@ import type { Card } from "../types";
 export type BoardTargetSelection = {
   actionId: string;
   canDecline: boolean;
+  choiceId?: string;
   legalTargetIds: string[];
   maxTargets: number;
   minTargets: number;

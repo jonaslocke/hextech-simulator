@@ -241,6 +241,7 @@ export function resumeEffectResolution(
     return true;
   }
   for (const selector of clause.selectors) {
+    if (!bindingChoiceGateMatches(selector, selectorContext)) continue;
     const selected =
       frame.selectionsByBinding[
         `${clause.id}:selectors:${selector.order}`
@@ -371,6 +372,7 @@ export function resumeEffectResolution(
     );
     applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
+      if (!bindingChoiceGateMatches(selector, context)) continue;
       const selected =
         frame.selectionsByBinding[
           `${clause.id}:selectors:${selector.order}`
@@ -496,6 +498,7 @@ export function resumeEffectResolution(
     );
     applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
+      if (!bindingChoiceGateMatches(selector, context)) continue;
       const selected =
         frame.selectionsByBinding[
           `${clause.id}:selectors:${selector.order}`

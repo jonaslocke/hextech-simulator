@@ -76,6 +76,7 @@ export function ChoiceDialog({
         !options.find((option) => option.id === selectedId)?.disabled;
   const selectedIds =
     selectionMode === "ordered" ? orderedIds : selectedId ? [selectedId] : [];
+  const isInteractionLocked = interactionSuspended || isSubmitting;
 
   return (
     <DialogPortal>
@@ -111,14 +112,14 @@ export function ChoiceDialog({
 
           {selectionMode === "single" ? (
             <SingleChoiceList
-              interactionSuspended={interactionSuspended}
+              interactionSuspended={isInteractionLocked}
               onSelect={setSelectedId}
               options={options}
               selectedId={selectedId}
             />
           ) : (
             <OrderedChoiceList
-              interactionSuspended={interactionSuspended}
+              interactionSuspended={isInteractionLocked}
               onOrderChange={setOrderedIds}
               options={options}
               orderedIds={orderedIds}
@@ -129,8 +130,10 @@ export function ChoiceDialog({
             {onCancel && (
               <GameActionButton
                 actionSlot="cancel"
-                onAction={onCancel}
-                disabled={interactionSuspended}
+                onAction={() => {
+                  if (!isInteractionLocked) onCancel();
+                }}
+                disabled={isInteractionLocked}
                 variant="secondary"
               >
                 Cancel
@@ -139,7 +142,7 @@ export function ChoiceDialog({
 
             <GameActionButton
               actionSlot="primary"
-              disabled={interactionSuspended || !canConfirm}
+              disabled={isInteractionLocked || !canConfirm}
               isBusy={isSubmitting}
               onAction={() => onConfirm(selectedIds)}
             >

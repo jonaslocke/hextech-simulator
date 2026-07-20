@@ -251,6 +251,7 @@ export function CardSelectionPrompt({
     currentSelectedIds.length >= effectiveMinSelected &&
     (maxSelected === undefined || currentSelectedIds.length <= maxSelected) &&
     currentSelectedIds.every((id) => !optionById.get(id)?.disabled);
+  const isInteractionLocked = interactionSuspended || isSubmitting;
 
   const selectionLimitReached =
     selectionMode === "multiple" &&
@@ -288,9 +289,13 @@ export function CardSelectionPrompt({
   );
 
   const cancelSelection = useCallback(() => {
+    if (isInteractionLocked) {
+      return;
+    }
+
     clearStoredDecisionDraft(draftStorageKey);
     onCancel?.();
-  }, [draftStorageKey, onCancel]);
+  }, [draftStorageKey, isInteractionLocked, onCancel]);
 
   const selectOption = useCallback(
     (option: CardSelectionPromptOption) => {
@@ -382,7 +387,7 @@ export function CardSelectionPrompt({
             {usesCardPresentation ? (
               <CardChoiceGrid
                 cardSize={cardSize}
-                interactionSuspended={interactionSuspended}
+                interactionSuspended={isInteractionLocked}
                 maxSelected={maxSelected}
                 onOrderChange={updateOrderedIds}
                 onSelect={selectOption}
@@ -401,14 +406,14 @@ export function CardSelectionPrompt({
               />
             ) : selectionMode === "ordered" ? (
               <OrderedChoiceList
-                interactionSuspended={interactionSuspended}
+                interactionSuspended={isInteractionLocked}
                 onOrderChange={updateOrderedIds}
                 options={options}
                 orderedIds={orderedIds}
               />
             ) : (
               <ChoiceList
-                interactionSuspended={interactionSuspended}
+                interactionSuspended={isInteractionLocked}
                 maxSelected={maxSelected}
                 onSelect={selectOption}
                 options={options}
@@ -428,7 +433,7 @@ export function CardSelectionPrompt({
             {onCancel && (
               <GameActionButton
                 actionSlot="cancel"
-                disabled={interactionSuspended}
+                disabled={isInteractionLocked}
                 onAction={cancelSelection}
                 variant="secondary"
               >
@@ -437,7 +442,7 @@ export function CardSelectionPrompt({
             )}
             <GameActionButton
               actionSlot="primary"
-              disabled={interactionSuspended || !canConfirm}
+              disabled={isInteractionLocked || !canConfirm}
               isBusy={isSubmitting}
               onAction={() => confirmSelection(currentSelectedIds)}
             >

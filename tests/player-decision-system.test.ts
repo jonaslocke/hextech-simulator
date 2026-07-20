@@ -213,6 +213,48 @@ test("maps an initiated non-board card target to a card selection decision", () 
     ["trash-unit"],
   );
   assert.equal(decision.actionId, "return-action");
+  assert.equal(decision.canCancel, true);
+});
+
+test("does not dismiss a mandatory pending selection through the local selection fallback", () => {
+  const trashUnit = card("pending-trash-unit", "Unit");
+  const action = effectSelectionAction(
+    "mandatory-choice",
+    "Choose a unit from trash",
+    [trashUnit.instanceId],
+  );
+  const projection = projectionWith({
+    actions: [action],
+    pendingChoice: effectSelectionChoice({
+      id: "mandatory-choice",
+      maximum: 1,
+      minimum: 1,
+      prompt: "Choose a unit from trash",
+      sourceZone: null,
+    }),
+  });
+  const trash = projection.players[0]!.zones.find(
+    (zone) => zone.kind === "trash",
+  )!;
+  trash.cards = [trashUnit];
+  trash.count = 1;
+
+  const decision = buildPlayerDecisionRequest({
+    activeTargetSelection: {
+      actionId: action.id,
+      canDecline: false,
+      legalTargetIds: [trashUnit.instanceId],
+      maxTargets: 1,
+      minTargets: 1,
+      targetKind: "card",
+    },
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.equal(decision.canCancel, false);
 });
 
 test("keeps initiated battlefield card targets out of card selection prompts", () => {

@@ -416,7 +416,12 @@ function mapActiveNonBoardCardDecision({
 
   return {
     actionId: action.id,
-    canCancel: true,
+    // A projected pending choice is authoritative and must remain on screen.
+    // Only an explicit decline action may dismiss it. Locally staged actions,
+    // which have no pending server choice yet, remain safely cancelable.
+    canCancel:
+      sourceProjection.pendingChoice === null ||
+      activeTargetSelection.canDecline,
     cancelLabel: activeTargetSelection.canDecline ? "Decline" : "Cancel",
     cards: activeTargetSelection.legalTargetIds.map((id) => {
       const location = cardLocationById.get(id)!;

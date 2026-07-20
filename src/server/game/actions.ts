@@ -125,6 +125,14 @@ export function gameplayActions(
       return actions;
     }
     if (pendingChoice.type === "effectSelection") {
+      const costPreview = pendingChoice.activation
+          ? activatedChoiceDeflectCostPreview(
+              game,
+              actorPlayerId,
+              pendingChoice.legalCardIds,
+              index,
+          )
+        : undefined;
       actions.push(
         action(
           game,
@@ -152,8 +160,20 @@ export function gameplayActions(
             prompt: pendingChoice.prompt,
             allowDecline: pendingChoice.allowDecline,
           },
+          costPreview,
         ),
       );
+      if (costPreview?.targetAdditionalPower.length) {
+        addAbilityActions(
+          actions,
+          game,
+          actorPlayerId,
+          index,
+          handlers,
+          currentTiming(game),
+          true,
+        );
+      }
       return actions;
     }
     if (pendingChoice.type === "tokenPlacement") {
@@ -1873,6 +1893,7 @@ function addAbilityActions(
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   timing: TurnTiming,
+  onlyResourceAbilities = false,
 ) {
   const player = game.state.players[playerId]!;
   const controlled = [
@@ -1900,6 +1921,9 @@ function addAbilityActions(
       ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
+        if (onlyResourceAbilities && !isAddResourceAbility(ability.behaviorId)) {
+          continue;
+        }
         if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
         const legionSatisfied = activatedAbilityLegionSatisfied(
@@ -1940,6 +1964,12 @@ function addAbilityActions(
           : canSatisfyTargetRequirements(targets);
         const enabled =
           legionSatisfied && sourceReady && costStatus.enabled && hasLegalTargets;
+        const costPreview = activatedChoiceDeflectCostPreview(
+          game,
+          playerId,
+          targets.flatMap((requirement) => requirement.legalIds),
+          index,
+        );
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
@@ -1970,6 +2000,8 @@ function addAbilityActions(
                   : "No legal targets are available.",
             `${clause.id}|${ability.behaviorId}`,
             targets,
+            undefined,
+            costPreview,
           ),
         );
       }
@@ -2130,6 +2162,13 @@ function executeActivatedAbility(
     };
     return;
   }
+  payActivatedChoiceDeflectCost(
+    game,
+    actorPlayerId,
+    sourceId,
+    selectedIds,
+    index,
+  );
   finalizeActivatedAbility(game, actorPlayerId, sourceId, clause, binding, selectedIds, index);
 }
 
@@ -2255,6 +2294,13 @@ function submitActivatedModeTargetSelection(
     (candidate) => candidate.behaviorId === activation.behaviorId,
   );
   if (!clause || !ability) throw new Error("Activated ability is unavailable.");
+  payActivatedChoiceDeflectCost(
+    game,
+    actorPlayerId,
+    activation.sourceCardInstanceId,
+    selectedIds,
+    index,
+  );
   game.state.pendingChoice = null;
   finalizeActivatedAbility(
     game,
@@ -2268,6 +2314,62 @@ function submitActivatedModeTargetSelection(
       [activation.modeBindingKey]: [activation.selectedModeId],
       [pending.bindingKey]: [...selectedIds],
     },
+  );
+}
+
+function activatedChoiceDeflectCostPreview(
+  game: GameDocument,
+  playerId: string,
+  legalTargetIds: readonly string[],
+  index: RuntimeCardIndex,
+): ProjectedAction["costPreview"] {
+  const targetAdditionalPower = legalTargetIds
+    .map((targetId) => ({
+      targetId,
+      amount: targetDeflectCost(game, playerId, [targetId], index),
+    }))
+    .filter((entry) => entry.amount > 0);
+  if (targetAdditionalPower.length === 0) return undefined;
+
+  return {
+    energy: 0,
+    basePower: 0,
+    availableAnyPower: Object.values(
+      game.state.players[playerId]?.power ?? {},
+    ).reduce((total, amount) => total + amount, 0),
+    reservedResourceSourceIds: [],
+    targetAdditionalPower,
+  };
+}
+
+function payActivatedChoiceDeflectCost(
+  game: GameDocument,
+  playerId: string,
+  sourceCardInstanceId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  const amount = targetDeflectCost(game, playerId, selectedIds, index);
+  if (amount === 0) return;
+
+  const sourceDefinition = definitionForInstance(sourceCardInstanceId, index);
+  payCardCost(
+    game,
+    playerId,
+    {
+      ...sourceDefinition,
+      card: {
+        ...sourceDefinition.card,
+        attributes: {
+          ...sourceDefinition.card.attributes,
+          energy: 0,
+          power: 0,
+        },
+      },
+    },
+    0,
+    index,
+    amount,
   );
 }
 

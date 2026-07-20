@@ -882,7 +882,7 @@ test("activated mode memory excludes choices already used by the source object",
     sequence: 0,
     sourceText: "Activate and choose a synthetic mode.",
     normalizedText: "Activate and choose a synthetic mode.",
-    abilities: [binding("ability.activate")],
+    abilities: [{ ...binding("ability.activate"), order: 1 }],
     triggers: [],
     conditions: [],
     selectors: [],
@@ -951,6 +951,168 @@ test("activated mode memory excludes choices already used by the source object",
       : [],
     ["beta"],
   );
+});
+
+test("an activated mode carries its gated target selection into the resolved effect", () => {
+  const source = card("SYN-MODAL-SOURCE", "Unit", 4);
+  const target = card("SYN-MODAL-TARGET", "Unit", 5);
+  const battlefield = card("SYN-MODAL-BATTLEFIELD", "Battlefield");
+  const resource = card("SYN-RESOURCE", "Gear");
+  resource.behaviorModel.clauses = [{
+    id: "add-power",
+    sequence: 0,
+    sourceText: "Add Power.",
+    normalizedText: "Add Power.",
+    abilities: [binding("ability.exhaust_for_resource", {
+      amount: 1,
+      domain: "Fury",
+      resourceType: "power",
+      usage: "unrestricted",
+    })],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  }];
+  target.behaviorModel.clauses = [{
+    id: "synthetic-deflect",
+    sequence: 0,
+    sourceText: "Deflect.",
+    normalizedText: "Deflect.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [binding("keyword.deflect", { amount: 1 })],
+  }];
+  source.behaviorModel.clauses = [{
+    id: "modal-target-effect",
+    sequence: 0,
+    sourceText: "Activate, choose a branch, then affect its selected target.",
+    normalizedText: "Activate, choose a branch, then affect its selected target.",
+    abilities: [binding("ability.activate")],
+    triggers: [],
+    conditions: [],
+    selectors: [
+      { ...binding("selector.unit", {
+        area: "battlefield",
+        maximumCount: 1,
+        minimumCount: 1,
+        selectionKey: "target",
+        requiresChoiceKey: "mode",
+        requiresChoiceValue: "damage",
+      }), order: 4 },
+      { ...binding("selector.unit", {
+        area: "battlefield",
+        maximumCount: 1,
+        minimumCount: 1,
+        selectionKey: "target",
+        requiresChoiceKey: "mode",
+        requiresChoiceValue: "other",
+      }), order: 5 },
+    ],
+    choices: [{ ...binding("choice.choose_mode", {
+      selectionKey: "mode",
+      optionIds: "damage|other",
+      optionLabels: "Damage|Other",
+    }), order: 3 }],
+    costs: [{ ...binding("cost.spend_source_buff"), order: 2 }],
+    timings: [],
+    effects: [{ ...binding("action.deal_damage", {
+      amount: 2,
+      target: "unit",
+      selectionKey: "target",
+      requiresChoiceKey: "mode",
+      requiresChoiceValue: "damage",
+    }), order: 6 }],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source, target, battlefield, resource], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("target", "p2", target.cardCode, "mainDeck"),
+    instance("battlefield", "p1", battlefield.cardCode, "battlefield"),
+    instance("resource", "p1", resource.cardCode, "mainDeck"),
+  ]);
+  game.state.cardStates.source!.buffed = true;
+  game.state.players.p1!.zones.base = ["resource"];
+  game.state.battlefields = [{
+    battlefieldId: "location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: ["source", "target"],
+  }];
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "source" && action.enabled,
+  );
+  assert.ok(activate);
+  let next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: [],
+    decks,
+    now: "activate-modal-effect",
+  }).game;
+  const chooseMode = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "mode" && action.enabled,
+  );
+  assert.ok(chooseMode);
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseMode.id,
+    selectedIds: ["damage"],
+    decks,
+    now: "choose-damage-mode",
+  }).game;
+  const addPower = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "resource" && action.enabled,
+  );
+  assert.ok(addPower);
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "add-deflect-power",
+  }).game;
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.equal(next.state.players.p1!.power.Fury, 1);
+  const chooseTarget = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection" && action.enabled,
+  );
+  assert.ok(chooseTarget);
+  assert.deepEqual(chooseTarget.costPreview, {
+    energy: 0,
+    basePower: 0,
+    availableAnyPower: 1,
+    reservedResourceSourceIds: [],
+    targetAdditionalPower: [{ targetId: "target", amount: 1 }],
+  });
+  next = performGameplayTransition({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseTarget.id,
+    selectedIds: ["target"],
+    decks,
+    now: "choose-damage-target",
+  }).game;
+  assert.equal(next.state.players.p1!.power.Fury, 0);
+  next = resolveCurrentChain(next, decks);
+
+  assert.equal(next.state.cardStates.target!.damage, 2);
 });
 
 test("optional targeted resolution accepts a legal target or declines", () => {

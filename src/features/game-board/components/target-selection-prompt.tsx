@@ -57,7 +57,7 @@ export function TargetSelectionPrompt({
   isSubmitting?: boolean;
   maxTargets: number;
   minTargets: number;
-  onCancel: () => void;
+  onCancel?: () => void;
   onSubmit: () => void;
   /**
    * Optional escape hatch for consumers that keep this component mounted while
@@ -310,17 +310,22 @@ export function TargetSelectionPrompt({
         )}
 
         <div className="flex justify-end items-center gap-2 px-4 py-3">
-          <GameActionButton
-            actionSlot="cancel"
-            onAction={onCancel}
-            variant="secondary"
-          >
-            {cancelLabel}
-          </GameActionButton>
+          {onCancel && (
+            <GameActionButton
+              actionSlot="cancel"
+              disabled={isSubmitting}
+              onAction={() => {
+                if (!isSubmitting) onCancel();
+              }}
+              variant="secondary"
+            >
+              {cancelLabel}
+            </GameActionButton>
+          )}
 
           <GameActionButton
             actionSlot="primary"
-            disabled={!canSubmit}
+            disabled={isSubmitting || !canSubmit}
             isBusy={isSubmitting}
             onAction={onSubmit}
           >
