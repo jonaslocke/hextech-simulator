@@ -72,13 +72,18 @@ export function activeContinuousNumericModifiers(
         (binding.parameters.target === "friendly_unit" &&
           input.targetScope === "source" &&
           input.targetCardInstanceId &&
-          input.controllerPlayerId === controllerPlayerId);
+          input.controllerPlayerId === controllerPlayerId) ||
+        (binding.parameters.target === "enemy_unit" &&
+          input.targetScope === "source" &&
+          input.targetCardInstanceId &&
+          input.controllerPlayerId !== controllerPlayerId);
       if (
         binding.parameters.attribute !== input.attribute ||
         !targetsCandidate ||
         (input.controllerPlayerId &&
           controllerPlayerId !== input.controllerPlayerId &&
-          binding.parameters.target !== "unit") ||
+          binding.parameters.target !== "unit" &&
+          binding.parameters.target !== "enemy_unit") ||
         (input.targetScope === "controller_spell" && input.cardType !== "Spell") ||
         (binding.parameters.target === "source" &&
           input.targetScope === "source" &&
@@ -165,6 +170,9 @@ function continuousConditionApplies(
   if (condition === "friendlyDefendsAlone") {
     return role === "defender" &&
       combatRoleCount(input.game, input.index, controllerPlayerId, "defender") === 1;
+  }
+  if (condition === "targetStunned") {
+    return input.game.state.cardStates[targetId]?.stunned === true;
   }
   return true;
 }

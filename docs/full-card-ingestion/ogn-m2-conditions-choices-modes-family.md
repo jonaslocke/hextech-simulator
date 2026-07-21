@@ -1,7 +1,8 @@
 # OGN M2 Family: Conditions, Optional Decisions, Modes, and Turn Memory
 
-Status: First 22-card subset manually validated; 34 excluded cards remain for the
-next primitive-driven implementation phase.
+Status: First 22-card subset manually validated; implementation batches for the
+34-card remainder are in progress. Published remainder cards stay ready for
+manual validation until the user accepts them in-game.
 
 ## Scope contract
 
@@ -72,6 +73,25 @@ rows because it needs both listed missing primitives; it is counted once.
 5. Conditional source-play Energy modifiers, event-subject numeric modifiers,
    automatic friendly-unit groups at the source location, and immediate
    win-game resolution.
+
+## Remainder implementation batches
+
+### Batch 1: state, legality, numeric copying, and prevention
+
+| Contract | Ownership and reuse | Classification | Published cards |
+|---|---|---|---|
+| Combat excess-damage history | Combat assignment records excess before damage is applied and forwards the attacking side's total on the conquer event. | Shared extension | `OGN-034` |
+| Conditional entry-ready | The card-play pipeline evaluates source entry replacement conditions before placement; the existing entry-ready modifier performs the state change. | Parameterized reuse | `OGN-079` |
+| Continuous play/ready restrictions | Unit-destination projection/execution and ready-effect execution consult active battlefield restrictions. Natural Awakening is deliberately unaffected. | New reusable legality hooks | `OGN-070` |
+| Cross-target value copy | A numeric-copy modifier snapshots the two selected Units' computed Might and records only the increase for the requested duration. | New primitive | `OGN-108` |
+| Special Unit destinations | The shared destination policy supports open battlefields from an active friendly permission and occupied enemy battlefields from the played Unit's own permission. | Shared extension | `OGN-161`, `OGN-193` |
+| Next-play cost modifier | The cost calculator applies the oldest matching one-shot Spell discount and consumes it only after a successful matching play. | New consumable permission | `OGN-031` |
+| Conditional damage prevention | Every damage producer consults the target's conditional prevention before mutation and event emission. | New prevention hook | `OGN-189` |
+
+These eight cards have synchronized supported canonical models and are ready
+for manual validation; they are not gameplay-accepted yet. `OGN-035` also uses
+the entry-ready contract but remains unpublished until its optional paid
+conquer clause is executable.
 
 ## Manually validated first subset
 

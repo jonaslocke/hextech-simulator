@@ -11,6 +11,8 @@ import {
 import {
   cleanupTurnModifiers,
   consumeEnterReadyEffect,
+  consumeNextPlayEnergyDiscount,
+  sourceEntersReady,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   definitionForInstance,
@@ -877,7 +879,7 @@ function playCard(
       : null;
   if (
     isUnit &&
-    !isLegalUnitDestination(game, playerId, definition, destinationId)
+    !isLegalUnitDestination(game, playerId, definition, destinationId, index)
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
@@ -934,6 +936,7 @@ function playCard(
     accelerated ? 1 : 0,
   );
   recordCardPlayed(game, playerId, cardId);
+  consumeNextPlayEnergyDiscount(game, playerId, definition);
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
@@ -941,6 +944,13 @@ function playCard(
     removeFacedownCard(battlefield, cardId);
   }
   if (isUnit || isGear) {
+    const entersReady = isUnit && sourceEntersReady(
+      game,
+      playerId,
+      cardId,
+      definition,
+      index,
+    );
     if (destinationBattlefield) {
       placeUnitAtBattlefield(game, {
         battlefieldId: destinationBattlefield.battlefieldId,
@@ -955,7 +965,9 @@ function playCard(
     ) {
       markBattlefieldContested(game, destinationId, playerId);
     }
-    game.state.cardStates[cardId]!.exhausted = isGear ? false : !accelerated;
+    game.state.cardStates[cardId]!.exhausted = isGear
+      ? false
+      : !(accelerated || entersReady);
     executeImmediateClauses(
       game,
       definition,
@@ -1658,7 +1670,7 @@ function addPlayableCardActions(
         : undefined;
     const unitDestinations =
       definition.card.classification.type === "Unit"
-        ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
+        ? legalUnitDestinationIds(game, playerId, definition, index).map((id) => ({
             id,
             name:
               id === "base"
@@ -1795,7 +1807,7 @@ function addHiddenPlayActions(
           "playHidden",
           `Play Hidden ${definition.card.name}`,
           cardId,
-          (!isUnit || isLegalUnitDestination(game, playerId, definition, battlefield.battlefieldId)) && hasLegalTargets,
+          (!isUnit || isLegalUnitDestination(game, playerId, definition, battlefield.battlefieldId, index)) && hasLegalTargets,
           !hasLegalTargets
             ? "No legal targets are available at the associated battlefield."
             : isUnit

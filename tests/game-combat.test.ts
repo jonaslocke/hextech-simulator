@@ -79,6 +79,14 @@ test("keeps conquer triggers after combat resolves", () => {
 
   assert.equal(game.state.chain?.items.length, 1);
   assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "battlefield");
+  assert.equal(
+    game.state.chain?.items[0]?.behaviorEvent?.values.excessDamageAssigned,
+    2,
+  );
+  assert.equal(
+    game.state.chain?.items[0]?.behaviorEvent?.values.afterAttack,
+    true,
+  );
 });
 
 test("combat damage emits unit-damaged events for ongoing triggers", () => {

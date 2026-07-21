@@ -89,6 +89,11 @@ function stateValue(
       0,
     );
   }
+  if (property === "controlledBattlefieldCount") {
+    return context.game.state.battlefields.filter(
+      (battlefield) => battlefield.controllerPlayerId === playerId,
+    ).length;
+  }
   if (property === "taggedUnitCount") {
     const tag = binding.parameters.tag;
     if (typeof tag !== "string" || !playerId) return 0;

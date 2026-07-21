@@ -6,6 +6,7 @@ import {
 import { scoreBattlefield } from "./scoring";
 import {
   cleanupCombatModifiers,
+  canTakeDamage,
   cleanupLethalDamage,
   definitionForInstance,
   hasKeyword,
@@ -68,7 +69,9 @@ export function startCombat(
     attackerMight: null,
     defenderMight: null,
     attackerAssignments: [],
-    defenderAssignments: []
+    defenderAssignments: [],
+    attackerExcessDamage: 0,
+    defenderExcessDamage: 0,
   };
   [...attackerUnitIds, ...defenderUnitIds].forEach((id) =>
     recomputeMight(game, id, index),
@@ -232,6 +235,7 @@ function applyAssignment(
   const combat = game.state.combat!;
   if (playerId === combat.attackerPlayerId) {
     combat.attackerAssignments = assignments;
+    combat.attackerExcessDamage = assignedExcessDamage(game, assignments);
     combat.stage = "defenderAssignment";
     requestOrApplyAssignment(
       game,
@@ -247,6 +251,7 @@ function applyAssignment(
     throw new Error("Player is not a participant in this combat.");
   }
   combat.defenderAssignments = assignments;
+  combat.defenderExcessDamage = assignedExcessDamage(game, assignments);
   const resolvedAssignments = [
     ...combat.attackerAssignments.map((assignment) => ({
       ...assignment,
@@ -257,11 +262,14 @@ function applyAssignment(
       actorPlayerId: combat.defenderPlayerId,
     })),
   ];
-  for (const assignment of resolvedAssignments) {
+  const appliedAssignments = resolvedAssignments.filter((assignment) =>
+    canTakeDamage(game, assignment.targetUnitId, index),
+  );
+  for (const assignment of appliedAssignments) {
     game.state.cardStates[assignment.targetUnitId]!.damage += assignment.amount;
   }
   (game.state.queuedBehaviorEvents ??= []).push(
-    ...resolvedAssignments.map((assignment) => ({
+    ...appliedAssignments.map((assignment) => ({
       type: "unit.damaged" as const,
       actorPlayerId: assignment.actorPlayerId,
       subjectCardInstanceId: assignment.targetUnitId,
@@ -270,7 +278,7 @@ function applyAssignment(
   );
   killUnitsMarkedForNextDamage(
     game,
-    resolvedAssignments.map((assignment) => assignment.targetUnitId),
+    appliedAssignments.map((assignment) => assignment.targetUnitId),
     index,
   );
   game.state.showdown = null;
@@ -433,8 +441,27 @@ function establishPostCombatControl(
       battlefield.battlefieldId,
       "conquer",
       decks,
+      {
+        afterAttack: true,
+        excessDamageAssigned:
+          battlefield.controllerPlayerId === combat.attackerPlayerId
+            ? combat.attackerExcessDamage
+            : combat.defenderExcessDamage,
+      },
     );
   }
+}
+
+function assignedExcessDamage(
+  game: GameDocument,
+  assignments: readonly DamageAssignment[],
+) {
+  return assignments.reduce((total, assignment) => {
+    const state = game.state.cardStates[assignment.targetUnitId];
+    if (!state) return total;
+    const lethalAmount = Math.max(0, (state.computedMight ?? 0) - state.damage);
+    return total + Math.max(0, assignment.amount - lethalAmount);
+  }, 0);
 }
 
 function endCombat(game: GameDocument, index: RuntimeCardIndex) {

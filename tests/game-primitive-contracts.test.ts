@@ -13,6 +13,8 @@ import {
   bindingChoiceGateMatches,
   dispatchBehaviorEvent,
   effectiveEnergyCost,
+  canTakeDamage,
+  legalUnitDestinationIds,
   type BehaviorEvent,
   type BehaviorBinding,
   type GameCardDefinition,
@@ -134,6 +136,152 @@ test("unit play consumes one matching enter-ready permission", () => {
   });
 
   assert.equal(next.state.cardStates["second-unit"]!.exhausted, true);
+});
+
+test("conditional source entry state is evaluated before placement", () => {
+  const entrant = card("SYN-CONDITIONAL-ENTRANT", "Unit", 3);
+  entrant.behaviorModel.clauses = [{
+    id: "conditional-entry",
+    sequence: 0,
+    sourceText: "If the opponent controls a battlefield, I enter ready.",
+    normalizedText: "If the opponent controls a battlefield, I enter ready.",
+    abilities: [], triggers: [], selectors: [], choices: [], costs: [], timings: [], keywords: [],
+    conditions: [binding("condition.state", {
+      subject: "opponent", property: "controlledBattlefieldCount",
+      operator: "greaterThanOrEqual", comparisonValue: 1,
+    })],
+    effects: [binding("modifier.enter_ready", { target: "source" })],
+  }];
+  const battlefield = card("SYN-ENTRY-BATTLEFIELD", "Battlefield");
+  const { game, decks } = fixture([entrant, battlefield], [
+    instance("entrant", "p1", entrant.cardCode, "mainDeck"),
+    instance("field-card", "p1", battlefield.cardCode, "battlefield"),
+  ]);
+  game.state.players.p1!.zones.hand = ["entrant"];
+  game.state.battlefields.push({
+    battlefieldId: "field", cardInstanceId: "field-card",
+    selectedByPlayerId: "p1", controllerPlayerId: "p2",
+    contestedByPlayerId: null, units: [], facedownCards: [],
+  });
+  const play = gameplayActions(game, "p1", decks).find(
+    (candidate) => candidate.sourceCardInstanceId === "entrant" && candidate.enabled,
+  );
+  assert.ok(play);
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "entry",
+  });
+  assert.equal(next.state.cardStates.entrant!.exhausted, false);
+});
+
+test("continuous destination restrictions and permissions compose", () => {
+  const restrictedUnit = card("SYN-RESTRICTED-UNIT", "Unit", 2);
+  const permissionSource = card("SYN-OPEN-PERMISSION", "Unit", 2);
+  permissionSource.behaviorModel.clauses = [{
+    id: "permission", sequence: 0, sourceText: "Friendly Units may be played to open battlefields.",
+    normalizedText: "Friendly Units may be played to open battlefields.",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], keywords: [],
+    effects: [binding("modifier.play_unit_destination", { destination: "openBattlefield" })],
+  }];
+  const restrictionSource = card("SYN-BASE-ONLY", "Unit", 2);
+  restrictionSource.behaviorModel.clauses = [{
+    id: "restriction", sequence: 0, sourceText: "Opponents may play Units only to their Base.",
+    normalizedText: "Opponents may play Units only to their Base.",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], keywords: [],
+    effects: [binding("modifier.unit_play_restriction", {
+      affectedPlayer: "opponent", destination: "baseOnly",
+    })],
+  }];
+  const battlefield = card("SYN-DESTINATION-BATTLEFIELD", "Battlefield");
+  const { game, decks } = fixture([restrictedUnit, permissionSource, restrictionSource, battlefield], [
+    instance("unit", "p1", restrictedUnit.cardCode, "mainDeck"),
+    instance("permission", "p1", permissionSource.cardCode, "mainDeck"),
+    instance("restriction", "p2", restrictionSource.cardCode, "mainDeck"),
+    instance("controlled-field-card", "p1", battlefield.cardCode, "battlefield"),
+    instance("open-field-card", "p1", battlefield.cardCode, "battlefield"),
+  ]);
+  game.state.battlefields = [{
+    battlefieldId: "controlled", cardInstanceId: "controlled-field-card", selectedByPlayerId: "p1",
+    controllerPlayerId: "p1", contestedByPlayerId: null, units: ["permission"], facedownCards: [],
+  }, {
+    battlefieldId: "open", cardInstanceId: "open-field-card", selectedByPlayerId: "p1",
+    controllerPlayerId: null, contestedByPlayerId: null, units: [], facedownCards: [],
+  }];
+  const index = createRuntimeCardIndex(decks, game);
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", restrictedUnit, index),
+    ["base", "controlled", "open"],
+  );
+  game.state.battlefields[0]!.units.push("restriction");
+  assert.deepEqual(legalUnitDestinationIds(game, "p1", restrictedUnit, index), ["base"]);
+});
+
+test("next matching play discount is single-use and damage prevention is conditional", () => {
+  const discountSource = card("SYN-DISCOUNT-SOURCE", "Unit", 2);
+  discountSource.behaviorModel.clauses = [{
+    id: "discount", sequence: 0, sourceText: "Your next Spell costs 5 less.",
+    normalizedText: "Your next Spell costs 5 less.", abilities: [], triggers: [], conditions: [],
+    selectors: [], choices: [], costs: [], timings: [], keywords: [],
+    effects: [binding("modifier.next_play_energy_discount", { amount: 5, cardType: "Spell", duration: "thisTurn" })],
+  }];
+  const spell = card("SYN-DISCOUNTED-SPELL", "Spell");
+  spell.card.attributes.energy = 7;
+  const protectedUnit = card("SYN-PROTECTED-UNIT", "Unit", 3);
+  protectedUnit.behaviorModel.clauses = [{
+    id: "prevention", sequence: 0, sourceText: "If I moved twice this turn, I cannot take damage.",
+    normalizedText: "If I moved twice this turn, I cannot take damage.", abilities: [], triggers: [], selectors: [],
+    choices: [], costs: [], timings: [], keywords: [],
+    conditions: [binding("condition.turn_event_count", {
+      eventType: "moved", subject: "source", operator: "greaterThanOrEqual", comparisonValue: 2,
+    })],
+    effects: [binding("prevention.prevent", { event: "damage", target: "source" })],
+  }];
+  const { game, decks, handlers } = fixture([discountSource, spell, protectedUnit], [
+    instance("discount-source", "p1", discountSource.cardCode, "mainDeck"),
+    instance("spell", "p1", spell.cardCode, "mainDeck"),
+    instance("protected", "p1", protectedUnit.cardCode, "mainDeck"),
+  ]);
+  handlers.get("modifier.next_play_energy_discount")!.execute!(
+    discountSource.behaviorModel.clauses[0]!.effects[0]!,
+    createBehaviorContext(game, "p1", "discount-source", null, []),
+  );
+  const index = createRuntimeCardIndex(decks, game);
+  assert.equal(effectiveEnergyCost(game, "p1", spell, index), 2);
+  assert.equal(canTakeDamage(game, "protected", index), true);
+  game.state.turnHistory.movedCardIdsByPlayerId.p1 = ["protected", "protected"];
+  assert.equal(canTakeDamage(game, "protected", index), false);
+});
+
+test("numeric copy snapshots the selected source value and only increases", () => {
+  const target = card("SYN-COPY-TARGET", "Unit", 2);
+  const value = card("SYN-COPY-VALUE", "Unit", 6);
+  const effect = card("SYN-COPY-EFFECT", "Spell");
+  const { game, handlers } = fixture([target, value, effect], [
+    instance("target", "p1", target.cardCode, "mainDeck"),
+    instance("value", "p1", value.cardCode, "mainDeck"),
+    instance("effect", "p1", effect.cardCode, "mainDeck"),
+  ]);
+  const context = createBehaviorContext(game, "p1", "effect", null, ["target", "value"]);
+  context.selectedBySelector.target = ["target"];
+  context.selectedBySelector.value = ["value"];
+  handlers.get("modifier.copy_numeric_value")!.execute!(binding(
+    "modifier.copy_numeric_value",
+    {
+      attribute: "might", targetSelectionKey: "target",
+      valueSelectionKey: "value", duration: "thisTurn",
+    },
+  ), context);
+  assert.equal(game.state.cardStates.target!.computedMight, 6);
+  assert.equal(game.state.modifiers.at(-1)?.amount, 4);
+
+  game.state.cardStates.value!.computedMight = 1;
+  handlers.get("modifier.copy_numeric_value")!.execute!(binding(
+    "modifier.copy_numeric_value",
+    {
+      attribute: "might", targetSelectionKey: "target",
+      valueSelectionKey: "value", duration: "thisTurn",
+    },
+  ), context);
+  assert.equal(game.state.modifiers.length, 1);
 });
 
 test("Awakening batches ready events into one trigger-order decision", () => {

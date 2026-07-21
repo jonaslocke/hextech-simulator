@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-16T00:47:59.897Z",
+  "updatedAt": "2026-07-21T01:17:08.453Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -1085,11 +1085,21 @@
           "name": "Raging Firebrand"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-031",
+        "approvedAt": "2026-07-21T01:17:07.444Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:07.444Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-031 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:07.444Z"
     },
     {
       "gameplayIdentity": "OGN-032:Ravenborn Tome",
@@ -1154,11 +1164,21 @@
           "name": "Tryndamere, Barbarian"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-034",
+        "approvedAt": "2026-07-21T01:17:07.647Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:07.647Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-034 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:07.647Z"
     },
     {
       "gameplayIdentity": "OGN-035:Vayne Hunter",
@@ -2268,11 +2288,21 @@
           "name": "Mageseeker Warden"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-070",
+        "approvedAt": "2026-07-21T01:17:07.782Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:07.782Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-070 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:07.782Z"
     },
     {
       "gameplayIdentity": "OGN-071:Party Favors",
@@ -2537,11 +2567,21 @@
           "name": "Leona, Zealot"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-079",
+        "approvedAt": "2026-07-21T01:17:07.915Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:07.915Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-079 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:07.915Z"
     },
     {
       "gameplayIdentity": "OGN-080:Mystic Reversal",
@@ -3555,11 +3595,21 @@
           "name": "Convergent Mutation"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-108",
+        "approvedAt": "2026-07-21T01:17:08.057Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:08.057Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-108 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:08.057Z"
     },
     {
       "gameplayIdentity": "OGN-109:Dr Mundo Expert",
@@ -5229,11 +5279,21 @@
           "name": "Deadbloom Predator"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-161",
+        "approvedAt": "2026-07-21T01:17:08.189Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:08.189Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-161 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:08.189Z"
     },
     {
       "gameplayIdentity": "OGN-162:Miss Fortune Captain",
@@ -5261,7 +5321,7 @@
       "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-162",
-        "approvedAt": "2026-07-16T00:46:47.734Z"
+        "approvedAt": "2026-07-16T10:20:36.062Z"
       },
       "familyStatuses": [
         {
@@ -5284,9 +5344,15 @@
           "status": "ready_for_manual_validation",
           "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
           "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        },
+        {
+          "at": "2026-07-16T10:20:36.062Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-162 approved."
         }
       ],
-      "updatedAt": "2026-07-16T00:47:59.897Z"
+      "updatedAt": "2026-07-16T10:20:36.062Z"
     },
     {
       "gameplayIdentity": "OGN-163:Seal of Strength",
@@ -6071,11 +6137,21 @@
           "name": "Kayn, Unleashed"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-189",
+        "approvedAt": "2026-07-21T01:17:08.320Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:08.320Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-189 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:08.320Z"
     },
     {
       "gameplayIdentity": "OGN-190:KogMaw Caustic",
@@ -6203,11 +6279,21 @@
           "name": "Miss Fortune, Buccaneer"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-193",
+        "approvedAt": "2026-07-21T01:17:08.453Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:17:08.453Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-193 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:17:08.453Z"
     },
     {
       "gameplayIdentity": "OGN-194:Nocturne Horrifying",
@@ -7778,7 +7864,7 @@
       "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-235",
-        "approvedAt": "2026-07-16T00:46:48.263Z"
+        "approvedAt": "2026-07-16T10:20:36.062Z"
       },
       "familyStatuses": [
         {
@@ -7801,9 +7887,15 @@
           "status": "ready_for_manual_validation",
           "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
           "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        },
+        {
+          "at": "2026-07-16T10:20:36.062Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-235 approved."
         }
       ],
-      "updatedAt": "2026-07-16T00:47:59.897Z"
+      "updatedAt": "2026-07-16T10:20:36.062Z"
     },
     {
       "gameplayIdentity": "OGN-236:Karthus Eternal",

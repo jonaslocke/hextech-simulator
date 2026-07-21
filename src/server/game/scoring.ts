@@ -24,6 +24,7 @@ export function scoreBattlefield(
   battlefieldId: string,
   method: "conquer" | "hold",
   decks: readonly DeckSnapshotDocument[],
+  eventValues: Record<string, string | number | boolean | null> = {},
 ): void {
   const player = game.state.players[playerId]!;
   const scored = player.scoredBattlefieldIdsThisTurn ?? [];
@@ -51,7 +52,7 @@ export function scoreBattlefield(
         method === "conquer" ? "battlefield.conquered" : "battlefield.held",
       actorPlayerId: playerId,
       subjectCardInstanceId: battlefield.cardInstanceId,
-      values: {},
+      values: eventValues,
     },
     decks,
   );

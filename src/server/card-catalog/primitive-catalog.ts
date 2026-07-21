@@ -1194,7 +1194,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("condition", "string", "Runtime predicate guarding the modifier.", [
         "friendlyDefendsAlone",
         "sourceCombatsAlone",
-        "onlyFriendlyUnitAtLocation"
+        "onlyFriendlyUnitAtLocation",
+        "targetStunned"
       ]),
       optional(
         "duration",
@@ -1238,7 +1239,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Play unit destination",
     description: "Adds a card-driven legal destination for playing a unit.",
     parameters: [
-      required("destination", "string", "The additional destination kind.", ["openBattlefield"])
+      required("destination", "string", "The additional destination kind.", ["openBattlefield", "occupiedEnemyBattlefield"])
     ],
     engineSupport: requiresEngineSupport("Unit destination permissions require a generalized legality policy.")
   }),
@@ -1320,12 +1321,59 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Guards a clause by comparing a controller, opponent, or source state value.",
     parameters: [
       required("subject", "string", "The state owner or source.", ["controller", "opponent", "source"]),
-      required("property", "string", "The state value to compare.", ["score", "scoreDistanceToVictory", "handCount", "facedownCount", "taggedUnitCount", "buffed", "atBattlefield"]),
+      required("property", "string", "The state value to compare.", ["score", "scoreDistanceToVictory", "handCount", "facedownCount", "controlledBattlefieldCount", "taggedUnitCount", "buffed", "atBattlefield"]),
       required("operator", "string", "The comparison applied to the state value.", numericComparisonOperators),
       required("comparisonValue", "number", "The constant value used by the comparison."),
       optional("tag", "string", "Required card tag when comparing tagged-unit count."),
     ],
     engineSupport: supported("Typed controller, opponent, and source state conditions are evaluated by the shared condition runtime."),
+  }),
+  "modifier.copy_numeric_value": primitiveSeed({
+    id: "modifier.copy_numeric_value",
+    family: "modifier",
+    name: "Copy numeric value",
+    description: "Increases a selected object's numeric value to the current value of another selected object.",
+    parameters: [
+      required("attribute", "string", "The numeric value copied.", ["might"]),
+      required("targetSelectionKey", "string", "Selector key containing the object to modify."),
+      required("valueSelectionKey", "string", "Selector key containing the object whose value is copied."),
+      required("duration", "duration", "How long the copied increase lasts.", behaviorDurationKinds),
+    ],
+    engineSupport: supported("The modifier snapshots both selected values at resolution and records only the required increase."),
+  }),
+  "modifier.next_play_energy_discount": primitiveSeed({
+    id: "modifier.next_play_energy_discount",
+    family: "modifier",
+    name: "Next-play Energy discount",
+    description: "Reduces the Energy cost of the controller's next matching card play this turn and is then consumed.",
+    parameters: [
+      required("amount", "number", "The Energy reduction."),
+      required("cardType", "string", "The matching card type.", ["Spell"]),
+      required("duration", "duration", "How long the permission remains available.", ["thisTurn"]),
+    ],
+    engineSupport: supported("The cost calculator applies the oldest matching permission and successful play consumes it once."),
+  }),
+  "modifier.unit_play_restriction": primitiveSeed({
+    id: "modifier.unit_play_restriction",
+    family: "modifier",
+    name: "Unit play restriction",
+    description: "Restricts where an affected player may play Units while the source remains active.",
+    parameters: [
+      required("affectedPlayer", "player", "The player affected by the restriction.", ["opponent"]),
+      required("destination", "string", "The remaining legal destination kind.", ["baseOnly"]),
+    ],
+    engineSupport: supported("The unit destination policy evaluates continuous restrictions from active battlefield sources."),
+  }),
+  "modifier.cannot_ready": primitiveSeed({
+    id: "modifier.cannot_ready",
+    family: "modifier",
+    name: "Ready restriction",
+    description: "Prevents an affected player's spells and abilities from readying Units or Gear.",
+    parameters: [
+      required("affectedPlayer", "player", "The affected player.", ["opponent"]),
+      required("source", "string", "The type of effect being restricted.", ["spellOrAbility"]),
+    ],
+    engineSupport: supported("Ready effects consult continuous restrictions from active battlefield sources."),
   }),
   "action.win_game": primitiveSeed({
     id: "action.win_game",
@@ -1350,11 +1398,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
   "condition.event_value": primitiveSeed({
     id: "condition.event_value",
     family: "condition",
-    name: "Compare event boolean",
-    description: "Guards a clause by requiring a boolean value recorded on its triggering event.",
+    name: "Compare event value",
+    description: "Guards a clause by comparing a boolean or numeric value recorded on its triggering event.",
     parameters: [
       required("key", "string", "The event value key to evaluate."),
-      required("expectedBoolean", "boolean", "The boolean value required for the clause."),
+      optional("expectedBoolean", "boolean", "The boolean value required for the clause."),
+      optional("operator", "string", "The numeric comparison to apply.", numericComparisonOperators),
+      optional("comparisonValue", "number", "The numeric value to compare against."),
     ],
     engineSupport: supported("Shared event metadata is evaluated when the trigger is collected."),
   }),
@@ -1587,7 +1637,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "prevention.prevent",
     family: "prevention",
     name: "Prevent effect",
-    description: "Prevents damage, movement, choice, or another event."
+    description: "Prevents damage, movement, choice, or another event.",
+    parameters: [
+      required("event", "string", "The event being prevented.", ["damage"]),
+      required("target", "target", "The protected object.", ["source"]),
+    ],
+    engineSupport: supported("Damage producers consult conditional source prevention before changing damage or emitting damage events."),
   })
 };
 

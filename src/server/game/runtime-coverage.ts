@@ -69,8 +69,12 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.play_token": "executable",
   "action.play_selected_unit": "executable",
   "modifier.modify_numeric_value": "executable",
+  "modifier.copy_numeric_value": "executable",
+  "modifier.next_play_energy_discount": "executable",
   "modifier.facedown_capacity": "executable",
   "modifier.play_unit_destination": "executable",
+  "modifier.unit_play_restriction": "executable",
+  "modifier.cannot_ready": "executable",
   "modifier.cannot_move_from_source_battlefield": "executable",
   "modifier.legion_energy_discount": "executable",
   "modifier.grant_keyword": "executable",
@@ -97,6 +101,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "replacement.recall_on_next_death": "executable",
   "modifier.cannot_play_cards": "executable",
   "modifier.enable_source_triggers": "executable",
+  "prevention.prevent": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 
 export function getRuntimeCoverageStatus(
