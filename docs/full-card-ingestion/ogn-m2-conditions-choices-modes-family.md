@@ -120,6 +120,11 @@ tracked through the `OGN-300` overnumbered printing before its canonical
 identity was repaired to the standard `OGN-249` printing. Publication is not
 manual gameplay acceptance.
 
+The user manually validated the Batch 2 resolution-time optional-payment
+behavior for `OGN-035` and `OGN-152` in-game on 2026-07-21. Both have passed
+that behavior-family gate without promoting their complete gameplay identities
+to `accepted`.
+
 The importable cross-domain deck at
 `data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve
 non-Legend targets using the matching Loose Cannon, Jinx, Rebel, and Super Mega

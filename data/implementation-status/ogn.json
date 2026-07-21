@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T18:39:37.198Z",
+  "updatedAt": "2026-07-21T18:54:15.272Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -1245,21 +1245,35 @@
           "name": "Vayne, Hunter"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-035",
         "approvedAt": "2026-07-21T01:36:20.733Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T18:54:15.272Z",
+          "note": "User validated the Batch 2 resolution-time optional-payment behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:36:20.733Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-035 approved."
+        },
+        {
+          "at": "2026-07-21T18:54:15.272Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "note": "User validated the Batch 2 resolution-time optional-payment behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T01:36:20.733Z"
+      "updatedAt": "2026-07-21T18:54:15.272Z"
     },
     {
       "gameplayIdentity": "OGN-036:Vi Destructive",
@@ -5181,21 +5195,35 @@
           "name": "Mistfall"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-152",
         "approvedAt": "2026-07-21T01:37:54.870Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T18:54:15.272Z",
+          "note": "User validated the Batch 2 resolution-time optional-payment behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:37:54.870Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-152 approved."
+        },
+        {
+          "at": "2026-07-21T18:54:15.272Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "note": "User validated the Batch 2 resolution-time optional-payment behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T01:37:54.870Z"
+      "updatedAt": "2026-07-21T18:54:15.272Z"
     },
     {
       "gameplayIdentity": "OGN-153:Overt Operation",
