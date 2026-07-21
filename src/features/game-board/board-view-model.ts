@@ -356,7 +356,24 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
       : []),
     ...(projection.selectionCards ?? []),
   ];
-  return [...new Map(cards.map((card) => [card.instanceId, card])).values()];
+  return deduplicateProjectedCardViews(cards);
+}
+
+export function deduplicateProjectedCardViews(
+  cards: readonly ProjectedCardView[],
+): ProjectedCardView[] {
+  const cardsByInstanceId = new Map<string, ProjectedCardView>();
+  for (const card of cards) {
+    const existing = cardsByInstanceId.get(card.instanceId);
+    if (
+      !existing ||
+      (card.activeModifiers?.length ?? 0) >
+        (existing.activeModifiers?.length ?? 0)
+    ) {
+      cardsByInstanceId.set(card.instanceId, card);
+    }
+  }
+  return [...cardsByInstanceId.values()];
 }
 
 function toCatalogCard(card: ProjectedCardView): BoardCatalogCard {

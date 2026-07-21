@@ -14,6 +14,41 @@ import {
   targetSelectionIsLegal,
   toggleMovementSelection,
 } from "../src/features/game-board/model";
+import { deduplicateProjectedCardViews } from "../src/features/game-board/board-view-model";
+import type { ProjectedCardView } from "../src/shared/game";
+
+test("keeps enriched card state when a stripped chain view shares its instance", () => {
+  const card = (activeModifiers?: ProjectedCardView["activeModifiers"]): ProjectedCardView => ({
+    instanceId: "SYN-CARD-INSTANCE",
+    ownerPlayerId: "p1",
+    name: "Synthetic Unit",
+    imageUrl: null,
+    rulesText: "",
+    publicCode: "SYN-001/001",
+    type: "Unit",
+    supertype: null,
+    domains: [],
+    energy: 1,
+    might: 4,
+    power: null,
+    computedMight: 5,
+    damage: 0,
+    exhausted: true,
+    stunned: false,
+    activeModifiers,
+  });
+  const enriched = card([{ label: "Buff +1", duration: "Until leaving board" }]);
+  const stripped = card([]);
+
+  assert.deepEqual(
+    deduplicateProjectedCardViews([enriched, stripped]),
+    [enriched],
+  );
+  assert.deepEqual(
+    deduplicateProjectedCardViews([stripped, enriched]),
+    [enriched],
+  );
+});
 
 test("auto-pass resets synchronously when a new chain item appears", () => {
   assert.equal(
