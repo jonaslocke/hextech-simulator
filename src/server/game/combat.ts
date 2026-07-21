@@ -325,7 +325,14 @@ function performCombatCleanup(
   )!;
   // Rules 323.4-323.5 and 466.1: capture self-death trigger context while
   // lethal units are still on the board, then kill them as one Cleanup task.
-  cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+  if (!combat.lethalCleanupPerformed) {
+    cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+    combat.lethalCleanupPerformed = true;
+  }
+  // Optional death replacements are part of the lethal event itself. Finish
+  // them before Combat Cleanup step 3d decides whether surviving attackers
+  // are recalled because defenders remain at the battlefield.
+  if (game.state.pendingChoice) return;
   const attackers = controlledUnits(
     battlefield.units,
     combat.attackerPlayerId,

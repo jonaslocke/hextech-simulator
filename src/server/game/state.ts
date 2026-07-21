@@ -340,6 +340,7 @@ export const gameStateSchema = z.object({
     resultWinnerPlayerId: z.string().min(1).nullable().optional(),
     resultLoserPlayerId: z.string().min(1).nullable().optional(),
     attackersRecalledDuringCleanup: z.boolean().optional(),
+    lethalCleanupPerformed: z.boolean().optional(),
     })
     .nullable(),
   modifiers: z.array(

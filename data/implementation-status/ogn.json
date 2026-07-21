@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T18:23:30.381Z",
+  "updatedAt": "2026-07-21T18:39:37.198Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -5634,21 +5634,35 @@
           "name": "Sett, Brawler"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-164",
         "approvedAt": "2026-07-21T18:23:30.381Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "sett-buff-ability",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T18:39:36.145Z",
+          "note": "User confirmed Sett's tested Buff and spend-Buff ability behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T18:23:30.381Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-164 approved."
+        },
+        {
+          "at": "2026-07-21T18:39:36.145Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "sett-buff-ability",
+          "note": "User confirmed Sett's tested Buff and spend-Buff ability behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T18:23:30.381Z"
+      "updatedAt": "2026-07-21T18:39:36.145Z"
     },
     {
       "gameplayIdentity": "OGN-165:Cemetery Attendant",
@@ -9451,21 +9465,35 @@
           "name": "The Boss"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-269",
         "approvedAt": "2026-07-21T01:44:30.097Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "optional-paid-death-replacement",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T18:39:37.198Z",
+          "note": "User confirmed The Boss optional paid death-replacement execution in-game; post-replacement combat conquest sequencing remains separately pending."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:44:30.097Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-269 approved."
+        },
+        {
+          "at": "2026-07-21T18:39:37.198Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "optional-paid-death-replacement",
+          "note": "User confirmed The Boss optional paid death-replacement execution in-game; post-replacement combat conquest sequencing remains separately pending."
         }
       ],
-      "updatedAt": "2026-07-21T01:44:30.097Z"
+      "updatedAt": "2026-07-21T18:39:37.198Z"
     },
     {
       "gameplayIdentity": "OGN-270:Showstopper",

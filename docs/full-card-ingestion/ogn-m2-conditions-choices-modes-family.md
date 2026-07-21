@@ -137,6 +137,14 @@ with a shared `exhaustedOnly` unit-selector constraint. Both support cards have
 supported canonical models and are ready for manual validation; publication is
 not manual gameplay acceptance.
 
+Manual validation on 2026-07-21 confirmed Sett's tested Buff/spend-Buff ability
+and The Boss's optional paid death replacement. That validation exposed a
+shared Combat Cleanup ordering defect: the engine was evaluating step 3d's
+attacker recall while a lethal defender was still awaiting its optional death
+replacement. Combat Cleanup now persists completion of its lethal substep and
+pauses before step 3d until the replacement decision is finished. The resulting
+control and Conquer behavior remains ready for manual validation.
+
 ### Batch 3: linked movement, sequenced decisions, and spell control
 
 | Contract | Ownership and reuse | Classification | Published cards |

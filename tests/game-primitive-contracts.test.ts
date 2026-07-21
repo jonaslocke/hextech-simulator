@@ -5,6 +5,7 @@ import {
   createBehaviorContext,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  continueCombatResolution,
   gameplayActions,
   hasKeyword,
   performGameplayAction,
@@ -460,6 +461,80 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   submitDeathReplacementChoice(game, "p1", ["decline"], index);
   assert.ok(game.state.players.p1!.zones.trash.includes("unit"));
   assert.equal(game.state.players.p1!.energy, 1);
+});
+
+test("combat cleanup finishes death replacement before deciding attacker recall", () => {
+  const battlefield = card("SYN-COMBAT-BATTLEFIELD", "Battlefield");
+  const replacementSource = card("SYN-REPLACEMENT-SOURCE", "Gear");
+  const attacker = card("SYN-SURVIVING-ATTACKER", "Unit", 4);
+  const defender = card("SYN-LETHAL-DEFENDER", "Unit", 3);
+  const { game, decks } = fixture(
+    [battlefield, replacementSource, attacker, defender],
+    [
+      instance("battlefield", "p1", battlefield.cardCode, "battlefield"),
+      instance("replacement-source", "p1", replacementSource.cardCode, "mainDeck"),
+      instance("attacker", "p2", attacker.cardCode, "mainDeck"),
+      instance("defender", "p1", defender.cardCode, "mainDeck"),
+    ],
+  );
+  game.state.players.p1!.zones.base = ["replacement-source"];
+  game.state.players.p1!.energy = 1;
+  game.state.battlefields = [{
+    battlefieldId: "location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: "p2",
+    units: ["defender", "attacker"],
+    facedownCards: [],
+  }];
+  game.state.cardStates.defender!.damage = 3;
+  game.state.cardStates.defender!.combatRole = "defender";
+  game.state.cardStates.attacker!.combatRole = "attacker";
+  game.state.ongoingEffects = [{
+    id: "replacement",
+    behaviorId: "replacement.optional_recall_on_death",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "replacement-source",
+    targetCardInstanceIds: ["defender"],
+    duration: "thisTurn",
+    createdAtTurn: 1,
+    parameters: { resource: "energy", amount: 1 },
+  }];
+  game.state.combat = {
+    battlefieldId: "location",
+    stage: "cleanup",
+    attackerPlayerId: "p2",
+    defenderPlayerId: "p1",
+    attackerUnitIds: ["attacker"],
+    defenderUnitIds: ["defender"],
+    attackerMight: 4,
+    defenderMight: 3,
+    attackerAssignments: [{ targetUnitId: "defender", amount: 4 }],
+    defenderAssignments: [{ targetUnitId: "attacker", amount: 3 }],
+    attackerExcessDamage: 1,
+    defenderExcessDamage: 0,
+  };
+  gameDocumentSchema.parse(game);
+  const index = createRuntimeCardIndex(decks, game);
+
+  continueCombatResolution(game, index, decks);
+
+  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.equal(game.state.combat?.stage, "cleanup");
+  assert.deepEqual(game.state.battlefields[0]!.units, ["defender", "attacker"]);
+  assert.ok(!game.state.players.p2!.zones.base.includes("attacker"));
+
+  submitDeathReplacementChoice(game, "p1", ["accept"], index);
+  continueCombatResolution(game, index, decks);
+
+  assert.equal(game.state.combat, null);
+  assert.deepEqual(game.state.battlefields[0]!.units, ["attacker"]);
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p2");
+  assert.equal(game.state.players.p2!.points, 1);
+  assert.ok(game.state.players.p1!.zones.base.includes("defender"));
+  assert.ok(!game.state.players.p2!.zones.base.includes("attacker"));
+  gameDocumentSchema.parse(game);
 });
 
 test("Awakening batches ready events into one trigger-order decision", () => {
