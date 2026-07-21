@@ -1,6 +1,7 @@
 # OGN M2 Family: Conditions, Optional Decisions, Modes, and Turn Memory
 
-Status: Implemented subset published; 22 cards ready for manual validation.
+Status: First 22-card subset manually validated; 34 excluded cards remain for the
+next primitive-driven implementation phase.
 
 ## Scope contract
 
@@ -72,12 +73,37 @@ rows because it needs both listed missing primitives; it is counted once.
    automatic friendly-unit groups at the source location, and immediate
    win-game resolution.
 
-## Published cards awaiting manual validation
+## Manually validated first subset
 
 `OGN-019`, `OGN-021`, `OGN-047`, `OGN-056`, `OGN-059`, `OGN-061`, `OGN-065`,
 `OGN-101`, `OGN-125`, `OGN-143`, `OGN-144`, `OGN-155`, `OGN-157`, `OGN-162`,
 `OGN-167`, `OGN-202`, `OGN-223`, `OGN-235`, `OGN-251`, `OGN-277`, `OGN-288`,
 and `OGN-293`.
+
+The user completed manual in-game validation of all 22 cards after validating
+the ordinary, discard-dependent, and Hidden-dependent scenarios. Automated
+primitive tests remain technical safeguards and are not the acceptance evidence
+for these cards.
+
+## Next implementation phase
+
+The 34 distinct excluded cards in the scope table are the remaining corpus for
+this vertical. Implement them by the missing reusable contracts recorded in the
+table, not as one card-by-card integration batch. `OGN-035` appears in both the
+conditional-entry and resolution-time optional-payment rows and must satisfy
+both contracts, but it counts as one card.
+
+For each reusable contract:
+
+1. Validate the exact card text and rules meaning from the local card corpus and
+   authoritative local rules reference.
+2. Reuse or extend the engine subsystem that owns the behavior; do not add card
+   name or code branches.
+3. Add focused synthetic primitive-contract coverage only when a reusable
+   primitive is introduced or changed, following `AGENTS.md`.
+4. Publish only cards whose complete rules text is executable.
+5. Provide a small manual-validation deck or scenario handoff and wait for the
+   user's in-game acceptance before marking those cards passed.
 
 ## Manual validation handoff
 

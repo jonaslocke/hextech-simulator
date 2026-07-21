@@ -139,6 +139,20 @@ Manual in-game validation is the authoritative acceptance gate for gameplay beha
 Do not create, update, repair, or expand automated gameplay integration,
 end-to-end, or regression tests for card behavior changes.
 
+When the user explicitly reports that one or more cards have passed manual
+gameplay validation, persist that result in the corresponding set ledger under
+`data/implementation-status/<set-code>.json` in the same task. Use
+`npm run catalog:update-implementation-status` rather than editing the ledger by
+hand, include the validated card codes, a stable behavior-family identifier,
+and a concise note describing the accepted manual gate. Use
+`manual_family_passed` for acceptance of the tested behavior family. Use
+`accepted` only when the user explicitly accepts the complete gameplay identity
+or applicable completion scope, rather than inferring it from a narrower
+scenario. Group cards by set when an acceptance spans multiple ledgers, then run
+`npm run catalog:check-implementation-status` and include the ledger changes in
+the next commit. Do not copy milestone-specific card lists or acceptance results
+into `AGENTS.md`; those belong in the set ledger and relevant family handoff.
+
 Automated tests are permitted only while building a reusable gameplay primitive,
 where they directly validate that primitive's isolated contract. Do not treat
 those tests as evidence that a card or behavior family is accepted.
