@@ -359,6 +359,54 @@ test("cleanup clears stale battlefield control and contest after units die", () 
   assert.equal(battlefield.contestedByPlayerId, null);
 });
 
+test("board control and Hidden cleanup wait for death-trigger chain work", () => {
+  const { game, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  const battlefield = game.state.battlefields[0]!;
+  addSyntheticHiddenCard(game, decks, "p2");
+  battlefield.units = [];
+  game.state.players.p2!.zones.trash.push("defender");
+  game.state.chain = {
+    items: [{
+      id: "synthetic-death-trigger",
+      kind: "trigger",
+      label: "Synthetic death trigger",
+      controllerPlayerId: "p2",
+      sourceCardInstanceId: "defender",
+      targetCardInstanceIds: [],
+      targetObjectVersions: {},
+      lockedSelectionsByBinding: {},
+      behaviorClauseId: null,
+      activatedBehaviorId: null,
+      behaviorEvent: {
+        type: "unit.died",
+        actorPlayerId: "p2",
+        subjectCardInstanceId: "defender",
+        values: { originBattlefieldId: "battlefield" },
+      },
+    }],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p2",
+    passedPlayerIds: [],
+    resumeFocusPlayerId: null,
+  };
+
+  cleanupBoard(game, createRuntimeCardIndex(decks));
+
+  assert.equal(battlefield.controllerPlayerId, "p2");
+  assert.equal(battlefield.facedownCards?.length, 1);
+  assert.ok(!game.state.players.p2!.zones.trash.includes("hidden-card"));
+
+  game.state.chain = null;
+  cleanupBoard(game, createRuntimeCardIndex(decks));
+
+  assert.equal(battlefield.controllerPlayerId, null);
+  assert.deepEqual(battlefield.facedownCards, []);
+  assert.ok(game.state.players.p2!.zones.trash.includes("hidden-card"));
+});
+
 test("cleanup clears a dead challenger's contest while preserving the controller", () => {
   const { game, decks } = combatFixture({
     attackerMight: 2,
@@ -513,6 +561,10 @@ test("combat cleanup preserves control and Hidden until death-trigger work compl
   });
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p2");
   assert.equal(game.state.battlefields[0]!.facedownCards?.length, 1);
+  assert.equal(
+    projectGame({ game, viewerPlayerId: "p1", decks }).combat?.stage,
+    "result",
+  );
 
   game = resolvePendingCombatWork(game, decks);
 

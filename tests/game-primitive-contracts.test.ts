@@ -1321,6 +1321,76 @@ test("choice gates accept implicit and explicit branch values", () => {
   );
 });
 
+test("an optional chain target selection explicitly permits declining", () => {
+  const source = card("SYN-OPTIONAL-TRIGGER", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "optional-target",
+    sequence: 0,
+    sourceText: "Synthetic optional target contract.",
+    normalizedText: "Synthetic optional target contract.",
+    abilities: [],
+    triggers: [binding("trigger.event", {
+      eventType: "synthetic.optional",
+      subject: "friendly_card",
+    })],
+    conditions: [],
+    selectors: [binding("selector.friendly_unit", {
+      minimumCount: 0,
+      maximumCount: 1,
+      selectionKey: "target",
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("action.buff_unit", { selectionKey: "target" })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([
+    source,
+    card("SYN-OPTIONAL-TARGET", "Unit", 2),
+    card("SYN-OPTIONAL-EVENT", "Spell"),
+  ], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("target", "p1", "SYN-OPTIONAL-TARGET", "mainDeck"),
+    instance("event-subject", "p1", "SYN-OPTIONAL-EVENT", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "target"];
+
+  dispatchBehaviorEvent(game, {
+    type: "synthetic.optional",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "event-subject",
+    values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.allowDecline
+      : false,
+    true,
+  );
+  const decline = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.choice?.kind === "effectSelection" &&
+      action.choice.allowDecline === true,
+  );
+  assert.ok(decline);
+
+  const declined = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: decline.id,
+    selectedIds: [],
+    decks,
+    now: "decline-optional-chain-target",
+  }).game;
+
+  assert.equal(declined.state.pendingChoice, null);
+  assert.equal(declined.state.chain?.items.length, 1);
+  assert.equal(declined.state.cardStates.target!.buffed, undefined);
+});
+
 test("deferred selectors choose from the legal set at effect resolution", () => {
   const source = card("SYN-DEFERRED-SOURCE", "Gear");
   source.behaviorModel.clauses = [{

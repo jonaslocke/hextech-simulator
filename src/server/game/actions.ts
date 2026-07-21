@@ -1242,9 +1242,9 @@ function passPriority(
           game.state.showdown.passedPlayerIds = [];
         }
       }
-      cleanupBoard(game, index);
       drainQueuedBehaviorEvents(game, decks);
       resetChainPriorityToTopItem(game);
+      cleanupBoard(game, index);
       openPendingShowdown(game, index, decks);
       finishTurnProgressionIfReady(game, index, decks);
     } else {
@@ -1545,6 +1545,9 @@ function settleAutomaticContinuations(
       drainQueuedBehaviorEvents(game, decks);
       resetChainPriorityToTopItem(game);
     }
+    if (game.state.chain || game.state.pendingChoice) return;
+    cleanupBoard(game, index);
+    if ((game.state.queuedBehaviorEvents?.length ?? 0) > 0) continue;
     if (game.state.chain || game.state.pendingChoice) return;
     const stageBefore = game.state.combat?.stage ?? null;
     continueCombatResolution(game, index, decks);

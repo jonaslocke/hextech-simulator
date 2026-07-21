@@ -267,13 +267,18 @@ function continueQueuedChainItems(
     const sourceZones = new Set(
       requirements.map((requirement) => requirement.sourceZone),
     );
+    const allowDecline = requirements.every(
+      (requirement) => requirement.minimum === 0,
+    );
     game.state.pendingChoice = {
       id: `choice:${game.stateVersion}:${item.id}:targets`,
       playerId: item.controllerPlayerId,
       type: "effectSelection",
       resolutionId: null,
       bindingKey: "chain-targets",
-      prompt: `Choose targets for ${item.label}`,
+      prompt: allowDecline
+        ? `Choose targets for ${item.label}, or decline.`
+        : `Choose targets for ${item.label}`,
       title: item.label,
       optionKind: requirements.some(
         (requirement) => requirement.kind === "battlefield",
@@ -295,6 +300,7 @@ function continueQueuedChainItems(
         (sum, requirement) => sum + requirement.maximum,
         0,
       ),
+      allowDecline,
       chainItem: item,
       targetRequirements: requirements,
     };

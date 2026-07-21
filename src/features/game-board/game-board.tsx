@@ -190,6 +190,10 @@ export const GameBoard: FC<GameBoardProps> = ({
     projection,
     scores,
   });
+  const battlefieldPlayerNameById = {
+    [board.player.playerId]: board.player.name,
+    [board.opponent.playerId]: board.opponent.name,
+  };
 
   const animationData = useMemo(() => createAnimationData(board), [board]);
 
@@ -676,6 +680,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerEnter={boardCardPointerEnter}
                   onCardPointerLeave={boardCardPointerLeave}
                   owner="player"
+                  playerNameById={battlefieldPlayerNameById}
                   showdownState={board.playerBattlefieldShowdownState}
                   enablePlayerUnitLocationDrag={canUseLocationDrag}
                   stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
@@ -706,6 +711,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerEnter={boardCardPointerEnter}
                   onCardPointerLeave={boardCardPointerLeave}
                   owner="opponent"
+                  playerNameById={battlefieldPlayerNameById}
                   showdownState={board.opponentBattlefieldShowdownState}
                   dropStatus={getLocationDropStatus({
                     kind: "battlefield",

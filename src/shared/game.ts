@@ -330,7 +330,15 @@ export const gameProjectionSchema = z.object({
   combat: z
     .object({
       battlefieldId: z.string().min(1),
-      stage: z.enum(["showdown", "attackerAssignment", "defenderAssignment"]),
+      stage: z.enum([
+        "showdown",
+        "attackerAssignment",
+        "defenderAssignment",
+        "cleanup",
+        "result",
+        "control",
+        "end",
+      ]),
       attackerPlayerId: z.string().min(1),
       defenderPlayerId: z.string().min(1),
       attackerUnitIds: z.array(z.string().min(1)),

@@ -212,6 +212,7 @@ type Props = {
   onCardPointerEnter?: (card: Card) => void;
   onCardPointerLeave?: (card: Card) => void;
   owner: "player" | "opponent";
+  playerNameById: Record<string, string>;
   showdownState?: "neutral" | "open" | "deferred";
   enablePlayerUnitLocationDrag?: boolean;
   dropStatus?: BoardLocationDropStatus;
@@ -271,6 +272,7 @@ export const BattlefieldBoard: FC<Props> = ({
   onCardPointerLeave,
   onCardPrimaryAction,
   owner,
+  playerNameById,
   showdownState = "neutral",
   enablePlayerUnitLocationDrag = false,
   stagedMovementCardInstanceIds,
@@ -392,8 +394,12 @@ export const BattlefieldBoard: FC<Props> = ({
             })}
           >
             {contestedByPlayerId
-              ? `Contested by ${contestedByPlayerId}`
-              : `Controlled by ${controllerPlayerId}`}
+              ? `Contested by ${playerNameById[contestedByPlayerId] ?? contestedByPlayerId}`
+              : `Controlled by ${
+                  controllerPlayerId
+                    ? (playerNameById[controllerPlayerId] ?? controllerPlayerId)
+                    : "Unknown player"
+                }`}
           </div>
         )}
 
@@ -405,6 +411,7 @@ export const BattlefieldBoard: FC<Props> = ({
             img={img}
             name={name}
             onClose={() => setIsBattlefieldCardOpen(false)}
+            playerNameById={playerNameById}
           />
         )}
 

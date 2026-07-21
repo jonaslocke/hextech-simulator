@@ -14,9 +14,10 @@ export function cleanupBoard(
 ): void {
   recomputeAllMight(game, index);
   cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
-  // Rule 323.6: battlefield control cannot be lost while combat is resolving.
-  // The combat state machine establishes control after all Cleanup/result work.
-  if (game.state.combat) return;
+  // Rule 323.6: battlefield control can be lost only in an Open State without
+  // a Showdown or Combat. Queued work is included because it closes the state
+  // before its Pending Items have been materialized onto the Chain.
+  if (boardControlCleanupIsDeferred(game)) return;
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
     if (controllers.length === 0) {
@@ -58,6 +59,18 @@ export function cleanupBoard(
       );
     }
   }
+}
+
+function boardControlCleanupIsDeferred(game: GameDocument) {
+  return Boolean(
+    game.state.showdown ||
+    game.state.combat ||
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.effectResolutions.length > 0 ||
+    (game.state.queuedChainItems?.length ?? 0) > 0 ||
+    game.state.queuedTriggerChoices.length > 0
+  );
 }
 
 export function clearMarkedDamage(game: GameDocument): void {

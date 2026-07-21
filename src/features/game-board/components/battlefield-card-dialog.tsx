@@ -11,6 +11,7 @@ export function BattlefieldCardDialog({
   img,
   name,
   onClose,
+  playerNameById = {},
 }: {
   contestedByPlayerId?: string | null;
   controllerPlayerId?: string | null;
@@ -18,13 +19,14 @@ export function BattlefieldCardDialog({
   img: string;
   name: string;
   onClose: () => void;
+  playerNameById?: Record<string, string>;
 }) {
   if (typeof document === "undefined") return null;
 
   const controlLabel = contestedByPlayerId
-    ? `Contested by ${contestedByPlayerId}`
+    ? `Contested by ${playerNameById[contestedByPlayerId] ?? contestedByPlayerId}`
     : controllerPlayerId
-      ? `Controlled by ${controllerPlayerId}`
+      ? `Controlled by ${playerNameById[controllerPlayerId] ?? controllerPlayerId}`
       : "Uncontrolled";
 
   return createPortal(
