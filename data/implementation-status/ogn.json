@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T10:19:25.053Z",
+  "updatedAt": "2026-07-21T10:37:59.989Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -6367,21 +6367,35 @@
           "name": "Kayn, Unleashed"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-189",
         "approvedAt": "2026-07-21T01:17:08.320Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:37:59.989Z",
+          "note": "User manually validated Kayn's two-movement damage-prevention and turn-memory behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:08.320Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-189 approved."
+        },
+        {
+          "at": "2026-07-21T10:37:59.989Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated Kayn's two-movement damage-prevention and turn-memory behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:08.320Z"
+      "updatedAt": "2026-07-21T10:37:59.989Z"
     },
     {
       "gameplayIdentity": "OGN-190:KogMaw Caustic",

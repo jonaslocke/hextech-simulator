@@ -89,16 +89,16 @@ rows because it needs both listed missing primitives; it is counted once.
 | Conditional damage prevention | Every damage producer consults the target's conditional prevention before mutation and event emission. | New prevention hook | `OGN-189` |
 
 These eight cards have synchronized supported canonical models. The user
-manually validated `OGN-031`, `OGN-034`, `OGN-079`, `OGN-108`, `OGN-161`, and
-`OGN-193` in-game on 2026-07-21. `OGN-070` and `OGN-189` remain ready for
-movement-focused manual validation; they are not gameplay-accepted yet.
-`OGN-035` also uses the entry-ready contract but remains unpublished until its
-optional paid conquer clause is executable.
+manually validated `OGN-031`, `OGN-034`, `OGN-079`, `OGN-108`, `OGN-161`,
+`OGN-189`, and `OGN-193` in-game on 2026-07-21. `OGN-070` remains ready for
+movement- and Sun Disc-focused manual validation; it is not gameplay-accepted
+yet. `OGN-035` also uses the entry-ready contract but remains unpublished until
+its optional paid conquer clause is executable.
 
 The follow-up deck is
 `data/decks/experimental/ogn-m2-batch-1-movement-validation.dec.txt`. It uses the
-Annie shell with Flash and Maddened Marauder so Mageseeker Warden can move off a
-battlefield and Kayn can cross the two-move boundary within one turn.
+Annie shell with Sun Disc for the entry-ready interaction and Flash plus
+Maddened Marauder so Mageseeker Warden can move off a battlefield.
 
 ### Batch 2: resolution payments, replacements, and zone-driven replay
 

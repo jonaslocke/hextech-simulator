@@ -17,6 +17,7 @@ Battlefields:
 MainDeck:
 3 Gust
 2 Flash
+3 Sun Disc
 3 Mageseeker Warden
 3 Mystic Poro
 2 Pouty Poro
@@ -28,5 +29,4 @@ MainDeck:
 3 Maddened Marauder
 3 Firestorm
 3 Sai Scout
-3 Kayn, Unleashed
 2 Tibbers
