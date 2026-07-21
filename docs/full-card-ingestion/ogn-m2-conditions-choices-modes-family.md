@@ -120,6 +120,16 @@ tracked through the `OGN-300` overnumbered printing before its canonical
 identity was repaired to the standard `OGN-249` printing. Publication is not
 manual gameplay acceptance.
 
+The importable cross-domain deck at
+`data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve
+non-Legend targets using the matching Loose Cannon, Jinx, Rebel, and Super Mega
+Death Rocket! identity. `OGN-249` Relentless Storm and `OGN-269` The Boss require
+separate Legend decks with approved Volibear and Sett Chosen Champions. The
+local corpus contains matching Champions, but none currently has an approved
+canonical behavior model; validation of those two Legends is blocked until a
+support Champion is published or the experimental deck contract is explicitly
+expanded beyond its current cross-domain-only exception.
+
 ### Batch 3: linked movement, sequenced decisions, and spell control
 
 | Contract | Ownership and reuse | Classification | Published cards |

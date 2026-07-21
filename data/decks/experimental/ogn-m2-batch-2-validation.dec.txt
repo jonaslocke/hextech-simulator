@@ -1,8 +1,8 @@
 Legend:
-1 Relentless Storm
+1 Loose Cannon
 
 Champion:
-1 Vayne, Hunter
+1 Jinx, Rebel
 
 Runes:
 2 Fury Rune
@@ -13,8 +13,8 @@ Runes:
 2 Order Rune
 
 Battlefields:
-1 Solari Shrine
-1 Mistfall
+1 Aspirant's Climb
+1 The Papertree
 1 Monastery of Hirana
 
 MainDeck:
@@ -26,13 +26,14 @@ MainDeck:
 2 Wildclaw Shaman
 2 Nocturne, Horrifying
 2 Super Mega Death Rocket!
-2 The Boss
 2 Vayne, Hunter
 2 Convergent Mutation
 2 Hidden Blade
 2 Mushroom Pouch
 2 Block
-3 Facebreaker
-3 Consult the Past
-3 Raging Soul
+2 Solari Shrine
+2 Mistfall
+2 Facebreaker
+2 Consult the Past
+2 Raging Soul
 3 Ember Monk
