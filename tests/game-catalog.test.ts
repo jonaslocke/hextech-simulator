@@ -35,6 +35,34 @@ test("does not impose a minimum unique-card count on deck snapshots", async () =
   assert.equal(snapshot.cards.length, 5);
 });
 
+test("stores the selected standard printing in deck snapshots independent of document order", async () => {
+  const fixture = await buildFixture();
+  const standard = fixture.documents.find(
+    (document) => document.card.name === "Synthetic Unit",
+  )!;
+  const alternate = structuredClone(standard);
+  alternate.card = {
+    ...alternate.card,
+    id: "SYN-003a/001",
+    riftbound_id: "syn-003a-001",
+    public_code: "SYN-003a/001",
+    metadata: { ...alternate.card.metadata, alternate_art: true },
+  };
+
+  for (const candidates of [[standard, alternate], [alternate, standard]]) {
+    const documents = fixture.documents.filter((document) => document !== standard);
+    const snapshot = buildDeckSnapshot(
+      fixture.sourceText,
+      [...documents, ...candidates],
+      fixture.definitions,
+    );
+    const selected = snapshot.cards.find((card) => card.cardCode === "SYN-003");
+
+    assert.equal(selected?.card.public_code, "SYN-003/001");
+    assert.equal(selected?.card.metadata.alternate_art, undefined);
+  }
+});
+
 test("rejects missing, stale, unsynchronized, and uncovered canonical cards", async () => {
   const fixture = await buildFixture();
   assert.throws(
@@ -95,6 +123,7 @@ async function buildFixture() {
     buildCanonicalCardDocument({
       cardCode: card.public_code.split("/")[0]!,
       card,
+      printingCandidates: [card],
       sourceTextHash: hashCardRulesText(card),
       modelingStatus: "approved",
       adminNotes: "fixture",

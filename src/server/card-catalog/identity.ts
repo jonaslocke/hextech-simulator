@@ -13,3 +13,17 @@ export function deriveCardCode(publicCode: string): string {
 export function deriveCardCodeFromCard(card: Card): string {
   return deriveCardCode(card.public_code);
 }
+
+export function deriveCanonicalPrintingGroupKey(card: Card): string {
+  const cleanName = card.metadata.clean_name ?? card.name;
+  const normalizedName = cleanName
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/gi, "")
+    .toLowerCase();
+
+  if (!normalizedName) {
+    throw new Error(`Unable to derive canonical printing group for ${card.public_code}.`);
+  }
+
+  return `${card.set.set_id.toUpperCase()}:${normalizedName}`;
+}

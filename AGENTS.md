@@ -133,6 +133,29 @@ For game rules, use only the repository’s local rules documentation and card c
 Do not browse or use online sources to determine, validate, or supplement rules.
 If the local rules do not answer a question, stop and ask the user for direction.
 
+## Canonical Card Printing and Images
+
+For every current or future card implementation, resolve the card's canonical
+printing from the complete local printing group before publishing behavior or
+creating a deck snapshot. Use the shared selector in
+`src/server/card-catalog/printing-selection.ts`; do not select a corpus entry by
+array order, last-write-wins maps, card name alone, or UI-specific image logic.
+
+The canonical default must be a standard printing whose
+`metadata.alternate_art`, `metadata.overnumbered`, and `metadata.signature`
+flags are all false. Among standard printings, prefer the lowest numeric
+`collector_number`, then an unsuffixed public code, then the selector's stable
+code tie-breakers. `metadata.signature` is a presentation flag;
+`classification.supertype: "Signature"` is gameplay data and must not exclude a
+printing.
+
+Always carry `media.image_url` from the selected canonical card definition into
+canonical publication and deck snapshots. Keep alternate printings in the
+source corpus, but never let them overwrite the default gameplay identity. If a
+printing group has no standard candidate, leave it unpublished and surface it
+for explicit catalog review. When changing ingestion or card-resolution code,
+group duplicates before building maps and preserve corpus-order independence.
+
 ## Gameplay Validation and Tests
 
 Manual in-game validation is the authoritative acceptance gate for gameplay behavior.

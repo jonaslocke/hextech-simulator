@@ -7,3 +7,4 @@ export * from "./implementation-status-ledger";
 export * from "./import-preview";
 export * from "./primitive-catalog";
 export * from "./primitive-discovery";
+export * from "./printing-selection";

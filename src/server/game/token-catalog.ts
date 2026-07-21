@@ -2,13 +2,26 @@ import ognCards from "@data/sets/ogn.json";
 import ogsCards from "@data/sets/ogs.json";
 import sfdCards from "@data/sets/sfd.json";
 import unlCards from "@data/sets/unl.json";
-import { deriveCardCodeFromCard } from "@/server/card-catalog/identity";
+import {
+  deriveCanonicalPrintingGroupKey,
+  deriveCardCodeFromCard,
+} from "@/server/card-catalog/identity";
+import { resolveCanonicalPrintingGroups } from "@/server/card-catalog/printing-selection";
 import { cardSetFileSchema } from "@/server/catalog";
 import type { GameCardDefinition } from "./schemas";
 
-const tokenCards = cardSetFileSchema
+const tokenPrintingGroups = resolveCanonicalPrintingGroups(
+  cardSetFileSchema
   .parse([...ognCards, ...ogsCards, ...sfdCards, ...unlCards])
-  .filter((card) => card.classification.supertype === "Token");
+  .filter((card) => card.classification.supertype === "Token"),
+  deriveCanonicalPrintingGroupKey,
+);
+if (tokenPrintingGroups.unresolved.length > 0) {
+  throw new Error(
+    tokenPrintingGroups.unresolved.map((group) => group.reason).join("; "),
+  );
+}
+const tokenCards = tokenPrintingGroups.selected;
 
 const tokenDefinitions = tokenCards.map((card) => ({
   cardCode: deriveCardCodeFromCard(card),

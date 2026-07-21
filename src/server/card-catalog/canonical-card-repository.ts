@@ -2,13 +2,17 @@ import type { Db } from "mongodb";
 import { z } from "zod";
 import { cardSchema, type Card } from "../catalog";
 import { loadBehaviorDefinitions } from "./behavior-definition-repository";
-import { deriveCardCodeFromCard } from "./identity";
+import {
+  deriveCanonicalPrintingGroupKey,
+  deriveCardCodeFromCard,
+} from "./identity";
 import { hashCardRulesText } from "./import-preview";
 import {
   hasImplementationStatusLedgerSource,
   synchronizeImplementationStatusLedger,
 } from "./implementation-status-ledger";
 import type { AppliedErratum } from "./official-errata";
+import { selectPreferredPrinting } from "./printing-selection";
 import {
   combineSupportStatuses,
   validatePrimitiveAssignmentParameters,
@@ -45,6 +49,7 @@ export const canonicalCardPublicationInputSchema = z.object({
   cardCode: z.string().min(1),
   card: cardSchema,
   printedCard: cardSchema.optional(),
+  printingCandidates: z.array(cardSchema).min(1),
   printedSourceTextHash: z.string().min(1).optional(),
   appliedErrata: z.array(z.object({
     releaseId: z.string().min(1),
@@ -145,12 +150,37 @@ export function buildCanonicalCardDocument(
   updatedAt: string
 ): CanonicalCardDocument {
   const parsed = canonicalCardPublicationInputSchema.parse(input);
+  const printingGroupKey = deriveCanonicalPrintingGroupKey(parsed.printingCandidates[0]!);
+  const nonmatchingPrinting = parsed.printingCandidates.find(
+    (candidate) => deriveCanonicalPrintingGroupKey(candidate) !== printingGroupKey,
+  );
+  if (nonmatchingPrinting) {
+    throw new Error(
+      `Printing ${nonmatchingPrinting.public_code} does not belong to ${printingGroupKey}.`,
+    );
+  }
+  const selectedPrinting = selectPreferredPrinting(
+    parsed.printingCandidates,
+    parsed.cardCode,
+  );
   const card = normalizeCanonicalCard(parsed.card);
   const printedCard = normalizeCanonicalCard(parsed.printedCard ?? parsed.card);
   const derivedCardCode = deriveCardCodeFromCard(card);
 
   if (parsed.cardCode !== derivedCardCode) {
     throw new Error(`Card code ${parsed.cardCode} does not match uploaded card ${derivedCardCode}.`);
+  }
+  if (!hasSamePrintingIdentity(printedCard, selectedPrinting)) {
+    throw new Error(
+      `Printing ${printedCard.public_code} is not the canonical default for ${parsed.cardCode}; ` +
+      `${selectedPrinting.public_code} must be published instead.`,
+    );
+  }
+  if (!hasSamePrintingIdentity(card, selectedPrinting)) {
+    throw new Error(
+      `Effective card presentation ${card.public_code} does not match canonical printing ` +
+      `${selectedPrinting.public_code}.`,
+    );
   }
   if (parsed.sourceTextHash !== hashCardRulesText(card)) {
     throw new Error("Card rules text changed after preview.");
@@ -279,6 +309,14 @@ export function buildCanonicalCardDocument(
     createdAt,
     updatedAt
   };
+}
+
+function hasSamePrintingIdentity(left: Card, right: Card) {
+  return (
+    left.id === right.id &&
+    left.public_code === right.public_code &&
+    left.riftbound_id === right.riftbound_id
+  );
 }
 
 function addBindingToStructuredClause(

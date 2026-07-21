@@ -11,7 +11,7 @@ import {
   type PrimitiveCatalogEntry,
 } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
-import { comparePrintingPreference } from "../card-catalog/printing-selection";
+import { selectPreferredPrinting } from "../card-catalog/printing-selection";
 import {
   getDeckCardLookupCandidates,
   getDeckCardNameAliases,
@@ -63,17 +63,29 @@ export function buildDeckSnapshot(
 ): DeckSnapshot {
   const parsedDeck = parseDeckList(sourceText);
   const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
+  const issues: string[] = [];
+  const candidatesByName = new Map<string, CanonicalCardDocument[]>();
   const cardsByName = new Map<string, CanonicalCardDocument>();
   for (const document of canonicalCards) {
     for (const name of getDeckCardNameAliases(document.card)) {
-      setPreferredCanonicalCard(cardsByName, name, document);
+      addCanonicalCardCandidate(candidatesByName, name, document);
     }
     for (const alias of legacyCardNameAliases(document.card.name)) {
-      setPreferredCanonicalCard(cardsByName, alias, document);
+      addCanonicalCardCandidate(candidatesByName, alias, document);
+    }
+  }
+  for (const [name, candidates] of candidatesByName) {
+    try {
+      const card = selectPreferredPrinting(
+        candidates.map((candidate) => candidate.card),
+        name,
+      );
+      cardsByName.set(name, candidates.find((candidate) => candidate.card === card)!);
+    } catch (caught) {
+      issues.push(caught instanceof Error ? caught.message : `Unresolved printing: ${name}`);
     }
   }
   const definitionsById = new Map(behaviorDefinitions.map((definition) => [definition.id, definition]));
-  const issues: string[] = [];
 
   const cards = expectedNames.flatMap((name): GameCardDefinition[] => {
     const document = cardsByName.get(name);
@@ -153,15 +165,12 @@ function cardNameLookupCandidates(name: string): string[] {
   return [...new Set([...candidates, name.replace(/^Yi, /, "Master Yi, ")])];
 }
 
-function setPreferredCanonicalCard(
-  cardsByName: Map<string, CanonicalCardDocument>,
+function addCanonicalCardCandidate(
+  cardsByName: Map<string, CanonicalCardDocument[]>,
   name: string,
   candidate: CanonicalCardDocument,
 ) {
-  const current = cardsByName.get(name);
-  if (!current || comparePrintingPreference(candidate.card, current.card) < 0) {
-    cardsByName.set(name, candidate);
-  }
+  cardsByName.set(name, [...(cardsByName.get(name) ?? []), candidate]);
 }
 
 function validateCanonicalDocument(

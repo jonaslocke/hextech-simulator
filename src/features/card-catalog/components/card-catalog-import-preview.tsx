@@ -151,6 +151,7 @@ export function CardCatalogImportPreview() {
         cardCode: card.cardCode,
         card: card.card,
         printedCard: card.printedCard,
+        printingCandidates: card.printingCandidates,
         printedSourceTextHash: card.printedSourceTextHash,
         appliedErrata: card.appliedErrata,
         sourceTextHash: card.sourceTextHash,
@@ -234,6 +235,9 @@ export function CardCatalogImportPreview() {
         {preview ? (
           <>
             <SummaryBand preview={preview} />
+            {preview.unresolvedPrintingGroups.length > 0 && (
+              <UnresolvedPrintingGroups preview={preview} />
+            )}
             <CardTable
               cards={sortedCards}
               onReview={reviewCardForApproval}
@@ -416,6 +420,27 @@ function SummaryBand({ preview }: { preview: Preview }) {
         label="Changed"
         value={preview.summary.changedSincePersistedCardCount}
       />
+    </section>
+  );
+}
+
+function UnresolvedPrintingGroups({ preview }: { preview: Preview }) {
+  return (
+    <section className="bg-amber-950/30 mt-5 p-4 border border-amber-400/30 rounded-lg">
+      <h2 className="font-medium text-amber-100">Canonical printing review required</h2>
+      <p className="mt-1 text-amber-200/80 text-sm">
+        These gameplay identities were not published because the upload contains no
+        standard printing.
+      </p>
+      <ul className="mt-3 space-y-2 text-sm">
+        {preview.unresolvedPrintingGroups.map((group) => (
+          <li key={group.cardCode}>
+            <span className="font-mono text-amber-100">{group.cardCode}</span>
+            {": "}
+            <span className="text-amber-200/80">{group.publicCodes.join(", ")}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

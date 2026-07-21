@@ -4,7 +4,7 @@ import type { Db } from "mongodb";
 import { z } from "zod";
 import { cardSetFileSchema, type Card } from "../catalog";
 import { deriveCardCodeFromCard } from "./identity";
-import { selectPreferredPrinting } from "./printing-selection";
+import { selectPrintingGroupRepresentative } from "./printing-selection";
 
 const STATUS_DIRECTORY = path.join(process.cwd(), "data", "implementation-status");
 const CANONICAL_CARDS_COLLECTION = "canonicalCards";
@@ -315,7 +315,9 @@ function buildIdentitySeed(sourceCards: readonly Card[]) {
   }
   return [...groups.values()]
     .map((printings) => {
-      const preferred = selectPreferredPrinting(printings);
+      // The ledger inventories even unresolved source groups; this representative
+      // is only a stable label and is never published as a canonical printing.
+      const preferred = selectPrintingGroupRepresentative(printings);
       const cleanName = preferred.metadata.clean_name ?? preferred.name;
       return {
         gameplayIdentity: `${deriveCardCodeFromCard(preferred)}:${cleanName}`,

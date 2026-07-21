@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { Card } from "../catalog";
 import { deriveCardCodeFromCard } from "./identity";
+import { selectPreferredPrinting } from "./printing-selection";
 
 const ERRATA_PATH = path.join(process.cwd(), "data", "errata", "official.json");
 const ERRATA_KEY = /^(OGN|OGS|SFD|UNL)-[0-9]{3}$/;
@@ -56,12 +57,10 @@ export async function loadOfficialErrata(cards: readonly Card[]) {
       if (!ERRATA_KEY.test(cardKey)) {
         throw new Error(`Invalid official errata card key: ${cardKey}`);
       }
-      const printed = knownCardsByKey.get(cardKey)?.find(
-        (card) =>
-          !card.metadata.alternate_art &&
-          !card.metadata.overnumbered &&
-          !card.metadata.signature,
-      ) ?? knownCardsByKey.get(cardKey)?.[0];
+      const candidates = knownCardsByKey.get(cardKey);
+      const printed = candidates?.length
+        ? selectPreferredPrinting(candidates, cardKey)
+        : undefined;
       // Imports can contain an individual set or a partial correction batch.
       // Errata for cards outside that upload are irrelevant to its overlay.
       if (!printed) continue;

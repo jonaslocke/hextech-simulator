@@ -83,6 +83,58 @@ test("previews textless Basic Runes as intrinsic behavior cards", async () => {
   ]);
 });
 
+test("previews one deterministic canonical card for a group of printings", async () => {
+  const standard = createTestCard({
+    name: "Synthetic Printed Unit",
+    publicCode: "SYN-143/221",
+    text: "",
+    type: "Unit"
+  });
+  const alternate = createTestCard({
+    name: "Synthetic Printed Unit",
+    publicCode: "SYN-143a/221",
+    text: "",
+    type: "Unit",
+    metadata: { alternate_art: true }
+  });
+
+  for (const printings of [[standard, alternate], [alternate, standard]]) {
+    const preview = await previewCardCatalogImport({
+      behaviorCatalog: buildPrimitiveCatalog(),
+      sourceLabel: "printings.json",
+      rawJson: JSON.stringify(printings),
+      existingCardLookup: async () => new Map()
+    });
+
+    assert.equal(preview.summary.uploadedCardCount, 2);
+    assert.equal(preview.summary.canonicalCardCount, 1);
+    assert.equal(preview.cards.length, 1);
+    assert.equal(preview.cards[0]?.card.public_code, "SYN-143/221");
+    assert.equal(preview.cards[0]?.printingCandidates.length, 2);
+  }
+});
+
+test("surfaces and withholds a printing group with no standard candidate", async () => {
+  const alternate = createTestCard({
+    name: "Synthetic Variant Only",
+    publicCode: "SYN-307a/221",
+    text: "",
+    type: "Unit",
+    metadata: { alternate_art: true }
+  });
+
+  const preview = await previewCardCatalogImport({
+    behaviorCatalog: buildPrimitiveCatalog(),
+    sourceLabel: "variants.json",
+    rawJson: JSON.stringify([alternate]),
+    existingCardLookup: async () => new Map()
+  });
+
+  assert.equal(preview.cards.length, 0);
+  assert.equal(preview.summary.unresolvedPrintingGroupCount, 1);
+  assert.deepEqual(preview.unresolvedPrintingGroups[0]?.publicCodes, ["SYN-307a/221"]);
+});
+
 test("marks uploaded cards that already exist in the persisted catalog", async () => {
   const card = createTestCard({
     name: "Synthetic Group Buff",

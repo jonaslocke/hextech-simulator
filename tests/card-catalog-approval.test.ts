@@ -42,6 +42,28 @@ test("rejects non-approved catalog publication", () => {
   );
 });
 
+test("rejects publication when the payload card is not the selected canonical printing", () => {
+  const input = createPublicationInput();
+  const alternate = {
+    ...input.card,
+    id: "SYN-001a/100",
+    riftbound_id: "syn-001a-100",
+    public_code: "SYN-001a/100",
+    metadata: { ...input.card.metadata, alternate_art: true }
+  };
+
+  assert.throws(
+    () => buildCanonicalCardDocument({
+      ...input,
+      card: alternate,
+      printedCard: alternate,
+      printingCandidates: [alternate, input.card],
+      sourceTextHash: hashCardRulesText(alternate)
+    }, buildPrimitiveCatalog(), "a", "b"),
+    /is not the canonical default/
+  );
+});
+
 test("publishes executable and vanilla behavior models", () => {
   const runtimePending = buildCanonicalCardDocument(
     createPublicationInput(),
@@ -60,6 +82,7 @@ test("publishes executable and vanilla behavior models", () => {
     {
       cardCode: "TST-001",
       card: vanillaCard,
+      printingCandidates: [vanillaCard],
       sourceTextHash: hashCardRulesText(vanillaCard),
       modelingStatus: "approved",
       adminNotes: "Confirmed vanilla.",
@@ -89,6 +112,7 @@ test("allows multiple canonical cards to reference one reusable behavior", () =>
     ...createPublicationInput(),
     cardCode: "TST-096",
     card: secondCard,
+    printingCandidates: [secondCard],
     sourceTextHash: hashCardRulesText(secondCard)
   };
   const catalog = buildPrimitiveCatalog();
@@ -177,6 +201,7 @@ function createPublicationInput(): CanonicalCardPublicationInput {
   return {
     cardCode: "SYN-001",
     card,
+    printingCandidates: [card],
     sourceTextHash: hashCardRulesText(card),
     modelingStatus: "approved",
     adminNotes: "Validated from uploaded set.",

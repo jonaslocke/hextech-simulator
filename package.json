@@ -9,6 +9,7 @@
     "build": "next build",
     "catalog:clear-validations": "node --env-file=.env --import tsx scripts/clear-card-behavior-validations.ts --confirm",
     "catalog:reset-canonical-cards": "node --env-file=.env --import tsx scripts/reset-canonical-card-catalog.ts --confirm",
+    "catalog:repair-canonical-printings": "node --env-file=.env --import tsx scripts/repair-canonical-card-printings.ts",
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-implementation-status": "node --env-file=.env --import tsx scripts/sync-implementation-status-ledgers.ts",
     "catalog:check-implementation-status": "node --env-file=.env --import tsx scripts/sync-implementation-status-ledgers.ts --check",

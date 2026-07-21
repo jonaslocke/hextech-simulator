@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { ZodError } from "zod";
 import { cardSetFileSchema, type Card } from "../catalog";
 import { analyzeCardBehaviorSuggestions, type CardBehaviorSuggestion } from "./behavior-suggestions";
-import { deriveCardCodeFromCard } from "./identity";
+import {
+  deriveCanonicalPrintingGroupKey,
+  deriveCardCodeFromCard,
+} from "./identity";
 import {
   applyOfficialErrata,
   loadOfficialErrata,
@@ -13,6 +16,10 @@ import type {
   ExistingCanonicalCardLookup,
   PersistedCanonicalCardSummary
 } from "./canonical-card-repository";
+import {
+  isStandardPrinting,
+  resolveCanonicalPrintingGroups,
+} from "./printing-selection";
 
 export type ExistingCardCatalogState =
   | "new"
@@ -22,6 +29,7 @@ export type ExistingCardCatalogState =
 export type CardCatalogImportPreviewCard = {
   card: Card;
   printedCard: Card;
+  printingCandidates: Card[];
   printedSourceTextHash: string;
   appliedErrata: AppliedErratum[];
   cardCode: string;
@@ -43,6 +51,9 @@ export type CardCatalogImportPreviewResult = {
   sourceLabel: string;
   summary: {
     uploadedCardCount: number;
+    canonicalCardCount: number;
+    presentationVariantCount: number;
+    unresolvedPrintingGroupCount: number;
     suggestedCardCount: number;
     vanillaCardCount: number;
     newCardCount: number;
@@ -55,6 +66,11 @@ export type CardCatalogImportPreviewResult = {
   };
   primitiveCatalog: PrimitiveCatalogEntry[];
   cards: CardCatalogImportPreviewCard[];
+  unresolvedPrintingGroups: Array<{
+    cardCode: string;
+    reason: string;
+    publicCodes: string[];
+  }>;
 };
 
 export class CardCatalogImportPreviewError extends Error {
@@ -73,7 +89,13 @@ export async function previewCardCatalogImport(input: {
   behaviorCatalog: PrimitiveCatalogEntry[];
   existingCardLookup?: ExistingCanonicalCardLookup;
 }): Promise<CardCatalogImportPreviewResult> {
-  const printedCards = parseUploadedCardSetJson(input.rawJson);
+  const uploadedPrintings = parseUploadedCardSetJson(input.rawJson);
+  const printingGroups = resolveCanonicalPrintingGroups(
+    uploadedPrintings,
+    deriveCanonicalPrintingGroupKey,
+  );
+  const candidatesByIdentity = groupPrintingsByIdentity(uploadedPrintings);
+  const printedCards = printingGroups.selected;
   const releases = await loadOfficialErrata(printedCards);
   const cards = printedCards.map((printedCard) =>
     applyOfficialErrata(printedCard, releases),
@@ -93,6 +115,9 @@ export async function previewCardCatalogImport(input: {
     return {
       card,
       printedCard: overlay.printedCard,
+      printingCandidates:
+        candidatesByIdentity.get(deriveCanonicalPrintingGroupKey(card)) ??
+        [overlay.printedCard],
       printedSourceTextHash: hashCardRulesText(overlay.printedCard),
       appliedErrata: overlay.appliedErrata,
       cardCode,
@@ -108,6 +133,7 @@ export async function previewCardCatalogImport(input: {
     ({
       card,
       printedCard,
+      printingCandidates,
       printedSourceTextHash,
       appliedErrata,
       cardCode,
@@ -119,6 +145,7 @@ export async function previewCardCatalogImport(input: {
       return {
         card,
         printedCard,
+        printingCandidates,
         printedSourceTextHash,
         appliedErrata,
         cardCode,
@@ -143,7 +170,12 @@ export async function previewCardCatalogImport(input: {
   return {
     sourceLabel: input.sourceLabel,
     summary: {
-      uploadedCardCount: cards.length,
+      uploadedCardCount: uploadedPrintings.length,
+      canonicalCardCount: cards.length,
+      presentationVariantCount: uploadedPrintings.filter(
+        (card) => !isStandardPrinting(card),
+      ).length,
+      unresolvedPrintingGroupCount: printingGroups.unresolved.length,
       suggestedCardCount: suggestionReport.summary.suggestedCardCount,
       vanillaCardCount: previewCards.filter((card) => card.isVanilla).length,
       newCardCount: previewCards.filter(
@@ -163,8 +195,26 @@ export async function previewCardCatalogImport(input: {
         suggestionReport.summary.missingRequiredParameterCount
     },
     primitiveCatalog: suggestionReport.primitiveCatalog,
-    cards: previewCards
+    cards: previewCards,
+    unresolvedPrintingGroups: printingGroups.unresolved.map((group) => ({
+      cardCode: group.candidates
+        .map(deriveCardCodeFromCard)
+        .sort((left, right) => left.localeCompare(right))[0] ?? group.identity,
+      reason: group.reason,
+      publicCodes: group.candidates
+        .map((card) => card.public_code)
+        .sort((left, right) => left.localeCompare(right)),
+    })),
   };
+}
+
+function groupPrintingsByIdentity(cards: readonly Card[]) {
+  const groups = new Map<string, Card[]>();
+  for (const card of cards) {
+    const identity = deriveCanonicalPrintingGroupKey(card);
+    groups.set(identity, [...(groups.get(identity) ?? []), card]);
+  }
+  return groups;
 }
 
 function parseUploadedCardSetJson(rawJson: string): Card[] {
