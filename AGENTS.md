@@ -256,6 +256,63 @@ Before keeping a test, ask: **Would this test remain useful if the card that
 revealed the problem were removed from the game?** If not, delete or decompose
 it and validate the full card manually.
 
+### Primitive boundary and lifecycle coverage
+
+Testing two primitives independently does not establish that their handoff is
+correct. When gameplay behavior composes existing primitives, explicitly review
+each boundary where ownership, identity, timing, location, or control passes
+from one subsystem to another. Add a focused synthetic boundary test when that
+handoff is stateful, lossy, deferred, or otherwise capable of changing the
+meaning of the data.
+
+Important boundaries include:
+
+- action projection -> submitted action -> server validation;
+- selector binding -> declaration cost payment -> effect resolution;
+- event producer -> attribution/history -> trigger routing;
+- effect execution -> pending decision or replacement -> resumed execution;
+- zone movement -> locked target/reference preservation;
+- permission creation -> matching operation -> exact-once consumption;
+- prevention or replacement -> suppressed/performed event emission;
+- chain completion -> continuation, priority, and pending-state cleanup.
+
+Use production transitions only when the handoff itself is the contract under
+test. Keep each fixture schema-valid, minimal, synthetic, and limited to the two
+or three responsibilities needed to observe that boundary. Do not reproduce a
+complete canonical card merely to exercise the composition.
+
+For stateful primitives, cover the applicable lifecycle matrix rather than only
+the successful path:
+
+- accept and decline;
+- sufficient and insufficient payment;
+- valid and invalid or zone-changed references;
+- immediate and chain-deferred resolution;
+- replacement performed and original action performed;
+- first use, repeated use, and cleanup;
+- owning player, affected player, and new decision owner when they differ.
+
+Assert observable invariants at these boundaries. In particular:
+
+- an action exposed by projection must be executable from the same state and
+  selections;
+- declaration-cost selections that move zones remain available as paid cost
+  records but are not revalidated as unresolved effect targets;
+- suspended resolution has an explicit continuation and resumes after the last
+  completed instruction without repeating prior work;
+- a replaced event is suppressed, while an unreplaced event is emitted exactly
+  once with its original attribution;
+- a consumed one-shot permission cannot apply again;
+- completion, decline, invalidation, and cancellation remove pending decisions,
+  continuations, temporary permissions, and other transient state they own.
+
+Before publishing a behavior composition, record a small primitive coverage map
+in the relevant family or implementation document. Name the producer, consumer,
+handoff contract, lifecycle branches, and focused synthetic coverage. Do not
+describe this map or its tests as card acceptance. If two primitives are already
+tested independently but their shared boundary is not, treat the boundary as
+untested.
+
 ### When a gameplay change touches a primitive
 
 A card implementation may expose a missing or broken reusable primitive. In
