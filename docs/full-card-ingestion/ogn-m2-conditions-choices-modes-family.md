@@ -43,7 +43,7 @@ branch or a partial model.
 | Cross-target numeric comparison and value copy | `OGN-108` Convergent Mutation | Excluded: selected-unit relative numeric comparison and copy-value modifier. |
 | Public-Trash source trigger and modified re-play | `OGN-006` Flame Chompers; `OGN-037` Immortal Phoenix; `OGN-252` Super Mega Death Rocket! | Excluded: event sources outside the active board plus modified public-Trash play. |
 | Death replacement | `OGN-023` Unlicensed Armory; `OGN-269` The Boss | Excluded: optional paid replacement of a pending death. |
-| Resolution-time optional resource cost | `OGN-035` Vayne, Hunter; `OGN-072` Solari Shrine; `OGN-147` Wildclaw Shaman; `OGN-152` Mistfall; `OGN-282` Monastery of Hirana; `OGN-300` Relentless Storm | Excluded: generic optional payment during a resolving effect or trigger. |
+| Resolution-time optional resource cost | `OGN-035` Vayne, Hunter; `OGN-072` Solari Shrine; `OGN-147` Wildclaw Shaman; `OGN-152` Mistfall; `OGN-282` Monastery of Hirana; `OGN-249` Relentless Storm | Excluded: generic optional payment during a resolving effect or trigger. |
 | Spell-control and new-choice ownership | `OGN-080` Mystic Reversal | Excluded: control transfer for a pending Chain spell and target re-declaration. |
 | Effect-driven play from Hidden or public Trash | `OGN-107` Ava Achiever; `OGN-112` Kai'Sa, Evolutionary; `OGN-194` Nocturne, Horrifying | Excluded: nested play from non-hand zone with source-specific cost and timing changes. |
 | Optional declaration cost that changes the parent spell cost | `OGN-146` Wallop | Excluded: optional Buff payment during parent-spell declaration. |
@@ -107,7 +107,7 @@ battlefield.
 |---|---|---|---|
 | Public-zone trigger sources | Trigger discovery includes explicit public-Trash sources and only a matching Main Deck event subject for private top-deck look/reveal triggers. | Shared extension | `OGN-006`, `OGN-037`, `OGN-194`, `OGN-252` |
 | Effect-driven play | A zone-authorized play validates the source zone and payment, records play history, applies Unit placement legality, puts Spells on the Chain, and honors post-resolution recycling. | New primitive | `OGN-006`, `OGN-037`, `OGN-107`, `OGN-112`, `OGN-194` |
-| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Insufficient costs suppress the offer; decline and failed revalidation leave later gated effects untouched. | New decision/payment primitives | `OGN-035`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-282`, `OGN-300` |
+| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Insufficient costs suppress the offer; decline and failed revalidation leave later gated effects untouched. | New decision/payment primitives | `OGN-035`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-249`, `OGN-282` |
 | Kill attribution | Spell damage emits a separate kill event after lethal cleanup while retaining the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
 | Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
 | Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
@@ -115,8 +115,10 @@ battlefield.
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,
-`OGN-252`, `OGN-269`, `OGN-282`, and `OGN-300`. Publication is not manual
-gameplay acceptance.
+`OGN-249`, `OGN-252`, `OGN-269`, and `OGN-282`. Relentless Storm was originally
+tracked through the `OGN-300` overnumbered printing before its canonical
+identity was repaired to the standard `OGN-249` printing. Publication is not
+manual gameplay acceptance.
 
 ### Batch 3: linked movement, sequenced decisions, and spell control
 

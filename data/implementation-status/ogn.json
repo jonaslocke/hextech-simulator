@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T10:53:01.642Z",
+  "updatedAt": "2026-07-21T10:56:19.246Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -8711,7 +8711,7 @@
       ],
       "status": "implemented",
       "canonicalModel": {
-        "cardCode": "OGN-300",
+        "cardCode": "OGN-249",
         "approvedAt": "2026-07-21T01:38:24.815Z"
       },
       "familyStatuses": [],
@@ -8721,6 +8721,12 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-300 approved."
+        },
+        {
+          "at": "2026-07-21T01:38:24.815Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-249 approved."
         }
       ],
       "updatedAt": "2026-07-21T01:38:24.815Z"

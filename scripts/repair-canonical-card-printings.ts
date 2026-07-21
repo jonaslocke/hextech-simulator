@@ -9,6 +9,7 @@ import {
   loadOfficialErrata,
   normalizeCanonicalCard,
   selectPreferredPrinting,
+  synchronizeImplementationStatusLedger,
   type CanonicalCardDocument,
 } from "../src/server/card-catalog";
 import { cardSetFileSchema } from "../src/server/catalog";
@@ -17,6 +18,9 @@ import { getMongoClient, getMongoDatabaseName } from "../src/server/db";
 const commandArguments = process.argv.slice(2);
 const requestedCardCodes = readCardCodes(commandArguments);
 const confirmed = commandArguments.includes("--confirm") || commandArguments.includes("confirm");
+const allowIdentityMigration =
+  commandArguments.includes("--allow-identity-migration") ||
+  commandArguments.includes("allow-identity-migration");
 
 if (requestedCardCodes.length === 0) {
   throw new Error("Pass at least one --card-code SET-000 value.");
@@ -30,7 +34,8 @@ try {
     CANONICAL_CARDS_COLLECTION,
   );
   const repairs = [] as Array<{
-    cardCode: string;
+    sourceCardCode: string;
+    targetCardCode: string;
     before: string;
     after: string;
     document: CanonicalCardDocument;
@@ -51,10 +56,19 @@ try {
     );
     const selected = selectPreferredPrinting(candidates, groupKey);
     const selectedCardCode = deriveCardCodeFromCard(selected);
-    if (selectedCardCode !== cardCode) {
+    if (selectedCardCode !== cardCode && !allowIdentityMigration) {
       throw new Error(
-        `${cardCode} resolves to ${selectedCardCode}; identity migration requires explicit review.`,
+        `${cardCode} resolves to ${selectedCardCode}; rerun with ` +
+        "--allow-identity-migration after explicit review.",
       );
+    }
+    if (selectedCardCode !== cardCode) {
+      const conflicting = await collection.findOne({ _id: selectedCardCode });
+      if (conflicting) {
+        throw new Error(
+          `Cannot migrate ${cardCode} to ${selectedCardCode}; the target identity already exists.`,
+        );
+      }
     }
 
     const releases = await loadOfficialErrata([selected]);
@@ -66,12 +80,17 @@ try {
       );
     }
 
+    const { _id: ignoredId, ...existingDocument } = existing;
+    void ignoredId;
     repairs.push({
-      cardCode,
+      sourceCardCode: cardCode,
+      targetCardCode: selectedCardCode,
       before: existing.card.public_code,
       after: selected.public_code,
       document: {
-        ...existing,
+        ...existingDocument,
+        id: selectedCardCode,
+        cardCode: selectedCardCode,
         card: normalizeCanonicalCard(overlay.effectiveCard),
         printedCard: normalizeCanonicalCard(overlay.printedCard),
         printedSourceTextHash: hashCardRulesText(overlay.printedCard),
@@ -84,18 +103,37 @@ try {
   }
 
   for (const repair of repairs) {
-    console.log(`${repair.cardCode}: ${repair.before} -> ${repair.after}`);
+    const identityChange = repair.sourceCardCode === repair.targetCardCode
+      ? repair.sourceCardCode
+      : `${repair.sourceCardCode} -> ${repair.targetCardCode}`;
+    console.log(`${identityChange}: ${repair.before} -> ${repair.after}`);
   }
 
   if (!confirmed) {
     console.log("Dry run only. Pass --confirm to persist these repairs.");
   } else {
     for (const repair of repairs) {
-      const { _id: ignoredId, ...document } = repair.document as CanonicalCardDocument & {
-        _id?: string;
-      };
-      void ignoredId;
-      await collection.updateOne({ _id: repair.cardCode }, { $set: document });
+      if (repair.sourceCardCode === repair.targetCardCode) {
+        await collection.updateOne(
+          { _id: repair.sourceCardCode },
+          { $set: repair.document },
+        );
+        continue;
+      }
+
+      await collection.insertOne({
+        _id: repair.targetCardCode,
+        ...repair.document,
+      });
+      const deletion = await collection.deleteOne({ _id: repair.sourceCardCode });
+      if (deletion.deletedCount !== 1) {
+        throw new Error(
+          `Created ${repair.targetCardCode}, but failed to remove ${repair.sourceCardCode}.`,
+        );
+      }
+    }
+    for (const setCode of new Set(repairs.map((repair) => repair.targetCardCode.split("-", 1)[0]!))) {
+      await synchronizeImplementationStatusLedger(db, setCode);
     }
     console.log(`Repaired ${repairs.length} canonical card printing(s).`);
   }
