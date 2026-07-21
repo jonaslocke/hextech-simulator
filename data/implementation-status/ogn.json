@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T10:56:19.246Z",
+  "updatedAt": "2026-07-21T18:23:30.381Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -4263,11 +4263,21 @@
           "name": "Arena Bar"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-124",
+        "approvedAt": "2026-07-21T18:23:30.231Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T18:23:30.231Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-124 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T18:23:30.231Z"
     },
     {
       "gameplayIdentity": "OGN-125:Bilgewater Bully",
@@ -5624,11 +5634,21 @@
           "name": "Sett, Brawler"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-164",
+        "approvedAt": "2026-07-21T18:23:30.381Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T18:23:30.381Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-164 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T18:23:30.381Z"
     },
     {
       "gameplayIdentity": "OGN-165:Cemetery Attendant",

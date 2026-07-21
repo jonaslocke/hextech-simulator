@@ -670,6 +670,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ,optional("automatic", "boolean", "Whether the affected units are derived automatically.")
       ,optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card.")
       ,optional("readyOnly", "boolean", "Whether only ready units are legal.")
+      ,optional("exhaustedOnly", "boolean", "Whether only exhausted units are legal.")
       ,optional("buffedOnly", "boolean", "Whether only units with a Buff are legal.")
       ,optional("selectionKey", "string", "Stable key used to route this selection.")
       ,optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target.")
@@ -697,6 +698,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
       optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
       optional("readyOnly", "boolean", "Whether only ready units are legal."),
+      optional("exhaustedOnly", "boolean", "Whether only exhausted units are legal."),
       optional("buffedOnly", "boolean", "Whether only units with a Buff are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target."),
@@ -740,6 +742,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
       optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
+      optional("exhaustedOnly", "boolean", "Whether only exhausted units are legal."),
       optional("buffedOnly", "boolean", "Whether only units with a Buff are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("referenceSelectionKey", "string", "Earlier selector whose location constrains this target."),

@@ -123,12 +123,19 @@ manual gameplay acceptance.
 The importable cross-domain deck at
 `data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve
 non-Legend targets using the matching Loose Cannon, Jinx, Rebel, and Super Mega
-Death Rocket! identity. `OGN-249` Relentless Storm and `OGN-269` The Boss require
-separate Legend decks with approved Volibear and Sett Chosen Champions. The
-local corpus contains matching Champions, but none currently has an approved
-canonical behavior model; validation of those two Legends is blocked until a
-support Champion is published or the experimental deck contract is explicitly
-expanded beyond its current cross-domain-only exception.
+Death Rocket! identity. `OGN-249` Relentless Storm still requires a separate
+Legend deck with an approved Volibear Chosen Champion; the local corpus has no
+approved matching Champion model, so that validation remains blocked.
+
+`OGN-269` The Boss is now covered by
+`data/decks/experimental/ogn-m2-sett-buff-validation.dec.txt`. The support
+publication adds `OGN-164` Sett, Brawler as its legal Sett-tag Chosen Champion
+and `OGN-124` Arena Bar as a repeatable Buff source. Sett's play and conquer
+Buff triggers, spend-Buff activated cost, and turn-scoped Might modifier are
+exact reuse. Arena Bar reuses activated abilities, source exhaustion, and Buff,
+with a shared `exhaustedOnly` unit-selector constraint. Both support cards have
+supported canonical models and are ready for manual validation; publication is
+not manual gameplay acceptance.
 
 ### Batch 3: linked movement, sequenced decisions, and spell control
 

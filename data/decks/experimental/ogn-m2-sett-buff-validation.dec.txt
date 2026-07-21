@@ -1,0 +1,39 @@
+Legend:
+1 The Boss
+
+Champion:
+1 Sett, Brawler
+
+Runes:
+2 Fury Rune
+2 Calm Rune
+2 Mind Rune
+2 Body Rune
+2 Chaos Rune
+2 Order Rune
+
+Battlefields:
+1 Aspirant's Climb
+1 The Papertree
+1 Monastery of Hirana
+
+MainDeck:
+2 Flame Chompers
+2 Unlicensed Armory
+2 Immortal Phoenix
+2 Ava Achiever
+2 Kai'Sa, Evolutionary
+2 Wildclaw Shaman
+2 Nocturne, Horrifying
+3 Arena Bar
+2 Sett, Brawler
+2 Vayne, Hunter
+2 Convergent Mutation
+2 Hidden Blade
+2 Overt Operation
+2 Block
+2 Solari Shrine
+2 Mistfall
+2 Facebreaker
+2 Consult the Past
+2 Raging Soul

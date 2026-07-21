@@ -69,6 +69,16 @@ test("selectors cover unit ownership, zones, readiness, exclusions, and counts",
     ["source", "friend", "friend-ready"],
   );
   assert.deepEqual(
+    friendly(binding("selector.friendly_unit", {
+      area: "any",
+      locationRelation: "any",
+      minimumCount: 1,
+      maximumCount: 1,
+      exhaustedOnly: true,
+    }), context).legalIds,
+    ["friend"],
+  );
+  assert.deepEqual(
     enemy(binding("selector.enemy_unit", {
       area: "any",
       locationRelation: "any",

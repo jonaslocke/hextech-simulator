@@ -2492,6 +2492,11 @@ function selectorTargets(
     )
     .filter(
       (id) =>
+        binding.parameters.exhaustedOnly !== true ||
+        game.state.cardStates[id]?.exhausted === true,
+    )
+    .filter(
+      (id) =>
         binding.parameters.buffedOnly !== true ||
         game.state.cardStates[id]?.buffed === true,
     )
