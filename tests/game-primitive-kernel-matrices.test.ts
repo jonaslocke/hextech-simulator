@@ -119,6 +119,39 @@ test("selectors cover unit ownership, zones, readiness, exclusions, and counts",
   assert.deepEqual(battlefieldRequirement.legalIds, ["middle"]);
 });
 
+test("kill trigger routing uses killer ownership and pre-death stunned state", () => {
+  const { game, handlers } = matrixFixture([
+    card("SYN-KILL-TRIGGER-SOURCE", "Gear"),
+    card("SYN-KILL-TRIGGER-ENEMY", "Unit", 2),
+    card("SYN-KILL-TRIGGER-FRIEND", "Unit", 2),
+  ], [
+    instance("source", "p1", "SYN-KILL-TRIGGER-SOURCE", "mainDeck"),
+    instance("enemy", "p2", "SYN-KILL-TRIGGER-ENEMY", "mainDeck"),
+    instance("friend", "p1", "SYN-KILL-TRIGGER-FRIEND", "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "friend"];
+  game.state.players.p2!.zones.base = ["enemy"];
+  const trigger = handlers.get("trigger.on_kill")!.matches!;
+  const matches = (
+    actorPlayerId: string,
+    subjectCardInstanceId: string,
+    wasStunned: boolean,
+  ) => trigger(
+    binding("trigger.on_kill", { subject: "stunned_enemy_unit" }),
+    createBehaviorContext(game, "p1", "source", {
+      type: "unit.killed",
+      actorPlayerId,
+      subjectCardInstanceId,
+      values: { method: "combat", wasStunned },
+    }, []),
+  );
+
+  assert.equal(matches("p1", "enemy", true), true);
+  assert.equal(matches("p1", "enemy", false), false);
+  assert.equal(matches("p2", "enemy", true), false);
+  assert.equal(matches("p1", "friend", true), false);
+});
+
 test("selectors distinguish combat, source locations, references, and automatic groups", () => {
   const { game, handlers } = matrixFixture([
     card("SOURCE", "Unit", 4),

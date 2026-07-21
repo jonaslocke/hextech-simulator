@@ -337,6 +337,12 @@ export const gameStateSchema = z.object({
       defenderAssignments: z.array(damageAssignmentSchema),
       attackerExcessDamage: z.number().int().nonnegative().default(0),
       defenderExcessDamage: z.number().int().nonnegative().default(0),
+    killCandidates: z.array(z.object({
+      unitId: z.string().min(1),
+      killerPlayerId: z.string().min(1),
+      wasStunned: z.boolean(),
+    })).optional(),
+    killEventsEmitted: z.boolean().optional(),
     resultWinnerPlayerId: z.string().min(1).nullable().optional(),
     resultLoserPlayerId: z.string().min(1).nullable().optional(),
     attackersRecalledDuringCleanup: z.boolean().optional(),

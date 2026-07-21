@@ -5,6 +5,7 @@ import {
   createBehaviorContext,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  beginCombatDamage,
   continueCombatResolution,
   gameplayActions,
   hasKeyword,
@@ -534,6 +535,61 @@ test("combat cleanup finishes death replacement before deciding attacker recall"
   assert.equal(game.state.players.p2!.points, 1);
   assert.ok(game.state.players.p1!.zones.base.includes("defender"));
   assert.ok(!game.state.players.p2!.zones.base.includes("attacker"));
+  gameDocumentSchema.parse(game);
+});
+
+test("combat damage emits kill attribution with pre-death stunned state", () => {
+  const battlefield = card("SYN-KILL-BATTLEFIELD", "Battlefield");
+  const attacker = card("SYN-KILL-ATTACKER", "Unit", 4);
+  const defender = card("SYN-KILL-DEFENDER", "Unit", 3);
+  const { game, decks } = fixture(
+    [battlefield, attacker, defender],
+    [
+      instance("battlefield", "p2", battlefield.cardCode, "battlefield"),
+      instance("attacker", "p1", attacker.cardCode, "mainDeck"),
+      instance("defender", "p2", defender.cardCode, "mainDeck"),
+    ],
+  );
+  game.state.battlefields = [{
+    battlefieldId: "location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p2",
+    controllerPlayerId: "p2",
+    contestedByPlayerId: "p1",
+    units: ["attacker", "defender"],
+    facedownCards: [],
+  }];
+  game.state.cardStates.attacker!.combatRole = "attacker";
+  game.state.cardStates.defender!.combatRole = "defender";
+  game.state.cardStates.defender!.stunned = true;
+  game.state.combat = {
+    battlefieldId: "location",
+    stage: "showdown",
+    attackerPlayerId: "p1",
+    defenderPlayerId: "p2",
+    attackerUnitIds: ["attacker"],
+    defenderUnitIds: ["defender"],
+    attackerMight: null,
+    defenderMight: null,
+    attackerAssignments: [],
+    defenderAssignments: [],
+    attackerExcessDamage: 0,
+    defenderExcessDamage: 0,
+  };
+  gameDocumentSchema.parse(game);
+
+  beginCombatDamage(game, createRuntimeCardIndex(decks, game), decks);
+
+  const killed = game.state.queuedBehaviorEvents?.find(
+    (event) => event.type === "unit.killed",
+  );
+  assert.deepEqual(killed, {
+    type: "unit.killed",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "defender",
+    values: { method: "combat", wasStunned: true },
+  });
+  assert.ok(game.state.players.p2!.zones.trash.includes("defender"));
   gameDocumentSchema.parse(game);
 });
 

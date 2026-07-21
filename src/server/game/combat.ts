@@ -265,6 +265,12 @@ function applyAssignment(
   const appliedAssignments = resolvedAssignments.filter((assignment) =>
     canTakeDamage(game, assignment.targetUnitId, index),
   );
+  combat.killCandidates = appliedAssignments.map((assignment) => ({
+    unitId: assignment.targetUnitId,
+    killerPlayerId: assignment.actorPlayerId,
+    wasStunned:
+      game.state.cardStates[assignment.targetUnitId]?.stunned === true,
+  }));
   for (const assignment of appliedAssignments) {
     game.state.cardStates[assignment.targetUnitId]!.damage += assignment.amount;
   }
@@ -333,6 +339,7 @@ function performCombatCleanup(
   // them before Combat Cleanup step 3d decides whether surviving attackers
   // are recalled because defenders remain at the battlefield.
   if (game.state.pendingChoice) return;
+  queueCombatKillEvents(game, index);
   const attackers = controlledUnits(
     battlefield.units,
     combat.attackerPlayerId,
@@ -363,6 +370,28 @@ function performCombatCleanup(
     }
   }
   combat.stage = "result";
+}
+
+function queueCombatKillEvents(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+) {
+  const combat = game.state.combat!;
+  if (combat.killEventsEmitted) return;
+  combat.killEventsEmitted = true;
+  for (const candidate of combat.killCandidates ?? []) {
+    const owner = index.instances.get(candidate.unitId)?.ownerPlayerId;
+    const died = !game.state.cardStates[candidate.unitId] || Boolean(
+      owner && game.state.players[owner]!.zones.trash.includes(candidate.unitId),
+    );
+    if (!died) continue;
+    (game.state.queuedBehaviorEvents ??= []).push({
+      type: "unit.killed",
+      actorPlayerId: candidate.killerPlayerId,
+      subjectCardInstanceId: candidate.unitId,
+      values: { method: "combat", wasStunned: candidate.wasStunned },
+    });
+  }
 }
 
 function determineCombatResult(

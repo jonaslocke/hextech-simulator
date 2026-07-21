@@ -108,7 +108,7 @@ battlefield.
 | Public-zone trigger sources | Trigger discovery includes explicit public-Trash sources and only a matching Main Deck event subject for private top-deck look/reveal triggers. | Shared extension | `OGN-006`, `OGN-037`, `OGN-194`, `OGN-252` |
 | Effect-driven play | A zone-authorized play validates the source zone and payment, records play history, applies Unit placement legality, puts Spells on the Chain, and honors post-resolution recycling. | New primitive | `OGN-006`, `OGN-037`, `OGN-107`, `OGN-112`, `OGN-194` |
 | Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Insufficient costs suppress the offer; decline and failed revalidation leave later gated effects untouched. | New decision/payment primitives | `OGN-035`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-249`, `OGN-282` |
-| Kill attribution | Spell damage emits a separate kill event after lethal cleanup while retaining the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
+| Kill attribution | Spell and combat damage emit a separate kill event after lethal cleanup with the responsible player and the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
 | Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
 | Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
 
