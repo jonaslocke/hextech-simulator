@@ -26,27 +26,29 @@ discard, reset, amend, squash, or combine milestone work.
 ## Validated defects
 
 1. **Move-trigger Showdown Focus — valid symptom, corrected rule model.**
-   Rules 140.1.b–140.1.c require a Standard Move to begin in Neutral Open.
-   Rule 583.3 permits its triggered abilities to create a Chain. Rules 615 and
-   621 require Cleanup, an empty Chain, and opposing units before Combat starts.
-   Rules 625.1 and 549 then open the Showdown and give Focus to the player who
+   Rules 144 and 410.1 make a Standard Move a Neutral-Open discretionary
+   action. Rules 383.3.c and 383.3.d permit its triggered abilities to create a
+   Chain, including during a Closed State. Rules 323.9 and 323.13 stage and open
+   Combat only through Cleanup after outstanding work is complete. Rules 344,
+   345, and 464.2.c.1.a then open the Showdown and give Focus to the player who
    applied Contested. Therefore a move-trigger Chain must resolve before the
    move's Cleanup opens its Showdown. It is not an already-open Showdown Chain,
-   so rule 552 must not pass Focus after it. For Chains genuinely opened during
-   a Showdown, rule 552 still passes Focus normally.
+   so rules 340.2.a and 346.1 must not pass Focus after it. For Chains genuinely
+   opened during a Showdown, rule 340.2.a still passes Focus normally.
 2. **Bonus Damage on triggered abilities — valid.**
    Annie, Fiery says the controller's spells and abilities deal 1 Bonus Damage,
-   with each damage instance increased by 1. Rule 139.3.a treats spell and
-   ability damage uniformly. Tibbers' play trigger is a triggered ability under
-   rules 583.1–583.3, so each unit it damages receives the modified amount.
+   with each damage instance increased by 1. Rules 417.4–417.5 define Bonus
+   Damage on Deal actions. Tibbers' play trigger is a triggered ability under
+   rules 383.1–383.3, and rules 713–715 apply its Bonus Damage separately to
+   each unit it damages.
 3. **Morbid Return Trash selection — valid.**
-   Rules 107.1.c and 107.1.f establish each player's public Trash. Rule 107.1.e
-   makes Trash unordered. Rules 138.1.b.1–138.1.b.3 preserve Unit type in Trash
+   Rules 108.2.c–108.2.d establish each player's public, unordered Trash.
+   Rules 141.1.b.3 and 141.2.b preserve Unit type in Trash
    and permit effects that specify Units there. Every eligible Unit in the
    controller's Trash must be selectable, independent of visual order.
 4. **Firestorm battlefield selection — valid.**
-   Rules 163.5 and 163.7 make Battlefields targetable Locations. Rules 559.3 and
-   559.3.a distinguish the specifically chosen Battlefield from units affected
+   Rule 170.5 makes Battlefields Locations. Rules 355.9 and 355.10.d
+   distinguish the specifically chosen Battlefield from units affected
    by criteria. Firestorm chooses one Battlefield containing an enemy unit;
    enemy units there are derived affected objects, not separately submitted
    targets.
@@ -99,7 +101,8 @@ discard, reset, amend, squash, or combine milestone work.
 - Move triggers resolve in Neutral Closed before pending Combat or non-combat
   Showdowns open.
 - The player applying Contested gains initial Showdown Focus.
-- A Chain opened inside an existing Showdown still passes Focus under rule 552.
+- A Chain opened inside an existing Showdown still passes Focus under rule
+  340.2.a.
 - Triggered automatic-group damage receives controller Bonus Damage per unit.
 - Unordered Trash selectors expose every eligible Unit.
 - Battlefield-scoped automatic groups submit only their selected location and
@@ -117,8 +120,8 @@ discard, reset, amend, squash, or combine milestone work.
 - Movement now dispatches `unit.moved` before opening a pending Showdown.
   Generic stabilization opens either Combat or a non-combat Showdown only when
   its trigger Chain and pending choices are empty. The attacker consequently
-  gains initial Focus under rules 549 and 625 rather than having it passed
-  under rule 552.
+  gains initial Focus under rules 345 and 464.2.c.1.a rather than having it
+  passed under rules 340.2.a and 346.1.
 - The reported triggered Bonus Damage failure is not reproducible in the
   current source revision. Triggered effect frames retain their controller,
   `action.deal_damage` evaluates `controller_effect` modifiers once per damage

@@ -1,0 +1,33 @@
+Legend:
+1 Loose Cannon
+
+Champion:
+1 Jinx, Rebel
+
+Runes:
+2 Fury Rune
+2 Calm Rune
+2 Mind Rune
+2 Body Rune
+2 Chaos Rune
+2 Order Rune
+
+Battlefields:
+1 Back-Alley Bar
+1 Startipped Peak
+1 Bandle Tree
+
+MainDeck:
+3 Mushroom Pouch
+3 Ember Monk
+3 Consult the Past
+3 Facebreaker
+3 Block
+3 Hidden Blade
+3 Adaptatron
+3 Eclipse Herald
+3 Wizened Elder
+3 Bilgewater Bully
+3 Qiyana, Victorious
+3 Udyr, Wildman
+3 Peak Guardian

@@ -14,14 +14,15 @@ export function cleanupBoard(
 ): void {
   recomputeAllMight(game, index);
   cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+  // Rule 323.6: battlefield control cannot be lost while combat is resolving.
+  // The combat state machine establishes control after all Cleanup/result work.
+  if (game.state.combat) return;
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
     if (controllers.length === 0) {
       battlefield.controllerPlayerId = null;
       battlefield.contestedByPlayerId = null;
-      continue;
-    }
-    if (
+    } else if (
       battlefield.controllerPlayerId &&
       !controllers.includes(battlefield.controllerPlayerId)
     ) {

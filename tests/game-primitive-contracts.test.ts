@@ -20,6 +20,10 @@ import {
   gameDocumentSchema,
 } from "../src/server/game";
 import { effectiveNumericValue } from "../src/server/game/numeric-modifiers";
+import {
+  facedownCapacity,
+  hasFacedownCapacity,
+} from "../src/server/game/facedown-cards";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import {
@@ -35,6 +39,50 @@ test("registers a handler for every executable behavior", () => {
       `Missing runtime handler for ${behaviorId}`,
     );
   }
+});
+
+test("facedown capacity modifiers add independent battlefield slots", () => {
+  const battlefieldDefinition = card("SYN-FACEDOWN-BATTLEFIELD", "Battlefield");
+  battlefieldDefinition.behaviorModel.clauses = [{
+    id: "additional-facedown-slot",
+    sequence: 0,
+    sourceText: "You may hide an additional card here.",
+    normalizedText: "You may hide an additional card here.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.facedown_capacity", { amount: 1 })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture(
+    [battlefieldDefinition],
+    [instance("battlefield", "p1", battlefieldDefinition.cardCode, "battlefield")],
+  );
+  const index = createRuntimeCardIndex(decks, game);
+  const battlefield: GameDocument["state"]["battlefields"][number] = {
+    battlefieldId: "location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: [],
+    facedownCards: [],
+  };
+
+  assert.equal(facedownCapacity(battlefield, index), 2);
+  assert.equal(hasFacedownCapacity(battlefield, index), true);
+  battlefield.facedownCards = [
+    { cardInstanceId: "hidden-1", controllerPlayerId: "p1", hiddenAtTurnNumber: 1 },
+  ];
+  assert.equal(hasFacedownCapacity(battlefield, index), true);
+  battlefield.facedownCards.push(
+    { cardInstanceId: "hidden-2", controllerPlayerId: "p1", hiddenAtTurnNumber: 2 },
+  );
+  assert.equal(hasFacedownCapacity(battlefield, index), false);
 });
 
 test("unit play consumes one matching enter-ready permission", () => {
@@ -293,7 +341,14 @@ test("move-to-base emits subject and origin metadata", () => {
 });
 
 test("card play events distinguish hand and Facedown origins", () => {
-  for (const fromFacedown of [false, true]) {
+  const scenarios = [
+    { fromFacedown: false, activePlayerId: "p1", turnNumber: 1 },
+    { fromFacedown: true, activePlayerId: "p2", turnNumber: 2 },
+    { fromFacedown: true, activePlayerId: "p1", turnNumber: 3 },
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const { fromFacedown } = scenario;
     const observer = card("SYN-PLAY-OBSERVER", "Gear");
     observer.behaviorModel.clauses = [{
       id: "observe-play",
@@ -356,8 +411,8 @@ test("card play events distinguish hand and Facedown origins", () => {
     }];
     if (fromFacedown) {
       game.state.turn = {
-        turnNumber: 2,
-        activePlayerId: "p2",
+        turnNumber: scenario.turnNumber,
+        activePlayerId: scenario.activePlayerId,
         phase: "action",
       };
     } else {
@@ -377,7 +432,9 @@ test("card play events distinguish hand and Facedown origins", () => {
       actionId: play.id,
       selectedIds: [],
       decks,
-      now: fromFacedown ? "play-facedown" : "play-hand",
+      now: fromFacedown
+        ? `play-facedown-${scenario.activePlayerId}`
+        : "play-hand",
     }).game;
     const event = next.state.chain?.items[0]?.behaviorEvent;
 

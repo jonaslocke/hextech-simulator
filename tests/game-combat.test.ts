@@ -493,6 +493,82 @@ test("clears surviving damage before temporary Might expires at end of turn", ()
   assert.equal(game.state.modifiers.length, 0);
 });
 
+test("combat cleanup preserves control and Hidden until death-trigger work completes", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  addSyntheticDeathClauses(decks, "DEFENDER", 1);
+  addSyntheticHiddenCard(initial, decks, "p2");
+
+  let game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.combat?.stage, "result");
+  assert.equal(game.state.chain?.items.length, 1);
+  assert.deepEqual(game.state.chain?.items[0]?.behaviorEvent?.values, {
+    originBattlefieldId: "battlefield",
+    might: 2,
+    damage: 2,
+    combatRole: "defender",
+  });
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p2");
+  assert.equal(game.state.battlefields[0]!.facedownCards?.length, 1);
+
+  game = resolvePendingCombatWork(game, decks);
+
+  assert.equal(game.state.combat, null);
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, null);
+  assert.deepEqual(game.state.battlefields[0]!.facedownCards, []);
+  assert.ok(game.state.players.p2!.zones.trash.includes("hidden-card"));
+});
+
+test("combat result uses the board produced by a resolved self-death trigger", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 3,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  addSyntheticDeathClauses(decks, "DEFENDER", 1, true);
+
+  let game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.combat?.stage, "result");
+  assert.ok(game.state.battlefields[0]!.units.includes("attacker"));
+  game = resolvePendingCombatWork(game, decks);
+
+  assert.equal(game.state.combat, null);
+  assert.ok(game.state.players.p1!.zones.trash.includes("attacker"));
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, null);
+  assert.equal(game.state.players.p1!.points, 0);
+});
+
+test("simultaneous self-death triggers require ordering before combat control changes", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  addSyntheticDeathClauses(decks, "DEFENDER", 2);
+  addSyntheticHiddenCard(initial, decks, "p2");
+
+  let game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.pendingChoice?.type, "orderTriggers");
+  assert.equal(
+    game.state.pendingChoice?.type === "orderTriggers"
+      ? game.state.pendingChoice.optionIds.length
+      : 0,
+    2,
+  );
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p2");
+  assert.equal(game.state.battlefields[0]!.facedownCards?.length, 1);
+
+  game = resolvePendingCombatWork(game, decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.equal(game.state.combat, null);
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, null);
+  assert.ok(game.state.players.p2!.zones.trash.includes("hidden-card"));
+});
+
 function moveAttacker(
   initial: GameDocument,
   decks: DeckSnapshotDocument[]
@@ -530,6 +606,141 @@ function passShowdown(
     });
   }
   return game;
+}
+
+function resolvePendingCombatWork(
+  initial: GameDocument,
+  decks: DeckSnapshotDocument[],
+) {
+  let game = initial;
+  for (let step = 0; step < 24; step += 1) {
+    const choice = game.state.pendingChoice;
+    if (choice) {
+      const action = gameplayActions(game, choice.playerId, decks).find(
+        (candidate) =>
+          candidate.presentation.surface === "choice-dialog" &&
+          candidate.enabled,
+      );
+      assert.ok(action, `Expected an enabled action for ${choice.type}.`);
+      const selectedIds = choice.type === "orderTriggers"
+        ? [...choice.optionIds]
+        : choice.type === "effectSelection"
+          ? choice.legalCardIds.slice(0, choice.minimum)
+          : [];
+      game = performGameplayAction({
+        game,
+        actorPlayerId: choice.playerId,
+        actionId: action.id,
+        selectedIds,
+        decks,
+        now: `resolve-choice-${step}`,
+      });
+      continue;
+    }
+    if (game.state.chain) {
+      const availablePasses = game.state.setup.playerIds.flatMap(
+        (actorPlayerId) => gameplayActions(game, actorPlayerId, decks)
+          .filter((action) => action.label === "Pass priority" && action.enabled)
+          .map((action) => ({ action, actorPlayerId })),
+      );
+      assert.equal(availablePasses.length, 1);
+      const { action, actorPlayerId } = availablePasses[0]!;
+      game = performGameplayAction({
+        game,
+        actorPlayerId,
+        actionId: action.id,
+        selectedIds: [],
+        decks,
+        now: `pass-priority-${step}`,
+      });
+      continue;
+    }
+    break;
+  }
+  assert.equal(game.state.chain, null);
+  assert.equal(game.state.pendingChoice, null);
+  return game;
+}
+
+function addSyntheticDeathClauses(
+  decks: DeckSnapshotDocument[],
+  cardCode: string,
+  count: number,
+  killEnemy = false,
+) {
+  const card = decks[0]!.snapshot.cards.find(
+    (candidate) => candidate.cardCode === cardCode,
+  )!;
+  card.behaviorModel.clauses = Array.from({ length: count }, (_, index) => ({
+    id: `self-death-${index}`,
+    sequence: index,
+    sourceText: "Synthetic self-death contract.",
+    normalizedText: "Synthetic self-death contract.",
+    abilities: [],
+    triggers: [{
+      behaviorId: "trigger.on_death",
+      parameters: { subject: "source" },
+      confidence: "high" as const,
+      order: 0,
+    }],
+    conditions: [],
+    selectors: killEnemy ? [{
+      behaviorId: "selector.enemy_unit",
+      parameters: {
+        area: "battlefield",
+        automatic: true,
+        selectionKey: "survivor",
+      },
+      confidence: "high" as const,
+      order: 1,
+    }] : [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: killEnemy ? [{
+      behaviorId: "action.kill_unit",
+      parameters: { selectionKey: "survivor" },
+      confidence: "high" as const,
+      order: 2,
+    }] : [{
+      behaviorId: "action.gain_points",
+      parameters: {},
+      confidence: "high" as const,
+      order: 1,
+    }],
+    keywords: [],
+  }));
+}
+
+function addSyntheticHiddenCard(
+  game: GameDocument,
+  decks: DeckSnapshotDocument[],
+  controllerPlayerId: string,
+) {
+  const hidden = definition("HIDDEN", "Synthetic Hidden Card", "Unit", 0);
+  hidden.card.classification.type = "Spell";
+  decks[0]!.snapshot.cards.push(hidden);
+  decks.find((deck) => deck.playerId === controllerPlayerId)!.instances.push({
+    instanceId: "hidden-card",
+    ownerPlayerId: controllerPlayerId,
+    source: "mainDeck",
+    cardCode: "HIDDEN",
+  });
+  game.state.cardStates["hidden-card"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+    combatRole: null,
+  };
+  const battlefield = game.state.battlefields[0]!;
+  battlefield.facedownCards = [{
+    cardInstanceId: "hidden-card",
+    controllerPlayerId,
+    hiddenAtTurnNumber: 1,
+  }];
+  battlefield.facedownCardInstanceId = "hidden-card";
+  battlefield.facedownControllerPlayerId = controllerPlayerId;
+  battlefield.hiddenAtTurnNumber = 1;
 }
 
 function combatFixture(input: {
@@ -677,6 +888,13 @@ function combatFixture(input: {
         computedMight: might,
         combatRole: null
       }])),
+      turnHistory: {
+        discardedCardIdsByPlayerId: {},
+        diedCardIdsByPlayerId: {},
+        movedCardIdsByPlayerId: {},
+        readiedCardIdsByPlayerId: {},
+        recycledCardIdsByPlayerId: {},
+      },
       turn: { turnNumber: 1, activePlayerId: "p1", phase: "action" },
       chain: null,
       showdown: null,

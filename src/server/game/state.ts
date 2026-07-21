@@ -293,7 +293,15 @@ export const gameStateSchema = z.object({
   combat: z
     .object({
       battlefieldId: z.string().min(1),
-      stage: z.enum(["showdown", "attackerAssignment", "defenderAssignment"]),
+      stage: z.enum([
+        "showdown",
+        "attackerAssignment",
+        "defenderAssignment",
+        "cleanup",
+        "result",
+        "control",
+        "end",
+      ]),
       attackerPlayerId: z.string().min(1),
       defenderPlayerId: z.string().min(1),
       attackerUnitIds: z.array(z.string().min(1)),
@@ -302,6 +310,9 @@ export const gameStateSchema = z.object({
       defenderMight: z.number().int().nonnegative().nullable(),
       attackerAssignments: z.array(damageAssignmentSchema),
       defenderAssignments: z.array(damageAssignmentSchema),
+    resultWinnerPlayerId: z.string().min(1).nullable().optional(),
+    resultLoserPlayerId: z.string().min(1).nullable().optional(),
+    attackersRecalledDuringCleanup: z.boolean().optional(),
     })
     .nullable(),
   modifiers: z.array(

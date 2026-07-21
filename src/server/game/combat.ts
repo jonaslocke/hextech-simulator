@@ -6,6 +6,7 @@ import {
 import { scoreBattlefield } from "./scoring";
 import {
   cleanupCombatModifiers,
+  cleanupLethalDamage,
   definitionForInstance,
   hasKeyword,
   killUnitsMarkedForNextDamage,
@@ -15,6 +16,7 @@ import {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { dispatchSimultaneousBehaviorEvents } from "./triggers";
+import { facedownCardsAt, setFacedownCards } from "./facedown-cards";
 
 export type DamageAssignment = {
   targetUnitId: string;
@@ -124,7 +126,9 @@ export function beginCombatDamage(
     index
   );
   if (!combat.attackerUnitIds.length || !combat.defenderUnitIds.length) {
-    resolveCombat(game, index, decks);
+    game.state.showdown = null;
+    combat.stage = "cleanup";
+    continueCombatResolution(game, index, decks);
     return;
   }
   combat.attackerMight = totalCombatMight(
@@ -269,19 +273,51 @@ function applyAssignment(
     resolvedAssignments.map((assignment) => assignment.targetUnitId),
     index,
   );
-  resolveCombat(game, index, decks);
+  game.state.showdown = null;
+  combat.stage = "cleanup";
+  continueCombatResolution(game, index, decks);
 }
 
-function resolveCombat(
+export function continueCombatResolution(
   game: GameDocument,
   index: RuntimeCardIndex,
   decks: readonly DeckSnapshotDocument[]
+) {
+  while (game.state.combat) {
+    const stage = game.state.combat.stage;
+    if (stage === "cleanup") {
+      if (game.state.chain || game.state.pendingChoice) return;
+      performCombatCleanup(game, index);
+      continue;
+    }
+    if (hasOutstandingResolutionWork(game)) return;
+    if (stage === "result") {
+      determineCombatResult(game, index, decks);
+      continue;
+    }
+    if (stage === "control") {
+      establishPostCombatControl(game, index, decks);
+      continue;
+    }
+    if (stage === "end") {
+      endCombat(game, index);
+      continue;
+    }
+    return;
+  }
+}
+
+function performCombatCleanup(
+  game: GameDocument,
+  index: RuntimeCardIndex,
 ) {
   const combat = game.state.combat!;
   const battlefield = game.state.battlefields.find(
     (candidate) => candidate.battlefieldId === combat.battlefieldId
   )!;
-  cleanupBoard(game, index);
+  // Rules 323.4-323.5 and 466.1: capture self-death trigger context while
+  // lethal units are still on the board, then kill them as one Cleanup task.
+  cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
   const attackers = controlledUnits(
     battlefield.units,
     combat.attackerPlayerId,
@@ -292,29 +328,14 @@ function resolveCombat(
     combat.defenderPlayerId,
     index
   );
-  let conqueredByAttacker = false;
   if (attackers.length && defenders.length) {
     battlefield.units = battlefield.units.filter(
       (id) => !attackers.includes(id)
     );
     game.state.players[combat.attackerPlayerId]!.zones.base.push(...attackers);
-    battlefield.controllerPlayerId = combat.defenderPlayerId;
-  } else if (attackers.length) {
-    const changed =
-      battlefield.controllerPlayerId !== combat.attackerPlayerId;
-    battlefield.controllerPlayerId = combat.attackerPlayerId;
-    conqueredByAttacker = changed;
-  } else if (defenders.length) {
-    battlefield.controllerPlayerId = combat.defenderPlayerId;
-  } else {
-    battlefield.controllerPlayerId = null;
-  }
-  battlefield.contestedByPlayerId = null;
-  for (const state of Object.values(game.state.cardStates)) {
-    state.combatRole = null;
+    combat.attackersRecalledDuringCleanup = true;
   }
   clearMarkedDamage(game);
-  cleanupCombatModifiers(game, index);
   for (const id of [
     ...combat.attackerUnitIds,
     ...combat.defenderUnitIds,
@@ -326,19 +347,125 @@ function resolveCombat(
       recomputeMight(game, id, index);
     }
   }
-  game.state.pendingChoice = null;
-  game.state.showdown = null;
-  game.state.combat = null;
-  cleanupBoard(game, index);
-  if (conqueredByAttacker) {
+  combat.stage = "result";
+}
+
+function determineCombatResult(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const combat = game.state.combat!;
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === combat.battlefieldId,
+  )!;
+  const attackers = controlledUnits(
+    battlefield.units,
+    combat.attackerPlayerId,
+    index,
+  );
+  const defenders = controlledUnits(
+    battlefield.units,
+    combat.defenderPlayerId,
+    index,
+  );
+  combat.resultWinnerPlayerId = combat.attackersRecalledDuringCleanup
+    ? null
+    : attackers.length > 0 && defenders.length === 0
+    ? combat.attackerPlayerId
+    : defenders.length > 0 && attackers.length === 0
+      ? combat.defenderPlayerId
+      : null;
+  combat.resultLoserPlayerId = combat.resultWinnerPlayerId === combat.attackerPlayerId
+    ? combat.defenderPlayerId
+    : combat.resultWinnerPlayerId === combat.defenderPlayerId
+      ? combat.attackerPlayerId
+      : null;
+  combat.stage = "control";
+  if (combat.resultWinnerPlayerId) {
+    dispatchSimultaneousBehaviorEvents(game, [
+      {
+        type: "combat.won",
+        actorPlayerId: combat.resultWinnerPlayerId,
+        subjectCardInstanceId: battlefield.cardInstanceId,
+        values: { battlefieldId: battlefield.battlefieldId },
+      },
+      {
+        type: "combat.lost",
+        actorPlayerId: combat.resultLoserPlayerId,
+        subjectCardInstanceId: battlefield.cardInstanceId,
+        values: { battlefieldId: battlefield.battlefieldId },
+      },
+    ], decks);
+  }
+}
+
+function establishPostCombatControl(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const combat = game.state.combat!;
+  const battlefield = game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === combat.battlefieldId,
+  )!;
+  const previousController = battlefield.controllerPlayerId;
+  const controllers = unitControllers(game, battlefield.units, index);
+  if (controllers.length > 1) {
+    battlefield.controllerPlayerId = previousController;
+    battlefield.contestedByPlayerId = controllers.find(
+      (controllerPlayerId) => controllerPlayerId !== previousController,
+    ) ?? combat.attackerPlayerId;
+    combat.stage = "end";
+    return;
+  }
+  battlefield.controllerPlayerId = controllers.length === 1 ? controllers[0]! : null;
+  battlefield.contestedByPlayerId = null;
+  removeMismatchedHiddenCards(game, battlefield);
+  combat.stage = "end";
+  if (
+    battlefield.controllerPlayerId &&
+    battlefield.controllerPlayerId !== previousController
+  ) {
     scoreBattlefield(
       game,
-      combat.attackerPlayerId,
+      battlefield.controllerPlayerId,
       battlefield.battlefieldId,
       "conquer",
       decks,
     );
   }
+}
+
+function endCombat(game: GameDocument, index: RuntimeCardIndex) {
+  for (const state of Object.values(game.state.cardStates)) {
+    state.combatRole = null;
+  }
+  cleanupCombatModifiers(game, index);
+  game.state.combat = null;
+}
+
+function removeMismatchedHiddenCards(
+  game: GameDocument,
+  battlefield: GameDocument["state"]["battlefields"][number],
+) {
+  const retained = facedownCardsAt(battlefield).filter((card) => {
+    if (card.controllerPlayerId === battlefield.controllerPlayerId) return true;
+    game.state.players[card.controllerPlayerId]!.zones.trash.push(card.cardInstanceId);
+    return false;
+  });
+  setFacedownCards(battlefield, retained);
+}
+
+function hasOutstandingResolutionWork(game: GameDocument) {
+  return Boolean(
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.effectResolutions.length > 0 ||
+    (game.state.queuedChainItems?.length ?? 0) > 0 ||
+    (game.state.queuedBehaviorEvents?.length ?? 0) > 0 ||
+    game.state.queuedTriggerChoices.length > 0
+  );
 }
 
 function validateDamageAssignments(

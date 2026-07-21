@@ -72,6 +72,7 @@ export function createPrimitiveHandlers(
     "modifier.legion_energy_discount", "cost.pay", "cost.exhaust_source",
     "cost.exhaust_selected_unit", "cost.spend_buff", "cost.spend_source_buff",
     "keyword.temporary", "modifier.cannot_move_from_source_battlefield",
+    "modifier.facedown_capacity",
   ]) handlers.set(id, passive);
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
   // card enters play. It has no separate state mutation when the clause is
@@ -2207,6 +2208,14 @@ export function cleanupLethalDamage(game: GameDocument, ids: string[], index: Ru
 }
 export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
   if (!isUnitInPlay(game, id)) return;
+  const originBattlefieldId = game.state.battlefields.find((battlefield) =>
+    battlefield.units.includes(id)
+  )?.battlefieldId ?? null;
+  const preDeathState = game.state.cardStates[id];
+  const preDeathMight = preDeathState?.computedMight ??
+    definitionForInstance(id, index).card.attributes.might ?? 0;
+  const preDeathDamage = preDeathState?.damage ?? 0;
+  const preDeathCombatRole = preDeathState?.combatRole ?? null;
   const replacementIndex = game.state.ongoingEffects.findIndex(
     (effect) =>
       effect.behaviorId === "replacement.recall_on_next_death" &&
@@ -2253,7 +2262,12 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     type: "unit.died",
     actorPlayerId: owner,
     subjectCardInstanceId: id,
-    values: {},
+    values: {
+      originBattlefieldId,
+      might: preDeathMight,
+      damage: preDeathDamage,
+      combatRole: preDeathCombatRole,
+    },
   });
 }
 

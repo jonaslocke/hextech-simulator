@@ -34,6 +34,7 @@ import {
 import {
   beginCombatDamage,
   combatChoiceTargets,
+  continueCombatResolution,
   startCombat,
   submitCombatDamage,
   type DamageAssignment,
@@ -41,6 +42,7 @@ import {
 import {
   beginDelayedEffectResolution,
   dispatchBehaviorEvent,
+  dispatchSimultaneousBehaviorEvents,
   queueChainItemsForTargets,
   queueDelayedEffects,
   submitChainTargetSelection,
@@ -779,6 +781,7 @@ export function performGameplayAction(input: {
     default:
       throw new Error("Action kind is not implemented.");
   }
+  settleAutomaticContinuations(game, index, input.decks);
   game.stateVersion += 1;
   game.updatedAt = input.now;
   return game;
@@ -1365,7 +1368,7 @@ function finishTurnProgressionIfReady(
   decks: readonly DeckSnapshotDocument[],
 ) {
   const turn = game.state.turn;
-  if (!turn || game.state.chain || game.state.pendingChoice) return;
+  if (!turn || game.state.chain || game.state.pendingChoice || game.state.combat) return;
   if (turn.phase === "end") {
     continueEndTurn(game, turn.activePlayerId, index, decks);
   } else if (isStartOfTurnPhase(turn.phase)) {
@@ -1520,9 +1523,39 @@ function drainQueuedBehaviorEvents(
 ) {
   const events = game.state.queuedBehaviorEvents ?? [];
   game.state.queuedBehaviorEvents = [];
-  for (const event of events) {
-    dispatchBehaviorEvent(game, event, decks);
+  while (events.length > 0) {
+    const eventType = events[0]!.type;
+    if (eventType !== "unit.died") {
+      dispatchBehaviorEvent(game, events.shift()!, decks);
+      continue;
+    }
+    const batch: typeof events = [];
+    while (events[0]?.type === "unit.died") batch.push(events.shift()!);
+    dispatchSimultaneousBehaviorEvents(game, batch, decks);
   }
+}
+
+function settleAutomaticContinuations(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  for (let guard = 0; guard < 16; guard += 1) {
+    if ((game.state.queuedBehaviorEvents?.length ?? 0) > 0) {
+      drainQueuedBehaviorEvents(game, decks);
+      resetChainPriorityToTopItem(game);
+    }
+    if (game.state.chain || game.state.pendingChoice) return;
+    const stageBefore = game.state.combat?.stage ?? null;
+    continueCombatResolution(game, index, decks);
+    const stageAfter = game.state.combat?.stage ?? null;
+    if ((game.state.queuedBehaviorEvents?.length ?? 0) > 0) continue;
+    if (game.state.chain || game.state.pendingChoice) return;
+    if (stageBefore !== stageAfter) continue;
+    break;
+  }
+  openPendingShowdown(game, index, decks);
+  finishTurnProgressionIfReady(game, index, decks);
 }
 
 function resetChainPriorityToTopItem(game: GameDocument) {
@@ -1724,7 +1757,7 @@ function addHiddenPlayActions(
 ) {
   if (isCardPlayRestricted(game, playerId)) return;
   const turn = game.state.turn;
-  if (!turn || turn.activePlayerId === playerId) return;
+  if (!turn) return;
   for (const battlefield of game.state.battlefields) {
     for (const facedownCard of facedownCardsAt(battlefield)) {
       const cardId = facedownCard.cardInstanceId;

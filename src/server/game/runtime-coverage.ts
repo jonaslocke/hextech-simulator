@@ -69,6 +69,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.play_token": "executable",
   "action.play_selected_unit": "executable",
   "modifier.modify_numeric_value": "executable",
+  "modifier.facedown_capacity": "executable",
   "modifier.play_unit_destination": "executable",
   "modifier.cannot_move_from_source_battlefield": "executable",
   "modifier.legion_energy_discount": "executable",
