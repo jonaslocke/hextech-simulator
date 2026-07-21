@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T02:09:54.428Z",
+  "updatedAt": "2026-07-21T10:19:25.053Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -1105,21 +1105,35 @@
           "name": "Raging Firebrand"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-031",
         "approvedAt": "2026-07-21T01:17:07.444Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:07.444Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-031 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:07.444Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-032:Ravenborn Tome",
@@ -1184,21 +1198,35 @@
           "name": "Tryndamere, Barbarian"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-034",
         "approvedAt": "2026-07-21T01:17:07.647Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:07.647Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-034 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:07.647Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-035:Vayne Hunter",
@@ -2637,21 +2665,35 @@
           "name": "Leona, Zealot"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-079",
         "approvedAt": "2026-07-21T01:17:07.915Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:07.915Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-079 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:07.915Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-080:Mystic Reversal",
@@ -3685,21 +3727,35 @@
           "name": "Convergent Mutation"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-108",
         "approvedAt": "2026-07-21T01:17:08.057Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:08.057Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-108 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:08.057Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-109:Dr Mundo Expert",
@@ -5419,21 +5475,35 @@
           "name": "Deadbloom Predator"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-161",
         "approvedAt": "2026-07-21T01:17:08.189Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:08.189Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-161 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:08.189Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-162:Miss Fortune Captain",
@@ -6439,21 +6509,35 @@
           "name": "Miss Fortune, Buccaneer"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-193",
         "approvedAt": "2026-07-21T01:17:08.453Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:19:25.053Z",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:08.453Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-193 approved."
+        },
+        {
+          "at": "2026-07-21T10:19:25.053Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:08.453Z"
+      "updatedAt": "2026-07-21T10:19:25.053Z"
     },
     {
       "gameplayIdentity": "OGN-194:Nocturne Horrifying",
