@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T10:37:59.989Z",
+  "updatedAt": "2026-07-21T10:53:01.642Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -2366,21 +2366,35 @@
           "name": "Mageseeker Warden"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-070",
         "approvedAt": "2026-07-21T01:17:07.782Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T10:53:01.642Z",
+          "note": "User manually validated Mageseeker Warden's battlefield play restriction and prevention of an opponent-controlled First Mate Ready action, including removal of the restriction after Mageseeker Warden left the battlefield."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:17:07.782Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-070 approved."
+        },
+        {
+          "at": "2026-07-21T10:53:01.642Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-batch-1-manual-validation",
+          "note": "User manually validated Mageseeker Warden's battlefield play restriction and prevention of an opponent-controlled First Mate Ready action, including removal of the restriction after Mageseeker Warden left the battlefield."
         }
       ],
-      "updatedAt": "2026-07-21T01:17:07.782Z"
+      "updatedAt": "2026-07-21T10:53:01.642Z"
     },
     {
       "gameplayIdentity": "OGN-071:Party Favors",

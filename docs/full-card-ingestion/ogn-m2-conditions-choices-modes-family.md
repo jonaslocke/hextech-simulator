@@ -89,11 +89,11 @@ rows because it needs both listed missing primitives; it is counted once.
 | Conditional damage prevention | Every damage producer consults the target's conditional prevention before mutation and event emission. | New prevention hook | `OGN-189` |
 
 These eight cards have synchronized supported canonical models. The user
-manually validated `OGN-031`, `OGN-034`, `OGN-079`, `OGN-108`, `OGN-161`,
-`OGN-189`, and `OGN-193` in-game on 2026-07-21. `OGN-070` remains ready for
-movement- and actual Ready-action-focused manual validation; it is not
-gameplay-accepted yet. `OGN-035` also uses the entry-ready contract but remains
-unpublished until its optional paid conquer clause is executable.
+manually validated `OGN-031`, `OGN-034`, `OGN-070`, `OGN-079`, `OGN-108`,
+`OGN-161`, `OGN-189`, and `OGN-193` in-game on 2026-07-21. All eight have passed
+their Batch 1 manual behavior-family gate without promoting their complete
+gameplay identities to `accepted`. `OGN-035` also uses the entry-ready contract
+but remains part of the Batch 2 optional-payment validation scope.
 
 The follow-up deck is
 `data/decks/experimental/ogn-m2-batch-1-movement-validation.dec.txt`. It uses the
