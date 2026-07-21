@@ -1,8 +1,8 @@
 # OGN M2 Family: Conditions, Optional Decisions, Modes, and Turn Memory
 
-Status: First 22-card subset manually validated; implementation batches for the
-34-card remainder are in progress. Published remainder cards stay ready for
-manual validation until the user accepts them in-game.
+Status: First 22-card subset manually validated; all 34 remainder cards are
+published and ready for manual validation. They remain unaccepted until the
+user validates them in-game.
 
 ## Scope contract
 
@@ -11,9 +11,9 @@ is classified below under its exact reusable primitive. A card is published
 only when its complete text is supported; no card received a name-specific
 branch or a partial model.
 
-## Card-by-card scope table
+## Card-by-card initial scope table
 
-| Exact reusable primitive | Cards | Disposition |
+| Exact reusable primitive | Cards | Initial disposition |
 |---|---|---|
 | `condition.turn_event_count` + conditional static keyword grants | `OGN-019` Raging Soul | Published |
 | Activated Legion effect with turn-scoped enter-ready permission | `OGN-021` Sun Disc | Published |
@@ -123,6 +123,21 @@ These seven cards have synchronized supported canonical models and are ready
 for manual validation: `OGN-067`, `OGN-071`, `OGN-080`, `OGN-177`, `OGN-187`,
 `OGN-199`, and `OGN-262`.
 
+### Batch 4: declaration costs, comparative top-deck play, and turn memory
+
+| Contract | Ownership and reuse | Classification | Published cards |
+|---|---|---|---|
+| Optional declaration cost | The existing locked optional-cost selector spends a selected friendly Buff before payment and makes the parent Spell ignore its base Energy and Power costs. | Exact and parameterized reuse | `OGN-146` |
+| Repeating independent Buff costs | One resolution choice offers every currently Buffed, exhausted friendly Unit; only selected Units spend their own Buff and ready before the automatic Buff-all effect. | New repeatable-cost primitive | `OGN-153` |
+| Comparative top-deck play | A resolution frame retains the killed Unit's current Might and the private looked-at group across choices. The eligible Unit is banished, played with normal placement while ignoring cost, and every still-decked remainder is recycled. | Shared resolution state plus new selection primitive | `OGN-242` |
+| Champion Zone return | Trash selection filters by the instance's original Champion source and an empty destination; execution revalidates both facts and resets the returning card's object state. | New zone-transfer primitive | `OGN-281` |
+| First spell target choice each turn | Spell target declaration and redeclaration emit public typed choice events. Trigger memory is keyed by battlefield source object and choosing player and resets at the turn boundary. | New event and turn-memory primitive | `OGN-292` |
+
+These final five cards have synchronized supported canonical models and are
+ready for manual validation: `OGN-146`, `OGN-153`, `OGN-242`, `OGN-281`, and
+`OGN-292`. This completes publication of all 34 remainder cards without
+claiming gameplay acceptance.
+
 ## Manually validated first subset
 
 `OGN-019`, `OGN-021`, `OGN-047`, `OGN-056`, `OGN-059`, `OGN-061`, `OGN-065`,
@@ -135,25 +150,13 @@ the ordinary, discard-dependent, and Hidden-dependent scenarios. Automated
 primitive tests remain technical safeguards and are not the acceptance evidence
 for these cards.
 
-## Next implementation phase
+## Remainder completion state
 
-The 34 distinct excluded cards in the scope table are the remaining corpus for
-this vertical. Implement them by the missing reusable contracts recorded in the
-table, not as one card-by-card integration batch. `OGN-035` appears in both the
-conditional-entry and resolution-time optional-payment rows and must satisfy
-both contracts, but it counts as one card.
-
-For each reusable contract:
-
-1. Validate the exact card text and rules meaning from the local card corpus and
-   authoritative local rules reference.
-2. Reuse or extend the engine subsystem that owns the behavior; do not add card
-   name or code branches.
-3. Add focused synthetic primitive-contract coverage only when a reusable
-   primitive is introduced or changed, following `AGENTS.md`.
-4. Publish only cards whose complete rules text is executable.
-5. Provide a small manual-validation deck or scenario handoff and wait for the
-   user's in-game acceptance before marking those cards passed.
+All 34 distinct cards formerly excluded by the scope table now have supported
+canonical models. `OGN-035` satisfies both its conditional-entry and optional
+payment contracts and still counts once. The remaining gate is the user's
+manual in-game validation; implementation status must not be promoted to an
+accepted family or complete gameplay identity before that gate.
 
 ## Manual validation handoff
 
@@ -174,3 +177,8 @@ For each reusable contract:
 | Atomic swap and event cleanup | Play Tideturner at Base and at a battlefield, swap with a friendly at another location, and decline. Confirm both locations exchange exactly once, no duplicate Unit remains, and same-location Units are not offered under the official erratum. | `199` |
 | Opponent-first decisions | Resolve Party Favors with the opponent choosing Cards, then Runes; verify both players receive exactly the selected outcome. Resolve Whirlwind with opponent accept/controller decline, then opponent decline/controller accept, and verify each prompt belongs to the correct player. | `071`, `187` |
 | Chain control and privacy | React to a targeted Spell with Mystic Reversal. Confirm control moves to the reactor, legal new targets are recalculated for that player, declining preserves the old choices, accepting replaces them, Priority resumes on the same Chain, and each viewer sees only normally public target information. | `080` |
+| Declaration-time alternate cost | Play Wallop normally, then play it by selecting a Buffed friendly Unit. Confirm declining or having no Buff requires the printed cost; paying spends exactly one Buff, ignores the full parent cost, still requires a legal ready target, and leaves no pending cost choice after resolution. | `146` |
+| Independent repeated costs | Resolve Overt Operation with multiple friendly Units covering Buffed/exhausted, Buffed/ready, unbuffed/exhausted, and unbuffed/ready states. Select some eligible Units, then none. Confirm only selected eligible Units spend Buffs and ready, after which every unbuffed friendly Unit receives one Buff. | `153` |
+| Top-deck comparison and mandatory cleanup | Activate Baited Hook with exact payment and a friendly Unit of known current Might. Test eligible boundary `killed Might + 1`, an ineligible larger Unit, decline, fewer than five cards, and no eligible Unit. Confirm payment and sacrifice are locked, the chosen Unit is first banished then played to a legal chosen destination without cost, all remaining looked cards recycle, private identities stay hidden from the opponent, and no vision/destination choice remains. | `242` |
+| Champion return legality | Hold Hallowed Tomb with the original Chosen Champion in Trash and an empty Champion Zone, then accept and decline. Repeat with the zone occupied and with a non-Chosen Champion-like Unit in Trash. Only the original Chosen Champion with an empty destination is offered and it returns reset. | `281` |
+| First target-choice memory | At The Dreaming Tree, have each player target one of their own friendly Units there with a Spell. Confirm each player draws only on their first qualifying choice that turn; enemy, Base, and other-battlefield targets do not count. Retarget a controlled Spell with Mystic Reversal, verify the new chooser owns the event, then advance the turn and confirm memory resets. | `292` |

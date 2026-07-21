@@ -590,6 +590,142 @@ test("spell control transfers choice ownership and replaces locked targets", () 
   assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.chosen");
 });
 
+test("looked-at Unit comparison uses a recorded value and recycles every remainder", () => {
+  const game = fixture();
+  const index = cardIndex();
+  for (const [id, might] of [["small", 3], ["large", 4], ["other", 0]] as const) {
+    const definition = structuredClone(index.definitions.get(id === "other" ? "SPELL" : "UNIT")!);
+    definition.cardCode = id.toUpperCase();
+    definition.card.attributes.might = id === "other" ? null : might;
+    index.definitions.set(definition.cardCode, definition);
+    index.instances.set(id, {
+      instanceId: id,
+      ownerPlayerId: "p1",
+      source: "mainDeck",
+      cardCode: definition.cardCode,
+    });
+    game.state.cardStates[id] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: id === "other" ? null : might,
+      objectVersion: 0,
+    };
+  }
+  game.state.players.p1!.zones.mainDeck = ["small", "large", "other"];
+  const handlers = createPrimitiveHandlers(index);
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+  context.effectOutcomes.killedMight = 2;
+  context.selectedBySelector.looked = ["small", "large", "other"];
+  const choose = binding("action.select_looked_unit", {
+    sourceSelectionKey: "looked",
+    comparisonOutcomeKey: "killedMight",
+    maximumOffset: 1,
+    selectionKey: "chosen",
+    banishSelected: true,
+  });
+  assert.deepEqual(handlers.get("action.select_looked_unit")!.choice!(choose, context)?.legalIds, ["small"]);
+  context.selectedBySelector.chosen = ["small"];
+  handlers.get("action.select_looked_unit")!.execute!(choose, context);
+  assert.deepEqual(game.state.players.p1!.zones.banishment, ["small"]);
+
+  handlers.get("action.recycle_top_cards")!.execute!(
+    binding("action.recycle_top_cards", {
+      count: 3,
+      sourceSelectionKey: "looked",
+      recycleAllRemaining: true,
+    }),
+    context,
+  );
+  assert.deepEqual(game.state.players.p1!.zones.mainDeck, ["large", "other"]);
+});
+
+test("repeatable Buff payments ready only independently selected eligible Units", () => {
+  const game = fixture();
+  const index = cardIndex();
+  for (const [id, exhausted, buffed] of [
+    ["eligible-a", true, true],
+    ["eligible-b", true, true],
+    ["already-ready", false, true],
+  ] as const) {
+    index.instances.set(id, { instanceId: id, ownerPlayerId: "p1", source: "mainDeck", cardCode: "UNIT" });
+    game.state.players.p1!.zones.base.push(id);
+    game.state.cardStates[id] = { exhausted, buffed, damage: 0, computedMight: 3, objectVersion: 0 };
+  }
+  const handlers = createPrimitiveHandlers(index);
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+  const ready = binding("action.ready_by_spending_buffs", { selectionKey: "paid" });
+  assert.deepEqual(handlers.get("action.ready_by_spending_buffs")!.choice!(ready, context)?.legalIds, ["eligible-a", "eligible-b"]);
+  context.selectedBySelector.paid = ["eligible-b"];
+  handlers.get("action.ready_by_spending_buffs")!.execute!(ready, context);
+  assert.equal(game.state.cardStates["eligible-a"]!.exhausted, true);
+  assert.equal(game.state.cardStates["eligible-a"]!.buffed, true);
+  assert.equal(game.state.cardStates["eligible-b"]!.exhausted, false);
+  assert.equal(game.state.cardStates["eligible-b"]!.buffed, false);
+  assert.equal(game.state.cardStates["already-ready"]!.buffed, true);
+});
+
+test("Champion-zone return validates original source and empty destination", () => {
+  const game = fixture();
+  const index = cardIndex();
+  index.instances.set("champion", {
+    instanceId: "champion",
+    ownerPlayerId: "p1",
+    source: "champion",
+    cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.trash.push("champion");
+  game.state.cardStates.champion = {
+    exhausted: true,
+    buffed: true,
+    damage: 2,
+    computedMight: 3,
+    objectVersion: 0,
+  };
+  const handlers = createPrimitiveHandlers(index);
+  const context = createBehaviorContext(game, "p1", "bf", null, []);
+  context.selectedBySelector.champion = ["champion"];
+  handlers.get("action.return_to_champion_zone")!.execute!(
+    binding("action.return_to_champion_zone", { selectionKey: "champion" }),
+    context,
+  );
+  assert.equal(game.state.players.p1!.zones.champion, "champion");
+  assert.ok(!game.state.players.p1!.zones.trash.includes("champion"));
+  assert.equal(game.state.cardStates.champion!.damage, 0);
+  assert.equal(game.state.cardStates.champion!.buffed, false);
+});
+
+test("first spell-choice trigger is scoped by source and choosing player each turn", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const handlers = createPrimitiveHandlers(index);
+  const event = {
+    type: "card.chosen",
+    actorPlayerId: "p2",
+    subjectCardInstanceId: "unit",
+    values: { method: "spell", targetBattlefieldId: "bf" },
+  };
+  const trigger = binding("trigger.on_choose", {
+    actor: "anyPlayer",
+    subject: "friendly_unit_at_source_battlefield",
+    firstPerSourcePerTurn: true,
+  });
+  assert.equal(
+    handlers.get("trigger.on_choose")!.matches!(
+      trigger,
+      createBehaviorContext(game, "p1", "bf", event, []),
+    ),
+    true,
+  );
+  assert.equal(
+    handlers.get("trigger.on_choose")!.matches!(
+      trigger,
+      createBehaviorContext(game, "p1", "bf", event, []),
+    ),
+    false,
+  );
+  assert.equal(game.state.players.p2!.triggerMemoryKeysThisTurn?.length, 1);
+});
+
 function binding(
   behaviorId: string,
   parameters: Record<string, string | number | boolean>,

@@ -2615,7 +2615,8 @@ function activatedAbilityCostStatus(
     const amount = cost.parameters.amount;
     if (
       (cost.parameters.resource !== "energy" &&
-        cost.parameters.resource !== "power") ||
+        cost.parameters.resource !== "power" &&
+        cost.parameters.resource !== "rune") ||
       typeof amount !== "number" ||
       !Number.isInteger(amount) ||
       amount < 0
@@ -2673,7 +2674,8 @@ function payActivatedAbilityCosts(
   );
   const domainPowerCost = clause.costs.reduce(
     (total, cost) =>
-      cost.behaviorId === "cost.pay" && cost.parameters.resource === "power"
+      cost.behaviorId === "cost.pay" &&
+        (cost.parameters.resource === "power" || cost.parameters.resource === "rune")
         ? total + (cost.parameters.amount as number)
         : total,
     0,

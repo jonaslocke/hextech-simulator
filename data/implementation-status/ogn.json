@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T02:05:32.919Z",
+  "updatedAt": "2026-07-21T02:09:54.428Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -4937,11 +4937,21 @@
           "name": "Wallop"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-146",
+        "approvedAt": "2026-07-21T02:07:16.039Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:07:16.039Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-146 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:07:16.039Z"
     },
     {
       "gameplayIdentity": "OGN-147:Wildclaw Shaman",
@@ -5124,11 +5134,21 @@
           "name": "Overt Operation"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-153",
+        "approvedAt": "2026-07-21T02:07:16.179Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:07:16.179Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-153 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:07:16.179Z"
     },
     {
       "gameplayIdentity": "OGN-154:Primal Strength",
@@ -8272,11 +8292,21 @@
           "name": "Baited Hook"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-242",
+        "approvedAt": "2026-07-21T02:07:36.237Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:07:36.237Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-242 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:07:36.237Z"
     },
     {
       "gameplayIdentity": "OGN-243:Darius Executioner",
@@ -9657,11 +9687,21 @@
           "name": "Hallowed Tomb"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-281",
+        "approvedAt": "2026-07-21T02:07:36.392Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:07:36.392Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-281 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:07:36.392Z"
     },
     {
       "gameplayIdentity": "OGN-282:Monastery of Hirana",
@@ -10077,11 +10117,21 @@
           "name": "The Dreaming Tree"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-292",
+        "approvedAt": "2026-07-21T02:07:36.526Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:07:36.526Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-292 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:07:36.526Z"
     },
     {
       "gameplayIdentity": "OGN-293:The Grand Plaza",
