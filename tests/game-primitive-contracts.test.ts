@@ -218,6 +218,50 @@ test("continuous destination restrictions and permissions compose", () => {
   assert.deepEqual(legalUnitDestinationIds(game, "p1", restrictedUnit, index), ["base"]);
 });
 
+test("a permanent with a continuous legality modifier enters play without executing that modifier", () => {
+  const permanent = card("SYN-CONTINUOUS-PERMANENT", "Unit", 2);
+  permanent.behaviorModel.clauses = [{
+    id: "continuous-ready-restriction",
+    sequence: 0,
+    sourceText: "An affected player cannot ready Units through effects.",
+    normalizedText: "An affected player cannot ready Units through effects.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("modifier.cannot_ready", {
+      affectedPlayer: "opponent",
+      source: "spellOrAbility",
+    })],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([permanent], [
+    instance("continuous-permanent", "p1", permanent.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.hand = ["continuous-permanent"];
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "continuous-permanent" &&
+      action.label.endsWith("to Base"),
+  );
+  assert.ok(play?.enabled);
+
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "play-continuous-permanent",
+  });
+
+  assert.deepEqual(next.state.players.p1!.zones.base, ["continuous-permanent"]);
+  assert.deepEqual(next.state.players.p1!.zones.hand, []);
+});
+
 test("next matching play discount is single-use and damage prevention is conditional", () => {
   const discountSource = card("SYN-DISCOUNT-SOURCE", "Unit", 2);
   discountSource.behaviorModel.clauses = [{

@@ -83,6 +83,18 @@ export function createPrimitiveHandlers(
     "modifier.active_in_zone",
     "cost.discard_cards",
   ]) handlers.set(id, passive);
+  // These modifiers are read continuously by their owning legality or
+  // prevention subsystem. A permanent entering play may still route its
+  // triggerless clauses through immediate resolution, where the modifier has
+  // no state mutation to perform.
+  for (const id of [
+    "modifier.cannot_move_from_source_battlefield",
+    "modifier.facedown_capacity",
+    "modifier.unit_play_restriction",
+    "modifier.cannot_ready",
+    "prevention.prevent",
+    "modifier.active_in_zone",
+  ]) handlers.set(id, { execute() {} });
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
   // card enters play. It has no separate state mutation when the clause is
   // resolved as part of playing that card.
