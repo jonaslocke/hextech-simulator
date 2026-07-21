@@ -211,6 +211,23 @@ export function targetSelectionCanAdd(
   );
 }
 
+export function appendTargetSelections(
+  requirement: CombinedTargetRequirement,
+  selectedIds: readonly string[],
+  candidateIds: readonly string[],
+): string[] | null {
+  const nextSelectedIds = [...selectedIds];
+
+  for (const candidateId of candidateIds) {
+    if (!targetSelectionCanAdd(requirement, nextSelectedIds, candidateId)) {
+      return null;
+    }
+    nextSelectedIds.push(candidateId);
+  }
+
+  return nextSelectedIds;
+}
+
 export function toggleMovementSelection(
   selectedIds: readonly string[],
   candidateId: string,

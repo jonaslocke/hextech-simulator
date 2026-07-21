@@ -409,10 +409,10 @@ function mapActiveNonBoardCardDecision({
   const requirement = action.targets.find(
     (target) =>
       target.kind === "card" &&
-      target.minimum === activeTargetSelection.minTargets &&
-      target.maximum === activeTargetSelection.maxTargets &&
       arraysEqual(target.legalIds, activeTargetSelection.legalTargetIds),
   );
+  const minimum = requirement?.minimum ?? activeTargetSelection.minTargets;
+  const maximum = requirement?.maximum ?? activeTargetSelection.maxTargets;
 
   return {
     actionId: action.id,
@@ -437,19 +437,19 @@ function mapActiveNonBoardCardDecision({
       actorPlayerId: sourceProjection.viewerPlayerId,
       decisionId: action.id,
       kind: "activeTargetSelection",
-      maximum: activeTargetSelection.maxTargets,
-      minimum: activeTargetSelection.minTargets,
+      maximum,
+      minimum,
       selectableIds: activeTargetSelection.legalTargetIds,
       source: activeTargetSelection.targetKind,
     }),
     description: `Choose ${requirement?.label ?? "card"}`,
     inspection: "publicGameState",
     kind: "cardSelection",
-    maxSelected: activeTargetSelection.maxTargets,
-    minSelected: activeTargetSelection.minTargets,
+    maxSelected: maximum,
+    minSelected: minimum,
     selectionMode:
-      activeTargetSelection.maxTargets === 1 &&
-      activeTargetSelection.minTargets > 0
+      maximum === 1 &&
+      minimum > 0
         ? "single"
         : "multiple",
     title:

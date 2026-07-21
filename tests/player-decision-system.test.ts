@@ -216,6 +216,45 @@ test("maps an initiated non-board card target to a card selection decision", () 
   assert.equal(decision.canCancel, true);
 });
 
+test("uses the active selector count for a staged non-board target decision", () => {
+  const handA = card("hand-a", "Spell");
+  const handB = card("hand-b", "Spell");
+  const action = cardTargetAction({
+    id: "staged-action",
+    label: "synthetic activation",
+    legalIds: [handA.instanceId, handB.instanceId],
+  });
+  action.targets.push({
+    kind: "card",
+    legalIds: ["board-unit"],
+    minimum: 1,
+    maximum: 1,
+    selectionKey: "subject",
+  });
+  const projection = projectionWith({ actions: [action], pendingChoice: null });
+  const hand = projection.players[0]!.zones.find((zone) => zone.kind === "hand")!;
+  hand.cards = [handA, handB];
+  hand.count = 2;
+
+  const decision = buildPlayerDecisionRequest({
+    activeTargetSelection: {
+      actionId: action.id,
+      canDecline: false,
+      legalTargetIds: [handA.instanceId, handB.instanceId],
+      maxTargets: 2,
+      minTargets: 2,
+      targetKind: "card",
+    },
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.equal(decision.minSelected, 1);
+  assert.equal(decision.maxSelected, 1);
+});
+
 test("does not dismiss a mandatory pending selection through the local selection fallback", () => {
   const trashUnit = card("pending-trash-unit", "Unit");
   const action = effectSelectionAction(

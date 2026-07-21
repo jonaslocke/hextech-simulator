@@ -112,6 +112,14 @@ battlefield.
 | Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
 | Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
 
+The client stages independently presented selector groups against their own
+minimum and maximum. A hand-payment selector and a board-target selector no
+longer expose their combined count in the hand dialog; each selection is kept
+in declaration order and the server-authoritative action is submitted only
+after every selector group is satisfied. This repairs the manual-validation UI
+boundary found while activating `OGN-023` without changing its canonical model
+or the runtime payment contract.
+
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,

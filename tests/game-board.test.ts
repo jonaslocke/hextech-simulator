@@ -4,6 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   actionsForSource,
+  activeTargetRequirement,
+  appendTargetSelections,
   chainOverlayOpen,
   chainAutoPassShouldReset,
   combineTargetRequirements,
@@ -139,6 +141,58 @@ test("combines and validates selector-bound targets for one action", () => {
   assert.equal(
     targetSelectionIsLegal(requirement, ["friendly-a", "friendly-b"]),
     false,
+  );
+});
+
+test("stages independently presented target groups without inflating the active count", () => {
+  const requirement = combineTargetRequirements(
+    {
+      id: "state:1:action:synthetic",
+      label: "Synthetic activated ability",
+      sourceCardInstanceId: "source",
+      enabled: true,
+      disabledReason: null,
+      targets: [
+        {
+          kind: "card",
+          legalIds: ["hand-a", "hand-b"],
+          minimum: 1,
+          maximum: 1,
+          selectionKey: "payment",
+          sourceZone: "hand",
+        },
+        {
+          kind: "card",
+          legalIds: ["unit-a", "unit-b"],
+          minimum: 1,
+          maximum: 1,
+          selectionKey: "subject",
+        },
+      ],
+      presentation: {
+        surface: "card-menu",
+        style: "primary",
+        prompt: null,
+      },
+    },
+    "card",
+  );
+
+  assert.ok(requirement);
+  assert.equal(activeTargetRequirement(requirement, [])?.maximum, 1);
+  const afterPayment = appendTargetSelections(requirement, [], ["hand-a"]);
+  assert.deepEqual(afterPayment, ["hand-a"]);
+  assert.deepEqual(activeTargetRequirement(requirement, afterPayment!)?.legalIds, [
+    "unit-a",
+    "unit-b",
+  ]);
+  assert.deepEqual(
+    appendTargetSelections(requirement, afterPayment!, ["unit-b"]),
+    ["hand-a", "unit-b"],
+  );
+  assert.equal(
+    appendTargetSelections(requirement, [], ["hand-a", "hand-b"]),
+    null,
   );
 });
 

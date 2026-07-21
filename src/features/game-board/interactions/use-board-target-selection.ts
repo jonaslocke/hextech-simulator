@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   activeTargetRequirement,
+  appendTargetSelections,
   targetSelectionCanAdd,
   targetSelectionIsLegal,
   toggleMovementSelection,
@@ -51,6 +52,9 @@ export function useBoardTargetSelection({
   submitProjectedAction,
 }: UseBoardTargetSelectionArgs): {
   chooseBoardTarget: (cardInstanceId: string | undefined) => void;
+  chooseNonBoardTargets: (
+    cardInstanceIds: readonly string[],
+  ) => Promise<boolean>;
   clearSubmittedTargetHighlights: () => void;
   declineTargetedChoice: () => Promise<boolean>;
   displayedHighlightedCardInstanceIds: Set<string>;
@@ -256,6 +260,46 @@ export function useBoardTargetSelection({
     [targetSelection, targetSelectionAction, submitTargetedPlay],
   );
 
+  const chooseNonBoardTargets = useCallback(
+    async (cardInstanceIds: readonly string[]): Promise<boolean> => {
+      if (!targetSelection) {
+        return false;
+      }
+
+      const nextSelectedTargetIds = appendTargetSelections(
+        targetSelection.requirement,
+        targetSelection.selectedTargetIds,
+        cardInstanceIds,
+      );
+      if (!nextSelectedTargetIds) {
+        return false;
+      }
+
+      const nextSelection = {
+        ...targetSelection,
+        legalTargetIds:
+          activeTargetRequirement(
+            targetSelection.requirement,
+            nextSelectedTargetIds,
+          )?.legalIds ?? [],
+        selectedTargetIds: nextSelectedTargetIds,
+      };
+
+      if (
+        targetSelectionIsLegal(
+          nextSelection.requirement,
+          nextSelectedTargetIds,
+        )
+      ) {
+        return submitTargetedPlay(nextSelection);
+      }
+
+      setTargetSelection(nextSelection);
+      return true;
+    },
+    [submitTargetedPlay, targetSelection],
+  );
+
   const handleTargetClickCapture = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       if (!targetSelection || !(event.target instanceof Element)) {
@@ -314,6 +358,7 @@ export function useBoardTargetSelection({
 
   return {
     chooseBoardTarget,
+    chooseNonBoardTargets,
     clearSubmittedTargetHighlights,
     declineTargetedChoice,
     displayedHighlightedCardInstanceIds,

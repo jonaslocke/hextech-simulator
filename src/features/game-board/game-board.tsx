@@ -209,6 +209,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const {
     chooseBoardTarget,
+    chooseNonBoardTargets,
     clearSubmittedTargetHighlights,
     declineTargetedChoice,
     displayedHighlightedCardInstanceIds,
@@ -583,6 +584,14 @@ export const GameBoard: FC<GameBoardProps> = ({
             : undefined
         }
         onIntent={async (intent) => {
+          if (
+            targetSelection &&
+            sourceProjection.pendingChoice === null &&
+            targetSelection.actionId === intent.actionId &&
+            playerDecision?.kind === "cardSelection"
+          ) {
+            return chooseNonBoardTargets(intent.selectedIds ?? []);
+          }
           const accepted = await submitProjectedAction(
             intent.actionId,
             intent.selectedIds ?? [],
