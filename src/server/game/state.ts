@@ -245,6 +245,9 @@ const binaryChoiceSchema = z.object({
     amount: z.number().int().positive(),
     exhaustSource: z.boolean(),
     spendTargetBuff: z.boolean(),
+    killActorPlayerId: z.string().min(1).nullable().default(null),
+    killMethod: z.enum(["spell", "ability", "combat"]).nullable().default(null),
+    wasStunned: z.boolean().default(false),
   }).optional(),
 });
 
@@ -258,6 +261,9 @@ const deathReplacementRequestSchema = z.object({
   amount: z.number().int().positive(),
   exhaustSource: z.boolean(),
   spendTargetBuff: z.boolean(),
+  killActorPlayerId: z.string().min(1).nullable().default(null),
+  killMethod: z.enum(["spell", "ability", "combat"]).nullable().default(null),
+  wasStunned: z.boolean().default(false),
 });
 
 const modeChoiceSchema = z.object({

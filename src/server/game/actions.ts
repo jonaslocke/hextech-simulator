@@ -5,6 +5,7 @@ import {
   createBehaviorContext,
   executeBehaviorClause,
   selectionRequirementsForClause,
+  selectorPaysDeclarationCost,
   submitTriggerOrder,
   targetRequirementsForClause,
 } from "./behavior-runtime";
@@ -72,6 +73,7 @@ import {
 } from "./payment";
 import {
   beginEffectResolution,
+  resumeEffectResolution,
   submitEffectSelection,
   submitBinaryChoice,
   submitModeChoice,
@@ -626,12 +628,16 @@ export function performGameplayAction(input: {
         game.state.pendingChoice?.type === "binary" &&
         game.state.pendingChoice.deathReplacement
       ) {
+        const resolutionId = game.state.pendingChoice.resolutionId;
         submitDeathReplacementChoice(
           game,
           input.actorPlayerId,
           input.selectedIds,
           index,
         );
+        if (resolutionId && !game.state.pendingChoice) {
+          resumeEffectResolution(game, resolutionId, input.decks);
+        }
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);
@@ -2471,6 +2477,18 @@ function finalizeActivatedAbility(
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
+  const resolvedLockedSelections = {
+    ...lockedActivatedSelectionsByBinding(
+      game,
+      actorPlayerId,
+      sourceId,
+      clause,
+      selectedIds,
+      index,
+      lockedSelectionsByBinding,
+    ),
+    ...lockedSelectionsByBinding,
+  };
   payActivatedAbilityCosts(
     game,
     actorPlayerId,
@@ -2502,7 +2520,7 @@ function finalizeActivatedAbility(
     sourceCardInstanceId: sourceId,
     targetCardInstanceIds: [...selectedIds],
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
-    lockedSelectionsByBinding,
+    lockedSelectionsByBinding: resolvedLockedSelections,
     behaviorClauseId: clause.id,
     activatedBehaviorId: binding.behaviorId,
     behaviorEvent: null,
@@ -2525,6 +2543,45 @@ function finalizeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function lockedActivatedSelectionsByBinding(
+  game: GameDocument,
+  actorPlayerId: string,
+  sourceId: string,
+  clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+  existingSelections: Record<string, string[]>,
+) {
+  const handlers = createPrimitiveHandlers(index);
+  const compiledClause = compileBehaviorModel(
+    definitionForInstance(sourceId, index).behaviorModel,
+    handlers,
+  ).clauses.find((candidate) => candidate.id === clause.id);
+  if (!compiledClause) {
+    throw new Error("Activated ability is unavailable during declaration.");
+  }
+  const context = createBehaviorContext(
+    game,
+    actorPlayerId,
+    sourceId,
+    null,
+    [],
+  );
+  applyChoiceSelections(compiledClause, existingSelections, context);
+  const selectionsByBinding: Record<string, string[]> = {};
+  let cursor = 0;
+  for (const { binding: selector, requirement } of selectionRequirementsForClause(
+    compiledClause,
+    context,
+    handlers,
+  )) {
+    const selected = selectedIds.slice(cursor, cursor + requirement.maximum);
+    cursor += selected.length;
+    selectionsByBinding[`${clause.id}:selectors:${selector.order}`] = selected;
+  }
+  return selectionsByBinding;
 }
 
 function availableActivatedModes(
@@ -3112,11 +3169,21 @@ function validLockedTargets(
       handlers,
     ).flatMap((requirement) => requirement.legalIds),
   );
+  const declarationCostIds = new Set(
+    clause.selectors.flatMap((selector) =>
+      selectorPaysDeclarationCost(clause, selector)
+        ? item.lockedSelectionsByBinding[
+            `${clause.id}:selectors:${selector.order}`
+          ] ?? []
+        : [],
+    ),
+  );
   return item.targetCardInstanceIds.filter(
     (id) =>
-      currentlyLegal.has(id) &&
-      (game.state.cardStates[id]?.objectVersion ?? 0) ===
-        item.targetObjectVersions[id],
+      declarationCostIds.has(id) ||
+      (currentlyLegal.has(id) &&
+        (game.state.cardStates[id]?.objectVersion ?? 0) ===
+          item.targetObjectVersions[id]),
   );
 }
 

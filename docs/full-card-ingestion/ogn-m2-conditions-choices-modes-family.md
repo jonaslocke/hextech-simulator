@@ -120,6 +120,15 @@ after every selector group is satisfied. This repairs the manual-validation UI
 boundary found while activating `OGN-023` without changing its canonical model
 or the runtime payment contract.
 
+Declaration-cost selections are now retained by selector binding when the cost
+changes their zone before the activated ability resolves. Such paid selections
+are not revalidated as effect targets. A death-replacement decision suspends its
+parent resolution, then resumes later linked instructions after accept or
+decline while retaining the locked target reference. Direct kill attribution is
+emitted only when the Unit actually dies; accepting the replacement suppresses
+the kill event, while declining it preserves the original spell or ability
+controller and method for downstream kill triggers.
+
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,

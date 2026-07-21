@@ -5,6 +5,7 @@ import {
   compileBehaviorModel,
   createBehaviorContext,
   selectionRequirementsForClause,
+  selectorPaysDeclarationCost,
 } from "./behavior-runtime";
 import type { BehaviorEvent } from "./behavior-runtime";
 import {
@@ -231,6 +232,7 @@ export function resumeEffectResolution(
   applyChoiceSelections(clause, frame.selectionsByBinding, selectorContext);
   if (
     frame.targetsLocked &&
+    !lockedSelectorSelectionsAreHydrated(frame, clause, selectorContext) &&
     !hydrateLockedSelectorSelections(
       frame,
       clause,
@@ -601,6 +603,13 @@ export function resumeEffectResolution(
     handler.execute(binding, context);
     frame.effectOutcomes = { ...context.effectOutcomes };
     frame.nextEffectIndex += 1;
+    if (
+      game.state.pendingChoice?.type === "binary" &&
+      game.state.pendingChoice.deathReplacement
+    ) {
+      game.state.pendingChoice.resolutionId = frame.id;
+      return false;
+    }
   }
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);
@@ -672,6 +681,19 @@ function optionalChoiceHasTargetSelector(
   );
 }
 
+function lockedSelectorSelectionsAreHydrated(
+  frame: GameDocument["state"]["effectResolutions"][number],
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  context: ReturnType<typeof createBehaviorContext>,
+) {
+  return clause.selectors
+    .filter((selector) => bindingChoiceGateMatches(selector, context))
+    .every((selector) => Object.hasOwn(
+      frame.selectionsByBinding,
+      `${clause.id}:selectors:${selector.order}`,
+    ));
+}
+
 function hydrateLockedSelectorSelections(
   frame: GameDocument["state"]["effectResolutions"][number],
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
@@ -692,6 +714,20 @@ function hydrateLockedSelectorSelections(
       : frame.lockedSelectionsByBinding[bindingKey] ??
         frame.initialSelectedIds.slice(cursor, cursor + requirement.maximum);
     if (requirement.maximum > 0) cursor += selected.length;
+    if (selectorPaysDeclarationCost(clause, selector)) {
+      if (
+        selected.length < requirement.minimum ||
+        selected.length > requirement.maximum
+      ) {
+        return false;
+      }
+      frame.selectionsByBinding[bindingKey] = selected;
+      context.selectedBySelector[bindingKey] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+      continue;
+    }
     if (selector.parameters.selectionPurpose === "optionalCost") {
       if (
         selected.length < requirement.minimum ||

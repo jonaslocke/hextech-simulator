@@ -148,6 +148,16 @@ export function clauseHasAutomaticAffectedGroup(
   });
 }
 
+export function selectorPaysDeclarationCost(
+  clause: CompiledBehaviorClause,
+  selector: BehaviorBinding,
+): boolean {
+  const selectionKey = selector.parameters.selectionKey;
+  return typeof selectionKey === "string" && clause.costs.some(
+    (cost) => cost.parameters.selectionKey === selectionKey,
+  );
+}
+
 export function applyChoiceSelections(
   clause: CompiledBehaviorClause,
   selectionsByBinding: Record<string, string[]>,

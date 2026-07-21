@@ -1402,7 +1402,15 @@ export function createPrimitiveHandlers(
           definitionForInstance(ids[0], index).card.attributes.might ??
           0;
       }
-      ids.forEach((id) => moveUnitToTrash(context.game, id, index));
+      const sourceType = definitionForInstance(
+        context.sourceCardInstanceId,
+        index,
+      ).card.classification.type;
+      ids.forEach((id) => moveUnitToTrash(context.game, id, index, false, {
+        actorPlayerId: context.controllerPlayerId,
+        method: sourceType === "Spell" ? "spell" : "ability",
+        wasStunned: context.game.state.cardStates[id]?.stunned === true,
+      }));
     }
   });
   handlers.set("action.return_to_champion_zone", {
@@ -3156,6 +3164,7 @@ export function moveUnitToTrash(
   id: string,
   index: RuntimeCardIndex,
   suppressOptionalReplacement = false,
+  killAttribution: KillAttribution | null = null,
 ) {
   if (!isUnitInPlay(game, id)) return;
   const originBattlefieldId = game.state.battlefields.find((battlefield) =>
@@ -3167,7 +3176,12 @@ export function moveUnitToTrash(
   const preDeathDamage = preDeathState?.damage ?? 0;
   const preDeathCombatRole = preDeathState?.combatRole ?? null;
   if (!suppressOptionalReplacement) {
-    const optionalReplacement = optionalDeathReplacement(game, id, index);
+    const optionalReplacement = optionalDeathReplacement(
+      game,
+      id,
+      index,
+      killAttribution,
+    );
     if (optionalReplacement) {
       if (optionalReplacement.effectId) {
         game.state.ongoingEffects = game.state.ongoingEffects.filter(
@@ -3207,6 +3221,7 @@ export function moveUnitToTrash(
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
   if (isTokenInstance(id, index)) {
     ceaseToken(game, id);
+    queueAttributedKillEvent(game, id, killAttribution);
     return;
   }
   const zones = game.state.players[owner]!.zones;
@@ -3239,14 +3254,38 @@ export function moveUnitToTrash(
       combatRole: preDeathCombatRole,
     },
   });
+  queueAttributedKillEvent(game, id, killAttribution);
 }
 
 type DeathReplacementRequest = GameDocument["state"]["queuedDeathReplacements"][number];
+type KillAttribution = {
+  actorPlayerId: string;
+  method: "spell" | "ability" | "combat";
+  wasStunned: boolean;
+};
+
+function queueAttributedKillEvent(
+  game: GameDocument,
+  unitId: string,
+  attribution: KillAttribution | null,
+) {
+  if (!attribution) return;
+  (game.state.queuedBehaviorEvents ??= []).push({
+    type: "unit.killed",
+    actorPlayerId: attribution.actorPlayerId,
+    subjectCardInstanceId: unitId,
+    values: {
+      method: attribution.method,
+      wasStunned: attribution.wasStunned,
+    },
+  });
+}
 
 function optionalDeathReplacement(
   game: GameDocument,
   unitId: string,
   index: RuntimeCardIndex,
+  killAttribution: KillAttribution | null,
 ): DeathReplacementRequest | null {
   const owner = index.instances.get(unitId)?.ownerPlayerId;
   if (!owner) return null;
@@ -3263,6 +3302,7 @@ function optionalDeathReplacement(
       ongoing.controllerPlayerId,
       ongoing.id,
       ongoing.parameters ?? {},
+      killAttribution,
     );
     return request && deathReplacementCanBePaid(game, request, index)
       ? request
@@ -3284,6 +3324,7 @@ function optionalDeathReplacement(
         owner,
         null,
         binding.parameters,
+        killAttribution,
       );
       if (request && deathReplacementCanBePaid(game, request, index)) return request;
     }
@@ -3297,6 +3338,7 @@ function deathReplacementRequestFromParameters(
   controllerPlayerId: string,
   effectId: string | null,
   parameters: Record<string, string | number | boolean | null>,
+  killAttribution: KillAttribution | null,
 ): DeathReplacementRequest | null {
   const resource = parameters.resource;
   const amount = parameters.amount;
@@ -3314,6 +3356,9 @@ function deathReplacementRequestFromParameters(
     amount,
     exhaustSource: parameters.exhaustSource === true,
     spendTargetBuff: parameters.spendTargetBuff === true,
+    killActorPlayerId: killAttribution?.actorPlayerId ?? null,
+    killMethod: killAttribution?.method ?? null,
+    wasStunned: killAttribution?.wasStunned ?? false,
   };
 }
 
@@ -3361,12 +3406,13 @@ function createReplacementContext(
 function promptDeathReplacement(
   game: GameDocument,
   request: DeathReplacementRequest,
+  resolutionId: string | null = null,
 ) {
   game.state.pendingChoice = {
     id: `death-replacement:${game.stateVersion}:${request.unitId}`,
     playerId: request.controllerPlayerId,
     type: "binary",
-    resolutionId: null,
+    resolutionId,
     bindingKey: "death-replacement",
     prompt: "Pay to heal, exhaust, and recall this Unit instead of it dying?",
     acceptLabel: "Pay and recall",
@@ -3418,24 +3464,49 @@ export function submitDeathReplacementChoice(
     game.state.cardStates[request.unitId]!.exhausted = true;
     recomputeMight(game, request.unitId, index);
   } else {
-    moveUnitToTrash(game, request.unitId, index, true);
+    moveUnitToTrash(
+      game,
+      request.unitId,
+      index,
+      true,
+      killAttributionFromRequest(request),
+    );
   }
-  advanceDeathReplacementQueue(game, index);
+  advanceDeathReplacementQueue(game, index, pending.resolutionId);
 }
 
 function advanceDeathReplacementQueue(
   game: GameDocument,
   index: RuntimeCardIndex,
+  resolutionId: string | null,
 ) {
   while (!game.state.pendingChoice && game.state.queuedDeathReplacements.length > 0) {
     const next = game.state.queuedDeathReplacements.shift()!;
     if (!isUnitInPlay(game, next.unitId)) continue;
     if (!deathReplacementCanBePaid(game, next, index)) {
-      moveUnitToTrash(game, next.unitId, index, true);
+      moveUnitToTrash(
+        game,
+        next.unitId,
+        index,
+        true,
+        killAttributionFromRequest(next),
+      );
       continue;
     }
-    promptDeathReplacement(game, next);
+    promptDeathReplacement(game, next, resolutionId);
   }
+}
+
+function killAttributionFromRequest(
+  request: DeathReplacementRequest,
+): KillAttribution | null {
+  return request.killActorPlayerId && request.killMethod
+    ? {
+        actorPlayerId: request.killActorPlayerId,
+        method: request.killMethod,
+        wasStunned: request.wasStunned,
+      }
+    : null;
 }
 
 function cardSelectedForPlay(

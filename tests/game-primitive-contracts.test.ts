@@ -464,6 +464,216 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   assert.equal(game.state.players.p1!.energy, 1);
 });
 
+test("activated declaration-cost selections remain locked after payment changes zone", () => {
+  const source = card("SYN-DECLARATION-SOURCE", "Gear");
+  const unit = card("SYN-DECLARATION-UNIT", "Unit", 3);
+  const payment = card("SYN-DECLARATION-PAYMENT", "Spell");
+  source.behaviorModel.clauses = [{
+    id: "discard-activation",
+    sequence: 0,
+    sourceText: "Discard a card to activate a synthetic effect.",
+    normalizedText: "Discard a card to activate a synthetic effect.",
+    abilities: [binding("ability.activate")],
+    triggers: [],
+    conditions: [],
+    selectors: [
+      binding("selector.friendly_unit", {
+        area: "board",
+        locationRelation: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "subject",
+      }),
+      { ...binding("selector.card", {
+        zone: "hand",
+        cardType: "any",
+        owner: "controller",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "payment",
+      }), order: 1 },
+    ],
+    choices: [],
+    costs: [{ ...binding("cost.discard_cards", {
+      count: 1,
+      selectionKey: "payment",
+    }), order: 2 }],
+    timings: [{ ...binding("timing.action"), order: 3 }],
+    effects: [{ ...binding("action.buff_unit", {
+      selectionKey: "subject",
+    }), order: 4 }],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source, unit, payment], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("unit", "p1", unit.cardCode, "mainDeck"),
+    instance("payment", "p1", payment.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "unit"];
+  game.state.players.p1!.zones.hand = ["payment"];
+
+  const activate = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "source" && action.enabled,
+  );
+  assert.ok(activate);
+  let next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: activate.id,
+    selectedIds: ["unit", "payment"],
+    decks,
+    now: "activate-with-payment",
+  }).game;
+
+  assert.deepEqual(next.state.players.p1!.zones.hand, []);
+  assert.deepEqual(next.state.players.p1!.zones.trash, ["payment"]);
+  next = resolveCurrentChain(next, decks);
+  assert.equal(next.state.cardStates.unit!.buffed, true);
+});
+
+test("effect resolution pauses for a death replacement and resumes later effects", () => {
+  const source = card("SYN-PAUSED-EFFECT", "Spell");
+  const unit = card("SYN-PAUSED-UNIT", "Unit", 3);
+  const location = card("SYN-PAUSED-LOCATION", "Battlefield");
+  source.behaviorModel.clauses = [{
+    id: "paused-resolution",
+    sequence: 0,
+    sourceText: "Perform two independently observable synthetic effects.",
+    normalizedText: "Perform two independently observable synthetic effects.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [binding("selector.unit", {
+      scope: "any",
+      area: "battlefield",
+      locationRelation: "any",
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "subject",
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [
+      { ...binding("action.kill_unit", {
+        selectionKey: "subject",
+      }), order: 1 },
+      { ...binding("action.buff_unit", {
+        selectionKey: "subject",
+      }), order: 2 },
+    ],
+    keywords: [],
+  }];
+  const { game, decks } = fixture([source, unit, location], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("unit", "p1", unit.cardCode, "mainDeck"),
+    instance("location-card", "p1", location.cardCode, "battlefield"),
+  ]);
+  game.state.players.p1!.zones.trash = ["source"];
+  game.state.battlefields = [{
+    battlefieldId: "location",
+    cardInstanceId: "location-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: ["unit"],
+    facedownCards: [],
+  }];
+  game.state.players.p1!.energy = 1;
+  game.state.ongoingEffects = [{
+    id: "replacement",
+    behaviorId: "replacement.optional_recall_on_death",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    targetCardInstanceIds: ["unit"],
+    duration: "thisTurn",
+    createdAtTurn: 1,
+    parameters: { resource: "energy", amount: 1 },
+  }];
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "paused-resolution",
+    selectedIds: ["unit"],
+    lockedSelectionsByBinding: {
+      "paused-resolution:selectors:0": ["unit"],
+    },
+    targetObjectVersions: { unit: 0 },
+    decks,
+  });
+
+  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.equal(game.state.cardStates.unit!.buffed, undefined);
+  const submit = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "binary" && action.enabled,
+  );
+  assert.ok(submit);
+  const next = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: submit.id,
+    selectedIds: ["accept"],
+    decks,
+    now: "accept-replacement",
+  }).game;
+
+  assert.equal(next.state.cardStates.unit!.buffed, true);
+  assert.ok(next.state.players.p1!.zones.base.includes("unit"));
+  assert.equal(next.state.pendingChoice, null);
+  assert.deepEqual(next.state.effectResolutions, []);
+});
+
+test("direct kill attribution is emitted only when a replacement permits death", () => {
+  for (const decision of ["accept", "decline"] as const) {
+    const source = card(`SYN-KILL-SOURCE-${decision}`, "Spell");
+    const unit = card(`SYN-KILL-UNIT-${decision}`, "Unit", 3);
+    const { game, decks, handlers } = fixture([source, unit], [
+      instance("source", "p1", source.cardCode, "mainDeck"),
+      instance("unit", "p2", unit.cardCode, "mainDeck"),
+    ]);
+    game.state.players.p2!.zones.base = ["unit"];
+    game.state.players.p2!.energy = 1;
+    game.state.ongoingEffects = [{
+      id: "replacement",
+      behaviorId: "replacement.optional_recall_on_death",
+      controllerPlayerId: "p2",
+      sourceCardInstanceId: "source",
+      targetCardInstanceIds: ["unit"],
+      duration: "thisTurn",
+      createdAtTurn: 1,
+      parameters: { resource: "energy", amount: 1 },
+    }];
+    const context = createBehaviorContext(game, "p1", "source", null, ["unit"]);
+    context.selectedBySelector.subject = ["unit"];
+    handlers.get("action.kill_unit")!.execute!(binding("action.kill_unit", {
+      selectionKey: "subject",
+    }), context);
+
+    assert.equal(
+      (game.state.queuedBehaviorEvents ?? []).some(
+        (event) => event.type === "unit.killed",
+      ),
+      false,
+    );
+    submitDeathReplacementChoice(
+      game,
+      "p2",
+      [decision],
+      createRuntimeCardIndex(decks, game),
+    );
+    assert.equal(
+      (game.state.queuedBehaviorEvents ?? []).some((event) =>
+        event.type === "unit.killed" &&
+        event.actorPlayerId === "p1" &&
+        event.values.method === "spell"
+      ),
+      decision === "decline",
+    );
+  }
+});
+
 test("combat cleanup finishes death replacement before deciding attacker recall", () => {
   const battlefield = card("SYN-COMBAT-BATTLEFIELD", "Battlefield");
   const replacementSource = card("SYN-REPLACEMENT-SOURCE", "Gear");
