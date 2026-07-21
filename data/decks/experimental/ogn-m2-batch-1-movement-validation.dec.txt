@@ -17,7 +17,7 @@ Battlefields:
 MainDeck:
 3 Gust
 2 Flash
-3 Sun Disc
+3 First Mate
 3 Mageseeker Warden
 3 Mystic Poro
 2 Pouty Poro
