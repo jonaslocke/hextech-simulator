@@ -508,6 +508,30 @@ function activeSourceIds(
       ? [event.subjectCardInstanceId]
       : [];
   });
+  const activeTrashSources = player.zones.trash.filter((id) => {
+    const instance = index.instances.get(id);
+    const definition = instance && index.definitions.get(instance.cardCode);
+    return definition?.behaviorModel.clauses.some((clause) =>
+      clause.effects.some(
+        (binding) =>
+          binding.behaviorId === "modifier.active_in_zone" &&
+          binding.parameters.zone === "trash",
+      ),
+    );
+  });
+  const activeEventSources = events.flatMap((event) => {
+    const id = event.subjectCardInstanceId;
+    if (!id || !player.zones.mainDeck.includes(id)) return [];
+    const instance = index.instances.get(id);
+    const definition = instance && index.definitions.get(instance.cardCode);
+    return definition?.behaviorModel.clauses.some((clause) =>
+      clause.effects.some(
+        (binding) =>
+          binding.behaviorId === "modifier.active_in_zone" &&
+          binding.parameters.zone === "mainDeck",
+      ),
+    ) ? [id] : [];
+  });
   return [
     ...new Set([
       ...(player.zones.legend ? [player.zones.legend] : []),
@@ -532,6 +556,8 @@ function activeSourceIds(
         )
         .map((effect) => effect.sourceCardInstanceId),
       ...justDiedSources,
+      ...activeTrashSources,
+      ...activeEventSources,
     ]),
   ];
 }

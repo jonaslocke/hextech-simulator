@@ -5,7 +5,7 @@ import type {
 } from "./behavior-runtime";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { BehaviorBinding, GameCardDefinition } from "./schemas";
-import type { CardInstance, GameDocument } from "./state";
+import type { CardInstance, ChainItem, GameDocument } from "./state";
 import { createHash } from "node:crypto";
 import {
   effectiveNumericValue,
@@ -15,8 +15,8 @@ import { keywordAmount } from "./keyword-evaluation";
 import { numericConditionMatches } from "./numeric-condition";
 import { conditionMatches } from "./condition-evaluation";
 import { getTokenCatalogDefinitions } from "./token-catalog";
-import { isLegalUnitDestination, legalUnitDestinationIds } from "./unit-destinations";
-import { buildPaymentPlan, payCardCost } from "./payment";
+import { isLegalUnitDestination, isUnitPlayRestrictedToBase, legalUnitDestinationIds } from "./unit-destinations";
+import { buildPaymentPlan, payAnyPower, payCardCost } from "./payment";
 import { markBattlefieldContested } from "./board-rules";
 
 export { hasKeyword, keywordAmount } from "./keyword-evaluation";
@@ -74,6 +74,8 @@ export function createPrimitiveHandlers(
     "keyword.temporary", "modifier.cannot_move_from_source_battlefield",
     "modifier.facedown_capacity", "modifier.unit_play_restriction",
     "modifier.cannot_ready", "prevention.prevent",
+    "modifier.active_in_zone",
+    "cost.discard_cards",
   ]) handlers.set(id, passive);
   // Legion's Energy modifier is consumed by effectiveEnergyCost before the
   // card enters play. It has no separate state mutation when the clause is
@@ -127,6 +129,14 @@ export function createPrimitiveHandlers(
       }
       if (binding.parameters.subject === "spell" && context.event.subjectCardInstanceId) {
         return definitionForInstance(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
+      }
+      if (
+        (binding.parameters.subject === "unit" || binding.parameters.subject === "gear") &&
+        context.event.subjectCardInstanceId
+      ) {
+        const type = definitionForInstance(context.event.subjectCardInstanceId, index)
+          .card.classification.type.toLowerCase();
+        return type === binding.parameters.subject;
       }
       return false;
     }
@@ -248,6 +258,35 @@ export function createPrimitiveHandlers(
         : subject === "enemy_unit" && owner !== context.controllerPlayerId;
     },
   });
+  handlers.set("trigger.on_kill", {
+    matches(binding, context) {
+      if (
+        context.event?.type !== "unit.killed" ||
+        context.event.actorPlayerId !== context.controllerPlayerId
+      ) {
+        return false;
+      }
+      if (
+        binding.parameters.method !== "spell" ||
+        context.event.values.method === "spell"
+      ) {
+        if (binding.parameters.subject !== "stunned_enemy_unit") return true;
+        const subjectId = context.event.subjectCardInstanceId;
+        return Boolean(
+          subjectId &&
+          context.event.values.wasStunned === true &&
+          index.instances.get(subjectId)?.ownerPlayerId !== context.controllerPlayerId,
+        );
+      }
+      return false;
+    },
+  });
+  handlers.set("trigger.look_or_reveal_source", {
+    matches: (_binding, context) =>
+      (context.event?.type === "card.lookedAt" ||
+        context.event?.type === "card.revealed") &&
+      context.event.subjectCardInstanceId === context.sourceCardInstanceId,
+  });
   handlers.set("trigger.event", {
     matches(binding, context) {
       const event = context.event;
@@ -330,6 +369,21 @@ export function createPrimitiveHandlers(
         binding.parameters.operator,
         binding.parameters.comparisonValue,
       );
+    },
+  });
+  handlers.set("condition.event_subject_characteristic", {
+    matches(binding, context) {
+      const id = context.event?.subjectCardInstanceId;
+      if (!id) return false;
+      const definition = definitionForInstance(id, index);
+      if (typeof binding.parameters.tag === "string") {
+        return definition.card.tags.includes(binding.parameters.tag);
+      }
+      if (typeof binding.parameters.minimumMight === "number") {
+        return (context.game.state.cardStates[id]?.computedMight ??
+          definition.card.attributes.might ?? 0) >= binding.parameters.minimumMight;
+      }
+      return true;
     },
   });
   handlers.set("condition.event_origin_source_location", {
@@ -461,7 +515,20 @@ export function createPrimitiveHandlers(
           ? [zoneValue]
           : [];
       const cardType = stringParam(binding, "cardType");
-      const legalIds = ids.filter(
+      const requiredPaymentAvailable =
+        typeof binding.parameters.requiredPaymentDomain !== "string" ||
+        canPayEffectResource({
+          ...binding,
+          parameters: {
+            resource: "power",
+            domain: binding.parameters.requiredPaymentDomain,
+            amount:
+              typeof binding.parameters.requiredPaymentAmount === "number"
+                ? binding.parameters.requiredPaymentAmount
+                : 1,
+          },
+        }, context, index);
+      const legalIds = (requiredPaymentAvailable ? ids : []).filter(
         (id) =>
           cardType === "any" ||
           (cardType === "nonUnit" &&
@@ -473,10 +540,21 @@ export function createPrimitiveHandlers(
         return (
           (typeof binding.parameters.maximumEnergy !== "number" ||
             (attributes.energy ?? 0) <= binding.parameters.maximumEnergy) &&
+          (binding.parameters.maximumEnergyBelowControllerPoints !== true ||
+            (attributes.energy ?? 0) <
+              (context.game.state.players[context.controllerPlayerId]?.points ?? 0)) &&
           (typeof binding.parameters.maximumPower !== "number" ||
             (attributes.power ?? 0) <= binding.parameters.maximumPower)
         );
       }).filter((id) =>
+        typeof binding.parameters.requiredBehaviorId !== "string" ||
+        definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+          [...clause.keywords, ...clause.effects].some(
+            (candidate) =>
+              candidate.behaviorId === binding.parameters.requiredBehaviorId,
+          ),
+        ),
+      ).filter((id) =>
         binding.parameters.requiresPayablePowerCost !== true ||
         buildPaymentPlan(
           context.game,
@@ -499,6 +577,9 @@ export function createPrimitiveHandlers(
       return {
         kind: "card" as const,
         label: `${cardLabel} from ${ownerLabel}${zone}`,
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
         ...(owner === "opponent" && zone === "hand"
           ? { title: "Choose from opponent's Hand" }
           : {}),
@@ -1091,6 +1172,9 @@ export function createPrimitiveHandlers(
       const ids = damageTargets(binding, context, index).filter((id) =>
         isUnitInPlay(context.game, id) && canTakeDamage(context.game, id, index),
       );
+      const wasStunned = new Map(
+        ids.map((id) => [id, context.game.state.cardStates[id]?.stunned === true]),
+      );
       let killed = false;
       for (const id of ids) {
         const state = context.game.state.cardStates[id];
@@ -1110,8 +1194,24 @@ export function createPrimitiveHandlers(
       cleanupLethalDamage(context.game, ids, index);
       for (const id of ids) {
         const owner = index.instances.get(id)?.ownerPlayerId;
-        if (owner && context.game.state.players[owner]!.zones.trash.includes(id)) {
+        if (
+          (owner && context.game.state.players[owner]!.zones.trash.includes(id)) ||
+          !context.game.state.cardStates[id]
+        ) {
           killed = true;
+          (context.game.state.queuedBehaviorEvents ??= []).push({
+            type: "unit.killed",
+            actorPlayerId: context.controllerPlayerId,
+            subjectCardInstanceId: id,
+            values: {
+              method:
+                definitionForInstance(context.sourceCardInstanceId, index)
+                  .card.classification.type === "Spell"
+                  ? "spell"
+                  : "ability",
+              wasStunned: wasStunned.get(id) ?? false,
+            },
+          });
         }
       }
       context.effectOutcomes.lastDamageKilled = killed;
@@ -1223,6 +1323,12 @@ export function createPrimitiveHandlers(
         if (!state || state.buffed) continue;
         state.buffed = true;
         recomputeMight(context.game, id, index);
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "unit.buffed",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        });
       }
     },
   });
@@ -1282,6 +1388,235 @@ export function createPrimitiveHandlers(
       }
     },
   });
+  handlers.set("action.play_selected_card", {
+    choice(binding, context) {
+      const cardId = cardSelectedForPlay(binding, context);
+      if (!cardId) return null;
+      const definition = definitionForInstance(cardId, index);
+      if (
+        definition.card.classification.type !== "Unit" ||
+        binding.parameters.destination === "sourceBattlefield"
+      ) {
+        return null;
+      }
+      const destinations = unitPlacementDestinations(
+        context.game,
+        context.controllerPlayerId,
+        definition,
+        index,
+      );
+      return destinations.length > 0 ? {
+        kind: "tokenPlacement" as const,
+        prompt: "Choose where to play the selected Unit.",
+        tokenName: definition.card.name,
+        placementKind: "unit" as const,
+        legalIds: destinations.map((destination) => destination.id),
+        minimum: 1,
+        maximum: 1,
+        destinations,
+      } : null;
+    },
+    execute(binding, context) {
+      const cardId = cardSelectedForPlay(binding, context);
+      if (!cardId) return;
+      const definition = definitionForInstance(cardId, index);
+      const owner = index.instances.get(cardId)?.ownerPlayerId;
+      if (!owner || !cardIsInPlayableEffectZone(context.game, owner, cardId)) return;
+      const unitDestinationId = definition.card.classification.type === "Unit"
+        ? binding.parameters.destination === "sourceBattlefield"
+          ? battlefieldForCard(context.game, context.sourceCardInstanceId)?.battlefieldId
+          : selectionFor(binding, context)[0]
+        : null;
+      if (
+        definition.card.classification.type === "Unit" &&
+        (!unitDestinationId || (
+          binding.parameters.destination === "sourceBattlefield"
+            ? isUnitPlayRestrictedToBase(
+                context.game,
+                context.controllerPlayerId,
+                index,
+              )
+            : !isLegalUnitDestination(
+                context.game,
+                context.controllerPlayerId,
+                definition,
+                unitDestinationId,
+                index,
+              )
+        ))
+      ) return;
+      if (binding.parameters.costMode === "powerOnly") {
+        const plan = buildPaymentPlan(
+          context.game, context.controllerPlayerId, definition, 0, index,
+        );
+        if (!plan) return;
+        payCardCost(context.game, context.controllerPlayerId, definition, 0, index);
+      } else if (binding.parameters.costMode === "oneAnyPower") {
+        payAnyPower(context.game, context.controllerPlayerId, index);
+      }
+      removeFromAllLocations(context.game, cardId);
+      recordCardPlayed(context.game, context.controllerPlayerId, cardId);
+      const playEvent = {
+        type: "card.played",
+        actorPlayerId: context.controllerPlayerId,
+        subjectCardInstanceId: cardId,
+        values: {
+          "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0,
+          "eventSubject.effectiveEnergyCost": 0,
+          "eventSubject.effectDriven": true,
+        },
+      };
+      if (definition.card.classification.type === "Spell") {
+        const resolutionClause = definition.behaviorModel.clauses.filter(
+          (clause) => clause.triggers.length === 0 && clause.abilities.length === 0,
+        );
+        const item: ChainItem = {
+          id: `chain:${context.game.stateVersion}:${cardId}:effect-play`,
+          kind: "spell",
+          label: definition.card.name,
+          controllerPlayerId: context.controllerPlayerId,
+          sourceCardInstanceId: cardId,
+          targetCardInstanceIds: [],
+          targetObjectVersions: {},
+          lockedSelectionsByBinding: {},
+          behaviorClauseId: resolutionClause.length === 1 ? resolutionClause[0]!.id : null,
+          activatedBehaviorId: null,
+          behaviorEvent: playEvent,
+          resolutionDestination:
+            binding.parameters.afterResolution === "recycle" ? "recycle" : "trash",
+        };
+        const chain = context.game.state.chain ?? {
+          items: [],
+          relevantPlayerIds: [...context.game.state.setup.playerIds],
+          priorityPlayerId: context.controllerPlayerId,
+          passedPlayerIds: [],
+          resumeFocusPlayerId: context.game.state.showdown?.focusPlayerId ?? null,
+        };
+        chain.items.push(item);
+        chain.priorityPlayerId = context.controllerPlayerId;
+        chain.passedPlayerIds = [];
+        context.game.state.chain = chain;
+        return;
+      }
+      if (definition.card.classification.type !== "Unit") return;
+      const destinationId = unitDestinationId!;
+      if (destinationId === "base") {
+        context.game.state.players[owner]!.zones.base.push(cardId);
+      } else {
+        placeUnitAtBattlefield(context.game, {
+          battlefieldId: destinationId,
+          controllerPlayerId: context.controllerPlayerId,
+          unitId: cardId,
+          index,
+        });
+        const battlefield = context.game.state.battlefields.find(
+          (candidate) => candidate.battlefieldId === destinationId,
+        );
+        if (battlefield?.controllerPlayerId !== context.controllerPlayerId) {
+          markBattlefieldContested(
+            context.game,
+            destinationId,
+            context.controllerPlayerId,
+          );
+        }
+      }
+      const state = context.game.state.cardStates[cardId];
+      if (state) {
+        state.exhausted = !sourceEntersReady(
+          context.game,
+          context.controllerPlayerId,
+          cardId,
+          definition,
+          index,
+        );
+        state.damage = 0;
+        state.stunned = false;
+        incrementObjectVersion(context.game, cardId);
+      }
+      recomputeMight(context.game, cardId, index);
+      (context.game.state.queuedBehaviorEvents ??= []).push(playEvent);
+    },
+  });
+  handlers.set("action.pay_optional_resource", {
+    choice(binding, context) {
+      if (!canPayEffectResource(binding, context, index)) return null;
+      return {
+        kind: "binary",
+        legalIds: ["accept", "decline"],
+        minimum: 1,
+        maximum: 1,
+        prompt: typeof binding.parameters.prompt === "string"
+          ? binding.parameters.prompt
+          : "Pay the optional cost?",
+        acceptLabel: "Pay",
+        declineLabel: "Decline",
+      };
+    },
+    execute(binding, context) {
+      if (!selectionFor(binding, context).includes("accept")) return;
+      payEffectResource(binding, context, index);
+      if (binding.parameters.exhaustSource === true) {
+        const state = context.game.state.cardStates[context.sourceCardInstanceId];
+        if (!state || state.exhausted) throw new Error("Optional cost source is unavailable.");
+        state.exhausted = true;
+      }
+    },
+  });
+  handlers.set("action.pay_resource", {
+    execute(binding, context) {
+      if (!canPayEffectResource(binding, context, index)) {
+        throw new Error("Required resolving resource cost cannot be paid.");
+      }
+      payEffectResource(binding, context, index);
+      if (binding.parameters.exhaustSource === true) {
+        context.game.state.cardStates[context.sourceCardInstanceId]!.exhausted = true;
+      }
+    },
+  });
+  handlers.set("action.pay_optional_buff", {
+    choice(_binding, context) {
+      const legalIds = friendlyUnitIds(context.game, context.controllerPlayerId, index)
+        .filter((id) => context.game.state.cardStates[id]?.buffed === true);
+      return legalIds.length > 0 ? {
+        kind: "card",
+        legalIds,
+        minimum: 0,
+        maximum: 1,
+        prompt: "Choose a friendly Unit whose Buff to spend, or decline.",
+      } : null;
+    },
+    execute(binding, context) {
+      const id = selectionFor(binding, context)[0];
+      if (!id || context.game.state.cardStates[id]?.buffed !== true) return;
+      context.game.state.cardStates[id]!.buffed = false;
+      recomputeMight(context.game, id, index);
+    },
+  });
+  handlers.set("action.pay_optional_exhaust", {
+    choice(binding, context) {
+      const targetId = binding.parameters.target === "legend"
+        ? context.game.state.players[context.controllerPlayerId]?.zones.legend
+        : context.sourceCardInstanceId;
+      if (!targetId || context.game.state.cardStates[targetId]?.exhausted !== false) return null;
+      return {
+        kind: "binary", legalIds: ["accept", "decline"], minimum: 1, maximum: 1,
+        prompt: typeof binding.parameters.prompt === "string"
+          ? binding.parameters.prompt
+          : "Exhaust the card to use this effect?",
+        acceptLabel: "Exhaust", declineLabel: "Decline",
+      };
+    },
+    execute(binding, context) {
+      if (!selectionFor(binding, context).includes("accept")) return;
+      const targetId = binding.parameters.target === "legend"
+        ? context.game.state.players[context.controllerPlayerId]?.zones.legend
+        : context.sourceCardInstanceId;
+      if (!targetId || context.game.state.cardStates[targetId]?.exhausted !== false) {
+        throw new Error("Optional exhaust cost is unavailable.");
+      }
+      context.game.state.cardStates[targetId]!.exhausted = true;
+    },
+  });
   handlers.set("action.win_game", {
     execute(_binding, context) {
       context.game.winnerPlayerId = context.controllerPlayerId;
@@ -1311,8 +1646,13 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.return_to_hand", {
-    execute(_binding, context) {
-      for (const id of context.selectedIds) {
+    execute(binding, context) {
+      const ids = binding.parameters.target === "source"
+        ? [context.sourceCardInstanceId]
+        : selectionFor(binding, context).length > 0
+          ? selectionFor(binding, context)
+          : context.selectedIds;
+      for (const id of ids) {
         const owner = index.instances.get(id)?.ownerPlayerId;
         if (!owner) continue;
         removeFromAllLocations(context.game, id);
@@ -1589,6 +1929,20 @@ export function createPrimitiveHandlers(
         targetCardInstanceIds: selectionFor(binding, context),
         duration: stringParam(binding, "duration"),
         createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+      });
+    },
+  });
+  handlers.set("replacement.optional_recall_on_death", {
+    execute(binding, context) {
+      context.game.state.ongoingEffects.push({
+        id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+        behaviorId: binding.behaviorId,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        targetCardInstanceIds: selectionFor(binding, context),
+        duration: stringParam(binding, "duration"),
+        createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+        parameters: { ...binding.parameters },
       });
     },
   });
@@ -1903,6 +2257,86 @@ function selectionFor(
   return typeof key === "string"
     ? context.selectedBySelector[key] ?? []
     : [];
+}
+
+function friendlyUnitIds(
+  game: GameDocument,
+  controllerPlayerId: string,
+  index: RuntimeCardIndex,
+) {
+  return [
+    ...game.state.players[controllerPlayerId]!.zones.base,
+    ...game.state.battlefields.flatMap((battlefield) => battlefield.units),
+  ].filter(
+    (id) =>
+      index.instances.get(id)?.ownerPlayerId === controllerPlayerId &&
+      definitionForInstance(id, index).card.classification.type === "Unit",
+  );
+}
+
+function effectPaymentDefinition(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const amount = numberParam(binding, "amount");
+  const source = definitionForInstance(context.sourceCardInstanceId, index);
+  const resource = stringParam(binding, "resource");
+  const domain = typeof binding.parameters.domain === "string"
+    ? binding.parameters.domain
+    : "Colorless";
+  return {
+    ...source,
+    card: {
+      ...source.card,
+      attributes: {
+        ...source.card.attributes,
+        energy: resource === "energy" ? amount : 0,
+        power: resource === "power" ? amount : 0,
+      },
+      classification: {
+        ...source.card.classification,
+        type: "Unit" as const,
+        domain: resource === "power" ? [domain] : ["Colorless"],
+      },
+    },
+  };
+}
+
+function canPayEffectResource(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  if (
+    binding.parameters.exhaustSource === true &&
+    context.game.state.cardStates[context.sourceCardInstanceId]?.exhausted !== false
+  ) {
+    return false;
+  }
+  const definition = effectPaymentDefinition(binding, context, index);
+  return buildPaymentPlan(
+    context.game,
+    context.controllerPlayerId,
+    definition,
+    definition.card.attributes.energy ?? 0,
+    index,
+  ) !== null;
+}
+
+function payEffectResource(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const definition = effectPaymentDefinition(binding, context, index);
+  payCardCost(
+    context.game,
+    context.controllerPlayerId,
+    definition,
+    definition.card.attributes.energy ?? 0,
+    index,
+  );
 }
 
 export function consumeEnterReadyEffect(
@@ -2400,7 +2834,12 @@ export function cleanupLethalDamage(game: GameDocument, ids: string[], index: Ru
     moveUnitToTrash(game, id, index);
   }
 }
-export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
+export function moveUnitToTrash(
+  game: GameDocument,
+  id: string,
+  index: RuntimeCardIndex,
+  suppressOptionalReplacement = false,
+) {
   if (!isUnitInPlay(game, id)) return;
   const originBattlefieldId = game.state.battlefields.find((battlefield) =>
     battlefield.units.includes(id)
@@ -2410,6 +2849,26 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
     definitionForInstance(id, index).card.attributes.might ?? 0;
   const preDeathDamage = preDeathState?.damage ?? 0;
   const preDeathCombatRole = preDeathState?.combatRole ?? null;
+  if (!suppressOptionalReplacement) {
+    const optionalReplacement = optionalDeathReplacement(game, id, index);
+    if (optionalReplacement) {
+      if (optionalReplacement.effectId) {
+        game.state.ongoingEffects = game.state.ongoingEffects.filter(
+          (effect) => effect.id !== optionalReplacement.effectId,
+        );
+      }
+      if (preDeathState) {
+        preDeathState.lethalSuppressedDamage = preDeathDamage;
+        preDeathState.lethalSuppressedMight = preDeathMight;
+      }
+      if (game.state.pendingChoice) {
+        game.state.queuedDeathReplacements.push(optionalReplacement);
+      } else {
+        promptDeathReplacement(game, optionalReplacement);
+      }
+      return;
+    }
+  }
   const replacementIndex = game.state.ongoingEffects.findIndex(
     (effect) =>
       effect.behaviorId === "replacement.recall_on_next_death" &&
@@ -2463,6 +2922,235 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
       combatRole: preDeathCombatRole,
     },
   });
+}
+
+type DeathReplacementRequest = GameDocument["state"]["queuedDeathReplacements"][number];
+
+function optionalDeathReplacement(
+  game: GameDocument,
+  unitId: string,
+  index: RuntimeCardIndex,
+): DeathReplacementRequest | null {
+  const owner = index.instances.get(unitId)?.ownerPlayerId;
+  if (!owner) return null;
+  const ongoing = game.state.ongoingEffects.find(
+    (effect) =>
+      effect.behaviorId === "replacement.optional_recall_on_death" &&
+      effect.controllerPlayerId === owner &&
+      effect.targetCardInstanceIds.includes(unitId),
+  );
+  if (ongoing) {
+    const request = deathReplacementRequestFromParameters(
+      unitId,
+      ongoing.sourceCardInstanceId,
+      ongoing.controllerPlayerId,
+      ongoing.id,
+      ongoing.parameters ?? {},
+    );
+    return request && deathReplacementCanBePaid(game, request, index)
+      ? request
+      : null;
+  }
+  const legendId = game.state.players[owner]?.zones.legend;
+  if (!legendId) return null;
+  const definition = definitionForInstance(legendId, index);
+  for (const clause of definition.behaviorModel.clauses) {
+    for (const binding of clause.effects) {
+      if (
+        binding.behaviorId !== "replacement.optional_recall_on_death" ||
+        binding.parameters.target !== "friendlyBuffedUnit" ||
+        game.state.cardStates[unitId]?.buffed !== true
+      ) continue;
+      const request = deathReplacementRequestFromParameters(
+        unitId,
+        legendId,
+        owner,
+        null,
+        binding.parameters,
+      );
+      if (request && deathReplacementCanBePaid(game, request, index)) return request;
+    }
+  }
+  return null;
+}
+
+function deathReplacementRequestFromParameters(
+  unitId: string,
+  sourceCardInstanceId: string,
+  controllerPlayerId: string,
+  effectId: string | null,
+  parameters: Record<string, string | number | boolean | null>,
+): DeathReplacementRequest | null {
+  const resource = parameters.resource;
+  const amount = parameters.amount;
+  if (
+    (resource !== "energy" && resource !== "power") ||
+    typeof amount !== "number" || amount <= 0
+  ) return null;
+  return {
+    unitId,
+    sourceCardInstanceId,
+    controllerPlayerId,
+    effectId,
+    resource,
+    domain: typeof parameters.domain === "string" ? parameters.domain : null,
+    amount,
+    exhaustSource: parameters.exhaustSource === true,
+    spendTargetBuff: parameters.spendTargetBuff === true,
+  };
+}
+
+function deathReplacementCanBePaid(
+  game: GameDocument,
+  request: DeathReplacementRequest,
+  index: RuntimeCardIndex,
+) {
+  if (
+    request.exhaustSource &&
+    game.state.cardStates[request.sourceCardInstanceId]?.exhausted !== false
+  ) return false;
+  if (
+    request.spendTargetBuff &&
+    game.state.cardStates[request.unitId]?.buffed !== true
+  ) return false;
+  const context = createReplacementContext(game, request);
+  return canPayEffectResource({
+    behaviorId: "action.pay_resource",
+    confidence: "high",
+    order: 0,
+    parameters: {
+      resource: request.resource,
+      amount: request.amount,
+      domain: request.domain,
+    },
+  }, context, index);
+}
+
+function createReplacementContext(
+  game: GameDocument,
+  request: DeathReplacementRequest,
+): BehaviorExecutionContext {
+  return {
+    game,
+    controllerPlayerId: request.controllerPlayerId,
+    sourceCardInstanceId: request.sourceCardInstanceId,
+    event: null,
+    selectedIds: [],
+    selectedBySelector: {},
+    effectOutcomes: {},
+  };
+}
+
+function promptDeathReplacement(
+  game: GameDocument,
+  request: DeathReplacementRequest,
+) {
+  game.state.pendingChoice = {
+    id: `death-replacement:${game.stateVersion}:${request.unitId}`,
+    playerId: request.controllerPlayerId,
+    type: "binary",
+    resolutionId: null,
+    bindingKey: "death-replacement",
+    prompt: "Pay to heal, exhaust, and recall this Unit instead of it dying?",
+    acceptLabel: "Pay and recall",
+    declineLabel: "Let it die",
+    deathReplacement: request,
+  };
+}
+
+export function submitDeathReplacementChoice(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending || pending.type !== "binary" || !pending.deathReplacement ||
+    pending.playerId !== playerId || selectedIds.length !== 1 ||
+    !["accept", "decline"].includes(selectedIds[0]!)
+  ) throw new Error("Death replacement choice is invalid.");
+  const request = pending.deathReplacement;
+  game.state.pendingChoice = null;
+  if (
+    selectedIds[0] === "accept" &&
+    deathReplacementCanBePaid(game, request, index)
+  ) {
+    const context = createReplacementContext(game, request);
+    payEffectResource({
+      behaviorId: "action.pay_resource",
+      confidence: "high",
+      order: 0,
+      parameters: {
+        resource: request.resource,
+        amount: request.amount,
+        domain: request.domain,
+      },
+    }, context, index);
+    if (request.exhaustSource) {
+      game.state.cardStates[request.sourceCardInstanceId]!.exhausted = true;
+    }
+    if (request.spendTargetBuff) {
+      game.state.cardStates[request.unitId]!.buffed = false;
+    }
+    const owner = index.instances.get(request.unitId)?.ownerPlayerId;
+    if (!owner) throw new Error("Recalled Unit owner is unavailable.");
+    removeFromAllLocations(game, request.unitId);
+    game.state.players[owner]!.zones.base.push(request.unitId);
+    resetStateAfterLeavingBoard(game, request.unitId, index);
+    game.state.cardStates[request.unitId]!.exhausted = true;
+    recomputeMight(game, request.unitId, index);
+  } else {
+    moveUnitToTrash(game, request.unitId, index, true);
+  }
+  advanceDeathReplacementQueue(game, index);
+}
+
+function advanceDeathReplacementQueue(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+) {
+  while (!game.state.pendingChoice && game.state.queuedDeathReplacements.length > 0) {
+    const next = game.state.queuedDeathReplacements.shift()!;
+    if (!isUnitInPlay(game, next.unitId)) continue;
+    if (!deathReplacementCanBePaid(game, next, index)) {
+      moveUnitToTrash(game, next.unitId, index, true);
+      continue;
+    }
+    promptDeathReplacement(game, next);
+  }
+}
+
+function cardSelectedForPlay(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  if (binding.parameters.source === "self") {
+    return context.sourceCardInstanceId;
+  }
+  return selectionForSource(binding, context)[0];
+}
+
+function cardIsInPlayableEffectZone(
+  game: GameDocument,
+  ownerPlayerId: string,
+  cardId: string,
+) {
+  const zones = game.state.players[ownerPlayerId]!.zones;
+  return (
+    zones.hand.includes(cardId) ||
+    zones.trash.includes(cardId) ||
+    zones.mainDeck.includes(cardId) ||
+    zones.banishment.includes(cardId)
+  );
+}
+
+function battlefieldForCard(game: GameDocument, cardId: string) {
+  return game.state.battlefields.find(
+    (battlefield) =>
+      battlefield.cardInstanceId === cardId ||
+      battlefield.units.includes(cardId),
+  );
 }
 
 export function killUnitsMarkedForNextDamage(

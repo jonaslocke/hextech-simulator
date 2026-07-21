@@ -93,6 +93,23 @@ for manual validation; they are not gameplay-accepted yet. `OGN-035` also uses
 the entry-ready contract but remains unpublished until its optional paid
 conquer clause is executable.
 
+### Batch 2: resolution payments, replacements, and zone-driven replay
+
+| Contract | Ownership and reuse | Classification | Published cards |
+|---|---|---|---|
+| Public-zone trigger sources | Trigger discovery includes explicit public-Trash sources and only a matching Main Deck event subject for private top-deck look/reveal triggers. | Shared extension | `OGN-006`, `OGN-037`, `OGN-194`, `OGN-252` |
+| Effect-driven play | A zone-authorized play validates the source zone and payment, records play history, applies Unit placement legality, puts Spells on the Chain, and honors post-resolution recycling. | New primitive | `OGN-006`, `OGN-037`, `OGN-107`, `OGN-112`, `OGN-194` |
+| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Insufficient costs suppress the offer; decline and failed revalidation leave later gated effects untouched. | New decision/payment primitives | `OGN-035`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-282`, `OGN-300` |
+| Kill attribution | Spell damage emits a separate kill event after lethal cleanup while retaining the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
+| Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
+| Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
+
+The fourteen distinct cards in this batch have synchronized supported canonical
+models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
+`OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,
+`OGN-252`, `OGN-269`, `OGN-282`, and `OGN-300`. Publication is not manual
+gameplay acceptance.
+
 ## Manually validated first subset
 
 `OGN-019`, `OGN-021`, `OGN-047`, `OGN-056`, `OGN-059`, `OGN-061`, `OGN-065`,

@@ -143,7 +143,7 @@ export function submitTokenPlacement(
 
 export function submitBinaryChoice(game: GameDocument, playerId: string, selectedIds: string[], decks: readonly DeckSnapshotDocument[]) {
   const pending = game.state.pendingChoice;
-  if (!pending || pending.type !== "binary" || pending.playerId !== playerId || selectedIds.length !== 1 || !["accept", "decline"].includes(selectedIds[0]!)) throw new Error("Optional choice is invalid.");
+  if (!pending || pending.type !== "binary" || !pending.resolutionId || pending.deathReplacement || pending.playerId !== playerId || selectedIds.length !== 1 || !["accept", "decline"].includes(selectedIds[0]!)) throw new Error("Optional choice is invalid.");
   const frame = game.state.effectResolutions.find((item) => item.id === pending.resolutionId);
   if (!frame) throw new Error("Effect resolution is unavailable.");
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
@@ -444,6 +444,7 @@ export function resumeEffectResolution(
   for (const binding of clause.choices as import("./schemas").BehaviorBinding[]) {
     const bindingKey = `${clause.id}:choices:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
+    if (!bindingChoiceGateMatches(binding, selectorContext)) continue;
     if (
       binding.behaviorId === "choice.optional" &&
       optionalChoiceHasTargetSelector(clause, binding, selectorContext, handlers)
@@ -545,6 +546,19 @@ export function resumeEffectResolution(
               destination.label,
             ]),
           ),
+        };
+        return false;
+      }
+      if (requirement.kind === "binary") {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "binary",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          acceptLabel: requirement.acceptLabel ?? "Accept",
+          declineLabel: requirement.declineLabel ?? "Decline",
         };
         return false;
       }

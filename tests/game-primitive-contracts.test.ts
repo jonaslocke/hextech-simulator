@@ -15,6 +15,8 @@ import {
   effectiveEnergyCost,
   canTakeDamage,
   legalUnitDestinationIds,
+  moveUnitToTrash,
+  submitDeathReplacementChoice,
   type BehaviorEvent,
   type BehaviorBinding,
   type GameCardDefinition,
@@ -30,6 +32,7 @@ import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import {
   beginEffectResolution,
+  submitBinaryChoice,
 } from "../src/server/game/effect-resolution";
 
 test("registers a handler for every executable behavior", () => {
@@ -282,6 +285,136 @@ test("numeric copy snapshots the selected source value and only increases", () =
     },
   ), context);
   assert.equal(game.state.modifiers.length, 1);
+});
+
+test("resolution-time resource payment prompts only when payable and gates later effects", () => {
+  const source = card("SYN-OPTIONAL-PAYMENT", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "optional-payment", sequence: 0, sourceText: "You may pay [Body] to draw 1.",
+    normalizedText: "You may pay [Body] to draw 1.", abilities: [], triggers: [], conditions: [],
+    selectors: [], choices: [], costs: [], timings: [], keywords: [], effects: [
+      binding("action.pay_optional_resource", {
+        resource: "power", domain: "Body", amount: 1, selectionKey: "pay",
+      }),
+      { ...binding("action.draw_cards", {
+        player: "controller", count: 1,
+        requiresChoiceKey: "pay", requiresChoiceValue: "accept",
+      }), order: 1 },
+    ],
+  }];
+  const drawn = card("SYN-PAYMENT-DRAW", "Unit", 1);
+  const { game, decks } = fixture([source, drawn], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("drawn", "p1", drawn.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.zones.mainDeck = ["drawn"];
+  game.state.players.p1!.power.Body = 1;
+
+  assert.equal(beginEffectResolution({
+    game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    clauseId: "optional-payment", decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "binary");
+  submitBinaryChoice(game, "p1", ["accept"], decks);
+  assert.equal(game.state.players.p1!.power.Body, 0);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["drawn"]);
+
+  const second = fixture([source, drawn], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("drawn", "p1", drawn.cardCode, "mainDeck"),
+  ]);
+  second.game.state.players.p1!.zones.base = ["source"];
+  second.game.state.players.p1!.zones.mainDeck = ["drawn"];
+  assert.equal(beginEffectResolution({
+    game: second.game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    clauseId: "optional-payment", decks: second.decks,
+  }), true);
+  assert.equal(second.game.state.pendingChoice, null);
+  assert.deepEqual(second.game.state.players.p1!.zones.hand, []);
+});
+
+test("effect-driven Unit play validates its source zone and uses normal placement", () => {
+  const source = card("SYN-EFFECT-SOURCE", "Gear");
+  const unit = card("SYN-EFFECT-PLAYED-UNIT", "Unit", 4);
+  const { game, handlers } = fixture([source, unit], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("unit", "p1", unit.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.zones.trash = ["unit"];
+  const context = createBehaviorContext(game, "p1", "source", null, ["unit", "base"]);
+  context.selectedBySelector.card = ["unit"];
+  context.selectedBySelector.destination = ["base"];
+  handlers.get("action.play_selected_card")!.execute!(binding(
+    "action.play_selected_card",
+    { sourceSelectionKey: "card", selectionKey: "destination", costMode: "ignoreAll" },
+  ), context);
+  assert.deepEqual(game.state.players.p1!.zones.trash, []);
+  assert.ok(game.state.players.p1!.zones.base.includes("unit"));
+  assert.deepEqual(game.state.players.p1!.playedCardIdsThisTurn, ["unit"]);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.played");
+});
+
+test("public Trash trigger sources are opt-in and private deck sources are event-subject only", () => {
+  const trashSource = card("SYN-TRASH-TRIGGER", "Unit", 2);
+  trashSource.behaviorModel.clauses = [
+    { id: "active-trash", sequence: 0, sourceText: "Active in Trash.", normalizedText: "Active in Trash.",
+      abilities: [], triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], keywords: [],
+      effects: [binding("modifier.active_in_zone", { zone: "trash" })] },
+    { id: "discarded", sequence: 1, sourceText: "When discarded.", normalizedText: "When discarded.",
+      abilities: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: [],
+      triggers: [binding("trigger.event", { eventType: "card.discarded", subject: "source" })] },
+  ];
+  const { game, decks } = fixture([trashSource], [
+    instance("trash-source", "p1", trashSource.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.trash = ["trash-source"];
+  dispatchBehaviorEvent(game, {
+    type: "card.discarded", actorPlayerId: "p1",
+    subjectCardInstanceId: "trash-source", values: {},
+  }, decks);
+  assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "trash-source");
+});
+
+test("optional paid death replacement suppresses lethal cleanup until accept or decline", () => {
+  const source = card("SYN-DEATH-REPLACEMENT", "Gear");
+  const unit = card("SYN-DOOMED-UNIT", "Unit", 3);
+  const { game, decks } = fixture([source, unit], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("unit", "p1", unit.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "unit"];
+  game.state.players.p1!.energy = 1;
+  game.state.cardStates.unit!.damage = 3;
+  game.state.ongoingEffects = [{
+    id: "replacement", behaviorId: "replacement.optional_recall_on_death",
+    controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    targetCardInstanceIds: ["unit"], duration: "thisTurn", createdAtTurn: 1,
+    parameters: { resource: "energy", amount: 1 },
+  }];
+  const index = createRuntimeCardIndex(decks, game);
+  moveUnitToTrash(game, "unit", index);
+  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.ok(game.state.players.p1!.zones.base.includes("unit"));
+  assert.deepEqual(game.state.ongoingEffects, []);
+  submitDeathReplacementChoice(game, "p1", ["accept"], index);
+  assert.equal(game.state.players.p1!.energy, 0);
+  assert.equal(game.state.cardStates.unit!.damage, 0);
+  assert.equal(game.state.cardStates.unit!.exhausted, true);
+
+  game.state.players.p1!.energy = 1;
+  game.state.cardStates.unit!.damage = 3;
+  game.state.ongoingEffects = [{
+    id: "replacement-2", behaviorId: "replacement.optional_recall_on_death",
+    controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    targetCardInstanceIds: ["unit"], duration: "thisTurn", createdAtTurn: 1,
+    parameters: { resource: "energy", amount: 1 },
+  }];
+  moveUnitToTrash(game, "unit", index);
+  submitDeathReplacementChoice(game, "p1", ["decline"], index);
+  assert.ok(game.state.players.p1!.zones.trash.includes("unit"));
+  assert.equal(game.state.players.p1!.energy, 1);
 });
 
 test("Awakening batches ready events into one trigger-order decision", () => {

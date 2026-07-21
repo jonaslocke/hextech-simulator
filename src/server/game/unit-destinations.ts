@@ -11,7 +11,7 @@ export function legalUnitDestinationIds(
   if (definition.card.classification.type !== "Unit") return [];
 
   const destinationIds = ["base"];
-  if (index && isRestrictedToBase(game, playerId, index)) return destinationIds;
+  if (index && isUnitPlayRestrictedToBase(game, playerId, index)) return destinationIds;
   for (const battlefield of game.state.battlefields) {
     if (battlefield.controllerPlayerId === playerId) {
       destinationIds.push(battlefield.battlefieldId);
@@ -79,7 +79,7 @@ function hasDestinationPermission(
   );
 }
 
-function isRestrictedToBase(
+export function isUnitPlayRestrictedToBase(
   game: GameDocument,
   playerId: string,
   index: RuntimeCardIndex,

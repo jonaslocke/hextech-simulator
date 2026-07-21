@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T01:17:08.453Z",
+  "updatedAt": "2026-07-21T01:44:30.097Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -208,11 +208,21 @@
           "name": "Flame Chompers"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-006",
+        "approvedAt": "2026-07-21T01:36:20.592Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:36:20.592Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-006 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:36:20.592Z"
     },
     {
       "gameplayIdentity": "OGN-007:Fury Rune",
@@ -793,11 +803,21 @@
           "name": "Unlicensed Armory"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-023",
+        "approvedAt": "2026-07-21T01:44:29.821Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:44:29.821Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-023 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:44:29.821Z"
     },
     {
       "gameplayIdentity": "OGN-024:Void Seeker",
@@ -1197,11 +1217,21 @@
           "name": "Vayne, Hunter"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-035",
+        "approvedAt": "2026-07-21T01:36:20.733Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:36:20.733Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-035 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:36:20.733Z"
     },
     {
       "gameplayIdentity": "OGN-036:Vi Destructive",
@@ -1243,11 +1273,21 @@
           "name": "Immortal Phoenix"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-037",
+        "approvedAt": "2026-07-21T01:36:20.875Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:36:20.875Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-037 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:36:20.875Z"
     },
     {
       "gameplayIdentity": "OGN-038:Kadregrin the Infernal",
@@ -2344,11 +2384,21 @@
           "name": "Solari Shrine"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-072",
+        "approvedAt": "2026-07-21T01:36:21.010Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:36:21.010Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-072 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:36:21.010Z"
     },
     {
       "gameplayIdentity": "OGN-073:Sona Harmonious",
@@ -3572,11 +3622,21 @@
           "name": "Ava Achiever"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-107",
+        "approvedAt": "2026-07-21T01:44:29.962Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:36:21.141Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-107 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:44:29.962Z"
     },
     {
       "gameplayIdentity": "OGN-108:Convergent Mutation",
@@ -3727,11 +3787,21 @@
           "name": "Kai'Sa, Evolutionary"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-112",
+        "approvedAt": "2026-07-21T01:37:05.594Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:37:05.594Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-112 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:37:05.594Z"
     },
     {
       "gameplayIdentity": "OGN-113:Malzahar Fanatic",
@@ -4860,11 +4930,21 @@
           "name": "Wildclaw Shaman"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-147",
+        "approvedAt": "2026-07-21T01:37:54.729Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:37:54.729Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-147 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:37:54.729Z"
     },
     {
       "gameplayIdentity": "OGN-148:Anivia Primal",
@@ -4981,11 +5061,21 @@
           "name": "Mistfall"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-152",
+        "approvedAt": "2026-07-21T01:37:54.870Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:37:54.870Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-152 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:37:54.870Z"
     },
     {
       "gameplayIdentity": "OGN-153:Overt Operation",
@@ -6312,11 +6402,21 @@
           "name": "Nocturne, Horrifying"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-194",
+        "approvedAt": "2026-07-21T01:37:55.004Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:37:55.004Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-194 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:37:55.004Z"
     },
     {
       "gameplayIdentity": "OGN-195:Rhasa the Sunderer",
@@ -8407,11 +8507,21 @@
           "name": "Relentless Storm"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-300",
+        "approvedAt": "2026-07-21T01:38:24.815Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:38:24.815Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-300 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:38:24.815Z"
     },
     {
       "gameplayIdentity": "OGN-250:Stormbringer",
@@ -8513,11 +8623,21 @@
           "name": "Super Mega Death Rocket!"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-252",
+        "approvedAt": "2026-07-21T01:38:24.526Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:38:24.526Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-252 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:38:24.526Z"
     },
     {
       "gameplayIdentity": "OGN-253:Hand of Noxus",
@@ -9093,11 +9213,21 @@
           "name": "The Boss"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-269",
+        "approvedAt": "2026-07-21T01:44:30.097Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:44:30.097Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-269 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:44:30.097Z"
     },
     {
       "gameplayIdentity": "OGN-270:Showstopper",
@@ -9480,11 +9610,21 @@
           "name": "Monastery of Hirana"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-282",
+        "approvedAt": "2026-07-21T01:38:24.681Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T01:38:24.681Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-282 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T01:38:24.681Z"
     },
     {
       "gameplayIdentity": "OGN-283:Navori Fighting Pit",

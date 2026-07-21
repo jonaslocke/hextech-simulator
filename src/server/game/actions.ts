@@ -13,6 +13,7 @@ import {
   consumeEnterReadyEffect,
   consumeNextPlayEnergyDiscount,
   sourceEntersReady,
+  submitDeathReplacementChoice,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   definitionForInstance,
@@ -621,6 +622,21 @@ export function performGameplayAction(input: {
         resetChainPriorityToTopItem(game);
         openPendingShowdown(game, index, input.decks);
         finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (
+        game.state.pendingChoice?.type === "binary" &&
+        game.state.pendingChoice.deathReplacement
+      ) {
+        submitDeathReplacementChoice(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          index,
+        );
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "binary") {
         submitBinaryChoice(game, input.actorPlayerId, input.selectedIds, input.decks);
         queueChainItemsForTargets(game, [], input.decks);
@@ -961,7 +977,7 @@ function playCard(
     } else player.zones.base.push(cardId);
     if (
       destinationBattlefield &&
-      destinationBattlefield.controllerPlayerId == null
+      destinationBattlefield.controllerPlayerId !== playerId
     ) {
       markBattlefieldContested(game, destinationId, playerId);
     }
@@ -1161,9 +1177,15 @@ function passPriority(
               });
               if (definition.card.classification.type === "Spell") {
                 if (!isCardInAnyZone(game, item.sourceCardInstanceId)) {
-                  game.state.players[owner]!.zones.trash.push(
-                    item.sourceCardInstanceId,
-                  );
+                  if (item.resolutionDestination === "recycle") {
+                    game.state.players[owner]!.zones.mainDeck.push(
+                      item.sourceCardInstanceId,
+                    );
+                  } else {
+                    game.state.players[owner]!.zones.trash.push(
+                      item.sourceCardInstanceId,
+                    );
+                  }
                 }
                 dispatchBehaviorEvent(
                   game,
@@ -1204,9 +1226,15 @@ function passPriority(
             definition.card.classification.type === "Spell" &&
             !isCardInAnyZone(game, item.sourceCardInstanceId)
           ) {
-            game.state.players[owner]!.zones.trash.push(
-              item.sourceCardInstanceId,
-            );
+            if (item.resolutionDestination === "recycle") {
+              game.state.players[owner]!.zones.mainDeck.push(
+                item.sourceCardInstanceId,
+              );
+            } else {
+              game.state.players[owner]!.zones.trash.push(
+                item.sourceCardInstanceId,
+              );
+            }
             dispatchBehaviorEvent(
               game,
               item.behaviorEvent?.type === "card.played"
@@ -2436,7 +2464,14 @@ function finalizeActivatedAbility(
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
   }
-  payActivatedAbilityCosts(game, actorPlayerId, sourceId, clause, index);
+  payActivatedAbilityCosts(
+    game,
+    actorPlayerId,
+    sourceId,
+    clause,
+    selectedIds,
+    index,
+  );
   const resolvesImmediately = isAddResourceAbility(binding.behaviorId);
   if (resolvesImmediately) {
     handler.execute(
@@ -2553,6 +2588,16 @@ function activatedAbilityCostStatus(
       }
       continue;
     }
+    if (cost.behaviorId === "cost.discard_cards") {
+      const count = cost.parameters.count;
+      if (
+        typeof count !== "number" ||
+        game.state.players[playerId]!.zones.hand.length < count
+      ) {
+        return { enabled: false, reason: "Not enough cards are available to discard." };
+      }
+      continue;
+    }
     if (cost.behaviorId !== "cost.pay") {
       return {
         enabled: false,
@@ -2595,6 +2640,7 @@ function payActivatedAbilityCosts(
   playerId: string,
   sourceId: string,
   clause: GameCardDefinition["behaviorModel"]["clauses"][number],
+  selectedIds: readonly string[],
   index: RuntimeCardIndex,
 ) {
   const status = activatedAbilityCostStatus(
@@ -2626,6 +2672,27 @@ function payActivatedAbilityCosts(
     if (cost.behaviorId === "cost.spend_source_buff") {
       game.state.cardStates[sourceId]!.buffed = false;
       recomputeMight(game, sourceId, index);
+      continue;
+    }
+    if (cost.behaviorId === "cost.discard_cards") {
+      const count = cost.parameters.count as number;
+      const hand = game.state.players[playerId]!.zones.hand;
+      const discarded = selectedIds.filter((id) => hand.includes(id)).slice(0, count);
+      if (discarded.length !== count) {
+        throw new Error("Discard cost selection is unavailable.");
+      }
+      game.state.players[playerId]!.zones.hand = hand.filter(
+        (id) => !discarded.includes(id),
+      );
+      game.state.players[playerId]!.zones.trash.push(...discarded);
+      (game.state.queuedBehaviorEvents ??= []).push(
+        ...discarded.map((id) => ({
+          type: "card.discarded",
+          actorPlayerId: playerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
     }
   }
 }

@@ -169,6 +169,7 @@ export function bindingChoiceGateMatches(
   if (typeof choiceKey !== "string") return true;
   const selected = context.selectedBySelector[choiceKey] ?? [];
   const requiredValue = binding.parameters.requiresChoiceValue;
+  if (requiredValue === "any") return selected.length > 0;
   return typeof requiredValue === "string"
     ? selected.includes(requiredValue)
     : selected.includes("accept");

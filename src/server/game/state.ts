@@ -150,6 +150,7 @@ export const chainItemSchema = z.object({
   // items because a trigger-order or target-selection prompt can outlive the
   // Chain that originally established the continuation.
   resumeFocusPlayerId: z.string().min(1).nullable().optional(),
+  resolutionDestination: z.enum(["trash", "recycle"]).optional(),
 });
 
 const triggerOrderChoiceSchema = z.object({
@@ -231,8 +232,31 @@ const tokenPlacementChoiceSchema = z.object({
 
 const binaryChoiceSchema = z.object({
   id: z.string().min(1), playerId: z.string().min(1), type: z.literal("binary"),
-  resolutionId: z.string().min(1), bindingKey: z.string().min(1), prompt: z.string().min(1),
+  resolutionId: z.string().min(1).nullable(), bindingKey: z.string().min(1), prompt: z.string().min(1),
   acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+  deathReplacement: z.object({
+    unitId: z.string().min(1),
+    sourceCardInstanceId: z.string().min(1),
+    controllerPlayerId: z.string().min(1),
+    effectId: z.string().min(1).nullable(),
+    resource: z.enum(["energy", "power"]),
+    domain: z.string().nullable(),
+    amount: z.number().int().positive(),
+    exhaustSource: z.boolean(),
+    spendTargetBuff: z.boolean(),
+  }).optional(),
+});
+
+const deathReplacementRequestSchema = z.object({
+  unitId: z.string().min(1),
+  sourceCardInstanceId: z.string().min(1),
+  controllerPlayerId: z.string().min(1),
+  effectId: z.string().min(1).nullable(),
+  resource: z.enum(["energy", "power"]),
+  domain: z.string().nullable(),
+  amount: z.number().int().positive(),
+  exhaustSource: z.boolean(),
+  spendTargetBuff: z.boolean(),
 });
 
 const modeChoiceSchema = z.object({
@@ -342,6 +366,7 @@ export const gameStateSchema = z.object({
         targetCardInstanceIds: z.array(z.string()),
         duration: z.string().min(1),
         createdAtTurn: z.number().int().nonnegative(),
+        parameters: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
       }),
     )
     .default([]),
@@ -392,6 +417,7 @@ export const gameStateSchema = z.object({
     ])
     .nullable(),
   queuedTriggerChoices: z.array(triggerOrderChoiceSchema),
+  queuedDeathReplacements: z.array(deathReplacementRequestSchema).default([]),
   queuedChainItems: z.array(chainItemSchema).optional(),
   queuedBehaviorEvents: z
     .array(
