@@ -20,6 +20,7 @@ import {
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
 import { ChainOverlay } from "./components/chain-overlay";
+import { HiddenLossWarningDialog } from "./components/hidden-loss-warning-dialog";
 import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
@@ -67,6 +68,14 @@ type GameBoardProps = {
   matchContext?: MatchHudContext;
 };
 
+type PendingHiddenLossAction = {
+  actionId: string;
+  selectedIds: string[];
+  allocations?: Array<{ targetUnitId: string; amount: number }>;
+  tokenPlacements?: Array<{ destinationId: string; count: number }>;
+  hiddenCardCount: number;
+};
+
 export const GameBoard: FC<GameBoardProps> = ({
   isSubmittingAction = false,
   onPerformAction,
@@ -86,7 +95,9 @@ export const GameBoard: FC<GameBoardProps> = ({
     sequence: index + 1,
   }));
   const interactionLockedRef = useRef(false);
-  const submitProjectedAction = useCallback(
+  const [pendingHiddenLossAction, setPendingHiddenLossAction] =
+    useState<PendingHiddenLossAction | null>(null);
+  const performProjectedAction = useCallback(
     (
       actionId: string | undefined,
       selectedIds: string[] = [],
@@ -105,6 +116,39 @@ export const GameBoard: FC<GameBoardProps> = ({
       });
     },
     [onPerformAction],
+  );
+  const submitProjectedAction = useCallback(
+    (
+      actionId: string | undefined,
+      selectedIds: string[] = [],
+      allocations?: Array<{ targetUnitId: string; amount: number }>,
+      tokenPlacements?: Array<{ destinationId: string; count: number }>,
+    ): Promise<boolean> => {
+      if (!actionId || pendingHiddenLossAction) {
+        return Promise.resolve(false);
+      }
+      const hiddenCardCount = hiddenCardsLostByReturningToBase(
+        sourceProjection,
+        actionId,
+      );
+      if (hiddenCardCount > 0) {
+        setPendingHiddenLossAction({
+          actionId,
+          selectedIds,
+          allocations,
+          tokenPlacements,
+          hiddenCardCount,
+        });
+        return Promise.resolve(true);
+      }
+      return performProjectedAction(
+        actionId,
+        selectedIds,
+        allocations,
+        tokenPlacements,
+      );
+    },
+    [pendingHiddenLossAction, performProjectedAction, sourceProjection],
   );
   const [openZone, setOpenZone] =
     useState<Exclude<TemporaryZone, "chain">>(null);
@@ -960,6 +1004,24 @@ export const GameBoard: FC<GameBoardProps> = ({
           title={`Choose where to play ${unitPlayChoice.card.name}`}
         />
       )}
+      <HiddenLossWarningDialog
+        hiddenCardCount={pendingHiddenLossAction?.hiddenCardCount ?? 0}
+        isOpen={pendingHiddenLossAction !== null}
+        isSubmitting={isSubmittingAction}
+        onCancel={() => {
+          if (!isSubmittingAction) setPendingHiddenLossAction(null);
+        }}
+        onConfirm={() => {
+          if (!pendingHiddenLossAction || isSubmittingAction) return;
+          const pending = pendingHiddenLossAction;
+          void performProjectedAction(
+            pending.actionId,
+            pending.selectedIds,
+            pending.allocations,
+            pending.tokenPlacements,
+          ).finally(() => setPendingHiddenLossAction(null));
+        }}
+      />
       <CardZoneTransferOverlay
         onActiveCardIdsChange={handleActiveTransferCardIdsChange}
         onPendingSnapshotConsumed={() => setPendingAnimationSnapshot(null)}
@@ -989,6 +1051,42 @@ export const GameBoard: FC<GameBoardProps> = ({
     </main>
   );
 };
+
+function hiddenCardsLostByReturningToBase(
+  projection: GameProjection,
+  actionId: string,
+) {
+  const action = projection.actions.find((candidate) => candidate.id === actionId);
+  if (
+    !action?.sourceCardInstanceId ||
+    action.id.split(":")[3] !== "move" ||
+    action.presentation.boardLocation?.kind !== "base"
+  ) {
+    return 0;
+  }
+  const battlefield = projection.battlefields.find((candidate) =>
+    candidate.units.some(
+      (unit) => unit.instanceId === action.sourceCardInstanceId,
+    ),
+  );
+  const movingUnit = battlefield?.units.find(
+    (unit) => unit.instanceId === action.sourceCardInstanceId,
+  );
+  if (
+    !battlefield ||
+    !movingUnit ||
+    battlefield.controllerPlayerId !== movingUnit.ownerPlayerId ||
+    battlefield.facedownCardCount === 0
+  ) {
+    return 0;
+  }
+  const hasAnotherControllingUnit = battlefield.units.some(
+    (unit) =>
+      unit.instanceId !== movingUnit.instanceId &&
+      unit.ownerPlayerId === movingUnit.ownerPlayerId,
+  );
+  return hasAnotherControllingUnit ? 0 : battlefield.facedownCardCount;
+}
 
 function targetSelectionIsChoosingOptionalCost(
   targetSelection: NonNullable<
