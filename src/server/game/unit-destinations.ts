@@ -106,7 +106,10 @@ function activeBoardSources(
   playerId: string,
   index: RuntimeCardIndex,
 ) {
-  return game.state.battlefields.flatMap((battlefield) => battlefield.units)
+  return [
+    ...game.state.players[playerId]!.zones.base,
+    ...game.state.battlefields.flatMap((battlefield) => battlefield.units),
+  ]
     .filter((id) => index.instances.get(id)?.ownerPlayerId === playerId)
     .map((id) => index.definitions.get(index.instances.get(id)!.cardCode))
     .filter((definition): definition is GameCardDefinition => Boolean(definition));

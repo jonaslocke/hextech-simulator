@@ -204,11 +204,12 @@ test("continuous destination restrictions and permissions compose", () => {
   ]);
   game.state.battlefields = [{
     battlefieldId: "controlled", cardInstanceId: "controlled-field-card", selectedByPlayerId: "p1",
-    controllerPlayerId: "p1", contestedByPlayerId: null, units: ["permission"], facedownCards: [],
+    controllerPlayerId: "p1", contestedByPlayerId: null, units: [], facedownCards: [],
   }, {
     battlefieldId: "open", cardInstanceId: "open-field-card", selectedByPlayerId: "p1",
     controllerPlayerId: null, contestedByPlayerId: null, units: [], facedownCards: [],
   }];
+  game.state.players.p1!.zones.base = ["permission"];
   const index = createRuntimeCardIndex(decks, game);
   assert.deepEqual(
     legalUnitDestinationIds(game, "p1", restrictedUnit, index),
