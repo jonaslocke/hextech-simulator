@@ -143,12 +143,14 @@ supported canonical models and are ready for manual validation; publication is
 not manual gameplay acceptance.
 
 Manual validation on 2026-07-21 confirmed Sett's tested Buff/spend-Buff ability
-and The Boss's optional paid death replacement. That validation exposed a
-shared Combat Cleanup ordering defect: the engine was evaluating step 3d's
-attacker recall while a lethal defender was still awaiting its optional death
-replacement. Combat Cleanup now persists completion of its lethal substep and
-pauses before step 3d until the replacement decision is finished. The resulting
-control and Conquer behavior remains ready for manual validation.
+and The Boss's optional paid death replacement. The user also manually
+validated `OGN-124` Arena Bar's exhausted-friendly-Unit Buff behavior. That
+validation exposed a shared Combat Cleanup ordering defect: the engine was
+evaluating step 3d's attacker recall while a lethal defender was still awaiting
+its optional death replacement. Combat Cleanup now persists completion of its
+lethal substep and pauses before step 3d until the replacement decision is
+finished. The resulting control and Conquer behavior remains ready for manual
+validation.
 
 ### Batch 3: linked movement, sequenced decisions, and spell control
 
@@ -177,6 +179,11 @@ These final five cards have synchronized supported canonical models and are
 ready for manual validation: `OGN-146`, `OGN-153`, `OGN-242`, `OGN-281`, and
 `OGN-292`. This completes publication of all 34 remainder cards without
 claiming gameplay acceptance.
+
+The user manually validated `OGN-153` Overt Operation's repeating independent
+Buff costs and final Buff-all behavior in-game on 2026-07-21. It has passed
+that behavior-family gate without promoting its complete gameplay identity to
+`accepted`.
 
 ## Manually validated first subset
 

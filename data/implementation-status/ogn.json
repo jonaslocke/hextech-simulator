@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T18:54:15.272Z",
+  "updatedAt": "2026-07-21T19:09:51.872Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -4277,21 +4277,35 @@
           "name": "Arena Bar"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-124",
         "approvedAt": "2026-07-21T18:23:30.231Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-exhausted-friendly-unit-buff",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T19:09:50.679Z",
+          "note": "User validated Arena Bar exhausted-friendly-unit Buff behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T18:23:30.231Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-124 approved."
+        },
+        {
+          "at": "2026-07-21T19:09:50.679Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-exhausted-friendly-unit-buff",
+          "note": "User validated Arena Bar exhausted-friendly-unit Buff behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T18:23:30.231Z"
+      "updatedAt": "2026-07-21T19:09:50.679Z"
     },
     {
       "gameplayIdentity": "OGN-125:Bilgewater Bully",
@@ -5242,21 +5256,35 @@
           "name": "Overt Operation"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-153",
         "approvedAt": "2026-07-21T02:07:16.179Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-repeating-independent-buff-costs",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-21T19:09:51.872Z",
+          "note": "User validated Overt Operation repeating independent Buff costs and Buff-all behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T02:07:16.179Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-153 approved."
+        },
+        {
+          "at": "2026-07-21T19:09:51.872Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-repeating-independent-buff-costs",
+          "note": "User validated Overt Operation repeating independent Buff costs and Buff-all behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T02:07:16.179Z"
+      "updatedAt": "2026-07-21T19:09:51.872Z"
     },
     {
       "gameplayIdentity": "OGN-154:Primal Strength",
