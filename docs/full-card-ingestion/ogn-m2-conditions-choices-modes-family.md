@@ -110,6 +110,19 @@ models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-252`, `OGN-269`, `OGN-282`, and `OGN-300`. Publication is not manual
 gameplay acceptance.
 
+### Batch 3: linked movement, sequenced decisions, and spell control
+
+| Contract | Ownership and reuse | Classification | Published cards |
+|---|---|---|---|
+| Linked battlefield movement | The shared movement transaction resolves source-, event-, and selected-Unit destinations and emits both origin and destination battlefield identifiers. | Shared extension | `OGN-067`, `OGN-177`, `OGN-262` |
+| Atomic battlefield swap | Both Units are removed before either is placed, so the exchange cannot observe a half-completed board and emits one move event per Unit. | New primitive | `OGN-199` |
+| Sequenced player decisions | Resolution selectors and mode prompts identify their choosing player; in the two-player runtime the next player decides before the controller and each optional selection is independent. | Shared decision extension | `OGN-071`, `OGN-187` |
+| Spell control and new choices | A Chain spell's controller changes before an optional target redeclaration; legal targets are recalculated for the new controller and locked target versions are replaced atomically. | New Chain primitives | `OGN-080` |
+
+These seven cards have synchronized supported canonical models and are ready
+for manual validation: `OGN-067`, `OGN-071`, `OGN-080`, `OGN-177`, `OGN-187`,
+`OGN-199`, and `OGN-262`.
+
 ## Manually validated first subset
 
 `OGN-019`, `OGN-021`, `OGN-047`, `OGN-056`, `OGN-059`, `OGN-061`, `OGN-065`,
@@ -157,3 +170,7 @@ For each reusable contract:
 | Move-origin event | Move a Unit from Back-Alley Bar to Base and confirm that Unit gets +1 Might this turn; move from a different battlefield and confirm it does not. | `277` |
 | Unit-count win condition | Hold The Grand Plaza with six Units, then with seven Units. Only the seven-Unit hold wins immediately. | `293` |
 | Existing optional trigger | Hold Startipped Peak and test both accepting and declining the exhausted Rune channel. | `288` |
+| Linked moves and invalid destinations | Play Blitzcrank to a battlefield and move an enemy from Base and from another battlefield; decline once, then hold and confirm Blitzcrank returns. Move a friendly away from Stealthy Pursuer and accept/decline following it. With Zenith Blade, stun an enemy at a battlefield, move a friendly there, and decline the move. | `067`, `177`, `262` |
+| Atomic swap and event cleanup | Play Tideturner at Base and at a battlefield, swap with a friendly at another location, and decline. Confirm both locations exchange exactly once, no duplicate Unit remains, and same-location Units are not offered under the official erratum. | `199` |
+| Opponent-first decisions | Resolve Party Favors with the opponent choosing Cards, then Runes; verify both players receive exactly the selected outcome. Resolve Whirlwind with opponent accept/controller decline, then opponent decline/controller accept, and verify each prompt belongs to the correct player. | `071`, `187` |
+| Chain control and privacy | React to a targeted Spell with Mystic Reversal. Confirm control moves to the reactor, legal new targets are recalculated for that player, declining preserves the old choices, accepting replaces them, Priority resumes on the same Chain, and each viewer sees only normally public target information. | `080` |

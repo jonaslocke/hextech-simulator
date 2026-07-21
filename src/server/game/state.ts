@@ -50,6 +50,7 @@ export const playerStateSchema = z.object({
   playedMainDeckCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   legionSatisfiedCardIdsThisTurn: z.array(z.string().min(1)).optional(),
   chosenModesThisTurn: z.record(z.array(z.string().min(1))).optional(),
+  triggerMemoryKeysThisTurn: z.array(z.string().min(1)).optional(),
   zones: playerZonesSchema,
 });
 
@@ -395,6 +396,9 @@ export const gameStateSchema = z.object({
       lockedSelectionsByBinding: z.record(z.array(z.string())),
       targetObjectVersions: z.record(z.number().int().nonnegative()),
       selectionsByBinding: z.record(z.array(z.string())),
+      effectOutcomes: z.record(
+        z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+      ).default({}),
       behaviorEvent: z
         .object({
           type: z.string(),

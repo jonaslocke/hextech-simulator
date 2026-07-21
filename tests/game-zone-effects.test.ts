@@ -464,6 +464,132 @@ test("selects every eligible card from unordered non-board zones", () => {
   assert.deepEqual(requirement.legalIds, ["trash-unit-a", "trash-unit-b"]);
 });
 
+test("linked battlefield movement records endpoints and atomic swaps exchange locations", () => {
+  const game = fixture();
+  const index = cardIndex();
+  for (const [id, owner] of [["source", "p1"], ["ally", "p1"]] as const) {
+    index.instances.set(id, {
+      instanceId: id,
+      ownerPlayerId: owner,
+      source: "mainDeck",
+      cardCode: "UNIT",
+    });
+    game.state.cardStates[id] = {
+      exhausted: true,
+      damage: 0,
+      computedMight: 2,
+      objectVersion: 0,
+    };
+  }
+  index.instances.set("bf-two-card", {
+    instanceId: "bf-two-card",
+    ownerPlayerId: "p2",
+    source: "battlefield",
+    cardCode: "BF",
+  });
+  game.state.cardStates["bf-two-card"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+    objectVersion: 0,
+  };
+  game.state.battlefields[0]!.units.push("source");
+  game.state.battlefields.push({
+    battlefieldId: "bf-two",
+    cardInstanceId: "bf-two-card",
+    selectedByPlayerId: "p2",
+    units: ["ally"],
+  });
+  const handlers = createPrimitiveHandlers(index);
+  const moveContext = createBehaviorContext(game, "p1", "source", {
+    type: "unit.moved",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "ally",
+    values: { destinationBattlefieldId: "bf-two" },
+  }, []);
+
+  handlers.get("action.move_unit")!.execute!(
+    binding("action.move_unit", { target: "source", destination: "eventDestination" }),
+    moveContext,
+  );
+  assert.ok(game.state.battlefields[1]!.units.includes("source"));
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.values.originBattlefieldId, "bf");
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.values.destinationBattlefieldId, "bf-two");
+
+  game.state.battlefields[0]!.units.push("source");
+  game.state.battlefields[1]!.units = game.state.battlefields[1]!.units.filter(
+    (id) => id !== "source",
+  );
+
+  const swapContext = createBehaviorContext(game, "p1", "source", null, []);
+  swapContext.selectedBySelector.swap = ["ally"];
+  handlers.get("action.swap_unit_locations")!.execute!(
+    binding("action.swap_unit_locations", { selectionKey: "swap" }),
+    swapContext,
+  );
+  assert.ok(game.state.battlefields[0]!.units.includes("ally"));
+  assert.ok(game.state.battlefields[1]!.units.includes("source"));
+  assert.deepEqual(
+    game.state.queuedBehaviorEvents?.slice(-2).map((event) => [
+      event.values.originBattlefieldId,
+      event.values.destinationBattlefieldId,
+    ]),
+    [["bf", "bf-two"], ["bf-two", "bf"]],
+  );
+});
+
+test("spell control transfers choice ownership and replaces locked targets", () => {
+  const game = fixture();
+  const index = cardIndex();
+  index.definitions.get("SPELL")!.behaviorModel.clauses = [{
+    id: "resolve",
+    sequence: 0,
+    sourceText: "Choose a Unit.",
+    normalizedText: "Choose a Unit.",
+    abilities: [], triggers: [], conditions: [], choices: [], costs: [], timings: [], effects: [], keywords: [],
+    selectors: [binding("selector.unit", {
+      area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1, selectionKey: "target",
+    })],
+  }];
+  game.state.players.p1!.zones.trash = [];
+  game.state.chain = {
+    items: [{
+      id: "pending-spell",
+      kind: "spell",
+      label: "Synthetic Spell",
+      controllerPlayerId: "p2",
+      sourceCardInstanceId: "spell",
+      targetCardInstanceIds: [],
+      targetObjectVersions: {},
+      lockedSelectionsByBinding: {},
+      behaviorClauseId: "resolve",
+      activatedBehaviorId: null,
+      behaviorEvent: null,
+    }],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p1",
+    passedPlayerIds: [],
+    resumeFocusPlayerId: null,
+  };
+  const handlers = createPrimitiveHandlers(index);
+  const context = createBehaviorContext(game, "p1", "source", null, []);
+  context.selectedBySelector.spell = ["pending-spell"];
+  handlers.get("action.gain_spell_control")!.execute!(
+    binding("action.gain_spell_control", { selectionKey: "spell" }),
+    context,
+  );
+  assert.equal(game.state.chain.items[0]!.controllerPlayerId, "p1");
+
+  const choices = binding("action.make_new_spell_choices", {
+    spellSelectionKey: "spell", selectionKey: "newChoices",
+  });
+  assert.deepEqual(handlers.get("action.make_new_spell_choices")!.choice!(choices, context)?.legalIds, ["unit"]);
+  context.selectedBySelector.newChoices = ["unit"];
+  handlers.get("action.make_new_spell_choices")!.execute!(choices, context);
+  assert.deepEqual(game.state.chain.items[0]!.targetCardInstanceIds, ["unit"]);
+  assert.equal(game.state.queuedBehaviorEvents?.at(-1)?.type, "card.chosen");
+});
+
 function binding(
   behaviorId: string,
   parameters: Record<string, string | number | boolean>,

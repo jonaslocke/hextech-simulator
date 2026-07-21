@@ -94,6 +94,7 @@ export const triggerSubjectKinds = [
   "friendly_unit",
   "another_friendly_unit",
   "enemy_unit",
+  "friendly_unit_at_source_battlefield",
 ] as const;
 
 export const delayedTimingKinds = [
@@ -166,6 +167,7 @@ export const unitLocationRelations = [
   "sharedLocation",
   "currentCombat",
   "eventBattlefield"
+  ,"differentFromReferenceLocation"
 ] as const;
 
 export const targetReferenceKinds = [
@@ -631,7 +633,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         "string",
         "What relationship the chosen object has to this source.",
         triggerSubjectKinds
-      )
+      ),
+      optional("firstPerSourcePerTurn", "boolean", "Whether the source may trigger only once per choosing player each turn.")
     ],
     listensToEvents: ["card.chosen"]
   }),
@@ -684,6 +687,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Select friendly unit",
     description: "Constrains a choice or effect to units controlled by the acting player.",
     parameters: [
+      optional("scope", "string", "Whether the affected friendly unit scope is any or each.", unitScopeKinds),
       optional("minimumCount", "number", "The minimum number of friendly units in the selection."),
       optional("maximumCount", "number", "The maximum number of friendly units in the selection."),
       required("area", "area", "The board area containing legal friendly unit targets."),
@@ -765,7 +769,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("deferred", "boolean", "Whether selection is made during effect resolution rather than while playing the card."),
       optional("revealZone", "boolean", "Whether the selected owner zone is publicly revealed when this selection is made."),
-      optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount.")
+      optional("requireMaximumAvailable", "boolean", "Requires selecting as many cards as possible, up to maximumCount."),
+      optional("chosenChampionOnly", "boolean", "Whether only the owner's original Chosen Champion is legal."),
+      optional("requiresEmptyChampionZone", "boolean", "Whether the owner's Champion Zone must be empty.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
   }),
@@ -839,8 +845,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Move unit",
     description: "Moves a unit between board zones or battlefields.",
     parameters: [
-      required("destination", "zone", "The destination zone or battlefield."),
-      optional("count", "number", "The number of units moved.")
+      required("destination", "string", "The destination zone or battlefield relation.", ["base", "sourceBattlefield", "eventDestination", "selectedUnitBattlefield"]),
+      optional("target", "target", "The moved Unit reference."),
+      optional("selectionKey", "string", "Selector key containing Units to move."),
+      optional("destinationSelectionKey", "string", "Selector key containing a Unit at the destination battlefield."),
+      optional("count", "number", "The number of units moved."),
+      optional("requiresChoiceKey", "string", "Choice key enabling the move."),
+      optional("requiresChoiceValue", "string", "Choice value enabling the move.")
     ],
     emitsEvents: ["unit.moved"],
     engineSupport: partiallySupported("Movement is recurring in the corpus; destination and timing variants require additional validation.")
@@ -968,7 +979,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Kills a unit and moves it through the appropriate game zones.",
     parameters: [
       required("target", "target", "The unit to kill."),
-      optional("selectionKey", "string", "Selector key supplying the units to kill.")
+      optional("selectionKey", "string", "Selector key supplying the units to kill."),
+      optional("recordMightKey", "string", "Effect-outcome key that receives the killed Unit's current Might.")
     ],
     emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -1354,6 +1366,68 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: supported("Typed controller, opponent, and source state conditions are evaluated by the shared condition runtime."),
   }),
+  "action.select_looked_unit": primitiveSeed({
+    id: "action.select_looked_unit",
+    family: "action",
+    name: "Select compared looked-at Unit",
+    description: "Optionally chooses a Unit from a preserved looked-at group whose Might is within a recorded limit.",
+    parameters: [
+      required("sourceSelectionKey", "string", "Key containing the looked-at cards."),
+      required("comparisonOutcomeKey", "string", "Effect-outcome key containing the reference Might."),
+      optional("maximumOffset", "number", "Amount added to the recorded Might."),
+      required("selectionKey", "string", "Key storing the selected Unit."),
+      optional("banishSelected", "boolean", "Whether the chosen Unit is banished as part of the selection effect."),
+    ],
+    engineSupport: supported("Selection legality is derived from the preserved looked-at group and the recorded resolution outcome."),
+  }),
+  "action.return_to_champion_zone": primitiveSeed({
+    id: "action.return_to_champion_zone",
+    family: "action",
+    name: "Return Chosen Champion to Champion Zone",
+    description: "Returns the owner's original Chosen Champion from Trash if that Champion Zone is empty.",
+    parameters: [required("selectionKey", "string", "Selector key supplying the Chosen Champion.")],
+    engineSupport: supported("The runtime validates the instance's original Champion source and the empty destination before moving it."),
+  }),
+  "selector.spell": primitiveSeed({
+    id: "selector.spell",
+    family: "selector",
+    name: "Select Chain spell",
+    description: "Selects a pending Spell item on the Chain.",
+    parameters: [
+      required("minimumCount", "number", "The minimum Spell count."),
+      required("maximumCount", "number", "The maximum Spell count."),
+      optional("selectionKey", "string", "Stable key used by control effects."),
+    ],
+    engineSupport: supported("The selector exposes only server-authoritative Chain item identifiers and does not treat them as board cards."),
+  }),
+  "action.swap_unit_locations": primitiveSeed({
+    id: "action.swap_unit_locations",
+    family: "action",
+    name: "Swap Unit locations",
+    description: "Moves the source and selected Unit to each other's board locations atomically.",
+    parameters: [required("selectionKey", "string", "Selector key containing the other Unit.")],
+    emitsEvents: ["unit.moved"],
+    engineSupport: supported("Both origins are captured before either Unit is placed and both typed move events are emitted after the atomic swap."),
+  }),
+  "action.gain_spell_control": primitiveSeed({
+    id: "action.gain_spell_control",
+    family: "action",
+    name: "Gain control of Spell",
+    description: "Transfers control of a selected pending Spell to the resolving effect controller.",
+    parameters: [required("selectionKey", "string", "Selector key containing the Chain Spell.")],
+    engineSupport: supported("The Chain item controller changes without changing card ownership or its source zone."),
+  }),
+  "action.make_new_spell_choices": primitiveSeed({
+    id: "action.make_new_spell_choices",
+    family: "action",
+    name: "Make new Spell choices",
+    description: "Optionally replaces a controlled pending Spell's locked target choices using its normal selector legality.",
+    parameters: [
+      required("spellSelectionKey", "string", "Selector key containing the controlled Spell."),
+      required("selectionKey", "string", "Key storing the replacement choices."),
+    ],
+    engineSupport: supported("New choices are owned by the new controller, revalidated against the Spell's compiled selectors, and atomically replace target locks."),
+  }),
   "action.play_selected_card": primitiveSeed({
     id: "action.play_selected_card",
     family: "action",
@@ -1418,6 +1492,15 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("prompt", "string", "Prompt shown to the player."),
     ],
     engineSupport: supported("The card must be ready both when the choice is offered and when it is submitted."),
+  }),
+  "action.ready_by_spending_buffs": primitiveSeed({
+    id: "action.ready_by_spending_buffs",
+    family: "action",
+    name: "Ready Units by spending their Buffs",
+    description: "Lets the controller independently choose any eligible friendly Units, spending each selected Unit's Buff to ready only that Unit.",
+    parameters: [required("selectionKey", "string", "Key storing the independently selected Units.")],
+    emitsEvents: ["card.readied"],
+    engineSupport: supported("A single multi-selection represents independent yes/no decisions and atomically validates every selected Unit's own Buff."),
   }),
   "modifier.copy_numeric_value": primitiveSeed({
     id: "modifier.copy_numeric_value",

@@ -1,3 +1,9 @@
+import {
+  allocateSelections,
+  compileBehaviorModel,
+  createBehaviorContext,
+  targetRequirementsForClause,
+} from "./behavior-runtime";
 import type {
   BehaviorExecutionContext,
   BehaviorHandler,
@@ -170,7 +176,22 @@ export function createPrimitiveHandlers(
       context.event?.type === "battlefield.conquered" &&
       context.event.actorPlayerId === context.controllerPlayerId,
   });
-  handlers.set("trigger.hold_battlefield", { matches: (_binding, context) => context.event?.type === "battlefield.held" && context.event.subjectCardInstanceId === context.sourceCardInstanceId });
+  handlers.set("trigger.hold_battlefield", {
+    matches: (_binding, context) => {
+      if (context.event?.type !== "battlefield.held") return false;
+      if (context.event.subjectCardInstanceId === context.sourceCardInstanceId) {
+        return true;
+      }
+      const heldBattlefield = context.game.state.battlefields.find(
+        (battlefield) =>
+          battlefield.cardInstanceId === context.event?.subjectCardInstanceId,
+      );
+      return Boolean(
+        heldBattlefield?.units.includes(context.sourceCardInstanceId) &&
+        context.event.actorPlayerId === context.controllerPlayerId,
+      );
+    },
+  });
   handlers.set("trigger.on_move", {
     matches: (binding, context) => {
       if (
@@ -308,7 +329,9 @@ export function createPrimitiveHandlers(
           ?.card.classification.type === "Unit";
       if (subject === "any_unit") return isUnit;
       if (subject === "friendly_unit") {
-        return isUnit && ownerPlayerId === context.controllerPlayerId;
+        return isUnit && ownerPlayerId === context.controllerPlayerId &&
+          (binding.parameters.excludesSource !== true ||
+            subjectCardInstanceId !== context.sourceCardInstanceId);
       }
       if (subject === "enemy_unit") {
         return isUnit && ownerPlayerId !== context.controllerPlayerId;
@@ -317,6 +340,47 @@ export function createPrimitiveHandlers(
         return ownerPlayerId === context.controllerPlayerId;
       }
       return subject === "enemy_card" && ownerPlayerId !== context.controllerPlayerId;
+    },
+  });
+  handlers.set("trigger.on_choose", {
+    matches(binding, context) {
+      const event = context.event;
+      const subjectId = event?.subjectCardInstanceId;
+      const actorPlayerId = event?.actorPlayerId;
+      if (!event || event.type !== "card.chosen" || !subjectId || !actorPlayerId) {
+        return false;
+      }
+      if (
+        binding.parameters.actor === "controller" &&
+        actorPlayerId !== context.controllerPlayerId
+      ) return false;
+      if (
+        binding.parameters.actor === "opponent" &&
+        actorPlayerId === context.controllerPlayerId
+      ) return false;
+      const isFriendlyUnit =
+        definitionForInstance(subjectId, index).card.classification.type === "Unit" &&
+        index.instances.get(subjectId)?.ownerPlayerId === actorPlayerId;
+      if (!isFriendlyUnit) return false;
+      if (binding.parameters.subject === "friendly_unit_at_source_battlefield") {
+        const sourceBattlefieldId = battlefieldForCard(
+          context.game,
+          context.sourceCardInstanceId,
+        )?.battlefieldId;
+        if (
+          !sourceBattlefieldId ||
+          event.values.targetBattlefieldId !== sourceBattlefieldId
+        ) return false;
+      }
+      if (binding.parameters.firstPerSourcePerTurn === true) {
+        const state = context.game.state.players[actorPlayerId];
+        if (!state) return false;
+        const key = `${context.sourceCardInstanceId}:${context.game.state.cardStates[context.sourceCardInstanceId]?.objectVersion ?? 0}:card.chosen`;
+        const memory = (state.triggerMemoryKeysThisTurn ??= []);
+        if (memory.includes(key)) return false;
+        memory.push(key);
+      }
+      return true;
     },
   });
   handlers.set("condition.compare_numeric_value", {
@@ -563,6 +627,14 @@ export function createPrimitiveHandlers(
           0,
           index,
         ) !== null,
+      ).filter(
+        (id) =>
+          binding.parameters.chosenChampionOnly !== true ||
+          index.instances.get(id)?.source === "champion",
+      ).filter(
+        () =>
+          binding.parameters.requiresEmptyChampionZone !== true ||
+          player.zones.champion === null,
       );
       const maximum = numberParam(binding, "maximumCount");
       const minimum = binding.parameters.requireMaximumAvailable === true
@@ -930,6 +1002,47 @@ export function createPrimitiveHandlers(
       );
     },
   });
+  handlers.set("action.select_looked_unit", {
+    choice(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const reference = context.effectOutcomes[
+        stringParam(binding, "comparisonOutcomeKey")
+      ];
+      if (typeof reference !== "number") return null;
+      const maximum = reference + optionalNumberParam(binding, "maximumOffset", 0);
+      const legalIds = lookedCardsFor(binding, context).filter(
+        (id) =>
+          player.zones.mainDeck.includes(id) &&
+          definitionForInstance(id, index).card.classification.type === "Unit" &&
+          (definitionForInstance(id, index).card.attributes.might ?? 0) <= maximum,
+      );
+      return legalIds.length > 0
+        ? {
+            legalIds,
+            minimum: 0,
+            maximum: 1,
+            prompt: `You may choose a looked-at Unit with Might ${maximum} or less.`,
+            sourceZone: "mainDeck" as const,
+            presentation: "vision" as const,
+            visionAction: "keep" as const,
+          }
+        : null;
+    },
+    execute(binding, context) {
+      const selected = selectionFor(binding, context)[0];
+      if (!selected || binding.parameters.banishSelected !== true) return;
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      if (!player.zones.mainDeck.includes(selected)) return;
+      player.zones.mainDeck = player.zones.mainDeck.filter((id) => id !== selected);
+      player.zones.banishment.push(selected);
+      (context.game.state.queuedBehaviorEvents ??= []).push({
+        type: "card.banished",
+        actorPlayerId: context.controllerPlayerId,
+        subjectCardInstanceId: selected,
+        values: {},
+      });
+    },
+  });
   handlers.set("action.order_top_cards", {
     choice(binding, context) {
       const cards = remainingLookedCards(binding, context);
@@ -1205,8 +1318,9 @@ export function createPrimitiveHandlers(
             subjectCardInstanceId: id,
             values: {
               method:
-                definitionForInstance(context.sourceCardInstanceId, index)
-                  .card.classification.type === "Spell"
+                index.definitions.get(
+                  index.instances.get(context.sourceCardInstanceId)?.cardCode ?? "",
+                )?.card.classification.type === "Spell"
                   ? "spell"
                   : "ability",
               wasStunned: wasStunned.get(id) ?? false,
@@ -1269,8 +1383,30 @@ export function createPrimitiveHandlers(
         : selectionFor(binding, context).length > 0
           ? selectionFor(binding, context)
           : context.selectedIds;
+      const recordMightKey = binding.parameters.recordMightKey;
+      if (typeof recordMightKey === "string" && ids[0]) {
+        context.effectOutcomes[recordMightKey] =
+          context.game.state.cardStates[ids[0]]?.computedMight ??
+          definitionForInstance(ids[0], index).card.attributes.might ??
+          0;
+      }
       ids.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
+  });
+  handlers.set("action.return_to_champion_zone", {
+    execute(binding, context) {
+      const id = selectionFor(binding, context)[0];
+      if (!id) return;
+      const instance = index.instances.get(id);
+      const owner = instance?.ownerPlayerId;
+      if (!owner || instance.source !== "champion") return;
+      const zones = context.game.state.players[owner]!.zones;
+      if (zones.champion !== null || !zones.trash.includes(id)) return;
+      removeFromAllLocations(context.game, id);
+      zones.champion = id;
+      resetStateAfterLeavingBoard(context.game, id, index);
+      recomputeAllMight(context.game, index);
+    },
   });
   handlers.set("action.kill_on_next_damage", {
     execute(binding, context) {
@@ -1386,6 +1522,23 @@ export function createPrimitiveHandlers(
         context.game.winnerPlayerId = playerId;
         context.game.status = "complete";
       }
+    },
+  });
+  handlers.set("selector.spell", {
+    targets(binding, context) {
+      const legalIds = (context.game.state.chain?.items ?? [])
+        .filter((item) => item.kind === "spell")
+        .map((item) => item.id);
+      return {
+        kind: "card" as const,
+        label: "spell on the Chain",
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
+        legalIds,
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
     },
   });
   handlers.set("action.play_selected_card", {
@@ -1617,6 +1770,45 @@ export function createPrimitiveHandlers(
       context.game.state.cardStates[targetId]!.exhausted = true;
     },
   });
+  handlers.set("action.ready_by_spending_buffs", {
+    choice(_binding, context) {
+      const legalIds = friendlyUnitIds(
+        context.game,
+        context.controllerPlayerId,
+        index,
+      ).filter((id) =>
+        context.game.state.cardStates[id]?.buffed === true &&
+        context.game.state.cardStates[id]?.exhausted === true,
+      );
+      return legalIds.length > 0 ? {
+        kind: "card",
+        legalIds,
+        minimum: 0,
+        maximum: legalIds.length,
+        prompt: "Choose any exhausted friendly Units whose Buffs you want to spend to ready them.",
+      } : null;
+    },
+    execute(binding, context) {
+      const readied = selectionFor(binding, context).filter((id) =>
+        context.game.state.cardStates[id]?.buffed === true &&
+        context.game.state.cardStates[id]?.exhausted === true,
+      );
+      for (const id of readied) {
+        const state = context.game.state.cardStates[id]!;
+        state.buffed = false;
+        state.exhausted = false;
+        recomputeMight(context.game, id, index);
+      }
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...readied.map((id) => ({
+          type: "card.readied",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        })),
+      );
+    },
+  });
   handlers.set("action.win_game", {
     execute(_binding, context) {
       context.game.winnerPlayerId = context.controllerPlayerId;
@@ -1705,34 +1897,142 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.move_unit", {
     execute(binding, context) {
-      if (binding.parameters.destination !== "base") {
-        throw new Error("Unsupported unit movement destination.");
+      const ids = binding.parameters.target === "source"
+        ? [context.sourceCardInstanceId]
+        : selectionFor(binding, context).length > 0
+          ? selectionFor(binding, context)
+          : context.selectedIds;
+      for (const id of ids) {
+        const destination = movementDestination(binding, context, id);
+        if (!destination) continue;
+        moveUnitToDestination(
+          context.game,
+          id,
+          destination,
+          context.controllerPlayerId,
+          index,
+        );
       }
-      for (const id of context.selectedIds) {
-        const owner = index.instances.get(id)?.ownerPlayerId;
-        if (!owner) continue;
-        const originBattlefieldId = context.game.state.battlefields.find(
-          (battlefield) => battlefield.units.includes(id),
-        )?.battlefieldId ?? null;
-        for (const player of Object.values(context.game.state.players)) {
-          player.zones.base = player.zones.base.filter(
-            (candidate) => candidate !== id,
-          );
-        }
-        for (const battlefield of context.game.state.battlefields) {
-          battlefield.units = battlefield.units.filter(
-            (candidate) => candidate !== id,
-          );
-        }
-        context.game.state.players[owner]!.zones.base.push(id);
-        const events = (context.game.state.queuedBehaviorEvents ??= []);
-        events.push({
-          type: "unit.moved",
+    },
+  });
+  handlers.set("action.swap_unit_locations", {
+    execute(binding, context) {
+      const otherId = selectionFor(binding, context)[0];
+      const sourceId = context.sourceCardInstanceId;
+      if (!otherId || sourceId === otherId) return;
+      const sourceLocation = boardLocationForUnit(context.game, sourceId);
+      const otherLocation = boardLocationForUnit(context.game, otherId);
+      if (!sourceLocation || !otherLocation ||
+        (sourceLocation.kind === otherLocation.kind && sourceLocation.id === otherLocation.id)) return;
+      removeUnitFromBoardLocation(context.game, sourceId);
+      removeUnitFromBoardLocation(context.game, otherId);
+      placeMovedUnit(context.game, sourceId, otherLocation, index);
+      placeMovedUnit(context.game, otherId, sourceLocation, index);
+      const events = (context.game.state.queuedBehaviorEvents ??= []);
+      events.push(
+        movementEvent(context.controllerPlayerId, sourceId, sourceLocation, otherLocation),
+        movementEvent(context.controllerPlayerId, otherId, otherLocation, sourceLocation),
+      );
+    },
+  });
+  handlers.set("action.gain_spell_control", {
+    execute(binding, context) {
+      const itemId = selectionFor(binding, context)[0];
+      const item = context.game.state.chain?.items.find(
+        (candidate) => candidate.id === itemId && candidate.kind === "spell",
+      );
+      if (item) item.controllerPlayerId = context.controllerPlayerId;
+    },
+  });
+  handlers.set("action.make_new_spell_choices", {
+    choice(binding, context) {
+      const itemId = context.selectedBySelector[
+        stringParam(binding, "spellSelectionKey")
+      ]?.[0];
+      const item = context.game.state.chain?.items.find(
+        (candidate) => candidate.id === itemId && candidate.kind === "spell",
+      );
+      if (!item?.sourceCardInstanceId || !item.behaviorClauseId) return null;
+      const definition = definitionForInstance(item.sourceCardInstanceId, index);
+      const clause = compileBehaviorModel(definition.behaviorModel, handlers)
+        .clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+      if (!clause) return null;
+      const requirements = targetRequirementsForClause(
+        clause,
+        createBehaviorContext(
+          context.game,
+          context.controllerPlayerId,
+          item.sourceCardInstanceId,
+          item.behaviorEvent,
+          [],
+        ),
+        handlers,
+      );
+      const legalIds = [...new Set(requirements.flatMap((item) => item.legalIds))];
+      if (legalIds.length === 0) return null;
+      return {
+        kind: "card",
+        legalIds,
+        minimum: 0,
+        maximum: requirements.reduce((sum, item) => sum + item.maximum, 0),
+        prompt: "Choose new targets for the controlled spell, or keep its current choices.",
+      };
+    },
+    execute(binding, context) {
+      const selected = selectionFor(binding, context);
+      if (selected.length === 0) return;
+      const itemId = context.selectedBySelector[
+        stringParam(binding, "spellSelectionKey")
+      ]?.[0];
+      const item = context.game.state.chain?.items.find(
+        (candidate) => candidate.id === itemId && candidate.kind === "spell",
+      );
+      if (!item?.sourceCardInstanceId || !item.behaviorClauseId) return;
+      const definition = definitionForInstance(item.sourceCardInstanceId, index);
+      const clause = compileBehaviorModel(definition.behaviorModel, handlers)
+        .clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+      if (!clause) return;
+      const choiceContext = createBehaviorContext(
+        context.game,
+        context.controllerPlayerId,
+        item.sourceCardInstanceId,
+        item.behaviorEvent,
+        [],
+      );
+      const requirements = clause.selectors.map((selector) =>
+        handlers.get(selector.behaviorId)!.targets!(selector, choiceContext),
+      );
+      const allocations = allocateSelections(requirements, selected);
+      if (allocations.some((ids, position) =>
+        ids.length < requirements[position]!.minimum ||
+        ids.some((id) => !requirements[position]!.legalIds.includes(id)))) {
+        throw new Error("New spell choices are not legal.");
+      }
+      item.controllerPlayerId = context.controllerPlayerId;
+      item.targetCardInstanceIds = [...selected];
+      item.targetObjectVersions = Object.fromEntries(
+        selected.map((id) => [id, context.game.state.cardStates[id]?.objectVersion ?? 0]),
+      );
+      item.lockedSelectionsByBinding = Object.fromEntries(
+        clause.selectors.map((selector, position) => [
+          `${clause.id}:selectors:${selector.order}`,
+          allocations[position] ?? [],
+        ]),
+      );
+      (context.game.state.queuedBehaviorEvents ??= []).push(
+        ...selected.map((id) => ({
+          type: "card.chosen",
           actorPlayerId: context.controllerPlayerId,
           subjectCardInstanceId: id,
-          values: { destination: "base", originBattlefieldId },
-        });
-      }
+          values: {
+            method: "spell",
+            targetBattlefieldId:
+              context.game.state.battlefields.find((battlefield) =>
+                battlefield.units.includes(id),
+              )?.battlefieldId ?? "base",
+          },
+        })),
+      );
     },
   });
   handlers.set("modifier.enter_ready", {
@@ -3290,12 +3590,21 @@ function unitLocationRelationMatches(
   if (
     relation !== "sourceLocation" &&
     relation !== "selectedTargetLocation" &&
-    relation !== "sharedLocation"
+    relation !== "sharedLocation" &&
+    relation !== "differentFromReferenceLocation"
   ) {
     return true;
   }
   const sourceLocation = boardLocationForUnit(game, sourceId);
   const targetLocation = boardLocationForUnit(game, targetId);
+  if (relation === "differentFromReferenceLocation") {
+    return (
+      sourceLocation !== null &&
+      targetLocation !== null &&
+      (sourceLocation.kind !== targetLocation.kind ||
+        sourceLocation.id !== targetLocation.id)
+    );
+  }
   if (relation === "selectedTargetLocation" && sourceLocation === null) {
     return true;
   }
@@ -3329,6 +3638,124 @@ function boardLocationForUnit(game: GameDocument, unitId: string) {
     }
   }
   return null;
+}
+
+type BoardUnitLocation = NonNullable<ReturnType<typeof boardLocationForUnit>>;
+
+function movementDestination(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  unitId: string,
+): BoardUnitLocation | null {
+  const owner = context.game.state.setup.playerIds.find((playerId) =>
+    context.game.state.players[playerId]!.zones.base.includes(unitId) ||
+    context.game.state.battlefields.some((battlefield) =>
+      battlefield.units.includes(unitId),
+    ),
+  );
+  if (binding.parameters.destination === "base") {
+    return owner ? { kind: "base", id: owner } : null;
+  }
+  if (binding.parameters.destination === "sourceBattlefield") {
+    const battlefield = battlefieldForCard(
+      context.game,
+      context.sourceCardInstanceId,
+    );
+    return battlefield
+      ? { kind: "battlefield", id: battlefield.battlefieldId }
+      : null;
+  }
+  if (binding.parameters.destination === "eventDestination") {
+    const battlefieldId = context.event?.values.destinationBattlefieldId;
+    if (typeof battlefieldId === "string") {
+      return { kind: "battlefield", id: battlefieldId };
+    }
+    return context.event?.values.destination === "base" && owner
+      ? { kind: "base", id: owner }
+      : null;
+  }
+  if (binding.parameters.destination === "selectedUnitBattlefield") {
+    const key = binding.parameters.destinationSelectionKey;
+    const referenceId = typeof key === "string"
+      ? context.selectedBySelector[key]?.[0]
+      : undefined;
+    const location = referenceId
+      ? boardLocationForUnit(context.game, referenceId)
+      : null;
+    return location?.kind === "battlefield" ? location : null;
+  }
+  return null;
+}
+
+function moveUnitToDestination(
+  game: GameDocument,
+  unitId: string,
+  destination: BoardUnitLocation,
+  actorPlayerId: string,
+  index: RuntimeCardIndex,
+) {
+  const origin = boardLocationForUnit(game, unitId);
+  if (!origin || (origin.kind === destination.kind && origin.id === destination.id)) return;
+  removeUnitFromBoardLocation(game, unitId);
+  placeMovedUnit(game, unitId, destination, index);
+  (game.state.queuedBehaviorEvents ??= []).push(
+    movementEvent(actorPlayerId, unitId, origin, destination),
+  );
+}
+
+function removeUnitFromBoardLocation(game: GameDocument, unitId: string) {
+  for (const player of Object.values(game.state.players)) {
+    player.zones.base = player.zones.base.filter((id) => id !== unitId);
+  }
+  for (const battlefield of game.state.battlefields) {
+    battlefield.units = battlefield.units.filter((id) => id !== unitId);
+  }
+}
+
+function placeMovedUnit(
+  game: GameDocument,
+  unitId: string,
+  destination: BoardUnitLocation,
+  index: RuntimeCardIndex,
+) {
+  const controllerPlayerId = index.instances.get(unitId)?.ownerPlayerId;
+  if (!controllerPlayerId) return;
+  if (destination.kind === "base") {
+    game.state.players[controllerPlayerId]!.zones.base.push(unitId);
+  } else {
+    placeUnitAtBattlefield(game, {
+      battlefieldId: destination.id,
+      controllerPlayerId,
+      unitId,
+      index,
+    });
+    const battlefield = game.state.battlefields.find(
+      (candidate) => candidate.battlefieldId === destination.id,
+    );
+    if (battlefield?.controllerPlayerId !== controllerPlayerId) {
+      markBattlefieldContested(game, destination.id, controllerPlayerId);
+    }
+  }
+  recomputeMight(game, unitId, index);
+}
+
+function movementEvent(
+  actorPlayerId: string,
+  unitId: string,
+  origin: BoardUnitLocation,
+  destination: BoardUnitLocation,
+) {
+  return {
+    type: "unit.moved",
+    actorPlayerId,
+    subjectCardInstanceId: unitId,
+    values: {
+      destination: destination.kind,
+      originBattlefieldId: origin.kind === "battlefield" ? origin.id : null,
+      destinationBattlefieldId:
+        destination.kind === "battlefield" ? destination.id : null,
+    },
+  };
 }
 
 function numberParam(binding: BehaviorBinding, key: string) {

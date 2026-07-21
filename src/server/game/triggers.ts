@@ -205,6 +205,22 @@ export function submitChainTargetSelection(
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
   );
+  if (item.kind === "spell") {
+    (game.state.queuedBehaviorEvents ??= []).push(
+      ...selectedIds.map((id) => ({
+        type: "card.chosen",
+        actorPlayerId: playerId,
+        subjectCardInstanceId: id,
+        values: {
+          method: "spell",
+          targetBattlefieldId:
+            game.state.battlefields.find((battlefield) =>
+              battlefield.units.includes(id),
+            )?.battlefieldId ?? "base",
+        },
+      })),
+    );
+  }
   const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
   if (!queuedForOrdering) appendChainItem(game, item);

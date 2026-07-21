@@ -1045,6 +1045,12 @@ function playCard(
         : null,
     };
   }
+  queueSpellChosenEvents(
+    game,
+    playerId,
+    definition,
+    item.lockedSelectionsByBinding,
+  );
 }
 
 function spellResolutionClauseId(
@@ -1386,6 +1392,7 @@ function completeEndTurn(
     player.playedMainDeckCardIdsThisTurn = [];
     player.legionSatisfiedCardIdsThisTurn = [];
     player.chosenModesThisTurn = {};
+    player.triggerMemoryKeysThisTurn = [];
   }
   game.state.turn = {
     turnNumber: turn.turnNumber + 1,
@@ -2575,6 +2582,7 @@ function activatedAbilityCostStatus(
   index: RuntimeCardIndex,
 ): { enabled: boolean; reason: string | null } {
   let energyCost = 0;
+  let domainPowerCost = 0;
   for (const cost of clause.costs) {
     if (cost.behaviorId === "cost.exhaust_source") {
       if (game.state.cardStates[sourceId]?.exhausted) {
@@ -2606,7 +2614,8 @@ function activatedAbilityCostStatus(
     }
     const amount = cost.parameters.amount;
     if (
-      cost.parameters.resource !== "energy" ||
+      (cost.parameters.resource !== "energy" &&
+        cost.parameters.resource !== "power") ||
       typeof amount !== "number" ||
       !Number.isInteger(amount) ||
       amount < 0
@@ -2616,7 +2625,8 @@ function activatedAbilityCostStatus(
         reason: "This ability's cost is not implemented.",
       };
     }
-    energyCost += amount;
+    if (cost.parameters.resource === "energy") energyCost += amount;
+    else domainPowerCost += amount;
   }
   const paymentDefinition = activatedAbilityPaymentDefinition(
     definitionForInstance(sourceId, index),
@@ -2628,6 +2638,8 @@ function activatedAbilityCostStatus(
       paymentDefinition,
       energyCost,
       index,
+      0,
+      domainPowerCost,
     ) === null
   ) {
     return { enabled: false, reason: "Ability costs cannot be paid." };
@@ -2654,7 +2666,16 @@ function payActivatedAbilityCosts(
 
   const energyCost = clause.costs.reduce(
     (total, cost) =>
-      cost.behaviorId === "cost.pay" ? total + (cost.parameters.amount as number) : total,
+      cost.behaviorId === "cost.pay" && cost.parameters.resource === "energy"
+        ? total + (cost.parameters.amount as number)
+        : total,
+    0,
+  );
+  const domainPowerCost = clause.costs.reduce(
+    (total, cost) =>
+      cost.behaviorId === "cost.pay" && cost.parameters.resource === "power"
+        ? total + (cost.parameters.amount as number)
+        : total,
     0,
   );
   payCardCost(
@@ -2663,6 +2684,8 @@ function payActivatedAbilityCosts(
     activatedAbilityPaymentDefinition(definitionForInstance(sourceId, index)),
     energyCost,
     index,
+    0,
+    domainPowerCost,
   );
   for (const cost of clause.costs) {
     if (cost.behaviorId === "cost.exhaust_source") {
@@ -2942,6 +2965,37 @@ function lockedPlaySelectionsByBinding(
     }
   }
   return selectionsByBinding;
+}
+
+function queueSpellChosenEvents(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  lockedSelectionsByBinding: Record<string, string[]>,
+) {
+  const chosenIds = definition.behaviorModel.clauses.flatMap((clause) =>
+    clause.selectors.flatMap((selector) =>
+      selector.parameters.selectionPurpose === "optionalCost"
+        ? []
+        : lockedSelectionsByBinding[
+            `${clause.id}:selectors:${selector.order}`
+          ] ?? [],
+    ),
+  );
+  (game.state.queuedBehaviorEvents ??= []).push(
+    ...chosenIds.map((id) => ({
+      type: "card.chosen",
+      actorPlayerId: playerId,
+      subjectCardInstanceId: id,
+      values: {
+        method: "spell",
+        targetBattlefieldId:
+          game.state.battlefields.find((battlefield) =>
+            battlefield.units.includes(id),
+          )?.battlefieldId ?? "base",
+      },
+    })),
+  );
 }
 
 function playSelectionRequirements(

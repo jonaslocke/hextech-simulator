@@ -54,6 +54,7 @@ export function beginEffectResolution(input: {
         key.includes(":choices:"),
       ),
     ),
+    effectOutcomes: {},
     behaviorEvent: input.behaviorEvent ?? null,
   });
   return resumeEffectResolution(input.game, id, input.decks);
@@ -367,8 +368,8 @@ export function resumeEffectResolution(
         ]),
       ],
       clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
-        ? { automaticTargets: true }
-        : {},
+        ? { ...frame.effectOutcomes, automaticTargets: true }
+        : frame.effectOutcomes,
     );
     applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
@@ -437,6 +438,7 @@ export function resumeEffectResolution(
       return false;
     }
     handler.execute(binding, context);
+    frame.effectOutcomes = { ...context.effectOutcomes };
     finishResolutionFrame(game, frame.id, frame.delayedEffectId);
     return true;
   }
@@ -453,11 +455,16 @@ export function resumeEffectResolution(
     }
     const requirement = handlers.get(binding.behaviorId)?.choice?.(binding, selectorContext);
     if (!requirement || (requirement.kind !== "binary" && requirement.kind !== "mode")) continue;
+    const choicePlayerId = selectorChoicePlayerId(
+      game,
+      frame.controllerPlayerId,
+      binding,
+    );
     game.state.pendingChoice = requirement.kind === "binary"
-      ? { id: `choice:${frame.id}:${binding.order}`, playerId: frame.controllerPlayerId, type: "binary", resolutionId: frame.id, bindingKey, prompt: requirement.prompt, acceptLabel: requirement.acceptLabel ?? "Accept", declineLabel: requirement.declineLabel ?? "Decline" }
+      ? { id: `choice:${frame.id}:${binding.order}`, playerId: choicePlayerId, type: "binary", resolutionId: frame.id, bindingKey, prompt: requirement.prompt, acceptLabel: requirement.acceptLabel ?? "Accept", declineLabel: requirement.declineLabel ?? "Decline" }
       : {
           id: `choice:${frame.id}:${binding.order}`,
-          playerId: frame.controllerPlayerId,
+          playerId: choicePlayerId,
           type: "mode",
           resolutionId: frame.id,
           prompt: requirement.prompt,
@@ -494,8 +501,8 @@ export function resumeEffectResolution(
         ...(frame.selectionsByBinding[bindingKey] ?? []),
       ],
       clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
-        ? { automaticTargets: true }
-        : {},
+        ? { ...frame.effectOutcomes, automaticTargets: true }
+        : frame.effectOutcomes,
     );
     applyChoiceSelections(clause, frame.selectionsByBinding, context);
     for (const selector of clause.selectors) {
@@ -592,6 +599,7 @@ export function resumeEffectResolution(
       ]!.zones.mainDeck.slice(0, Math.max(0, count));
     }
     handler.execute(binding, context);
+    frame.effectOutcomes = { ...context.effectOutcomes };
     frame.nextEffectIndex += 1;
   }
 
@@ -724,7 +732,10 @@ function selectorChoicePlayerId(
   controllerPlayerId: string,
   binding: import("./schemas").BehaviorBinding,
 ) {
-  if (binding.parameters.selectionPlayer !== "opponent") {
+  if (
+    binding.parameters.selectionPlayer !== "opponent" &&
+    binding.parameters.player !== "opponent"
+  ) {
     return controllerPlayerId;
   }
   return game.state.setup.playerIds.find((id) => id !== controllerPlayerId) ??

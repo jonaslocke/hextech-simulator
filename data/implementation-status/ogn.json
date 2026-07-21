@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T01:44:30.097Z",
+  "updatedAt": "2026-07-21T02:05:32.919Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -2259,11 +2259,21 @@
           "name": "Blitzcrank, Impassive"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-067",
+        "approvedAt": "2026-07-21T02:02:35.244Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.244Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-067 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.244Z"
     },
     {
       "gameplayIdentity": "OGN-068:Caitlyn Patrolling",
@@ -2361,11 +2371,21 @@
           "name": "Party Favors"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-071",
+        "approvedAt": "2026-07-21T02:02:35.399Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.399Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-071 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.399Z"
     },
     {
       "gameplayIdentity": "OGN-072:Solari Shrine",
@@ -2650,11 +2670,21 @@
           "name": "Mystic Reversal"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-080",
+        "approvedAt": "2026-07-21T02:02:35.534Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.534Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-080 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.534Z"
     },
     {
       "gameplayIdentity": "OGN-081:Seal of Focus",
@@ -5917,11 +5947,21 @@
           "name": "Stealthy Pursuer"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-177",
+        "approvedAt": "2026-07-21T02:02:35.668Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.668Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-177 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.668Z"
     },
     {
       "gameplayIdentity": "OGN-178:Undercover Agent",
@@ -6181,11 +6221,21 @@
           "name": "Whirlwind"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-187",
+        "approvedAt": "2026-07-21T02:02:35.803Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.803Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-187 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.803Z"
     },
     {
       "gameplayIdentity": "OGN-188:Zaunite Bouncer",
@@ -6581,11 +6631,21 @@
           "name": "Tideturner"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-199",
+        "approvedAt": "2026-07-21T02:02:35.946Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:35.946Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-199 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:35.946Z"
     },
     {
       "gameplayIdentity": "OGN-200:Twisted Fate Gambler",
@@ -8976,11 +9036,21 @@
           "name": "Zenith Blade"
         }
       ],
-      "status": "unreviewed",
-      "canonicalModel": null,
+      "status": "implemented",
+      "canonicalModel": {
+        "cardCode": "OGN-262",
+        "approvedAt": "2026-07-21T02:02:36.087Z"
+      },
       "familyStatuses": [],
-      "history": [],
-      "updatedAt": "2026-07-15T11:11:21.144Z"
+      "history": [
+        {
+          "at": "2026-07-21T02:02:36.087Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-262 approved."
+        }
+      ],
+      "updatedAt": "2026-07-21T02:02:36.087Z"
     },
     {
       "gameplayIdentity": "OGN-263:Swift Scout",
