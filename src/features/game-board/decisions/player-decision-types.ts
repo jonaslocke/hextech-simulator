@@ -60,6 +60,7 @@ export type OptionDecisionRequest = DecisionInspectionCapability & {
   options: PlayerDecisionOption[];
   confirmLabel?: string;
   canCancel?: boolean;
+  allowsBoardInteraction?: boolean;
 };
 
 export type OrderedDecisionRequest = DecisionInspectionCapability & {

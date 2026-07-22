@@ -13,6 +13,7 @@ import {
   cleanupTurnModifiers,
   consumeEnterReadyEffect,
   consumeNextPlayEnergyDiscount,
+  canPayResolutionResource,
   sourceEntersReady,
   submitDeathReplacementChoice,
   createPrimitiveHandlers,
@@ -77,6 +78,7 @@ import {
   submitEffectSelection,
   submitBinaryChoice,
   submitModeChoice,
+  submitResourcePaymentChoice,
   submitTokenPlacement,
   type TokenPlacement,
 } from "./effect-resolution";
@@ -212,6 +214,59 @@ export function gameplayActions(
     }
     if (pendingChoice.type === "binary") {
       actions.push(action(game, "submitChoice", pendingChoice.prompt, null, true, null, undefined, [{ kind: "card", label: pendingChoice.prompt, legalIds: ["accept", "decline"], minimum: 1, maximum: 1 }], { kind: "binary", choiceId: pendingChoice.id, prompt: pendingChoice.prompt, acceptLabel: pendingChoice.acceptLabel, declineLabel: pendingChoice.declineLabel }));
+      return actions;
+    }
+    if (pendingChoice.type === "resourcePayment") {
+      const canAccept =
+        (!pendingChoice.exhaustSource ||
+          game.state.cardStates[pendingChoice.sourceCardInstanceId]
+            ?.exhausted === false) &&
+        canPayResolutionResource(game, actorPlayerId, pendingChoice);
+      const legalIds = [
+        ...(canAccept ? ["accept"] : []),
+        ...(pendingChoice.allowDecline ? ["decline"] : []),
+      ];
+      actions.push(
+        action(
+          game,
+          "submitChoice",
+          pendingChoice.prompt,
+          null,
+          legalIds.length > 0,
+          legalIds.length > 0
+            ? null
+            : "Add the required resources to your Rune Pool.",
+          undefined,
+          [{
+            kind: "card",
+            label: pendingChoice.prompt,
+            legalIds,
+            minimum: 1,
+            maximum: 1,
+          }],
+          {
+            kind: "resourcePayment",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+            acceptLabel: pendingChoice.acceptLabel,
+            declineLabel: pendingChoice.declineLabel,
+            allowDecline: pendingChoice.allowDecline,
+            canAccept,
+            resource: pendingChoice.resource,
+            domain: pendingChoice.domain,
+            amount: pendingChoice.amount,
+          },
+        ),
+      );
+      addAbilityActions(
+        actions,
+        game,
+        actorPlayerId,
+        index,
+        handlers,
+        currentTiming(game),
+        true,
+      );
       return actions;
     }
     if (pendingChoice.type === "mode") {
@@ -638,6 +693,37 @@ export function performGameplayAction(input: {
         if (resolutionId && !game.state.pendingChoice) {
           resumeEffectResolution(game, resolutionId, input.decks);
         }
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (
+        game.state.pendingChoice?.type === "resourcePayment" &&
+        game.state.pendingChoice.deathReplacement
+      ) {
+        const resolutionId = game.state.pendingChoice.resolutionId;
+        submitDeathReplacementChoice(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          index,
+        );
+        if (resolutionId && !game.state.pendingChoice) {
+          resumeEffectResolution(game, resolutionId, input.decks);
+        }
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (game.state.pendingChoice?.type === "resourcePayment") {
+        submitResourcePaymentChoice(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);

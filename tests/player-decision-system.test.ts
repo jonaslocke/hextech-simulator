@@ -164,6 +164,72 @@ test("maps keep-style Vision to a single keep choice", () => {
   );
 });
 
+test("maps resolution payment to a board-interactive decision with disabled Pay", () => {
+  const projection = projectionWith({
+    actions: [{
+      choice: {
+        kind: "resourcePayment",
+        choiceId: "payment-choice",
+        prompt: "Pay for the optional effect?",
+        acceptLabel: "Pay",
+        declineLabel: "Decline",
+        allowDecline: true,
+        canAccept: false,
+        resource: "power",
+        domain: "Body",
+        amount: 1,
+      },
+      disabledReason: null,
+      enabled: true,
+      id: "payment-action",
+      label: "Pay for the optional effect?",
+      presentation: {
+        prompt: null,
+        style: "primary",
+        surface: "choice-dialog",
+      },
+      sourceCardInstanceId: null,
+      targets: [{
+        kind: "card",
+        label: "Pay for the optional effect?",
+        legalIds: ["decline"],
+        minimum: 1,
+        maximum: 1,
+      }],
+    }],
+    pendingChoice: {
+      type: "resourcePayment",
+      id: "payment-choice",
+      playerId: "player-1",
+      prompt: "Pay for the optional effect?",
+      acceptLabel: "Pay",
+      declineLabel: "Decline",
+      allowDecline: true,
+      canAccept: false,
+      resource: "power",
+      domain: "Body",
+      amount: 1,
+    },
+  });
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "optionDecision");
+  if (decision?.kind !== "optionDecision") return;
+  assert.equal(decision.allowsBoardInteraction, true);
+  assert.deepEqual(
+    decision.options.map((option) => ({ id: option.id, disabled: option.disabled ?? false })),
+    [
+      { id: "accept", disabled: true },
+      { id: "decline", disabled: false },
+    ],
+  );
+  assert.match(decision.description ?? "", /Rune Pool/);
+});
+
 test("builds combat damage intents without changing allocation payloads", () => {
   const allocations = [{ amount: 3, targetUnitId: "unit-1" }];
 

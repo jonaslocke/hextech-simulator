@@ -12,7 +12,10 @@ import { facedownCardsAt } from "./facedown-cards";
 import { victoryRequirement } from "./victory";
 import { getTokenCatalogDefinitions } from "./token-catalog";
 import { activeStaticKeywordGrants } from "./keyword-evaluation";
-import { createRuntimeCardIndex } from "./primitive-handlers";
+import {
+  canPayResolutionResource,
+  createRuntimeCardIndex,
+} from "./primitive-handlers";
 import type { GameCardDefinition } from "./schemas";
 import { activeContinuousNumericModifiers } from "./numeric-modifiers";
 
@@ -314,6 +317,29 @@ export function projectGame(input: {
                   prompt: input.game.state.pendingChoice.prompt, acceptLabel: input.game.state.pendingChoice.acceptLabel,
                   declineLabel: input.game.state.pendingChoice.declineLabel,
                 }
+              : input.game.state.pendingChoice?.type === "resourcePayment"
+                ? {
+                    type: "resourcePayment",
+                    id: input.game.state.pendingChoice.id,
+                    playerId: input.game.state.pendingChoice.playerId,
+                    prompt: input.game.state.pendingChoice.prompt,
+                    acceptLabel: input.game.state.pendingChoice.acceptLabel,
+                    declineLabel: input.game.state.pendingChoice.declineLabel,
+                    allowDecline: input.game.state.pendingChoice.allowDecline,
+                    canAccept:
+                      (!input.game.state.pendingChoice.exhaustSource ||
+                        input.game.state.cardStates[
+                          input.game.state.pendingChoice.sourceCardInstanceId
+                        ]?.exhausted === false) &&
+                      canPayResolutionResource(
+                        input.game,
+                        input.game.state.pendingChoice.playerId,
+                        input.game.state.pendingChoice,
+                      ),
+                    resource: input.game.state.pendingChoice.resource,
+                    domain: input.game.state.pendingChoice.domain,
+                    amount: input.game.state.pendingChoice.amount,
+                  }
               : input.game.state.pendingChoice?.type === "mode"
                 ? {
                     type: "mode",

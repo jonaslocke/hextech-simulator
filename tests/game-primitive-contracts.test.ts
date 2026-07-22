@@ -34,7 +34,7 @@ import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import {
   beginEffectResolution,
-  submitBinaryChoice,
+  submitResourcePaymentChoice,
 } from "../src/server/game/effect-resolution";
 
 test("registers a handler for every executable behavior", () => {
@@ -334,7 +334,7 @@ test("numeric copy snapshots the selected source value and only increases", () =
   assert.equal(game.state.modifiers.length, 1);
 });
 
-test("resolution-time resource payment prompts only when payable and gates later effects", () => {
+test("resolution-time resource payment waits for the Rune Pool and gates later effects", () => {
   const source = card("SYN-OPTIONAL-PAYMENT", "Gear");
   source.behaviorModel.clauses = [{
     id: "optional-payment", sequence: 0, sourceText: "You may pay [Body] to draw 1.",
@@ -362,8 +362,8 @@ test("resolution-time resource payment prompts only when payable and gates later
     game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
     clauseId: "optional-payment", decks,
   }), false);
-  assert.equal(game.state.pendingChoice?.type, "binary");
-  submitBinaryChoice(game, "p1", ["accept"], decks);
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
+  submitResourcePaymentChoice(game, "p1", ["accept"], decks);
   assert.equal(game.state.players.p1!.power.Body, 0);
   assert.deepEqual(game.state.players.p1!.zones.hand, ["drawn"]);
 
@@ -376,9 +376,120 @@ test("resolution-time resource payment prompts only when payable and gates later
   assert.equal(beginEffectResolution({
     game: second.game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
     clauseId: "optional-payment", decks: second.decks,
-  }), true);
+  }), false);
+  assert.equal(second.game.state.pendingChoice?.type, "resourcePayment");
+  assert.throws(
+    () => submitResourcePaymentChoice(second.game, "p1", ["accept"], second.decks),
+    /not available from the Rune Pool/,
+  );
+  assert.equal(second.game.state.pendingChoice?.type, "resourcePayment");
+  submitResourcePaymentChoice(second.game, "p1", ["decline"], second.decks);
   assert.equal(second.game.state.pendingChoice, null);
   assert.deepEqual(second.game.state.players.p1!.zones.hand, []);
+});
+
+test("pending resolution payment exposes Add abilities and preserves its continuation", () => {
+  const source = card("SYN-PAYMENT-SOURCE", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "payment-only", sequence: 0, sourceText: "Synthetic payment boundary.",
+    normalizedText: "Synthetic payment boundary.", abilities: [], triggers: [], conditions: [],
+    selectors: [], choices: [], costs: [], timings: [], keywords: [], effects: [
+      binding("action.pay_optional_resource", {
+        resource: "power", domain: "Body", amount: 1, selectionKey: "pay",
+      }),
+    ],
+  }];
+  const rune = resourceCard("SYN-PAYMENT-RUNE", "Rune", "power", "Body");
+  const permanent = resourceCard("SYN-PAYMENT-PERMANENT", "Gear", "energy");
+  const legend = resourceCard("SYN-PAYMENT-LEGEND", "Legend", "power", "Body");
+  const battlefield = card("SYN-PAYMENT-BATTLEFIELD", "Battlefield");
+  const battlefieldUnit = resourceCard(
+    "SYN-PAYMENT-BATTLEFIELD-UNIT",
+    "Unit",
+    "power",
+    "Mind",
+  );
+  const { game, decks } = fixture([
+    source,
+    rune,
+    permanent,
+    legend,
+    battlefield,
+    battlefieldUnit,
+  ], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("rune", "p1", rune.cardCode, "runeDeck"),
+    instance("permanent", "p1", permanent.cardCode, "mainDeck"),
+    instance("legend", "p1", legend.cardCode, "legend"),
+    instance("battlefield", "p1", battlefield.cardCode, "battlefield"),
+    instance("battlefield-unit", "p1", battlefieldUnit.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "rune", "permanent"];
+  game.state.players.p1!.zones.legend = "legend";
+  game.state.battlefields = [{
+    battlefieldId: "payment-location",
+    cardInstanceId: "battlefield",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    contestedByPlayerId: null,
+    units: ["battlefield-unit"],
+  }];
+
+  assert.equal(beginEffectResolution({
+    game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    clauseId: "payment-only", decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
+
+  const initialActions = gameplayActions(game, "p1", decks);
+  const initialPayment = initialActions.find(
+    (action) => action.choice?.kind === "resourcePayment",
+  );
+  assert.ok(initialPayment);
+  assert.equal(initialPayment.choice?.kind === "resourcePayment" && initialPayment.choice.canAccept, false);
+  assert.deepEqual(initialPayment.targets[0]?.legalIds, ["decline"]);
+  assert.deepEqual(
+    initialActions
+      .filter((action) => action.sourceCardInstanceId)
+      .map((action) => action.sourceCardInstanceId)
+      .sort(),
+    ["battlefield-unit", "legend", "permanent", "rune"],
+  );
+
+  const addPower = initialActions.find(
+    (action) => action.sourceCardInstanceId === "rune" && /Add Power/.test(action.label),
+  );
+  assert.ok(addPower?.enabled);
+  const withPower = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "add-payment-resource",
+  });
+  assert.equal(withPower.state.pendingChoice?.type, "resourcePayment");
+  assert.equal(withPower.state.effectResolutions.length, 1);
+  assert.equal(withPower.state.players.p1!.power.Body, 1);
+
+  const readyPayment = gameplayActions(withPower, "p1", decks).find(
+    (action) => action.choice?.kind === "resourcePayment",
+  );
+  assert.ok(readyPayment?.enabled);
+  assert.equal(readyPayment.choice?.kind === "resourcePayment" && readyPayment.choice.canAccept, true);
+  assert.deepEqual(readyPayment.targets[0]?.legalIds, ["accept", "decline"]);
+  const completed = performGameplayAction({
+    game: withPower,
+    actorPlayerId: "p1",
+    actionId: readyPayment.id,
+    selectedIds: ["accept"],
+    decks,
+    now: "confirm-payment",
+  });
+  assert.equal(completed.state.pendingChoice, null);
+  assert.deepEqual(completed.state.effectResolutions, []);
+  assert.equal(completed.state.players.p1!.power.Body, 0);
+  gameDocumentSchema.parse(completed);
 });
 
 test("effect-driven Unit play validates its source zone and uses normal placement", () => {
@@ -442,7 +553,7 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   }];
   const index = createRuntimeCardIndex(decks, game);
   moveUnitToTrash(game, "unit", index);
-  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
   assert.ok(game.state.players.p1!.zones.base.includes("unit"));
   assert.deepEqual(game.state.ongoingEffects, []);
   submitDeathReplacementChoice(game, "p1", ["accept"], index);
@@ -450,7 +561,7 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   assert.equal(game.state.cardStates.unit!.damage, 0);
   assert.equal(game.state.cardStates.unit!.exhausted, true);
 
-  game.state.players.p1!.energy = 1;
+  game.state.players.p1!.energy = 0;
   game.state.cardStates.unit!.damage = 3;
   game.state.ongoingEffects = [{
     id: "replacement-2", behaviorId: "replacement.optional_recall_on_death",
@@ -461,7 +572,7 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   moveUnitToTrash(game, "unit", index);
   submitDeathReplacementChoice(game, "p1", ["decline"], index);
   assert.ok(game.state.players.p1!.zones.trash.includes("unit"));
-  assert.equal(game.state.players.p1!.energy, 1);
+  assert.equal(game.state.players.p1!.energy, 0);
 });
 
 test("activated declaration-cost selections remain locked after payment changes zone", () => {
@@ -604,10 +715,10 @@ test("effect resolution pauses for a death replacement and resumes later effects
     decks,
   });
 
-  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
   assert.equal(game.state.cardStates.unit!.buffed, undefined);
   const submit = gameplayActions(game, "p1", decks).find(
-    (action) => action.choice?.kind === "binary" && action.enabled,
+    (action) => action.choice?.kind === "resourcePayment" && action.enabled,
   );
   assert.ok(submit);
   const next = performGameplayTransition({
@@ -731,7 +842,7 @@ test("combat cleanup finishes death replacement before deciding attacker recall"
 
   continueCombatResolution(game, index, decks);
 
-  assert.equal(game.state.pendingChoice?.type, "binary");
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
   assert.equal(game.state.combat?.stage, "cleanup");
   assert.deepEqual(game.state.battlefields[0]!.units, ["defender", "attacker"]);
   assert.ok(!game.state.players.p2!.zones.base.includes("attacker"));
@@ -2912,7 +3023,7 @@ function player(playerId: string) {
 
 function card(
   cardCode: string,
-  type: "Battlefield" | "Gear" | "Rune" | "Spell" | "Unit",
+  type: "Battlefield" | "Gear" | "Legend" | "Rune" | "Spell" | "Unit",
   might: number | null = null,
 ): GameCardDefinition {
   return {
@@ -2937,6 +3048,37 @@ function card(
     },
     behaviorModel: { playTimings: [], clauses: [] },
   };
+}
+
+function resourceCard(
+  cardCode: string,
+  type: "Gear" | "Legend" | "Rune" | "Unit",
+  resourceType: "energy" | "power",
+  domain: string | null = null,
+) {
+  const definition = card(cardCode, type);
+  definition.card.classification.domain = domain ? [domain] : ["Colorless"];
+  definition.behaviorModel.clauses = [{
+    id: "add-resource",
+    sequence: 0,
+    sourceText: "Synthetic Add reaction.",
+    normalizedText: "Synthetic Add reaction.",
+    abilities: [binding("ability.exhaust_for_resource", {
+      resourceType,
+      amount: 1,
+      domain,
+      usage: "all",
+    })],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [binding("timing.reaction")],
+    effects: [],
+    keywords: [],
+  }];
+  return definition;
 }
 
 function instance(

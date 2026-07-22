@@ -225,6 +225,38 @@ export function buildPlayerDecisionRequest({
       }
     }
 
+    if (pendingChoice.type === "resourcePayment") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "resourcePayment" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+      if (action?.choice?.kind === "resourcePayment") {
+        const resourceLabel =
+          pendingChoice.resource === "energy"
+            ? `${pendingChoice.amount} Energy`
+            : `${pendingChoice.amount} ${pendingChoice.domain ?? "any"} Power`;
+        return {
+          actionId: action.id,
+          allowsBoardInteraction: true,
+          decisionKey: pendingChoice.id,
+          description: `Add ${resourceLabel} to your Rune Pool, then confirm payment.`,
+          kind: "optionDecision",
+          title: pendingChoice.prompt,
+          options: [
+            {
+              id: "accept",
+              label: pendingChoice.acceptLabel,
+              disabled: !pendingChoice.canAccept,
+            },
+            ...(pendingChoice.allowDecline
+              ? [{ id: "decline", label: pendingChoice.declineLabel }]
+              : []),
+          ],
+        };
+      }
+    }
+
     if (pendingChoice.type === "binary") {
       const action = sourceProjection.actions.find((candidate) => candidate.choice?.kind === "binary" && candidate.choice.choiceId === pendingChoice.id);
       if (action?.choice?.kind === "binary") {
@@ -353,6 +385,13 @@ export function buildPlayerDecisionRequest({
         };
       case "binary":
         return { inspection: "none", kind: "pendingDecision", message: `Waiting for ${playerName} to decide: ${pendingChoice.prompt}`, title: pendingChoice.prompt };
+      case "resourcePayment":
+        return {
+          inspection: "none",
+          kind: "pendingDecision",
+          message: `Waiting for ${playerName} to pay or decline: ${pendingChoice.prompt}`,
+          title: pendingChoice.prompt,
+        };
       case "orderTriggers":
         return {
           inspection: "none",

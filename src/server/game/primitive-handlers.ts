@@ -1712,9 +1712,9 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.pay_optional_resource", {
     choice(binding, context) {
-      if (!canPayEffectResource(binding, context, index)) return null;
+      const payment = resolutionResourcePayment(binding, context, index, true);
       return {
-        kind: "binary",
+        kind: "resourcePayment",
         legalIds: ["accept", "decline"],
         minimum: 1,
         maximum: 1,
@@ -1723,6 +1723,7 @@ export function createPrimitiveHandlers(
           : "Pay the optional cost?",
         acceptLabel: "Pay",
         declineLabel: "Decline",
+        payment,
       };
     },
     execute(binding, context) {
@@ -1736,6 +1737,21 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.pay_resource", {
+    choice(binding, context) {
+      const payment = resolutionResourcePayment(binding, context, index, false);
+      return {
+        kind: "resourcePayment",
+        legalIds: ["accept"],
+        minimum: 1,
+        maximum: 1,
+        prompt: typeof binding.parameters.prompt === "string"
+          ? binding.parameters.prompt
+          : "Pay the required cost.",
+        acceptLabel: "Pay",
+        declineLabel: "Decline",
+        payment,
+      };
+    },
     execute(binding, context) {
       if (!canPayEffectResource(binding, context, index)) {
         throw new Error("Required resolving resource cost cannot be paid.");
@@ -2633,20 +2649,16 @@ function canPayEffectResource(
   context: BehaviorExecutionContext,
   index: RuntimeCardIndex,
 ) {
-  if (
-    binding.parameters.exhaustSource === true &&
-    context.game.state.cardStates[context.sourceCardInstanceId]?.exhausted !== false
-  ) {
-    return false;
-  }
-  const definition = effectPaymentDefinition(binding, context, index);
-  return buildPaymentPlan(
-    context.game,
-    context.controllerPlayerId,
-    definition,
-    definition.card.attributes.energy ?? 0,
-    index,
-  ) !== null;
+  const payment = resolutionResourcePayment(binding, context, index, false);
+  return (
+    (!payment.exhaustSource ||
+      context.game.state.cardStates[context.sourceCardInstanceId]?.exhausted === false) &&
+    canPayResolutionResource(
+      context.game,
+      context.controllerPlayerId,
+      payment,
+    )
+  );
 }
 
 function payEffectResource(
@@ -2654,14 +2666,100 @@ function payEffectResource(
   context: BehaviorExecutionContext,
   index: RuntimeCardIndex,
 ) {
-  const definition = effectPaymentDefinition(binding, context, index);
-  payCardCost(
+  const payment = resolutionResourcePayment(binding, context, index, false);
+  if (!canPayEffectResource(binding, context, index)) {
+    throw new Error("Resolving resource cost cannot be paid from the Rune Pool.");
+  }
+  payResolutionResource(
     context.game,
     context.controllerPlayerId,
-    definition,
-    definition.card.attributes.energy ?? 0,
-    index,
+    payment,
   );
+}
+
+export type ResolutionResourcePayment = {
+  resource: "energy" | "power";
+  amount: number;
+  domain: string | null;
+};
+
+export function canPayResolutionResource(
+  game: GameDocument,
+  playerId: string,
+  payment: ResolutionResourcePayment,
+) {
+  const player = game.state.players[playerId];
+  if (!player) return false;
+  if (payment.resource === "energy") return player.energy >= payment.amount;
+  return availableResolutionPower(player.power, payment.domain) >= payment.amount;
+}
+
+export function payResolutionResource(
+  game: GameDocument,
+  playerId: string,
+  payment: ResolutionResourcePayment,
+) {
+  if (!canPayResolutionResource(game, playerId, payment)) {
+    throw new Error("Resolving resource cost cannot be paid from the Rune Pool.");
+  }
+  const player = game.state.players[playerId]!;
+  if (payment.resource === "energy") {
+    player.energy -= payment.amount;
+    return;
+  }
+  let remaining = payment.amount;
+  for (const domain of resolutionPowerSpendOrder(player.power, payment.domain)) {
+    const spent = Math.min(player.power[domain] ?? 0, remaining);
+    if (spent <= 0) continue;
+    player.power[domain] = (player.power[domain] ?? 0) - spent;
+    remaining -= spent;
+    if (remaining === 0) return;
+  }
+}
+
+function resolutionResourcePayment(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+  allowDecline: boolean,
+) {
+  const definition = effectPaymentDefinition(binding, context, index);
+  const resource = stringParam(binding, "resource") as "energy" | "power";
+  return {
+    resource,
+    amount: numberParam(binding, "amount"),
+    domain:
+      resource === "power"
+        ? definition.card.classification.domain[0] ?? null
+        : null,
+    allowDecline,
+    exhaustSource: binding.parameters.exhaustSource === true,
+  };
+}
+
+function availableResolutionPower(
+  power: Record<string, number>,
+  requestedDomain: string | null,
+) {
+  return resolutionPowerSpendOrder(power, requestedDomain).reduce(
+    (total, domain) => total + (power[domain] ?? 0),
+    0,
+  );
+}
+
+function resolutionPowerSpendOrder(
+  power: Record<string, number>,
+  requestedDomain: string | null,
+) {
+  if (!requestedDomain || requestedDomain === "Colorless") {
+    return Object.keys(power).sort((left, right) => {
+      if (left === "Rainbow") return 1;
+      if (right === "Rainbow") return -1;
+      return left.localeCompare(right);
+    });
+  }
+  const domain = `${requestedDomain.slice(0, 1).toUpperCase()}${requestedDomain.slice(1)}`;
+  return domain === "Rainbow" ? ["Rainbow"] : [domain, "Rainbow"];
 }
 
 export function consumeEnterReadyEffect(
@@ -3304,7 +3402,7 @@ function optionalDeathReplacement(
       ongoing.parameters ?? {},
       killAttribution,
     );
-    return request && deathReplacementCanBePaid(game, request, index)
+    return request && deathReplacementCanBeOffered(game, request)
       ? request
       : null;
   }
@@ -3326,7 +3424,7 @@ function optionalDeathReplacement(
         binding.parameters,
         killAttribution,
       );
-      if (request && deathReplacementCanBePaid(game, request, index)) return request;
+      if (request && deathReplacementCanBeOffered(game, request)) return request;
     }
   }
   return null;
@@ -3367,14 +3465,7 @@ function deathReplacementCanBePaid(
   request: DeathReplacementRequest,
   index: RuntimeCardIndex,
 ) {
-  if (
-    request.exhaustSource &&
-    game.state.cardStates[request.sourceCardInstanceId]?.exhausted !== false
-  ) return false;
-  if (
-    request.spendTargetBuff &&
-    game.state.cardStates[request.unitId]?.buffed !== true
-  ) return false;
+  if (!deathReplacementCanBeOffered(game, request)) return false;
   const context = createReplacementContext(game, request);
   return canPayEffectResource({
     behaviorId: "action.pay_resource",
@@ -3386,6 +3477,21 @@ function deathReplacementCanBePaid(
       domain: request.domain,
     },
   }, context, index);
+}
+
+function deathReplacementCanBeOffered(
+  game: GameDocument,
+  request: DeathReplacementRequest,
+) {
+  if (
+    request.exhaustSource &&
+    game.state.cardStates[request.sourceCardInstanceId]?.exhausted !== false
+  ) return false;
+  if (
+    request.spendTargetBuff &&
+    game.state.cardStates[request.unitId]?.buffed !== true
+  ) return false;
+  return true;
 }
 
 function createReplacementContext(
@@ -3411,12 +3517,18 @@ function promptDeathReplacement(
   game.state.pendingChoice = {
     id: `death-replacement:${game.stateVersion}:${request.unitId}`,
     playerId: request.controllerPlayerId,
-    type: "binary",
+    type: "resourcePayment",
     resolutionId,
     bindingKey: "death-replacement",
     prompt: "Pay to heal, exhaust, and recall this Unit instead of it dying?",
     acceptLabel: "Pay and recall",
     declineLabel: "Let it die",
+    allowDecline: true,
+    sourceCardInstanceId: request.sourceCardInstanceId,
+    resource: request.resource,
+    domain: request.domain,
+    amount: request.amount,
+    exhaustSource: request.exhaustSource,
     deathReplacement: request,
   };
 }
@@ -3429,11 +3541,19 @@ export function submitDeathReplacementChoice(
 ) {
   const pending = game.state.pendingChoice;
   if (
-    !pending || pending.type !== "binary" || !pending.deathReplacement ||
+    !pending ||
+    (pending.type !== "binary" && pending.type !== "resourcePayment") ||
+    !pending.deathReplacement ||
     pending.playerId !== playerId || selectedIds.length !== 1 ||
     !["accept", "decline"].includes(selectedIds[0]!)
   ) throw new Error("Death replacement choice is invalid.");
   const request = pending.deathReplacement;
+  if (
+    selectedIds[0] === "accept" &&
+    !deathReplacementCanBePaid(game, request, index)
+  ) {
+    throw new Error("Death replacement cost is not available in the Rune Pool.");
+  }
   game.state.pendingChoice = null;
   if (
     selectedIds[0] === "accept" &&
@@ -3483,7 +3603,7 @@ function advanceDeathReplacementQueue(
   while (!game.state.pendingChoice && game.state.queuedDeathReplacements.length > 0) {
     const next = game.state.queuedDeathReplacements.shift()!;
     if (!isUnitInPlay(game, next.unitId)) continue;
-    if (!deathReplacementCanBePaid(game, next, index)) {
+    if (!deathReplacementCanBeOffered(game, next)) {
       moveUnitToTrash(
         game,
         next.unitId,

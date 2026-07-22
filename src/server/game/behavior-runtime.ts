@@ -28,7 +28,13 @@ export type BehaviorHandler = {
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,
   ): {
-    kind?: "card" | "battlefield" | "tokenPlacement" | "binary" | "mode";
+    kind?:
+      | "card"
+      | "battlefield"
+      | "tokenPlacement"
+      | "binary"
+      | "resourcePayment"
+      | "mode";
     legalIds: string[];
     minimum: number;
     maximum: number;
@@ -41,6 +47,13 @@ export type BehaviorHandler = {
     visionAction?: "recycle" | "keep";
     acceptLabel?: string;
     declineLabel?: string;
+    payment?: {
+      resource: "energy" | "power";
+      amount: number;
+      domain: string | null;
+      allowDecline: boolean;
+      exhaustSource: boolean;
+    };
     options?: Array<{ id: string; label: string }>;
   } | null;
 };

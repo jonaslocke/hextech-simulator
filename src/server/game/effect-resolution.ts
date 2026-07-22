@@ -9,6 +9,7 @@ import {
 } from "./behavior-runtime";
 import type { BehaviorEvent } from "./behavior-runtime";
 import {
+  canPayResolutionResource,
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   definitionForInstance,
@@ -174,6 +175,44 @@ export function submitModeChoice(
     (item) => item.id === pending.resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
+  frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
+  game.state.pendingChoice = null;
+  return resumeEffectResolution(game, frame.id, decks);
+}
+
+export function submitResourcePaymentChoice(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: string[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "resourcePayment" ||
+    !pending.resolutionId ||
+    pending.deathReplacement ||
+    pending.playerId !== playerId ||
+    selectedIds.length !== 1 ||
+    (selectedIds[0] === "decline" && !pending.allowDecline) ||
+    !["accept", "decline"].includes(selectedIds[0]!)
+  ) {
+    throw new Error("Resolution resource payment choice is invalid.");
+  }
+  const frame = game.state.effectResolutions.find(
+    (item) => item.id === pending.resolutionId,
+  );
+  if (!frame) throw new Error("Effect resolution is unavailable.");
+  if (
+    selectedIds[0] === "accept" &&
+    ((pending.exhaustSource &&
+      game.state.cardStates[pending.sourceCardInstanceId]?.exhausted !== false) ||
+      !canPayResolutionResource(game, playerId, pending))
+  ) {
+    throw new Error(
+      "Resolution resource payment is not available from the Rune Pool.",
+    );
+  }
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
   game.state.pendingChoice = null;
   return resumeEffectResolution(game, frame.id, decks);
@@ -421,6 +460,25 @@ export function resumeEffectResolution(
         };
         return false;
       }
+      if (requirement.kind === "resourcePayment" && requirement.payment) {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "resourcePayment",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          acceptLabel: requirement.acceptLabel ?? "Pay",
+          declineLabel: requirement.declineLabel ?? "Decline",
+          allowDecline: requirement.payment.allowDecline,
+          sourceCardInstanceId: frame.sourceCardInstanceId,
+          resource: requirement.payment.resource,
+          domain: requirement.payment.domain,
+          amount: requirement.payment.amount,
+          exhaustSource: requirement.payment.exhaustSource,
+        };
+        return false;
+      }
       game.state.pendingChoice = {
         id: `choice:${frame.id}:${binding.order}`,
         playerId: frame.controllerPlayerId,
@@ -571,6 +629,25 @@ export function resumeEffectResolution(
         };
         return false;
       }
+      if (requirement.kind === "resourcePayment" && requirement.payment) {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "resourcePayment",
+          resolutionId: frame.id,
+          bindingKey,
+          prompt: requirement.prompt,
+          acceptLabel: requirement.acceptLabel ?? "Pay",
+          declineLabel: requirement.declineLabel ?? "Decline",
+          allowDecline: requirement.payment.allowDecline,
+          sourceCardInstanceId: frame.sourceCardInstanceId,
+          resource: requirement.payment.resource,
+          domain: requirement.payment.domain,
+          amount: requirement.payment.amount,
+          exhaustSource: requirement.payment.exhaustSource,
+        };
+        return false;
+      }
       game.state.pendingChoice = {
         id: `choice:${frame.id}:${binding.order}`,
         playerId: frame.controllerPlayerId,
@@ -604,7 +681,8 @@ export function resumeEffectResolution(
     frame.effectOutcomes = { ...context.effectOutcomes };
     frame.nextEffectIndex += 1;
     if (
-      game.state.pendingChoice?.type === "binary" &&
+      (game.state.pendingChoice?.type === "binary" ||
+        game.state.pendingChoice?.type === "resourcePayment") &&
       game.state.pendingChoice.deathReplacement
     ) {
       game.state.pendingChoice.resolutionId = frame.id;

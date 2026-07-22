@@ -231,26 +231,6 @@ const tokenPlacementChoiceSchema = z.object({
   destinationLabels: z.record(z.string().min(1)).default({}),
 });
 
-const binaryChoiceSchema = z.object({
-  id: z.string().min(1), playerId: z.string().min(1), type: z.literal("binary"),
-  resolutionId: z.string().min(1).nullable(), bindingKey: z.string().min(1), prompt: z.string().min(1),
-  acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
-  deathReplacement: z.object({
-    unitId: z.string().min(1),
-    sourceCardInstanceId: z.string().min(1),
-    controllerPlayerId: z.string().min(1),
-    effectId: z.string().min(1).nullable(),
-    resource: z.enum(["energy", "power"]),
-    domain: z.string().nullable(),
-    amount: z.number().int().positive(),
-    exhaustSource: z.boolean(),
-    spendTargetBuff: z.boolean(),
-    killActorPlayerId: z.string().min(1).nullable().default(null),
-    killMethod: z.enum(["spell", "ability", "combat"]).nullable().default(null),
-    wasStunned: z.boolean().default(false),
-  }).optional(),
-});
-
 const deathReplacementRequestSchema = z.object({
   unitId: z.string().min(1),
   sourceCardInstanceId: z.string().min(1),
@@ -264,6 +244,33 @@ const deathReplacementRequestSchema = z.object({
   killActorPlayerId: z.string().min(1).nullable().default(null),
   killMethod: z.enum(["spell", "ability", "combat"]).nullable().default(null),
   wasStunned: z.boolean().default(false),
+});
+
+const binaryChoiceSchema = z.object({
+  id: z.string().min(1), playerId: z.string().min(1), type: z.literal("binary"),
+  resolutionId: z.string().min(1).nullable(), bindingKey: z.string().min(1), prompt: z.string().min(1),
+  acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+  // Retained for persisted games created before paid decisions received their
+  // own choice type. New death-replacement prompts use resourcePayment.
+  deathReplacement: deathReplacementRequestSchema.optional(),
+});
+
+const resourcePaymentChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("resourcePayment"),
+  resolutionId: z.string().min(1).nullable(),
+  bindingKey: z.string().min(1),
+  prompt: z.string().min(1),
+  acceptLabel: z.string().min(1),
+  declineLabel: z.string().min(1),
+  allowDecline: z.boolean(),
+  sourceCardInstanceId: z.string().min(1),
+  resource: z.enum(["energy", "power"]),
+  domain: z.string().nullable(),
+  amount: z.number().int().positive(),
+  exhaustSource: z.boolean(),
+  deathReplacement: deathReplacementRequestSchema.optional(),
 });
 
 const modeChoiceSchema = z.object({
@@ -430,6 +437,7 @@ export const gameStateSchema = z.object({
       effectSelectionChoiceSchema,
       tokenPlacementChoiceSchema,
       binaryChoiceSchema,
+      resourcePaymentChoiceSchema,
       modeChoiceSchema,
     ])
     .nullable(),

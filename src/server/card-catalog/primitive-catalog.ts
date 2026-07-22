@@ -1459,7 +1459,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("selectionKey", "string", "Key recording accept or decline."),
       optional("prompt", "string", "Prompt shown to the paying player."),
     ],
-    engineSupport: supported("The resolution frame offers the choice only while all payment components are legal, then validates again before mutation."),
+    engineSupport: supported("The resolution frame remains pending while Add resource abilities are available, enables confirmation only when the Rune Pool can pay, and keeps decline available for optional instructions."),
   }),
   "action.pay_resource": primitiveSeed({
     id: "action.pay_resource",
@@ -1474,7 +1474,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("requiresChoiceKey", "string", "Choice key enabling the payment."),
       optional("requiresChoiceValue", "string", "Choice value enabling the payment."),
     ],
-    engineSupport: supported("Payment legality is revalidated immediately before the resource mutation."),
+    engineSupport: supported("The resolution frame waits for the required Rune Pool resources and revalidates payment immediately before mutation."),
   }),
   "action.pay_optional_buff": primitiveSeed({
     id: "action.pay_optional_buff",

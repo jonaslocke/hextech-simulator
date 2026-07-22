@@ -17,6 +17,7 @@ export type ChoiceDialogOption = {
 };
 
 export type ChoiceDialogProps = {
+  allowBackgroundInteraction?: boolean;
   headerAction?: ReactNode;
   interactionSuspended?: boolean;
   isVisible?: boolean;
@@ -33,6 +34,7 @@ export type ChoiceDialogProps = {
 };
 
 export function ChoiceDialog({
+  allowBackgroundInteraction = false,
   confirmLabel,
   headerAction,
   interactionSuspended = false,
@@ -84,15 +86,20 @@ export function ChoiceDialog({
         aria-hidden={!isVisible || undefined}
         className={cn(
           "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100",
+          allowBackgroundInteraction &&
+            "pointer-events-none items-start bg-black/20 pt-20 backdrop-blur-[1px]",
           !isVisible && "invisible pointer-events-none",
         )}
       >
         <section
-          aria-modal={isVisible ? "true" : undefined}
+          aria-modal={
+            isVisible && !allowBackgroundInteraction ? "true" : undefined
+          }
           className={cn(
             "gap-4 grid rounded-xl w-full max-w-2xl max-h-[min(42rem,calc(100vh-2rem))] overflow-hidden",
             "border border-cyan-300/25 bg-slate-950/82 p-4 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
             "supports-backdrop-filter:bg-slate-950/68 supports-backdrop-filter:backdrop-blur-md",
+            allowBackgroundInteraction && "pointer-events-auto max-w-xl",
           )}
           role="dialog"
         >

@@ -107,7 +107,7 @@ battlefield.
 |---|---|---|---|
 | Public-zone trigger sources | Trigger discovery includes explicit public-Trash sources and only a matching Main Deck event subject for private top-deck look/reveal triggers. | Shared extension | `OGN-006`, `OGN-037`, `OGN-194`, `OGN-252` |
 | Effect-driven play | A zone-authorized play validates the source zone and payment, records play history, applies Unit placement legality, puts Spells on the Chain, and honors post-resolution recycling. | New primitive | `OGN-006`, `OGN-037`, `OGN-107`, `OGN-112`, `OGN-194` |
-| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Insufficient costs suppress the offer; decline and failed revalidation leave later gated effects untouched. | New decision/payment primitives | `OGN-035`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-249`, `OGN-282` |
+| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Energy and Power prompts remain pending while Add abilities are available, enable Pay only when the Rune Pool satisfies the cost, and preserve optional decline. | New decision/payment primitives | `OGN-006`, `OGN-035`, `OGN-037`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-249`, `OGN-269`, `OGN-282` |
 | Kill attribution | Spell and combat damage emit a separate kill event after lethal cleanup with the responsible player and the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
 | Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
 | Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
@@ -129,6 +129,22 @@ emitted only when the Unit actually dies; accepting the replacement suppresses
 the kill event, while declining it preserves the original spell or ability
 controller and method for downstream kill triggers.
 
+Resolution-time Energy and Power payments now follow the Rune Pool procedure in
+Core Rules 166.1, 429.3, and 444.2. The payment decision remains pending while
+the paying player activates legal Add abilities from controlled Runes,
+permanents, battlefield objects, or their Legend. Pay is unavailable until the
+current Rune Pool satisfies the Energy or typed Power requirement; an optional
+instruction always retains Decline. Confirming consumes only resources already
+in the pool, so the server no longer chooses or exhausts resource sources on the
+player's behalf. The payment prompt is non-modal for board interaction, while
+the opponent receives only the normal waiting projection.
+
+| Producer | Consumer | Handoff contract | Lifecycle branches | Focused synthetic coverage |
+|---|---|---|---|---|
+| Resolving Energy or Power instruction | Pending payment decision and action projection | Preserve the resolution continuation and expose Pay only from a sufficient Rune Pool. | Initially payable, initially insufficient, accept, decline, typed Power, cleanup. | Resolution payment gating and linked-effect continuation. |
+| Rune, permanent, battlefield object, or Legend Add ability | Pending payment decision | Add resolves immediately without replacing the pending decision; reprojection updates Pay legality. | Multiple source locations, exhausted source, insufficient pool, exact payment. | Public Add-action projection, production transition, pending-state preservation, and exact consumption. |
+| Optional death replacement | Pending payment decision and lethal cleanup | Replacement waits for explicit resource production, suppresses death only on paid acceptance, and otherwise preserves death attribution. | Accept, decline, insufficient pool, continuation, combat cleanup. | Replacement payment, event suppression, resolution resume, and combat cleanup matrices. |
+
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,
@@ -146,6 +162,23 @@ The user manually validated `OGN-282` Monastery of Hirana's resolution-time
 optional-payment behavior in-game on 2026-07-22. It has passed that
 behavior-family gate without promoting its complete gameplay identity to
 `accepted`.
+
+The user manually validated `OGN-006` Flame Chompers' public-Trash discard
+trigger and modified replay behavior in-game on 2026-07-22. It has passed that
+behavior-family gate without promoting its complete gameplay identity to
+`accepted`. The revised interactive Rune Pool payment experience is a shared
+UX and server-authority extension made after that validation and remains ready
+for manual validation.
+
+For that payment UX, trigger Flame Chompers with no Fury Power in the Rune Pool.
+Pay must be disabled, Decline must remain available, and legal Add objects must
+remain interactive. Add Fury from a Rune, then repeat with another legal Add
+source such as a permanent or Legend when available: the same prompt and
+resolution must survive, Pay must enable, and confirmation must consume the
+pool resource before continuing to the destination choice. Also verify that a
+wrong Power domain and an exhausted Add source do not enable Pay, declining
+leaves Flame Chompers in Trash and clears the continuation, and the opponent
+sees only the waiting state without private payment controls.
 
 The importable cross-domain deck at
 `data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve

@@ -96,6 +96,18 @@ export const projectedActionSchema = z.object({
         acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
       }),
       z.object({
+        kind: z.literal("resourcePayment"),
+        choiceId: z.string().min(1),
+        prompt: z.string().min(1),
+        acceptLabel: z.string().min(1),
+        declineLabel: z.string().min(1),
+        allowDecline: z.boolean(),
+        canAccept: z.boolean(),
+        resource: z.enum(["energy", "power"]),
+        domain: z.string().nullable(),
+        amount: z.number().int().positive(),
+      }),
+      z.object({
         kind: z.literal("mode"),
         choiceId: z.string().min(1),
         prompt: z.string().min(1),
@@ -392,6 +404,19 @@ export const gameProjectionSchema = z.object({
       z.object({
         type: z.literal("binary"), id: z.string().min(1), playerId: z.string().min(1),
         prompt: z.string().min(1), acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+      }),
+      z.object({
+        type: z.literal("resourcePayment"),
+        id: z.string().min(1),
+        playerId: z.string().min(1),
+        prompt: z.string().min(1),
+        acceptLabel: z.string().min(1),
+        declineLabel: z.string().min(1),
+        allowDecline: z.boolean(),
+        canAccept: z.boolean(),
+        resource: z.enum(["energy", "power"]),
+        domain: z.string().nullable(),
+        amount: z.number().int().positive(),
       }),
       z.object({
         type: z.literal("mode"),

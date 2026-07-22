@@ -23,6 +23,7 @@ export function OptionDecisionPrompt({
 }) {
   return (
     <ChoiceDialog
+      allowBackgroundInteraction={decision.allowsBoardInteraction}
       confirmLabel={decision.confirmLabel}
       decisionKey={decision.decisionKey}
       description={decision.description}

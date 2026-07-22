@@ -145,6 +145,19 @@ export type BoardProjection = {
     | {
         id: string;
         playerId: string;
+        type: "resourcePayment";
+        prompt: string;
+        acceptLabel: string;
+        declineLabel: string;
+        allowDecline: boolean;
+        canAccept: boolean;
+        resource: "energy" | "power";
+        domain: string | null;
+        amount: number;
+      }
+    | {
+        id: string;
+        playerId: string;
         type: "mode";
         prompt: string;
         waitingMessage: string;
