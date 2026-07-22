@@ -7,13 +7,10 @@ the accepted Kai'Sa and Viktor deck validations, their issue reports, the
 Kai'Sa resolution ledger, the Viktor resolution ledger, and the follow-up
 engine defects discovered while validating both decks.
 
-It does not redefine the original evidence. Read these documents when the
-underlying scenario is needed:
-
-- [Kai'Sa issue ledger](issues-found-after-kaisa-implementation/resolution-ledger.md)
-- [Viktor issue report](after-viktor-implementation/issues.md)
-- [Viktor resolution ledger](after-viktor-implementation/resolution-ledger.md)
-- [Program tracking and deck inventory](tracking.md)
+It does not redefine the original evidence. The detailed Kai'Sa and Viktor
+issue ledgers were temporary handoff artifacts and are no longer retained.
+Current milestone status and deck inventory live in [Program tracking and deck
+inventory](tracking.md).
 
 ## Executive conclusion
 
