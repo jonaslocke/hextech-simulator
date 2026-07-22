@@ -2427,6 +2427,74 @@ test("an optional chain target selection explicitly permits declining", () => {
   assert.equal(declined.state.cardStates.target!.buffed, undefined);
 });
 
+test("a deferred selector with no legal candidates skips its decision", () => {
+  const source = card("SYN-EMPTY-DEFERRED-SOURCE", "Gear");
+  const candidate = card("SYN-EMPTY-DEFERRED-CANDIDATE", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "deferred-optional-selection",
+    sequence: 0,
+    sourceText: "Choose up to one eligible object during resolution.",
+    normalizedText: "Choose up to one eligible object during resolution.",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [binding("selector.card", {
+      zone: "trash",
+      cardType: "Unit",
+      owner: "controller",
+      minimumCount: 0,
+      maximumCount: 1,
+      selectionKey: "candidate",
+      deferred: true,
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("action.return_to_hand", {
+      selectionKey: "candidate",
+    })],
+    keywords: [],
+  }];
+
+  const empty = fixture([source, candidate], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("candidate", "p1", candidate.cardCode, "mainDeck"),
+  ]);
+  empty.game.state.players.p1!.zones.base = ["source"];
+  empty.game.state.players.p1!.zones.mainDeck = ["candidate"];
+  assert.equal(beginEffectResolution({
+    game: empty.game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "deferred-optional-selection",
+    decks: empty.decks,
+  }), true);
+  assert.equal(empty.game.state.pendingChoice, null);
+  assert.deepEqual(empty.game.state.effectResolutions, []);
+  assert.deepEqual(empty.game.state.players.p1!.zones.mainDeck, ["candidate"]);
+
+  const available = fixture([source, candidate], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("candidate", "p1", candidate.cardCode, "mainDeck"),
+  ]);
+  available.game.state.players.p1!.zones.base = ["source"];
+  available.game.state.players.p1!.zones.trash = ["candidate"];
+  assert.equal(beginEffectResolution({
+    game: available.game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "deferred-optional-selection",
+    decks: available.decks,
+  }), false);
+  assert.equal(available.game.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(
+    available.game.state.pendingChoice?.type === "effectSelection"
+      ? available.game.state.pendingChoice.legalCardIds
+      : [],
+    ["candidate"],
+  );
+});
+
 test("deferred selectors choose from the legal set at effect resolution", () => {
   const source = card("SYN-DEFERRED-SOURCE", "Gear");
   source.behaviorModel.clauses = [{

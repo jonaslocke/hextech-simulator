@@ -307,7 +307,10 @@ export function resumeEffectResolution(
     if (frame.targetsLocked) {
       throw new Error(`Locked selector was not initialized: ${bindingKey}`);
     }
-    if (requirement.legalIds.length < requirement.minimum) {
+    if (
+      requirement.legalIds.length === 0 ||
+      requirement.legalIds.length < requirement.minimum
+    ) {
       // An instruction that cannot be carried out is skipped, but later
       // selectors in the same effect may still be possible (for example,
       // each player choosing one of their own Units). Record the empty
@@ -725,7 +728,10 @@ function nextOptionalTargetSelection(
     );
     if (!target) continue;
 
-    if (target.requirement.legalIds.length < target.requirement.minimum) {
+    if (
+      target.requirement.legalIds.length === 0 ||
+      target.requirement.legalIds.length < target.requirement.minimum
+    ) {
       frame.selectionsByBinding[choiceBindingKey] = ["decline"];
       continue;
     }

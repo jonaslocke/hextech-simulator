@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T11:23:46.065Z",
+  "updatedAt": "2026-07-22T14:00:30.351Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -10004,21 +10004,35 @@
           "name": "Hallowed Tomb"
         }
       ],
-      "status": "implemented",
+      "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-281",
         "approvedAt": "2026-07-21T02:07:36.392Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-champion-zone-return",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-22T14:00:30.351Z",
+          "note": "Deferred resolution selectors now skip empty legal sets without creating an uncompletable prompt; Hallowed Tomb is ready for manual validation of empty and populated Champion-return cases."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T02:07:36.392Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-281 approved."
+        },
+        {
+          "at": "2026-07-22T14:00:30.351Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-champion-zone-return",
+          "note": "Deferred resolution selectors now skip empty legal sets without creating an uncompletable prompt; Hallowed Tomb is ready for manual validation of empty and populated Champion-return cases."
         }
       ],
-      "updatedAt": "2026-07-21T02:07:36.392Z"
+      "updatedAt": "2026-07-22T14:00:30.351Z"
     },
     {
       "gameplayIdentity": "OGN-282:Monastery of Hirana",
