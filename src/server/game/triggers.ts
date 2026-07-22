@@ -575,5 +575,41 @@ function activeSourceIds(
       ...activeTrashSources,
       ...activeEventSources,
     ]),
-  ];
+  ].filter((id) =>
+    sourceMatchesDeclaredActiveZone(
+      game,
+      controllerPlayerId,
+      id,
+      index,
+    ),
+  );
+}
+
+function sourceMatchesDeclaredActiveZone(
+  game: GameDocument,
+  controllerPlayerId: string,
+  sourceCardInstanceId: string,
+  index: ReturnType<typeof createRuntimeCardIndex>,
+) {
+  const definition = definitionForInstance(sourceCardInstanceId, index);
+  const declaredZones = definition.behaviorModel.clauses.flatMap((clause) =>
+    clause.effects.flatMap((binding) =>
+      binding.behaviorId === "modifier.active_in_zone" &&
+      typeof binding.parameters.zone === "string"
+        ? [binding.parameters.zone]
+        : [],
+    ),
+  );
+  if (declaredZones.length === 0) return true;
+  const zones = game.state.players[controllerPlayerId]!.zones;
+  return declaredZones.some((zone) => {
+    switch (zone) {
+      case "trash":
+        return zones.trash.includes(sourceCardInstanceId);
+      case "mainDeck":
+        return zones.mainDeck.includes(sourceCardInstanceId);
+      default:
+        return false;
+    }
+  });
 }

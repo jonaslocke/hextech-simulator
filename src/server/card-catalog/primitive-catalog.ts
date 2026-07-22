@@ -1853,9 +1853,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "modifier.active_in_zone",
     family: "modifier",
     name: "Active trigger source zone",
-    description: "Allows the source's trigger clauses to be collected while it remains in a named public zone.",
+    description: "Declares the zone in which the source's trigger clauses are active instead of the normal board zones.",
     parameters: [required("zone", "zone", "The source zone.", ["trash", "mainDeck"])],
-    engineSupport: supported("Trigger discovery includes public Trash opt-ins and only the matching event subject for private Main Deck opt-ins."),
+    engineSupport: supported("Trigger discovery requires public Trash opt-ins to remain in Trash and private Main Deck opt-ins to be the matching event subject."),
   }),
   "prevention.prevent": primitiveSeed({
     id: "prevention.prevent",

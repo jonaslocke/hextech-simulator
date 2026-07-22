@@ -7,10 +7,13 @@ const statusValue = argumentValue("--status") ?? positionalArguments[1];
 const cardCodesValue = argumentValue("--cards") ?? positionalArguments[2];
 const familyId = argumentValue("--family") ?? positionalArguments[3];
 const note = argumentValue("--note") ?? positionalArguments[4];
+const allowDowngrade =
+  process.argv.includes("--allow-downgrade") ||
+  positionalArguments[5] === "allow-downgrade";
 
 if (!setCode || !statusValue || !cardCodesValue) {
   throw new Error(
-    "Usage: --set OGN --status manual_family_passed --cards \"OGN-001,OGN-002\" [--family id] [--note text]",
+    "Usage: --set OGN --status manual_family_passed --cards \"OGN-001,OGN-002\" [--family id] [--note text] [--allow-downgrade]",
   );
 }
 
@@ -22,7 +25,14 @@ const client = await getMongoClient();
 try {
   const ledger = await updateImplementationStatus(
     client.db(getMongoDatabaseName()),
-    { setCode, status, cardCodes, ...(familyId ? { familyId } : {}), ...(note ? { note } : {}) },
+    {
+      setCode,
+      status,
+      cardCodes,
+      ...(familyId ? { familyId } : {}),
+      ...(note ? { note } : {}),
+      ...(allowDowngrade ? { allowDowngrade: true } : {}),
+    },
   );
   console.log(`Updated ${cardCodes.length} card(s) in ${ledger.setCode} implementation-status ledger.`);
 } finally {

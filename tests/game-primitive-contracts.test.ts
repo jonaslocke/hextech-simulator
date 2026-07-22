@@ -598,6 +598,67 @@ test("public Trash trigger sources are opt-in and private deck sources are event
   assert.equal(game.state.chain?.items[0]?.sourceCardInstanceId, "trash-source");
 });
 
+test("a declared active trigger zone excludes copies in normal board zones", () => {
+  const source = card("SYN-ZONE-BOUND-TRIGGER", "Unit", 2);
+  source.behaviorModel.clauses = [
+    {
+      id: "active-trash",
+      sequence: 0,
+      sourceText: "This source is active only in Trash.",
+      normalizedText: "This source is active only in Trash.",
+      abilities: [],
+      triggers: [],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      keywords: [],
+      effects: [binding("modifier.active_in_zone", { zone: "trash" })],
+    },
+    {
+      id: "generic-event-trigger",
+      sequence: 1,
+      sourceText: "When a synthetic event occurs.",
+      normalizedText: "When a synthetic event occurs.",
+      abilities: [],
+      conditions: [],
+      selectors: [],
+      choices: [],
+      costs: [],
+      timings: [],
+      effects: [],
+      keywords: [],
+      triggers: [binding("trigger.event", {
+        eventType: "unit.killed",
+        subject: "any_unit",
+      })],
+    },
+  ];
+  const eventUnit = card("SYN-ZONE-BOUND-EVENT-UNIT", "Unit", 1);
+  const { game, decks } = fixture([source, eventUnit], [
+    instance("trash-copy", "p1", source.cardCode, "mainDeck"),
+    instance("board-copy", "p1", source.cardCode, "mainDeck"),
+    instance("event-unit", "p2", eventUnit.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.trash = ["trash-copy"];
+  game.state.players.p1!.zones.base = ["board-copy"];
+  game.state.players.p2!.zones.trash = ["event-unit"];
+
+  dispatchBehaviorEvent(game, {
+    type: "unit.killed",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "event-unit",
+    values: { method: "spell" },
+  }, decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(
+    game.state.chain?.items.map((item) => item.sourceCardInstanceId),
+    ["trash-copy"],
+  );
+});
+
 test("optional paid death replacement suppresses lethal cleanup until accept or decline", () => {
   const source = card("SYN-DEATH-REPLACEMENT", "Gear");
   const unit = card("SYN-DOOMED-UNIT", "Unit", 3);

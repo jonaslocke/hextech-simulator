@@ -144,6 +144,7 @@ the opponent receives only the normal waiting projection.
 | Resolving Energy or Power instruction | Pending payment decision and action projection | Preserve the resolution continuation and expose Pay only from a sufficient Rune Pool. | Initially payable, initially insufficient, accept, decline, typed Power, cleanup. | Resolution payment gating and linked-effect continuation. |
 | Rune, permanent, battlefield object, or Legend Add ability | Pending payment decision | Add resolves immediately without replacing the pending decision; reprojection updates Pay legality. | Multiple source locations, exhausted source, insufficient pool, exact payment. | Public Add-action projection, production transition, pending-state preservation, and exact consumption. |
 | Optional death replacement | Pending payment decision and lethal cleanup | Replacement waits for explicit resource production, suppresses death only on paid acceptance, and otherwise preserves death attribution. | Accept, decline, insufficient pool, continuation, combat cleanup. | Replacement payment, event suppression, resolution resume, and combat cleanup matrices. |
+| Typed gameplay event | Active-source discovery and trigger routing | A definition that declares `modifier.active_in_zone` contributes trigger sources only from that zone; normal Base/Battlefield discovery must not also activate another copy. | Declared-zone copy, normal-board copy, mixed copies, event-subject Main Deck source. | Synthetic mixed Trash/Base source routing plus the existing public-Trash/private-deck discovery matrix. |
 
 The interactive payment overlay leaves the board visually unobscured and
 pointer-accessible. An Add ability whose cost exhausts its source is projected
@@ -185,6 +186,20 @@ effect-driven replay family, `OGN-023` Unlicensed Armory for its corrected Fury
 payment and optional death replacement, and `OGN-202` Jinx, Rebel for its typed
 discard-event trigger. These are behavior-family passes, not promotion of the
 complete gameplay identities to `accepted`.
+
+Subsequent validation found that the active-zone marker was additive to normal
+board trigger discovery, allowing a board copy and a Trash copy of the same
+definition to trigger from one event. `modifier.active_in_zone` now constrains
+the source's triggered clauses to its declared zone: a Trash-active definition
+must be in Trash, while a private Main Deck source must additionally be the
+matching event subject. `OGN-037` therefore returns to ready for manual
+validation for the mixed board/Trash-copy boundary; its earlier family pass is
+retained as historical evidence, not treated as acceptance of this correction.
+Revalidate with one Immortal Phoenix in Trash and one in Base or at a
+battlefield: a spell kill must create exactly one trigger, sourced by the Trash
+copy. After payment that same copy must be played, and the board copy must
+remain unchanged. Decline must leave the Trash copy there and clear the pending
+resolution without exposing a second Phoenix payment.
 
 For that payment UX, trigger Flame Chompers with no Fury Power in the Rune Pool.
 Pay must be disabled, Decline must remain available, and legal Add objects must

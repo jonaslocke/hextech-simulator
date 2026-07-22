@@ -79,6 +79,8 @@ type StatusUpdate = {
   familyId?: string;
   note?: string;
   now?: string;
+  /** Explicitly invalidate a prior gate after a confirmed regression. */
+  allowDowngrade?: boolean;
 };
 
 export async function synchronizeImplementationStatusLedger(
@@ -143,14 +145,20 @@ export async function updateImplementationStatus(
     matchedCodes.forEach((cardCode) => remainingCodes.delete(cardCode));
 
     const familyStatuses = input.familyId
-      ? upsertFamilyStatus(card.familyStatuses, {
-          familyId: input.familyId,
-          status: input.status,
-          updatedAt: now,
-          ...(input.note ? { note: input.note } : {}),
-        })
+      ? upsertFamilyStatus(
+          card.familyStatuses,
+          {
+            familyId: input.familyId,
+            status: input.status,
+            updatedAt: now,
+            ...(input.note ? { note: input.note } : {}),
+          },
+          input.allowDowngrade,
+        )
       : card.familyStatuses;
-    const status = highestStatus(card.status, input.status);
+    const status = input.allowDowngrade
+      ? statusAfterExplicitDowngrade(card.canonicalModel !== null, familyStatuses, input)
+      : highestStatus(card.status, input.status);
     return {
       ...card,
       status,
@@ -354,14 +362,32 @@ function unionCardIds(parentById: Map<string, string>, left: string, right: stri
 function upsertFamilyStatus(
   statuses: readonly z.infer<typeof familyStatusSchema>[],
   next: z.infer<typeof familyStatusSchema>,
+  allowDowngrade = false,
 ) {
   const previous = statuses.find((status) => status.familyId === next.familyId);
   return [
     ...statuses.filter((status) => status.familyId !== next.familyId),
     previous
-      ? { ...next, status: highestStatus(previous.status, next.status) }
+      ? {
+          ...next,
+          status: allowDowngrade
+            ? next.status
+            : highestStatus(previous.status, next.status),
+        }
       : next,
   ].sort((left, right) => left.familyId.localeCompare(right.familyId));
+}
+
+function statusAfterExplicitDowngrade(
+  hasCanonicalModel: boolean,
+  familyStatuses: readonly z.infer<typeof familyStatusSchema>[],
+  input: StatusUpdate,
+) {
+  const baseline: ImplementationStatus = hasCanonicalModel ? "implemented" : "unreviewed";
+  const candidates = input.familyId
+    ? familyStatuses.map((familyStatus) => familyStatus.status)
+    : [input.status];
+  return candidates.reduce(highestStatus, baseline);
 }
 
 function appendHistory(

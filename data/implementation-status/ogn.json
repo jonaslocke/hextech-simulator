@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T10:39:55.266Z",
+  "updatedAt": "2026-07-22T10:50:48.628Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -1343,7 +1343,7 @@
           "name": "Immortal Phoenix"
         }
       ],
-      "status": "manual_family_passed",
+      "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-037",
         "approvedAt": "2026-07-21T01:36:20.875Z"
@@ -1351,9 +1351,9 @@
       "familyStatuses": [
         {
           "familyId": "ogn-m2-public-trash-effect-replay",
-          "status": "manual_family_passed",
-          "updatedAt": "2026-07-22T10:39:54.125Z",
-          "note": "User manually validated Immortal Phoenix in-game, including its public-Trash trigger and effect-driven replay behavior."
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-22T10:50:48.628Z",
+          "note": "A mixed board/Trash duplicate-source trigger defect was found after the earlier manual pass; the active-zone routing fix requires manual revalidation."
         }
       ],
       "history": [
@@ -1369,9 +1369,16 @@
           "status": "manual_family_passed",
           "familyId": "ogn-m2-public-trash-effect-replay",
           "note": "User manually validated Immortal Phoenix in-game, including its public-Trash trigger and effect-driven replay behavior."
+        },
+        {
+          "at": "2026-07-22T10:47:52.172Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "note": "A mixed board/Trash duplicate-source trigger defect was found after the earlier manual pass; the active-zone routing fix requires manual revalidation."
         }
       ],
-      "updatedAt": "2026-07-22T10:39:54.125Z"
+      "updatedAt": "2026-07-22T10:50:48.628Z"
     },
     {
       "gameplayIdentity": "OGN-038:Kadregrin the Infernal",
