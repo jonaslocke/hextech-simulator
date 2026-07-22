@@ -50,6 +50,7 @@ import {
   dispatchSimultaneousBehaviorEvents,
   queueChainItemsForTargets,
   queueDelayedEffects,
+  submitChainOptionalChoice,
   submitChainTargetSelection,
 } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
@@ -681,6 +682,20 @@ export function performGameplayAction(input: {
         finishTurnProgressionIfReady(game, index, input.decks);
       } else if (
         game.state.pendingChoice?.type === "binary" &&
+        game.state.pendingChoice.chainItem
+      ) {
+        submitChainOptionalChoice(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
+      } else if (
+        game.state.pendingChoice?.type === "binary" &&
         game.state.pendingChoice.deathReplacement
       ) {
         const resolutionId = game.state.pendingChoice.resolutionId;
@@ -1253,21 +1268,14 @@ function passPriority(
                 controllerPlayerId: controller,
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
-                selectedIds:
-                  Object.keys(item.lockedSelectionsByBinding).length > 0
-                    ? item.targetCardInstanceIds
-                    : validLockedTargets(
-                        game,
-                        clause,
-                        item,
-                        controller,
-                        handlers,
-                      ),
-                targetsLocked: !clause.selectors.some(
-                  (selector) =>
-                    selector.parameters.deferred === true ||
-                    typeof selector.parameters.requiresChoiceKey === "string",
+                selectedIds: validLockedTargets(
+                  game,
+                  clause,
+                  item,
+                  controller,
+                  handlers,
                 ),
+                targetsLocked: chainItemTargetsAreLocked(clause, item),
                 lockedSelectionsByBinding: item.lockedSelectionsByBinding,
                 targetObjectVersions: item.targetObjectVersions,
                 behaviorEvent: item.behaviorEvent,
@@ -3271,6 +3279,24 @@ function validLockedTargets(
         (game.state.cardStates[id]?.objectVersion ?? 0) ===
           item.targetObjectVersions[id]),
   );
+}
+
+function chainItemTargetsAreLocked(
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  item: NonNullable<GameDocument["state"]["chain"]>["items"][number],
+) {
+  return !clause.selectors.some((selector) => {
+    if (selector.parameters.deferred === true) return true;
+    const choiceKey = selector.parameters.requiresChoiceKey;
+    if (typeof choiceKey !== "string") return false;
+    const choice = clause.choices.find(
+      (candidate) => candidate.parameters.selectionKey === choiceKey,
+    );
+    return !choice || !Object.hasOwn(
+      item.lockedSelectionsByBinding,
+      `${clause.id}:choices:${choice.order}`,
+    );
+  });
 }
 
 function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {

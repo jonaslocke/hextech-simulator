@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T14:00:30.351Z",
+  "updatedAt": "2026-07-22T14:42:51.661Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -6921,21 +6921,35 @@
           "name": "Tideturner"
         }
       ],
-      "status": "implemented",
+      "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-199",
-        "approvedAt": "2026-07-21T02:02:35.946Z"
+        "approvedAt": "2026-07-22T14:42:17.197Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-trigger-finalization",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-22T14:42:51.661Z",
+          "note": "Initial optional Play Effect now accepts or declines during trigger finalization, locks the selected target before Priority, and never retargets during resolution."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T02:02:35.946Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-199 approved."
+        },
+        {
+          "at": "2026-07-22T14:42:51.661Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-trigger-finalization",
+          "note": "Initial optional Play Effect now accepts or declines during trigger finalization, locks the selected target before Priority, and never retargets during resolution."
         }
       ],
-      "updatedAt": "2026-07-21T02:02:35.946Z"
+      "updatedAt": "2026-07-22T14:42:51.661Z"
     },
     {
       "gameplayIdentity": "OGN-200:Twisted Fate Gambler",

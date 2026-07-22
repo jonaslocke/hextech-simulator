@@ -11,6 +11,7 @@ import {
   hasKeyword,
   performGameplayAction,
   performGameplayTransition,
+  projectGame,
   applyStartOfTurn,
   bindingChoiceGateMatches,
   dispatchBehaviorEvent,
@@ -2425,6 +2426,266 @@ test("an optional chain target selection explicitly permits declining", () => {
   assert.equal(declined.state.pendingChoice, null);
   assert.equal(declined.state.chain?.items.length, 1);
   assert.equal(declined.state.cardStates.target!.buffed, undefined);
+});
+
+test("trigger finalization locks an accepted target before priority or removes a declined item", () => {
+  const setup = () => {
+    const source = card("SYN-FINALIZATION-SOURCE", "Unit", 2);
+    source.behaviorModel.clauses = [{
+      id: "optional-trigger-target",
+      sequence: 0,
+      sourceText: "A synthetic optional trigger chooses a target during finalization.",
+      normalizedText: "A synthetic optional trigger chooses a target during finalization.",
+      abilities: [],
+      triggers: [binding("trigger.event", {
+        eventType: "synthetic.finalization",
+        subject: "friendly_card",
+      })],
+      conditions: [],
+      selectors: [binding("selector.friendly_unit", {
+        area: "board",
+        locationRelation: "differentFromReferenceLocation",
+        excludesSource: true,
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "target",
+        requiresChoiceKey: "performEffect",
+      })],
+      choices: [binding("choice.optional", {
+        player: "controller",
+        selectionKey: "performEffect",
+        decisionTiming: "triggerFinalization",
+        prompt: "Use the synthetic trigger?",
+      })],
+      costs: [],
+      timings: [],
+      effects: [binding("action.swap_unit_locations", {
+        selectionKey: "target",
+        requiresChoiceKey: "performEffect",
+      })],
+      keywords: [],
+    }];
+    const target = card("SYN-FINALIZATION-TARGET", "Unit", 2);
+    const eventSubject = card("SYN-FINALIZATION-EVENT", "Spell");
+    const battlefield = card("SYN-FINALIZATION-BATTLEFIELD", "Battlefield");
+    const result = fixture([source, target, eventSubject, battlefield], [
+      instance("source", "p1", source.cardCode, "mainDeck"),
+      instance("target", "p1", target.cardCode, "mainDeck"),
+      instance("event-subject", "p1", eventSubject.cardCode, "mainDeck"),
+      instance("battlefield", "p1", battlefield.cardCode, "battlefield"),
+    ]);
+    result.game.state.players.p1!.zones.base = ["source"];
+    result.game.state.battlefields = [{
+      battlefieldId: "location",
+      cardInstanceId: "battlefield",
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: ["target"],
+    }];
+    dispatchBehaviorEvent(result.game, {
+      type: "synthetic.finalization",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "event-subject",
+      values: {},
+    }, result.decks);
+    return result;
+  };
+
+  const declined = setup();
+  assert.equal(declined.game.state.chain, null);
+  assert.equal(declined.game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    declined.game.state.pendingChoice?.type === "effectSelection"
+      ? declined.game.state.pendingChoice.minimum
+      : 0,
+    1,
+  );
+  assert.equal(
+    gameplayActions(declined.game, "p2", declined.decks).some(
+      (action) => action.choice?.kind === "effectSelection",
+    ),
+    false,
+  );
+  const declineAction = gameplayActions(declined.game, "p1", declined.decks)
+    .find((action) => action.choice?.kind === "effectSelection");
+  assert.ok(declineAction);
+  const afterDecline = performGameplayTransition({
+    game: declined.game,
+    actorPlayerId: "p1",
+    actionId: declineAction.id,
+    selectedIds: [],
+    decks: declined.decks,
+    now: "decline-finalization-trigger",
+  }).game;
+  assert.equal(afterDecline.state.pendingChoice, null);
+  assert.equal(afterDecline.state.chain, null);
+
+  const accepted = setup();
+  const acceptAction = gameplayActions(accepted.game, "p1", accepted.decks)
+    .find((action) => action.choice?.kind === "effectSelection");
+  assert.ok(acceptAction);
+  const afterAccept = performGameplayTransition({
+    game: accepted.game,
+    actorPlayerId: "p1",
+    actionId: acceptAction.id,
+    selectedIds: ["target"],
+    decks: accepted.decks,
+    now: "accept-finalization-trigger",
+  }).game;
+  assert.equal(afterAccept.state.pendingChoice, null);
+  assert.deepEqual(
+    afterAccept.state.chain?.items[0]?.targetCardInstanceIds,
+    ["target"],
+  );
+  assert.deepEqual(
+    afterAccept.state.chain?.items[0]?.lockedSelectionsByBinding,
+    {
+      "optional-trigger-target:choices:0": ["accept"],
+      "optional-trigger-target:selectors:0": ["target"],
+    },
+  );
+  for (const viewerPlayerId of ["p1", "p2"] as const) {
+    assert.deepEqual(
+      projectGame({
+        game: afterAccept,
+        viewerPlayerId,
+        decks: accepted.decks,
+      }).chain?.items[0]?.targetCardInstanceIds,
+      ["target"],
+    );
+  }
+
+  const resolved = resolveCurrentChain(afterAccept, accepted.decks);
+  assert.deepEqual(resolved.state.players.p1!.zones.base, ["target"]);
+  assert.deepEqual(resolved.state.battlefields[0]!.units, ["source"]);
+});
+
+test("a targetless initial optional trigger is accepted or removed during finalization", () => {
+  const setup = () => {
+    const source = card("SYN-TARGETLESS-FINALIZATION", "Gear");
+    source.behaviorModel.clauses = [{
+      id: "targetless-finalization",
+      sequence: 0,
+      sourceText: "A synthetic targetless trigger is optional during finalization.",
+      normalizedText: "A synthetic targetless trigger is optional during finalization.",
+      abilities: [],
+      triggers: [binding("trigger.event", {
+        eventType: "synthetic.targetless-finalization",
+        subject: "friendly_card",
+      })],
+      conditions: [],
+      selectors: [],
+      choices: [binding("choice.optional", {
+        player: "controller",
+        selectionKey: "performEffect",
+        decisionTiming: "triggerFinalization",
+      })],
+      costs: [],
+      timings: [],
+      effects: [],
+      keywords: [],
+    }];
+    const eventSubject = card("SYN-TARGETLESS-EVENT", "Spell");
+    const result = fixture([source, eventSubject], [
+      instance("source", "p1", source.cardCode, "mainDeck"),
+      instance("event-subject", "p1", eventSubject.cardCode, "mainDeck"),
+    ]);
+    result.game.state.players.p1!.zones.base = ["source"];
+    dispatchBehaviorEvent(result.game, {
+      type: "synthetic.targetless-finalization",
+      actorPlayerId: "p1",
+      subjectCardInstanceId: "event-subject",
+      values: {},
+    }, result.decks);
+    return result;
+  };
+
+  for (const decision of ["decline", "accept"] as const) {
+    const { game, decks } = setup();
+    assert.equal(game.state.pendingChoice?.type, "binary");
+    assert.equal(game.state.chain, null);
+    const decide = gameplayActions(game, "p1", decks)
+      .find((action) => action.choice?.kind === "binary");
+    assert.ok(decide);
+    const decided = performGameplayTransition({
+      game,
+      actorPlayerId: "p1",
+      actionId: decide.id,
+      selectedIds: [decision],
+      decks,
+      now: `${decision}-targetless-finalization`,
+    }).game;
+    assert.equal(decided.state.pendingChoice, null);
+    if (decision === "decline") {
+      assert.equal(decided.state.chain, null);
+    } else {
+      assert.equal(decided.state.chain?.items.length, 1);
+      assert.deepEqual(
+        decided.state.chain?.items[0]?.lockedSelectionsByBinding,
+        { "targetless-finalization:choices:0": ["accept"] },
+      );
+    }
+  }
+});
+
+test("a finalized trigger target that becomes invalid is not replaced on resolution", () => {
+  const source = card("SYN-LOCKED-SOURCE", "Unit", 2);
+  source.behaviorModel.clauses = [{
+    id: "locked-target",
+    sequence: 0,
+    sourceText: "A synthetic trigger locks one target before priority.",
+    normalizedText: "A synthetic trigger locks one target before priority.",
+    abilities: [],
+    triggers: [binding("trigger.event", {
+      eventType: "synthetic.locked",
+      subject: "friendly_card",
+    })],
+    conditions: [],
+    selectors: [binding("selector.friendly_unit", {
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+    })],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [binding("action.buff_unit", { selectionKey: "target" })],
+    keywords: [],
+  }];
+  const target = card("SYN-LOCKED-TARGET", "Unit", 2);
+  const eventSubject = card("SYN-LOCKED-EVENT", "Spell");
+  const { game, decks } = fixture([source, target, eventSubject], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("target", "p1", target.cardCode, "mainDeck"),
+    instance("event-subject", "p1", eventSubject.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "target"];
+  dispatchBehaviorEvent(game, {
+    type: "synthetic.locked",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "event-subject",
+    values: {},
+  }, decks);
+  const choose = gameplayActions(game, "p1", decks)
+    .find((action) => action.choice?.kind === "effectSelection");
+  assert.ok(choose);
+  const finalized = performGameplayTransition({
+    game,
+    actorPlayerId: "p1",
+    actionId: choose.id,
+    selectedIds: ["target"],
+    decks,
+    now: "lock-target",
+  }).game;
+  finalized.state.players.p1!.zones.base = ["source"];
+  finalized.state.players.p1!.zones.trash = ["target"];
+  finalized.state.cardStates.target!.objectVersion = 1;
+
+  const resolved = resolveCurrentChain(finalized, decks);
+  assert.equal(resolved.state.cardStates.target!.buffed, undefined);
+  assert.equal(resolved.state.pendingChoice, null);
+  assert.deepEqual(resolved.state.effectResolutions, []);
 });
 
 test("a deferred selector with no legal candidates skips its decision", () => {

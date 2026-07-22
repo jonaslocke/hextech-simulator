@@ -270,6 +270,18 @@ validation.
 | Sequenced player decisions | Resolution selectors and mode prompts identify their choosing player; in the two-player runtime the next player decides before the controller and each optional selection is independent. | Shared decision extension | `OGN-071`, `OGN-187` |
 | Spell control and new choices | A Chain spell's controller changes before an optional target redeclaration; legal targets are recalculated for the new controller and locked target versions are replaced atomically. | New Chain primitives | `OGN-080` |
 
+| Producer | Consumer | Handoff contract | Lifecycle branches | Focused synthetic coverage |
+|---|---|---|---|---|
+| Initial optional triggered effect | Trigger finalization, target binding, Chain projection, and resolution | The source controller accepts or declines before Priority. Decline removes the Pending Item; acceptance locks every required target and its object version into the finalized Chain item, visible to every player. Resolution consumes only those locked selections. | Accept, decline, public target projection, successful resolution, target invalidation, pending-state cleanup. | Synthetic optional trigger-finalization target contract plus a separate stale locked-target resolution boundary. |
+
+Tideturner's earlier approved model represented its optional target as a
+zero-minimum deferred selector. That incorrectly moved both the initial
+"you may" decision and its target choice to resolution. The corrected model
+uses an explicit `choice.optional` with `decisionTiming:
+"triggerFinalization"`, a required non-deferred selector gated by acceptance,
+and the existing atomic swap effect. This matches Core Rules 355.8, 355.15,
+383.3.a, and 383.4.a without special-casing the card identity.
+
 These seven cards have synchronized supported canonical models and are ready
 for manual validation: `OGN-067`, `OGN-071`, `OGN-080`, `OGN-177`, `OGN-187`,
 `OGN-199`, and `OGN-262`.
@@ -334,7 +346,7 @@ accepted family or complete gameplay identity before that gate.
 | Unit-count win condition | Hold The Grand Plaza with six Units, then with seven Units. Only the seven-Unit hold wins immediately. | `293` |
 | Existing optional trigger | Hold Startipped Peak and test both accepting and declining the exhausted Rune channel. | `288` |
 | Linked moves and invalid destinations | Play Blitzcrank to a battlefield and move an enemy from Base and from another battlefield; decline once, then hold and confirm Blitzcrank returns. Move a friendly away from Stealthy Pursuer and accept/decline following it. With Zenith Blade, stun an enemy at a battlefield, move a friendly there, and decline the move. | `067`, `177`, `262` |
-| Atomic swap and event cleanup | Play Tideturner at Base and at a battlefield, swap with a friendly at another location, and decline. Confirm both locations exchange exactly once, no duplicate Unit remains, and same-location Units are not offered under the official erratum. | `199` |
+| Atomic swap, finalization, and event cleanup | Play Tideturner at Base and at a battlefield. Decline the initial optional trigger and confirm no Chain item remains. Accept it, choose a friendly Unit at another location, and confirm both players can identify that locked target before passing Priority. Let it resolve and confirm both locations exchange exactly once with no duplicate Unit. In a separate attempt, make the locked target invalid in reaction and confirm resolution does not offer or use a replacement target. Same-location Units must not be offered under the official erratum. | `199` |
 | Opponent-first decisions | Resolve Party Favors with the opponent choosing Cards, then Runes; verify both players receive exactly the selected outcome. Resolve Whirlwind with opponent accept/controller decline, then opponent decline/controller accept, and verify each prompt belongs to the correct player. | `071`, `187` |
 | Chain control and privacy | React to a targeted Spell with Mystic Reversal. Confirm control moves to the reactor, legal new targets are recalculated for that player, declining preserves the old choices, accepting replaces them, Priority resumes on the same Chain, and each viewer sees only normally public target information. | `080` |
 | Declaration-time alternate cost | Play Wallop normally, then play it by selecting a Buffed friendly Unit. Confirm declining or having no Buff requires the printed cost; paying spends exactly one Buff, ignores the full parent cost, still requires a legal ready target, and leaves no pending cost choice after resolution. | `146` |

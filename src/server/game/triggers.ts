@@ -1,4 +1,6 @@
 import {
+  allocateSelections,
+  applyChoiceSelections,
   compileBehaviorModel,
   collectTriggeredClauses,
   createBehaviorContext,
@@ -180,24 +182,40 @@ export function submitChainTargetSelection(
     (sum, target) => sum + target.maximum,
     0,
   );
+  const isDecliningFinalizationChoice =
+    pending.allowDecline === true &&
+    Boolean(pending.optionalChoiceBindingKey) &&
+    selectedIds.length === 0;
   if (
-    selectedIds.length < minimum ||
-    selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    requirements.some((target) => {
-      const selectedForTarget = selectedIds.filter((id) =>
-        target.legalIds.includes(id),
-      ).length;
-      return (
-        selectedForTarget < target.minimum ||
-        selectedForTarget > target.maximum
-      );
-    })
+    !isDecliningFinalizationChoice &&
+    (selectedIds.length < minimum ||
+      selectedIds.length > maximum ||
+      selectedIds.some((id) => !legal.has(id)) ||
+      new Set(selectedIds).size !== selectedIds.length ||
+      requirements.some((target) => {
+        const selectedForTarget = selectedIds.filter((id) =>
+          target.legalIds.includes(id),
+        ).length;
+        return (
+          selectedForTarget < target.minimum ||
+          selectedForTarget > target.maximum
+        );
+      }))
   ) {
     throw new Error("Selected chain targets are not legal.");
   }
   const item = pending.chainItem;
+  if (isDecliningFinalizationChoice) {
+    game.state.pendingChoice = null;
+    removeQueuedTriggerItem(game, item.id);
+    continueQueuedChainItems(game, decks);
+    return;
+  }
+  if (pending.optionalChoiceBindingKey) {
+    item.lockedSelectionsByBinding[pending.optionalChoiceBindingKey] = [
+      "accept",
+    ];
+  }
   item.targetCardInstanceIds = [...selectedIds];
   item.targetObjectVersions = Object.fromEntries(
     selectedIds.map((id) => [
@@ -205,6 +223,7 @@ export function submitChainTargetSelection(
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
   );
+  lockChainSelectorSelections(game, item, selectedIds, decks);
   if (item.kind === "spell") {
     (game.state.queuedBehaviorEvents ??= []).push(
       ...selectedIds.map((id) => ({
@@ -224,6 +243,39 @@ export function submitChainTargetSelection(
   const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
   if (!queuedForOrdering) appendChainItem(game, item);
+  continueQueuedChainItems(game, decks);
+}
+
+export function submitChainOptionalChoice(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: string[],
+  decks: readonly DeckSnapshotDocument[],
+): void {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending ||
+    pending.type !== "binary" ||
+    !pending.chainItem ||
+    pending.resolutionId !== null ||
+    pending.playerId !== playerId ||
+    selectedIds.length !== 1 ||
+    !["accept", "decline"].includes(selectedIds[0]!)
+  ) {
+    throw new Error("Chain optional choice is not available.");
+  }
+  const item = pending.chainItem;
+  game.state.pendingChoice = null;
+  if (selectedIds[0] === "decline") {
+    removeQueuedTriggerItem(game, item.id);
+    continueQueuedChainItems(game, decks);
+    return;
+  }
+  item.lockedSelectionsByBinding[pending.bindingKey] = ["accept"];
+  game.state.queuedChainItems = [
+    item,
+    ...(game.state.queuedChainItems ?? []),
+  ];
   continueQueuedChainItems(game, decks);
 }
 
@@ -249,18 +301,82 @@ function continueQueuedChainItems(
       definition.behaviorModel,
       handlers,
     ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
-    const requirements = clause
-      ? selectionRequirementsForClause(
-          clause,
-          createBehaviorContext(
-            game,
-            item.controllerPlayerId,
-            item.sourceCardInstanceId,
-            item.behaviorEvent,
-            [],
-          ),
-          handlers,
+    const context = createBehaviorContext(
+      game,
+      item.controllerPlayerId,
+      item.sourceCardInstanceId,
+      item.behaviorEvent,
+      [],
+    );
+    if (clause) {
+      applyChoiceSelections(clause, item.lockedSelectionsByBinding, context);
+    }
+    const finalizationChoice = clause?.choices.find((choice) =>
+      choice.behaviorId === "choice.optional" &&
+      choice.parameters.decisionTiming === "triggerFinalization" &&
+      !Object.hasOwn(
+        item.lockedSelectionsByBinding,
+        `${clause.id}:choices:${choice.order}`,
+      ),
+    );
+    if (clause && finalizationChoice) {
+      const selectionKey = finalizationChoice.parameters.selectionKey;
+      if (typeof selectionKey !== "string") {
+        throw new Error("Trigger-finalization choice selection key is missing.");
+      }
+      const choiceBindingKey = `${clause.id}:choices:${finalizationChoice.order}`;
+      const acceptedContext = {
+        ...context,
+        selectedBySelector: {
+          ...context.selectedBySelector,
+          [selectionKey]: ["accept"],
+        },
+      };
+      const choiceTargets = selectionRequirementsForClause(
+        clause,
+        acceptedContext,
+        handlers,
+      ).filter(({ binding }) => binding.parameters.deferred !== true);
+      if (
+        choiceTargets.some(
+          ({ requirement }) =>
+            new Set(requirement.legalIds).size < requirement.minimum,
         )
+      ) {
+        removeQueuedTriggerItem(game, item.id);
+        continue;
+      }
+      if (choiceTargets.length > 0) {
+        const requirements = choiceTargets.map(({ requirement }) => requirement);
+        game.state.pendingChoice = chainTargetChoice(
+          game,
+          item,
+          requirements,
+          choiceBindingKey,
+        );
+        return;
+      }
+      const requirement = handlers
+        .get(finalizationChoice.behaviorId)
+        ?.choice?.(finalizationChoice, context);
+      if (!requirement || requirement.kind !== "binary") {
+        throw new Error("Trigger-finalization optional choice is unavailable.");
+      }
+      game.state.pendingChoice = {
+        id: `choice:${game.stateVersion}:${item.id}:optional`,
+        playerId: item.controllerPlayerId,
+        type: "binary",
+        resolutionId: null,
+        bindingKey: choiceBindingKey,
+        prompt: requirement.prompt,
+        acceptLabel: requirement.acceptLabel ?? "Accept",
+        declineLabel: requirement.declineLabel ?? "Decline",
+        chainItem: item,
+      };
+      return;
+    }
+    const requirements = clause
+      ? selectionRequirementsForClause(clause, context, handlers)
           .filter(({ binding }) => binding.parameters.deferred !== true)
           .map(({ requirement }) => requirement)
       : [];
@@ -280,46 +396,7 @@ function continueQueuedChainItems(
       else updateQueuedTriggerItem(game, item);
       continue;
     }
-    const sourceZones = new Set(
-      requirements.map((requirement) => requirement.sourceZone),
-    );
-    const allowDecline = requirements.every(
-      (requirement) => requirement.minimum === 0,
-    );
-    game.state.pendingChoice = {
-      id: `choice:${game.stateVersion}:${item.id}:targets`,
-      playerId: item.controllerPlayerId,
-      type: "effectSelection",
-      resolutionId: null,
-      bindingKey: "chain-targets",
-      prompt: allowDecline
-        ? `Choose targets for ${item.label}, or decline.`
-        : `Choose targets for ${item.label}`,
-      title: item.label,
-      optionKind: requirements.some(
-        (requirement) => requirement.kind === "battlefield",
-      )
-        ? "battlefield"
-        : "card",
-      sourceZone:
-        sourceZones.size === 1 ? ([...sourceZones][0] ?? null) : null,
-      presentation: "cardSelection",
-      visionAction: "recycle",
-      legalCardIds: [
-        ...new Set(requirements.flatMap((requirement) => requirement.legalIds)),
-      ],
-      minimum: requirements.reduce(
-        (sum, requirement) => sum + requirement.minimum,
-        0,
-      ),
-      maximum: requirements.reduce(
-        (sum, requirement) => sum + requirement.maximum,
-        0,
-      ),
-      allowDecline,
-      chainItem: item,
-      targetRequirements: requirements,
-    };
+    game.state.pendingChoice = chainTargetChoice(game, item, requirements);
     return;
   }
   queueNextTriggerOrderChoice(game);
@@ -582,6 +659,105 @@ function activeSourceIds(
       id,
       index,
     ),
+  );
+}
+
+function chainTargetChoice(
+  game: GameDocument,
+  item: ChainItem,
+  requirements: ReturnType<typeof selectionRequirementsForClause>[number]["requirement"][],
+  optionalChoiceBindingKey?: string,
+): Extract<NonNullable<GameDocument["state"]["pendingChoice"]>, { type: "effectSelection" }> {
+  const sourceZones = new Set(
+    requirements.map((requirement) => requirement.sourceZone),
+  );
+  const allowDecline = Boolean(optionalChoiceBindingKey) || requirements.every(
+    (requirement) => requirement.minimum === 0,
+  );
+  return {
+    id: `choice:${game.stateVersion}:${item.id}:targets`,
+    playerId: item.controllerPlayerId,
+    type: "effectSelection",
+    resolutionId: null,
+    bindingKey: "chain-targets",
+    prompt: allowDecline
+      ? `Choose targets for ${item.label}, or decline.`
+      : `Choose targets for ${item.label}`,
+    title: item.label,
+    optionKind: requirements.some(
+      (requirement) => requirement.kind === "battlefield",
+    )
+      ? "battlefield"
+      : "card",
+    sourceZone: sourceZones.size === 1 ? ([...sourceZones][0] ?? null) : null,
+    presentation: "cardSelection",
+    visionAction: "recycle",
+    legalCardIds: [
+      ...new Set(requirements.flatMap((requirement) => requirement.legalIds)),
+    ],
+    minimum: requirements.reduce(
+      (sum, requirement) => sum + requirement.minimum,
+      0,
+    ),
+    maximum: requirements.reduce(
+      (sum, requirement) => sum + requirement.maximum,
+      0,
+    ),
+    allowDecline,
+    optionalChoiceBindingKey,
+    chainItem: item,
+    targetRequirements: requirements,
+  };
+}
+
+function lockChainSelectorSelections(
+  game: GameDocument,
+  item: ChainItem,
+  selectedIds: string[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  if (!item.sourceCardInstanceId || !item.behaviorClauseId) return;
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const clause = compileBehaviorModel(
+    definitionForInstance(item.sourceCardInstanceId, index).behaviorModel,
+    handlers,
+  ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+  if (!clause) return;
+  const context = createBehaviorContext(
+    game,
+    item.controllerPlayerId,
+    item.sourceCardInstanceId,
+    item.behaviorEvent,
+    [],
+  );
+  applyChoiceSelections(clause, item.lockedSelectionsByBinding, context);
+  const requirements = selectionRequirementsForClause(
+    clause,
+    context,
+    handlers,
+  ).filter(({ binding }) => binding.parameters.deferred !== true);
+  const selections = allocateSelections(
+    requirements.map(({ requirement }) => requirement),
+    selectedIds,
+  );
+  requirements.forEach(({ binding }, index) => {
+    item.lockedSelectionsByBinding[
+      `${clause.id}:selectors:${binding.order}`
+    ] = selections[index] ?? [];
+  });
+}
+
+function removeQueuedTriggerItem(game: GameDocument, itemId: string) {
+  game.state.queuedChainItems = (game.state.queuedChainItems ?? []).filter(
+    (item) => item.id !== itemId,
+  );
+  game.state.queuedTriggerChoices = game.state.queuedTriggerChoices.map(
+    (choice) => ({
+      ...choice,
+      optionIds: choice.optionIds.filter((id) => id !== itemId),
+      pendingItems: choice.pendingItems.filter((item) => item.id !== itemId),
+    }),
   );
 }
 

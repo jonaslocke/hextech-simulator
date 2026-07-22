@@ -1697,8 +1697,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("player", "player", "The player who may choose to apply the behavior."),
       required("selectionKey", "string", "Stable key read by the optional behavior branch."),
       optional("prompt", "string", "The optional effect prompt."),
+      optional(
+        "decisionTiming",
+        "string",
+        "When the optional decision is made.",
+        ["resolution", "triggerFinalization"],
+      ),
     ],
-    engineSupport: supported("The runtime records an explicit Accept or Decline decision before executing effects gated by the choice key.")
+    engineSupport: supported("The runtime records an explicit Accept or Decline decision at resolution or, when declared, while finalizing a triggered ability before Priority passes.")
   }),
   "keyword.vision": primitiveSeed({
     id: "keyword.vision",

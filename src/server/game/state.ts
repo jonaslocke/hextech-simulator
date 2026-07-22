@@ -250,6 +250,7 @@ const binaryChoiceSchema = z.object({
   id: z.string().min(1), playerId: z.string().min(1), type: z.literal("binary"),
   resolutionId: z.string().min(1).nullable(), bindingKey: z.string().min(1), prompt: z.string().min(1),
   acceptLabel: z.string().min(1), declineLabel: z.string().min(1),
+  chainItem: chainItemSchema.nullable().optional(),
   // Retained for persisted games created before paid decisions received their
   // own choice type. New death-replacement prompts use resourcePayment.
   deathReplacement: deathReplacementRequestSchema.optional(),
