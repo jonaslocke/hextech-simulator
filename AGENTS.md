@@ -313,6 +313,66 @@ describe this map or its tests as card acceptance. If two primitives are already
 tested independently but their shared boundary is not, treat the boundary as
 untested.
 
+### Permission, restriction, and scope coverage
+
+A test that proves an operation is allowed does not establish the boundaries of
+that permission. Whenever a primitive grants, prevents, replaces, redirects, or
+changes the legality of an operation, test both entitlement and containment.
+The minimum useful fixture normally contains the intended beneficiary and one
+nearby non-beneficiary that differs along exactly one relevant scope axis.
+
+Identify every scope dimension encoded or implied by the primitive, including:
+
+- source versus another object;
+- owner, controller, actor, affected player, and opponent;
+- selected object versus an unselected object;
+- source location, another controlled location, open location, and opposing
+  location;
+- active zone versus each normally active or nearby inactive zone;
+- current event subject versus another object with the same definition;
+- current turn, one-shot use, or other duration boundary;
+- permission source active, inactive, moved, exhausted, removed, or
+  zone-changed.
+
+For each applicable scope dimension, include a paired assertion:
+
+- the intended beneficiary, zone, destination, event, or operation is included;
+- the closest non-beneficiary or forbidden alternative is excluded and remains
+  unchanged if submitted through a stale or malformed path.
+
+Do not model materially different statements with one unscoped flag. Wording
+such as "me," "this," "selected," "friendly," "enemy," "at this location,"
+"from this zone," and "this turn" must become explicit primitive parameters or
+an equally explicit engine contract. Determine whether a modifier is additive,
+exclusive, or replacing, and test that distinction. In particular, an
+additional active zone or legal destination must not silently preserve a normal
+zone or grant the same permission to other objects unless the contract says so.
+
+When legality is exposed through player actions, exercise the complete boundary
+with the same synthetic state:
+
+1. Assert that projection exposes every legal option and omits the nearest
+   illegal option.
+2. Submit a projected legal option and assert the intended mutation.
+3. Submit or directly validate the omitted/stale option at the server boundary
+   and assert rejection or an explicit no-op with no resource, zone, history,
+   permission, or pending-state corruption.
+4. Change or remove the permission source between projection and execution when
+   that state can become stale, then repeat the server-side assertion.
+
+When a new parameter gives stricter meaning to previously persisted behavior,
+cover both new explicit data and supported legacy data. Legacy compatibility
+must infer only what the old approved data actually states; it must not restore
+the original over-broad behavior. If safe inference is impossible, reject the
+legacy state or require migration rather than silently widening permission.
+
+Before keeping a primitive test, ask both questions:
+
+- What proves that the intended object can receive this behavior?
+- What proves that the nearest unintended object cannot receive it?
+
+If the test answers only the first question, its scope coverage is incomplete.
+
 ### When a gameplay change touches a primitive
 
 A card implementation may expose a missing or broken reusable primitive. In
