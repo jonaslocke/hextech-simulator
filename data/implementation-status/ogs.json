@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGS",
-  "updatedAt": "2026-07-22T16:45:42.785Z",
+  "updatedAt": "2026-07-22T17:19:41.933Z",
   "cards": [
     {
       "gameplayIdentity": "OGS-001:Annie Fiery",
@@ -313,7 +313,7 @@
     },
     {
       "gameplayIdentity": "OGS-009:Yi Honed",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-009",
         "approvedAt": "2026-07-10T22:11:16.659Z"
@@ -325,9 +325,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-009 approved."
+        },
+        {
+          "at": "2026-07-22T17:19:41.933Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-10T22:11:16.659Z",
+      "updatedAt": "2026-07-22T17:19:41.933Z",
       "name": "Master Yi, Honed",
       "cleanName": "Yi Honed",
       "printingCodes": [

@@ -11,13 +11,13 @@ import {
   Layers3,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
-
 import ognData from "@data/implementation-status/ogn.json";
 import ogsData from "@data/implementation-status/ogs.json";
 import sfdData from "@data/implementation-status/sfd.json";
 import unlData from "@data/implementation-status/unl.json";
-
 import ognCardsData from "@data/sets/ogn.json";
 import ogsCardsData from "@data/sets/ogs.json";
 import sfdCardsData from "@data/sets/sfd.json";
@@ -53,61 +53,9 @@ import {
   SelectValue,
 } from "@/shared/components/select";
 import { Separator } from "@/shared/components/separator";
+import { cn } from "@/shared/utils/cn";
 
-const PAGE_SIZE = 40;
-
-const STATUS_ORDER = [
-  "accepted",
-  "manual_family_passed",
-  "ready_for_manual_validation",
-  "implemented",
-  "unreviewed",
-];
-
-const STATUS_META: Record<
-  string,
-  {
-    label: string;
-    description: string;
-    className: string;
-    dotClassName: string;
-  }
-> = {
-  accepted: {
-    label: "Accepted",
-    description: "Implementation and validation accepted.",
-    className:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    dotClassName: "bg-emerald-500",
-  },
-  manual_family_passed: {
-    label: "Manual family passed",
-    description: "The reusable behavior family passed manual validation.",
-    className:
-      "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
-    dotClassName: "bg-cyan-500",
-  },
-  ready_for_manual_validation: {
-    label: "Ready for validation",
-    description: "Implemented and waiting for manual validation.",
-    className:
-      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-    dotClassName: "bg-amber-500",
-  },
-  implemented: {
-    label: "Implemented",
-    description: "A canonical behavior model is available.",
-    className:
-      "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-    dotClassName: "bg-blue-500",
-  },
-  unreviewed: {
-    label: "Unreviewed",
-    description: "No canonical implementation has been approved yet.",
-    className: "border-muted-foreground/20 bg-muted text-muted-foreground",
-    dotClassName: "bg-muted-foreground/50",
-  },
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FamilyStatus = {
   familyId: string;
@@ -130,71 +78,14 @@ type CardImplementation = {
   cleanName: string;
   printingCodes: string[];
   sourceCardIds: string[];
-  printings: Array<{
-    sourceCardId: string;
-    cardCode: string;
-    name: string;
-  }>;
+  printings: Array<{ sourceCardId: string; cardCode: string; name: string }>;
   status: string;
-  canonicalModel: null | {
-    cardCode: string;
-    approvedAt: string;
-  };
+  canonicalModel: null | { cardCode: string; approvedAt: string };
   familyStatuses: FamilyStatus[];
   history: HistoryEntry[];
   updatedAt: string;
   imageUrl?: string;
-  media?: {
-    image_url?: string;
-    accessibility_text?: string;
-    artist?: string;
-  };
-};
-
-type ImplementationSet = {
-  schemaVersion: number;
-  setCode: string;
-  updatedAt: string;
-  cards: CardImplementation[];
-};
-
-type SourceCard = {
-  id: string;
-  name: string;
-  riftbound_id?: string;
-  public_code?: string;
-  collector_number?: number;
-  attributes?: {
-    energy?: number | null;
-    might?: number | null;
-    power?: number | null;
-  };
-  classification?: {
-    type?: string | null;
-    supertype?: string | null;
-    rarity?: string | null;
-    domain?: string[];
-  };
-  text?: {
-    plain?: string;
-  };
-  set?: {
-    set_id?: string;
-    label?: string;
-  };
-  media?: {
-    image_url?: string;
-    artist?: string;
-    accessibility_text?: string;
-  };
-  tags?: string[];
-  orientation?: "portrait" | "landscape" | string;
-  metadata?: {
-    clean_name?: string;
-    alternate_art?: boolean;
-    overnumbered?: boolean;
-    signature?: boolean;
-  };
+  media?: { image_url?: string; accessibility_text?: string; artist?: string };
 };
 
 type CardArtwork = {
@@ -214,6 +105,44 @@ type CardArtwork = {
   power?: number | null;
 };
 
+type ImplementationSet = {
+  schemaVersion: number;
+  setCode: string;
+  updatedAt: string;
+  cards: CardImplementation[];
+};
+
+type SourceCard = {
+  id: string;
+  name: string;
+  public_code?: string;
+  attributes?: {
+    energy?: number | null;
+    might?: number | null;
+    power?: number | null;
+  };
+  classification?: {
+    type?: string | null;
+    supertype?: string | null;
+    rarity?: string | null;
+    domain?: string[];
+  };
+  text?: { plain?: string };
+  media?: {
+    image_url?: string;
+    artist?: string;
+    accessibility_text?: string;
+  };
+  tags?: string[];
+  orientation?: string;
+  metadata?: {
+    clean_name?: string;
+    alternate_art?: boolean;
+    overnumbered?: boolean;
+    signature?: boolean;
+  };
+};
+
 type CatalogCard = CardImplementation & {
   setCode: string;
   setUpdatedAt: string;
@@ -223,20 +152,101 @@ type CatalogCard = CardImplementation & {
 };
 
 type SortOption = "code-asc" | "name-asc" | "updated-desc" | "status-desc";
+type FamilyDraft = { status: string; note: string };
+type SaveFeedback = { kind: "error" | "success"; message: string } | null;
 
-type ImageFilter = "all" | "with-image" | "missing-image";
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-type FamilyDraft = {
-  status: string;
-  note: string;
+const PAGE_SIZE = 40;
+
+const STATUS_ORDER = [
+  "accepted",
+  "manual_family_passed",
+  "ready_for_manual_validation",
+  "implemented",
+  "unreviewed",
+];
+
+const STATUS_META: Record<
+  string,
+  { label: string; description: string; className: string; dotClassName: string }
+> = {
+  accepted: {
+    label: "Accepted",
+    description: "Implementation and validation accepted.",
+    className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-400",
+    dotClassName: "bg-emerald-400",
+  },
+  manual_family_passed: {
+    label: "Manual family passed",
+    description: "The reusable behavior family passed manual validation.",
+    className: "border-cyan-500/25 bg-cyan-500/10 text-cyan-400",
+    dotClassName: "bg-cyan-400",
+  },
+  ready_for_manual_validation: {
+    label: "Ready for validation",
+    description: "Implemented and waiting for manual validation.",
+    className: "border-amber-500/25 bg-amber-500/10 text-amber-400",
+    dotClassName: "bg-amber-400",
+  },
+  implemented: {
+    label: "Implemented",
+    description: "A canonical behavior model is available.",
+    className: "border-blue-500/25 bg-blue-500/10 text-blue-400",
+    dotClassName: "bg-blue-400",
+  },
+  unreviewed: {
+    label: "Unreviewed",
+    description: "No canonical implementation has been approved yet.",
+    className: "border-white/10 bg-white/5 text-muted-foreground",
+    dotClassName: "bg-muted-foreground/50",
+  },
 };
 
-type SaveFeedback = {
-  kind: "error" | "success";
-  message: string;
-} | null;
+// ─── Demo data (replace with real imports in your project) ─────────────────────
 
-const SET_FILES = [
+/*
+const DEMO_CARDS: CatalogCard[] = [
+  { name: "Annie, Fiery", cleanName: "Annie Fiery", primaryCode: "OGS-001/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Firestorm", cleanName: "Firestorm", primaryCode: "OGS-002/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Incinerate", cleanName: "Incinerate", primaryCode: "OGS-003/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Master Yi, Meditative", cleanName: "Master Yi", primaryCode: "OGS-004/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Zephyr Sage", cleanName: "Zephyr Sage", primaryCode: "OGS-005/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Lux, Illuminated", cleanName: "Lux", primaryCode: "OGS-006/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Garen, Rugged", cleanName: "Garen", primaryCode: "OGS-007/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Gentleman's Duel", cleanName: "Gentlemans Duel", primaryCode: "OGS-008/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Master Yi, Honored", cleanName: "Master Yi", primaryCode: "OGS-009/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Annie, Stubborn", cleanName: "Annie", primaryCode: "OGS-010/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Flash", cleanName: "Flash", primaryCode: "OGS-011/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Blast of Power", cleanName: "Blast of Power", primaryCode: "OGS-012/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Garen, Commander", cleanName: "Garen", primaryCode: "OGS-013/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Lux, Crownguard", cleanName: "Lux", primaryCode: "OGS-014/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Recruit the Vanguard", cleanName: "Recruit Vanguard", primaryCode: "OGS-015/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Vanguard Attendant", cleanName: "Vanguard Attendant", primaryCode: "OGS-016/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Dark Child — Starter", cleanName: "Dark Child", primaryCode: "OGS-017/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Tibbers", cleanName: "Tibbers", primaryCode: "OGS-018/024", setCode: "OGS", status: "implemented", implemented: true },
+  { name: "Wuju Bladesman — Starter", cleanName: "Wuju Bladesman", primaryCode: "OGS-019/024", setCode: "OGS", status: "ready_for_manual_validation", implemented: true },
+  { name: "Highlander", cleanName: "Highlander", primaryCode: "OGS-020/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Lady of Luminosity — Star...", cleanName: "Lady Luminosity", primaryCode: "OGS-021/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Final Spark", cleanName: "Final Spark", primaryCode: "OGS-022/024", setCode: "OGS", status: "accepted", implemented: true },
+  { name: "Might of Demacia — Star...", cleanName: "Might Demacia", primaryCode: "OGS-023/024", setCode: "OGS", status: "ready_for_manual_validation", implemented: true },
+  { name: "Decisive Strike", cleanName: "Decisive Strike", primaryCode: "OGS-024/024", setCode: "OGS", status: "accepted", implemented: true },
+].map((c, i) => ({
+  ...c,
+  gameplayIdentity: `${c.setCode}-${c.cleanName.replace(/\s/g, "-").toLowerCase()}`,
+  printingCodes: [c.primaryCode],
+  sourceCardIds: [],
+  printings: [],
+  canonicalModel: c.implemented ? { cardCode: c.primaryCode, approvedAt: "2024-07-22T00:00:00Z" } : null,
+  familyStatuses: i % 4 === 0 ? [{ familyId: "basic-attack", status: c.status, updatedAt: "2024-07-22T00:00:00Z" }] : [],
+  history: [{ at: "2024-07-22T00:00:00Z", event: "status_updated", status: c.status }],
+  updatedAt: "2024-07-22T00:00:00Z",
+  setUpdatedAt: "2024-07-22T04:05:00Z",
+  artwork: null,
+}));
+*/
+
+const REAL_SET_FILES = [
   ogsData as ImplementationSet,
   ognData as ImplementationSet,
   sfdData as ImplementationSet,
@@ -249,12 +259,6 @@ const SOURCE_CARDS_BY_SET: Record<string, SourceCard[]> = {
   SFD: sfdCardsData as SourceCard[],
   UNL: unlCardsData as SourceCard[],
 };
-
-function humanize(value: string) {
-  return value
-    .replace(/[-_]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
 
 function normalizeCardCode(value?: string) {
   if (!value) return "";
@@ -274,15 +278,7 @@ function normalizeName(value?: string) {
     .toLocaleLowerCase();
 }
 
-function hasCanonicalCollectorCode(value?: string) {
-  if (!value) return false;
-  return /^[A-Z]+-\d+\/\d+$/i.test(value.trim());
-}
-
-function sourceCardScore(
-  sourceCard: SourceCard,
-  implementation: CardImplementation,
-) {
+function sourceCardScore(sourceCard: SourceCard, implementation: CardImplementation) {
   const sourceIds = new Set([
     ...implementation.sourceCardIds,
     ...implementation.printings.map((printing) => printing.sourceCardId),
@@ -293,31 +289,20 @@ function sourceCardScore(
       ...implementation.printings.map((printing) => printing.cardCode),
     ].map(normalizeCardCode),
   );
-  const canonicalCode = normalizeCardCode(
-    implementation.canonicalModel?.cardCode,
-  );
+  const canonicalCode = normalizeCardCode(implementation.canonicalModel?.cardCode);
   const sourceCode = normalizeCardCode(sourceCard.public_code);
-  const sourceName = normalizeName(
-    sourceCard.metadata?.clean_name ?? sourceCard.name,
-  );
-  const implementationName = normalizeName(
-    implementation.cleanName ?? implementation.name,
-  );
+  const sourceName = normalizeName(sourceCard.metadata?.clean_name ?? sourceCard.name);
+  const implementationName = normalizeName(implementation.cleanName ?? implementation.name);
 
   let score = 0;
-
-  // Prefer the canonical collector code over a variant-specific source ID.
-  // This keeps OGN-193 ahead of OGN-193a, showcase, signature, or overnumbered art.
   if (canonicalCode && sourceCode === canonicalCode) score += 25_000;
   if (sourceCode && printingCodes.has(sourceCode)) score += 20_000;
   if (sourceIds.has(sourceCard.id)) score += 10_000;
   if (sourceName && sourceName === implementationName) score += 1_000;
-
-  if (hasCanonicalCollectorCode(sourceCard.public_code)) score += 100;
+  if (sourceCard.public_code && /^[A-Z]+-\d+\/\d+$/i.test(sourceCard.public_code.trim())) score += 100;
   if (sourceCard.metadata?.alternate_art === false) score += 40;
   if (sourceCard.metadata?.overnumbered === false) score += 20;
   if (sourceCard.metadata?.signature === false) score += 10;
-
   if (sourceCard.metadata?.alternate_art) score -= 100;
   if (sourceCard.metadata?.overnumbered) score -= 60;
   if (sourceCard.metadata?.signature) score -= 30;
@@ -347,13 +332,8 @@ function toArtwork(sourceCard: SourceCard): CardArtwork | null {
   };
 }
 
-function resolveArtwork(
-  implementation: CardImplementation,
-  setCode: string,
-): CardArtwork | null {
-  const implementationImage =
-    implementation.imageUrl ?? implementation.media?.image_url;
-
+function resolveArtwork(implementation: CardImplementation, setCode: string): CardArtwork | null {
+  const implementationImage = implementation.imageUrl ?? implementation.media?.image_url;
   if (implementationImage) {
     return {
       imageUrl: implementationImage,
@@ -364,16 +344,11 @@ function resolveArtwork(
     };
   }
 
-  const sourceCards = SOURCE_CARDS_BY_SET[setCode] ?? [];
-  const rankedCandidates = sourceCards
-    .map((sourceCard) => ({
-      sourceCard,
-      score: sourceCardScore(sourceCard, implementation),
-    }))
+  const rankedCandidates = (SOURCE_CARDS_BY_SET[setCode] ?? [])
+    .map((sourceCard) => ({ sourceCard, score: sourceCardScore(sourceCard, implementation) }))
     .filter(({ score, sourceCard }) => score > 0 && sourceCard.media?.image_url)
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
-
       return (left.sourceCard.public_code ?? "").localeCompare(
         right.sourceCard.public_code ?? "",
         undefined,
@@ -381,12 +356,10 @@ function resolveArtwork(
       );
     });
 
-  return rankedCandidates.length
-    ? toArtwork(rankedCandidates[0].sourceCard)
-    : null;
+  return rankedCandidates.length ? toArtwork(rankedCandidates[0].sourceCard) : null;
 }
 
-const CATALOG: CatalogCard[] = SET_FILES.flatMap((set) =>
+const REAL_CATALOG: CatalogCard[] = REAL_SET_FILES.flatMap((set) =>
   set.cards.map((card) => ({
     ...card,
     setCode: set.setCode,
@@ -397,24 +370,25 @@ const CATALOG: CatalogCard[] = SET_FILES.flatMap((set) =>
   })),
 );
 
-function getStatusMeta(status: string) {
-  return (
-    STATUS_META[status] ?? {
-      label: humanize(status),
-      description: "Custom implementation workflow status.",
-      className:
-        "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300",
-      dotClassName: "bg-violet-500",
-    }
-  );
+const REAL_SET_SUMMARIES = REAL_SET_FILES.map((set) => ({
+  setCode: set.setCode,
+  cards: set.cards.length,
+  implemented: set.cards.filter((card) => card.canonicalModel).length,
+  updatedAt: set.updatedAt,
+}));
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function humanize(value: string) {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatDate(value?: string) {
   if (!value) return "—";
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -422,21 +396,31 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
+function getStatusMeta(status: string) {
+  return (
+    STATUS_META[status] ?? {
+      label: humanize(status),
+      description: "Custom implementation workflow status.",
+      className: "border-violet-500/25 bg-violet-500/10 text-violet-400",
+      dotClassName: "bg-violet-400",
+    }
+  );
+}
+
 function shouldWarnBeforeStatusChange(current: string, next: string) {
   if (current === next) return false;
   if (current === "accepted") return true;
-  if (current === "manual_family_passed") {
-    return next !== "accepted";
-  }
+  if (current === "manual_family_passed") return next !== "accepted";
   return false;
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function StatusBadge({ status }: { status: string }) {
   const meta = getStatusMeta(status);
-
   return (
-    <Badge variant="outline" className={meta.className}>
-      <span className={`mr-1.5 size-1.5 rounded-full ${meta.dotClassName}`} />
+    <Badge variant="outline" className={cn("gap-1.5 font-normal", meta.className)}>
+      <span className={cn("rounded-full size-1.5 shrink-0", meta.dotClassName)} />
       {meta.label}
     </Badge>
   );
@@ -454,14 +438,14 @@ function MetricCard({
   icon: ReactNode;
 }) {
   return (
-    <Card className="bg-card/70 shadow-sm backdrop-blur">
+    <Card className="relative bg-white/[0.04] backdrop-blur-md border-white/[0.06] overflow-hidden">
       <CardContent className="flex justify-between items-start gap-4 p-5">
-        <div className="space-y-1">
-          <p className="font-medium text-muted-foreground text-sm">{title}</p>
-          <p className="font-semibold text-2xl tracking-tight">{value}</p>
-          <p className="text-muted-foreground text-xs">{description}</p>
+        <div className="space-y-1 min-w-0">
+          <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">{title}</p>
+          <p className="font-semibold text-foreground text-2xl tracking-tight">{value}</p>
+          <p className="text-muted-foreground text-xs leading-relaxed">{description}</p>
         </div>
-        <div className="bg-background/70 p-2.5 border rounded-lg text-muted-foreground">
+        <div className="bg-white/[0.06] p-2.5 border border-white/[0.08] rounded-lg text-primary shrink-0">
           {icon}
         </div>
       </CardContent>
@@ -482,14 +466,15 @@ function CardArtworkImage({
   if (!imageUrl || failed) {
     return (
       <div
-        className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/50 px-4 text-center text-muted-foreground ${className}`}
+        className={cn(
+          "flex flex-col justify-center items-center gap-2 bg-white/[0.03] px-4 w-full h-full text-muted-foreground text-center",
+          className,
+        )}
       >
-        <ImageOff className="size-8" />
+        <ImageOff className="opacity-40 size-7" />
         <div>
-          <p className="font-medium text-foreground text-sm">
-            Image unavailable
-          </p>
-          <p className="mt-1 font-mono text-xs">{card.primaryCode}</p>
+          <p className="font-medium text-foreground/60 text-xs">No image</p>
+          <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/60">{card.primaryCode}</p>
         </div>
       </div>
     );
@@ -502,7 +487,7 @@ function CardArtworkImage({
       loading="lazy"
       decoding="async"
       onError={() => setFailed(true)}
-      className={`h-full w-full object-contain ${className}`}
+      className={cn("w-full h-full object-contain", className)}
     />
   );
 }
@@ -521,92 +506,100 @@ function CatalogCardTile({
       type="button"
       onClick={() => onSelect(card)}
       aria-label={`View ${card.name} implementation details`}
-      className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-w-0 text-left"
+      className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-w-0 text-left"
     >
-      <Card className="bg-card/80 shadow-sm group-hover:shadow-md group-hover:border-primary/35 h-full overflow-hidden transition group-hover:-translate-y-0.5 duration-200">
-        <div className="relative bg-black/10 dark:bg-black/30 p-1.5 aspect-[744/1039] overflow-hidden">
+      <div className="bg-white/[0.03] group-hover:bg-white/[0.06] group-hover:shadow-black/30 group-hover:shadow-lg backdrop-blur-sm border border-white/[0.07] group-hover:border-primary/30 rounded-xl h-full overflow-hidden transition-all group-hover:-translate-y-0.5 duration-200">
+        {/* Artwork */}
+        <div className="relative bg-black/20 p-1.5 aspect-[744/1039] overflow-hidden">
           <CardArtworkImage
             card={card}
-            className="rounded-md group-hover:scale-[1.015] transition duration-200"
+            className="rounded-md group-hover:scale-[1.012] transition-transform duration-300"
           />
 
+          {/* Top badges */}
           <div className="top-2 absolute inset-x-2 flex justify-between items-start gap-2 pointer-events-none">
-            <Badge className="bg-background/90 shadow-sm backdrop-blur border-black/10 font-mono text-[10px]">
+            <span className="bg-black/60 backdrop-blur-sm px-1.5 py-0.5 border border-white/15 rounded-md font-mono font-medium text-[9px] text-white/80">
               {card.setCode}
-            </Badge>
+            </span>
             <span
               title={statusMeta.label}
-              className={`size-3 rounded-full border-2 border-background shadow-sm ${statusMeta.dotClassName}`}
+              className={cn(
+                "shadow-sm border-2 border-background/80 rounded-full size-2.5",
+                statusMeta.dotClassName,
+              )}
             />
           </div>
 
-          {card.implemented ? (
-            <div className="right-2 bottom-2 absolute bg-background/90 shadow-sm backdrop-blur p-1.5 border border-emerald-500/30 rounded-full text-emerald-600 dark:text-emerald-300 pointer-events-none">
-              <CheckCircle2 className="size-3.5" />
+          {/* Implemented checkmark */}
+          {card.implemented && (
+            <div className="right-2 bottom-2 absolute bg-black/70 backdrop-blur-sm p-1 border border-emerald-500/30 rounded-full pointer-events-none">
+              <CheckCircle2 className="size-3 text-emerald-400" />
             </div>
-          ) : null}
+          )}
         </div>
 
-        <CardContent className="space-y-2 p-3">
+        {/* Card info */}
+        <div className="space-y-1.5 p-2.5">
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate" title={card.name}>
+            <p className="font-semibold text-[13px] text-foreground/90 truncate leading-tight" title={card.name}>
               {card.name}
             </p>
-            <p className="mt-1 font-mono text-[11px] text-muted-foreground truncate">
+            <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/70 truncate">
               {card.artwork?.publicCode ?? card.primaryCode}
             </p>
           </div>
 
-          <StatusBadge status={card.status} />
+          <Badge
+            variant="outline"
+            className={cn(
+              "gap-1 px-1.5 py-0 h-5 font-normal text-[10px] whitespace-nowrap",
+              statusMeta.className,
+            )}
+          >
+            <span className={cn("rounded-full size-1.5 shrink-0", statusMeta.dotClassName)} />
+            {statusMeta.label}
+          </Badge>
 
-          {card.familyStatuses.length ? (
-            <p className="text-[11px] text-muted-foreground truncate">
-              {card.familyStatuses.length} behavior family
-              {card.familyStatuses.length === 1 ? "" : "ies"}
-            </p>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              No behavior family
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          <p className="text-[10px] text-muted-foreground/50 truncate">
+            {card.familyStatuses.length
+              ? `${card.familyStatuses.length} behavior famil${card.familyStatuses.length === 1 ? "y" : "ies"}`
+              : "No behavior family"}
+          </p>
+        </div>
+      </div>
     </button>
   );
 }
 
+// ─── Main dashboard ────────────────────────────────────────────────────────────
+
 export default function CardImplementationDashboard() {
-  const [catalog, setCatalog] = useState(CATALOG);
+  const [catalog, setCatalog] = useState<CatalogCard[]>(REAL_CATALOG);
   const [search, setSearch] = useState("");
   const [setFilter, setSetFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [implementationFilter, setImplementationFilter] = useState("all");
-  const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
+  const [imageFilter, setImageFilter] = useState("all");
   const [familyFilter, setFamilyFilter] = useState("all");
   const [sort, setSort] = useState<SortOption>("code-asc");
   const [page, setPage] = useState(1);
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
-  const [setUpdatedAtByCode, setSetUpdatedAtByCode] = useState<
-    Record<string, string>
-  >(() => Object.fromEntries(SET_FILES.map((set) => [set.setCode, set.updatedAt])));
   const [cardStatusDraft, setCardStatusDraft] = useState("");
   const [cardNoteDraft, setCardNoteDraft] = useState("");
-  const [familyDrafts, setFamilyDrafts] = useState<Record<string, FamilyDraft>>(
-    {},
-  );
+  const [familyDrafts, setFamilyDrafts] = useState<Record<string, FamilyDraft>>({});
   const [savingTarget, setSavingTarget] = useState<string | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null);
+  const [setUpdatedAtByCode, setSetUpdatedAtByCode] = useState<Record<string, string>>(
+    () => Object.fromEntries(REAL_SET_SUMMARIES.map((set) => [set.setCode, set.updatedAt])),
+  );
 
   const selectCard = (card: CatalogCard) => {
     setSelectedCard(card);
-    setCardStatusDraft(card.status);
+    setCardStatusDraft(card.status as string);
     setCardNoteDraft("");
     setFamilyDrafts(
       Object.fromEntries(
-        card.familyStatuses.map((family) => [
-          family.familyId,
-          { status: family.status, note: family.note ?? "" },
-        ]),
+        card.familyStatuses.map((f) => [f.familyId, { status: f.status, note: f.note ?? "" }]),
       ),
     );
     setSaveFeedback(null);
@@ -651,17 +644,136 @@ export default function CardImplementationDashboard() {
     response: Extract<CardImplementationStatusUpdateResponse, { accepted: false }>,
   ) => response.error.message;
 
-  const saveCardStatus = async () => {
-    if (!selectedCard || savingTarget) return;
+  const statusCounts = useMemo(
+    () =>
+      catalog.reduce<Record<string, number>>((acc, card) => {
+        acc[card.status] = (acc[card.status] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [catalog],
+  );
 
+  const statusOptions = useMemo(() => {
+    const statuses = catalog.flatMap((c) => [c.status, ...c.familyStatuses.map((f) => f.status)]);
+    return Array.from(new Set([...STATUS_ORDER, ...statuses])).sort((a, b) => {
+      const ai = STATUS_ORDER.indexOf(a);
+      const bi = STATUS_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }, [catalog]);
+
+  const familyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(catalog.flatMap((c) => c.familyStatuses.map((f) => f.familyId))),
+      ).sort((a, b) => a.localeCompare(b)),
+    [catalog],
+  );
+
+  const totalImplemented = useMemo(() => catalog.filter((c) => c.implemented).length, [catalog]);
+  const implementationPercentage = Math.round((totalImplemented / catalog.length) * 100);
+
+  const filteredCards = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase();
+    const result = catalog.filter((card) => {
+      const matchesSearch =
+        !q ||
+        card.name.toLocaleLowerCase().includes(q) ||
+        card.cleanName.toLocaleLowerCase().includes(q) ||
+        card.gameplayIdentity.toLocaleLowerCase().includes(q) ||
+        card.printingCodes.some((code) => code.toLocaleLowerCase().includes(q)) ||
+        card.familyStatuses.some((f) => f.familyId.toLocaleLowerCase().includes(q));
+      const matchesSet = !setFilter || setFilter === "all" || card.setCode === setFilter;
+      const matchesStatus = !statusFilter || statusFilter === "all" || card.status === statusFilter;
+      const matchesImpl =
+        !implementationFilter ||
+        implementationFilter === "all" ||
+        (implementationFilter === "implemented" && card.implemented) ||
+        (implementationFilter === "not-implemented" && !card.implemented);
+      const matchesImage =
+        !imageFilter ||
+        imageFilter === "all" ||
+        (imageFilter === "with-image" && Boolean(card.artwork)) ||
+        (imageFilter === "missing-image" && !card.artwork);
+      const matchesFamily =
+        !familyFilter || familyFilter === "all" || card.familyStatuses.some((f) => f.familyId === familyFilter);
+      return matchesSearch && matchesSet && matchesStatus && matchesImpl && matchesImage && matchesFamily;
+    });
+
+    const effectiveSort = sort ?? "code-asc";
+    result.sort((a, b) => {
+      if (effectiveSort === "name-asc") return a.name.localeCompare(b.name);
+      if (effectiveSort === "updated-desc") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      if (effectiveSort === "status-desc") {
+        const ai = STATUS_ORDER.indexOf(a.status);
+        const bi = STATUS_ORDER.indexOf(b.status);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.primaryCode.localeCompare(b.primaryCode);
+      }
+      return a.primaryCode.localeCompare(b.primaryCode, undefined, { numeric: true });
+    });
+
+    return result;
+  }, [catalog, search, setFilter, statusFilter, implementationFilter, imageFilter, familyFilter, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredCards.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const visibleCards = filteredCards.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const resetPage = () => setPage(1);
+
+  const clearFilters = () => {
+    setSearch("");
+    setSetFilter("all");
+    setStatusFilter("all");
+    setImplementationFilter("all");
+    setImageFilter("all");
+    setFamilyFilter("all");
+    setSort("code-asc");
+    setPage(1);
+  };
+
+  const hasActiveFilters =
+    search !== "" ||
+    (setFilter !== "all" && setFilter !== null) ||
+    (statusFilter !== "all" && statusFilter !== null) ||
+    (implementationFilter !== "all" && implementationFilter !== null) ||
+    (imageFilter !== "all" && imageFilter !== null) ||
+    (familyFilter !== "all" && familyFilter !== null) ||
+    (sort !== "code-asc" && sort !== null);
+
+  const exportCsv = () => {
+    const esc = (v: string | number | boolean) => `"${String(v).replaceAll('"', '""')}"`;
+    const rows = [
+      ["Code", "Name", "Set", "Workflow status", "Implemented", "Canonical model", "Updated at"],
+      ...filteredCards.map((c) => [
+        c.artwork?.publicCode ?? c.primaryCode,
+        c.name,
+        c.setCode,
+        c.status,
+        c.implemented,
+        c.canonicalModel?.cardCode ?? "",
+        c.updatedAt,
+      ]),
+    ];
+    const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "card-implementation-catalog.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const saveCardStatus = async () => {
+    if (!selectedCard || savingTarget || !cardStatusDraft) return;
     if (
       shouldWarnBeforeStatusChange(selectedCard.status, cardStatusDraft) &&
       !window.confirm(
-        `This changes the card from ${getStatusMeta(selectedCard.status).label} to ${getStatusMeta(cardStatusDraft).label}. Continue?`,
+        `Change from ${getStatusMeta(selectedCard.status).label} to ${getStatusMeta(cardStatusDraft).label}?`,
       )
-    ) {
-      return;
-    }
+    ) return;
 
     setSavingTarget("card");
     setSaveFeedback(null);
@@ -693,22 +805,15 @@ export default function CardImplementationDashboard() {
     }
   };
 
-  const updateFamilyDraft = (
-    familyId: string,
-    update: Partial<FamilyDraft>,
-  ) => {
-    setFamilyDrafts((current) => ({
-      ...current,
-      [familyId]: {
-        ...(current[familyId] ?? { status: "unreviewed", note: "" }),
-        ...update,
-      },
+  const updateFamilyDraft = (familyId: string, update: Partial<FamilyDraft>) => {
+    setFamilyDrafts((prev) => ({
+      ...prev,
+      [familyId]: { ...(prev[familyId] ?? { status: "unreviewed", note: "" }), ...update },
     }));
   };
 
   const saveFamilyStatus = async (familyId: string) => {
     if (!selectedCard || savingTarget) return;
-
     const draft = familyDrafts[familyId];
     if (!draft) return;
 
@@ -720,7 +825,7 @@ export default function CardImplementationDashboard() {
     if (
       shouldWarnBeforeStatusChange(currentFamily.status, draft.status) &&
       !window.confirm(
-        `This changes ${familyId} from ${getStatusMeta(currentFamily.status).label} to ${getStatusMeta(draft.status).label}. Continue?`,
+        `Change ${familyId} from ${getStatusMeta(currentFamily.status).label} to ${getStatusMeta(draft.status).label}?`,
       )
     ) {
       return;
@@ -745,264 +850,56 @@ export default function CardImplementationDashboard() {
       }
 
       updateCatalogCard(response);
-      setSaveFeedback({
-        kind: "success",
-        message: `${familyId} status saved.`,
-      });
+      setSaveFeedback({ kind: "success", message: `${familyId} status saved.` });
     } catch (caught) {
       setSaveFeedback({
         kind: "error",
-        message:
-          caught instanceof Error ? caught.message : "Family status save failed.",
+        message: caught instanceof Error ? caught.message : "Family status save failed.",
       });
     } finally {
       setSavingTarget(null);
     }
   };
 
-  const statusCounts = useMemo(() => {
-    return catalog.reduce<Record<string, number>>((counts, card) => {
-      counts[card.status] = (counts[card.status] ?? 0) + 1;
-      return counts;
-    }, {});
-  }, [catalog]);
-
-  const statusOptions = useMemo(() => {
-    const statuses = catalog.flatMap((card) => [
-      card.status,
-      ...card.familyStatuses.map((family) => family.status),
-    ]);
-
-    return Array.from(new Set([...STATUS_ORDER, ...statuses])).sort(
-      (left, right) => {
-        const leftIndex = STATUS_ORDER.indexOf(left);
-        const rightIndex = STATUS_ORDER.indexOf(right);
-        return (
-          (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) -
-          (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex)
-        );
-      },
-    );
-  }, [catalog]);
-
-  const familyOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        catalog.flatMap((card) =>
-          card.familyStatuses.map((family) => family.familyId),
-        ),
-      ),
-    ).sort((left, right) => left.localeCompare(right));
-  }, [catalog]);
-
-  const totalImplemented = useMemo(
-    () => catalog.filter((card) => card.implemented).length,
-    [catalog],
-  );
-  const totalWithImages = useMemo(
-    () => catalog.filter((card) => card.artwork).length,
-    [catalog],
-  );
-  const implementationPercentage = Math.round(
-    (totalImplemented / catalog.length) * 100,
-  );
-
-  const filteredCards = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase();
-
-    const result = catalog.filter((card) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        card.name.toLocaleLowerCase().includes(normalizedSearch) ||
-        card.cleanName.toLocaleLowerCase().includes(normalizedSearch) ||
-        card.gameplayIdentity.toLocaleLowerCase().includes(normalizedSearch) ||
-        card.printingCodes.some((code) =>
-          code.toLocaleLowerCase().includes(normalizedSearch),
-        ) ||
-        card.artwork?.publicCode
-          ?.toLocaleLowerCase()
-          .includes(normalizedSearch) ||
-        card.artwork?.type?.toLocaleLowerCase().includes(normalizedSearch) ||
-        card.artwork?.domains.some((domain) =>
-          domain.toLocaleLowerCase().includes(normalizedSearch),
-        ) ||
-        card.familyStatuses.some((family) =>
-          family.familyId.toLocaleLowerCase().includes(normalizedSearch),
-        );
-
-      const matchesSet = setFilter === "all" || card.setCode === setFilter;
-      const matchesStatus =
-        statusFilter === "all" || card.status === statusFilter;
-      const matchesImplementation =
-        implementationFilter === "all" ||
-        (implementationFilter === "implemented" && card.implemented) ||
-        (implementationFilter === "not-implemented" && !card.implemented);
-      const matchesImage =
-        imageFilter === "all" ||
-        (imageFilter === "with-image" && Boolean(card.artwork)) ||
-        (imageFilter === "missing-image" && !card.artwork);
-      const matchesFamily =
-        familyFilter === "all" ||
-        card.familyStatuses.some((family) => family.familyId === familyFilter);
-
-      return (
-        matchesSearch &&
-        matchesSet &&
-        matchesStatus &&
-        matchesImplementation &&
-        matchesImage &&
-        matchesFamily
-      );
-    });
-
-    result.sort((left, right) => {
-      if (sort === "name-asc") {
-        return left.name.localeCompare(right.name);
-      }
-
-      if (sort === "updated-desc") {
-        return (
-          new Date(right.updatedAt).getTime() -
-          new Date(left.updatedAt).getTime()
-        );
-      }
-
-      if (sort === "status-desc") {
-        const leftRank = STATUS_ORDER.indexOf(left.status);
-        const rightRank = STATUS_ORDER.indexOf(right.status);
-        const normalizedLeft = leftRank === -1 ? STATUS_ORDER.length : leftRank;
-        const normalizedRight =
-          rightRank === -1 ? STATUS_ORDER.length : rightRank;
-        return (
-          normalizedLeft - normalizedRight ||
-          left.primaryCode.localeCompare(right.primaryCode)
-        );
-      }
-
-      return left.primaryCode.localeCompare(right.primaryCode, undefined, {
-        numeric: true,
-      });
-    });
-
-    return result;
-  }, [
-    familyFilter,
-    imageFilter,
-    implementationFilter,
-    catalog,
-    search,
-    setFilter,
-    sort,
-    statusFilter,
-  ]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredCards.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const visibleCards = filteredCards.slice(pageStart, pageStart + PAGE_SIZE);
-
-  const resetPage = () => setPage(1);
-
-  const clearFilters = () => {
-    setSearch("");
-    setSetFilter("all");
-    setStatusFilter("all");
-    setImplementationFilter("all");
-    setImageFilter("all");
-    setFamilyFilter("all");
-    setSort("code-asc");
-    setPage(1);
-  };
-
-  const hasActiveFilters =
-    search !== "" ||
-    setFilter !== "all" ||
-    statusFilter !== "all" ||
-    implementationFilter !== "all" ||
-    imageFilter !== "all" ||
-    familyFilter !== "all" ||
-    sort !== "code-asc";
-
-  const exportCsv = () => {
-    const escapeCell = (value: string | number | boolean) =>
-      `"${String(value).replaceAll('"', '""')}"`;
-
-    const rows = [
-      [
-        "Code",
-        "Name",
-        "Set",
-        "Workflow status",
-        "Implemented",
-        "Canonical model",
-        "Families",
-        "Image URL",
-        "Updated at",
-      ],
-      ...filteredCards.map((card) => [
-        card.artwork?.publicCode ?? card.primaryCode,
-        card.name,
-        card.setCode,
-        card.status,
-        card.implemented,
-        card.canonicalModel?.cardCode ?? "",
-        card.familyStatuses.map((family) => family.familyId).join(" | "),
-        card.artwork?.imageUrl ?? "",
-        card.updatedAt,
-      ]),
-    ];
-
-    const csv = rows
-      .map((row) => row.map((cell) => escapeCell(cell)).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "card-implementation-catalog.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <main className="bg-muted/20 min-h-screen">
-      <div className="flex flex-col gap-6 mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1800px]">
-        <section className="flex lg:flex-row flex-col lg:justify-between lg:items-end gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
-              <Layers3 className="size-4" />
+    <main className="bg-background min-h-screen">
+      {/* Subtle background texture */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,oklch(0.72_0.14_210/0.07),transparent)] pointer-events-none" aria-hidden="true" />
+
+      <div className="relative flex flex-col gap-6 mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1800px]">
+
+        {/* ── Header ── */}
+        <header className="flex lg:flex-row flex-col lg:justify-between lg:items-end gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 font-medium text-primary/80 text-xs uppercase tracking-widest">
+              <Layers3 className="size-3.5" />
               Hextech Simulator
             </div>
-            <div>
-              <h1 className="font-semibold text-3xl tracking-tight">
-                Card implementation catalog
-              </h1>
-              <p className="mt-1 max-w-3xl text-muted-foreground text-sm">
-                Browse the real card artwork while tracking canonical
-                implementations, reusable behavior families, and manual
-                validation progress.
-              </p>
-            </div>
+            <h1 className="font-semibold text-foreground text-3xl tracking-tight">
+              Card implementation catalog
+            </h1>
+            <p className="max-w-xl text-muted-foreground text-sm leading-relaxed">
+              Browse card artwork while tracking canonical implementations, reusable behavior families, and manual validation progress.
+            </p>
           </div>
 
-          <Button variant="outline" onClick={exportCsv}>
-            <Download className="mr-2 size-4" />
+          <Button
+            variant="outline"
+            onClick={exportCsv}
+            className="self-start lg:self-auto bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-foreground/80"
+          >
+            <Download data-icon="inline-start" />
             Export filtered CSV
           </Button>
-        </section>
+        </header>
 
-        <section className="gap-3 grid sm:grid-cols-2 xl:grid-cols-4">
+        {/* ── Metric cards ── */}
+        <section className="gap-3 grid sm:grid-cols-2 xl:grid-cols-3" aria-label="Summary metrics">
           <MetricCard
             title="Implemented cards"
             value={`${totalImplemented} / ${catalog.length}`}
             description={`${implementationPercentage}% have a canonical model`}
             icon={<CheckCircle2 className="size-5" />}
-          />
-          <MetricCard
-            title="Card images"
-            value={`${totalWithImages} / ${catalog.length}`}
-            description="Matched from implementation or set JSON data"
-            icon={<Layers3 className="size-5" />}
           />
           <MetricCard
             title="Accepted"
@@ -1018,44 +915,40 @@ export default function CardImplementationDashboard() {
           />
         </section>
 
-        <Card className="bg-card/70 shadow-sm backdrop-blur overflow-hidden">
+        {/* ── Implementation by set ── */}
+        <Card className="bg-white/[0.03] backdrop-blur-md border-white/[0.06]">
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Implementation by set</CardTitle>
-            <CardDescription>
-              A card counts as implemented whenever its implementation JSON
-              entry contains a canonical model.
+            <CardTitle className="font-semibold text-foreground/90 text-sm">Implementation by set</CardTitle>
+            <CardDescription className="text-xs">
+              A card counts as implemented whenever its implementation JSON entry contains a canonical model.
             </CardDescription>
           </CardHeader>
-          <CardContent className="gap-5 grid md:grid-cols-2 xl:grid-cols-4">
-            {SET_FILES.map((set) => {
-              const implemented = set.cards.filter(
-                (card) => card.canonicalModel,
-              ).length;
-              const percentage = Math.round(
-                (implemented / set.cards.length) * 100,
-              );
-
+          <CardContent className="gap-3 grid md:grid-cols-2 xl:grid-cols-4">
+            {REAL_SET_SUMMARIES.map((set) => {
+              const percentage = Math.round((set.implemented / set.cards) * 100);
               return (
                 <button
                   key={set.setCode}
                   type="button"
-                  onClick={() => {
-                    setSetFilter(set.setCode);
-                    setPage(1);
-                  }}
-                  className="bg-background/60 hover:bg-accent/50 p-4 border rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-left transition-colors"
+                  onClick={() => { setSetFilter(set.setCode); setPage(1); }}
+                  className="group bg-white/[0.03] hover:bg-white/[0.06] p-4 border border-white/[0.06] hover:border-primary/30 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 text-left transition-all duration-200"
                 >
-                  <div className="flex justify-between items-center gap-3 mb-3">
+                  <div className="flex justify-between items-start gap-2 mb-3">
                     <div>
-                      <p className="font-semibold">{set.setCode}</p>
+                      <p className="font-mono font-semibold text-foreground/90 text-sm">{set.setCode}</p>
                       <p className="text-muted-foreground text-xs">
-                        {implemented} of {set.cards.length} cards
+                        {set.implemented.toLocaleString()} of {set.cards.toLocaleString()} cards
                       </p>
                     </div>
-                    <span className="font-semibold text-sm">{percentage}%</span>
+                    <span className="bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-md font-mono font-semibold text-primary text-xs">
+                      {percentage}%
+                    </span>
                   </div>
-                  <Progress value={percentage} className="h-2" />
-                  <p className="mt-3 text-[11px] text-muted-foreground">
+                  <Progress
+                    value={percentage}
+                    className="bg-white/[0.06] h-1.5"
+                  />
+                  <p className="mt-2.5 text-[10px] text-muted-foreground/60">
                     JSON updated {formatDate(setUpdatedAtByCode[set.setCode] ?? set.updatedAt)} UTC
                   </p>
                 </button>
@@ -1064,173 +957,145 @@ export default function CardImplementationDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/70 shadow-sm backdrop-blur">
+        {/* ── Filters ── */}
+        <Card className="bg-white/[0.03] backdrop-blur-md border-white/[0.06]">
           <CardHeader className="pb-4">
-            <div className="flex lg:flex-row flex-col lg:justify-between lg:items-center gap-3">
-              <div>
-                <CardTitle className="text-base">Catalog filters</CardTitle>
-                <CardDescription>
-                  Search by name, collector code, card type, domain, or family
-                  ID.
-                </CardDescription>
+            <div className="flex justify-between items-center gap-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="size-4 text-primary/70" />
+                <div>
+                  <CardTitle className="font-semibold text-foreground/90 text-sm">Catalog filters</CardTitle>
+                  <CardDescription className="text-xs">
+                    Search by name, collector code, card type, domain, or family ID.
+                  </CardDescription>
+                </div>
               </div>
-              {hasActiveFilters ? (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="gap-1.5 text-muted-foreground hover:text-foreground text-xs"
+                >
+                  <X className="size-3.5" />
                   Clear filters
                 </Button>
-              ) : null}
+              )}
             </div>
           </CardHeader>
-          <CardContent className="gap-3 grid md:grid-cols-2 xl:grid-cols-7">
-            <div className="relative md:col-span-2 xl:col-span-2">
-              <Search className="top-1/2 left-3 absolute size-4 text-muted-foreground -translate-y-1/2 pointer-events-none" />
-              <Input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  resetPage();
-                }}
-                placeholder="Search cards, types, domains, or families..."
-                className="pl-9"
-              />
+          <CardContent className="flex flex-col gap-2.5">
+            {/* Row 1: search only */}
+            <div className="w-full">
+              {/* Search — grows to fill available space */}
+              <div className="relative w-full">
+                <Search className="top-1/2 left-3 absolute size-3.5 text-muted-foreground/60 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); resetPage(); }}
+                  placeholder="Search cards, types, domains, or families…"
+                  className="bg-white/[0.04] pl-9 border-white/[0.08] focus-visible:border-primary/40 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 text-sm"
+                />
+              </div>
+
             </div>
 
-            <Select
-              value={setFilter}
-              onValueChange={(value) => {
-                setSetFilter(value);
-                resetPage();
-              }}
-            >
-              <SelectTrigger aria-label="Filter by set">
-                <SelectValue placeholder="All sets" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All sets</SelectItem>
-                {SET_FILES.map((set) => (
-                  <SelectItem key={set.setCode} value={set.setCode}>
-                    {set.setCode} ({set.cards.length})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value);
-                resetPage();
-              }}
-            >
-              <SelectTrigger aria-label="Filter by workflow status">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {getStatusMeta(status).label} ({statusCounts[status] ?? 0})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={implementationFilter}
-              onValueChange={(value) => {
-                setImplementationFilter(value);
-                resetPage();
-              }}
-            >
-              <SelectTrigger aria-label="Filter by implementation state">
-                <SelectValue placeholder="Any implementation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any implementation</SelectItem>
-                <SelectItem value="implemented">Implemented</SelectItem>
-                <SelectItem value="not-implemented">Not implemented</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={imageFilter}
-              onValueChange={(value) => {
-                setImageFilter(value as ImageFilter);
-                resetPage();
-              }}
-            >
-              <SelectTrigger aria-label="Filter by card image availability">
-                <SelectValue placeholder="Any image state" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any image state</SelectItem>
-                <SelectItem value="with-image">With image</SelectItem>
-                <SelectItem value="missing-image">Missing image</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sort}
-              onValueChange={(value) => {
-                setSort(value as SortOption);
-                resetPage();
-              }}
-            >
-              <SelectTrigger aria-label="Sort catalog">
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="code-asc">Collector code</SelectItem>
-                <SelectItem value="name-asc">Card name</SelectItem>
-                <SelectItem value="updated-desc">Recently updated</SelectItem>
-                <SelectItem value="status-desc">Workflow progress</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="md:col-span-2 xl:col-span-7">
-              <Select
-                value={familyFilter}
-                onValueChange={(value) => {
-                  setFamilyFilter(value);
-                  resetPage();
-                }}
-              >
-                <SelectTrigger aria-label="Filter by behavior family">
-                  <SelectValue placeholder="All behavior families" />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Select value={setFilter} onValueChange={(v) => { setSetFilter(v); resetPage(); }}>
+                <SelectTrigger aria-label="Filter by set" className="bg-white/[0.04] border-white/[0.08] w-36 text-sm">
+                  <SelectValue placeholder="All sets" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All behavior families</SelectItem>
-                  {familyOptions.map((family) => (
-                    <SelectItem key={family} value={family}>
-                      {family}
+                  <SelectItem value="all">All sets</SelectItem>
+                  {REAL_SET_SUMMARIES.map((s) => (
+                    <SelectItem key={s.setCode} value={s.setCode}>
+                      {s.setCode} ({s.cards})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
+                <SelectTrigger aria-label="Filter by status" className="bg-white/[0.04] border-white/[0.08] w-40 text-sm">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {getStatusMeta(s).label} ({statusCounts[s] ?? 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={implementationFilter} onValueChange={(v) => { setImplementationFilter(v); resetPage(); }}>
+                <SelectTrigger aria-label="Filter by implementation" className="bg-white/[0.04] border-white/[0.08] w-44 text-sm">
+                  <SelectValue placeholder="Any implementation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any implementation</SelectItem>
+                  <SelectItem value="implemented">Implemented</SelectItem>
+                  <SelectItem value="not-implemented">Not implemented</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={imageFilter} onValueChange={(v) => { setImageFilter(v); resetPage(); }}>
+                <SelectTrigger aria-label="Filter by image" className="bg-white/[0.04] border-white/[0.08] w-40 text-sm">
+                  <SelectValue placeholder="Any image state" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any image state</SelectItem>
+                  <SelectItem value="with-image">With image</SelectItem>
+                  <SelectItem value="missing-image">Missing image</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); resetPage(); }}>
+                <SelectTrigger aria-label="Sort cards" className="bg-white/[0.04] border-white/[0.08] w-44 text-sm">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="code-asc">Collector code</SelectItem>
+                  <SelectItem value="name-asc">Card name</SelectItem>
+                  <SelectItem value="updated-desc">Recently updated</SelectItem>
+                  <SelectItem value="status-desc">Workflow progress</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={familyFilter} onValueChange={(v) => { setFamilyFilter(v); resetPage(); }}>
+                <SelectTrigger aria-label="Filter by behavior family" className="bg-white/[0.04] border-white/[0.08] w-44 text-sm">
+                  <SelectValue placeholder="All behavior families" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All behavior families</SelectItem>
+                  {familyOptions.map((f) => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
           </CardContent>
         </Card>
 
-        <Card className="bg-card/70 shadow-sm backdrop-blur overflow-hidden">
-          <CardHeader className="pb-4 border-b">
-            <div className="flex sm:flex-row flex-col sm:justify-between sm:items-end gap-2">
+        {/* ── Cards grid ── */}
+        <Card className="bg-white/[0.03] backdrop-blur-md border-white/[0.06] overflow-hidden">
+          {/* Header row */}
+          <CardHeader className="pb-4 border-white/[0.06] border-b">
+            <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
               <div>
-                <CardTitle className="text-base">Cards</CardTitle>
-                <CardDescription>
+                <CardTitle className="font-semibold text-foreground/90 text-sm">Cards</CardTitle>
+                <CardDescription className="text-xs">
                   {filteredCards.length.toLocaleString()} matching cards
                 </CardDescription>
               </div>
-              <div className="flex flex-wrap gap-2 text-muted-foreground text-xs">
+              {/* Legend */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                 {statusOptions.map((status) => {
                   const meta = getStatusMeta(status);
                   return (
-                    <span
-                      key={status}
-                      className="inline-flex items-center gap-1.5"
-                    >
-                      <span
-                        className={`size-1.5 rounded-full ${meta.dotClassName}`}
-                      />
+                    <span key={status} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+                      <span className={cn("rounded-full size-1.5", meta.dotClassName)} />
                       {meta.label}
                     </span>
                   );
@@ -1241,221 +1106,181 @@ export default function CardImplementationDashboard() {
 
           <CardContent className="p-4 sm:p-5">
             {visibleCards.length ? (
-              <div className="gap-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8 xl:grid-cols-6">
+              <div className="gap-2.5 grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
                 {visibleCards.map((card) => (
-                  <CatalogCardTile
-                    key={card.gameplayIdentity}
-                    card={card}
-                    onSelect={selectCard}
-                  />
+                  <CatalogCardTile key={card.gameplayIdentity} card={card} onSelect={selectCard} />
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col justify-center items-center gap-2 border border-dashed rounded-xl min-h-56 text-muted-foreground text-center">
-                <Search className="size-6" />
-                <p className="font-medium text-foreground">No cards found</p>
-                <p className="max-w-sm text-sm">
-                  Change the search term or clear one of the active filters.
-                </p>
+              <div className="flex flex-col justify-center items-center gap-3 border border-white/[0.08] border-dashed rounded-xl min-h-56 text-center">
+                <Search className="size-6 text-muted-foreground/40" />
+                <div>
+                  <p className="font-medium text-foreground/70 text-sm">No cards found</p>
+                  <p className="mt-1 max-w-sm text-muted-foreground/60 text-xs">
+                    Change the search term or clear one of the active filters.
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>
 
-          <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3 px-4 py-4 border-t">
-            <p className="text-muted-foreground text-sm">
+          {/* Pagination */}
+          <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3 px-5 py-4 border-white/[0.06] border-t">
+            <p className="text-muted-foreground/70 text-xs">
               {filteredCards.length
-                ? `Showing ${pageStart + 1}–${Math.min(
-                    pageStart + PAGE_SIZE,
-                    filteredCards.length,
-                  )} of ${filteredCards.length}`
+                ? `Showing ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filteredCards.length)} of ${filteredCards.length.toLocaleString()}`
                 : "Showing 0 cards"}
             </p>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={safePage <= 1}
+                className="bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-xs"
               >
-                <ChevronLeft className="mr-1 size-4" />
+                <ChevronLeft data-icon="inline-start" />
                 Previous
               </Button>
-              <span className="min-w-20 text-muted-foreground text-sm text-center">
+              <span className="min-w-16 text-muted-foreground/70 text-xs text-center">
                 {safePage} / {pageCount}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  setPage((current) => Math.min(pageCount, current + 1))
-                }
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                 disabled={safePage >= pageCount}
+                className="bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-xs"
               >
                 Next
-                <ChevronRight className="ml-1 size-4" />
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </div>
           </div>
         </Card>
       </div>
 
+      {/* ── Card detail dialog ── */}
       <Dialog
         open={Boolean(selectedCard)}
         onOpenChange={(open) => {
-          if (!open) {
-            setSelectedCard(null);
-            setSaveFeedback(null);
-          }
+          if (!open) { setSelectedCard(null); setSaveFeedback(null); }
         }}
       >
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
-          {selectedCard ? (
-            <div className="gap-6 grid lg:grid-cols-[minmax(260px,360px)_1fr]">
-              <div className="space-y-3">
-                <div className="bg-black/10 dark:bg-black/30 shadow-sm p-2 border rounded-xl aspect-[744/1039] overflow-hidden">
+        <DialogContent className="bg-[oklch(0.17_0.016_258)] backdrop-blur-xl border-white/[0.08] max-w-5xl max-h-[92vh] overflow-y-auto">
+          {selectedCard && (
+            <div className="gap-6 grid lg:grid-cols-[minmax(240px,320px)_1fr]">
+              {/* Artwork panel */}
+              <div className="space-y-2">
+                <div className="bg-black/30 p-2 border border-white/[0.08] rounded-xl aspect-[744/1039] overflow-hidden">
                   <CardArtworkImage
-                    key={
-                      selectedCard.artwork?.imageUrl ?? selectedCard.primaryCode
-                    }
+                    key={selectedCard.artwork?.imageUrl ?? selectedCard.primaryCode}
                     card={selectedCard}
                     className="rounded-lg"
                   />
                 </div>
-
-                {selectedCard.artwork?.artist ? (
-                  <p className="text-muted-foreground text-xs text-center">
+                {selectedCard.artwork?.artist && (
+                  <p className="text-[11px] text-muted-foreground/60 text-center">
                     Art by {selectedCard.artwork.artist}
                   </p>
-                ) : null}
+                )}
               </div>
 
-              <div className="space-y-6 min-w-0">
+              {/* Info panel */}
+              <div className="space-y-5 min-w-0">
                 <DialogHeader>
                   <div className="flex flex-wrap items-center gap-2 pr-8">
-                    <Badge variant="secondary">{selectedCard.setCode}</Badge>
+                    <Badge variant="secondary" className="bg-white/[0.06] border-white/[0.08] font-mono text-xs">
+                      {selectedCard.setCode}
+                    </Badge>
                     <StatusBadge status={selectedCard.status} />
                   </div>
-                  <DialogTitle className="pt-2 text-2xl">
+                  <DialogTitle className="pt-1 font-semibold text-xl">
                     {selectedCard.name}
                   </DialogTitle>
-                  <DialogDescription className="font-mono break-all">
+                  <DialogDescription className="font-mono text-muted-foreground/60 text-xs break-all">
                     {selectedCard.gameplayIdentity}
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="gap-3 grid sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="bg-muted/20 p-3 border rounded-lg">
-                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Printing code
-                    </p>
-                    <p className="mt-1 font-medium text-sm">
-                      {selectedCard.artwork?.publicCode ??
-                        selectedCard.printingCodes.join(", ")}
-                    </p>
-                  </div>
-                  <div className="bg-muted/20 p-3 border rounded-lg">
-                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Card type
-                    </p>
-                    <p className="mt-1 font-medium text-sm">
-                      {[
-                        selectedCard.artwork?.supertype,
-                        selectedCard.artwork?.type,
-                      ]
-                        .filter(Boolean)
-                        .join(" ") || "—"}
-                    </p>
-                  </div>
-                  <div className="bg-muted/20 p-3 border rounded-lg">
-                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Canonical model
-                    </p>
-                    <p className="mt-1 font-medium text-sm">
-                      {selectedCard.canonicalModel?.cardCode ?? "Not approved"}
-                    </p>
-                  </div>
-                  <div className="bg-muted/20 p-3 border rounded-lg">
-                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Updated
-                    </p>
-                    <p className="mt-1 font-medium text-sm">
-                      {formatDate(selectedCard.updatedAt)} UTC
-                    </p>
-                  </div>
+                {/* Detail grid */}
+                <div className="gap-2 grid sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    { label: "Printing code", value: selectedCard.artwork?.publicCode ?? selectedCard.printingCodes.join(", ") },
+                    {
+                      label: "Card type",
+                      value: [selectedCard.artwork?.supertype, selectedCard.artwork?.type].filter(Boolean).join(" ") || "—",
+                    },
+                    { label: "Canonical model", value: selectedCard.canonicalModel?.cardCode ?? "Not approved" },
+                    { label: "Updated", value: `${formatDate(selectedCard.updatedAt)} UTC` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-white/[0.03] p-3 border border-white/[0.06] rounded-lg">
+                      <p className="font-medium text-[10px] text-muted-foreground/60 uppercase tracking-wider">{label}</p>
+                      <p className="mt-1 font-medium text-foreground/90 text-sm">{value}</p>
+                    </div>
+                  ))}
                 </div>
 
-                {selectedCard.artwork ? (
-                  <section className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {selectedCard.artwork.rarity ? (
-                        <Badge variant="outline">
-                          {selectedCard.artwork.rarity}
-                        </Badge>
-                      ) : null}
-                      {selectedCard.artwork.domains.map((domain) => (
-                        <Badge key={domain} variant="secondary">
-                          {domain}
-                        </Badge>
-                      ))}
-                      {selectedCard.artwork.tags.map((tag) => (
-                        <Badge key={tag} variant="outline">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                {/* Tags */}
+                {selectedCard.artwork && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCard.artwork.rarity && (
+                      <Badge variant="outline" className="border-white/[0.1] text-xs">
+                        {selectedCard.artwork.rarity}
+                      </Badge>
+                    )}
+                    {selectedCard.artwork.domains.map((d) => (
+                      <Badge key={d} variant="secondary" className="text-xs">{d}</Badge>
+                    ))}
+                    {selectedCard.artwork.tags.map((t) => (
+                      <Badge key={t} variant="outline" className="border-white/[0.1] text-xs">{t}</Badge>
+                    ))}
+                  </div>
+                )}
 
-                    {selectedCard.artwork.rulesText ? (
-                      <div className="bg-muted/20 p-4 border rounded-lg">
-                        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                          Card text
-                        </p>
-                        <p className="mt-2 text-sm leading-relaxed whitespace-pre-line">
-                          {selectedCard.artwork.rulesText}
-                        </p>
-                      </div>
-                    ) : null}
-                  </section>
-                ) : null}
+                {selectedCard.artwork?.rulesText && (
+                  <div className="bg-white/[0.03] p-4 border border-white/[0.06] rounded-lg">
+                    <p className="font-medium text-[10px] text-muted-foreground/60 uppercase tracking-wider">Card text</p>
+                    <p className="mt-2 text-foreground/80 text-sm leading-relaxed whitespace-pre-line">
+                      {selectedCard.artwork.rulesText}
+                    </p>
+                  </div>
+                )}
 
-                <Separator />
+                <Separator className="bg-white/[0.06]" />
 
-                <section className="space-y-4 bg-muted/10 p-4 border rounded-xl">
+                {/* Manual validation */}
+                <section className="space-y-4 bg-white/[0.02] p-4 border border-white/[0.06] rounded-xl">
                   <div>
-                    <h3 className="font-semibold">Manual validation</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Update workflow gates and record the latest manual gameplay
-                      validation note.
+                    <h3 className="font-semibold text-foreground/90 text-sm">Manual validation</h3>
+                    <p className="text-muted-foreground/70 text-xs">
+                      Update workflow gates and record the latest manual gameplay validation note.
                     </p>
                   </div>
 
-                  <div className="gap-3 grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] bg-background/40 p-3 border rounded-lg">
+                  <div className="gap-3 grid sm:grid-cols-2 bg-white/[0.03] p-3 border border-white/[0.06] rounded-lg">
                     <label className="space-y-1.5 text-sm">
-                      <span className="font-medium">Card workflow status</span>
-                      <Select
-                        value={cardStatusDraft}
-                        onValueChange={setCardStatusDraft}
-                        disabled={Boolean(savingTarget)}
-                      >
-                        <SelectTrigger aria-label="Card workflow status">
+                      <span className="font-medium text-foreground/80 text-xs">Card workflow status</span>
+                      <Select value={cardStatusDraft} onValueChange={setCardStatusDraft} disabled={Boolean(savingTarget)}>
+                        <SelectTrigger aria-label="Card workflow status" className="bg-white/[0.04] border-white/[0.08] text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {statusOptions.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {getStatusMeta(status).label}
-                            </SelectItem>
+                          {statusOptions.map((s) => (
+                            <SelectItem key={s} value={s}>{getStatusMeta(s).label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </label>
 
                     <label className="space-y-1.5 text-sm">
-                      <span className="font-medium">Validation note (optional)</span>
+                      <span className="font-medium text-foreground/80 text-xs">Validation note (optional)</span>
                       <Input
                         value={cardNoteDraft}
-                        onChange={(event) => setCardNoteDraft(event.target.value)}
+                        onChange={(e) => setCardNoteDraft(e.target.value)}
                         placeholder="What was verified?"
                         disabled={Boolean(savingTarget)}
+                        className="bg-white/[0.04] border-white/[0.08] text-sm"
                       />
                     </label>
 
@@ -1464,79 +1289,69 @@ export default function CardImplementationDashboard() {
                         type="button"
                         onClick={saveCardStatus}
                         disabled={Boolean(savingTarget)}
+                        className="bg-primary/90 hover:bg-primary text-primary-foreground text-sm"
                       >
-                        {savingTarget === "card" ? "Saving..." : "Save card status"}
+                        {savingTarget === "card" ? "Saving…" : "Save card status"}
                       </Button>
                     </div>
                   </div>
 
-                  {selectedCard.familyStatuses.length ? (
+                  {/* Behavior families */}
+                  {selectedCard.familyStatuses.length > 0 ? (
                     <div className="space-y-3">
                       <div>
-                        <h4 className="font-medium text-sm">Behavior families</h4>
-                        <p className="mt-1 text-muted-foreground text-xs">
+                        <h4 className="font-semibold text-foreground/80 text-xs">Behavior families</h4>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground/60">
                           Only existing behavior families can be updated here.
                         </p>
                       </div>
 
                       {selectedCard.familyStatuses.map((family) => {
-                        const draft = familyDrafts[family.familyId] ?? {
-                          status: family.status,
-                          note: family.note ?? "",
-                        };
+                        const draft = familyDrafts[family.familyId] ?? { status: family.status, note: family.note ?? "" };
                         const target = `family:${family.familyId}`;
 
                         return (
                           <div
                             key={`${selectedCard.gameplayIdentity}-${family.familyId}`}
-                            className="space-y-3 bg-background/40 p-3 border rounded-lg"
+                            className="space-y-3 bg-white/[0.03] p-3 border border-white/[0.06] rounded-lg"
                           >
                             <div className="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-2">
                               <div>
-                                <p className="font-mono font-medium text-sm break-all">
-                                  {family.familyId}
-                                </p>
-                                <p className="mt-1 text-muted-foreground text-xs">
-                                  Current: {getStatusMeta(family.status).label} · Updated {formatDate(family.updatedAt)} UTC
+                                <p className="font-mono font-medium text-foreground/90 text-sm break-all">{family.familyId}</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground/60">
+                                  Updated {formatDate(family.updatedAt)} UTC
                                 </p>
                               </div>
                               <StatusBadge status={family.status} />
                             </div>
 
-                            <div className="gap-3 grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                            <div className="gap-3 grid sm:grid-cols-2">
                               <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">Family status</span>
+                                <span className="font-medium text-foreground/80 text-xs">Family status</span>
                                 <Select
                                   value={draft.status}
-                                  onValueChange={(status) =>
-                                    updateFamilyDraft(family.familyId, { status })
-                                  }
+                                  onValueChange={(s) => s && updateFamilyDraft(family.familyId, { status: s })}
                                   disabled={Boolean(savingTarget)}
                                 >
-                                  <SelectTrigger aria-label={`${family.familyId} status`}>
+                                  <SelectTrigger aria-label={`${family.familyId} status`} className="bg-white/[0.04] border-white/[0.08] text-sm">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {statusOptions.map((status) => (
-                                      <SelectItem key={status} value={status}>
-                                        {getStatusMeta(status).label}
-                                      </SelectItem>
+                                    {statusOptions.map((s) => (
+                                      <SelectItem key={s} value={s}>{getStatusMeta(s).label}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
                               </label>
 
                               <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">Validation note (optional)</span>
+                                <span className="font-medium text-foreground/80 text-xs">Validation note (optional)</span>
                                 <Input
                                   value={draft.note}
-                                  onChange={(event) =>
-                                    updateFamilyDraft(family.familyId, {
-                                      note: event.target.value,
-                                    })
-                                  }
+                                  onChange={(e) => updateFamilyDraft(family.familyId, { note: e.target.value })}
                                   placeholder="What was verified?"
                                   disabled={Boolean(savingTarget)}
+                                  className="bg-white/[0.04] border-white/[0.08] text-sm"
                                 />
                               </label>
                             </div>
@@ -1545,10 +1360,12 @@ export default function CardImplementationDashboard() {
                               <Button
                                 type="button"
                                 variant="outline"
+                                size="sm"
                                 onClick={() => saveFamilyStatus(family.familyId)}
                                 disabled={Boolean(savingTarget)}
+                                className="bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-xs"
                               >
-                                {savingTarget === target ? "Saving..." : "Save family status"}
+                                {savingTarget === target ? "Saving…" : "Save family status"}
                               </Button>
                             </div>
                           </div>
@@ -1556,31 +1373,31 @@ export default function CardImplementationDashboard() {
                       })}
                     </div>
                   ) : (
-                    <div className="p-4 border border-dashed rounded-lg text-muted-foreground text-sm text-center">
+                    <div className="p-4 border border-white/[0.08] border-dashed rounded-lg text-muted-foreground/60 text-xs text-center">
                       This card is not currently linked to a behavior family.
                     </div>
                   )}
 
-                  {saveFeedback ? (
+                  {saveFeedback && (
                     <p
                       aria-live="polite"
-                      className={
-                        saveFeedback.kind === "error"
-                          ? "text-destructive text-sm"
-                          : "text-emerald-600 dark:text-emerald-300 text-sm"
-                      }
+                      className={cn(
+                        "text-xs",
+                        saveFeedback.kind === "error" ? "text-destructive" : "text-emerald-400",
+                      )}
                     >
                       {saveFeedback.message}
                     </p>
-                  ) : null}
+                  )}
                 </section>
 
-                <Separator />
+                <Separator className="bg-white/[0.06]" />
 
+                {/* History */}
                 <section className="space-y-3">
                   <div>
-                    <h3 className="font-semibold">Implementation history</h3>
-                    <p className="text-muted-foreground text-sm">
+                    <h3 className="font-semibold text-foreground/90 text-sm">Implementation history</h3>
+                    <p className="text-muted-foreground/60 text-xs">
                       Recorded canonical approvals and family status changes.
                     </p>
                   </div>
@@ -1588,53 +1405,38 @@ export default function CardImplementationDashboard() {
                   {selectedCard.history.length ? (
                     <div className="space-y-3">
                       {[...selectedCard.history]
-                        .sort(
-                          (left, right) =>
-                            new Date(right.at).getTime() -
-                            new Date(left.at).getTime(),
-                        )
-                        .map((entry, index) => (
-                          <div
-                            key={`${entry.at}-${entry.event}-${index}`}
-                            className="relative pl-6"
-                          >
-                            <span className="top-1.5 left-0 absolute bg-primary rounded-full size-2" />
-                            {index < selectedCard.history.length - 1 ? (
-                              <span className="top-4 bottom-[-18px] left-[3px] absolute bg-border w-px" />
-                            ) : null}
+                        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+                        .map((entry, i) => (
+                          <div key={`${entry.at}-${entry.event}-${i}`} className="relative pl-5">
+                            <span className="top-1.5 left-0 absolute bg-primary/70 rounded-full size-2" />
+                            {i < selectedCard.history.length - 1 && (
+                              <span className="top-4 bottom-[-16px] left-[3px] absolute bg-white/[0.06] w-px" />
+                            )}
                             <div className="flex flex-col gap-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-medium text-sm">
-                                  {humanize(entry.event)}
-                                </p>
+                                <p className="font-medium text-foreground/90 text-sm">{humanize(entry.event)}</p>
                                 <StatusBadge status={entry.status} />
                               </div>
-                              {entry.familyId ? (
-                                <p className="font-mono text-muted-foreground text-xs break-all">
-                                  {entry.familyId}
-                                </p>
-                              ) : null}
-                              {entry.note ? (
-                                <p className="text-muted-foreground text-sm">
-                                  {entry.note}
-                                </p>
-                              ) : null}
-                              <p className="text-muted-foreground text-xs">
-                                {formatDate(entry.at)} UTC
-                              </p>
+                              {entry.familyId && (
+                                <p className="font-mono text-muted-foreground/60 text-xs break-all">{entry.familyId}</p>
+                              )}
+                              {entry.note && (
+                                <p className="text-muted-foreground/70 text-xs">{entry.note}</p>
+                              )}
+                              <p className="text-[11px] text-muted-foreground/50">{formatDate(entry.at)} UTC</p>
                             </div>
                           </div>
                         ))}
                     </div>
                   ) : (
-                    <div className="p-6 border border-dashed rounded-lg text-muted-foreground text-sm text-center">
+                    <div className="p-6 border border-white/[0.08] border-dashed rounded-lg text-muted-foreground/60 text-xs text-center">
                       No implementation events have been recorded.
                     </div>
                   )}
                 </section>
               </div>
             </div>
-          ) : null}
+          )}
         </DialogContent>
       </Dialog>
     </main>
