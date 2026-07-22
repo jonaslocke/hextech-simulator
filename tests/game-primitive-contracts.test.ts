@@ -409,6 +409,27 @@ test("pending resolution payment exposes Add abilities and preserves its continu
     "power",
     "Mind",
   );
+  const recyclableRune = card("SYN-PAYMENT-RECYCLABLE-RUNE", "Rune");
+  recyclableRune.card.classification.domain = ["Fury"];
+  recyclableRune.behaviorModel.clauses = [{
+    id: "recycle-for-power",
+    sequence: 0,
+    sourceText: "Synthetic Recycle Add reaction.",
+    normalizedText: "Synthetic Recycle Add reaction.",
+    abilities: [binding("ability.recycle_for_power", {
+      amount: 1,
+      domain: "Fury",
+      usage: "all",
+    })],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [binding("timing.reaction")],
+    effects: [],
+    keywords: [],
+  }];
   const { game, decks } = fixture([
     source,
     rune,
@@ -416,6 +437,7 @@ test("pending resolution payment exposes Add abilities and preserves its continu
     legend,
     battlefield,
     battlefieldUnit,
+    recyclableRune,
   ], [
     instance("source", "p1", source.cardCode, "mainDeck"),
     instance("rune", "p1", rune.cardCode, "runeDeck"),
@@ -423,10 +445,17 @@ test("pending resolution payment exposes Add abilities and preserves its continu
     instance("legend", "p1", legend.cardCode, "legend"),
     instance("battlefield", "p1", battlefield.cardCode, "battlefield"),
     instance("battlefield-unit", "p1", battlefieldUnit.cardCode, "mainDeck"),
+    instance("recyclable-rune", "p1", recyclableRune.cardCode, "runeDeck"),
   ]);
-  game.state.players.p1!.zones.base = ["source", "rune", "permanent"];
+  game.state.players.p1!.zones.base = [
+    "source",
+    "rune",
+    "permanent",
+    "recyclable-rune",
+  ];
   game.state.players.p1!.zones.legend = "legend";
   game.state.cardStates.permanent!.exhausted = true;
+  game.state.cardStates["recyclable-rune"]!.exhausted = true;
   game.state.battlefields = [{
     battlefieldId: "payment-location",
     cardInstanceId: "battlefield",
@@ -454,7 +483,7 @@ test("pending resolution payment exposes Add abilities and preserves its continu
       .filter((action) => action.sourceCardInstanceId)
       .map((action) => action.sourceCardInstanceId)
       .sort(),
-    ["battlefield-unit", "legend", "permanent", "rune"],
+    ["battlefield-unit", "legend", "permanent", "recyclable-rune", "rune"],
   );
   const exhaustedAdd = initialActions.find(
     (action) => action.sourceCardInstanceId === "permanent",
@@ -471,6 +500,23 @@ test("pending resolution payment exposes Add abilities and preserves its continu
       now: "reject-exhausted-add-source",
     }),
     /not legal for the current game state/,
+  );
+  const recycleForPower = initialActions.find(
+    (action) => action.sourceCardInstanceId === "recyclable-rune",
+  );
+  assert.ok(recycleForPower?.enabled);
+  const afterRecycle = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: recycleForPower.id,
+    selectedIds: [],
+    decks,
+    now: "recycle-exhausted-source-for-power",
+  });
+  assert.equal(afterRecycle.state.pendingChoice?.type, "resourcePayment");
+  assert.equal(afterRecycle.state.players.p1!.power.Fury, 1);
+  assert.ok(
+    afterRecycle.state.players.p1!.zones.runeDeck.includes("recyclable-rune"),
   );
 
   const addPower = initialActions.find(
@@ -599,7 +645,7 @@ test("typed death-replacement payment reprojects only after matching Power is ad
     "SYN-TYPED-PAYMENT-RUNE",
     "Rune",
     "power",
-    "Calm",
+    "Fury",
   );
   const { game, decks } = fixture([source, unit, matchingRune], [
     instance("source", "p1", source.cardCode, "mainDeck"),
@@ -607,7 +653,7 @@ test("typed death-replacement payment reprojects only after matching Power is ad
     instance("matching-rune", "p1", matchingRune.cardCode, "runeDeck"),
   ]);
   game.state.players.p1!.zones.base = ["source", "unit", "matching-rune"];
-  game.state.players.p1!.power.Fury = 1;
+  game.state.players.p1!.power.Calm = 1;
   game.state.cardStates.unit!.damage = 3;
   game.state.ongoingEffects = [{
     id: "typed-replacement",
@@ -617,7 +663,7 @@ test("typed death-replacement payment reprojects only after matching Power is ad
     targetCardInstanceIds: ["unit"],
     duration: "thisTurn",
     createdAtTurn: 1,
-    parameters: { resource: "power", domain: "Calm", amount: 1 },
+    parameters: { resource: "power", domain: "Fury", amount: 1 },
   }];
 
   moveUnitToTrash(game, "unit", createRuntimeCardIndex(decks, game));
@@ -644,8 +690,8 @@ test("typed death-replacement payment reprojects only after matching Power is ad
     now: "add-matching-replacement-power",
   });
   assert.equal(next.state.pendingChoice?.type, "resourcePayment");
-  assert.equal(next.state.players.p1!.power.Fury, 1);
   assert.equal(next.state.players.p1!.power.Calm, 1);
+  assert.equal(next.state.players.p1!.power.Fury, 1);
 
   const readyPayment = gameplayActions(next, "p1", decks).find(
     (action) => action.choice?.kind === "resourcePayment",
@@ -664,8 +710,8 @@ test("typed death-replacement payment reprojects only after matching Power is ad
     now: "pay-matching-replacement-power",
   });
   assert.equal(next.state.pendingChoice, null);
-  assert.equal(next.state.players.p1!.power.Fury, 1);
-  assert.equal(next.state.players.p1!.power.Calm, 0);
+  assert.equal(next.state.players.p1!.power.Calm, 1);
+  assert.equal(next.state.players.p1!.power.Fury, 0);
   assert.ok(next.state.players.p1!.zones.base.includes("unit"));
   assert.equal(next.state.cardStates.unit!.damage, 0);
   assert.equal(next.state.cardStates.unit!.exhausted, true);

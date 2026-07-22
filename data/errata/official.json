@@ -150,8 +150,9 @@
       },
       "OGN-023": {
         "cardName": "Unlicensed Armory",
-        "effectiveText": "Discard 1, [E]: Choose a friendly unit. The next time it would die this turn, you may pay [C] to heal it, exhaust it, and recall it instead. (Send it to base. This isn't a move.)",
-        "reason": "Official card errata"
+        "effectiveText": "Discard 1, [E]: Choose a friendly unit. The next time it would die this turn, you may pay [Fury] to heal it, exhaust it, and recall it instead. (Send it to base. This isn't a move.)",
+        "reason": "Official card errata",
+        "notes": ["The payment domain is Fury, matching the card's printed domain."]
       },
       "OGN-296": {
         "cardName": "Void Gate",

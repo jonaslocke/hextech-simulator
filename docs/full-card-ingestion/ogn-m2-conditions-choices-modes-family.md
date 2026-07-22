@@ -150,9 +150,9 @@ pointer-accessible. An Add ability whose cost exhausts its source is projected
 disabled while that source is exhausted, and the server rejects a stale
 submission of that action. Typed Power payments reproject against their exact
 domain plus Rainbow after each Add action; unrelated Power remains in the pool
-and does not enable confirmation. For `OGN-023`, the authoritative local
-official errata changes the printed Fury payment to Calm, so its replacement
-correctly requires Calm or Rainbow Power despite the original corpus face text.
+and does not enable confirmation. The corrected local `OGN-023` erratum retains
+the printed Fury payment domain while adding the replacement's heal wording, so
+its replacement requires Fury or Rainbow Power.
 
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
@@ -190,10 +190,11 @@ leaves Flame Chompers in Trash and clears the continuation, and the opponent
 sees only the waiting state without private payment controls.
 
 For Unlicensed Armory, establish the delayed replacement and lethally damage
-the chosen Unit with Fury but no Calm or Rainbow in the Rune Pool. Confirm that
-Pay and recall remains disabled under the official errata. Add Calm from a
-ready source and confirm the same prompt enables immediately, consumes Calm,
-and recalls the Unit exhausted; verify an exhausted Calm source cannot Add.
+the chosen Unit with no Fury or Rainbow in the Rune Pool. Confirm that Pay and
+recall remains disabled. Recycle an exhausted Fury Rune for Fury Power and
+confirm the same prompt enables immediately, consumes Fury, and recalls the
+Unit exhausted. Separately verify that an exhausted Rune cannot exhaust again
+to Add Energy even though its Recycle-for-Power ability remains legal.
 
 The importable cross-domain deck at
 `data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve

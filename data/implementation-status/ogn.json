@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T09:34:50.778Z",
+  "updatedAt": "2026-07-22T10:12:42.987Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -820,7 +820,7 @@
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGN-023",
-        "approvedAt": "2026-07-21T01:44:29.821Z"
+        "approvedAt": "2026-07-22T10:12:42.987Z"
       },
       "familyStatuses": [],
       "history": [
@@ -831,7 +831,7 @@
           "note": "Canonical model OGN-023 approved."
         }
       ],
-      "updatedAt": "2026-07-21T01:44:29.821Z"
+      "updatedAt": "2026-07-22T10:12:42.987Z"
     },
     {
       "gameplayIdentity": "OGN-024:Void Seeker",
