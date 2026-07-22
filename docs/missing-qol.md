@@ -56,3 +56,4 @@
 [ ] Client needs a queue of intents, to no discard subsequential intents.
 [ ] Choose mode needs inspect board feature. ![alt text](image-8.png)
 [ ] Convergent Mutation - this cards requires two targets, and the on board selector is not specific, the xp could be better since the order of chossing might differ the result if a player selects a unit with less might first the card can be resolved without no effect. ![alt text](image-9.png)
+[ ] cards with errata text do not follow the same card parse when show the card preview, we need to update our official errata json text to look like the current card corpus text, do not make the parser better, make the source consistent. ![alt text](image-10.png)

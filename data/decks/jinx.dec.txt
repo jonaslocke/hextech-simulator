@@ -1,30 +1,37 @@
 Legend:
-1 Loose Cannon
+1 Jinx, Loose Cannon
 
 Champion:
 1 Jinx, Rebel
 
-Runes:
-6 Fury Rune
-6 Chaos Rune
+MainDeck:
+3 Flame Chompers
+3 Hextech Ray
+3 Noxus Hopeful
+3 Pouty Poro
+3 Tideturner
+3 Sneaky Deckhand
+3 Stacked Deck
+3 Traveling Merchant
+2 Falling Star
+2 Unlicensed Armory
+2 Immortal Phoenix
+2 Super Mega Death Rocket!
+3 Nocturne, Horrifying
+2 Darius, Trifarian
+2 Vayne, Hunter
 
 Battlefields:
-1 Aspirant's Climb
-1 The Papertree
-1 Targon's Peak
+1 The Arena's Greatest
+1 The Candlelit Sanctum
+1 Hallowed Tomb
 
-MainDeck:
-3 Raging Soul
-3 Traveling Merchant
+Runes:
+8 Fury Rune
+4 Chaos Rune
+
+Sideboard:
 3 Gust
+2 Cleave
 2 Flash
-3 Incinerate
-3 Morbid Return
-3 Mystic Poro
-2 Pouty Poro
-3 Sneaky Deckhand
-3 Disintegrate
-2 Annie, Fiery
-3 Maddened Marauder
-3 Firestorm
-3 Sai Scout
+1 Darius, Trifarian
