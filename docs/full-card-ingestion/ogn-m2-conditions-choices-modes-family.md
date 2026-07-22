@@ -179,6 +179,13 @@ behavior-family gate without promoting its complete gameplay identity to
 UX and server-authority extension made after that validation and remains ready
 for manual validation.
 
+Manual in-game validation on 2026-07-22 also passed `OGN-037` Immortal Phoenix
+and `OGN-252` Super Mega Death Rocket! for their public-Trash trigger and
+effect-driven replay family, `OGN-023` Unlicensed Armory for its corrected Fury
+payment and optional death replacement, and `OGN-202` Jinx, Rebel for its typed
+discard-event trigger. These are behavior-family passes, not promotion of the
+complete gameplay identities to `accepted`.
+
 For that payment UX, trigger Flame Chompers with no Fury Power in the Rune Pool.
 Pay must be disabled, Decline must remain available, and legal Add objects must
 remain interactive. Add Fury from a Rune, then repeat with another legal Add

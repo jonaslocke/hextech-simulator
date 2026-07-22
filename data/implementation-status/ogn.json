@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T10:12:42.987Z",
+  "updatedAt": "2026-07-22T10:39:55.266Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -817,21 +817,35 @@
           "name": "Unlicensed Armory"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-023",
         "approvedAt": "2026-07-22T10:12:42.987Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-optional-paid-death-replacement",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-22T10:39:36.598Z",
+          "note": "User manually validated Unlicensed Armory in-game with its corrected Fury payment and optional death-replacement flow."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:44:29.821Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-023 approved."
+        },
+        {
+          "at": "2026-07-22T10:39:36.598Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-optional-paid-death-replacement",
+          "note": "User manually validated Unlicensed Armory in-game with its corrected Fury payment and optional death-replacement flow."
         }
       ],
-      "updatedAt": "2026-07-22T10:12:42.987Z"
+      "updatedAt": "2026-07-22T10:39:36.598Z"
     },
     {
       "gameplayIdentity": "OGN-024:Void Seeker",
@@ -1329,21 +1343,35 @@
           "name": "Immortal Phoenix"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-037",
         "approvedAt": "2026-07-21T01:36:20.875Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-22T10:39:54.125Z",
+          "note": "User manually validated Immortal Phoenix in-game, including its public-Trash trigger and effect-driven replay behavior."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:36:20.875Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-037 approved."
+        },
+        {
+          "at": "2026-07-22T10:39:54.125Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "note": "User manually validated Immortal Phoenix in-game, including its public-Trash trigger and effect-driven replay behavior."
         }
       ],
-      "updatedAt": "2026-07-21T01:36:20.875Z"
+      "updatedAt": "2026-07-22T10:39:54.125Z"
     },
     {
       "gameplayIdentity": "OGN-038:Kadregrin the Infernal",
@@ -6952,7 +6980,7 @@
           "name": "Jinx, Rebel"
         }
       ],
-      "status": "ready_for_manual_validation",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-202",
         "approvedAt": "2026-07-16T00:46:47.997Z"
@@ -6963,6 +6991,12 @@
           "status": "ready_for_manual_validation",
           "updatedAt": "2026-07-16T00:47:59.897Z",
           "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        },
+        {
+          "familyId": "ogn-m2-typed-discard-event-trigger",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-22T10:39:37.807Z",
+          "note": "User manually validated Jinx, Rebel's typed discard-event trigger in-game."
         }
       ],
       "history": [
@@ -6978,9 +7012,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "ogn-m2-conditions-choices-modes-turn-memory",
           "note": "Complete-card subset implemented; pending manual validation by reusable primitive."
+        },
+        {
+          "at": "2026-07-22T10:39:37.807Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-typed-discard-event-trigger",
+          "note": "User manually validated Jinx, Rebel's typed discard-event trigger in-game."
         }
       ],
-      "updatedAt": "2026-07-16T00:47:59.897Z"
+      "updatedAt": "2026-07-22T10:39:37.807Z"
     },
     {
       "gameplayIdentity": "OGN-203:Possession",
@@ -8935,21 +8976,35 @@
           "name": "Super Mega Death Rocket!"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-252",
         "approvedAt": "2026-07-21T01:38:24.526Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-22T10:39:55.266Z",
+          "note": "User manually validated Super Mega Death Rocket! in-game, including its public-Trash trigger and effect-driven replay behavior."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:38:24.526Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-252 approved."
+        },
+        {
+          "at": "2026-07-22T10:39:55.266Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "note": "User manually validated Super Mega Death Rocket! in-game, including its public-Trash trigger and effect-driven replay behavior."
         }
       ],
-      "updatedAt": "2026-07-21T01:38:24.526Z"
+      "updatedAt": "2026-07-22T10:39:55.266Z"
     },
     {
       "gameplayIdentity": "OGN-253:Hand of Noxus",
