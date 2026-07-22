@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "setCode": "OGS",
-  "updatedAt": "2026-07-22T17:19:41.933Z",
+  "updatedAt": "2026-07-22T17:55:10.750Z",
   "cards": [
     {
       "gameplayIdentity": "OGS-001:Annie Fiery",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-001",
         "approvedAt": "2026-07-04T14:36:50.904Z"
@@ -17,9 +17,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-001 approved."
+        },
+        {
+          "at": "2026-07-22T17:54:41.585Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:36:50.904Z",
+      "updatedAt": "2026-07-22T17:54:41.585Z",
       "name": "Annie, Fiery",
       "cleanName": "Annie Fiery",
       "printingCodes": [
@@ -351,7 +356,7 @@
     },
     {
       "gameplayIdentity": "OGS-010:Annie Stubborn",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-010",
         "approvedAt": "2026-07-04T14:37:42.472Z"
@@ -363,9 +368,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-010 approved."
+        },
+        {
+          "at": "2026-07-22T17:48:37.600Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:37:42.472Z",
+      "updatedAt": "2026-07-22T17:48:37.600Z",
       "name": "Annie, Stubborn",
       "cleanName": "Annie Stubborn",
       "printingCodes": [
@@ -384,7 +394,7 @@
     },
     {
       "gameplayIdentity": "OGS-011:Flash",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-011",
         "approvedAt": "2026-07-04T14:38:14.828Z"
@@ -396,9 +406,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-011 approved."
+        },
+        {
+          "at": "2026-07-22T17:48:45.915Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:38:14.828Z",
+      "updatedAt": "2026-07-22T17:48:45.915Z",
       "name": "Flash",
       "cleanName": "Flash",
       "printingCodes": [
@@ -417,7 +432,7 @@
     },
     {
       "gameplayIdentity": "OGS-012:Blast of Power",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-012",
         "approvedAt": "2026-06-23T09:24:20.977Z"
@@ -429,9 +444,19 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-012 approved."
+        },
+        {
+          "at": "2026-07-22T17:48:54.187Z",
+          "event": "card_status_updated",
+          "status": "accepted"
+        },
+        {
+          "at": "2026-07-22T17:49:00.735Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-06-23T09:24:20.977Z",
+      "updatedAt": "2026-07-22T17:49:00.735Z",
       "name": "Blast of Power",
       "cleanName": "Blast of Power",
       "printingCodes": [
@@ -497,7 +522,7 @@
     },
     {
       "gameplayIdentity": "OGS-014:Lux Crownguard",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-014",
         "approvedAt": "2026-06-23T09:24:23.184Z"
@@ -509,9 +534,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-014 approved."
+        },
+        {
+          "at": "2026-07-22T17:55:10.750Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-06-23T09:24:23.184Z",
+      "updatedAt": "2026-07-22T17:55:10.750Z",
       "name": "Lux, Crownguard",
       "cleanName": "Lux Crownguard",
       "printingCodes": [
@@ -624,7 +654,7 @@
     },
     {
       "gameplayIdentity": "OGS-017:Dark Child  Starter",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-017",
         "approvedAt": "2026-07-04T14:38:28.151Z"
@@ -636,9 +666,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-017 approved."
+        },
+        {
+          "at": "2026-07-22T17:54:48.704Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:38:28.151Z",
+      "updatedAt": "2026-07-22T17:54:48.704Z",
       "name": "Dark Child - Starter",
       "cleanName": "Dark Child  Starter",
       "printingCodes": [
@@ -657,7 +692,7 @@
     },
     {
       "gameplayIdentity": "OGS-018:Tibbers",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-018",
         "approvedAt": "2026-07-04T14:38:36.801Z"
@@ -669,9 +704,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-018 approved."
+        },
+        {
+          "at": "2026-07-22T17:54:57.744Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:38:36.801Z",
+      "updatedAt": "2026-07-22T17:54:57.744Z",
       "name": "Tibbers",
       "cleanName": "Tibbers",
       "printingCodes": [
@@ -690,7 +730,7 @@
     },
     {
       "gameplayIdentity": "OGS-019:Wuju Bladesman  Starter",
-      "status": "implemented",
+      "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-019",
         "approvedAt": "2026-07-06T19:58:45.154Z"
@@ -702,9 +742,14 @@
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGS-019 approved."
+        },
+        {
+          "at": "2026-07-22T17:55:03.945Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-06T19:58:45.154Z",
+      "updatedAt": "2026-07-22T17:55:03.945Z",
       "name": "Wuju Bladesman - Starter",
       "cleanName": "Wuju Bladesman  Starter",
       "printingCodes": [
