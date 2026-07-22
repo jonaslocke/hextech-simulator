@@ -1280,9 +1280,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Play unit destination",
     description: "Adds a card-driven legal destination for playing a unit.",
     parameters: [
-      required("destination", "string", "The additional destination kind.", ["openBattlefield", "occupiedEnemyBattlefield"])
+      required("destination", "string", "The additional destination kind.", ["openBattlefield", "occupiedEnemyBattlefield"]),
+      optional("scope", "string", "Which Units receive the destination permission.", ["self", "friendlyUnits", "selfAndFriendlyUnits"]),
     ],
-    engineSupport: requiresEngineSupport("Unit destination permissions require a generalized legality policy.")
+    engineSupport: supported("The shared destination policy distinguishes self-only permissions from active friendly-Unit permissions and validates the same scope during projection and execution.")
   }),
   "modifier.cannot_move_from_source_battlefield": primitiveSeed({
     id: "modifier.cannot_move_from_source_battlefield",

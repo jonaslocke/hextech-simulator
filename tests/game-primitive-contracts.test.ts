@@ -185,7 +185,9 @@ test("continuous destination restrictions and permissions compose", () => {
     id: "permission", sequence: 0, sourceText: "Friendly Units may be played to open battlefields.",
     normalizedText: "Friendly Units may be played to open battlefields.",
     abilities: [], triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], keywords: [],
-    effects: [binding("modifier.play_unit_destination", { destination: "openBattlefield" })],
+    effects: [binding("modifier.play_unit_destination", {
+      destination: "openBattlefield", scope: "friendlyUnits",
+    })],
   }];
   const restrictionSource = card("SYN-BASE-ONLY", "Unit", 2);
   restrictionSource.behaviorModel.clauses = [{
@@ -217,6 +219,30 @@ test("continuous destination restrictions and permissions compose", () => {
     legalUnitDestinationIds(game, "p1", restrictedUnit, index),
     ["base", "controlled", "open"],
   );
+  permissionSource.behaviorModel.clauses[0]!.effects[0]!.parameters.scope = "self";
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", restrictedUnit, index),
+    ["base", "controlled"],
+  );
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", permissionSource, index),
+    ["base", "controlled", "open"],
+  );
+  delete permissionSource.behaviorModel.clauses[0]!.effects[0]!.parameters.scope;
+  permissionSource.behaviorModel.clauses[0]!.normalizedText =
+    "You may play me to an open battlefield.";
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", restrictedUnit, index),
+    ["base", "controlled"],
+  );
+  permissionSource.behaviorModel.clauses[0]!.normalizedText =
+    "Friendly Units may be played to open battlefields.";
+  assert.deepEqual(
+    legalUnitDestinationIds(game, "p1", restrictedUnit, index),
+    ["base", "controlled", "open"],
+  );
+  permissionSource.behaviorModel.clauses[0]!.effects[0]!.parameters.scope =
+    "friendlyUnits";
   game.state.battlefields[0]!.units.push("restriction");
   assert.deepEqual(legalUnitDestinationIds(game, "p1", restrictedUnit, index), ["base"]);
 });
@@ -558,19 +584,48 @@ test("pending resolution payment exposes Add abilities and preserves its continu
 test("effect-driven Unit play validates its source zone and uses normal placement", () => {
   const source = card("SYN-EFFECT-SOURCE", "Gear");
   const unit = card("SYN-EFFECT-PLAYED-UNIT", "Unit", 4);
-  const { game, handlers } = fixture([source, unit], [
+  const selfPermission = card("SYN-SELF-DESTINATION", "Unit", 2);
+  selfPermission.behaviorModel.clauses = [{
+    id: "self-destination", sequence: 0,
+    sourceText: "This Unit has an additional destination.",
+    normalizedText: "This Unit has an additional destination.",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], keywords: [], effects: [binding(
+      "modifier.play_unit_destination",
+      { destination: "openBattlefield", scope: "self" },
+    )],
+  }];
+  const battlefield = card("SYN-EFFECT-BATTLEFIELD", "Battlefield");
+  const { game, handlers } = fixture([source, unit, selfPermission, battlefield], [
     instance("source", "p1", source.cardCode, "mainDeck"),
     instance("unit", "p1", unit.cardCode, "mainDeck"),
+    instance("self-permission", "p1", selfPermission.cardCode, "mainDeck"),
+    instance("open-field", "p1", battlefield.cardCode, "battlefield"),
   ]);
-  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.zones.base = ["source", "self-permission"];
   game.state.players.p1!.zones.trash = ["unit"];
-  const context = createBehaviorContext(game, "p1", "source", null, ["unit", "base"]);
+  game.state.battlefields = [{
+    battlefieldId: "open", cardInstanceId: "open-field", selectedByPlayerId: "p1",
+    controllerPlayerId: null, contestedByPlayerId: null, units: [], facedownCards: [],
+  }];
+  const playBinding = binding("action.play_selected_card", {
+    sourceSelectionKey: "card", selectionKey: "destination", costMode: "ignoreAll",
+  });
+  const context = createBehaviorContext(game, "p1", "source", null, ["unit"]);
   context.selectedBySelector.card = ["unit"];
+  const choice = handlers.get("action.play_selected_card")!.choice!(playBinding, context);
+  assert.deepEqual(choice?.legalIds, ["base"]);
+
+  const illegal = createBehaviorContext(game, "p1", "source", null, ["unit", "open"]);
+  illegal.selectedBySelector.card = ["unit"];
+  illegal.selectedBySelector.destination = ["open"];
+  handlers.get("action.play_selected_card")!.execute!(playBinding, illegal);
+  assert.deepEqual(game.state.players.p1!.zones.trash, ["unit"]);
+  assert.deepEqual(game.state.battlefields[0]!.units, []);
+
+  context.selectedIds = ["unit", "base"];
   context.selectedBySelector.destination = ["base"];
-  handlers.get("action.play_selected_card")!.execute!(binding(
-    "action.play_selected_card",
-    { sourceSelectionKey: "card", selectionKey: "destination", costMode: "ignoreAll" },
-  ), context);
+  handlers.get("action.play_selected_card")!.execute!(playBinding, context);
   assert.deepEqual(game.state.players.p1!.zones.trash, []);
   assert.ok(game.state.players.p1!.zones.base.includes("unit"));
   assert.deepEqual(game.state.players.p1!.playedCardIdsThisTurn, ["unit"]);

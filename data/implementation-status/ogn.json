@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T10:50:48.628Z",
+  "updatedAt": "2026-07-22T11:23:46.065Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -1352,8 +1352,8 @@
         {
           "familyId": "ogn-m2-public-trash-effect-replay",
           "status": "ready_for_manual_validation",
-          "updatedAt": "2026-07-22T10:50:48.628Z",
-          "note": "A mixed board/Trash duplicate-source trigger defect was found after the earlier manual pass; the active-zone routing fix requires manual revalidation."
+          "updatedAt": "2026-07-22T11:23:46.065Z",
+          "note": "Trigger-source count is corrected, but effect-driven placement exposed a self-only destination permission leak; OGN-037 requires manual revalidation of trigger routing and destination legality."
         }
       ],
       "history": [
@@ -1376,9 +1376,16 @@
           "status": "ready_for_manual_validation",
           "familyId": "ogn-m2-public-trash-effect-replay",
           "note": "A mixed board/Trash duplicate-source trigger defect was found after the earlier manual pass; the active-zone routing fix requires manual revalidation."
+        },
+        {
+          "at": "2026-07-22T11:23:46.065Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-public-trash-effect-replay",
+          "note": "Trigger-source count is corrected, but effect-driven placement exposed a self-only destination permission leak; OGN-037 requires manual revalidation of trigger routing and destination legality."
         }
       ],
-      "updatedAt": "2026-07-22T10:50:48.628Z"
+      "updatedAt": "2026-07-22T11:23:46.065Z"
     },
     {
       "gameplayIdentity": "OGN-038:Kadregrin the Infernal",
@@ -5607,7 +5614,7 @@
       "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-161",
-        "approvedAt": "2026-07-21T01:17:08.189Z"
+        "approvedAt": "2026-07-22T11:22:16.192Z"
       },
       "familyStatuses": [
         {
@@ -5630,9 +5637,15 @@
           "status": "manual_family_passed",
           "familyId": "ogn-m2-batch-1-manual-validation",
           "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        },
+        {
+          "at": "2026-07-22T11:22:16.192Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-161 approved."
         }
       ],
-      "updatedAt": "2026-07-21T10:19:25.053Z"
+      "updatedAt": "2026-07-22T11:22:16.192Z"
     },
     {
       "gameplayIdentity": "OGN-162:Miss Fortune Captain",
@@ -6104,7 +6117,7 @@
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGN-174",
-        "approvedAt": "2026-07-04T14:35:44.168Z"
+        "approvedAt": "2026-07-22T11:22:16.192Z"
       },
       "familyStatuses": [],
       "history": [
@@ -6115,7 +6128,7 @@
           "note": "Canonical model OGN-174 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:35:44.168Z"
+      "updatedAt": "2026-07-22T11:22:16.192Z"
     },
     {
       "gameplayIdentity": "OGN-175:Shipyard Skulker",
@@ -6160,7 +6173,7 @@
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGN-176",
-        "approvedAt": "2026-07-04T14:35:49.775Z"
+        "approvedAt": "2026-07-22T11:22:16.192Z"
       },
       "familyStatuses": [],
       "history": [
@@ -6171,7 +6184,7 @@
           "note": "Canonical model OGN-176 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:35:49.775Z"
+      "updatedAt": "2026-07-22T11:22:16.192Z"
     },
     {
       "gameplayIdentity": "OGN-177:Stealthy Pursuer",
@@ -6679,7 +6692,7 @@
       "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-193",
-        "approvedAt": "2026-07-21T01:17:08.453Z"
+        "approvedAt": "2026-07-22T11:22:16.192Z"
       },
       "familyStatuses": [
         {
@@ -6702,9 +6715,15 @@
           "status": "manual_family_passed",
           "familyId": "ogn-m2-batch-1-manual-validation",
           "note": "User manually validated the Batch 1 behavior scenarios in-game; OGN-070 and OGN-189 remain pending movement-focused validation."
+        },
+        {
+          "at": "2026-07-22T11:22:16.192Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGN-193 approved."
         }
       ],
-      "updatedAt": "2026-07-21T10:19:25.053Z"
+      "updatedAt": "2026-07-22T11:22:16.192Z"
     },
     {
       "gameplayIdentity": "OGN-194:Nocturne Horrifying",

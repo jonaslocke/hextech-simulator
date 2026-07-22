@@ -55,28 +55,50 @@ function permitsOpenBattlefield(
   definition: GameCardDefinition,
   index?: RuntimeCardIndex,
 ): boolean {
-  if (hasDestinationPermission(definition, "openBattlefield")) return true;
+  if (hasDestinationPermission(definition, "openBattlefield", "self")) return true;
   if (!index) return false;
   return activeBoardSources(game, playerId, index).some((source) =>
-    hasDestinationPermission(source, "openBattlefield"),
+    hasDestinationPermission(source, "openBattlefield", "friendlyUnits"),
   );
 }
 
 function permitsOccupiedEnemyBattlefield(definition: GameCardDefinition) {
-  return hasDestinationPermission(definition, "occupiedEnemyBattlefield");
+  return hasDestinationPermission(definition, "occupiedEnemyBattlefield", "self");
 }
 
 function hasDestinationPermission(
   definition: GameCardDefinition,
   destination: string,
+  requestedScope: "self" | "friendlyUnits",
 ) {
   return definition.behaviorModel.clauses.some((clause) =>
     clause.effects.some(
       (binding) =>
         binding.behaviorId === "modifier.play_unit_destination" &&
-        binding.parameters.destination === destination,
+        binding.parameters.destination === destination &&
+        destinationPermissionScopeMatches(
+          binding.parameters.scope,
+          requestedScope,
+          clause.normalizedText,
+        ),
     ),
   );
+}
+
+function destinationPermissionScopeMatches(
+  declaredScope: unknown,
+  requestedScope: "self" | "friendlyUnits",
+  sourceText: string,
+) {
+  if (declaredScope === "selfAndFriendlyUnits") return true;
+  if (declaredScope === requestedScope) return true;
+  if (declaredScope !== undefined) return false;
+
+  // Preserve old deck snapshots created before the permission gained an
+  // explicit scope while still distinguishing self-only and global wording.
+  return requestedScope === "self"
+    ? /\bplay me\b/i.test(sourceText)
+    : /\bfriendly units\b[^.]*\bplayed\b/i.test(sourceText);
 }
 
 export function isUnitPlayRestrictedToBase(

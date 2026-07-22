@@ -84,7 +84,7 @@ rows because it needs both listed missing primitives; it is counted once.
 | Conditional entry-ready | The card-play pipeline evaluates source entry replacement conditions before placement; the existing entry-ready modifier performs the state change. | Parameterized reuse | `OGN-079` |
 | Continuous play/ready restrictions | Unit-destination projection/execution and ready-effect execution consult active battlefield restrictions. Natural Awakening is deliberately unaffected. | New reusable legality hooks | `OGN-070` |
 | Cross-target value copy | A numeric-copy modifier snapshots the two selected Units' computed Might and records only the increase for the requested duration. | New primitive | `OGN-108` |
-| Special Unit destinations | The shared destination policy supports open battlefields from an active friendly permission and occupied enemy battlefields from the played Unit's own permission. | Shared extension | `OGN-161`, `OGN-193` |
+| Special Unit destinations | The shared destination policy distinguishes a played Unit's self-only permission from an active source's friendly-Unit permission. It supports open battlefields for either applicable scope and occupied enemy battlefields only from the played Unit's own permission. | Shared extension | `OGN-161`, `OGN-193` |
 | Next-play cost modifier | The cost calculator applies the oldest matching one-shot Spell discount and consumes it only after a successful matching play. | New consumable permission | `OGN-031` |
 | Conditional damage prevention | Every damage producer consults the target's conditional prevention before mutation and event emission. | New prevention hook | `OGN-189` |
 
@@ -94,6 +94,15 @@ manually validated `OGN-031`, `OGN-034`, `OGN-070`, `OGN-079`, `OGN-108`,
 their Batch 1 manual behavior-family gate without promoting their complete
 gameplay identities to `accepted`. `OGN-035` also uses the entry-ready contract
 but remains part of the Batch 2 optional-payment validation scope.
+
+A later effect-driven play exposed that an unscoped self permission such as
+"You may play me to an open battlefield" was also being read as a continuous
+permission for every friendly Unit while that source remained on the board.
+`modifier.play_unit_destination` now records `self`, `friendlyUnits`, or the
+combined scope explicitly. Legacy match snapshots infer the scope from their
+approved clause text. This preserves Miss Fortune, Buccaneer's active friendly
+permission while preventing a self-only source such as Sneaky Deckhand from
+granting an open-battlefield destination to another Unit.
 
 The follow-up deck is
 `data/decks/experimental/ogn-m2-batch-1-movement-validation.dec.txt`. It uses the
@@ -145,6 +154,7 @@ the opponent receives only the normal waiting projection.
 | Rune, permanent, battlefield object, or Legend Add ability | Pending payment decision | Add resolves immediately without replacing the pending decision; reprojection updates Pay legality. | Multiple source locations, exhausted source, insufficient pool, exact payment. | Public Add-action projection, production transition, pending-state preservation, and exact consumption. |
 | Optional death replacement | Pending payment decision and lethal cleanup | Replacement waits for explicit resource production, suppresses death only on paid acceptance, and otherwise preserves death attribution. | Accept, decline, insufficient pool, continuation, combat cleanup. | Replacement payment, event suppression, resolution resume, and combat cleanup matrices. |
 | Typed gameplay event | Active-source discovery and trigger routing | A definition that declares `modifier.active_in_zone` contributes trigger sources only from that zone; normal Base/Battlefield discovery must not also activate another copy. | Declared-zone copy, normal-board copy, mixed copies, event-subject Main Deck source. | Synthetic mixed Trash/Base source routing plus the existing public-Trash/private-deck discovery matrix. |
+| Unit destination permission | Effect-driven placement choice and server execution | Projection and execution apply the same permission scope: self-only modifiers affect only the played Unit, while active friendly-Unit modifiers affect other friendly Units. | Self permission, active friendly permission, combined permission, illegal stale destination. | Synthetic destination-policy scope matrix and effect-play projection/execution rejection of an unauthorized open battlefield. |
 
 The interactive payment overlay leaves the board visually unobscured and
 pointer-accessible. An Add ability whose cost exhausts its source is projected
@@ -200,6 +210,12 @@ battlefield: a spell kill must create exactly one trigger, sourced by the Trash
 copy. After payment that same copy must be played, and the board copy must
 remain unchanged. Decline must leave the Trash copy there and clear the pending
 resolution without exposing a second Phoenix payment.
+With a self-only open-battlefield Unit in Base, the Phoenix placement prompt
+must offer only Base and battlefields the Phoenix controller controls. An open
+or opponent-controlled battlefield must be absent and a stale submission for
+it must leave Phoenix in Trash. With an active friendly-Unit permission instead,
+an otherwise open battlefield must become legal; this is retained behavior,
+not a new permission for Phoenix itself.
 
 For that payment UX, trigger Flame Chompers with no Fury Power in the Rune Pool.
 Pay must be disabled, Decline must remain available, and legal Add objects must

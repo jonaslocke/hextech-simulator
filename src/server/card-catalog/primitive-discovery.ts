@@ -324,9 +324,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "action.take_to_hand", "action", { sourceSelectionKey: "lookedCards", count: readFirstNumber(context.rulesText) ?? 1, selectionKey: "cardToHand" }, "high")
       : null
   ),
-  primitive("modifier.play_unit_destination", "modifier", "Play unit destination", "Adds a card-driven legal play destination.", ["destination"], (context) =>
+  primitive("modifier.play_unit_destination", "modifier", "Play unit destination", "Adds a card-driven legal play destination.", ["destination", "scope"], (context) =>
     /\bplay me to an open battlefield\b/.test(context.rulesText)
-      ? assignment(context, "modifier.play_unit_destination", "modifier", { destination: "openBattlefield" }, "high")
+      ? assignment(context, "modifier.play_unit_destination", "modifier", {
+          destination: "openBattlefield",
+          scope: /\bfriendly units may be played to open battlefields\b/.test(context.rulesText)
+            ? "selfAndFriendlyUnits"
+            : "self",
+        }, "high")
       : null
   ),
   primitive("action.recycle_cards", "action", "Recycle cards", "Move cards to bottom of a deck.", ["target", "count"], (context) =>
