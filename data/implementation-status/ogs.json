@@ -1,25 +1,10 @@
 {
   "schemaVersion": 1,
   "setCode": "OGS",
-  "updatedAt": "2026-07-15T11:23:35.831Z",
+  "updatedAt": "2026-07-22T16:45:42.785Z",
   "cards": [
     {
       "gameplayIdentity": "OGS-001:Annie Fiery",
-      "name": "Annie, Fiery",
-      "cleanName": "Annie Fiery",
-      "printingCodes": [
-        "OGS-001"
-      ],
-      "sourceCardIds": [
-        "a4658ad3-2540-43a9-8d2d-0108c64848b8"
-      ],
-      "printings": [
-        {
-          "sourceCardId": "a4658ad3-2540-43a9-8d2d-0108c64848b8",
-          "cardCode": "OGS-001",
-          "name": "Annie, Fiery"
-        }
-      ],
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-001",
@@ -34,10 +19,45 @@
           "note": "Canonical model OGS-001 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:36:50.904Z"
+      "updatedAt": "2026-07-04T14:36:50.904Z",
+      "name": "Annie, Fiery",
+      "cleanName": "Annie Fiery",
+      "printingCodes": [
+        "OGS-001"
+      ],
+      "sourceCardIds": [
+        "a4658ad3-2540-43a9-8d2d-0108c64848b8"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "a4658ad3-2540-43a9-8d2d-0108c64848b8",
+          "cardCode": "OGS-001",
+          "name": "Annie, Fiery"
+        }
+      ]
     },
     {
       "gameplayIdentity": "OGS-002:Firestorm",
+      "status": "accepted",
+      "canonicalModel": {
+        "cardCode": "OGS-002",
+        "approvedAt": "2026-07-04T14:37:07.376Z"
+      },
+      "familyStatuses": [],
+      "history": [
+        {
+          "at": "2026-07-04T14:37:07.376Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGS-002 approved."
+        },
+        {
+          "at": "2026-07-22T16:44:22.697Z",
+          "event": "card_status_updated",
+          "status": "accepted"
+        }
+      ],
+      "updatedAt": "2026-07-22T16:44:22.697Z",
       "name": "Firestorm",
       "cleanName": "Firestorm",
       "printingCodes": [
@@ -52,25 +72,30 @@
           "cardCode": "OGS-002",
           "name": "Firestorm"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-003:Incinerate",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-002",
-        "approvedAt": "2026-07-04T14:37:07.376Z"
+        "cardCode": "OGS-003",
+        "approvedAt": "2026-07-04T14:37:27.776Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-07-04T14:37:07.376Z",
+          "at": "2026-07-04T14:37:27.776Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-002 approved."
+          "note": "Canonical model OGS-003 approved."
+        },
+        {
+          "at": "2026-07-22T16:44:31.159Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:37:07.376Z"
-    },
-    {
-      "gameplayIdentity": "OGS-003:Incinerate",
+      "updatedAt": "2026-07-22T16:44:31.159Z",
       "name": "Incinerate",
       "cleanName": "Incinerate",
       "printingCodes": [
@@ -85,25 +110,30 @@
           "cardCode": "OGS-003",
           "name": "Incinerate"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-004:Yi Meditative",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-003",
-        "approvedAt": "2026-07-04T14:37:27.776Z"
+        "cardCode": "OGS-004",
+        "approvedAt": "2026-07-10T22:11:16.659Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-07-04T14:37:27.776Z",
+          "at": "2026-07-10T22:11:16.659Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-003 approved."
+          "note": "Canonical model OGS-004 approved."
+        },
+        {
+          "at": "2026-07-22T16:44:38.726Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-04T14:37:27.776Z"
-    },
-    {
-      "gameplayIdentity": "OGS-004:Yi Meditative",
+      "updatedAt": "2026-07-22T16:44:38.726Z",
       "name": "Master Yi, Meditative",
       "cleanName": "Yi Meditative",
       "printingCodes": [
@@ -118,25 +148,30 @@
           "cardCode": "OGS-004",
           "name": "Master Yi, Meditative"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-005:Zephyr Sage",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-004",
-        "approvedAt": "2026-07-10T22:11:16.659Z"
+        "cardCode": "OGS-005",
+        "approvedAt": "2026-07-06T20:02:32.192Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-07-10T22:11:16.659Z",
+          "at": "2026-07-06T20:02:32.192Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-004 approved."
+          "note": "Canonical model OGS-005 approved."
+        },
+        {
+          "at": "2026-07-22T16:44:58.196Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-10T22:11:16.659Z"
-    },
-    {
-      "gameplayIdentity": "OGS-005:Zephyr Sage",
+      "updatedAt": "2026-07-22T16:44:58.196Z",
       "name": "Zephyr Sage",
       "cleanName": "Zephyr Sage",
       "printingCodes": [
@@ -151,25 +186,30 @@
           "cardCode": "OGS-005",
           "name": "Zephyr Sage"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-006:Lux Illuminated",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-005",
-        "approvedAt": "2026-07-06T20:02:32.192Z"
+        "cardCode": "OGS-006",
+        "approvedAt": "2026-06-23T09:24:19.168Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-07-06T20:02:32.192Z",
+          "at": "2026-06-23T09:24:19.168Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-005 approved."
+          "note": "Canonical model OGS-006 approved."
+        },
+        {
+          "at": "2026-07-22T16:45:05.220Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-06T20:02:32.192Z"
-    },
-    {
-      "gameplayIdentity": "OGS-006:Lux Illuminated",
+      "updatedAt": "2026-07-22T16:45:05.220Z",
       "name": "Lux, Illuminated",
       "cleanName": "Lux Illuminated",
       "printingCodes": [
@@ -184,40 +224,10 @@
           "cardCode": "OGS-006",
           "name": "Lux, Illuminated"
         }
-      ],
-      "status": "implemented",
-      "canonicalModel": {
-        "cardCode": "OGS-006",
-        "approvedAt": "2026-06-23T09:24:19.168Z"
-      },
-      "familyStatuses": [],
-      "history": [
-        {
-          "at": "2026-06-23T09:24:19.168Z",
-          "event": "canonical_model_approved",
-          "status": "implemented",
-          "note": "Canonical model OGS-006 approved."
-        }
-      ],
-      "updatedAt": "2026-06-23T09:24:19.168Z"
+      ]
     },
     {
       "gameplayIdentity": "OGS-007:Garen Rugged",
-      "name": "Garen, Rugged",
-      "cleanName": "Garen Rugged",
-      "printingCodes": [
-        "OGS-007"
-      ],
-      "sourceCardIds": [
-        "cf7196a6-8d8c-40a3-a692-62ab9b6e8d10"
-      ],
-      "printings": [
-        {
-          "sourceCardId": "cf7196a6-8d8c-40a3-a692-62ab9b6e8d10",
-          "cardCode": "OGS-007",
-          "name": "Garen, Rugged"
-        }
-      ],
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-007",
@@ -246,10 +256,45 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Garen, Rugged",
+      "cleanName": "Garen Rugged",
+      "printingCodes": [
+        "OGS-007"
+      ],
+      "sourceCardIds": [
+        "cf7196a6-8d8c-40a3-a692-62ab9b6e8d10"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "cf7196a6-8d8c-40a3-a692-62ab9b6e8d10",
+          "cardCode": "OGS-007",
+          "name": "Garen, Rugged"
+        }
+      ]
     },
     {
       "gameplayIdentity": "OGS-008:Gentlemens Duel",
+      "status": "accepted",
+      "canonicalModel": {
+        "cardCode": "OGS-008",
+        "approvedAt": "2026-07-06T19:58:31.168Z"
+      },
+      "familyStatuses": [],
+      "history": [
+        {
+          "at": "2026-07-06T19:58:31.168Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGS-008 approved."
+        },
+        {
+          "at": "2026-07-22T16:45:14.608Z",
+          "event": "card_status_updated",
+          "status": "accepted"
+        }
+      ],
+      "updatedAt": "2026-07-22T16:45:14.608Z",
       "name": "Gentlemen's Duel",
       "cleanName": "Gentlemens Duel",
       "printingCodes": [
@@ -264,40 +309,10 @@
           "cardCode": "OGS-008",
           "name": "Gentlemen's Duel"
         }
-      ],
-      "status": "implemented",
-      "canonicalModel": {
-        "cardCode": "OGS-008",
-        "approvedAt": "2026-07-06T19:58:31.168Z"
-      },
-      "familyStatuses": [],
-      "history": [
-        {
-          "at": "2026-07-06T19:58:31.168Z",
-          "event": "canonical_model_approved",
-          "status": "implemented",
-          "note": "Canonical model OGS-008 approved."
-        }
-      ],
-      "updatedAt": "2026-07-06T19:58:31.168Z"
+      ]
     },
     {
       "gameplayIdentity": "OGS-009:Yi Honed",
-      "name": "Master Yi, Honed",
-      "cleanName": "Yi Honed",
-      "printingCodes": [
-        "OGS-009"
-      ],
-      "sourceCardIds": [
-        "09397732-5f8d-412c-ae14-c8d84ed02ee6"
-      ],
-      "printings": [
-        {
-          "sourceCardId": "09397732-5f8d-412c-ae14-c8d84ed02ee6",
-          "cardCode": "OGS-009",
-          "name": "Master Yi, Honed"
-        }
-      ],
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-009",
@@ -312,25 +327,25 @@
           "note": "Canonical model OGS-009 approved."
         }
       ],
-      "updatedAt": "2026-07-10T22:11:16.659Z"
-    },
-    {
-      "gameplayIdentity": "OGS-010:Annie Stubborn",
-      "name": "Annie, Stubborn",
-      "cleanName": "Annie Stubborn",
+      "updatedAt": "2026-07-10T22:11:16.659Z",
+      "name": "Master Yi, Honed",
+      "cleanName": "Yi Honed",
       "printingCodes": [
-        "OGS-010"
+        "OGS-009"
       ],
       "sourceCardIds": [
-        "4118a71c-c841-4b45-ab7a-af92e24b48f1"
+        "09397732-5f8d-412c-ae14-c8d84ed02ee6"
       ],
       "printings": [
         {
-          "sourceCardId": "4118a71c-c841-4b45-ab7a-af92e24b48f1",
-          "cardCode": "OGS-010",
-          "name": "Annie, Stubborn"
+          "sourceCardId": "09397732-5f8d-412c-ae14-c8d84ed02ee6",
+          "cardCode": "OGS-009",
+          "name": "Master Yi, Honed"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-010:Annie Stubborn",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-010",
@@ -345,25 +360,25 @@
           "note": "Canonical model OGS-010 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:37:42.472Z"
-    },
-    {
-      "gameplayIdentity": "OGS-011:Flash",
-      "name": "Flash",
-      "cleanName": "Flash",
+      "updatedAt": "2026-07-04T14:37:42.472Z",
+      "name": "Annie, Stubborn",
+      "cleanName": "Annie Stubborn",
       "printingCodes": [
-        "OGS-011"
+        "OGS-010"
       ],
       "sourceCardIds": [
-        "93f1e74f-35fc-49e2-a997-a8fe23e832b9"
+        "4118a71c-c841-4b45-ab7a-af92e24b48f1"
       ],
       "printings": [
         {
-          "sourceCardId": "93f1e74f-35fc-49e2-a997-a8fe23e832b9",
-          "cardCode": "OGS-011",
-          "name": "Flash"
+          "sourceCardId": "4118a71c-c841-4b45-ab7a-af92e24b48f1",
+          "cardCode": "OGS-010",
+          "name": "Annie, Stubborn"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-011:Flash",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-011",
@@ -378,25 +393,25 @@
           "note": "Canonical model OGS-011 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:38:14.828Z"
-    },
-    {
-      "gameplayIdentity": "OGS-012:Blast of Power",
-      "name": "Blast of Power",
-      "cleanName": "Blast of Power",
+      "updatedAt": "2026-07-04T14:38:14.828Z",
+      "name": "Flash",
+      "cleanName": "Flash",
       "printingCodes": [
-        "OGS-012"
+        "OGS-011"
       ],
       "sourceCardIds": [
-        "f55e5090-af45-45d5-8a14-32a12f7b8e2f"
+        "93f1e74f-35fc-49e2-a997-a8fe23e832b9"
       ],
       "printings": [
         {
-          "sourceCardId": "f55e5090-af45-45d5-8a14-32a12f7b8e2f",
-          "cardCode": "OGS-012",
-          "name": "Blast of Power"
+          "sourceCardId": "93f1e74f-35fc-49e2-a997-a8fe23e832b9",
+          "cardCode": "OGS-011",
+          "name": "Flash"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-012:Blast of Power",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-012",
@@ -411,25 +426,25 @@
           "note": "Canonical model OGS-012 approved."
         }
       ],
-      "updatedAt": "2026-06-23T09:24:20.977Z"
-    },
-    {
-      "gameplayIdentity": "OGS-013:Garen Commander",
-      "name": "Garen, Commander",
-      "cleanName": "Garen Commander",
+      "updatedAt": "2026-06-23T09:24:20.977Z",
+      "name": "Blast of Power",
+      "cleanName": "Blast of Power",
       "printingCodes": [
-        "OGS-013"
+        "OGS-012"
       ],
       "sourceCardIds": [
-        "7b419775-97ce-4b49-80c1-9785c7c2a3d2"
+        "f55e5090-af45-45d5-8a14-32a12f7b8e2f"
       ],
       "printings": [
         {
-          "sourceCardId": "7b419775-97ce-4b49-80c1-9785c7c2a3d2",
-          "cardCode": "OGS-013",
-          "name": "Garen, Commander"
+          "sourceCardId": "f55e5090-af45-45d5-8a14-32a12f7b8e2f",
+          "cardCode": "OGS-012",
+          "name": "Blast of Power"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-013:Garen Commander",
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-013",
@@ -458,25 +473,25 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
-    },
-    {
-      "gameplayIdentity": "OGS-014:Lux Crownguard",
-      "name": "Lux, Crownguard",
-      "cleanName": "Lux Crownguard",
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Garen, Commander",
+      "cleanName": "Garen Commander",
       "printingCodes": [
-        "OGS-014"
+        "OGS-013"
       ],
       "sourceCardIds": [
-        "adbc306c-99e5-44e6-89d5-2520908cc986"
+        "7b419775-97ce-4b49-80c1-9785c7c2a3d2"
       ],
       "printings": [
         {
-          "sourceCardId": "adbc306c-99e5-44e6-89d5-2520908cc986",
-          "cardCode": "OGS-014",
-          "name": "Lux, Crownguard"
+          "sourceCardId": "7b419775-97ce-4b49-80c1-9785c7c2a3d2",
+          "cardCode": "OGS-013",
+          "name": "Garen, Commander"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-014:Lux Crownguard",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-014",
@@ -491,25 +506,25 @@
           "note": "Canonical model OGS-014 approved."
         }
       ],
-      "updatedAt": "2026-06-23T09:24:23.184Z"
-    },
-    {
-      "gameplayIdentity": "OGS-015:Recruit the Vanguard",
-      "name": "Recruit the Vanguard",
-      "cleanName": "Recruit the Vanguard",
+      "updatedAt": "2026-06-23T09:24:23.184Z",
+      "name": "Lux, Crownguard",
+      "cleanName": "Lux Crownguard",
       "printingCodes": [
-        "OGS-015"
+        "OGS-014"
       ],
       "sourceCardIds": [
-        "1556594f-8470-4dfd-8be4-aae5045185d8"
+        "adbc306c-99e5-44e6-89d5-2520908cc986"
       ],
       "printings": [
         {
-          "sourceCardId": "1556594f-8470-4dfd-8be4-aae5045185d8",
-          "cardCode": "OGS-015",
-          "name": "Recruit the Vanguard"
+          "sourceCardId": "adbc306c-99e5-44e6-89d5-2520908cc986",
+          "cardCode": "OGS-014",
+          "name": "Lux, Crownguard"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-015:Recruit the Vanguard",
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-015",
@@ -538,25 +553,25 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
-    },
-    {
-      "gameplayIdentity": "OGS-016:Vanguard Attendant",
-      "name": "Vanguard Attendant",
-      "cleanName": "Vanguard Attendant",
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Recruit the Vanguard",
+      "cleanName": "Recruit the Vanguard",
       "printingCodes": [
-        "OGS-016"
+        "OGS-015"
       ],
       "sourceCardIds": [
-        "fd8e48a1-2341-48d0-93b5-3f2dd32a80f8"
+        "1556594f-8470-4dfd-8be4-aae5045185d8"
       ],
       "printings": [
         {
-          "sourceCardId": "fd8e48a1-2341-48d0-93b5-3f2dd32a80f8",
-          "cardCode": "OGS-016",
-          "name": "Vanguard Attendant"
+          "sourceCardId": "1556594f-8470-4dfd-8be4-aae5045185d8",
+          "cardCode": "OGS-015",
+          "name": "Recruit the Vanguard"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-016:Vanguard Attendant",
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-016",
@@ -585,25 +600,25 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
-    },
-    {
-      "gameplayIdentity": "OGS-017:Dark Child  Starter",
-      "name": "Dark Child - Starter",
-      "cleanName": "Dark Child  Starter",
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Vanguard Attendant",
+      "cleanName": "Vanguard Attendant",
       "printingCodes": [
-        "OGS-017"
+        "OGS-016"
       ],
       "sourceCardIds": [
-        "b15344ec-e5dd-43f9-a34b-4e7eefa25084"
+        "fd8e48a1-2341-48d0-93b5-3f2dd32a80f8"
       ],
       "printings": [
         {
-          "sourceCardId": "b15344ec-e5dd-43f9-a34b-4e7eefa25084",
-          "cardCode": "OGS-017",
-          "name": "Dark Child - Starter"
+          "sourceCardId": "fd8e48a1-2341-48d0-93b5-3f2dd32a80f8",
+          "cardCode": "OGS-016",
+          "name": "Vanguard Attendant"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-017:Dark Child  Starter",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-017",
@@ -618,25 +633,25 @@
           "note": "Canonical model OGS-017 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:38:28.151Z"
-    },
-    {
-      "gameplayIdentity": "OGS-018:Tibbers",
-      "name": "Tibbers",
-      "cleanName": "Tibbers",
+      "updatedAt": "2026-07-04T14:38:28.151Z",
+      "name": "Dark Child - Starter",
+      "cleanName": "Dark Child  Starter",
       "printingCodes": [
-        "OGS-018"
+        "OGS-017"
       ],
       "sourceCardIds": [
-        "980742ee-5f47-483b-9409-6d4d067aa9e7"
+        "b15344ec-e5dd-43f9-a34b-4e7eefa25084"
       ],
       "printings": [
         {
-          "sourceCardId": "980742ee-5f47-483b-9409-6d4d067aa9e7",
-          "cardCode": "OGS-018",
-          "name": "Tibbers"
+          "sourceCardId": "b15344ec-e5dd-43f9-a34b-4e7eefa25084",
+          "cardCode": "OGS-017",
+          "name": "Dark Child - Starter"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-018:Tibbers",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-018",
@@ -651,25 +666,25 @@
           "note": "Canonical model OGS-018 approved."
         }
       ],
-      "updatedAt": "2026-07-04T14:38:36.801Z"
-    },
-    {
-      "gameplayIdentity": "OGS-019:Wuju Bladesman  Starter",
-      "name": "Wuju Bladesman - Starter",
-      "cleanName": "Wuju Bladesman  Starter",
+      "updatedAt": "2026-07-04T14:38:36.801Z",
+      "name": "Tibbers",
+      "cleanName": "Tibbers",
       "printingCodes": [
-        "OGS-019"
+        "OGS-018"
       ],
       "sourceCardIds": [
-        "cfa62e26-900a-4562-a408-7959a695893a"
+        "980742ee-5f47-483b-9409-6d4d067aa9e7"
       ],
       "printings": [
         {
-          "sourceCardId": "cfa62e26-900a-4562-a408-7959a695893a",
-          "cardCode": "OGS-019",
-          "name": "Wuju Bladesman - Starter"
+          "sourceCardId": "980742ee-5f47-483b-9409-6d4d067aa9e7",
+          "cardCode": "OGS-018",
+          "name": "Tibbers"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-019:Wuju Bladesman  Starter",
       "status": "implemented",
       "canonicalModel": {
         "cardCode": "OGS-019",
@@ -684,10 +699,45 @@
           "note": "Canonical model OGS-019 approved."
         }
       ],
-      "updatedAt": "2026-07-06T19:58:45.154Z"
+      "updatedAt": "2026-07-06T19:58:45.154Z",
+      "name": "Wuju Bladesman - Starter",
+      "cleanName": "Wuju Bladesman  Starter",
+      "printingCodes": [
+        "OGS-019"
+      ],
+      "sourceCardIds": [
+        "cfa62e26-900a-4562-a408-7959a695893a"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "cfa62e26-900a-4562-a408-7959a695893a",
+          "cardCode": "OGS-019",
+          "name": "Wuju Bladesman - Starter"
+        }
+      ]
     },
     {
       "gameplayIdentity": "OGS-020:Highlander",
+      "status": "accepted",
+      "canonicalModel": {
+        "cardCode": "OGS-020",
+        "approvedAt": "2026-07-06T19:59:13.150Z"
+      },
+      "familyStatuses": [],
+      "history": [
+        {
+          "at": "2026-07-06T19:59:13.150Z",
+          "event": "canonical_model_approved",
+          "status": "implemented",
+          "note": "Canonical model OGS-020 approved."
+        },
+        {
+          "at": "2026-07-22T16:45:42.785Z",
+          "event": "card_status_updated",
+          "status": "accepted"
+        }
+      ],
+      "updatedAt": "2026-07-22T16:45:42.785Z",
       "name": "Highlander",
       "cleanName": "Highlander",
       "printingCodes": [
@@ -702,25 +752,30 @@
           "cardCode": "OGS-020",
           "name": "Highlander"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-021:Lady of Luminosity  Starter",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-020",
-        "approvedAt": "2026-07-06T19:59:13.150Z"
+        "cardCode": "OGS-021",
+        "approvedAt": "2026-06-23T09:24:27.096Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-07-06T19:59:13.150Z",
+          "at": "2026-06-23T09:24:27.096Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-020 approved."
+          "note": "Canonical model OGS-021 approved."
+        },
+        {
+          "at": "2026-07-22T16:45:34.391Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-07-06T19:59:13.150Z"
-    },
-    {
-      "gameplayIdentity": "OGS-021:Lady of Luminosity  Starter",
+      "updatedAt": "2026-07-22T16:45:34.391Z",
       "name": "Lady of Luminosity - Starter",
       "cleanName": "Lady of Luminosity  Starter",
       "printingCodes": [
@@ -735,25 +790,30 @@
           "cardCode": "OGS-021",
           "name": "Lady of Luminosity - Starter"
         }
-      ],
-      "status": "implemented",
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-022:Final Spark",
+      "status": "accepted",
       "canonicalModel": {
-        "cardCode": "OGS-021",
-        "approvedAt": "2026-06-23T09:24:27.096Z"
+        "cardCode": "OGS-022",
+        "approvedAt": "2026-06-23T09:24:28.811Z"
       },
       "familyStatuses": [],
       "history": [
         {
-          "at": "2026-06-23T09:24:27.096Z",
+          "at": "2026-06-23T09:24:28.811Z",
           "event": "canonical_model_approved",
           "status": "implemented",
-          "note": "Canonical model OGS-021 approved."
+          "note": "Canonical model OGS-022 approved."
+        },
+        {
+          "at": "2026-07-22T16:45:26.884Z",
+          "event": "card_status_updated",
+          "status": "accepted"
         }
       ],
-      "updatedAt": "2026-06-23T09:24:27.096Z"
-    },
-    {
-      "gameplayIdentity": "OGS-022:Final Spark",
+      "updatedAt": "2026-07-22T16:45:26.884Z",
       "name": "Final Spark",
       "cleanName": "Final Spark",
       "printingCodes": [
@@ -768,40 +828,10 @@
           "cardCode": "OGS-022",
           "name": "Final Spark"
         }
-      ],
-      "status": "implemented",
-      "canonicalModel": {
-        "cardCode": "OGS-022",
-        "approvedAt": "2026-06-23T09:24:28.811Z"
-      },
-      "familyStatuses": [],
-      "history": [
-        {
-          "at": "2026-06-23T09:24:28.811Z",
-          "event": "canonical_model_approved",
-          "status": "implemented",
-          "note": "Canonical model OGS-022 approved."
-        }
-      ],
-      "updatedAt": "2026-06-23T09:24:28.811Z"
+      ]
     },
     {
       "gameplayIdentity": "OGS-023:Might of Demacia  Starter",
-      "name": "Might of Demacia - Starter",
-      "cleanName": "Might of Demacia  Starter",
-      "printingCodes": [
-        "OGS-023"
-      ],
-      "sourceCardIds": [
-        "fda78980-b4db-4efb-986d-5446b03d021e"
-      ],
-      "printings": [
-        {
-          "sourceCardId": "fda78980-b4db-4efb-986d-5446b03d021e",
-          "cardCode": "OGS-023",
-          "name": "Might of Demacia - Starter"
-        }
-      ],
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-023",
@@ -830,25 +860,25 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
-    },
-    {
-      "gameplayIdentity": "OGS-024:Decisive Strike",
-      "name": "Decisive Strike",
-      "cleanName": "Decisive Strike",
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Might of Demacia - Starter",
+      "cleanName": "Might of Demacia  Starter",
       "printingCodes": [
-        "OGS-024"
+        "OGS-023"
       ],
       "sourceCardIds": [
-        "535c45d3-1fb9-4227-993e-576444b70bfd"
+        "fda78980-b4db-4efb-986d-5446b03d021e"
       ],
       "printings": [
         {
-          "sourceCardId": "535c45d3-1fb9-4227-993e-576444b70bfd",
-          "cardCode": "OGS-024",
-          "name": "Decisive Strike"
+          "sourceCardId": "fda78980-b4db-4efb-986d-5446b03d021e",
+          "cardCode": "OGS-023",
+          "name": "Might of Demacia - Starter"
         }
-      ],
+      ]
+    },
+    {
+      "gameplayIdentity": "OGS-024:Decisive Strike",
       "status": "accepted",
       "canonicalModel": {
         "cardCode": "OGS-024",
@@ -877,7 +907,22 @@
           "note": "garen deck manual validation accepted."
         }
       ],
-      "updatedAt": "2026-07-15T11:23:35.831Z"
+      "updatedAt": "2026-07-15T11:23:35.831Z",
+      "name": "Decisive Strike",
+      "cleanName": "Decisive Strike",
+      "printingCodes": [
+        "OGS-024"
+      ],
+      "sourceCardIds": [
+        "535c45d3-1fb9-4227-993e-576444b70bfd"
+      ],
+      "printings": [
+        {
+          "sourceCardId": "535c45d3-1fb9-4227-993e-576444b70bfd",
+          "cardCode": "OGS-024",
+          "name": "Decisive Strike"
+        }
+      ]
     }
   ]
 }

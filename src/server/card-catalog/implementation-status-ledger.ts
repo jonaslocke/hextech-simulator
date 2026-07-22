@@ -17,12 +17,16 @@ const STATUS_ORDER = [
   "accepted",
 ] as const;
 
-export const implementationStatusSchema = z.enum(STATUS_ORDER);
+export const implementationStatusSchema = z.string().trim().min(1).max(100);
 export type ImplementationStatus = z.infer<typeof implementationStatusSchema>;
 
 const statusHistoryEntrySchema = z.object({
   at: z.string().datetime(),
-  event: z.enum(["canonical_model_approved", "family_status_updated"]),
+  event: z.enum([
+    "canonical_model_approved",
+    "card_status_updated",
+    "family_status_updated",
+  ]),
   status: implementationStatusSchema,
   familyId: z.string().min(1).optional(),
   note: z.string().min(1).optional(),
@@ -407,7 +411,19 @@ function appendHistory(
 }
 
 function highestStatus(left: ImplementationStatus, right: ImplementationStatus) {
-  return STATUS_ORDER.indexOf(left) >= STATUS_ORDER.indexOf(right) ? left : right;
+  if (left === right) return left;
+
+  const leftIndex = STATUS_ORDER.indexOf(
+    left as (typeof STATUS_ORDER)[number],
+  );
+  const rightIndex = STATUS_ORDER.indexOf(
+    right as (typeof STATUS_ORDER)[number],
+  );
+
+  if (leftIndex === -1) return left;
+  if (rightIndex === -1) return right;
+
+  return leftIndex >= rightIndex ? left : right;
 }
 
 async function loadSetCards(setCode: string): Promise<Card[]> {

@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  CircleDashed,
   Clock3,
   Download,
   ImageOff,
@@ -24,6 +23,10 @@ import ogsCardsData from "@data/sets/ogs.json";
 import sfdCardsData from "@data/sets/sfd.json";
 import unlCardsData from "@data/sets/unl.json";
 
+import {
+  updateCardImplementationStatus,
+  type CardImplementationStatusUpdateResponse,
+} from "../api";
 import { Badge } from "@/shared/components/badge";
 import { Button } from "@/shared/components/button";
 import {
@@ -223,6 +226,16 @@ type SortOption = "code-asc" | "name-asc" | "updated-desc" | "status-desc";
 
 type ImageFilter = "all" | "with-image" | "missing-image";
 
+type FamilyDraft = {
+  status: string;
+  note: string;
+};
+
+type SaveFeedback = {
+  kind: "error" | "success";
+  message: string;
+} | null;
+
 const SET_FILES = [
   ogsData as ImplementationSet,
   ognData as ImplementationSet,
@@ -409,6 +422,15 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
+function shouldWarnBeforeStatusChange(current: string, next: string) {
+  if (current === next) return false;
+  if (current === "accepted") return true;
+  if (current === "manual_family_passed") {
+    return next !== "accepted";
+  }
+  return false;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const meta = getStatusMeta(status);
 
@@ -554,6 +576,7 @@ function CatalogCardTile({
 }
 
 export default function CardImplementationDashboard() {
+  const [catalog, setCatalog] = useState(CATALOG);
   const [search, setSearch] = useState("");
   const [setFilter, setSetFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -563,51 +586,231 @@ export default function CardImplementationDashboard() {
   const [sort, setSort] = useState<SortOption>("code-asc");
   const [page, setPage] = useState(1);
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
+  const [setUpdatedAtByCode, setSetUpdatedAtByCode] = useState<
+    Record<string, string>
+  >(() => Object.fromEntries(SET_FILES.map((set) => [set.setCode, set.updatedAt])));
+  const [cardStatusDraft, setCardStatusDraft] = useState("");
+  const [cardNoteDraft, setCardNoteDraft] = useState("");
+  const [familyDrafts, setFamilyDrafts] = useState<Record<string, FamilyDraft>>(
+    {},
+  );
+  const [savingTarget, setSavingTarget] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null);
+
+  const selectCard = (card: CatalogCard) => {
+    setSelectedCard(card);
+    setCardStatusDraft(card.status);
+    setCardNoteDraft("");
+    setFamilyDrafts(
+      Object.fromEntries(
+        card.familyStatuses.map((family) => [
+          family.familyId,
+          { status: family.status, note: family.note ?? "" },
+        ]),
+      ),
+    );
+    setSaveFeedback(null);
+  };
+
+  const updateCatalogCard = (
+    response: Extract<CardImplementationStatusUpdateResponse, { accepted: true }>,
+  ) => {
+    setCatalog((current) =>
+      current.map((card) =>
+        card.gameplayIdentity === response.card.gameplayIdentity
+          ? {
+              ...card,
+              status: response.card.status,
+              familyStatuses: response.card.familyStatuses,
+              history: response.card.history,
+              updatedAt: response.card.updatedAt,
+              canonicalModel: response.card.canonicalModel,
+            }
+          : card,
+      ),
+    );
+    setSetUpdatedAtByCode((current) => ({
+      ...current,
+      [selectedCard?.setCode ?? ""]: response.setUpdatedAt,
+    }));
+    setSelectedCard((current) =>
+      current && current.gameplayIdentity === response.card.gameplayIdentity
+        ? {
+            ...current,
+            status: response.card.status,
+            familyStatuses: response.card.familyStatuses,
+            history: response.card.history,
+            updatedAt: response.card.updatedAt,
+            canonicalModel: response.card.canonicalModel,
+          }
+        : current,
+    );
+  };
+
+  const readSaveError = (
+    response: Extract<CardImplementationStatusUpdateResponse, { accepted: false }>,
+  ) => response.error.message;
+
+  const saveCardStatus = async () => {
+    if (!selectedCard || savingTarget) return;
+
+    if (
+      shouldWarnBeforeStatusChange(selectedCard.status, cardStatusDraft) &&
+      !window.confirm(
+        `This changes the card from ${getStatusMeta(selectedCard.status).label} to ${getStatusMeta(cardStatusDraft).label}. Continue?`,
+      )
+    ) {
+      return;
+    }
+
+    setSavingTarget("card");
+    setSaveFeedback(null);
+
+    try {
+      const response = await updateCardImplementationStatus({
+        setCode: selectedCard.setCode,
+        gameplayIdentity: selectedCard.gameplayIdentity,
+        target: "card",
+        status: cardStatusDraft,
+        note: cardNoteDraft.trim() || null,
+      });
+
+      if (!response.accepted) {
+        setSaveFeedback({ kind: "error", message: readSaveError(response) });
+        return;
+      }
+
+      updateCatalogCard(response);
+      setCardNoteDraft("");
+      setSaveFeedback({ kind: "success", message: "Card status saved." });
+    } catch (caught) {
+      setSaveFeedback({
+        kind: "error",
+        message: caught instanceof Error ? caught.message : "Card status save failed.",
+      });
+    } finally {
+      setSavingTarget(null);
+    }
+  };
+
+  const updateFamilyDraft = (
+    familyId: string,
+    update: Partial<FamilyDraft>,
+  ) => {
+    setFamilyDrafts((current) => ({
+      ...current,
+      [familyId]: {
+        ...(current[familyId] ?? { status: "unreviewed", note: "" }),
+        ...update,
+      },
+    }));
+  };
+
+  const saveFamilyStatus = async (familyId: string) => {
+    if (!selectedCard || savingTarget) return;
+
+    const draft = familyDrafts[familyId];
+    if (!draft) return;
+
+    const currentFamily = selectedCard.familyStatuses.find(
+      (family) => family.familyId === familyId,
+    );
+    if (!currentFamily) return;
+
+    if (
+      shouldWarnBeforeStatusChange(currentFamily.status, draft.status) &&
+      !window.confirm(
+        `This changes ${familyId} from ${getStatusMeta(currentFamily.status).label} to ${getStatusMeta(draft.status).label}. Continue?`,
+      )
+    ) {
+      return;
+    }
+
+    setSavingTarget(`family:${familyId}`);
+    setSaveFeedback(null);
+
+    try {
+      const response = await updateCardImplementationStatus({
+        setCode: selectedCard.setCode,
+        gameplayIdentity: selectedCard.gameplayIdentity,
+        target: "family",
+        familyId,
+        status: draft.status,
+        note: draft.note.trim() || null,
+      });
+
+      if (!response.accepted) {
+        setSaveFeedback({ kind: "error", message: readSaveError(response) });
+        return;
+      }
+
+      updateCatalogCard(response);
+      setSaveFeedback({
+        kind: "success",
+        message: `${familyId} status saved.`,
+      });
+    } catch (caught) {
+      setSaveFeedback({
+        kind: "error",
+        message:
+          caught instanceof Error ? caught.message : "Family status save failed.",
+      });
+    } finally {
+      setSavingTarget(null);
+    }
+  };
 
   const statusCounts = useMemo(() => {
-    return CATALOG.reduce<Record<string, number>>((counts, card) => {
+    return catalog.reduce<Record<string, number>>((counts, card) => {
       counts[card.status] = (counts[card.status] ?? 0) + 1;
       return counts;
     }, {});
-  }, []);
+  }, [catalog]);
 
   const statusOptions = useMemo(() => {
-    return Object.keys(statusCounts).sort((left, right) => {
-      const leftIndex = STATUS_ORDER.indexOf(left);
-      const rightIndex = STATUS_ORDER.indexOf(right);
-      return (
-        (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) -
-        (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex)
-      );
-    });
-  }, [statusCounts]);
+    const statuses = catalog.flatMap((card) => [
+      card.status,
+      ...card.familyStatuses.map((family) => family.status),
+    ]);
+
+    return Array.from(new Set([...STATUS_ORDER, ...statuses])).sort(
+      (left, right) => {
+        const leftIndex = STATUS_ORDER.indexOf(left);
+        const rightIndex = STATUS_ORDER.indexOf(right);
+        return (
+          (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+          (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex)
+        );
+      },
+    );
+  }, [catalog]);
 
   const familyOptions = useMemo(() => {
     return Array.from(
       new Set(
-        CATALOG.flatMap((card) =>
+        catalog.flatMap((card) =>
           card.familyStatuses.map((family) => family.familyId),
         ),
       ),
     ).sort((left, right) => left.localeCompare(right));
-  }, []);
+  }, [catalog]);
 
   const totalImplemented = useMemo(
-    () => CATALOG.filter((card) => card.implemented).length,
-    [],
+    () => catalog.filter((card) => card.implemented).length,
+    [catalog],
   );
   const totalWithImages = useMemo(
-    () => CATALOG.filter((card) => card.artwork).length,
-    [],
+    () => catalog.filter((card) => card.artwork).length,
+    [catalog],
   );
   const implementationPercentage = Math.round(
-    (totalImplemented / CATALOG.length) * 100,
+    (totalImplemented / catalog.length) * 100,
   );
 
   const filteredCards = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
 
-    const result = CATALOG.filter((card) => {
+    const result = catalog.filter((card) => {
       const matchesSearch =
         !normalizedSearch ||
         card.name.toLocaleLowerCase().includes(normalizedSearch) ||
@@ -686,6 +889,7 @@ export default function CardImplementationDashboard() {
     familyFilter,
     imageFilter,
     implementationFilter,
+    catalog,
     search,
     setFilter,
     sort,
@@ -790,13 +994,13 @@ export default function CardImplementationDashboard() {
         <section className="gap-3 grid sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="Implemented cards"
-            value={`${totalImplemented} / ${CATALOG.length}`}
+            value={`${totalImplemented} / ${catalog.length}`}
             description={`${implementationPercentage}% have a canonical model`}
             icon={<CheckCircle2 className="size-5" />}
           />
           <MetricCard
             title="Card images"
-            value={`${totalWithImages} / ${CATALOG.length}`}
+            value={`${totalWithImages} / ${catalog.length}`}
             description="Matched from implementation or set JSON data"
             icon={<Layers3 className="size-5" />}
           />
@@ -852,7 +1056,7 @@ export default function CardImplementationDashboard() {
                   </div>
                   <Progress value={percentage} className="h-2" />
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    JSON updated {formatDate(set.updatedAt)} UTC
+                    JSON updated {formatDate(setUpdatedAtByCode[set.setCode] ?? set.updatedAt)} UTC
                   </p>
                 </button>
               );
@@ -925,7 +1129,7 @@ export default function CardImplementationDashboard() {
                 <SelectItem value="all">All statuses</SelectItem>
                 {statusOptions.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {getStatusMeta(status).label} ({statusCounts[status]})
+                    {getStatusMeta(status).label} ({statusCounts[status] ?? 0})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1042,7 +1246,7 @@ export default function CardImplementationDashboard() {
                   <CatalogCardTile
                     key={card.gameplayIdentity}
                     card={card}
-                    onSelect={setSelectedCard}
+                    onSelect={selectCard}
                   />
                 ))}
               </div>
@@ -1098,7 +1302,10 @@ export default function CardImplementationDashboard() {
       <Dialog
         open={Boolean(selectedCard)}
         onOpenChange={(open) => {
-          if (!open) setSelectedCard(null);
+          if (!open) {
+            setSelectedCard(null);
+            setSaveFeedback(null);
+          }
         }}
       >
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
@@ -1212,45 +1419,160 @@ export default function CardImplementationDashboard() {
 
                 <Separator />
 
-                <section className="space-y-3">
+                <section className="space-y-4 bg-muted/10 p-4 border rounded-xl">
                   <div>
-                    <h3 className="font-semibold">Behavior families</h3>
+                    <h3 className="font-semibold">Manual validation</h3>
                     <p className="text-muted-foreground text-sm">
-                      Reusable implementation groups connected to this card.
+                      Update workflow gates and record the latest manual gameplay
+                      validation note.
                     </p>
+                  </div>
+
+                  <div className="gap-3 grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] bg-background/40 p-3 border rounded-lg">
+                    <label className="space-y-1.5 text-sm">
+                      <span className="font-medium">Card workflow status</span>
+                      <Select
+                        value={cardStatusDraft}
+                        onValueChange={setCardStatusDraft}
+                        disabled={Boolean(savingTarget)}
+                      >
+                        <SelectTrigger aria-label="Card workflow status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {getStatusMeta(status).label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+
+                    <label className="space-y-1.5 text-sm">
+                      <span className="font-medium">Validation note (optional)</span>
+                      <Input
+                        value={cardNoteDraft}
+                        onChange={(event) => setCardNoteDraft(event.target.value)}
+                        placeholder="What was verified?"
+                        disabled={Boolean(savingTarget)}
+                      />
+                    </label>
+
+                    <div className="flex sm:justify-end sm:col-span-2">
+                      <Button
+                        type="button"
+                        onClick={saveCardStatus}
+                        disabled={Boolean(savingTarget)}
+                      >
+                        {savingTarget === "card" ? "Saving..." : "Save card status"}
+                      </Button>
+                    </div>
                   </div>
 
                   {selectedCard.familyStatuses.length ? (
                     <div className="space-y-3">
-                      {selectedCard.familyStatuses.map((family) => (
-                        <div
-                          key={`${selectedCard.gameplayIdentity}-${family.familyId}`}
-                          className="p-4 border rounded-lg"
-                        >
-                          <div className="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-2">
-                            <div>
-                              <p className="font-mono font-medium text-sm break-all">
-                                {family.familyId}
-                              </p>
-                              {family.note ? (
-                                <p className="mt-2 text-muted-foreground text-sm">
-                                  {family.note}
+                      <div>
+                        <h4 className="font-medium text-sm">Behavior families</h4>
+                        <p className="mt-1 text-muted-foreground text-xs">
+                          Only existing behavior families can be updated here.
+                        </p>
+                      </div>
+
+                      {selectedCard.familyStatuses.map((family) => {
+                        const draft = familyDrafts[family.familyId] ?? {
+                          status: family.status,
+                          note: family.note ?? "",
+                        };
+                        const target = `family:${family.familyId}`;
+
+                        return (
+                          <div
+                            key={`${selectedCard.gameplayIdentity}-${family.familyId}`}
+                            className="space-y-3 bg-background/40 p-3 border rounded-lg"
+                          >
+                            <div className="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-2">
+                              <div>
+                                <p className="font-mono font-medium text-sm break-all">
+                                  {family.familyId}
                                 </p>
-                              ) : null}
+                                <p className="mt-1 text-muted-foreground text-xs">
+                                  Current: {getStatusMeta(family.status).label} · Updated {formatDate(family.updatedAt)} UTC
+                                </p>
+                              </div>
+                              <StatusBadge status={family.status} />
                             </div>
-                            <StatusBadge status={family.status} />
+
+                            <div className="gap-3 grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                              <label className="space-y-1.5 text-sm">
+                                <span className="font-medium">Family status</span>
+                                <Select
+                                  value={draft.status}
+                                  onValueChange={(status) =>
+                                    updateFamilyDraft(family.familyId, { status })
+                                  }
+                                  disabled={Boolean(savingTarget)}
+                                >
+                                  <SelectTrigger aria-label={`${family.familyId} status`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {statusOptions.map((status) => (
+                                      <SelectItem key={status} value={status}>
+                                        {getStatusMeta(status).label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </label>
+
+                              <label className="space-y-1.5 text-sm">
+                                <span className="font-medium">Validation note (optional)</span>
+                                <Input
+                                  value={draft.note}
+                                  onChange={(event) =>
+                                    updateFamilyDraft(family.familyId, {
+                                      note: event.target.value,
+                                    })
+                                  }
+                                  placeholder="What was verified?"
+                                  disabled={Boolean(savingTarget)}
+                                />
+                              </label>
+                            </div>
+
+                            <div className="flex sm:justify-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => saveFamilyStatus(family.familyId)}
+                                disabled={Boolean(savingTarget)}
+                              >
+                                {savingTarget === target ? "Saving..." : "Save family status"}
+                              </Button>
+                            </div>
                           </div>
-                          <p className="mt-3 text-muted-foreground text-xs">
-                            Updated {formatDate(family.updatedAt)} UTC
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="p-6 border border-dashed rounded-lg text-muted-foreground text-sm text-center">
+                    <div className="p-4 border border-dashed rounded-lg text-muted-foreground text-sm text-center">
                       This card is not currently linked to a behavior family.
                     </div>
                   )}
+
+                  {saveFeedback ? (
+                    <p
+                      aria-live="polite"
+                      className={
+                        saveFeedback.kind === "error"
+                          ? "text-destructive text-sm"
+                          : "text-emerald-600 dark:text-emerald-300 text-sm"
+                      }
+                    >
+                      {saveFeedback.message}
+                    </p>
+                  ) : null}
                 </section>
 
                 <Separator />
