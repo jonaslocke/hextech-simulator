@@ -1455,7 +1455,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("resource", "resource", "The resource kind.", ["energy", "power"]),
       required("amount", "number", "The amount paid."),
-      optional("domain", "string", "The required Power domain."),
+      optional("domain", "string", "The required Power domain; omit it to accept Power of any domain."),
       optional("exhaustSource", "boolean", "Whether the source must also exhaust."),
       required("selectionKey", "string", "Key recording accept or decline."),
       optional("prompt", "string", "Prompt shown to the paying player."),
@@ -1470,7 +1470,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("resource", "resource", "The resource kind.", ["energy", "power"]),
       required("amount", "number", "The amount paid."),
-      optional("domain", "string", "The required Power domain."),
+      optional("domain", "string", "The required Power domain; omit it to accept Power of any domain."),
       optional("exhaustSource", "boolean", "Whether the source also exhausts."),
       optional("requiresChoiceKey", "string", "Choice key enabling the payment."),
       optional("requiresChoiceValue", "string", "Choice value enabling the payment."),

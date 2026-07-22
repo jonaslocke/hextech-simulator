@@ -415,6 +415,43 @@ test("resolution-time resource payment waits for the Rune Pool and gates later e
   assert.deepEqual(second.game.state.players.p1!.zones.hand, []);
 });
 
+test("an optional any-domain Power payment accepts Power without inventing a domain", () => {
+  const source = card("SYN-ANY-POWER-PAYMENT", "Gear");
+  source.behaviorModel.clauses = [{
+    id: "any-power-payment", sequence: 0,
+    sourceText: "You may pay one Power of any domain.",
+    normalizedText: "You may pay one Power of any domain.",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], keywords: [], effects: [
+      binding("action.pay_optional_resource", {
+        resource: "power", amount: 1, selectionKey: "pay",
+      }),
+    ],
+  }];
+  const { game, decks } = fixture([source], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source"];
+  game.state.players.p1!.power.Fury = 1;
+
+  assert.equal(beginEffectResolution({
+    game, controllerPlayerId: "p1", sourceCardInstanceId: "source",
+    clauseId: "any-power-payment", decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "resourcePayment");
+  assert.equal(
+    game.state.pendingChoice?.type === "resourcePayment"
+      ? game.state.pendingChoice.domain
+      : undefined,
+    null,
+  );
+
+  submitResourcePaymentChoice(game, "p1", ["accept"], decks);
+  assert.equal(game.state.players.p1!.power.Fury, 0);
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.effectResolutions, []);
+});
+
 test("pending resolution payment exposes Add abilities and preserves its continuation", () => {
   const source = card("SYN-PAYMENT-SOURCE", "Gear");
   source.behaviorModel.clauses = [{

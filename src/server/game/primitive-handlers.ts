@@ -603,7 +603,7 @@ export function createPrimitiveHandlers(
                 ? binding.parameters.requiredPaymentAmount
                 : 1,
           },
-        }, context, index);
+        }, context);
       const legalIds = (requiredPaymentAvailable ? ids : []).filter(
         (id) =>
           cardType === "any" ||
@@ -1711,8 +1711,8 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.pay_optional_resource", {
-    choice(binding, context) {
-      const payment = resolutionResourcePayment(binding, context, index, true);
+    choice(binding) {
+      const payment = resolutionResourcePayment(binding, true);
       return {
         kind: "resourcePayment",
         legalIds: ["accept", "decline"],
@@ -1728,7 +1728,7 @@ export function createPrimitiveHandlers(
     },
     execute(binding, context) {
       if (!selectionFor(binding, context).includes("accept")) return;
-      payEffectResource(binding, context, index);
+      payEffectResource(binding, context);
       if (binding.parameters.exhaustSource === true) {
         const state = context.game.state.cardStates[context.sourceCardInstanceId];
         if (!state || state.exhausted) throw new Error("Optional cost source is unavailable.");
@@ -1737,8 +1737,8 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.pay_resource", {
-    choice(binding, context) {
-      const payment = resolutionResourcePayment(binding, context, index, false);
+    choice(binding) {
+      const payment = resolutionResourcePayment(binding, false);
       return {
         kind: "resourcePayment",
         legalIds: ["accept"],
@@ -1753,10 +1753,10 @@ export function createPrimitiveHandlers(
       };
     },
     execute(binding, context) {
-      if (!canPayEffectResource(binding, context, index)) {
+      if (!canPayEffectResource(binding, context)) {
         throw new Error("Required resolving resource cost cannot be paid.");
       }
-      payEffectResource(binding, context, index);
+      payEffectResource(binding, context);
       if (binding.parameters.exhaustSource === true) {
         context.game.state.cardStates[context.sourceCardInstanceId]!.exhausted = true;
       }
@@ -2615,41 +2615,11 @@ function friendlyUnitIds(
   );
 }
 
-function effectPaymentDefinition(
-  binding: BehaviorBinding,
-  context: BehaviorExecutionContext,
-  index: RuntimeCardIndex,
-) {
-  const amount = numberParam(binding, "amount");
-  const source = definitionForInstance(context.sourceCardInstanceId, index);
-  const resource = stringParam(binding, "resource");
-  const domain = typeof binding.parameters.domain === "string"
-    ? binding.parameters.domain
-    : "Colorless";
-  return {
-    ...source,
-    card: {
-      ...source.card,
-      attributes: {
-        ...source.card.attributes,
-        energy: resource === "energy" ? amount : 0,
-        power: resource === "power" ? amount : 0,
-      },
-      classification: {
-        ...source.card.classification,
-        type: "Unit" as const,
-        domain: resource === "power" ? [domain] : ["Colorless"],
-      },
-    },
-  };
-}
-
 function canPayEffectResource(
   binding: BehaviorBinding,
   context: BehaviorExecutionContext,
-  index: RuntimeCardIndex,
 ) {
-  const payment = resolutionResourcePayment(binding, context, index, false);
+  const payment = resolutionResourcePayment(binding, false);
   return (
     (!payment.exhaustSource ||
       context.game.state.cardStates[context.sourceCardInstanceId]?.exhausted === false) &&
@@ -2664,10 +2634,9 @@ function canPayEffectResource(
 function payEffectResource(
   binding: BehaviorBinding,
   context: BehaviorExecutionContext,
-  index: RuntimeCardIndex,
 ) {
-  const payment = resolutionResourcePayment(binding, context, index, false);
-  if (!canPayEffectResource(binding, context, index)) {
+  const payment = resolutionResourcePayment(binding, false);
+  if (!canPayEffectResource(binding, context)) {
     throw new Error("Resolving resource cost cannot be paid from the Rune Pool.");
   }
   payResolutionResource(
@@ -2719,18 +2688,17 @@ export function payResolutionResource(
 
 function resolutionResourcePayment(
   binding: BehaviorBinding,
-  context: BehaviorExecutionContext,
-  index: RuntimeCardIndex,
   allowDecline: boolean,
 ) {
-  const definition = effectPaymentDefinition(binding, context, index);
   const resource = stringParam(binding, "resource") as "energy" | "power";
   return {
     resource,
     amount: numberParam(binding, "amount"),
     domain:
       resource === "power"
-        ? definition.card.classification.domain[0] ?? null
+        ? typeof binding.parameters.domain === "string"
+          ? binding.parameters.domain
+          : null
         : null,
     allowDecline,
     exhaustSource: binding.parameters.exhaustSource === true,
@@ -3463,7 +3431,6 @@ function deathReplacementRequestFromParameters(
 function deathReplacementCanBePaid(
   game: GameDocument,
   request: DeathReplacementRequest,
-  index: RuntimeCardIndex,
 ) {
   if (!deathReplacementCanBeOffered(game, request)) return false;
   const context = createReplacementContext(game, request);
@@ -3476,7 +3443,7 @@ function deathReplacementCanBePaid(
       amount: request.amount,
       domain: request.domain,
     },
-  }, context, index);
+  }, context);
 }
 
 function deathReplacementCanBeOffered(
@@ -3550,14 +3517,14 @@ export function submitDeathReplacementChoice(
   const request = pending.deathReplacement;
   if (
     selectedIds[0] === "accept" &&
-    !deathReplacementCanBePaid(game, request, index)
+    !deathReplacementCanBePaid(game, request)
   ) {
     throw new Error("Death replacement cost is not available in the Rune Pool.");
   }
   game.state.pendingChoice = null;
   if (
     selectedIds[0] === "accept" &&
-    deathReplacementCanBePaid(game, request, index)
+    deathReplacementCanBePaid(game, request)
   ) {
     const context = createReplacementContext(game, request);
     payEffectResource({
@@ -3569,7 +3536,7 @@ export function submitDeathReplacementChoice(
         amount: request.amount,
         domain: request.domain,
       },
-    }, context, index);
+    }, context);
     if (request.exhaustSource) {
       game.state.cardStates[request.sourceCardInstanceId]!.exhausted = true;
     }

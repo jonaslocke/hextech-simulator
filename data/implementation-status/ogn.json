@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-22T14:42:51.661Z",
+  "updatedAt": "2026-07-22T14:58:00.083Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -6742,21 +6742,35 @@
           "name": "Nocturne, Horrifying"
         }
       ],
-      "status": "implemented",
+      "status": "ready_for_manual_validation",
       "canonicalModel": {
         "cardCode": "OGN-194",
-        "approvedAt": "2026-07-21T01:37:55.004Z"
+        "approvedAt": "2026-07-22T14:57:21.093Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-nocturne-payment-flow",
+          "status": "ready_for_manual_validation",
+          "updatedAt": "2026-07-22T14:58:00.083Z",
+          "note": "Nocturne preserves its separate optional banish decision and now uses the shared Rune Pool payment prompt for its optional one-Any-Power play."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:37:55.004Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-194 approved."
+        },
+        {
+          "at": "2026-07-22T14:58:00.083Z",
+          "event": "family_status_updated",
+          "status": "ready_for_manual_validation",
+          "familyId": "ogn-m2-nocturne-payment-flow",
+          "note": "Nocturne preserves its separate optional banish decision and now uses the shared Rune Pool payment prompt for its optional one-Any-Power play."
         }
       ],
-      "updatedAt": "2026-07-21T01:37:55.004Z"
+      "updatedAt": "2026-07-22T14:58:00.083Z"
     },
     {
       "gameplayIdentity": "OGN-195:Rhasa the Sunderer",

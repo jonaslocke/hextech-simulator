@@ -116,7 +116,7 @@ battlefield.
 |---|---|---|---|
 | Public-zone trigger sources | Trigger discovery includes explicit public-Trash sources and only a matching Main Deck event subject for private top-deck look/reveal triggers. | Shared extension | `OGN-006`, `OGN-037`, `OGN-194`, `OGN-252` |
 | Effect-driven play | A zone-authorized play validates the source zone and payment, records play history, applies Unit placement legality, puts Spells on the Chain, and honors post-resolution recycling. | New primitive | `OGN-006`, `OGN-037`, `OGN-107`, `OGN-112`, `OGN-194` |
-| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, Buff, and exhaust payments. Energy and Power prompts remain pending while Add abilities are available, enable Pay only when the Rune Pool satisfies the cost, and preserve optional decline. | New decision/payment primitives | `OGN-006`, `OGN-035`, `OGN-037`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-249`, `OGN-269`, `OGN-282` |
+| Optional resolution payments | Resolution frames support revalidated Energy, typed Power, any-domain Power, Buff, and exhaust payments. Energy and Power prompts remain pending while Add abilities are available, enable Pay only when the Rune Pool satisfies the cost, and preserve optional decline. | New decision/payment primitives | `OGN-006`, `OGN-035`, `OGN-037`, `OGN-072`, `OGN-107`, `OGN-147`, `OGN-152`, `OGN-194`, `OGN-249`, `OGN-269`, `OGN-282` |
 | Kill attribution | Spell and combat damage emit a separate kill event after lethal cleanup with the responsible player and the victim's pre-death stunned state. | Shared event extension | `OGN-037`, `OGN-072` |
 | Optional paid death replacement | Lethal cleanup pauses at a replacement decision, revalidates payment, processes heal/exhaust/recall atomically, and resumes queued simultaneous deaths. | New replacement primitive | `OGN-023`, `OGN-269` |
 | Activated discard declaration cost | The ability declaration locks a hand selection, exhausts the source, and emits the normal discard event before the ability enters the Chain. | Shared activation extension | `OGN-023` |
@@ -147,6 +147,14 @@ instruction always retains Decline. Confirming consumes only resources already
 in the pool, so the server no longer chooses or exhausts resource sources on the
 player's behalf. The payment prompt is non-modal for board interaction, while
 the opponent receives only the normal waiting projection.
+
+Nocturne, Horrifying retains both decisions required by its official erratum:
+declining the first leaves it in the Main Deck, accepting the first banishes
+it, and declining the later play payment leaves it in Banishment. The later
+decision now reuses the shared optional Rune Pool payment with an any-domain
+Power requirement. Legal Add abilities remain available while it is pending,
+Pay enables only after one Power of any domain is in the pool, and the
+effect-driven play no longer attempts to charge that Power a second time.
 
 | Producer | Consumer | Handoff contract | Lifecycle branches | Focused synthetic coverage |
 |---|---|---|---|---|
@@ -351,6 +359,7 @@ accepted family or complete gameplay identity before that gate.
 | Chain control and privacy | React to a targeted Spell with Mystic Reversal. Confirm control moves to the reactor, legal new targets are recalculated for that player, declining preserves the old choices, accepting replaces them, Priority resumes on the same Chain, and each viewer sees only normally public target information. | `080` |
 | Declaration-time alternate cost | Play Wallop normally, then play it by selecting a Buffed friendly Unit. Confirm declining or having no Buff requires the printed cost; paying spends exactly one Buff, ignores the full parent cost, still requires a legal ready target, and leaves no pending cost choice after resolution. | `146` |
 | Independent repeated costs | Resolve Overt Operation with multiple friendly Units covering Buffed/exhausted, Buffed/ready, unbuffed/exhausted, and unbuffed/ready states. Select some eligible Units, then none. Confirm only selected eligible Units spend Buffs and ready, after which every unbuffed friendly Unit receives one Buff. | `153` |
+| Look-triggered banish and play payment | Look at or reveal Nocturne from the top of the Main Deck. First decline banishment and confirm it remains in the deck. In a second attempt accept banishment, then decline payment and confirm it remains in Banishment. In a third attempt begin with an empty Rune Pool, accept banishment, Add one Power of any domain from each available source type in separate attempts, confirm Pay enables only after the Add action, then pay and choose a legal Unit destination. | `194` |
 | Top-deck comparison and mandatory cleanup | Activate Baited Hook with exact payment and a friendly Unit of known current Might. Test eligible boundary `killed Might + 1`, an ineligible larger Unit, decline, fewer than five cards, and no eligible Unit. Confirm payment and sacrifice are locked, the chosen Unit is first banished then played to a legal chosen destination without cost, all remaining looked cards recycle, private identities stay hidden from the opponent, and no vision/destination choice remains. | `242` |
 | Champion return legality | Hold Hallowed Tomb with the original Chosen Champion in Trash and an empty Champion Zone, then accept and decline. Repeat with an empty Trash, with the zone occupied, and with only a non-Chosen Champion-like Unit in Trash. No prompt is created when there is no legal candidate; otherwise only the original Chosen Champion with an empty destination is offered and it returns reset. | `281` |
 | First target-choice memory | At The Dreaming Tree, have each player target one of their own friendly Units there with a Spell. Confirm each player draws only on their first qualifying choice that turn; enemy, Base, and other-battlefield targets do not count. Retarget a controlled Spell with Mystic Reversal, verify the new chooser owns the event, then advance the turn and confirm memory resets. | `292` |
