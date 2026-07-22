@@ -85,9 +85,10 @@ export function ChoiceDialog({
       <div
         aria-hidden={!isVisible || undefined}
         className={cn(
-          "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100",
-          allowBackgroundInteraction &&
-            "pointer-events-none items-start bg-black/20 pt-20 backdrop-blur-[1px]",
+          "z-[2147483646] fixed inset-0 flex justify-center items-center p-4 text-slate-100",
+          allowBackgroundInteraction
+            ? "pointer-events-none items-start bg-transparent pt-20"
+            : "bg-black/70 backdrop-blur-sm",
           !isVisible && "invisible pointer-events-none",
         )}
       >

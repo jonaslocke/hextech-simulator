@@ -2122,11 +2122,11 @@ function addAbilityActions(
             );
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
-          ability.behaviorId === "ability.exhaust_for_resource" ||
-          !clause.costs.some(
-            (cost) => cost.behaviorId === "cost.exhaust_source",
-          ) ||
-          !game.state.cardStates[sourceId]!.exhausted;
+          (ability.behaviorId === "ability.exhaust_for_resource"
+            ? !game.state.cardStates[sourceId]!.exhausted
+            : !clause.costs.some(
+                (cost) => cost.behaviorId === "cost.exhaust_source",
+              ) || !game.state.cardStates[sourceId]!.exhausted);
         const costStatus = activatedAbilityCostStatus(
           game,
           playerId,

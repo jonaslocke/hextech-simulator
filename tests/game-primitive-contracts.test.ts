@@ -426,6 +426,7 @@ test("pending resolution payment exposes Add abilities and preserves its continu
   ]);
   game.state.players.p1!.zones.base = ["source", "rune", "permanent"];
   game.state.players.p1!.zones.legend = "legend";
+  game.state.cardStates.permanent!.exhausted = true;
   game.state.battlefields = [{
     battlefieldId: "payment-location",
     cardInstanceId: "battlefield",
@@ -454,6 +455,22 @@ test("pending resolution payment exposes Add abilities and preserves its continu
       .map((action) => action.sourceCardInstanceId)
       .sort(),
     ["battlefield-unit", "legend", "permanent", "rune"],
+  );
+  const exhaustedAdd = initialActions.find(
+    (action) => action.sourceCardInstanceId === "permanent",
+  );
+  assert.equal(exhaustedAdd?.enabled, false);
+  assert.match(exhaustedAdd?.disabledReason ?? "", /exhausted/i);
+  assert.throws(
+    () => performGameplayAction({
+      game,
+      actorPlayerId: "p1",
+      actionId: exhaustedAdd!.id,
+      selectedIds: [],
+      decks,
+      now: "reject-exhausted-add-source",
+    }),
+    /not legal for the current game state/,
   );
 
   const addPower = initialActions.find(
@@ -573,6 +590,85 @@ test("optional paid death replacement suppresses lethal cleanup until accept or 
   submitDeathReplacementChoice(game, "p1", ["decline"], index);
   assert.ok(game.state.players.p1!.zones.trash.includes("unit"));
   assert.equal(game.state.players.p1!.energy, 0);
+});
+
+test("typed death-replacement payment reprojects only after matching Power is added", () => {
+  const source = card("SYN-TYPED-REPLACEMENT", "Gear");
+  const unit = card("SYN-TYPED-DOOMED-UNIT", "Unit", 3);
+  const matchingRune = resourceCard(
+    "SYN-TYPED-PAYMENT-RUNE",
+    "Rune",
+    "power",
+    "Calm",
+  );
+  const { game, decks } = fixture([source, unit, matchingRune], [
+    instance("source", "p1", source.cardCode, "mainDeck"),
+    instance("unit", "p1", unit.cardCode, "mainDeck"),
+    instance("matching-rune", "p1", matchingRune.cardCode, "runeDeck"),
+  ]);
+  game.state.players.p1!.zones.base = ["source", "unit", "matching-rune"];
+  game.state.players.p1!.power.Fury = 1;
+  game.state.cardStates.unit!.damage = 3;
+  game.state.ongoingEffects = [{
+    id: "typed-replacement",
+    behaviorId: "replacement.optional_recall_on_death",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    targetCardInstanceIds: ["unit"],
+    duration: "thisTurn",
+    createdAtTurn: 1,
+    parameters: { resource: "power", domain: "Calm", amount: 1 },
+  }];
+
+  moveUnitToTrash(game, "unit", createRuntimeCardIndex(decks, game));
+  const initialActions = gameplayActions(game, "p1", decks);
+  const initialPayment = initialActions.find(
+    (action) => action.choice?.kind === "resourcePayment",
+  );
+  assert.equal(
+    initialPayment?.choice?.kind === "resourcePayment" &&
+      initialPayment.choice.canAccept,
+    false,
+  );
+  const addMatchingPower = initialActions.find(
+    (action) => action.sourceCardInstanceId === "matching-rune",
+  );
+  assert.ok(addMatchingPower?.enabled);
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addMatchingPower.id,
+    selectedIds: [],
+    decks,
+    now: "add-matching-replacement-power",
+  });
+  assert.equal(next.state.pendingChoice?.type, "resourcePayment");
+  assert.equal(next.state.players.p1!.power.Fury, 1);
+  assert.equal(next.state.players.p1!.power.Calm, 1);
+
+  const readyPayment = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "resourcePayment",
+  );
+  assert.equal(
+    readyPayment?.choice?.kind === "resourcePayment" &&
+      readyPayment.choice.canAccept,
+    true,
+  );
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: readyPayment!.id,
+    selectedIds: ["accept"],
+    decks,
+    now: "pay-matching-replacement-power",
+  });
+  assert.equal(next.state.pendingChoice, null);
+  assert.equal(next.state.players.p1!.power.Fury, 1);
+  assert.equal(next.state.players.p1!.power.Calm, 0);
+  assert.ok(next.state.players.p1!.zones.base.includes("unit"));
+  assert.equal(next.state.cardStates.unit!.damage, 0);
+  assert.equal(next.state.cardStates.unit!.exhausted, true);
 });
 
 test("activated declaration-cost selections remain locked after payment changes zone", () => {

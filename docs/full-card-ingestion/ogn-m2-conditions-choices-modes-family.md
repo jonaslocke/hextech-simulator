@@ -145,6 +145,15 @@ the opponent receives only the normal waiting projection.
 | Rune, permanent, battlefield object, or Legend Add ability | Pending payment decision | Add resolves immediately without replacing the pending decision; reprojection updates Pay legality. | Multiple source locations, exhausted source, insufficient pool, exact payment. | Public Add-action projection, production transition, pending-state preservation, and exact consumption. |
 | Optional death replacement | Pending payment decision and lethal cleanup | Replacement waits for explicit resource production, suppresses death only on paid acceptance, and otherwise preserves death attribution. | Accept, decline, insufficient pool, continuation, combat cleanup. | Replacement payment, event suppression, resolution resume, and combat cleanup matrices. |
 
+The interactive payment overlay leaves the board visually unobscured and
+pointer-accessible. An Add ability whose cost exhausts its source is projected
+disabled while that source is exhausted, and the server rejects a stale
+submission of that action. Typed Power payments reproject against their exact
+domain plus Rainbow after each Add action; unrelated Power remains in the pool
+and does not enable confirmation. For `OGN-023`, the authoritative local
+official errata changes the printed Fury payment to Calm, so its replacement
+correctly requires Calm or Rainbow Power despite the original corpus face text.
+
 The fourteen distinct cards in this batch have synchronized supported canonical
 models and are ready for manual validation: `OGN-006`, `OGN-023`, `OGN-035`,
 `OGN-037`, `OGN-072`, `OGN-107`, `OGN-112`, `OGN-147`, `OGN-152`, `OGN-194`,
@@ -179,6 +188,12 @@ pool resource before continuing to the destination choice. Also verify that a
 wrong Power domain and an exhausted Add source do not enable Pay, declining
 leaves Flame Chompers in Trash and clears the continuation, and the opponent
 sees only the waiting state without private payment controls.
+
+For Unlicensed Armory, establish the delayed replacement and lethally damage
+the chosen Unit with Fury but no Calm or Rainbow in the Rune Pool. Confirm that
+Pay and recall remains disabled under the official errata. Add Calm from a
+ready source and confirm the same prompt enables immediately, consumes Calm,
+and recalls the Unit exhausted; verify an exhausted Calm source cannot Add.
 
 The importable cross-domain deck at
 `data/decks/experimental/ogn-m2-batch-2-validation.dec.txt` covers the twelve
