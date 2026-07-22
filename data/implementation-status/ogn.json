@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "setCode": "OGN",
-  "updatedAt": "2026-07-21T19:09:51.872Z",
+  "updatedAt": "2026-07-22T08:49:30.005Z",
   "cards": [
     {
       "gameplayIdentity": "OGN-001:Blazing Scorcher",
@@ -9942,21 +9942,35 @@
           "name": "Monastery of Hirana"
         }
       ],
-      "status": "implemented",
+      "status": "manual_family_passed",
       "canonicalModel": {
         "cardCode": "OGN-282",
         "approvedAt": "2026-07-21T01:38:24.681Z"
       },
-      "familyStatuses": [],
+      "familyStatuses": [
+        {
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "status": "manual_family_passed",
+          "updatedAt": "2026-07-22T08:49:30.005Z",
+          "note": "User manually validated Monastery of Hirana's resolution-time optional-payment behavior in-game."
+        }
+      ],
       "history": [
         {
           "at": "2026-07-21T01:38:24.681Z",
           "event": "canonical_model_approved",
           "status": "implemented",
           "note": "Canonical model OGN-282 approved."
+        },
+        {
+          "at": "2026-07-22T08:49:30.005Z",
+          "event": "family_status_updated",
+          "status": "manual_family_passed",
+          "familyId": "ogn-m2-resolution-time-optional-payment",
+          "note": "User manually validated Monastery of Hirana's resolution-time optional-payment behavior in-game."
         }
       ],
-      "updatedAt": "2026-07-21T01:38:24.681Z"
+      "updatedAt": "2026-07-22T08:49:30.005Z"
     },
     {
       "gameplayIdentity": "OGN-283:Navori Fighting Pit",
