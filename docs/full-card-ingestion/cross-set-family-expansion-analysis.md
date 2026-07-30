@@ -1,77 +1,231 @@
-# Cross-Set Behavior-Family Expansion Analysis
+# Cross-Set Behavior-Family Expansion Analysis and Execution Plan
 
-Snapshot: 2026-07-22
+Revision: 2026-07-30
 
-This is an analysis and planning document. It does not publish card models,
-change runtime behavior, change implementation ledgers, or add tests.
+This document is an evidence-driven analysis and proposed execution plan. It
+does not itself publish card models, change runtime behavior, change
+implementation ledgers, create validation decks, or add tests.
 
-The review used the local rules authority in this order: `docs/riftbound_core_rules_reference.md`,
-`docs/deck_validation.md`, `data/errata/official.json`, the four set files, and
-`docs/game_definition.md`. Errata text is treated as the effective card text
-for semantic classification. The runtime conclusions below were traced through
-the current behavior catalog, `behavior-runtime.ts`, `triggers.ts`,
-`effect-resolution.ts`, `primitive-handlers.ts`, `actions.ts`, `payment.ts`,
-`keyword-evaluation.ts`, `unit-destinations.ts`, and the implementation-status
-and family documents.
+The review uses only repository-local rules and card data:
+`docs/riftbound_core_rules_reference.md`, `docs/deck_validation.md`,
+`data/errata/official.json`, `data/sets/*.json`, and
+`docs/game_definition.md`. Effective errata is part of gameplay identity. No
+online rule source is used.
 
-## 1. Executive summary
+The runtime conclusions were traced through the behavior catalog,
+`behavior-runtime.ts`, `triggers.ts`, `effect-resolution.ts`,
+`primitive-handlers.ts`, `actions.ts`, `payment.ts`,
+`keyword-evaluation.ts`, `unit-destinations.ts`, projection, deck snapshot
+construction, canonical publication, and implementation-status synchronization.
 
-The four raw corpora contain 936 records. After excluding alternate-art,
-overnumbered, signature, duplicate-printing, and one metadata-mislabeled
-duplicate presentation, the review covers **780 unique gameplay identities**:
+## 1. Executive decision
 
-| Set | Raw records | Gameplay identities reviewed | Presentations excluded |
-| --- | ---: | ---: | ---: |
-| OGS | 24 | 24 | 0 |
-| OGN | 352 | 298 | 54 |
-| SFD | 280 | 233 | 47 |
-| UNL | 280 | 225 | 55 |
-| **Total** | **936** | **780** | **156** |
+The original expansion estimate was too optimistic to use as an execution
+commitment. It mixed three different concepts:
 
-The identity pass uses normal, non-alternate, non-overnumbered printings as
-representatives when available. It also treats `UNL-238` Baron Nashor
-(Ultimate) as a duplicate of the identical `UNL-147` gameplay text. Conversely,
-`SFD-247` Emperor of the Sands is retained as a distinct gameplay identity
-from `SFD-197`: its same-name text adds a different static Weaponmaster clause.
-That distinction is important because the current clean-name printing key would
-otherwise collapse the two cards.
+1. physical corpus printings;
+2. global gameplay identities, including tokens and visual skins; and
+3. behavior families that may be reused by otherwise different cards.
 
-Current approval state is uneven: OGS has 24 canonical models, 6 complete-card
-accepted entries, and 18 implemented entries; OGN has 157 canonical models, 67
-complete-card accepted entries, 28 `manual_family_passed` entries, 25
-`ready_for_manual_validation` entries, and 37 other implemented entries; SFD
-has only the accepted `SFD-219` model; UNL has no canonical gameplay models.
-Family-pass status is evidence for a reusable primitive gate, not complete-card
+It also treated the presence of a primitive name as evidence that a complete
+producer-to-consumer contract already existed. Repository tracing disproved
+that assumption for several proposed early-wave cards.
+
+The following earlier claims are therefore withdrawn:
+
+- **780 unique gameplay identities** is not an authoritative global count;
+- **208 directly supported**, **126 existing composition**, and **334 unlocked
+  without new primitives** are not reproducible publication claims;
+- the original Wave 1 and Wave 2 lists are candidate portfolios, not safe
+  implementation batches; and
+- `SFD-219` is not a new gain because its ledger already records it as accepted.
+
+The plan now uses a **zero-known-contract-risk** gate. A card is considered
+data/binding-only only after its full identity, clauses, parameters, event
+producers, selectors, payment paths, zone transitions, projection, pending
+state, cleanup, and consumers have been traced. Any required production-code
+change or untested handoff removes the card from that gate.
+
+Failure during implementation or the user's manual validation remains possible.
+The purpose of the gate is not to promise that failure is impossible. It is to
+avoid knowingly placing an uncertain card in a low-risk batch.
+
+### Reproducible baseline
+
+The source corpus contains **936 physical printing records**. The current
+set-ledger grouping contains **792 set-local ledger entries**, but this is not a
+global gameplay-identity count:
+
+| Set | Ledger entries | Canonical models | Current statuses |
+| --- | ---: | ---: | --- |
+| OGS | 24 | 24 | 24 accepted |
+| OGN | 298 | 157 | 140 accepted; 1 `manual_family_passed`; 4 `ready_for_manual_validation`; 12 implemented; 141 unreviewed |
+| SFD | 232 | 1 | 1 accepted (`SFD-219`); 231 unreviewed |
+| UNL | 238 | 0 | 238 unreviewed |
+| **Total** | **792** | **182** | Statuses remain ledger-specific |
+
+Baseline commit: `dac71547d23bcf6e72068fc910abb35464315ff7`.
+`npm run catalog:check-implementation-status` passes against these ledgers.
+
+The definitive global identity count must be generated by the identity
+foundation described below. Until that deterministic manifest exists, this
+plan reports physical printings, set-ledger entries, and named candidates
+separately. It does not infer a coverage percentage from them.
+
+### Settled program decisions
+
+These are user-approved constraints, not open questions:
+
+1. A card can be the same global gameplay identity across sets. Later
+   mechanically identical printings are skins, not new gameplay definitions.
+2. A published canonical anchor is stable. A later lower collector number
+   cannot silently replace it.
+3. `UNL-238` is an explicit skin of canonical `UNL-147`.
+4. `SFD-247` is an overnumbered skin of canonical `SFD-197`. The canonical
+   gameplay record wins despite the presentation's materially different raw
+   wording.
+5. Tokens are first-class collectible records. Mechanically identical token
+   printings share one token gameplay identity, while printing and gameplay
+   counts remain separately visible.
+6. Selectable skins are out of scope. Canonical deck snapshots continue to use
+   the canonical default printing and its image.
+7. Cross-set implementation may get ahead of sequential full-set completion.
+   It does not waive permanent set-deck, BO3, completeness, or user-acceptance
+   gates.
+8. Codex may create narrowly scoped temporary family-validation decks under
+   `data/decks/experimental`. They are not permanent set decks and are not
+   acceptance evidence.
+9. Automated gameplay acceptance tests remain prohibited. Automated coverage
+   is limited to reusable synthetic primitive and boundary contracts. The user
+   alone performs real-card integration and manual acceptance.
+10. Reveal is public; Look is private. Reveal names persist in the shared game
+    log. Reveal never adds an acknowledgement or gameplay pause.
+
+## 2. Identity foundation
+
+Global identity must be resolved before behavior classification, canonical
+publication, ledger inheritance, or deck snapshot construction. The current
+set-scoped `metadata.clean_name` key is insufficient: it cannot join future
+cross-set reprints, it fails many UNL presentation suffixes, and it can merge
+same-name records without proving gameplay equivalence.
+
+### 2.1 Terminology
+
+| Term | Meaning |
+| --- | --- |
+| Printing record | One physical corpus entry with its set, public code, collector number, presentation metadata, and media. |
+| Printing family | All standard and presentation printings that render one global gameplay identity. |
+| Global gameplay identity | One complete executable card definition, anchored by one stable canonical standard printing. |
+| Token gameplay identity | A global gameplay identity in the Token namespace. It can merge only with mechanically identical tokens. |
+| Behavior family | A reusable engine contract shared by cards that may otherwise have different names, costs, stats, text, or identities. |
+
+A shared behavior family never makes two cards the same gameplay identity.
+Conversely, every skin of one gameplay identity must use the same complete
+canonical behavior model.
+
+### 2.2 Deterministic matching policy
+
+Identity resolution follows this order:
+
+1. Load all source printings and retain every printing, including tokens,
+   alternate art, overnumbered, and signature presentations.
+2. Apply explicit user-approved aliases. Initial required aliases include
+   `UNL-238 -> UNL-147` and `SFD-247 -> SFD-197`.
+3. Attach a flagged presentation to a deterministic standard anchor when its
+   base relation is proven. The standard anchor's complete gameplay record
+   wins. A presentation flag alone is not proof: the normalized base name/code
+   relation must resolve to exactly one viable standard anchor. Zero or multiple
+   viable anchors block review. Never union tags, domains, costs, stats, or
+   rules text from skins.
+4. Compare remaining ordinary standard printings globally. Automatic merging
+   requires an exact normalized base name and equality of all gameplay fields:
+   card type, gameplay supertype, Token status, domains, tags, Energy, Power,
+   Might where applicable, and effective rules text.
+5. Name normalization may remove approved presentation suffixes and normalize
+   case, Unicode, whitespace, and typography. It must not delete arbitrary
+   parenthetical text or make semantic paraphrases equal.
+6. A "mostly the same" name or near-match is discovery evidence only. It enters
+   a review queue and never auto-merges.
+7. Apply official errata at family scope after grouping. Conflicting errata
+   among candidate family members blocks publication.
+8. If a group has no standard anchor and cannot join an existing global
+   standard identity with certainty, leave it unpublished for explicit review.
+
+Gameplay supertype must not be confused with presentation metadata:
+`classification.supertype: "Signature"` remains gameplay data, while
+`metadata.signature` marks a presentation.
+
+The resolver must be corpus-order independent and emit the same result after
+input reordering.
+
+For candidate comparison, "effective rules text" means the printing's local
+official errata when present, otherwise its raw text. After a family is
+established, one family-effective errata record is authoritative for every
+skin. A skin without its own code-scoped errata inherits that record; two
+different member errata texts block the family.
+
+### 2.3 Stable canonical anchor
+
+The family stores an explicit canonical anchor rather than recalculating one
+from the lowest collector number across all sets. `selectPreferredPrinting`
+continues to choose the default standard printing within a resolved printing
+family, but it cannot re-anchor a previously published global identity.
+
+A later exact reprint inherits:
+
+- the canonical gameplay definition and behavior model;
+- implementation and complete-card acceptance belonging to that exact
+  identity; and
+- the canonical default image used in new deck snapshots.
+
+The later set ledger must retain its printing record and record the canonical
+anchor and inherited provenance. It must not fabricate a new manual-validation
+event. Reuse of only a behavior family does not inherit complete-card
 acceptance.
 
-The review found **12 established behavior families** broad enough to compare
-across sets. The following are planning classifications, not claims that the
-cards are already approved or manually accepted:
+If two standard gameplay identities share a deck-visible name but fail the
+identity comparison, publication through the current name-only deck lookup is
+blocked. The system must not guess. Code-aware deck syntax and selectable skins
+are separate future work.
 
-| Classification | Unique cards | Meaning |
-| --- | ---: | --- |
-| Directly supported | 208 | Existing executable primitives and an honest existing family contract are sufficient; only canonical behavior data, bindings, and approval remain. |
-| Existing primitive composition | 126 | Existing primitives can express the behavior, but a new clause ordering, selector combination, or binding composition is required. |
-| Small generic extension | 84 | A reusable parameter or narrowly scoped engine contract is missing, such as a Gear selector, dynamic remembered value, or broader replacement scope. |
-| New primitive or subsystem | 212 | The card crosses a material boundary such as Repeat, countering, copying, XP, control transfer, or private-zone replay. |
-| Ambiguous or blocked | 150 | Local identity, errata, rules interpretation, source data, or a required semantic contract is not currently safe to resolve. |
-| **Total** | **780** | One primary classification per gameplay identity. |
+### 2.4 Token accounting
 
-The most valuable near-term expansion is not a new set milestone. It is a
-cross-set batch combining:
+Tokens remain executable dependencies and collectible printings. They are not
+filtered from ingestion or headline corpus reporting.
 
-1. top-deck inspection with filtered draw, recycle, and effect-driven play;
-2. public-Trash recovery and replay using the already passed OGN family; and
-3. simple trigger-plus-effect families for move, hold, Beginning, play, and
-   token/combat-role modifiers.
+For example, `OGN-271`, `OGN-272`, and `OGN-273` are three collectible Recruit
+token printings but one executable Recruit token gameplay identity. Reports
+must show at least:
 
-Together these are likely to unlock **334 cards without new primitives**
-(direct support plus existing composition), with **84 more** likely after small
-generic extensions. They should be implemented only after the identity blocker
-around same-name variants and no-standard printings is resolved or explicitly
-excluded from the publication batch.
+- all physical printings;
+- all global gameplay identities;
+- token physical printings; and
+- token gameplay identities.
 
-## 2. Current family inventory
+Token-to-non-token merging is prohibited even if the remaining signature
+matches.
+
+### 2.5 Required identity manifest
+
+Before any expansion batch, generate a deterministic, reviewable manifest that
+contains:
+
+- every source printing code and source record ID;
+- its global family ID and canonical anchor;
+- whether the relation was exact, presentation-derived, explicit, or blocked;
+- normalized and original identity fields;
+- effective errata provenance;
+- token classification;
+- canonical image URL;
+- mismatches deliberately ignored for confirmed skins;
+- ambiguous-name collisions;
+- unresolved/no-standard groups; and
+- aggregate printing and gameplay-identity counts with set/token subtotals.
+
+The manifest generator must support a check mode that fails on drift. A batch
+cannot publish from an unreviewed, locally improvised grouping.
+
+## 3. Current behavior-family inventory
 
 The family names below describe reusable behavior, not card-name groups.
 
@@ -82,7 +236,7 @@ The family names below describe reusable behavior, not card-name groups.
 | Play, move, conquer, hold, and Beginning triggers | `OGS-010`, `OGS-021`, `OGS-023`, OGN Garen/Viktor cards, `OGN-289` | `trigger.on_play`, `trigger.on_move`, `trigger.conquer`, `trigger.hold_battlefield`, `trigger.beginning`, `trigger.end_of_turn`, `action.draw_cards`, `action.move_unit`, `action.ready_cards` | Trigger routing through the Chain; source and event-subject relationships; simple effects; simultaneous trigger ordering | Choices that must be locked while creating a trigger, linked movement, combat-result memory, and source copies outside normal board zones need explicit contracts. |
 | Public-Trash recovery and effect-driven play | `OGN-165`, `OGN-170`, `OGN-196`, `OGN-198`, `OGN-226` | `selector.card`, `action.return_to_hand`, `action.play_selected_unit`, `action.play_selected_card`, normal destination policy, Power payment | Public-Trash target locking before Priority; return to Hand; all-cost and Power-only Unit play; normal destination choices; resumable resolution | Hand/private-zone play, source-specific banishment, Spell replay, and replay after a conditional kill need separate review. |
 | Opponent-Hand reveal and selection | `OGN-156`, `OGN-192` | `selector.card` with `revealZone`, opponent ownership, `action.discard_cards`, `action.recycle_cards`, pending effect selection | Opponent Hand reveal, controller-only private selection, discard or recycle of the revealed card | Does not cover the opponent choosing, playing, or retaining a private card; delayed return of a remembered card is separate. |
-| Top-deck inspection and Vision | `OGN-183`, `OGN-171`, `OGN-235` | `keyword.vision`, `action.look`, `action.vision`, `action.take_to_hand`, `action.recycle_top_cards`, `action.select_looked_unit`, `action.order_top_cards` | Private look/reveal, optional top-card recycle, selected look-result routing, ordered remainder, viewer-safe projection | Filtered play from looked cards, replacement of draw with reveal, Predict 2 ordering, and multiple-player private decisions require composition or extension. |
+| Top-deck inspection and Vision | `OGN-183`, `OGN-171`, `OGN-235` | `keyword.vision`, `action.look`, `action.vision`, `action.take_to_hand`, `action.recycle_top_cards`, `action.select_looked_unit`, `action.order_top_cards` | Private Look, optional top-card recycle, selected look-result routing, ordered remainder, and owner-only projection | Public Reveal is a separate visibility/logging contract. Filtered complete-group presentation, selected-card play, Predict 2 ordering, and multiple-player decisions require composition or extension. |
 | Optional play-cost declaration | `OGN-048` Meditation | `choice.optional`, `cost.exhaust_selected_unit`, `action.pay_optional_exhaust`, `action.draw_by_optional_cost` | Choice and cost are made during card play, before the parent item receives Priority; accepted paid and declined branches | This is not a generic resolution payment or a generic additional-cost framework for XP, kill, or dynamic cost reduction. |
 | Resolution-time optional payment and modes | `OGN-035`, `OGN-152`, `OGN-282`, `OGN-157` | persisted effect frames, `choice.optional`, `choice.choose_mode`, resource/ Buff/exhaust payment handlers, `condition.turn_event_count`, `condition.state` | Accept/decline, pending resource payment, mode choice, per-turn memory, continuation after payment, cleanup | Payment source interaction, entry-state replacement, Repeat, XP, and choices that belong to another player require separate family boundaries. |
 | Legion and conditional resource abilities | `OGN-021`, `OGN-217`, `OGN-253`, `OGN-254` | `keyword.legion`, `ability.exhaust_for_resource`, `modifier.enter_ready`, `modifier.legion_energy_discount`, `action.kill_on_next_damage` | Legion entitlement after another card; automatic payment eligibility; turn-scoped enter-ready and discounts; typed resource Add | General activated Add abilities are not automatically generalized; Legion must not be treated as ordinary Action timing. |
@@ -118,42 +272,55 @@ similarity score. The signature records the following dimensions:
 | Remembered data | Selected object identity, original location, source/event value, discarded/revealed card type, combat/excess-damage result, and per-turn choice memory. |
 | Privacy and priority | Public, private, or secret information; which player may see it; and whether the choice must be locked while playing the card, while finalizing a trigger, or during resolution before opponents receive Priority. |
 
-Two cards share a family only when every difference in this signature can be
+Two cards share a behavior family only when every difference in this signature can be
 represented by a validated parameter or by composition of existing ordered
 primitives. A shared verb such as “return,” “draw,” or “play” is not sufficient.
 
-## 3. Cross-set expansion matrix
+## 4. Cross-set candidate matrix
 
 The matrix intentionally lists representative card codes, not alternate
-presentations. Classification is for the complete card identity, including all
-clauses and effective errata text.
+presentations. The classifications are retained as discovery hypotheses from
+the original analysis. They are not execution gates, confidence guarantees, or
+coverage counts. Every row must be reclassified by the evidence process in
+Section 7. A row marked A or B can still require production work when a
+producer, consumer, projection, or lifecycle contract is incomplete.
+The confidence column is retained only as audit evidence. Values were reduced
+where direct tracing disproved the first assumption; every value is superseded
+and non-gating.
 
-| Proposed family | Candidate card | Set/code | Classification | Existing reusable capability | Missing capability | Confidence | Notes |
+| Legacy label | Original intent | Current use |
+| --- | --- | --- |
+| A | Directly supported | Preflight candidate only |
+| B | Existing primitive composition | Boundary audit required |
+| C | Small generic extension | Contract spike required |
+| E | New primitive or subsystem | Explicitly outside an early expansion batch |
+
+| Proposed family | Candidate card | Set/code | Legacy class | Existing reusable capability | Known or suspected gap | Superseded confidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Move-triggered simple draw | Stellacorn Herder | SFD / `SFD-048` | A | `trigger.on_move` + `action.draw_cards` | None identified | High | Exact semantic reuse; movement event must retain normal attribution. |
+| Move-triggered simple draw | Stellacorn Herder | SFD / `SFD-048` | A | `trigger.on_move` + `action.draw_cards` | `card.drawn` producer parity and movement attribution | Medium | Zone mutation alone does not establish the declared draw-event contract. |
 | Printed Ganking keyword | Laurent Bladekeeper | SFD / `SFD-096` | A | `keyword.ganking` | None identified | High | Keyword-only behavior; no new movement family implied. |
-| Hold-triggered channel | The Papertree | SFD / `SFD-219` | A | `trigger.hold_battlefield` + `action.channel_runes` with `eachPlayer` | None identified | Medium | Confirm each-player channeling and trigger ordering during hold cleanup. |
-| Deathknell channel | Black Rose Dignitary | UNL / `UNL-152` | A | `trigger.on_death` + `action.channel_runes` | None identified | Medium | The Deathknell timing marker is represented by the existing own-death trigger path. |
-| Hold-triggered draw with exhaust cost | Vex - Gloomist | UNL / `UNL-193` | B | Hold trigger, optional choice, source exhaust, draw | None at primitive level | Medium | Optional cost is part of triggered-ability finalization/resolution and needs a fresh binding. |
-| Hold-triggered move to Base | Amateur Recital | UNL / `UNL-207` | B | Hold trigger, friendly-unit selector, `action.move_unit` | None at primitive level | High | Verify “a unit at a battlefield” is not narrowed to the source battlefield. |
-| Beginning kill-or-draw | Dusk Rose Lab | UNL / `UNL-209` | B | Beginning trigger, friendly selector, kill, optional branch, draw | None at primitive level | Medium | The “before scoring” timing must remain a Beginning-phase trigger, not an end-turn effect. |
+| Hold-triggered channel | The Papertree | SFD / `SFD-219` | A | `trigger.hold_battlefield` + `action.channel_runes` with `eachPlayer` | Already accepted; use only as a regression anchor | Medium | This is not a new expansion gain. Confirm each-player channeling and trigger ordering during hold cleanup before relying on the producer contract. |
+| Deathknell channel | Black Rose Dignitary | UNL / `UNL-152` | A | `trigger.on_death` + `action.channel_runes` | `rune.channeled` producer parity | Low | The own-death trigger path exists, but the channel mutation/event handoff still requires closure. |
+| Hold-triggered draw with exhaust cost | Vex - Gloomist | UNL / `UNL-193` | B | Hold trigger, optional choice, source exhaust, draw | Trigger-finalization cost and Hold scope outside ordinary board discovery | Low | Exhaust payment must be locked at the correct timing and the active source scope must be explicit. |
+| Hold-triggered move to Base | Amateur Recital | UNL / `UNL-207` | B | Hold trigger, friendly-unit selector, `action.move_unit` | Cross-battlefield selector containment | Medium | “A unit at a battlefield” must not be narrowed to the source battlefield or broadened to Base. |
+| Beginning kill-or-draw | Dusk Rose Lab | UNL / `UNL-209` | B | Beginning trigger, friendly selector, kill, optional branch, draw | Trigger-finalization cost/choice and pre-scoring continuation | Low | The “before scoring” timing and decline/invalid branches need an explicit lifecycle. |
 | Beginning area damage | Frozen Fortress | UNL / `UNL-212` | B | Beginning trigger, automatic location group, damage | Automatic group location binding | Medium | Requires all units here, not only friendly or enemy units. |
-| Unit-play optional Buff | Valley of Idols | UNL / `UNL-218` | B | Typed `card.played` event, location relation, optional choice, Buff | Event-location binding review | Medium | The choice belongs to the player who played the Unit; source battlefield is the event location. |
-| Play-triggered selected Buff | Rengar - Pridestalker | UNL / `UNL-183` | B | `trigger.on_play`, unit selector, Buff, this-turn modifier | None at primitive level | High | “A unit” is not automatically the source; keep the selection explicit. |
+| Unit-play optional Buff | Valley of Idols | UNL / `UNL-218` | B | Typed `card.played` event, location relation, optional choice, Buff | Any-player actor, event destination, and decision-owner routing | Low | The choice belongs to the player who played the Unit; source battlefield is the event location. |
+| Play-triggered selected Buff | Rengar - Pridestalker | UNL / `UNL-183` | B | `trigger.on_play`, unit selector, Buff, this-turn modifier | Explicit selected-target binding and duration cleanup | Medium | “A unit” is not automatically the source; keep the selection explicit. |
 | Activated stun with source costs | Shadow | UNL / `UNL-194` | B | Activated ability, payment, enemy selector, stun | Attacking-here legality binding | Medium | The target must be an attacking enemy Unit at this location. |
-| Move-triggered top-card branch | Apprentice Smith | SFD / `SFD-041` | B | On-move trigger, look/reveal, type condition, draw/recycle | None at primitive level | High | Public trigger source with private top-card projection. |
-| Top-four Gear selection | Ornn, Blacksmith | SFD / `SFD-058` | B | `action.look`, filtered selection, take to Hand, recycle remainder | Gear filter binding | High | Same top-deck contract as existing look/recycle; target type is Gear. |
+| Move-triggered top-card branch | Apprentice Smith | SFD / `SFD-041` | B | On-move trigger, Reveal, type condition, draw/recycle | Public Reveal state and log contract | Low | The revealed card name is public. It must not use the private Look projection. |
+| Top-four Gear selection | Ornn, Blacksmith | SFD / `SFD-058` | B | private Look, filtered selection, public Reveal of the chosen card, draw, recycle remainder | Complete-group/eligible-subset split and Gear filter | Medium | The four-card group stays private, but the selected Gear name becomes public. |
 | Static Vision grant to Mechs | Forecaster | SFD / `SFD-065` | B | Static keyword grant, source location/board scope, Vision | Tag-filtered recipient group | Medium | Generalize by tag only if the recipient scope is represented as a reusable selector. |
-| Attack top-two selected play | Rek'Sai, Swarm Queen | SFD / `SFD-170` | B | Look/reveal, optional banish, selected card play, post-effect recycle | Unit-to-source-battlefield destination binding | Medium | Uses local errata; this is not the older “play then recycle rest” text. |
-| Conquer top-two selected play | Void Burrower | SFD / `SFD-187` | B | Conquer trigger, look/reveal, optional banish, selected play, recycle | Destination and play-origin binding | Medium | Same errata-driven top-deck/replay contract as `SFD-170`. |
-| Top-two cost-reduced play | Void Rush | SFD / `SFD-188` | B | Top-deck look, optional banish, selected card play, numeric cost modifier, draw remainder | Card-type-independent selected play review | Medium | The unplayed card is drawn, not recycled; preserve that destination. |
-| Defense top-card type branch | Ravenbloom Conservatory | SFD / `SFD-215` | B | Defend-at-source trigger, reveal, type condition, draw/recycle | None identified | High | Must not become a generic Vision keyword trigger. |
-| Top-three Unit draw and conditional Buff | Ivern - Nurturer | UNL / `UNL-051` | B | On-play/hold trigger, look, filtered draw, recycle remainder, conditional Buff | Tag predicate on revealed card | Medium | The revealed tag is a remembered resolution value, not a live board selector. |
+| Attack top-two selected play | Rek'Sai, Swarm Queen | SFD / `SFD-170` | B | public Reveal, optional banish, selected card play, post-effect recycle | Public group, Unit-to-source-battlefield destination, and play-origin binding | Low | Uses local errata; both revealed names are public before one may be banished and played. |
+| Conquer top-two selected play | Void Burrower | SFD / `SFD-187` | B | Conquer trigger, public Reveal, optional banish, selected play, recycle | Public group, destination, play-origin, and trigger-cost binding | Low | Same errata-driven Reveal/banish/play contract as `SFD-170`. |
+| Top-two cost-reduced play | Void Rush | SFD / `SFD-188` | B | public Reveal, optional banish, selected card play, numeric cost modifier, draw remainder | Public group and card-type-independent reduced-cost play | Low | The cards not banished are drawn; preserve that destination and public history. |
+| Defense top-card type branch | Ravenbloom Conservatory | SFD / `SFD-215` | B | Defend-at-source trigger, Reveal, type condition, draw/recycle | Public Reveal state and log contract | Low | Both players receive the public identity; it must not become a private Vision flow. |
+| Top-three Unit draw and conditional Buff | Ivern - Nurturer | UNL / `UNL-051` | B | private Look, public Reveal of one Unit, draw, recycle remainder, conditional Buff | Complete-group/eligible-subset split and remembered tag | Low | Only the selected Unit becomes public. Its tag is a remembered resolution value, not a live board selector. |
 | Deathknell Predict 2 | Dramatic Visionary | UNL / `UNL-062` | B | Death trigger, top-two look, recycle selected cards, order remainder | Predict/order binding | High | Private choices occur during resolution and must be viewer-safe. |
-| Filtered top-four Spell draw | Fate Weaver | UNL / `UNL-064` | B | Look, filtered card selection, draw, recycle remainder | Printed Energy threshold filter | High | Uses printed cost, not an altered cost. |
+| Filtered top-four Spell draw | Fate Weaver | UNL / `UNL-064` | B | private Look, public Reveal of one Spell, draw, recycle remainder | Complete-group/eligible-subset split and printed Energy filter | Medium | Only the selected Spell becomes public; the threshold uses printed cost. |
 | Vision plus conditional play cost | Jhin - Meticulous Killer | UNL / `UNL-089` | B | Vision plus turn-event cost condition and alternative payment | Reaction/alternate play declaration path | Medium | The conditional “play me for Power” is a play-cost model, not a normal resolution payment. |
 | Resolution Predict and reveal | Diana - Lunari | UNL / `UNL-079` | C | Optional resource payment, Predict/look, reveal, conditional draw | Reveal-result branch after payment | Medium | The payment, private top-card choice, and conditional draw must resume one effect frame. |
-| Vision plus activated self-cost | Divining Shells | UNL / `UNL-161` | B | Vision, action timing, self-kill/exhaust cost, Buff target | None identified | High | Keep the Vision clause separate from the activated clause. |
+| Vision plus activated self-cost | Divining Shells | UNL / `UNL-161` | B | Vision, action timing, self-kill/exhaust cost, Buff target | Source-kill activation cost and paid-cost preservation | Low | Keep the Vision clause separate; the activation cost must complete before Priority without invalidating the effect frame. |
 | Deathknell conditional draw | LeBlanc - Fragmented | UNL / `UNL-172` | C | Death trigger, draw, Beginning-phase condition | Trigger-time phase condition | Medium | “If it’s your Beginning Phase” is evaluated when the Deathknell resolves. |
 | Static Mech Shield grant | Mechanized Menace | SFD / `SFD-181` | C | Static keyword grant and combat evaluation | Tag-based continuous recipient filter | Medium | Generalizable to tagged groups, but must not broaden to all friendly units. |
 | Trash Gear recovery | Aspiring Engineer | SFD / `SFD-061` | C | On-play trigger, public-zone card selector, return to Hand | `selector.card` Gear type | High | A useful generic selector extension; do not model Gear as `nonUnit` if later effects need exact type. |
@@ -184,31 +351,50 @@ clauses and effective errata text.
 | Copy token | Mirror Image | UNL / `UNL-200` | E | Token play and Temporary cleanup | Copying a Unit's identity, text, stats, and restrictions | High | Must not be represented by a fixed token card code. |
 | Sequential linked movement | Void Assault | UNL / `UNL-202` | E | Two move effects | Atomic sequential movement and attacker determination | High | The second move depends on the first and the final battlefield controllers. |
 
-## 4. Recommended family boundary changes
+## 5. Proposed behavior-family boundary changes
 
-### A. Broaden “top-deck inspection” to “look, classify, route, and resolve a preserved private group”
+### A. Split inspection state from visibility: Look and Reveal
 
 Current boundary: `OGN-183` and Vision-like effects look at a fixed number of
 top cards, optionally select or recycle them, and preserve the remaining order.
 
-Proposed boundary: the family should cover a private looked-at group whose
-cards can be classified, optionally selected, routed to Hand/Banishment/Trash,
-played with a declared cost treatment, or returned in order.
+Proposed boundary: one inspected-group state captures an immutable ordered list
+of card instance IDs. Visibility is a required parameter:
 
-The shared contract is: look/reveal is private to the controller; selection is
-made during the resolution frame; the selected card identity is locked; the
-remainder follows an explicit destination and ordering rule; printed costs are
-used for filters unless the card explicitly refers to effective cost.
+- **Look** exposes the group only to the authorized viewer;
+- **Reveal** exposes the group to both players and writes the card names to the
+  persistent shared log; and
+- the complete inspected group is separate from its eligible/selectable subset.
+
+New cards entering the origin zone do not join the captured group. A member
+leaving the zone does not cause an unseen replacement card to enter it.
+Selections are locked within the resolution frame, and the remainder follows an
+explicit destination and ordering rule. Printed costs are used for filters
+unless the card explicitly refers to an effective cost.
+
+For a Reveal that suspends on a decision, both projections show the complete
+revealed group while only the decision owner receives enabled controls. For an
+atomic Reveal with no decision, resolution does not pause for acknowledgement:
+the shared log captures names in source order, including duplicates. A
+non-blocking UI preview may be added later but is not gameplay state.
+
+Look creates at most a public count-only audit entry. It must never put card
+identities into an opponent event, projection, pending choice, player-facing
+log, image URL, or rules-text field.
 
 Parameters should represent count, card type, printed-cost bounds, optionality,
 selection destination, selected-card play cost mode, remainder destination,
-and whether the selected card is played at a fixed or chosen destination.
+whether the selected card is played at a fixed or chosen destination, viewer,
+and an explicit `look` or `reveal` visibility kind. Visibility must not be an
+optional boolean whose default can silently change privacy; each kind owns a
+separate projection and logging contract.
 Composition should represent Vision, look, filtered select, draw, recycle,
 banish, and play as separate ordered effects.
 
 Do not absorb Repeat, private opponent-deck choices, card copying, or a value
-captured from a killed object into this family. Regression cards are
-`OGN-183`, `OGN-242`, `OGN-062`, `SFD-170`, `SFD-187`, and `SFD-188`.
+captured from a killed object into this family. Manual real-card regression
+references are `OGN-183`, `OGN-242`, `OGN-062`, `SFD-170`, `SFD-187`, and
+`SFD-188`.
 
 ### B. Broaden “public-Trash Unit recovery/play” to “zone-authorized effect-driven card play”
 
@@ -227,10 +413,15 @@ and whether the selection is public or private. Existing `selector.card`,
 `action.play_selected_unit`, `action.play_selected_card`, payment, and pending
 resolution should remain the owners.
 
+The existence of those primitives is not proof that every combination is
+supported. Each source-zone, card-type, payment, Chain, destination, and
+post-resolution handoff must pass Gate 3 before a card using that combination
+can be called data/binding-only.
+
 Keep separate: self-replay after a resolved kill (`UNL-186`), stored-card replay
 after a banishment effect (`UNL-148`), opponent-selected private play
-(`UNL-139`), and play from Hidden. Regression cards are `OGN-165`, `OGN-170`,
-`OGN-196`, `OGN-198`, and `OGN-226`.
+(`UNL-139`), and play from Hidden. Manual real-card regression references are
+`OGN-165`, `OGN-170`, `OGN-196`, `OGN-198`, and `OGN-226`.
 
 ### C. Broaden “simple location/event trigger” to a typed trigger-plus-effect family
 
@@ -239,8 +430,9 @@ typed-event clauses are implemented as separate bindings.
 
 Proposed boundary: a trigger clause is reusable when its event subject,
 controller relation, source location, duration, and selection timing are
-explicit. This supports `SFD-048`, `SFD-219`, `UNL-193`, `UNL-207`, `UNL-209`,
-`UNL-212`, `UNL-214`, and `UNL-218` without naming cards.
+explicit. After their separate boundary audits, candidates include `SFD-048`,
+`UNL-193`, `UNL-207`, `UNL-209`, `UNL-212`, `UNL-214`, and `UNL-218`.
+Accepted `SFD-219` remains a manual regression reference.
 
 Parameters should capture event type, subject, source-location relation,
 affected-player relation, optionality, and whether target selection occurs at
@@ -249,8 +441,9 @@ can draw, move, kill, channel, Buff, or create a token without a family-specific
 branch.
 
 Do not merge event triggers with printed instructions, combat-result triggers,
-first-time memory, or delayed source-independent effects. Regression cards are
-`OGN-202`, `OGN-235`, `OGN-277`, `OGN-288`, and accepted Garen hold/conquer cards.
+first-time memory, or delayed source-independent effects. Manual real-card
+regression references are `OGN-202`, `OGN-235`, `OGN-277`, `OGN-288`, and
+accepted Garen hold/conquer cards.
 
 ### D. Extend death replacement by scope, not by card name
 
@@ -266,9 +459,10 @@ This could cover `UNL-175` and `UNL-206`, and later `SFD-173` after the dynamic
 Might comparison is separately represented. The comparison must remain a
 condition, not an implicit replacement exception.
 
-Regression cards are `OGS-020`, `OGN-023`, and `OGN-269`. Do not absorb “kill
-this instead” (`OGN-077`), damage prevention (`OGN-189`), or a replacement of
-the spell's destination (`UNL-131`) without distinct replacement kinds.
+Manual real-card regression references are `OGS-020`, `OGN-023`, and
+`OGN-269`. Do not absorb “kill this instead” (`OGN-077`), damage prevention
+(`OGN-189`), or a replacement of the spell's destination (`UNL-131`) without
+distinct replacement kinds.
 
 ### E. Keep Repeat as a separate subsystem boundary
 
@@ -279,7 +473,7 @@ and per-repeat limits. `SFD-003`, `SFD-077`, `SFD-122`, and `UNL-032` should
 share a future Repeat subsystem, not be added to the top-deck or damage family
 through special flags.
 
-## 5. False-positive exclusions
+## 6. False-positive exclusions and explicit identity exceptions
 
 The following exclusions were deliberate semantic decisions rather than text
 matching failures.
@@ -300,227 +494,405 @@ matching failures.
 | Static Buff/keyword grant | `SFD-181` Mechanized Menace and `UNL-208` Black Flame Altar | Tag or status filtered recipients must remain explicit. “Your Mechs” and “Temporary Units here” are not all-friendly-unit scopes. |
 | Simple conquer trigger | `OGN-034` Tryndamere and `UNL-217` Trapping Grounds | Excess-damage totals must be preserved from combat assignment; a normal conquer event does not contain that value. |
 | Simple play-cost discount | `UNL-168` Undying Loyalty and `UNL-089` Jhin - Meticulous Killer | A choice or earlier event changes the alternative play cost. It is not a generic numeric modifier on the current source card. |
-| Printed same-name printing | `SFD-197` and `SFD-247` Emperor of the Sands | The overnumbered text is materially different, not an alternate presentation. The current clean-name grouping would be unsafe. |
+| Ordinary automatic identity matching | `SFD-247` Emperor of the Sands | User-approved exception: it is an overnumbered skin of canonical `SFD-197`. The canonical record wins; the raw text mismatch is retained as a diagnostic and must not create a second gameplay identity. |
+| Ordinary automatic identity matching | `UNL-238` Baron Nashor (Ultimate) | User-approved exception: it is a skin of canonical `UNL-147` despite source naming/metadata differences. This relationship must be explicit rather than inferred through fuzzy matching. |
 
-## 6. Prioritized implementation waves
+## 7. Evidence-gated execution
 
-Coverage gains below are planning estimates against the 780-identity corpus;
-they are not approval counts.
+The work is organized by gates, not promised card counts. A gate can fail
+without weakening its acceptance criteria. The next gate does not start until
+the current gate's evidence is reviewable.
 
-### Wave 1 — Existing behavior only
+### Gate 0 - Freeze and reproduce the baseline
 
-Scope: exact or near-exact bindings with no new selector, event, payment, or
-resolution contract.
+Required evidence:
 
-Included cards: `SFD-048`, `SFD-096`, `SFD-219`, `UNL-152`.
+1. Run `npm run catalog:check-implementation-status`.
+2. Record the source-set file hashes, errata hash, ledger hashes, canonical
+   model count, and accepted canonical model hashes.
+3. Regenerate the 936-printing source inventory directly from `data/sets`.
+4. Confirm the worktree contains no unrelated changes that would be included in
+   a publication batch.
+5. Record the exact candidate codes proposed for the next micro-batch. Do not
+   use a family-wide count as a substitute for a card list.
 
-Expected gain: 4 cards.
+Exit: the baseline can be regenerated by command and compared after every later
+gate.
 
-Dependencies: canonical representatives, effective errata text, complete
-behavior clauses, and approval workflow.
+### Gate 1 - Implement and review global identity
 
-Regression surface: accepted OGS Garen cards, `OGN-202` typed discard routing,
-`OGN-235` recycle event attribution, and existing Beginning/hold cleanup.
+Deliverables:
 
-Validation scenario: one synthetic match with a moving Unit, a held Battlefield,
-a Deathknell Unit, and a two-player channel effect. Verify player ownership,
-turn timing, and no duplicate triggers.
+- the deterministic global identity manifest from Section 2.5;
+- stable persisted canonical anchors;
+- explicit aliases for Baron Nashor and Emperor of the Sands;
+- presentation inheritance that never unions gameplay fields;
+- family-scoped errata with conflict blocking;
+- token namespace and dual printing/gameplay reporting;
+- unresolved and ambiguous-name review queues; and
+- check mode that fails on source, errata, or grouping drift.
 
-Exit criteria: all four models compile; projected actions and pending choices
-are correct; manual in-game validation passes; no accepted card changes.
+Allowed automated coverage protects catalog/identity tooling, not gameplay
+acceptance. It must cover:
 
-### Wave 2 — Existing primitive composition
+- corpus-order independence;
+- a flagged skin inheriting the anchor without merging conflicting tags;
+- an unflagged exact cross-set reprint joining an existing anchor;
+- a near-name or one-field mismatch remaining separate and review-blocked;
+- `UNL-238 -> UNL-147` and `SFD-247 -> SFD-197`;
+- no-standard local presentation groups joining a global anchor only when the
+  approved relationship is deterministic;
+- conflicting family errata blocking publication;
+- token-to-token merging and token-to-non-token exclusion; and
+- same-name distinct identities blocking name-only deck resolution.
 
-Scope: combinations of existing triggers, selectors, top-deck actions, numeric
-modifiers, token play, and destination effects.
+Exit: every source printing has exactly one resolved family or one explicit
+blocked reason. Aggregate counts reconcile to 936 physical records. No
+canonical behavior model is published by this gate.
 
-Included cards: `SFD-041`, `SFD-058`, `SFD-065`, `SFD-140`, `SFD-165`,
-`SFD-170`, `SFD-187`, `SFD-188`, `SFD-215`, `UNL-051`, `UNL-062`, `UNL-064`,
-`UNL-161`, `UNL-183`, `UNL-193`, `UNL-194`, `UNL-207`, `UNL-209`, `UNL-212`,
-`UNL-218`, and `UNL-211`.
+### Gate 2 - Make publication preflighted and recoverable
 
-Expected gain: 21 cards.
+Current canonical and behavior publication performs multiple writes, and ledger
+synchronization is a separate filesystem operation. This is not one atomic
+transaction. The plan must not describe it as one.
 
-Dependencies: Wave 1 trigger routing; top-deck private projection; selected-card
-play cost modes; token catalog; existing destination policy.
+Required contract:
 
-Regression surface: `OGN-183` Stacked Deck, `OGN-165` Cemetery Attendant,
-`OGN-196` Soulgorger, `OGN-198` The Harrowing, `OGN-226` Spectral Matron,
-`OGN-070` restriction scope, and `OGN-193` destination permission.
+1. Generate a sorted publication manifest with canonical anchor, behavior
+   model hash, source text hash, image URL, expected prior status, and expected
+   final status for every card in the micro-batch.
+2. Validate the complete manifest before the first write. One preflight failure
+   writes nothing.
+3. Use micro-batches of one to four global gameplay identities.
+4. Make every write idempotent against the manifest.
+5. After writes begin, recover by deterministic resume/reconciliation. Do not
+   improvise broad deletion or rollback commands.
+6. Consider a batch complete only when behavior definitions, canonical cards,
+   images, family anchors, and ledgers all reconcile to the same manifest.
+7. Rebuild fresh deck snapshots only after reconciliation. Existing snapshots
+   remain immutable.
+8. Compare accepted canonical model hashes before and after publication. Any
+   unexpected accepted-model change fails the gate.
 
-Validation scenario: top-card and top-two/top-four cases with eligible and
-ineligible cards; a selected card leaving its zone before resolution; no legal
-target; optional decline; source moving away; and a source-controlled versus
-open Battlefield destination.
+Allowed automated coverage uses synthetic catalog documents and protects
+preflight rejection, idempotent resume, malformed input, stale expected state,
+duplicate invocation, and reconciliation. It does not prove a named card's
+gameplay.
 
-Exit criteria: all selected/remainder destinations are explicit, private cards
-are exposed only to their owner, stale targets do not retarget, and the accepted
-OGN top-deck and Trash families pass focused manual regression.
+### Gate 3 - Close reusable contract gaps
 
-### Wave 3 — Small reusable extensions
+The original matrix underestimated several boundaries. Each row below is a
+separate contract spike. A spike changes one reusable responsibility and uses
+synthetic fixtures only.
 
-Scope: generic selector, remembered-value, replacement-scope, and alternative
-payment improvements.
+| Contract | Confirmed or suspected gap | Candidate impact | Required synthetic evidence |
+| --- | --- | --- | --- |
+| Look versus Reveal | `action.look` and `action.reveal` currently enqueue internal behavior events, but top-deck pending projection is private and `card.revealed` does not become a player-facing log entry | `SFD-041`, `SFD-058`, `SFD-170`, `SFD-187`, `SFD-188`, `SFD-215`, `UNL-051`, `UNL-064`, `UNL-079`, other reveal branches | Immutable group, complete group versus eligible subset, both-player Reveal projection, owner-only Look projection, persistent ordered Reveal names, count-only Look log, no acknowledgement pause, full cleanup |
+| Draw event production | Catalog metadata declares `card.drawn`, while the traced draw handler mutates zones without establishing that complete producer contract | `SFD-048` and downstream draw-event consumers | Correct actor/subject/count, exact-once emission, no event on no-op, preserved zone mutation |
+| Channel event production | Catalog metadata declares `rune.channeled`, while the traced channel handler does not establish that complete producer contract | `SFD-219` regression, `UNL-152`, `UNL-214` | Per-player attribution, each-player ordering, exact rune mutation, no duplicate event |
+| Filtered inspected-group selection | Current take-to-Hand flow does not express all card-type, tag, or printed-cost filters while preserving the whole inspected group and publicly revealing only the selected member | `SFD-058`, `UNL-051`, `UNL-064` | Eligible and nearest ineligible cards, complete private group, selected public member, no replacement draw, stale member handling |
+| Effect-driven selected-card play | Current cost modes do not establish normal, reduced, all-cost, and Power-only play for every card type and post-resolution destination | `SFD-140`, `SFD-165`, `SFD-170`, `SFD-187`, `SFD-188`, `UNL-179` | Projection/execution agreement, payment containment, Spell Chain flow, Unit destination, banish-before-play, remainder route, stale source |
+| Tag-scoped grant and remembered tag | Static recipient tags and a revealed card's remembered tags cross different lifecycles | `SFD-065`, `SFD-181`, `UNL-051`, `UNL-167` | Intended tag included, nearest non-tag excluded, source inactive/moved, captured value survives only its frame |
+| Trigger finalization cost | Choice/cost timing during trigger creation is not interchangeable with resolution-time payment | `UNL-193`, `UNL-209` and similar cards | Accept/decline, sufficient/insufficient, cost record, Priority timing, no repeated instruction, cleanup |
+| Event actor and choice owner | Source controller, event actor, affected player, and decision owner can differ | `UNL-218`, `UNL-214` | Both player directions, decision routed to event actor, non-actor cannot submit, exact mutation and cleanup |
+| Selector and location containment | "Attacking here," "all units here," global friendly units, and another battlefield are distinct scopes | `UNL-194`, `UNL-207`, `UNL-212`, `UNL-193` | Intended scope plus nearest non-beneficiary, stale source/location, malformed submission rejection |
+| Activated source costs | Killing or exhausting the source as an activation cost must be paid and recorded before the ability receives Priority | `UNL-161` | Valid/invalid source, cost zone movement, locked paid-cost record, effect continuation without target revalidation |
 
-Included cards: `SFD-035`, `SFD-061`, `SFD-173`, `UNL-025`, `UNL-079`,
-`UNL-142`, `UNL-167`, `UNL-168`, `UNL-172`, `UNL-175`, `UNL-179`, `UNL-186`,
-`UNL-206`, and `UNL-214`.
+Repeat, countering, copying, XP, control transfer, equipment lifecycle,
+opponent-private play, long-lived private-card memory, linked movement, and
+dynamic continuous replacement remain new subsystem work. They cannot enter a
+contract-closure batch merely because some component primitives already exist.
 
-Expected gain: 14 cards in the first extension slice; the wider 84-card
-classification includes related future variants not yet safe to bind.
+### Gate 4 - Admit zero-known-contract-risk cards
 
-Dependencies: Wave 2 zone-play and event contracts; explicit Gear/tag selector
-parameters; remembered values; replacement target scopes; owner/controller
-distinction; resolution-time payment continuation.
+A candidate can enter this gate only when all answers below are yes:
 
-Regression surface: all OGN death-replacement cards, public-Trash family cards,
-opponent-Hand privacy, and payment source projections.
+- Is its global gameplay identity resolved and its canonical anchor stable?
+- Is every clause represented, including keywords, static text, costs, and
+  alternate play permissions?
+- Does every behavior parameter already exist and execute with the required
+  scope?
+- Are all event producers and consumers connected with the required actor,
+  subject, origin, destination, and value metadata?
+- Do projection and server validation expose/reject the same options?
+- Are privacy, selection ownership, and log visibility correct?
+- Are zone-changing selections locked and preserved correctly?
+- Do completion, decline, invalidation, cancellation, and source movement clean
+  up all owned transient state?
+- Is the publication change data/binding-only?
+- Does the relevant primitive coverage map have no open handoff?
 
-Validation scenario: Gear versus Unit versus Spell selector pairs; a selected
-object changing zones; a killed object supplying a remembered value; payment
-accepted/declined/insufficient; source leaving play; and combat-only versus
-turn-long replacement duration.
+If any answer is no or unknown, the card leaves Gate 4. It returns to Gate 3 or
+to a later subsystem plan. Confidence labels and similarity to an accepted card
+cannot override this result.
 
-Exit criteria: each extension has at least two distinct candidate cards or a
-documented future contract, server legality and projection agree, and no
-existing primitive is broadened by an unscoped default.
+No card is pre-approved for Gate 4 by this document. `SFD-096` is the simplest
+candidate for the first preflight because it appears keyword-only, but it still
+must pass the checklist. `SFD-048` and `UNL-152` depend on event-producer
+closure. `SFD-219` is an accepted regression anchor, not an expansion gain.
+All original Wave 2 cards require a documented boundary audit before admission.
 
-### Wave 4 — New engine capabilities
+The first Gate 4 micro-batch may contain fewer cards than expected, including
+zero. That is a valid result.
 
-Scope: Repeat, countering, copying, private opponent play, XP, control transfer,
-equipment lifecycle, and combat-result memory.
+### Gate 5 - Build temporary family-validation decks
 
-Included cards: `SFD-003`, `SFD-077`, `SFD-107`, `SFD-122`, `UNL-032`,
-`UNL-080`, `UNL-131`, `UNL-135`, `UNL-139`, `UNL-169`, `UNL-181`, `UNL-190`,
-`UNL-199`, `UNL-200`, and `UNL-202`.
+After a micro-batch is published and reconciled, Codex may create narrowly
+scoped decks under:
 
-Expected gain: 15 named cards, with a much larger later portfolio.
+```text
+data/decks/experimental/
+```
 
-Dependencies: new public contracts and focused primitive tests where the
-contract is durable; effect continuation/Chain suppression; private choice
-projection; copy identity; XP state; equipment attachment state; sequential
-movement transaction; and combat event extensions.
+Requirements:
 
-Regression surface: broad. This wave must not be mixed into a family-only
-milestone or used to justify approval of earlier waves.
+- kebab-case names identifying the family or micro-batch;
+- only the minimum real cards and support cards needed for manual scenarios;
+- a companion family handoff documenting what the deck can and cannot validate;
+- no claim that the deck is balanced, permanent, or a full-set completeness
+  deck;
+- no automatic ledger acceptance; and
+- removal or archival when it is no longer useful.
 
-Validation scenario: repeat accept/decline and independent targets; countered
-versus resolved Chain item; private choice seen by the correct player only;
-remembered card after source leaves; copied Unit identity; and sequential move
-with both final destination variants.
+The user performs all real-card integration validation. A temporary deck is a
+manual tool, not an automated fixture and not evidence by itself.
 
-Exit criteria: the missing subsystem contract is documented and tested in
-synthetic isolation, manual card validation passes, and all prior family
-regressions remain green. No Wave 4 card should be implemented as a card-name
-branch.
+### Gate 6 - Record only user-reported manual results
 
-## 7. Validation strategy
+When the user explicitly reports a manual result:
 
-Manual in-game validation remains the authoritative acceptance gate. Automated
-tests are recommended only for durable primitive, schema, selector, event, or
-confirmed-regression contracts; broad browser or `GameBoard` tests are not
-recommended.
+1. Separate complete-card acceptance from narrower behavior-family acceptance.
+2. Group affected identities by ledger set.
+3. Use `npm run catalog:update-implementation-status`; do not edit ledgers by
+   hand.
+4. Use `manual_family_passed` for an accepted behavior-family gate.
+5. Use `accepted` only when the user explicitly accepts the complete gameplay
+   identity or applicable completion scope.
+6. For an exact skin of an already accepted global identity, record inherited
+   provenance without inventing a separate manual validation.
+7. Run `npm run catalog:check-implementation-status`.
 
-| Family | Compact manual matrix |
+Cross-set progress does not change the full-set roadmap state. SFD and UNL
+remain incomplete until their normal permanent decks, full inventory,
+fresh-game/BO3 validation, and explicit user acceptance are complete.
+
+## 8. Validation strategy
+
+### 8.1 Automated coverage boundary
+
+Automated gameplay coverage is allowed only for durable reusable primitives and
+their stateful handoffs. Every gameplay fixture must use schema-valid synthetic
+cards such as `SYN-001`. It must assert:
+
+- the intended state mutation;
+- the closest non-beneficiary or forbidden alternative remains unchanged;
+- projection entitlement and containment;
+- server rejection of stale or malformed submissions;
+- event actor, subject, origin, destination, and exact-once behavior;
+- pending decision, continuation, permission, and temporary-state cleanup; and
+- absence of protected IDs, names, codes, images, and rules text from an
+  unauthorized serialized projection.
+
+Do not add tests that reproduce a complete named card, deck, behavior family
+composition, or full game. Real card behavior remains manual.
+
+Catalog, identity, import, publication, and ledger tools may have focused
+tooling-contract tests. Canonical identities may appear only when the identity
+or synchronization contract itself is the subject, such as the two approved
+alias exceptions.
+
+### 8.2 Primitive coverage map
+
+Before publishing a behavior composition, its family handoff must include:
+
+| Field | Required content |
 | --- | --- |
-| Damage and numeric modifiers | Base versus Battlefield; friendly versus enemy; one versus multiple targets; minimum Might; damage that kills versus does not; source Bonus Damage active/inactive; Chain resolution; replacement present/absent. |
-| Move/hold/conquer/Beginning triggers | Source at Base versus Battlefield; source leaves before event; event at source versus another location; one trigger versus simultaneous triggers; hold/conquer before and after control changes; turn cleanup. |
-| Top-deck/Vision | One, two, three, four, and five cards; eligible versus ineligible type/cost; take, recycle, banish, draw, and ordered remainder; no eligible card; private owner projection; target leaves before resolution; repeated trigger attempts. |
-| Public-Trash recovery/play | Unit versus Gear versus Spell; one versus no eligible cards; target locked before Priority; target leaves Trash; Power sufficient/insufficient; normal Base/controlled Battlefield/open Battlefield; source leaves play; post-resolution recycle. |
-| Opponent-Hand selection | Reveal one opponent Hand; choose a legal versus excluded type; controller sees cards and opponent does not gain hidden details; decline where allowed; selected card changes zone; opponent and owner differ; stale submission rejection. |
-| Optional declaration cost | Pay versus decline; insufficient cost; selected cost object becomes illegal; cost moves zones; parent Chain item still resolves; optional target versus optional effect distinction. |
-| Resolution payment/modes | Initially payable versus initially insufficient; Add ability from Rune, permanent, Battlefield, and Legend; accept/decline; typed Power; exact payment consumption; new player receives the decision; cleanup after cancellation. |
-| Legion and entry modifiers | Before versus after another card is played; automatic payment allowed/forbidden; source exhausted; next matching play; nonmatching play; turn expiration; entry ready versus normal exhausted entry. |
-| Death replacement | Base versus Battlefield; friendly versus enemy; selected versus automatic scope; one target versus simultaneous deaths; accept/decline; insufficient payment; source leaves play; replacement suppresses death event; unreplaced death emits exactly once; combat-only duration. |
-| Tokens and temporary objects | Base versus source Battlefield; ready versus exhausted; counted placement; no legal destination; Temporary cleanup at Beginning before scoring; token event triggers; alternate presentation maps to one canonical token definition. |
-| Destination/active-zone permissions | Self versus friendly-unit permission; open versus controlled versus enemy-occupied Battlefield; source active/inactive/moved; projection versus stale server submission; one board copy versus one Trash copy; no duplicate trigger source. |
+| Producer | Operation that creates the event, selection, permission, paid-cost record, or pending state |
+| Consumer | Trigger, condition, effect, projection, validation, cleanup, or history path that reads it |
+| Handoff contract | Exact identity, actor/owner/controller relation, zone/location, timing, values, and visibility |
+| Lifecycle branches | Applicable accept/decline, valid/invalid, immediate/deferred, first/repeated, source active/inactive, and cleanup branches |
+| Synthetic coverage | Focused test file and assertions protecting the reusable contract |
+| Open gaps | Any untested or ambiguous boundary; a non-empty gap blocks Gate 4 |
 
-For every family, include at least one alternate/duplicate presentation check:
-the standard representative and its alternate art, overnumbered, signature, or
-suffix variant must resolve to the same canonical behavior only when the
-normalized gameplay text is identical. Same-name text differences must be
-tested as separate identities or held for catalog review.
+Independent producer and consumer tests do not prove their handoff. A stateful,
+lossy, deferred, private, or zone-changing handoff needs focused boundary
+coverage.
 
-## 8. Risks and unresolved questions
+### 8.3 Look and Reveal contract matrix
 
-1. `deriveCanonicalPrintingGroupKey` uses `metadata.clean_name`; it would group
-   `SFD-197` and `SFD-247` Emperor of the Sands even though their gameplay text
-   differs. This is the most dangerous identity false positive in the corpus.
-2. SFD has no standard printing for `SFD-222`, `SFD-223`, `SFD-226`,
-   `SFD-227`, `SFD-229`, `SFD-231`, `SFD-232`, `SFD-234`, `SFD-236`, and
-   `SFD-238`. UNL has no standard printing for `UNL-220` through `UNL-225`.
-   These 16 identities are reviewed but must remain unpublished until explicit
-   catalog review resolves their representatives.
-3. The runtime coverage map says many catalog primitives are executable, but
-   the complete semantic contract can still be narrow. `keyword.repeat`,
-   `keyword.ambush`, equipment attachment/detachment, copy, counter, XP, and
-   several card-specific-looking keywords are not safe to infer from names.
-4. Primitive discovery reports are useful leads, not approval evidence. They
-   over-match text such as “if,” “may,” “unit,” and “draw” and can produce
-   incomplete parameter sets. Full execution path tracing is required.
-5. Several historical family documents mark behavior as ready or
-   `manual_family_passed`, not complete-card `accepted`. That evidence must not
-   be promoted to canonical gameplay acceptance for cross-set cards.
-6. `UNL-238` is a standard-flagged Baron Nashor (Ultimate) with gameplay text
-   identical to `UNL-147`; the source metadata does not mark it as an alternate
-   presentation. It needs an identity decision before catalog synchronization.
-7. Public-Trash source activation and private Main Deck source activation now
-   have explicit active-zone routing. Expanding trigger discovery additively
-   would reintroduce duplicate triggers from board and Trash copies.
-8. Choices made during card play, trigger finalization, and effect resolution
-   are not interchangeable. `UNL-139`, `UNL-169`, `UNL-179`, and `UNL-200` are
-   particularly dangerous because a plausible binding can expose private data
-   or retarget after Priority.
-9. “Move,” “recall,” “kill,” “would die,” “discard,” “banish,” “recycle,” and
-   “put into a zone” have distinct event and replacement consequences. Textual
-   grouping by destination is unsafe.
-10. The local corpus contains effective errata that materially changes family
-    classification, especially `SFD-170`, `SFD-187`, `SFD-188`, `OGN-025`,
-    `OGN-062`, `OGN-121`, and `OGN-242`. Any future intake must apply the errata
-    overlay before semantic signatures are built.
+| Boundary | Reveal | Look |
+| --- | --- | --- |
+| Producer | Preserve origin zone/order and emit one internal `card.revealed` event per captured card in order | Preserve origin zone/order and emit `card.lookedAt` |
+| Captured group | Later zone additions do not join; moved members are not replaced | Same |
+| Eligibility | Both players see the complete group; only eligible cards are selectable | Only authorized viewer sees complete group; only eligible cards are selectable |
+| Projection | Both projections contain identical revealed identities while active; hidden neighbor is absent | Opponent serialization contains none of the inspected identities or presentation fields |
+| Log | One persistent shared grouped entry, source order, duplicate names retained | Public count-only entry; never identities |
+| Atomic resolution | No acknowledgement, artificial pending choice, or Priority pause | No additional pause beyond a real decision |
+| Cleanup | Active group clears on completion, decline, invalidation, or cancellation; historical log remains | Private group clears on the same lifecycle |
 
-## 9. Recommended next milestone
+### 8.4 Manual validation
 
-The recommended next milestone is **Cross-set top-deck plus simple event
-composition**, limited to cards that reuse current pending-choice, private
-projection, and destination contracts.
+The temporary family handoff must give the user a concise scenario matrix for
+the real cards in that deck. At minimum include:
 
-Exact scope:
+- normal success;
+- closest legal-scope boundary;
+- insufficient payment or no eligible choice;
+- optional decline when applicable;
+- source or selected object changing zones;
+- immediate versus Chain-deferred resolution when applicable;
+- repeated use and cleanup; and
+- both player directions for actor/owner/controller-sensitive behavior.
 
-`SFD-041`, `SFD-048`, `SFD-058`, `SFD-065`, `SFD-096`, `SFD-170`,
-`SFD-187`, `SFD-188`, `SFD-215`, `SFD-219`, `UNL-051`, `UNL-062`, `UNL-064`,
-`UNL-152`, `UNL-161`, `UNL-183`, `UNL-193`, `UNL-194`, `UNL-207`, `UNL-209`,
-`UNL-212`, and `UNL-218`.
+Manual validation is authoritative for the real composition. Passing primitive
+tests, typecheck, lint, catalog checks, or deck construction cannot mark a real
+card accepted.
 
-Implementation order:
+### 8.5 Verification commands
 
-1. Resolve the catalog identity decision for same-name/different-text cards;
-   exclude all 16 no-standard groups and `UNL-238` from publication until
-   resolved.
-2. Build semantic signatures from effective errata text and select only normal
-   canonical representatives.
-3. Bind the exact trigger-only cards (`SFD-048`, `SFD-096`, `SFD-219`,
-   `UNL-152`) and manually validate trigger routing and ownership.
-4. Bind simple composed modifiers/effects (`UNL-161`, `UNL-183`, `UNL-193`,
-   `UNL-194`, `UNL-207`, `UNL-209`, `UNL-212`, `UNL-218`).
-5. Bind top-deck cards in increasing privacy/selection complexity:
-   `SFD-041`, `SFD-058`, `SFD-065`, `SFD-215`, `UNL-051`, `UNL-062`,
-   `UNL-064`, then errata-sensitive selected-play cards `SFD-170`, `SFD-187`,
-   and `SFD-188`.
-6. Run `npm run typecheck` and `npm run lint`; perform the manual matrix above;
-   do not add gameplay acceptance tests or update ledgers unless the user
-   explicitly reports a manual family pass.
+For gameplay contract work, run:
+
+```text
+npm run typecheck
+npm run lint
+```
+
+Run only the focused synthetic primitive/boundary tests relevant to the
+changed contract. Do not run or repair broad card integration/regression tests
+unless the user explicitly requests automated test work.
+
+For identity or ledger work, also run:
+
+```text
+npm run catalog:check-implementation-status
+```
+
+and the identity/publication check commands introduced by Gates 1 and 2.
+
+## 9. Publication and recovery rules
+
+| Failure point | Required behavior |
+| --- | --- |
+| Identity or preflight failure | Write nothing; leave the complete micro-batch blocked with explicit reasons |
+| Production write fails before reconciliation | Stop; retain the immutable manifest; resume idempotently from observed state |
+| Canonical card and behavior definition disagree | Do not create a fresh deck snapshot or mark implementation complete |
+| Ledger synchronization fails | Publication is incomplete; reconcile before new work |
+| Accepted canonical hash changes unexpectedly | Stop the batch and investigate the shared primitive or identity resolution |
+| Temporary deck cannot resolve every card uniquely | Do not weaken name resolution; block the deck/card until identity is unambiguous |
+| Manual validation fails | Record no acceptance; return the smallest reusable failed contract to analysis |
+
+Do not delete broad catalog state, reset ledgers, or rebuild accepted snapshots
+as an ad hoc rollback. Recovery targets the exact manifest and verifies all
+dependent stores afterward.
+
+## 10. Risk register
+
+### Critical prerequisites
+
+1. **Three identity systems currently disagree.** Import grouping, ledger
+   grouping, and the original analysis use different rules. Global identity
+   must become one shared resolver consumed by all three.
+2. **The definitive global count is unknown.** The old 780 count and its
+   derived coverage percentages are withdrawn until the manifest is generated.
+3. **Publication spans non-atomic stores.** Preflight, idempotency, manifest
+   reconciliation, and recovery are prerequisites to safe expansion.
+4. **Look and Reveal are conflated.** Current top-deck pending projection is
+   private, while Reveal must be public and logged without adding a pause.
+5. **Catalog support labels can overstate runtime contracts.** Draw/channel
+   event production and several choice/payment boundaries need direct evidence.
+6. **Name-only deck lookup cannot represent distinct same-name identities.**
+   Such identities remain blocked; the resolver must never choose by map order.
+
+### Known data hazards
+
+1. UNL presentation names include suffixes that other sets do not use.
+2. Many presentation printings omit reminder text or have tag differences.
+   Confirmed skins inherit the anchor; fields are never unioned.
+3. Errata is currently code-scoped. Family grouping must prevent errata from
+   disappearing on another skin and block conflicting member errata.
+4. SFD local groups `SFD-222`, `SFD-223`, `SFD-226`, `SFD-227`, `SFD-229`,
+   `SFD-231`, `SFD-232`, `SFD-234`, `SFD-236`, and `SFD-238`, plus UNL
+   `UNL-220` through `UNL-225`, have no local standard candidate. A proven
+   global anchor may resolve some; the rest stay unpublished.
+5. `UNL-238` and `SFD-247` are explicit exceptions. General fuzzy matching must
+   not be expanded to make those exceptions appear automatic.
+
+### Known gameplay hazards
+
+1. Choice timing during card declaration, trigger finalization, and effect
+   resolution is not interchangeable.
+2. Owner, controller, actor, affected player, and decision owner can differ.
+3. Move, recall, kill, death replacement, discard, banish, recycle, and direct
+   zone placement have different events and replacement semantics.
+4. Private selection, public Reveal, persisted logging, and active temporary
+   visibility are separate contracts.
+5. A selected object changing zones can remain a paid-cost record but cannot be
+   silently retargeted as an unresolved effect target.
+6. New cost modes, tag filters, destination permissions, active zones, or event
+   metadata can leak behavior to the nearest unintended object.
+7. Historical first-pass behavior accuracy was approximately 40%. That evidence
+   justifies smaller micro-batches and boundary-first review rather than larger
+   optimistic waves.
+
+There are no unresolved product-policy questions in this document. A newly
+discovered rules ambiguity, identity mismatch, or material scope decision is a
+stop condition and must be returned to the user rather than assumed.
+
+## 11. Relationship to the full-set roadmap
+
+This plan is an approved exception to the sequential implementation restriction:
+shared primitives, global identities, and selected SFD/UNL canonical models may
+be prepared before OGN is fully accepted.
+
+It is not an exception to completion:
+
+- OGN remains the current full-set milestone until explicitly accepted;
+- the user will provide each later set's permanent validation decks only after
+  the preceding set is truly complete;
+- temporary cross-set family decks do not become permanent selectable set
+  decks;
+- a family pass does not imply complete-card or set acceptance; and
+- no SFD/UNL completeness percentage may treat an inherited primitive pass as
+  manual acceptance of a different complete card.
+
+## 12. Recommended next milestone
+
+The next milestone is **Global identity and publication safety**, not a
+top-deck card batch.
+
+Execution order:
+
+1. Freeze Gate 0 and generate reproducible source/ledger/model hashes.
+2. Implement Gate 1's global identity resolver and review its complete manifest,
+   including token subtotals and explicit aliases.
+3. Implement Gate 2's preflight, idempotent micro-batch manifest, and
+   reconciliation contract.
+4. Close the Look/Reveal contract with synthetic producer, projection, log,
+   lifecycle, and leakage coverage.
+5. Close draw and channel event-producer discrepancies before using them in a
+   supposedly data-only card.
+6. Produce an evidence sheet for every original A/B candidate and classify it
+   as Gate 4, Gate 3, later subsystem, already accepted, or identity-blocked.
+7. Admit the smallest passing Gate 4 micro-batch. Do not fill a quota.
+8. Create a temporary experimental family deck and handoff for the user.
+9. Record only the manual result the user explicitly reports.
 
 Stopping conditions:
 
-- any projected legal choice differs from server validation;
-- any private top-deck or Hand information is visible to the wrong player;
-- any selected card is retargeted after leaving its original zone;
-- any accepted OGS/OGN behavior changes, especially Stacked Deck, public Trash
-  play, typed event routing, or destination permissions; or
-- canonical identity remains unresolved for a candidate required by the batch.
+- the identity manifest does not reconcile to all 936 printing records;
+- a family anchor changes because a later collector number ranks lower;
+- a confirmed skin changes canonical gameplay fields or image selection;
+- a same-name distinct identity is resolved by guesswork;
+- preflight cannot prove that a failed batch writes nothing;
+- post-write state cannot be reconciled idempotently;
+- any opponent projection leaks Look identities;
+- Reveal names are absent from the shared log or resolution adds an
+  acknowledgement pause;
+- any projected legal option differs from server validation;
+- any candidate needs a production change after entering Gate 4; or
+- any accepted canonical model changes outside the explicitly reviewed
+  primitive contract.
 
-Keep Repeat, countering, copying, XP, private opponent play, dynamic death
-replacement, equipment lifecycle, linked movement, and the 16 no-standard
-printing groups out of scope. Those belong to later Wave 3 or Wave 4 work and
-should not be used to widen the first cross-set family milestone.
+The plan intentionally makes no promised card-count gain for this milestone.
+The first trustworthy gain forecast is produced only after the identity
+manifest and per-candidate evidence sheets exist.
