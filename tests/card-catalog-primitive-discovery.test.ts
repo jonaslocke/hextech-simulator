@@ -35,6 +35,7 @@ test("derives stable card identity from public code variants", () => {
   assert.equal(deriveCardCode("OGN-027/298"), "OGN-027");
   assert.equal(deriveCardCode("OGN-027a/298"), "OGN-027");
   assert.equal(deriveCardCode("OGN-307*/298"), "OGN-307");
+  assert.equal(deriveCardCode("VEN-SP1/006"), "VEN-SP1");
 });
 
 test("discovers primitive assignments for Stupefy without behavior templates", () => {
