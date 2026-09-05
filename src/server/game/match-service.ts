@@ -48,6 +48,8 @@ const deckSnapshotCache = new Map<string, DeckSnapshotDocument>();
 const matchDocumentCache = new Map<string, MatchDocument>();
 const gameDocumentCache = new Map<string, GameDocument>();
 
+class BetweenGamesWriteConflict extends Error {}
+
 type CreateMatchInput = {
   db: Db;
   repositories: GameRepositories;
@@ -394,6 +396,7 @@ async function performGameAction(
       repositories,
       input.matchId,
       input.playerToken,
+      { bypassCache: attempt > 0 },
     );
     if (match.status !== "playing") {
       throw new MatchServiceError(
@@ -575,11 +578,12 @@ async function readyForNextGame(
   betweenGamesId: string,
   now: string,
 ): Promise<MatchProjection> {
-  return runInTransaction(db, async (repositories) => {
+  return runBetweenGamesIntent(db, async (repositories, attempt) => {
     const { match, game, seat, decks } = await loadContext(
       repositories,
       input.matchId,
       input.playerToken,
+      { bypassCache: attempt > 0 },
     );
     if (match.status !== "between_games" || !match.betweenGames) {
       throw new MatchServiceError(
@@ -587,12 +591,8 @@ async function readyForNextGame(
         "Readiness is allowed only between games.",
       );
     }
-    if (match.stateVersion !== input.stateVersion) {
-      throw new MatchServiceError(
-        "match.betweenGamesChanged",
-        "Between-games state has changed.",
-      );
-    }
+    // stateVersion is the client's observation. The CAS save below merges this
+    // player's submission into the latest intermission snapshot.
     if (match.betweenGames.id !== betweenGamesId) {
       throw new MatchServiceError(
         "match.betweenGamesChanged",
@@ -702,10 +702,7 @@ async function readyForNextGame(
       match.stateVersion,
     );
     if (!saved) {
-      throw new MatchServiceError(
-        "match.betweenGamesChanged",
-        "Between-games state has changed.",
-      );
+      throw new BetweenGamesWriteConflict();
     }
 
     await repositories.gameEvents.insert({
@@ -745,11 +742,12 @@ async function submitDeckReconfiguration(
   configuration: MatchDocument["seats"][number]["currentDeckConfiguration"],
   now: string,
 ): Promise<MatchProjection> {
-  return runInTransaction(db, async (repositories) => {
+  return runBetweenGamesIntent(db, async (repositories, attempt) => {
     const { match, game, seat, decks } = await loadContext(
       repositories,
       input.matchId,
       input.playerToken,
+      { bypassCache: attempt > 0 },
     );
     if (match.status !== "between_games" || !match.betweenGames) {
       throw new MatchServiceError(
@@ -757,12 +755,8 @@ async function submitDeckReconfiguration(
         "Deck reconfiguration is allowed only between games.",
       );
     }
-    if (match.stateVersion !== input.stateVersion) {
-      throw new MatchServiceError(
-        "match.betweenGamesChanged",
-        "Between-games state has changed.",
-      );
-    }
+    // A stale client version is safe because only this player's submission is
+    // changed, and a failed CAS retries from a fresh intermission snapshot.
     if (match.betweenGames.id !== betweenGamesId) {
       throw new MatchServiceError(
         "match.betweenGamesChanged",
@@ -894,10 +888,7 @@ async function submitDeckReconfiguration(
       match.stateVersion,
     );
     if (!saved) {
-      throw new MatchServiceError(
-        "match.betweenGamesChanged",
-        "Between-games state has changed.",
-      );
+      throw new BetweenGamesWriteConflict();
     }
 
     await repositories.gameEvents.insert({
@@ -1148,8 +1139,13 @@ async function loadContext(
   repositories: GameRepositories,
   matchId: string,
   token: string,
+  options: { bypassCache?: boolean } = {},
 ) {
-  const match = await loadMatchDocumentFromCache(repositories, matchId);
+  const match = await loadMatchDocumentFromCache(
+    repositories,
+    matchId,
+    options.bypassCache,
+  );
   if (!match) {
     throw new MatchServiceError("match.notFound", "Match was not found.");
   }
@@ -1163,7 +1159,11 @@ async function loadContext(
     );
   }
   const [game, decks] = await Promise.all([
-    loadGameDocumentFromCache(repositories, match.currentGameId),
+    loadGameDocumentFromCache(
+      repositories,
+      match.currentGameId,
+      options.bypassCache,
+    ),
     Promise.all(
       match.seats.map((item) =>
         loadDeckSnapshotFromCache(
@@ -1192,9 +1192,10 @@ async function loadContext(
 async function loadMatchDocumentFromCache(
   repositories: GameRepositories,
   id: string,
+  bypassCache = false,
 ): Promise<MatchDocument | null> {
   const cached = matchDocumentCache.get(id);
-  if (cached) return structuredClone(cached);
+  if (cached && !bypassCache) return structuredClone(cached);
 
   const match = await repositories.matches.findById(id);
   if (match) cacheMatchDocument(match);
@@ -1204,9 +1205,10 @@ async function loadMatchDocumentFromCache(
 async function loadGameDocumentFromCache(
   repositories: GameRepositories,
   id: string,
+  bypassCache = false,
 ): Promise<GameDocument | null> {
   const cached = gameDocumentCache.get(id);
-  if (cached) return structuredClone(cached);
+  if (cached && !bypassCache) return structuredClone(cached);
 
   const game = await repositories.games.findById(id);
   if (game) cacheGameDocument(game);
@@ -1260,6 +1262,28 @@ async function runInTransaction<T>(
   }
 
   return result;
+}
+
+async function runBetweenGamesIntent<T>(
+  db: Db,
+  callback: (repositories: GameRepositories, attempt: number) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await runInTransaction(db, (repositories) =>
+        callback(repositories, attempt),
+      );
+    } catch (error) {
+      if (!(error instanceof BetweenGamesWriteConflict)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new MatchServiceError(
+    "match.betweenGamesChanged",
+    "Between-games state has changed.",
+  );
 }
 
 function runtimeDecksForGame(
