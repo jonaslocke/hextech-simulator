@@ -6,7 +6,10 @@ This document defines the product direction for extracting, suggesting, validati
 
 The goal is to avoid implementing each card as isolated custom logic. Instead, the product should analyze the full available card pool, identify reusable behavior patterns, suggest behaviors for every card, and allow admins to validate selected cards before they become usable by the game engine.
 
-This is a product definition, not a technical implementation specification. It describes what the product should support, why the approach is valid, what the first validation workflow should achieve, and how approved card behavior should become available for gameplay.
+This is a product definition, not a technical implementation specification. It
+describes the maintained behavior-model direction and how approved card behavior
+becomes available for gameplay. Approved canonical models are consumed in match
+snapshots; raw card text is not interpreted directly at match runtime.
 
 ---
 
@@ -30,11 +33,9 @@ The strongest product hypothesis is:
 
 ---
 
-## MVP Direction
+## Validation Direction
 
-The MVP is not a reduced behavior catalog.
-
-The MVP is the first validation workflow.
+The validation workflow is not a reduced behavior catalog.
 
 The product must analyze the full card base and generate behavior suggestions for all cards. The smaller card set used during the first implementation phase is only a controlled validation and gameplay test batch.
 
@@ -50,9 +51,9 @@ The small card set is not the behavior scope. It is the first practical validati
 
 ---
 
-## Intended First Validation Workflow
+## Validation Workflow
 
-The first product workflow should follow this sequence:
+The product workflow follows this sequence:
 
 1. Import and analyze the entire available card base.
 2. Generate suggested behavior definitions for every card with rules text.

@@ -2,9 +2,8 @@
 
 ## Status And Authority
 
-This document defines the first server-authoritative Riftbound simulator target for
-Hextech. It is the working product and rules definition for a best-of-3 duel
-simulator.
+This document defines the current product and engine contract for Hextech, a
+server-authoritative 1v1 best-of-3 Riftbound simulator.
 
 This document does not replace the support documents. When there is a conflict,
 use this authority order:
@@ -12,13 +11,20 @@ use this authority order:
 1. `docs/riftbound_core_rules_reference.md` for official rules behavior.
 2. `docs/deck_validation.md` for deck legality requirements.
 3. `data/sets/*.json` for card metadata and card text.
-4. This document for simulator scope, sequencing, server/client contracts, and
-   MVP decisions.
+4. This document for simulator scope and server/client contracts.
 
-The first playable fixture decks are:
+The product overview records the current repository map. Sections explicitly
+describing an initial or MVP implementation phase are retained as historical
+design context; they do not override current implemented contracts, including
+BO3 lifecycle, sideboarding, card-catalog runtime models, and current supported
+deck availability.
+
+The established playable deck baseline includes:
 
 - `data/decks/annie.dec.txt`
 - `data/decks/lux.dec.txt`
+- `data/decks/masteryi.dec.txt`
+- `data/decks/garen.dec.txt`
 
 Both fixture decks must pass strict deck validation before they can be used in a
 game. Invalid decks are not playable.
@@ -37,8 +43,10 @@ Clients must not:
 - Reveal hidden information.
 - Infer private state from server payloads.
 
-The MVP has no chat and no deck editor. Players provide deck lists in the strict
-official text format. The first supported format is 1v1 best-of-3.
+The supported match format is 1v1 best-of-3. Match-level sideboarding uses a
+server-validated reconfiguration flow between games; it does not transfer
+runtime game state between games. Chat and unrelated account-management product
+features are outside this contract unless separately specified.
 
 ## Technical Stack And Boundaries
 
@@ -51,14 +59,15 @@ The implementation stack is:
 - shadcn/ui for reusable UI primitives.
 - MongoDB with the official native Node.js driver.
 - Zod for schema and payload validation.
-- Socket.IO on a custom long-running Node server for later realtime multiplayer.
+- Socket.IO on a custom long-running Node server for matchmaking and room
+  coordination.
 
 Mongoose must not be used.
 
 The backend must remain pure Node.js/TypeScript code. The game engine,
 repositories, deck validation, card catalog, seeded RNG, event log, realtime
 room orchestration, and match/game services must not import React, Next.js, or UI
-modules. Realtime room orchestration is deferred until after the game loop works.
+modules.
 
 Next.js responsibilities:
 
@@ -78,26 +87,25 @@ Pure backend responsibilities:
 - Produce accepted state changes and projections that can later be broadcast to
   match rooms.
 
-Recommended source layout:
+Established source layout:
 
 ```txt
 src/
   app/                  Next.js App Router routes, layouts, and route adapters
-  components/           shadcn/ui components and game UI components
+  features/             product UI and client workflows
   server/               framework-free backend modules
     catalog/            set JSON loading and catalog contracts
     db/                 MongoDB native driver connection and repositories
     deck/               parser, zod schemas, and validation
-    engine/             rules engine, primitives, zones, visibility, RNG
-    events/             canonical event log and viewer-safe projections
-    match/              match/game orchestration
-    realtime/           Socket.IO rooms and gameplay broadcasts
+    game/               rules engine, match lifecycle, projections, combat
+    card-catalog/       approved behavior models and canonical publication
+    deck/               parser and validation
+    online-matchmaking/ Socket.IO rooms and presence
   shared/               shared zod schemas, DTOs, and transport types
 ```
 
-The initial deployment assumption is local-first on a long-running Node process.
-This avoids serverless constraints while gameplay, game-log, persistence, and
-later realtime multiplayer contracts are still changing.
+The application uses a long-running Node process for its custom server and
+Socket.IO integration.
 
 ## Core Challenge: Primitives Are Not Only Zone Moves
 
@@ -1020,12 +1028,11 @@ events are deferred until after the first working game loop.
 
 ### Sideboarding Timing
 
-Sideboarding and best-of-3 deck reconfiguration remain out of the MVP
-implementation.
-
-The first implementation repeats games using the original validated deck
-snapshots and enforces battlefield reuse rules. Add sideboarding only after
-setup, projections, game-log audit, and the basic game loop are stable.
+Sideboarding is a match-level between-games workflow. It edits a local draft of
+stable registered card-copy identities, submits a complete desired
+configuration, and requires server-side deck validation and authorization before
+the next fresh game is created. The Legend, Rune Deck, and registered
+Battlefield pool remain governed by the match policy.
 
 ## Remaining Open Questions
 

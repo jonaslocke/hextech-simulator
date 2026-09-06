@@ -23,6 +23,11 @@ This document tracks gameplay and UI issues found during beta testing. It is int
 | `BETA-002` | Chain panel prevents opening Trash at the same time                  | UI / Interaction bug               | Medium   | Needs verification |
 | `BETA-003` | Card sizes are too large on some monitors                            | UI / Responsive layout             | Medium   | Needs verification |
 | `BETA-004` | Ability choices do not follow the same timing model as spell choices | Rules / Engine / Corpus validation | High     | Needs verification |
+| `BETA-005` | Highlander recall replacement retains lethal damage                  | Rules / Engine / Projection        | High     | Needs validation |
+| `BETA-006` | Meditation optional-cost selector is indistinct                      | Rules / Decision UI                | Medium   | Needs validation |
+| `BETA-007` | Temporary Might modifiers can be lost during recomputation           | Rules / Engine / Projection        | High     | Needs validation |
+| `BETA-008` | Yi, Meditative rune-threshold Might is stale                         | Rules / Engine / Projection        | High     | Needs validation |
+| `BETA-009` | Triggered Chain item gives priority to the wrong player              | Rules / Engine / Projection        | High     | Needs validation |
 
 ---
 
@@ -337,6 +342,152 @@ These are examples to classify, not final rulings:
 ### Notes
 
 Do not fix this card by card. The goal is to validate the generic rule model and then make the behavior primitives follow that model.
+
+---
+
+## BETA-005 — Highlander recall replacement retains lethal damage
+
+### Problem Statement
+
+Highlander's death-replacement path can recall a protected unit exhausted while
+leaving the lethal marked damage visible or effective after the unit returns to
+base.
+
+### Expected Behavior
+
+The replacement consumes the death, moves the unit to base exhausted, and
+clears the damage that caused the lethal state. The recalled unit must remain
+stable rather than immediately dying again or projecting as damaged.
+
+### Investigation Checklist
+
+- Validate the Highlander replacement against the local rules reference and
+  local card data only.
+- Verify recall clears damage on this path and lethal-death bookkeeping ends
+  when the replacement is consumed.
+- Verify the viewer projection cannot retain stale damage after canonical state
+  is corrected.
+
+### Status
+
+`Needs validation`
+
+---
+
+## BETA-006 — Meditation optional-cost selector is indistinct
+
+### Problem Statement
+
+Meditation's board selector appears to be a generic target selector rather than
+an optional-cost decision.
+
+### Expected Behavior
+
+The decision clearly offers either declining the optional cost to draw 1, or
+exhausting one ready friendly unit to draw 2. Only legal ready friendly units
+are selectable; enemies, exhausted units, and invalid board objects are
+excluded. The projected prompt distinguishes `optionalCost` from a normal
+effect target and makes submit and decline actions clear.
+
+### Investigation Checklist
+
+- Verify decision metadata distinguishes the optional cost from a target.
+- Verify `CardSelectionPrompt` and board-selection UI render that purpose.
+- Validate candidates and both resolution outcomes using local card data.
+
+### Status
+
+`Needs validation`
+
+---
+
+## BETA-007 — Temporary Might modifiers can be lost during recomputation
+
+### Problem Statement
+
+When Wuju Bladesman - Starter adds Might to a friendly unit, a temporary
+negative modifier can be lost as current Might is recomputed. The observed
+case is Stalwart Poro targeted by Stupefy while defending alone.
+
+### Reproduction Notes
+
+1. Control Wuju Bladesman - Starter and Stalwart Poro at a Battlefield.
+2. Target Stalwart Poro with Stupefy.
+3. Attack that Battlefield while Poro is the only defender.
+
+### Expected Behavior
+
+Poro's current Might is `4`: base `2`, Shield `+1`, Wuju Bladesman `+2`, and
+Stupefy `-1`. This value must be used for the projected badge, preview, legal
+actions, and combat calculation. The fix must address the general modifier
+pipeline rather than a card-name-specific branch.
+
+### Investigation Checklist
+
+- Verify Stupefy's temporary modifier persists through Chain resolution.
+- Verify combat-Might recomputation includes negative modifiers and happens
+  before combat totals lock.
+- Verify canonical state and viewer projection use the same current-Might
+  source.
+
+### Status
+
+`Needs validation`
+
+---
+
+## BETA-008 — Yi, Meditative rune-threshold Might is stale
+
+### Problem Statement
+
+Yi, Meditative can remain at base Might after its controller reaches eight or
+more runes, then update only after an unrelated board change.
+
+### Expected Behavior
+
+Yi is `4` Might with zero through seven controller runes and immediately `8`
+Might at eight or more. It returns to `4` immediately below the threshold.
+This must be consistent in base and at Battlefields, in board and preview
+projections, combat calculation, and legality calculations that use Might.
+
+### Investigation Checklist
+
+- Verify rune-count changes invalidate any current-Might computation or cache.
+- Verify the condition uses Yi's controller, not active player, viewer, or
+  opponent.
+- Verify all projected displays share the canonical computed-Might source.
+
+### Status
+
+`Needs validation`
+
+---
+
+## BETA-009 — Triggered Chain item gives priority to the wrong player
+
+### Problem Statement
+
+After Lady of Luminosity - Starter triggers from a spell costing five or more,
+the opponent can receive priority while the Lux player's triggered ability is
+the next Chain item.
+
+### Expected Behavior
+
+When a triggered item becomes next on the Chain, its controller receives
+priority first. After that player passes, priority moves to the opponent. This
+applies whether the trigger joins an existing Chain or creates a new Chain, both
+outside and inside a Showdown without breaking Focus rules.
+
+### Investigation Checklist
+
+- Verify the path that queues card-play triggers and drains queued triggers.
+- Verify `priorityPlayerId` resets to the next Chain item's controller after
+  triggers are added rather than inheriting the previous passer.
+- Verify the projection is not stale if canonical priority is correct.
+
+### Status
+
+`Needs validation`
 
 ---
 
