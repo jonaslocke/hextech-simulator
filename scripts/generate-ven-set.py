@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 from html.parser import HTMLParser
 import json
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -31,6 +32,17 @@ RIFTCODEX_BASE = "https://api.riftcodex.com"
 RIFTBOUND_GALLERY_URL = "https://playriftbound.com/en-us/card-gallery/"
 SET_ID = "ven"
 PAGE_SIZE = 100
+VEN_BASE_CARD_COUNT = 166
+VEN_LAST_OVERNUMBERED = 197
+
+VEN_NAME_OVERRIDES = {
+    "VEN-194/166": "Jayce - Defender of Tomorrow",
+}
+
+VEN_CLEAN_NAME_OVERRIDES = {
+    "VEN-104/166": "Tail Cloaked Matriarch",
+    "VEN-194/166": "Jayce Defender of Tomorrow",
+}
 
 CORE_TOP_LEVEL_KEYS = {
     "id",
@@ -351,6 +363,54 @@ def normalize_clean_name(card: dict[str, Any]) -> None:
     metadata["clean_name"] = clean_name
 
 
+def vendetta_variant_kind(public_code: str) -> str | None:
+    match = re.fullmatch(r"VEN-(\d{3})(a?)/166", public_code, re.IGNORECASE)
+    if match is None:
+        return None
+
+    collector_number = int(match.group(1))
+    if match.group(2):
+        return "Alternate Art"
+    if VEN_BASE_CARD_COUNT < collector_number <= VEN_LAST_OVERNUMBERED:
+        return "Overnumbered"
+    return None
+
+
+def normalize_vendetta_presentation(card: dict[str, Any]) -> None:
+    public_code = card.get("public_code")
+    if not isinstance(public_code, str):
+        return
+
+    normalized_code = public_code.upper()
+    if normalized_code in VEN_NAME_OVERRIDES:
+        card["name"] = VEN_NAME_OVERRIDES[normalized_code]
+
+    metadata = card.get("metadata")
+    if not isinstance(metadata, dict):
+        return
+    if normalized_code in VEN_CLEAN_NAME_OVERRIDES:
+        metadata["clean_name"] = VEN_CLEAN_NAME_OVERRIDES[normalized_code]
+
+    variant_kind = vendetta_variant_kind(normalized_code)
+    metadata["alternate_art"] = variant_kind == "Alternate Art"
+    metadata["overnumbered"] = variant_kind == "Overnumbered"
+    if variant_kind is None:
+        return
+
+    classification = card.get("classification")
+    if isinstance(classification, dict):
+        classification["rarity"] = "Showcase"
+
+    suffix = f" ({variant_kind})"
+    name = card.get("name")
+    if isinstance(name, str) and not name.endswith(suffix):
+        card["name"] = f"{name}{suffix}"
+
+    clean_name = metadata.get("clean_name")
+    if isinstance(clean_name, str) and not clean_name.endswith(variant_kind):
+        metadata["clean_name"] = f"{clean_name} {variant_kind}"
+
+
 def validate_card(card: dict[str, Any], index: int) -> None:
     missing = CORE_TOP_LEVEL_KEYS - card.keys()
     if missing:
@@ -383,6 +443,21 @@ def validate_card(card: dict[str, Any], index: int) -> None:
     if not isinstance(metadata["clean_name"], str) or not metadata["clean_name"]:
         raise RuntimeError(f"Card #{index} metadata.clean_name must be a string.")
 
+    variant_kind = vendetta_variant_kind(card["public_code"])
+    if metadata["alternate_art"] != (variant_kind == "Alternate Art"):
+        raise RuntimeError(f"Card #{index} has inconsistent alternate-art metadata.")
+    if metadata["overnumbered"] != (variant_kind == "Overnumbered"):
+        raise RuntimeError(f"Card #{index} has inconsistent overnumbered metadata.")
+    if variant_kind is not None:
+        if card["classification"]["rarity"] != "Showcase":
+            raise RuntimeError(f"Card #{index} variant must use Showcase rarity.")
+        if not card["name"].endswith(f"({variant_kind})"):
+            raise RuntimeError(f"Card #{index} name is missing its variant treatment.")
+        if not metadata["clean_name"].endswith(variant_kind):
+            raise RuntimeError(
+                f"Card #{index} clean_name is missing its variant treatment."
+            )
+
     if card["set"].get("set_id", "").upper() != "VEN":
         raise RuntimeError(
             f"Card #{index} is not Vendetta: {card['set'].get('set_id')!r}"
@@ -404,10 +479,11 @@ def validate_card(card: dict[str, Any], index: int) -> None:
 
 def canonicalize(cards: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """
-    Keep the Riftcodex object structure intact.
+    Keep the Riftcodex object structure intact while applying audited Vendetta
+    presentation metadata that the upstream feed does not expose consistently.
 
-    Only discard Riftcodex's optional transient `new` marker, because the
-    existing set files are source data rather than a 'new card' query result.
+    Discard Riftcodex's optional transient `new` marker, because the existing set
+    files are source data rather than a 'new card' query result.
     """
     result: list[dict[str, Any]] = []
     seen_riftbound_ids: set[str] = set()
@@ -417,6 +493,7 @@ def canonicalize(cards: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         card.pop("new", None)
 
         normalize_clean_name(card)
+        normalize_vendetta_presentation(card)
         validate_card(card, index)
 
         rid = card["riftbound_id"].lower()

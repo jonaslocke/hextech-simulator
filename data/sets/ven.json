@@ -1423,7 +1423,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -1562,7 +1562,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -1699,7 +1699,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -2435,7 +2435,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -2616,7 +2616,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -2895,7 +2895,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -3713,7 +3713,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -3990,7 +3990,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -4036,7 +4036,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -4799,7 +4799,7 @@
   },
   {
     "id": "6a590eef0e5d4c92d5d1efe0",
-    "name": "Ambessa, The Wolf",
+    "name": "Ambessa, The Wolf (Alternate Art)",
     "riftbound_id": "ven-084a-166",
     "tcgplayer_id": null,
     "public_code": "VEN-084a/166",
@@ -4812,7 +4812,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -4836,9 +4836,9 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Ambessa The Wolf",
+      "clean_name": "Ambessa The Wolf Alternate Art",
       "updated_on": "2026-07-16T17:03:43.243730+00:00",
-      "alternate_art": false,
+      "alternate_art": true,
       "overnumbered": false,
       "signature": false
     }
@@ -4993,7 +4993,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -5255,7 +5255,7 @@
   },
   {
     "id": "6a56aba0ff602fd324f4768f",
-    "name": "Renekton, Brute",
+    "name": "Renekton, Brute (Alternate Art)",
     "riftbound_id": "ven-092a-166",
     "tcgplayer_id": null,
     "public_code": "VEN-092a/166",
@@ -5268,7 +5268,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -5292,9 +5292,9 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Renekton Brute",
+      "clean_name": "Renekton Brute Alternate Art",
       "updated_on": "2026-07-14T21:35:28.934986+00:00",
-      "alternate_art": false,
+      "alternate_art": true,
       "overnumbered": false,
       "signature": false
     }
@@ -5844,7 +5844,7 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "TailCloaked Matriarch",
+      "clean_name": "Tail Cloaked Matriarch",
       "updated_on": "2026-07-16T17:03:45.989201+00:00",
       "alternate_art": false,
       "overnumbered": false,
@@ -6089,7 +6089,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -6275,7 +6275,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -6355,7 +6355,7 @@
   },
   {
     "id": "6a590ef00e5d4c92d5d1eff0",
-    "name": "Kennen, Storm of Shuriken",
+    "name": "Kennen, Storm of Shuriken (Alternate Art)",
     "riftbound_id": "ven-113a-166",
     "tcgplayer_id": null,
     "public_code": "VEN-113a/166",
@@ -6368,7 +6368,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -6394,9 +6394,9 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Kennen Storm of Shuriken",
+      "clean_name": "Kennen Storm of Shuriken Alternate Art",
       "updated_on": "2026-07-16T17:03:44.557908+00:00",
-      "alternate_art": false,
+      "alternate_art": true,
       "overnumbered": false,
       "signature": false
     }
@@ -7382,7 +7382,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -7524,7 +7524,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -7663,7 +7663,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -8984,7 +8984,7 @@
   },
   {
     "id": "6a56ab9aff602fd324f47672",
-    "name": "Vi, Destructive",
+    "name": "Vi, Destructive (Overnumbered)",
     "riftbound_id": "ven-167-166",
     "tcgplayer_id": "706118",
     "public_code": "VEN-167/166",
@@ -8997,7 +8997,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -9021,10 +9021,10 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Vi Destructive",
+      "clean_name": "Vi Destructive Overnumbered",
       "updated_on": "2026-07-16T17:03:38.270964+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
@@ -9043,7 +9043,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -9089,7 +9089,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -9122,7 +9122,7 @@
   },
   {
     "id": "6a590ef10e5d4c92d5d1f001",
-    "name": "Shen, Scourge of Shadows",
+    "name": "Shen, Scourge of Shadows (Overnumbered)",
     "riftbound_id": "ven-170-166",
     "tcgplayer_id": null,
     "public_code": "VEN-170/166",
@@ -9135,7 +9135,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -9159,16 +9159,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Shen Scourge of Shadows",
+      "clean_name": "Shen Scourge of Shadows Overnumbered",
       "updated_on": "2026-07-16T17:03:45.801060+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5a92b5fe2355878c40cc94",
-    "name": "Riven, Shattered",
+    "name": "Riven, Shattered (Overnumbered)",
     "riftbound_id": "ven-171-166",
     "tcgplayer_id": null,
     "public_code": "VEN-171/166",
@@ -9181,7 +9181,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -9205,16 +9205,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Riven Shattered",
+      "clean_name": "Riven Shattered Overnumbered",
       "updated_on": "2026-07-17T20:38:13.330181+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5a92b3fe2355878c40cc89",
-    "name": "Draven, Showboat",
+    "name": "Draven, Showboat (Overnumbered)",
     "riftbound_id": "ven-172-166",
     "tcgplayer_id": null,
     "public_code": "VEN-172/166",
@@ -9227,7 +9227,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -9251,16 +9251,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Draven Showboat",
+      "clean_name": "Draven Showboat Overnumbered",
       "updated_on": "2026-07-17T20:38:11.923168+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5a92b5fe2355878c40cc9b",
-    "name": "Swain, Visionary",
+    "name": "Swain, Visionary (Overnumbered)",
     "riftbound_id": "ven-173-166",
     "tcgplayer_id": null,
     "public_code": "VEN-173/166",
@@ -9273,7 +9273,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -9297,16 +9297,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Swain Visionary",
+      "clean_name": "Swain Visionary Overnumbered",
       "updated_on": "2026-07-17T20:38:13.870034+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5a92b4fe2355878c40cc8e",
-    "name": "Irelia, Fervent",
+    "name": "Irelia, Fervent (Overnumbered)",
     "riftbound_id": "ven-174-166",
     "tcgplayer_id": null,
     "public_code": "VEN-174/166",
@@ -9319,7 +9319,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Calm"
       ]
@@ -9344,16 +9344,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Irelia Fervent",
+      "clean_name": "Irelia Fervent Overnumbered",
       "updated_on": "2026-07-17T20:38:12.410546+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56ab97ff602fd324f4762a",
-    "name": "Jayce, Man of Progress",
+    "name": "Jayce, Man of Progress (Overnumbered)",
     "riftbound_id": "ven-175-166",
     "tcgplayer_id": "706046",
     "public_code": "VEN-175/166",
@@ -9366,7 +9366,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -9391,16 +9391,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Jayce Man of Progress",
+      "clean_name": "Jayce Man of Progress Overnumbered",
       "updated_on": "2026-07-16T17:03:35.328133+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56ab9bff602fd324f47673",
-    "name": "Viktor, Innovator",
+    "name": "Viktor, Innovator (Overnumbered)",
     "riftbound_id": "ven-176-166",
     "tcgplayer_id": "706119",
     "public_code": "VEN-176/166",
@@ -9413,7 +9413,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -9437,16 +9437,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Viktor Innovator",
+      "clean_name": "Viktor Innovator Overnumbered",
       "updated_on": "2026-07-16T17:03:38.333826+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a590ef10e5d4c92d5d1effd",
-    "name": "Renekton, Brute",
+    "name": "Renekton, Brute (Overnumbered)",
     "riftbound_id": "ven-177-166",
     "tcgplayer_id": null,
     "public_code": "VEN-177/166",
@@ -9459,7 +9459,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -9483,16 +9483,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Renekton Brute",
+      "clean_name": "Renekton Brute Overnumbered",
       "updated_on": "2026-07-16T17:03:45.392740+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a590ef00e5d4c92d5d1eff4",
-    "name": "Nasus, Guardian of Knowledge",
+    "name": "Nasus, Guardian of Knowledge (Overnumbered)",
     "riftbound_id": "ven-178-166",
     "tcgplayer_id": null,
     "public_code": "VEN-178/166",
@@ -9505,7 +9505,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind"
       ]
@@ -9530,16 +9530,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Nasus Guardian of Knowledge",
+      "clean_name": "Nasus Guardian of Knowledge Overnumbered",
       "updated_on": "2026-07-16T17:03:44.877417+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56ab99ff602fd324f47657",
-    "name": "Rengar, Trophy Hunter",
+    "name": "Rengar, Trophy Hunter (Overnumbered)",
     "riftbound_id": "ven-179-166",
     "tcgplayer_id": "706091",
     "public_code": "VEN-179/166",
@@ -9552,7 +9552,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -9578,16 +9578,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Rengar Trophy Hunter",
+      "clean_name": "Rengar Trophy Hunter Overnumbered",
       "updated_on": "2026-07-16T17:03:37.205766+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56ab97ff602fd324f47630",
-    "name": "Kha'Zix, Evolving Hunter",
+    "name": "Kha'Zix, Evolving Hunter (Overnumbered)",
     "riftbound_id": "ven-180-166",
     "tcgplayer_id": "706052",
     "public_code": "VEN-180/166",
@@ -9600,7 +9600,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -9625,10 +9625,10 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "KhaZix Evolving Hunter",
+      "clean_name": "KhaZix Evolving Hunter Overnumbered",
       "updated_on": "2026-07-16T17:03:35.636104+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
@@ -9647,7 +9647,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Body"
       ]
@@ -9693,7 +9693,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -9726,7 +9726,7 @@
   },
   {
     "id": "6a56aba0ff602fd324f47682",
-    "name": "Diana, No Longer Human",
+    "name": "Diana, No Longer Human (Overnumbered)",
     "riftbound_id": "ven-183-166",
     "tcgplayer_id": null,
     "public_code": "VEN-183/166",
@@ -9739,7 +9739,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -9764,16 +9764,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Diana No Longer Human",
+      "clean_name": "Diana No Longer Human Overnumbered",
       "updated_on": "2026-07-14T21:35:28.243715+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56aba0ff602fd324f4768a",
-    "name": "Leona, Determined",
+    "name": "Leona, Determined (Overnumbered)",
     "riftbound_id": "ven-184-166",
     "tcgplayer_id": null,
     "public_code": "VEN-184/166",
@@ -9786,7 +9786,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -9810,16 +9810,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Leona Determined",
+      "clean_name": "Leona Determined Overnumbered",
       "updated_on": "2026-07-14T21:35:28.694085+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5fd1037dd422cf1aaca13c",
-    "name": "Kayle, Justified",
+    "name": "Kayle, Justified (Overnumbered)",
     "riftbound_id": "ven-185-166",
     "tcgplayer_id": null,
     "public_code": "VEN-185/166",
@@ -9832,7 +9832,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -9856,16 +9856,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Kayle Justified",
+      "clean_name": "Kayle Justified Overnumbered",
       "updated_on": "2026-07-21T20:05:23.077874+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a5fd1037dd422cf1aaca13d",
-    "name": "Morgana, Vindictive",
+    "name": "Morgana, Vindictive (Overnumbered)",
     "riftbound_id": "ven-186-166",
     "tcgplayer_id": null,
     "public_code": "VEN-186/166",
@@ -9878,7 +9878,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury"
       ]
@@ -9902,16 +9902,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Morgana Vindictive",
+      "clean_name": "Morgana Vindictive Overnumbered",
       "updated_on": "2026-07-21T20:05:23.285938+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56ab9fff602fd324f4767b",
-    "name": "Ambessa, Respected and Feared",
+    "name": "Ambessa, Respected and Feared (Overnumbered)",
     "riftbound_id": "ven-187-166",
     "tcgplayer_id": null,
     "public_code": "VEN-187/166",
@@ -9924,7 +9924,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Epic",
+      "rarity": "Showcase",
       "domain": [
         "Order"
       ]
@@ -9948,16 +9948,16 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Ambessa Respected and Feared",
+      "clean_name": "Ambessa Respected and Feared Overnumbered",
       "updated_on": "2026-07-16T17:03:43.173776+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
   {
     "id": "6a56aba0ff602fd324f4768b",
-    "name": "Mel, Defiant Soul",
+    "name": "Mel, Defiant Soul (Overnumbered)",
     "riftbound_id": "ven-188-166",
     "tcgplayer_id": null,
     "public_code": "VEN-188/166",
@@ -9970,7 +9970,7 @@
     "classification": {
       "type": "Unit",
       "supertype": "Champion",
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Chaos"
       ]
@@ -9994,10 +9994,10 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Mel Defiant Soul",
+      "clean_name": "Mel Defiant Soul Overnumbered",
       "updated_on": "2026-07-14T21:35:28.739017+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
@@ -10016,7 +10016,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury",
         "Calm"
@@ -10063,7 +10063,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury",
         "Body"
@@ -10110,7 +10110,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Fury",
         "Chaos"
@@ -10157,7 +10157,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm",
         "Mind"
@@ -10204,7 +10204,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Calm",
         "Order"
@@ -10238,7 +10238,7 @@
   },
   {
     "id": "6a56aba0ff602fd324f47681",
-    "name": "Defender of Tomorrow",
+    "name": "Jayce - Defender of Tomorrow (Overnumbered)",
     "riftbound_id": "ven-194-166",
     "tcgplayer_id": null,
     "public_code": "VEN-194/166",
@@ -10251,7 +10251,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind",
         "Body"
@@ -10276,10 +10276,10 @@
     ],
     "orientation": "portrait",
     "metadata": {
-      "clean_name": "Defender of Tomorrow",
+      "clean_name": "Jayce Defender of Tomorrow Overnumbered",
       "updated_on": "2026-07-14T21:35:28.184407+00:00",
       "alternate_art": false,
-      "overnumbered": false,
+      "overnumbered": true,
       "signature": false
     }
   },
@@ -10298,7 +10298,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Mind",
         "Chaos"
@@ -10345,7 +10345,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Body",
         "Order"
@@ -10392,7 +10392,7 @@
     "classification": {
       "type": "Legend",
       "supertype": null,
-      "rarity": "Rare",
+      "rarity": "Showcase",
       "domain": [
         "Order",
         "Chaos"
