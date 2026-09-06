@@ -1,1 +1,0 @@
-- the used battlefields should be shown on the next game screen as disabled. ![alt text](image-6.png)
