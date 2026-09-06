@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DeckSnapshotDocument } from "../src/server/game";
-import { gameplayActions, performGameplayAction, type GameDocument } from "../src/server/game";
+import type {
+  BehaviorBinding,
+  BehaviorClause,
+  DeckSnapshotDocument,
+} from "../src/server/game";
+import {
+  createBehaviorContext,
+  gameplayActions,
+  performGameplayAction,
+  projectGame,
+  type GameDocument,
+} from "../src/server/game";
+import { cleanupBoard } from "../src/server/game/board-rules";
+import {
+  createPrimitiveHandlers,
+  createRuntimeCardIndex,
+} from "../src/server/game/primitive-handlers";
 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
   const { game: initial, decks } = fixture();
@@ -125,6 +140,282 @@ test("automatically pays card costs with behavior-backed rune abilities", () => 
   assert.ok(game.state.players.p1!.zones.base.includes("p1:rune-b"));
   assert.equal(game.state.cardStates["p1:rune-b"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
+});
+
+test("uses generic restricted Power for Gear cards and Gear Equip abilities", () => {
+  const { game: initial, decks } = fixture();
+  const game = structuredClone(initial);
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(
+    definition("ORNN", "Fire Below the Mountain", "Legend", 0, 0),
+    definition("GEAR", "Test Gear", "Gear", 0, 0, 1),
+    definition("POWER_UNIT", "Power Unit", "Unit", 0, 1, 1),
+  );
+  const ornn = snapshot.cards.find((card) => card.cardCode === "ORNN")!;
+  ornn.behaviorModel.clauses = [clause("ornn-add", {
+    abilities: [binding("ability.exhaust_for_resource", 0, {
+      resourceType: "power",
+      amountSource: "constant",
+      amount: 1,
+      domain: "rainbow",
+      usage: "cardOrAbility:Gear",
+    })],
+  })];
+  const gear = snapshot.cards.find((card) => card.cardCode === "GEAR")!;
+  gear.card.tags = ["Equipment"];
+  gear.card.attributes.might = 2;
+  gear.behaviorModel.clauses = [clause("equip", {
+    abilities: [binding("ability.equip", 0, {})],
+    selectors: [binding("selector.friendly_unit", 0, {
+      minimumCount: 1,
+      maximumCount: 1,
+      area: "board",
+      locationRelation: "any",
+      controller: "controller",
+    })],
+    costs: [binding("cost.pay", 0, { amount: 1, resource: "rune" })],
+  })];
+  decks[0]!.instances.push(
+    { instanceId: "p1:ornn", ownerPlayerId: "p1", source: "legend", cardCode: "ORNN" },
+    { instanceId: "p1:gear", ownerPlayerId: "p1", source: "mainDeck", cardCode: "GEAR" },
+    { instanceId: "p1:power-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "POWER_UNIT" },
+  );
+  decks[1]!.instances.push({
+    instanceId: "p2:enemy",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.legend = "p1:ornn";
+  game.state.players.p1!.zones.hand.push("p1:gear", "p1:power-unit");
+  game.state.players.p1!.zones.base = game.state.players.p1!.zones.base.filter(
+    (id) => id !== "p1:rune" && id !== "p1:rune-b",
+  );
+  game.state.cardStates["p1:ornn"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:gear"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:power-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p2!.zones.base.push("p2:enemy");
+  game.state.cardStates["p2:enemy"] = { exhausted: false, damage: 0, computedMight: 1 };
+
+  const addPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:ornn",
+  )!;
+  const afterAdd = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "ornn-add",
+  });
+  assert.deepEqual(afterAdd.state.players.p1!.restrictedResources, {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Rainbow: 1 } },
+  });
+  assert.equal(
+    gameplayActions(afterAdd, "p1", decks).find(
+      (action) => action.label === "Play Power Unit to Base",
+    )?.enabled,
+    false,
+  );
+  const playGear = gameplayActions(afterAdd, "p1", decks).find(
+    (action) => action.label === "Play Test Gear",
+  )!;
+  const afterGear = performGameplayAction({
+    game: afterAdd,
+    actorPlayerId: "p1",
+    actionId: playGear.id,
+    selectedIds: [],
+    decks,
+    now: "play-gear",
+  });
+  assert.ok(afterGear.state.players.p1!.zones.base.includes("p1:gear"));
+  assert.deepEqual(afterGear.state.players.p1!.restrictedResources, {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Rainbow: 0 } },
+  });
+
+  afterGear.state.players.p1!.restrictedResources = {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Mind: 1 } },
+  };
+  const equip = gameplayActions(afterGear, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:gear" && action.label === "Equip",
+  )!;
+  assert.equal(equip.targets[0]?.legalIds.includes("p1:mover"), true);
+  assert.equal(equip.targets[0]?.legalIds.includes("p2:enemy"), false);
+  assert.throws(
+    () => performGameplayAction({
+      game: afterGear,
+      actorPlayerId: "p1",
+      actionId: equip.id,
+      selectedIds: ["p2:enemy"],
+      decks,
+      now: "forged-equip",
+    }),
+    /target/i,
+  );
+  let afterActivate = performGameplayAction({
+    game: afterGear,
+    actorPlayerId: "p1",
+    actionId: equip.id,
+    selectedIds: ["p1:mover"],
+    decks,
+    now: "activate-equip",
+  });
+  assert.equal(
+    afterActivate.state.players.p1!.restrictedResources?.power["cardOrAbility:Gear"]?.Mind,
+    0,
+  );
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(afterActivate, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    afterActivate = performGameplayAction({
+      game: afterActivate,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `equip-pass-${playerId}`,
+    });
+  }
+  assert.equal(
+    afterActivate.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    "p1:mover",
+  );
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 3);
+  assert.equal(
+    gameplayActions(afterActivate, "p1", decks).some(
+      (action) => action.sourceCardInstanceId === "p1:gear" && action.label === "Equip",
+    ),
+    false,
+  );
+
+  const runtimeIndex = createRuntimeCardIndex(decks, afterActivate);
+  createPrimitiveHandlers(runtimeIndex)
+    .get("action.detach_equipment")!
+    .execute!(
+      binding("action.detach_equipment", 0, { target: "equipment" }),
+      createBehaviorContext(
+        afterActivate,
+        "p1",
+        "p1:bf",
+        null,
+        ["p1:gear"],
+      ),
+    );
+  assert.equal(
+    afterActivate.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    null,
+  );
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 1);
+
+  createPrimitiveHandlers(runtimeIndex)
+    .get("action.attach_equipment")!
+    .execute!(
+      binding("action.attach_equipment", 0, { target: "friendly_unit" }),
+      createBehaviorContext(
+        afterActivate,
+        "p1",
+        "p1:gear",
+        null,
+        ["p1:mover"],
+      ),
+    );
+
+  const move = gameplayActions(afterActivate, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:mover" &&
+      action.label === "Move to Arena",
+  )!;
+  const atBattlefield = performGameplayAction({
+    game: afterActivate,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [],
+    decks,
+    now: "move-equipped-unit",
+  });
+  assert.equal(atBattlefield.state.players.p1!.zones.base.includes("p1:gear"), false);
+  assert.deepEqual(
+    atBattlefield.state.battlefields[0]!.attachedCardInstanceIds,
+    ["p1:gear"],
+  );
+  assert.deepEqual(
+    projectGame({
+      game: atBattlefield,
+      viewerPlayerId: "p1",
+      decks,
+    }).battlefields[0]!.attachedCards?.map((card) => card.instanceId),
+    ["p1:gear"],
+  );
+
+  atBattlefield.state.cardStates["p1:mover"]!.damage = 3;
+  cleanupBoard(atBattlefield, createRuntimeCardIndex(decks, atBattlefield));
+  assert.ok(atBattlefield.state.players.p1!.zones.trash.includes("p1:mover"));
+  assert.equal(
+    atBattlefield.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    null,
+  );
+  assert.deepEqual(
+    atBattlefield.state.battlefields[0]!.attachedCardInstanceIds,
+    [],
+  );
+  assert.ok(atBattlefield.state.players.p1!.zones.base.includes("p1:gear"));
+});
+
+test("Quick-Draw Gear uses normal play target projection and attaches on play", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("QUICK_GEAR", "Quick Gear", "Gear", 0, 0));
+  const quickGear = snapshot.cards.find(
+    (card) => card.cardCode === "QUICK_GEAR",
+  )!;
+  quickGear.card.tags = ["Equipment"];
+  quickGear.behaviorModel.clauses = [clause("quick-draw", {
+    selectors: [binding("selector.friendly_unit", 0, {
+      minimumCount: 1,
+      maximumCount: 1,
+      area: "board",
+      locationRelation: "any",
+      controller: "controller",
+    })],
+    effects: [binding("action.attach_equipment", 0, {
+      target: "friendly_unit",
+    })],
+    keywords: [binding("keyword.quick_draw", 0, {})],
+  })];
+  decks[0]!.instances.push({
+    instanceId: "p1:quick-gear",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "QUICK_GEAR",
+  });
+  game.state.players.p1!.zones.hand.push("p1:quick-gear");
+  game.state.cardStates["p1:quick-gear"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Quick Gear",
+  )!;
+  assert.equal(play.targets[0]?.legalIds.includes("p1:mover"), true);
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: ["p1:mover"],
+    decks,
+    now: "quick-draw",
+  });
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:quick-gear"));
+  assert.equal(
+    next.state.cardStates["p1:quick-gear"]!.attachedToCardInstanceId,
+    "p1:mover",
+  );
 });
 
 test("projects Deflect before payment and requires its Power in the Rune Pool", () => {
@@ -547,7 +838,7 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   return { game, decks };
 }
 
-function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Battlefield", energy: number, might: number, power = 0) {
+function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Gear" | "Legend" | "Battlefield", energy: number, might: number, power = 0) {
   const runeClauses = type === "Rune" ? [{
     id: "energy", sequence: 0, sourceText: "", normalizedText: "",
     abilities: [{ behaviorId: "ability.exhaust_for_resource", parameters: { resourceType: "energy", amountSource: "constant", amount: 1, usage: "unrestricted" }, confidence: "high" as const, order: 0 }],
@@ -558,4 +849,37 @@ function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" 
     triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: []
   }] : [];
   return { cardCode: code, sourceTextHash: "h", behaviorModel: { playTimings: [], clauses: runeClauses }, card: { id: code, name, public_code: `${code}/1`, attributes: { energy, might, power }, classification: { type, supertype: type === "Rune" ? "Basic" as const : null, domain: ["Mind"] }, text: { plain: "" }, set: { set_id: "T", label: "Test" }, media: {}, tags: [], metadata: {} } };
+}
+
+function binding(
+  behaviorId: string,
+  order: number,
+  parameters: Record<string, string | number | boolean | null>,
+): BehaviorBinding {
+  return { behaviorId, parameters, confidence: "high" as const, order };
+}
+
+function clause(
+  id: string,
+  input: Partial<BehaviorClause>,
+): BehaviorClause {
+  return { ...emptyClause(id), ...input };
+}
+
+function emptyClause(id: string): BehaviorClause {
+  return {
+    id,
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  };
 }

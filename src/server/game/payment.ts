@@ -8,12 +8,26 @@ import {
 
 export type PaymentPlan = {
   conditionalEnergy: number;
+  restrictedEnergy: Record<string, number>;
   pooledEnergy: number;
   energySourceIds: string[];
   generatedConditionalEnergy: number;
   generatedPooledEnergy: number;
   powerFromPool: Record<string, number>;
+  restrictedPower: Record<string, Record<string, number>>;
   powerRuneIds: string[];
+};
+
+export type PaymentContext =
+  | { kind: "card"; cardType: string }
+  | { kind: "ability"; sourceCardType: string };
+
+type PaymentRequest = {
+  energyCost: number;
+  powerCost: number;
+  allowedPowerDomains: string[];
+  context: PaymentContext;
+  additionalAnyPower: number;
 };
 
 export function buildPaymentPlan(
@@ -24,21 +38,85 @@ export function buildPaymentPlan(
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
 ): PaymentPlan | null {
+  return buildPaymentPlanForRequest(game, playerId, definition, index, {
+    energyCost,
+    powerCost: definition.card.attributes.power ?? 0,
+    allowedPowerDomains: definition.card.classification.domain.filter(
+      (domain) => domain !== "Colorless",
+    ),
+    context: { kind: "card", cardType: definition.card.classification.type },
+    additionalAnyPower,
+  });
+}
+
+export function buildAbilityPaymentPlan(
+  game: GameDocument,
+  playerId: string,
+  sourceDefinition: GameCardDefinition,
+  costs: { energy: number; power: number },
+  index: RuntimeCardIndex,
+): PaymentPlan | null {
+  return buildPaymentPlanForRequest(game, playerId, sourceDefinition, index, {
+    energyCost: costs.energy,
+    powerCost: costs.power,
+    allowedPowerDomains: sourceDefinition.card.classification.domain.filter(
+      (domain) => domain !== "Colorless",
+    ),
+    context: {
+      kind: "ability",
+      sourceCardType: sourceDefinition.card.classification.type,
+    },
+    additionalAnyPower: 0,
+  });
+}
+
+function buildPaymentPlanForRequest(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  index: RuntimeCardIndex,
+  request: PaymentRequest,
+): PaymentPlan | null {
   const player = game.state.players[playerId]!;
-  let remainingEnergy = energyCost;
-  const conditionalEnergy =
-    definition.card.classification.type === "Spell"
-      ? Math.min(player.conditionalEnergy, remainingEnergy)
-      : 0;
+  let remainingEnergy = request.energyCost;
+  const conditionalEnergy = resourceUsageAllowsPayment(
+    "spellsOnly",
+    request.context,
+  )
+    ? Math.min(player.conditionalEnergy, remainingEnergy)
+    : 0;
   remainingEnergy -= conditionalEnergy;
+  const restrictedEnergy: Record<string, number> = {};
+  for (const [usage, available] of Object.entries(
+    player.restrictedResources?.energy ?? {},
+  ).sort(([left], [right]) => left.localeCompare(right))) {
+    if (!resourceUsageAllowsPayment(usage, request.context)) continue;
+    const spend = Math.min(available, remainingEnergy);
+    if (spend > 0) restrictedEnergy[usage] = spend;
+    remainingEnergy -= spend;
+  }
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
-  let remainingPower = definition.card.attributes.power ?? 0;
-  const allowedDomains = definition.card.classification.domain.filter(
-    (domain) => domain !== "Colorless",
-  );
+  let remainingPower = request.powerCost;
+  const allowedDomains = request.allowedPowerDomains;
   if (remainingPower > 0 && allowedDomains.length === 0) return null;
   const powerFromPool: Record<string, number> = {};
+  const restrictedPower: Record<string, Record<string, number>> = {};
+  for (const [usage, domains] of Object.entries(
+    player.restrictedResources?.power ?? {},
+  ).sort(([left], [right]) => left.localeCompare(right))) {
+    if (!resourceUsageAllowsPayment(usage, request.context)) continue;
+    for (const domain of [...allowedDomains, "Rainbow"]) {
+      const spend = Math.min(domains[domain] ?? 0, remainingPower);
+      if (spend > 0) {
+        restrictedPower[usage] = {
+          ...(restrictedPower[usage] ?? {}),
+          [domain]: spend,
+        };
+      }
+      remainingPower -= spend;
+    }
+  }
   for (const domain of [...allowedDomains, "Rainbow"]) {
     const spend = Math.min(player.power[domain] ?? 0, remainingPower);
     if (spend > 0) powerFromPool[domain] = spend;
@@ -55,7 +133,7 @@ export function buildPaymentPlan(
     remainingPower -= 1;
   }
   if (remainingPower > 0) return null;
-  let remainingAnyPower = additionalAnyPower;
+  let remainingAnyPower = request.additionalAnyPower;
   const poolDomains = Object.keys(player.power).sort((left, right) => {
     if (left === "Rainbow") return 1;
     if (right === "Rainbow") return -1;
@@ -85,7 +163,7 @@ export function buildPaymentPlan(
     }
     const ability = exhaustForEnergyAbility(
       id,
-      definition.card.classification.type,
+      request.context,
       index,
     );
     if (!ability) return;
@@ -99,7 +177,7 @@ export function buildPaymentPlan(
   for (const id of player.zones.base) {
     const ability = exhaustForEnergyAbility(
       id,
-      definition.card.classification.type,
+      request.context,
       index,
     );
     if (ability?.usage === "spellsOnly") consumeEnergySource(id);
@@ -110,11 +188,13 @@ export function buildPaymentPlan(
 
   return {
     conditionalEnergy,
+    restrictedEnergy,
     pooledEnergy,
     energySourceIds,
     generatedConditionalEnergy,
     generatedPooledEnergy,
     powerFromPool,
+    restrictedPower,
     powerRuneIds,
   };
 }
@@ -136,8 +216,42 @@ export function payCardCost(
     additionalAnyPower,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
+}
+
+export function payAbilityCost(
+  game: GameDocument,
+  playerId: string,
+  sourceDefinition: GameCardDefinition,
+  costs: { energy: number; power: number },
+  index: RuntimeCardIndex,
+) {
+  const plan = buildAbilityPaymentPlan(
+    game,
+    playerId,
+    sourceDefinition,
+    costs,
+    index,
+  );
+  if (!plan) throw new Error("Ability costs cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
+}
+
+function applyPaymentPlan(
+  game: GameDocument,
+  playerId: string,
+  plan: PaymentPlan,
+  index: RuntimeCardIndex,
+) {
   const player = game.state.players[playerId]!;
   player.conditionalEnergy -= plan.conditionalEnergy;
+  for (const [usage, amount] of Object.entries(plan.restrictedEnergy)) {
+    const resources = player.restrictedResources?.energy;
+    if (!resources || (resources[usage] ?? 0) < amount) {
+      throw new Error("Restricted Energy payment is unavailable.");
+    }
+    resources[usage] -= amount;
+  }
   player.energy -= plan.pooledEnergy;
   player.conditionalEnergy += plan.generatedConditionalEnergy;
   player.energy += plan.generatedPooledEnergy;
@@ -146,6 +260,15 @@ export function payCardCost(
   });
   for (const [domain, amount] of Object.entries(plan.powerFromPool))
     player.power[domain] = (player.power[domain] ?? 0) - amount;
+  for (const [usage, domains] of Object.entries(plan.restrictedPower)) {
+    const resources = player.restrictedResources?.power[usage];
+    for (const [domain, amount] of Object.entries(domains)) {
+      if (!resources || (resources[domain] ?? 0) < amount) {
+        throw new Error("Restricted Power payment is unavailable.");
+      }
+      resources[domain] -= amount;
+    }
+  }
   for (const id of plan.powerRuneIds) {
     player.zones.base = player.zones.base.filter(
       (candidate) => candidate !== id,
@@ -160,6 +283,31 @@ export function payCardCost(
   if (plan.powerRuneIds.length > 0) {
     recomputeAllMight(game, index);
   }
+}
+
+export function resourceUsageAllowsPayment(
+  usage: string,
+  context: PaymentContext,
+) {
+  if (usage === "unrestricted") return true;
+  if (usage === "spellsOnly") {
+    return context.kind === "card" && context.cardType === "Spell";
+  }
+  if (usage === "gearAndGearAbilitiesOnly") {
+    return (
+      (context.kind === "card" && context.cardType === "Gear") ||
+      (context.kind === "ability" && context.sourceCardType === "Gear")
+    );
+  }
+  const match = usage.match(/^(card|cardOrAbility):(Unit|Gear|Spell)$/);
+  if (!match) return false;
+  const [, scope, cardType] = match;
+  return (
+    (context.kind === "card" && context.cardType === cardType) ||
+    (scope === "cardOrAbility" &&
+      context.kind === "ability" &&
+      context.sourceCardType === cardType)
+  );
 }
 
 export function availableAnyPowerAfterBaseCost(
@@ -210,7 +358,7 @@ function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {
 
 function exhaustForEnergyAbility(
   id: string,
-  cardType: string,
+  paymentContext: PaymentContext,
   index: RuntimeCardIndex,
 ): { amount: number; usage: string } | null {
   for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
@@ -227,7 +375,7 @@ function exhaustForEnergyAbility(
         typeof amount !== "number" ||
         amount <= 0 ||
         typeof usage !== "string" ||
-        (usage === "spellsOnly" && cardType !== "Spell")
+        !resourceUsageAllowsPayment(usage, paymentContext)
       ) {
         continue;
       }

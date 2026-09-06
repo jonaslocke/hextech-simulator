@@ -5,6 +5,7 @@ export type RuntimeCoverageStatus = (typeof runtimeCoverageStatuses)[number];
 export const GAME__RUNTIME_COVERAGE = {
   "ability.exhaust_for_resource": "executable",
   "ability.recycle_for_power": "executable",
+  "ability.equip": "executable",
   "timing.action": "executable",
   "timing.reaction": "executable",
   "timing.delayed": "executable",
@@ -25,6 +26,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.draw_cards": "executable",
   "action.vision": "executable",
   "keyword.vision": "executable",
+  "keyword.quick_draw": "executable",
   "action.discard_cards": "executable",
   "action.ready_cards": "executable",
   "action.channel_runes": "executable",
@@ -36,6 +38,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.return_to_hand": "executable",
   "action.move_unit": "executable",
   "action.play_token": "executable",
+  "action.attach_equipment": "executable",
+  "action.detach_equipment": "executable",
   "modifier.modify_numeric_value": "executable",
   "modifier.play_unit_destination": "executable",
   "modifier.enter_ready": "executable",
@@ -47,6 +51,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "keyword.deflect": "executable",
   "keyword.ganking": "executable",
   "cost.exhaust_selected_unit": "executable",
+  "cost.pay": "executable",
   "replacement.recall_on_next_death": "executable",
 } as const satisfies Record<string, RuntimeCoverageStatus>;
 

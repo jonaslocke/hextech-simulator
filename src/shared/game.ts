@@ -152,6 +152,7 @@ export const deckIdSchema = z.enum([
   "annie-s",
   "master-yi-s",
   "garen-s",
+  "ornn",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
@@ -179,6 +180,7 @@ export const projectedCardViewSchema = z.object({
   computedMight: z.number().nullable(),
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
+  attachedToCardInstanceId: z.string().min(1).nullable().optional(),
 });
 
 export const projectedZoneSchema = z.object({
@@ -205,6 +207,12 @@ export const projectedPlayerSchema = z.object({
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
+  restrictedResources: z
+    .object({
+      energy: z.record(z.number().int().nonnegative()),
+      power: z.record(z.record(z.number().int().nonnegative())),
+    })
+    .optional(),
   zones: z.array(projectedZoneSchema),
 });
 
@@ -215,6 +223,7 @@ export const projectedBattlefieldSchema = z.object({
   contestedByPlayerId: z.string().min(1).nullable(),
   card: projectedCardViewSchema,
   units: z.array(projectedCardViewSchema),
+  attachedCards: z.array(projectedCardViewSchema).optional(),
   facedownCard: projectedCardViewSchema.nullable().default(null),
 });
 

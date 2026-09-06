@@ -1,12 +1,17 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { cardSetFileSchema, type Card } from "../src/server/catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 
 const DECK_PATHS = [
   path.join("data", "decks", "lux.dec.txt"),
   path.join("data", "decks", "annie.dec.txt"),
   path.join("data", "decks", "masteryi.dec.txt"),
+  path.join(
+    "data",
+    "decks",
+    "Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt",
+  ),
 ] as const;
 const OUTPUT_PATH = path.join("data", "catalog", "mvp.json");
 const GENERATED_OUTPUT_PATH = path.join(
@@ -15,7 +20,6 @@ const GENERATED_OUTPUT_PATH = path.join(
   "catalog",
   "fixed-mvp-cards.generated.ts",
 );
-const EXPECTED_CARD_COUNT = 57;
 
 const setFiles = (await readdir(path.join("data", "sets")))
   .filter((name) => name.endsWith(".json"))
@@ -45,15 +49,15 @@ for (const deckPath of DECK_PATHS) {
 }
 
 const cards = names.map((name) => {
-  const card = byName.get(name);
+  const card = resolveDeckCard({ byName }, name);
   if (!card) throw new Error(`MVP card is missing from the local catalog: ${name}`);
   return card;
 });
 cardSetFileSchema.parse(cards);
 const codes = cards.map((card) => card.public_code.split("/")[0]!);
-if (cards.length !== EXPECTED_CARD_COUNT || new Set(codes).size !== cards.length) {
+if (new Set(codes).size !== cards.length) {
   throw new Error(
-    `MVP catalog must contain ${EXPECTED_CARD_COUNT} unique canonical cards; found ${cards.length}.`,
+    `MVP catalog must contain one source definition per deck card; found ${cards.length} entries with ${new Set(codes).size} codes.`,
   );
 }
 

@@ -22,10 +22,16 @@ test("validates all playable starter fixture decks", async () => {
     catalog,
     { ownerId: "master-yi" },
   );
+  const ornn = validateDeckList(
+    await loadDeck("Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt"),
+    catalog,
+    { ownerId: "ornn" },
+  );
 
   assert.equal(annie.ok, true, JSON.stringify(annie.issues, null, 2));
   assert.equal(lux.ok, true, JSON.stringify(lux.issues, null, 2));
   assert.equal(masterYi.ok, true, JSON.stringify(masterYi.issues, null, 2));
+  assert.equal(ornn.ok, true, JSON.stringify(ornn.issues, null, 2));
 
   if (annie.ok) {
     assert.equal(annie.snapshot.legend.name, "Dark Child - Starter");
@@ -42,6 +48,31 @@ test("validates all playable starter fixture decks", async () => {
     assert.equal(masterYi.snapshot.legend.name, "Wuju Bladesman - Starter");
     assert.equal(masterYi.snapshot.champion.name, "Yi, Honed");
     assert.equal(masterYi.snapshot.instances.length, 56);
+  }
+  if (ornn.ok) {
+    assert.equal(ornn.snapshot.legend.name, "Fire Below the Mountain");
+    assert.equal(ornn.snapshot.sideboard.length, 6);
+    assert.equal(
+      ornn.snapshot.sideboard.reduce((total, entry) => total + entry.quantity, 0),
+      10,
+    );
+  }
+});
+
+test("accepts the official Rune Pool heading", async () => {
+  const catalog = await loadCardCatalog();
+  const result = validateDeckList(
+    await loadDeck("Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt"),
+    catalog,
+  );
+
+  assert.equal(result.ok, true, JSON.stringify(result.issues, null, 2));
+  if (result.ok) {
+    assert.equal(result.snapshot.runes.length, 2);
+    assert.equal(
+      result.snapshot.runes.reduce((total, entry) => total + entry.quantity, 0),
+      12,
+    );
   }
 });
 

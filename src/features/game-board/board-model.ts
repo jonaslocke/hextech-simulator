@@ -221,6 +221,15 @@ function buildBattlefieldData({
       ownerPlayerId,
     }));
   });
+  const attachmentCards = (battlefield?.attachedCardInstanceIds ?? []).flatMap(
+    (cardInstanceId) => {
+      const ownerPlayerId =
+        cardOwnerByInstanceId[cardInstanceId] ?? battlefield?.selectedByPlayerId;
+      return buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates).map(
+        (card) => ({ card, ownerPlayerId }),
+      );
+    },
+  );
 
   return {
     id: battlefield?.battlefieldId ?? `missing:${fallbackSelectedByPlayerId}`,
@@ -235,6 +244,12 @@ function buildBattlefieldData({
       .filter(({ ownerPlayerId }) => ownerPlayerId === viewerPlayerId)
       .map(({ card }) => card),
     opponentUnits: unitCards
+      .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
+      .map(({ card }) => card),
+    playerAttachments: attachmentCards
+      .filter(({ ownerPlayerId }) => ownerPlayerId === viewerPlayerId)
+      .map(({ card }) => card),
+    opponentAttachments: attachmentCards
       .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
       .map(({ card }) => card),
   };

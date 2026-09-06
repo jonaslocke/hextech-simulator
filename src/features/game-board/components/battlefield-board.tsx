@@ -255,7 +255,9 @@ export const BattlefieldBoard: FC<Props> = ({
     description,
     id,
     name,
+    opponentAttachments,
     opponentUnits,
+    playerAttachments,
     playerUnits,
     img,
   },
@@ -426,7 +428,7 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         <BattlefieldUnitRow
-          cards={opponentUnits}
+          cards={[...opponentUnits, ...opponentAttachments]}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -451,6 +453,17 @@ export const BattlefieldBoard: FC<Props> = ({
           side="player"
           stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
           zoneAnimationId={`battlefield:${id}:player`}
+        />
+        <BattlefieldUnitRow
+          cards={playerAttachments}
+          className="border-none pt-0"
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
+          onCardPointerEnter={onCardPointerEnter}
+          onCardPointerLeave={onCardPointerLeave}
+          onCardPrimaryAction={onCardPrimaryAction}
+          side="player"
+          zoneAnimationId={`battlefield:${id}:player-attachments`}
         />
       </div>
 

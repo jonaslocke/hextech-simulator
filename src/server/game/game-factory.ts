@@ -81,6 +81,7 @@ export function createMatchGame(input: CreateMatchGameInput): GameDocument {
           energy: 0,
           conditionalEnergy: 0,
           power: {},
+          restrictedResources: { energy: {}, power: {} },
           zones: {
             legend: null,
             champion: null,

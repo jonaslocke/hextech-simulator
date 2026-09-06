@@ -184,6 +184,14 @@ export const resourceAmountSources = ["constant", "paidAmount"] as const;
 
 export const resourceUsageKinds = [
   "unrestricted",
+  "card:Unit",
+  "card:Gear",
+  "card:Spell",
+  "cardOrAbility:Unit",
+  "cardOrAbility:Gear",
+  "cardOrAbility:Spell",
+  // Retained for already-published models. New models use the generic scopes
+  // above so a restriction is expressed by source type rather than a card name.
   "spellsOnly",
   "gearAndGearAbilitiesOnly"
 ] as const;
@@ -285,6 +293,31 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["card.recycled", "resource.added"],
     engineSupport: requiresEngineSupport(
       "The catalog contract is reusable; generalized activated resource abilities remain future engine work."
+    )
+  }),
+  "ability.equip": primitiveSeed({
+    id: "ability.equip",
+    family: "ability",
+    name: "Equip",
+    description: "Pays the printed Equip cost to attach the source Gear to a unit you control.",
+    fixedRules: [
+      "Equip is an activated ability of Gear.",
+      "The selected unit must be controlled by the Gear controller.",
+      "The Equip cost is paid as the ability is activated."
+    ],
+    emitsEvents: ["equipment.attached"],
+    engineSupport: supported(
+      "Equip uses server-authoritative activated-ability payment and attachment state."
+    )
+  }),
+  "keyword.quick_draw": primitiveSeed({
+    id: "keyword.quick_draw",
+    family: "keyword",
+    name: "Quick-Draw",
+    description:
+      "The Gear has Reaction timing and attaches to a controlled unit when played.",
+    engineSupport: supported(
+      "Quick-Draw reuses normal Gear play targeting and attachment execution."
     )
   }),
   "keyword.hidden": primitiveSeed({

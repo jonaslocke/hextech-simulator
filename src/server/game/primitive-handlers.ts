@@ -12,6 +12,14 @@ import {
   isContinuousDuration,
 } from "./numeric-modifiers";
 import { numericConditionMatches } from "./numeric-condition";
+import {
+  attachCardToTopMost,
+  attachedCardIds,
+  detachCard,
+  detachCardsFromTopMostLeavingBoard,
+  moveAttachedCardsWithTopMost,
+  removeFromAttachmentLocations,
+} from "./attachment-lifecycle";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -57,7 +65,9 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
+    "keyword.quick_draw",
     "keyword.ganking", "cost.exhaust_selected_unit",
+    "cost.pay",
   ]) handlers.set(id, passive);
   handlers.set("modifier.play_unit_destination", {
     execute() {
@@ -495,6 +505,7 @@ export function createPrimitiveHandlers(
           );
         }
         context.game.state.players[owner]!.zones.base.push(id);
+        moveAttachedCardsWithTopMost(context.game, id, index);
         const events = (context.game.state.queuedBehaviorEvents ??= []);
         events.push({
           type: "unit.moved",
@@ -582,9 +593,57 @@ export function createPrimitiveHandlers(
       state.exhausted = true;
       const player = context.game.state.players[context.controllerPlayerId]!;
       const amount = numberParam(binding, "amount");
-      if (binding.parameters.usage === "spellsOnly") player.conditionalEnergy += amount;
-      else player.energy += amount;
+      const usage = stringParam(binding, "usage");
+      if (binding.parameters.resourceType === "power") {
+        const domain = resourceDomainForBinding(binding, context, index);
+        player.restrictedResources ??= { energy: {}, power: {} };
+        player.restrictedResources.power[usage] ??= {};
+        player.restrictedResources.power[usage][domain] =
+          (player.restrictedResources.power[usage][domain] ?? 0) + amount;
+        return;
+      }
+      if (usage === "unrestricted") {
+        player.energy += amount;
+        return;
+      }
+      if (usage === "spellsOnly") {
+        player.conditionalEnergy += amount;
+        return;
+      }
+      player.restrictedResources ??= { energy: {}, power: {} };
+      player.restrictedResources.energy[usage] =
+        (player.restrictedResources.energy[usage] ?? 0) + amount;
     }
+  });
+  handlers.set("action.attach_equipment", {
+    execute(_binding, context) {
+      attachEquipmentToSelectedUnit(context, index);
+    },
+  });
+  handlers.set("ability.equip", {
+    execute(_binding, context) {
+      attachEquipmentToSelectedUnit(context, index);
+    },
+  });
+  handlers.set("action.detach_equipment", {
+    execute(_binding, context) {
+      for (const cardInstanceId of context.selectedIds) {
+        const definition = definitionForInstance(cardInstanceId, index);
+        if (
+          definition.card.classification.type !== "Gear" ||
+          !definition.card.tags.includes("Equipment")
+        ) {
+          throw new Error("Only Equipment can be detached.");
+        }
+        const topMostCardInstanceId = detachCard(
+          context.game,
+          cardInstanceId,
+        );
+        if (topMostCardInstanceId) {
+          recomputeMight(context.game, topMostCardInstanceId, index);
+        }
+      }
+    },
   });
   handlers.set("ability.recycle_for_power", {
     execute(_binding, context) {
@@ -1070,6 +1129,13 @@ export function recomputeMight(
   if (combatRole === "defender") {
     value += keywordAmount(id, "keyword.shield", index);
   }
+  value += attachedCardIds(game, id).reduce(
+    (total, attachedCardInstanceId) =>
+      total +
+      (definitionForInstance(attachedCardInstanceId, index).card.attributes
+        .might ?? 0),
+    0,
+  );
   game.state.cardStates[id]!.computedMight = Math.max(0, value);
 }
 
@@ -1163,6 +1229,7 @@ function isTokenInstance(id: string, index: RuntimeCardIndex) {
 
 function ceaseToken(game: GameDocument, id: string) {
   removeFromAllLocations(game, id);
+  detachCardsFromTopMostLeavingBoard(game, id);
   delete game.state.cardStates[id];
   game.state.modifiers = game.state.modifiers.filter(
     (modifier) =>
@@ -1198,6 +1265,7 @@ function removeFromAllLocations(game: GameDocument, id: string) {
       (candidate) => candidate !== id,
     );
   }
+  removeFromAttachmentLocations(game, id);
 }
 function resetStateAfterLeavingBoard(
   game: GameDocument,
@@ -1212,6 +1280,8 @@ function resetStateAfterLeavingBoard(
   state.combatRole = null;
   state.lethalSuppressedDamage = null;
   state.lethalSuppressedMight = null;
+  state.attachedToCardInstanceId = null;
+  detachCardsFromTopMostLeavingBoard(game, id);
   if (
     index &&
     definitionForInstance(id, index).card.classification.type === "Unit"
@@ -1276,6 +1346,50 @@ function numberParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "number") throw new Error(`Behavior parameter ${key} must be numeric.`);
   return value;
+}
+
+function attachEquipmentToSelectedUnit(
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const targetId = context.selectedIds[0];
+  if (!targetId) throw new Error("Equip requires a unit target.");
+  const source = definitionForInstance(context.sourceCardInstanceId, index);
+  if (
+    source.card.classification.type !== "Gear" ||
+    !source.card.tags.includes("Equipment")
+  ) {
+    throw new Error("Only Equipment can be attached with Equip.");
+  }
+  const target = definitionForInstance(targetId, index);
+  if (
+    target.card.classification.type !== "Unit" ||
+    index.instances.get(targetId)?.ownerPlayerId !== context.controllerPlayerId
+  ) {
+    throw new Error("Equipment must be attached to a unit you control.");
+  }
+  attachCardToTopMost(
+    context.game,
+    context.sourceCardInstanceId,
+    targetId,
+    index,
+  );
+  recomputeMight(context.game, targetId, index);
+}
+
+function resourceDomainForBinding(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  index: RuntimeCardIndex,
+) {
+  const domain = stringParam(binding, "domain");
+  if (domain === "sourceDomain") {
+    return (
+      definitionForInstance(context.sourceCardInstanceId, index).card.classification
+        .domain.find((candidate) => candidate !== "Colorless") ?? "Rainbow"
+    );
+  }
+  return domain.slice(0, 1).toUpperCase() + domain.slice(1);
 }
 function stringParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];

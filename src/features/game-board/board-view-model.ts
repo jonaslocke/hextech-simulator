@@ -35,6 +35,12 @@ export type BoardPlayerProjection = {
     conditionalEnergy: Record<string, { amount: number; restriction: "spell" }>;
     energy: number;
     power: Record<string, number>;
+    restrictedEnergy: Record<string, { amount: number; restriction: string }>;
+    restrictedPower: Array<{
+      amount: number;
+      domain: string;
+      restriction: string;
+    }>;
   };
   availableAbilityIdsByCard: Record<string, string[]>;
   availablePaymentModes: Record<
@@ -139,11 +145,17 @@ export type BoardProjection = {
     contestedByPlayerId: string | null;
     cardInstanceId: string;
     units: string[];
+    attachedCardInstanceIds: string[];
     facedownSlot: null;
   }>;
   cardStates: Record<
     string,
-    { exhausted: boolean; damage: number; computedMight?: number }
+    {
+      exhausted: boolean;
+      damage: number;
+      computedMight?: number;
+      attachedToCardInstanceId?: string | null;
+    }
   >;
 };
 
@@ -164,6 +176,9 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         ...(card.computedMight === null
           ? {}
           : { computedMight: card.computedMight }),
+        ...(card.attachedToCardInstanceId === null
+          ? {}
+          : { attachedToCardInstanceId: card.attachedToCardInstanceId }),
       },
     ]),
   );
@@ -238,6 +253,23 @@ export function adaptProjectionToBoard(projection: GameProjection): {
                   >),
             energy: player.energy,
             power: player.power,
+            restrictedEnergy: Object.fromEntries(
+              Object.entries(player.restrictedResources?.energy ?? {}).map(
+                ([restriction, amount]) => [
+                  restriction,
+                  { amount, restriction },
+                ],
+              ),
+            ),
+            restrictedPower: Object.entries(
+              player.restrictedResources?.power ?? {},
+            ).flatMap(([restriction, domains]) =>
+              Object.entries(domains).map(([domain, amount]) => ({
+                amount,
+                domain,
+                restriction,
+              })),
+            ),
           },
           availableAbilityIdsByCard: Object.fromEntries(
             Object.entries(bySource).map(([sourceId, sourceActions]) => [
@@ -302,6 +334,9 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
+        attachedCardInstanceIds: (battlefield.attachedCards ?? []).map(
+          (card) => card.instanceId,
+        ),
         facedownSlot: null,
       })),
       cardStates,
@@ -317,6 +352,7 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...projection.battlefields.flatMap((battlefield) => [
       battlefield.card,
       ...battlefield.units,
+      ...(battlefield.attachedCards ?? []),
       ...(battlefield.facedownCard ? [battlefield.facedownCard] : []),
     ]),
     ...(projection.chain?.items.flatMap((item) =>

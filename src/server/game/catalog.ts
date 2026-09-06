@@ -11,6 +11,10 @@ import {
   type PrimitiveCatalogEntry,
 } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
+import {
+  deckCardNameAliases,
+  deckCardNameLookupCandidates,
+} from "../deck/card-name";
 import { parseDeckList } from "../deck";
 import { getRuntimeCoverageStatus } from "./runtime-coverage";
 import {
@@ -43,7 +47,7 @@ export async function buildDeckSnapshotFromSource(
 ): Promise<DeckSnapshot> {
   const parsedDeck = parseDeckList(sourceText);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
-  const queryNames = [...new Set(names.flatMap(cardNameLookupCandidates))];
+  const queryNames = [...new Set(names.flatMap(deckCardNameLookupCandidates))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
     db.collection<CanonicalCardStoredDocument>(CANONICAL_CARDS_COLLECTION)
       .find({ "card.name": { $in: queryNames } }).toArray(),
@@ -63,7 +67,7 @@ export function buildDeckSnapshot(
   const cardsByName = new Map<string, CanonicalCardDocument>();
   for (const document of canonicalCards) {
     cardsByName.set(document.card.name, document);
-    for (const alias of legacyCardNameAliases(document.card.name)) {
+    for (const alias of deckCardNameAliases(document.card)) {
       cardsByName.set(alias, document);
     }
   }
@@ -101,7 +105,7 @@ export function buildDeckSnapshot(
   const cardsByNameResolved = new Map<string, GameCardDefinition>();
   for (const definition of cards) {
     cardsByNameResolved.set(definition.card.name, definition);
-    for (const alias of legacyCardNameAliases(definition.card.name)) {
+    for (const alias of deckCardNameAliases(definition.card)) {
       cardsByNameResolved.set(alias, definition);
     }
   }
@@ -137,21 +141,6 @@ export function buildDeckSnapshot(
   });
 }
 
-function legacyCardNameAliases(name: string): string[] {
-  if (name.startsWith("Master Yi, ")) {
-    return [name.replace(/^Master Yi, /, "Yi, ")];
-  }
-
-  return [];
-}
-
-function cardNameLookupCandidates(name: string): string[] {
-  if (name.startsWith("Yi, ")) {
-    return [name, name.replace(/^Yi, /, "Master Yi, ")];
-  }
-
-  return [name];
-}
 
 function validateCanonicalDocument(
   document: CanonicalCardDocument,

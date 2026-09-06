@@ -218,7 +218,8 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
-    /\bfriendly units?\b/.test(context.rulesText)
+    (/\bfriendly units?\b/.test(context.rulesText) ||
+      /\bunits? you control\b/.test(context.normalizedText))
       ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "controller", excludesSource: context.rulesText.includes("another") || context.rulesText.includes("other friendly"), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "high")
       : null
   ),
@@ -266,7 +267,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("action.draw_cards", "action", "Draw cards", "Move cards from deck to player hand.", ["player", "count"], (context) =>
-    /\bdraw\b/.test(context.rulesText)
+    /\bdraw\b/.test(context.rulesText) && !/\[quick-draw\]/.test(context.lowerText)
       ? assignment(context, "action.draw_cards", "action", { player: "controller", count: readNumberAfter(context.rulesText, "draw") ?? 1 }, "high")
       : null
   ),
@@ -343,8 +344,14 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "action.reveal", "action", { count: readFirstNumber(context.rulesText) }, "medium")
       : null
   ),
+  primitive("ability.equip", "ability", "Equip", "Pays the Equip cost to attach the source Gear to a unit.", [], (context) =>
+    /\[equip\]/.test(context.rulesText)
+      ? assignment(context, "ability.equip", "ability", {}, "high")
+      : null
+  ),
   primitive("action.attach_equipment", "action", "Attach equipment", "Attach equipment to a unit.", ["target"], (context) =>
-    /\battach\b|\[equip\]/.test(context.rulesText)
+    (/\battach\b/.test(context.rulesText) && !/\[equip\]/.test(context.rulesText)) ||
+    /\[quick-draw\]/.test(context.lowerText)
       ? assignment(context, "action.attach_equipment", "action", { target: "friendly_unit" }, "medium")
       : null
   ),
@@ -436,7 +443,9 @@ const primitiveDetectors: PrimitiveDetector[] = [
       : null
   ),
   primitive("cost.pay", "cost", "Pay cost", "Pay an additional or alternate cost.", ["amount", "resource"], (context) =>
-    /\bpay\b/.test(context.rulesText)
+    /\[equip\]\s*:rb_rune_[a-z_]+:/.test(context.rulesText)
+      ? assignment(context, "cost.pay", "cost", { amount: 1, resource: "rune" }, "high")
+      : /\bpay\b/.test(context.rulesText)
       ? assignment(context, "cost.pay", "cost", { amount: readFirstNumber(context.rulesText), resource: readCostType(context.rulesText) }, "medium")
       : null
   ),
@@ -629,7 +638,7 @@ function discoverMasterYiClauses(card: Card): ClauseDiscovery[] | null {
       ["selector.friendly_unit", "selector", { area: "board", locationRelation: "any", automatic: true, selectionKey: "affected" }],
       ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "friendly_unit", duration: "whileSourceOnBoard", condition: "friendlyDefendsAlone", selectionKey: "affected" }]
     ],
-    "Yi, Meditative": [
+    "Master Yi, Meditative": [
       ["condition.compare_numeric_value", "condition", { valueSource: "controller.boardRuneCount", operator: "greaterThanOrEqual", comparisonValue: 8 }],
       ["modifier.modify_numeric_value", "modifier", { attribute: "might", operation: "increase", operand: "constant", amount: 4, target: "source", duration: "whileSourceOnBoard" }]
     ],
@@ -833,6 +842,9 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
   const visionAssignments = /\[Vision\]/i.test(context.normalizedText)
     ? [assignment(context, "keyword.vision", "keyword", {}, "high")]
     : [];
+  const quickDrawAssignments = /\[Quick-Draw\]/i.test(context.normalizedText)
+    ? [assignment(context, "keyword.quick_draw", "keyword", {}, "high")]
+    : [];
   const deflectAssignments = /\[Deflect(?:\s+(\d+))?\]/i.exec(
     context.normalizedText,
   );
@@ -851,7 +863,7 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
     .map((match) => match[1]!.trim())
     .filter(
       (keyword) =>
-        !["Action", "Reaction", "Hidden", "Add", "Tank", "Vision", "Deflect"].includes(keyword) &&
+        !["Action", "Reaction", "Hidden", "Add", "Tank", "Vision", "Deflect", "Quick-Draw", "Equip"].includes(keyword) &&
         !/^Assault(?:\s+\d+)?$/i.test(keyword) &&
         !/^Shield(?:\s+\d+)?$/i.test(keyword)
     )
@@ -884,6 +896,7 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
     ...shieldAssignments,
     ...tankAssignments,
     ...visionAssignments,
+    ...quickDrawAssignments,
     ...deflect,
     ...genericAssignments
   ];
@@ -1338,11 +1351,11 @@ function readProducedPowerDomain(rulesText: string): string | null {
 
 function readResourceUsage(rulesText: string): string {
   if (rulesText.includes("use only to play spells")) {
-    return "spellsOnly";
+    return "card:Spell";
   }
 
   if (rulesText.includes("use only to play gear or use gear abilities")) {
-    return "gearAndGearAbilitiesOnly";
+    return "cardOrAbility:Gear";
   }
 
   return "unrestricted";

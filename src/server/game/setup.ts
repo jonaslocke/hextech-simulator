@@ -104,7 +104,8 @@ function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckR
       selectedByPlayerId: playerId,
       controllerPlayerId: null,
       contestedByPlayerId: null,
-      units: []
+      units: [],
+      attachedCardInstanceIds: [],
     });
   }
 }

@@ -8,6 +8,7 @@ import type {
   ResolvedDeckEntry,
   RuntimeCardInstance
 } from "./types";
+import { resolveDeckCard } from "./card-name";
 
 const mainDeckTypes = new Set(["Gear", "Spell", "Unit"]);
 const championPoolSections = new Set(["Champion", "MainDeck", "Sideboard"]);
@@ -41,7 +42,7 @@ export function validateDeckList(
 
   const resolved = parsed.entries.map((entry) => ({
     ...entry,
-    card: catalog.byName.get(entry.name)
+    card: resolveDeckCard(catalog, entry.name)
   }));
 
   for (const entry of resolved) {

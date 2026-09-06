@@ -3,6 +3,7 @@ import {
   recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
+import { recallUnattachedGearAtBattlefields } from "./attachment-lifecycle";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { scoreBattlefield } from "./scoring";
@@ -13,6 +14,7 @@ export function cleanupBoard(
 ): void {
   recomputeAllMight(game, index);
   cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+  recallUnattachedGearAtBattlefields(game, index);
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
     if (controllers.length === 0) {

@@ -40,6 +40,12 @@ export const playerStateSchema = z.object({
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
+  restrictedResources: z
+    .object({
+      energy: z.record(z.number().int().nonnegative()),
+      power: z.record(z.record(z.number().int().nonnegative())),
+    })
+    .optional(),
   zones: playerZonesSchema,
 });
 
@@ -50,6 +56,7 @@ export const battlefieldStateSchema = z.object({
   controllerPlayerId: z.string().nullable().optional(),
   contestedByPlayerId: z.string().nullable().optional(),
   units: z.array(z.string()),
+  attachedCardInstanceIds: z.array(z.string()).optional(),
 });
 
 export const setupStateSchema = z.object({
@@ -87,6 +94,7 @@ export const cardStateSchema = z.object({
   combatRole: z.enum(["attacker", "defender"]).nullable().optional(),
   lethalSuppressedDamage: z.number().int().nonnegative().nullable().optional(),
   lethalSuppressedMight: z.number().int().nonnegative().nullable().optional(),
+  attachedToCardInstanceId: z.string().min(1).nullable().optional(),
 });
 
 export const chainItemSchema = z.object({

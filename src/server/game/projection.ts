@@ -62,6 +62,7 @@ export function projectGame(input: {
       computedMight: state.computedMight,
       damage: state.damage,
       exhausted: state.exhausted,
+      attachedToCardInstanceId: state.attachedToCardInstanceId ?? null,
     };
   };
   const players = input.game.state.setup.playerIds.map((playerId) => {
@@ -96,6 +97,7 @@ export function projectGame(input: {
       energy: player.energy,
       conditionalEnergy: player.conditionalEnergy,
       power: player.power,
+      restrictedResources: player.restrictedResources ?? { energy: {}, power: {} },
       zones,
     };
   });
@@ -250,6 +252,7 @@ export function projectGame(input: {
       contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
       card: view(battlefield.cardInstanceId),
       units: battlefield.units.map(view),
+      attachedCards: (battlefield.attachedCardInstanceIds ?? []).map(view),
       facedownCard: null,
     })),
     chain: input.game.state.chain

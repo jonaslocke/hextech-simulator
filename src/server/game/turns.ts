@@ -41,6 +41,7 @@ export function applyStartOfTurn(
         candidate.energy = 0;
         candidate.power = {};
         candidate.conditionalEnergy = 0;
+        candidate.restrictedResources = { energy: {}, power: {} };
       }
       player.scoredBattlefieldIdsThisTurn = [];
       const controlledBattlefieldUnits = game.state.battlefields

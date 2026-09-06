@@ -51,7 +51,7 @@ test("plans idempotent deck-definition synchronization", async () => {
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
   assert.deepEqual(first.result, {
-    insertedCount: 4,
+    insertedCount: 5,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +61,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 4,
+    unchangedCount: 5,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,7 +75,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 3,
+    unchangedCount: 4,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
@@ -116,6 +116,7 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
     { id: "lux", label: "Lux" },
     { id: "master-yi", label: "Master Yi" },
     { id: "garen", label: "Garen" },
+    { id: "ornn", label: "Ornn" },
   ]);
   assert.equal(errors.length, 1);
 
@@ -174,6 +175,7 @@ function seedSet(): DeckDefinitionSeed[] {
       sourceText: validSourceText("Master Yi"),
     },
     { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
+    { id: "ornn", label: "Ornn", sourceText: validSourceText("Ornn") },
   ];
 }
 

@@ -9,7 +9,7 @@ import {
   hashCardRulesText,
 } from "../src/server/card-catalog";
 import { cardSetFileSchema } from "../src/server/catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import { buildDeckSnapshot } from "../src/server/game";
 
 const EXPECTED_COMPLEX_PRIMITIVES: Record<string, string[]> = {
@@ -17,11 +17,11 @@ const EXPECTED_COMPLEX_PRIMITIVES: Record<string, string[]> = {
     "modifier.modify_numeric_value",
     "selector.friendly_unit",
   ],
-  "Yi, Meditative": [
+  "Master Yi, Meditative": [
     "condition.compare_numeric_value",
     "modifier.modify_numeric_value",
   ],
-  "Yi, Honed": ["keyword.ganking", "modifier.enter_ready"],
+  "Master Yi, Honed": ["keyword.ganking", "modifier.enter_ready"],
   "Wielder of Water": ["modifier.modify_numeric_value"],
   "En Garde": [
     "modifier.modify_numeric_value",
@@ -62,8 +62,15 @@ test("Master Yi deck has exact publishable executable behavior models", async ()
     buildCurrentBehaviorCatalog(),
   ]);
   const allCards = cardSetFileSchema.parse(JSON.parse(rawCatalog));
-  const names = new Set(parseDeckList(deckText).entries.map((entry) => entry.name));
-  const cards = allCards.filter((card) => names.has(card.name));
+  const byName = new Map(allCards.map((card) => [card.name, card]));
+  const cards = [
+    ...new Map(
+      parseDeckList(deckText).entries.flatMap((entry) => {
+        const card = resolveDeckCard({ byName }, entry.name);
+        return card ? [[card.public_code, card] as const] : [];
+      }),
+    ).values(),
+  ];
   const report = analyzeCardBehaviorSuggestions(
     cards,
     ["data/decks/masteryi.dec.txt"],
@@ -83,7 +90,7 @@ test("Master Yi deck has exact publishable executable behavior models", async ()
   }
 
   const meditative = report.cards.find(
-    (card) => card.cardName === "Yi, Meditative",
+    (card) => card.cardName === "Master Yi, Meditative",
   );
   assert.ok(meditative);
   const meditativeAssignments = meditative.clauses.flatMap(

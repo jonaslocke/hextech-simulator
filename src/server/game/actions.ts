@@ -22,6 +22,7 @@ import {
   resolveNonCombatShowdown,
   unitControllers,
 } from "./board-rules";
+import { moveAttachedCardsWithTopMost } from "./attachment-lifecycle";
 import {
   beginCombatDamage,
   combatChoiceTargets,
@@ -37,7 +38,7 @@ import {
   submitChainTargetSelection,
 } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
-import type { GameCardDefinition } from "./schemas";
+import type { BehaviorClause, GameCardDefinition } from "./schemas";
 import type { ChainItem, GameDocument } from "./state";
 import {
   addConsecutivePass,
@@ -52,7 +53,9 @@ import {
 } from "./transitions";
 import {
   availableAnyPowerAfterBaseCost,
+  buildAbilityPaymentPlan,
   buildPaymentPlan,
+  payAbilityCost,
   payCardCost,
   targetDeflectCost,
 } from "./payment";
@@ -545,6 +548,7 @@ export function performGameplayAction(input: {
         }
         player.zones.base.push(cardId);
         game.state.cardStates[cardId]!.exhausted = true;
+        moveAttachedCardsWithTopMost(game, cardId, index);
         cleanupBoard(game, index);
         dispatchBehaviorEvent(
           game,
@@ -656,6 +660,7 @@ function playCard(
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
   const isUnit = definition.card.classification.type === "Unit";
+  const isGear = definition.card.classification.type === "Gear";
   const showdownAtPlayStart = game.state.showdown;
   const destinationBattlefield =
     isUnit && destinationId !== "base"
@@ -691,6 +696,23 @@ function playCard(
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
+  if (isGear) {
+    // Rules 143.1.a.1, 144.1, and 563.1.d: Gear enters ready at its
+    // controller's Base and does not use a Unit play destination.
+    player.zones.base.push(cardId);
+    game.state.cardStates[cardId]!.exhausted = false;
+    executeImmediateClauses(
+      game,
+      definition,
+      playerId,
+      cardId,
+      selectedIds,
+      handlers,
+    );
+    dispatchBehaviorEvent(game, playEvent, decks);
+    cleanupBoard(game, index);
+    return;
+  }
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
@@ -1149,6 +1171,7 @@ function moveUnitsToBattlefield(
     }
     battlefield.units.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
+    moveAttachedCardsWithTopMost(game, cardId, index);
   }
   markBattlefieldContested(game, battlefieldId, actorPlayerId);
   cleanupBoard(game, index);
@@ -1233,12 +1256,14 @@ function addPlayableCardActions(
     ...(player.zones.champion ? [player.zones.champion] : []),
   ]) {
     const definition = definitionForInstance(cardId, index);
-    if (!["Unit", "Spell"].includes(definition.card.classification.type))
+    if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const timings = compiled.playTimings.map((binding) => binding.behaviorId);
     const hasAction = timings.includes("timing.action");
-    const hasReaction = timings.includes("timing.reaction");
+    const hasReaction =
+      timings.includes("timing.reaction") ||
+      hasBehavior(definition, "keyword.quick_draw");
     if (timing === "showdownOpen" && !hasAction && !hasReaction) continue;
     if (
       (timing === "neutralClosed" || timing === "showdownClosed") &&
@@ -1366,6 +1391,7 @@ function addAbilityActions(
     ),
   ];
   for (const sourceId of controlled) {
+    if (game.state.cardStates[sourceId]?.attachedToCardInstanceId) continue;
     const definition = definitionForInstance(sourceId, index);
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const activations = compiled.clauses.flatMap((clause) =>
@@ -1391,14 +1417,29 @@ function addAbilityActions(
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
-        const enabled = sourceReady && canSatisfyTargetRequirements(targets);
+        const abilityCosts = activationCosts(clause);
+        const costsPayable =
+          buildAbilityPaymentPlan(
+            game,
+            playerId,
+            definition,
+            abilityCosts,
+            index,
+          ) !== null;
+        const enabled =
+          sourceReady && costsPayable && canSatisfyTargetRequirements(targets);
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
             : ability.behaviorId === "ability.exhaust_for_resource"
-              ? ability.parameters.usage === "spellsOnly"
+              ? ability.parameters.resourceType === "power"
+                ? `Add Power [${String(ability.parameters.domain ?? powerDomain)}]`
+                : ability.parameters.usage === "spellsOnly" ||
+                    ability.parameters.usage === "card:Spell"
                 ? "Add spell Energy"
                 : "Add Energy"
+              : ability.behaviorId === "ability.equip"
+                ? "Equip"
               : `${definition.card.name} ability`;
         actions.push(
           action(
@@ -1410,7 +1451,9 @@ function addAbilityActions(
             enabled
               ? null
               : sourceReady
-                ? "No legal targets are available."
+                ? costsPayable
+                  ? "No legal targets are available."
+                  : "Ability costs cannot be paid."
                 : "Source is exhausted.",
             `${clause.id}|${ability.behaviorId}`,
             targets,
@@ -1527,7 +1570,7 @@ function executeActivatedAbility(
   const binding = clause?.abilities.find(
     (item) => item.behaviorId === behaviorId,
   );
-  if (!binding) throw new Error("Activated ability is unavailable.");
+  if (!binding || !clause) throw new Error("Activated ability is unavailable.");
   const handler = handlers.get(binding.behaviorId);
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
@@ -1546,6 +1589,10 @@ function executeActivatedAbility(
       game.state.showdown.passedPlayerIds = [];
     }
     return;
+  }
+  const costs = activationCosts(clause);
+  if (costs.energy > 0 || costs.power > 0) {
+    payAbilityCost(game, actorPlayerId, definition, costs, index);
   }
   const item = {
     id: `ability:${game.stateVersion + 1}:${sourceId}:${clauseId}`,
@@ -1570,6 +1617,24 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function activationCosts(clause: BehaviorClause) {
+  return clause.costs.reduce(
+    (total, cost) => {
+      if (cost.behaviorId !== "cost.pay") return total;
+      const amount = cost.parameters.amount;
+      const resource = cost.parameters.resource;
+      if (typeof amount !== "number" || amount < 0 || typeof resource !== "string") {
+        throw new Error("Activated ability payment cost is malformed.");
+      }
+      if (resource === "energy") total.energy += amount;
+      else if (resource === "rune") total.power += amount;
+      else throw new Error(`Unsupported activated ability cost resource: ${resource}`);
+      return total;
+    },
+    { energy: 0, power: 0 },
+  );
 }
 
 function isAddResourceAbility(behaviorId: string) {
@@ -1658,7 +1723,16 @@ function clauseCanRequirePlaySelections(
   definition: GameCardDefinition,
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
 ) {
-  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (
+    clause.triggers.length > 0 ||
+    (clause.abilities.length > 0 &&
+      !(definition.card.classification.type === "Gear" &&
+        clause.keywords.some(
+          (binding) => binding.behaviorId === "keyword.quick_draw",
+        )))
+  ) {
+    return false;
+  }
   if (definition.card.classification.type !== "Unit") return true;
   return !looksLikeNonPlayUnitText(clause.sourceText);
 }
@@ -1667,7 +1741,16 @@ function clauseCanResolveImmediately(
   definition: GameCardDefinition,
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
 ) {
-  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (
+    clause.triggers.length > 0 ||
+    (clause.abilities.length > 0 &&
+      !(definition.card.classification.type === "Gear" &&
+        clause.keywords.some(
+          (binding) => binding.behaviorId === "keyword.quick_draw",
+        )))
+  ) {
+    return false;
+  }
   if (definition.card.classification.type !== "Unit") return true;
   return !looksLikeNonPlayUnitText(clause.sourceText);
 }
