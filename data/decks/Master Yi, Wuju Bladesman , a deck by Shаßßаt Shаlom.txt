@@ -1,0 +1,47 @@
+
+Legend:
+1 Master Yi, Wuju Bladesman
+
+Champion:
+1 Master Yi, Tempered
+
+MainDeck:
+1 Alpha Strike
+1 Back Off
+3 Charm
+3 Defy
+3 Discipline
+3 En Garde
+2 First Mate
+1 Grim Resolve
+2 Irelia, Fervent
+3 Lonely Poro
+1 Not So Fast
+2 Pit Rookie
+3 Punch First
+1 Rampage
+3 Rengar, Trophy Hunter
+1 Ruin Runner
+1 Sabotage
+3 Scuttle Crab
+1 Steel Paws
+1 Zhonya's Hourglass
+
+Battlefields:
+1 Abandoned Hall
+1 Emperor's Dais
+1 Grove of the God-Willow
+
+Rune Pool:
+7 Body Rune
+5 Calm Rune
+
+Sideboard:
+1 Alpha Strike
+2 Decree of Focus
+1 Irelia, Fervent
+1 Not So Fast
+1 Rampage
+1 Ruin Runner
+1 Sabotage
+2 Tomb-Raider Barbara
