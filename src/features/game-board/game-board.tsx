@@ -20,7 +20,9 @@ import {
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
 import { ChainOverlay } from "./components/chain-overlay";
+import { CopyGameStateButton } from "./components/copy-game-state-button";
 import { PlayerBoard } from "./components/player-board";
+import { PublicRevealToast } from "./components/public-reveal-toast";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
 import { ScoreHeader, type MatchHudContext } from "./components/score-header";
@@ -476,12 +478,17 @@ export const GameBoard: FC<GameBoardProps> = ({
         decisionInspection.isInspecting ? undefined : handleTargetClickCapture
       }
     >
-      <ScoreHeader
-        matchContext={matchContext}
-        opponent={board.opponent}
-        player={board.player}
-        victoryScore={projection.victoryScore}
-      />
+      <div className="relative">
+        <ScoreHeader
+          matchContext={matchContext}
+          opponent={board.opponent}
+          player={board.player}
+          victoryScore={projection.victoryScore}
+        />
+        <div className="top-2 right-3 z-10 absolute">
+          <CopyGameStateButton projection={sourceProjection} />
+        </div>
+      </div>
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
@@ -697,6 +704,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           ))}
         </div>
       )}
+      <PublicRevealToast reveals={sourceProjection.publicReveals} />
       <ChainOverlay
         canPassPriority={!decisionInspection.isInspecting && canViewerPassChain}
         chainCards={chainCards}

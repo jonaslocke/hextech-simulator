@@ -205,6 +205,7 @@ export function resumeEffectResolution(
       sourceZone: requirement.sourceZone ?? null,
       presentation: "cardSelection",
       legalCardIds: requirement.legalIds,
+      visibleCardIds: requirement.legalIds,
       minimum: requirement.minimum,
       maximum: requirement.maximum,
       targetRequirements: [requirement],
@@ -305,6 +306,7 @@ export function resumeEffectResolution(
         sourceZone: requirement.sourceZone ?? null,
         presentation: requirement.presentation ?? "cardSelection",
         legalCardIds: requirement.legalIds,
+        visibleCardIds: requirement.visibleIds ?? requirement.legalIds,
         minimum: requirement.minimum,
         maximum: requirement.maximum,
       };

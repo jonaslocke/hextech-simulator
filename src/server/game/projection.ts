@@ -9,6 +9,7 @@ import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
 import { victoryRequirement } from "./victory";
+import { cardHasType } from "./primitive-handlers";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -51,9 +52,9 @@ export function projectGame(input: {
       ownerPlayerId: instance.ownerPlayerId,
       name: card.name,
       imageUrl: card.media.image_url ?? null,
-      rulesText: card.text.plain,
+      rulesText: displayRulesText(definition),
       publicCode: card.public_code,
-      type: card.classification.type,
+      type: displayCardTypes(definition).join(" / "),
       supertype: card.classification.supertype,
       domains: card.classification.domain,
       energy: card.attributes.energy,
@@ -235,6 +236,11 @@ export function projectGame(input: {
                 input.game.state.pendingChoice.presentation === "vision"
                   ? input.game.state.pendingChoice.legalCardIds.map(view)
                   : [],
+              visibleCards:
+                input.game.state.pendingChoice.playerId ===
+                input.viewerPlayerId
+                  ? (input.game.state.pendingChoice.visibleCardIds ?? []).map(view)
+                  : [],
               minimum: input.game.state.pendingChoice.minimum,
               maximum: input.game.state.pendingChoice.maximum,
             }
@@ -331,6 +337,11 @@ export function projectGame(input: {
           passedPlayerIds: input.game.state.chain.passedPlayerIds,
         }
       : null,
+    publicReveals: (input.game.state.publicReveals ?? []).map((reveal) => ({
+      id: reveal.id,
+      message: reveal.message,
+      cards: reveal.cardInstanceIds.map(view),
+    })),
     actions: (input.game.status === "setup_pending"
       ? setupActions(input.game, input.viewerPlayerId)
       : gameplayActions(input.game, input.viewerPlayerId, input.decks)
@@ -367,6 +378,26 @@ function projectChainItem(
           : definitionKind(item.sourceCardInstanceId, definitions, instances),
     card: item.sourceCardInstanceId ? view(item.sourceCardInstanceId) : null,
   };
+}
+
+function displayCardTypes(
+  definition: DeckSnapshotDocument["snapshot"]["cards"][number],
+) {
+  const primary = definition.card.classification.type;
+  const additional = ["Unit", "Gear", "Spell", "Rune", "Battlefield", "Legend"]
+    .filter((type) => type !== primary && cardHasType(definition, type));
+  return [primary, ...additional];
+}
+
+function displayRulesText(
+  definition: DeckSnapshotDocument["snapshot"]["cards"][number],
+) {
+  if (definition.card.text.plain.trim()) return definition.card.text.plain;
+  return [...new Set(
+    definition.behaviorModel.clauses
+      .map((clause) => clause.sourceText.trim())
+      .filter(Boolean),
+  )].join("\n");
 }
 
 function waitingReason(

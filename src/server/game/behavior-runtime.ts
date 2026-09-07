@@ -37,6 +37,7 @@ export type BehaviorHandler = {
     destinations?: Array<{ id: string; label: string }>;
     sourceZone?: "hand" | "trash" | "mainDeck";
     presentation?: "cardSelection" | "vision";
+    visibleIds?: string[];
     options?: Array<{ id: string; label: string }>;
     choiceKey?: string;
   } | null;
@@ -249,7 +250,8 @@ export function queueTriggeredClauses(input: {
     relevantPlayerIds: input.game.state.showdown?.relevantPlayerIds
       ?? [...input.game.state.setup.playerIds],
     priorityPlayerId: input.controllerPlayerId,
-    passedPlayerIds: []
+    passedPlayerIds: [],
+    openedBy: "triggeredAbility" as const,
   };
   chain.items.push(...items);
   chain.priorityPlayerId = chain.items.at(-1)!.controllerPlayerId;
@@ -301,7 +303,8 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
     relevantPlayerIds: game.state.showdown?.relevantPlayerIds
       ?? [...game.state.setup.playerIds],
     priorityPlayerId: playerId,
-    passedPlayerIds: []
+    passedPlayerIds: [],
+    openedBy: "triggeredAbility" as const,
   };
   chain.items.push(...orderedIds.map((id) => byId.get(id)!));
   chain.priorityPlayerId = playerId;

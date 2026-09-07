@@ -16,7 +16,17 @@ export type PaymentPlan = {
   generatedPooledEnergy: number;
   powerFromPool: Record<string, number>;
   restrictedPower: Record<string, Record<string, number>>;
+  powerSourceUses: PowerSourceUse[];
+  generatedRestrictedPower: Record<string, Record<string, number>>;
+  generatedPooledPower: Record<string, number>;
   powerRuneIds: string[];
+};
+
+type PowerSourceUse = {
+  id: string;
+  amount: number;
+  domain: string;
+  usage: string;
 };
 
 export type PaymentContext =
@@ -105,6 +115,34 @@ function buildPaymentPlanForRequest(
   }
   const pooledEnergy = Math.min(player.energy, remainingEnergy);
   remainingEnergy -= pooledEnergy;
+  const energySourceIds: string[] = [];
+  let generatedConditionalEnergy = 0;
+  let generatedPooledEnergy = 0;
+  const consumeEnergySource = (id: string) => {
+    if (
+      remainingEnergy === 0 ||
+      energySourceIds.includes(id) ||
+      game.state.cardStates[id]?.exhausted
+    ) {
+      return;
+    }
+    const ability = exhaustForEnergyAbility(id, request.context, index);
+    if (!ability) return;
+    energySourceIds.push(id);
+    const unusedEnergy = Math.max(0, ability.amount - remainingEnergy);
+    remainingEnergy = Math.max(0, remainingEnergy - ability.amount);
+    if (ability.usage === "spellsOnly")
+      generatedConditionalEnergy += unusedEnergy;
+    else generatedPooledEnergy += unusedEnergy;
+  };
+  const sourceIds = paymentResourceSourceIds(game, playerId, index);
+  for (const id of sourceIds) {
+    const ability = exhaustForEnergyAbility(id, request.context, index);
+    if (ability?.usage === "spellsOnly") consumeEnergySource(id);
+  }
+  sourceIds.forEach(consumeEnergySource);
+  if (remainingEnergy > 0) return null;
+
   let remainingPower = request.powerCost;
   const allowedDomains = request.allowedPowerDomains;
   if (remainingPower > 0 && allowedDomains.length === 0) return null;
@@ -129,6 +167,36 @@ function buildPaymentPlanForRequest(
     const spend = Math.min(player.power[domain] ?? 0, remainingPower);
     if (spend > 0) powerFromPool[domain] = spend;
     remainingPower -= spend;
+  }
+  const powerSourceUses: PowerSourceUse[] = [];
+  const generatedRestrictedPower: Record<string, Record<string, number>> = {};
+  const generatedPooledPower: Record<string, number> = {};
+  for (const id of sourceIds) {
+    if (
+      remainingPower === 0 ||
+      energySourceIds.includes(id) ||
+      game.state.cardStates[id]?.exhausted
+    ) {
+      continue;
+    }
+    const ability = exhaustForPowerAbility(id, request.context, index);
+    if (!ability || !powerDomainCanPay(ability.domain, allowedDomains)) continue;
+    powerSourceUses.push({ id, ...ability });
+    const unusedPower = Math.max(0, ability.amount - remainingPower);
+    remainingPower = Math.max(0, remainingPower - ability.amount);
+    if (unusedPower > 0) {
+      if (ability.usage === "unrestricted") {
+        generatedPooledPower[ability.domain] =
+          (generatedPooledPower[ability.domain] ?? 0) + unusedPower;
+      } else {
+        generatedRestrictedPower[ability.usage] = {
+          ...(generatedRestrictedPower[ability.usage] ?? {}),
+          [ability.domain]:
+            (generatedRestrictedPower[ability.usage]?.[ability.domain] ?? 0) +
+            unusedPower,
+        };
+      }
+    }
   }
   const powerRuneIds: string[] = [];
   for (const id of player.zones.base) {
@@ -158,42 +226,6 @@ function buildPaymentPlanForRequest(
   }
   if (remainingAnyPower > 0) return null;
 
-  const energySourceIds: string[] = [];
-  let generatedConditionalEnergy = 0;
-  let generatedPooledEnergy = 0;
-  const consumeEnergySource = (id: string) => {
-    if (
-      remainingEnergy === 0 ||
-      energySourceIds.includes(id) ||
-      game.state.cardStates[id]?.exhausted
-    ) {
-      return;
-    }
-    const ability = exhaustForEnergyAbility(
-      id,
-      request.context,
-      index,
-    );
-    if (!ability) return;
-    energySourceIds.push(id);
-    const unusedEnergy = Math.max(0, ability.amount - remainingEnergy);
-    remainingEnergy = Math.max(0, remainingEnergy - ability.amount);
-    if (ability.usage === "spellsOnly")
-      generatedConditionalEnergy += unusedEnergy;
-    else generatedPooledEnergy += unusedEnergy;
-  };
-  for (const id of player.zones.base) {
-    const ability = exhaustForEnergyAbility(
-      id,
-      request.context,
-      index,
-    );
-    if (ability?.usage === "spellsOnly") consumeEnergySource(id);
-  }
-  powerRuneIds.forEach(consumeEnergySource);
-  player.zones.base.forEach(consumeEnergySource);
-  if (remainingEnergy > 0) return null;
-
   return {
     conditionalEnergy,
     restrictedEnergy,
@@ -203,6 +235,9 @@ function buildPaymentPlanForRequest(
     generatedPooledEnergy,
     powerFromPool,
     restrictedPower,
+    powerSourceUses,
+    generatedRestrictedPower,
+    generatedPooledPower,
     powerRuneIds,
   };
 }
@@ -322,6 +357,19 @@ function applyPaymentPlan(
       }
       resources[domain] -= amount;
     }
+  }
+  for (const source of plan.powerSourceUses) {
+    game.state.cardStates[source.id]!.exhausted = true;
+  }
+  for (const [usage, domains] of Object.entries(plan.generatedRestrictedPower)) {
+    player.restrictedResources ??= { energy: {}, power: {} };
+    const resources = player.restrictedResources.power[usage] ??= {};
+    for (const [domain, amount] of Object.entries(domains)) {
+      resources[domain] = (resources[domain] ?? 0) + amount;
+    }
+  }
+  for (const [domain, amount] of Object.entries(plan.generatedPooledPower)) {
+    player.power[domain] = (player.power[domain] ?? 0) + amount;
   }
   for (const id of plan.powerRuneIds) {
     player.zones.base = player.zones.base.filter(
@@ -445,4 +493,65 @@ function exhaustForEnergyAbility(
     }
   }
   return null;
+}
+
+function exhaustForPowerAbility(
+  id: string,
+  paymentContext: PaymentContext,
+  index: RuntimeCardIndex,
+): Omit<PowerSourceUse, "id"> | null {
+  const definition = definitionForInstance(id, index);
+  for (const clause of definition.behaviorModel.clauses) {
+    for (const ability of clause.abilities) {
+      if (
+        ability.behaviorId !== "ability.exhaust_for_resource" ||
+        ability.parameters.resourceType !== "power"
+      ) {
+        continue;
+      }
+      const amount = ability.parameters.amount;
+      const usage = ability.parameters.usage;
+      const requestedDomain = ability.parameters.domain;
+      const domain =
+        requestedDomain === "sourceDomain"
+          ? definition.card.classification.domain.find(
+              (candidate) => candidate !== "Colorless",
+            )
+          : typeof requestedDomain === "string"
+            ? normalizedDomain(requestedDomain)
+            : null;
+      if (
+        typeof amount !== "number" ||
+        amount <= 0 ||
+        typeof usage !== "string" ||
+        !domain ||
+        !resourceUsageAllowsPayment(usage, paymentContext)
+      ) {
+        continue;
+      }
+      return { amount, domain, usage };
+    }
+  }
+  return null;
+}
+
+function powerDomainCanPay(domain: string, allowedDomains: readonly string[]) {
+  return domain === "Rainbow" || allowedDomains.includes(domain);
+}
+
+function paymentResourceSourceIds(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  return [
+    ...player.zones.base,
+    ...(player.zones.legend ? [player.zones.legend] : []),
+    ...game.state.battlefields.flatMap((battlefield) =>
+      battlefield.units.filter(
+        (id) => index.instances.get(id)?.ownerPlayerId === playerId,
+      ),
+    ),
+  ].filter((id) => !game.state.cardStates[id]?.attachedToCardInstanceId);
 }

@@ -99,7 +99,10 @@ export function createPrimitiveHandlers(
         return definitionForInstance(context.event.subjectCardInstanceId, index).card.classification.type === "Spell";
       }
       if (binding.parameters.subject === "gear" && context.event.subjectCardInstanceId) {
-        return definitionForInstance(context.event.subjectCardInstanceId, index).card.classification.type === "Gear";
+        return cardHasType(
+          definitionForInstance(context.event.subjectCardInstanceId, index),
+          "Gear",
+        );
       }
       return false;
     }
@@ -457,27 +460,6 @@ export function createPrimitiveHandlers(
       const legalIds = top.filter((id) =>
         cardHasType(definitionForInstance(id, index), stringParam(binding, "cardType")),
       );
-      if (legalIds.length === 0) return null;
-      const selected = context.selectedIds.filter((id) => legalIds.includes(id));
-      if (
-        binding.parameters.revealSelected === true &&
-        selected.length > 0 &&
-        !context.selectedIds.includes("continue")
-      ) {
-        const revealed = (context.game.state.revealedCardInstanceIds ??= []);
-        for (const cardId of selected) {
-          if (!revealed.includes(cardId)) revealed.push(cardId);
-        }
-        return {
-          kind: "option" as const,
-          choiceKey: "public-reveal",
-          legalIds: ["continue"],
-          minimum: 1,
-          maximum: 1,
-          prompt: "Selected card revealed. Continue when all players have reviewed it.",
-          options: [{ id: "continue", label: "Continue" }],
-        };
-      }
       return {
         legalIds,
         minimum: 0,
@@ -489,7 +471,8 @@ export function createPrimitiveHandlers(
         ),
         prompt: "Choose a matching card to draw, then recycle the rest.",
         sourceZone: "mainDeck",
-        presentation: "vision",
+        presentation: "cardSelection",
+        visibleIds: top,
       };
     },
     execute(binding, context) {
@@ -504,9 +487,14 @@ export function createPrimitiveHandlers(
           `${context.game.id}:${context.game.stateVersion}:${context.sourceCardInstanceId}`,
         ),
       );
-      context.game.state.revealedCardInstanceIds = (
-        context.game.state.revealedCardInstanceIds ?? []
-      ).filter((id) => !selected.has(id));
+      if (binding.parameters.revealSelected === true && selected.size > 0) {
+        addPublicReveal(
+          context,
+          [...selected],
+          `${definitionForInstance(context.sourceCardInstanceId, index).card.name} revealed`,
+          index,
+        );
+      }
     },
   });
   handlers.set("action.gain_xp", {
@@ -516,26 +504,20 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.reveal_opponent_hand", {
-    choice(_binding, context) {
+    choice() {
+      return null;
+    },
+    execute(_binding, context) {
       const opponentId = context.game.state.setup.playerIds.find(
         (playerId) => playerId !== context.controllerPlayerId,
       );
       if (!opponentId) return null;
-      const revealed = (context.game.state.revealedCardInstanceIds ??= []);
-      for (const cardId of context.game.state.players[opponentId]!.zones.hand) {
-        if (!revealed.includes(cardId)) revealed.push(cardId);
-      }
-      return {
-        kind: "option" as const,
-        legalIds: ["continue"],
-        minimum: 1,
-        maximum: 1,
-        prompt: "Opponent hand revealed. Continue when all players have reviewed it.",
-        options: [{ id: "continue", label: "Continue" }],
-      };
-    },
-    execute(_binding, context) {
-      context.game.state.revealedCardInstanceIds = [];
+      addPublicReveal(
+        context,
+        [...context.game.state.players[opponentId]!.zones.hand],
+        `${definitionForInstance(context.sourceCardInstanceId, index).card.name} revealed ${opponentId}'s hand`,
+        index,
+      );
     },
   });
   handlers.set("action.grant_facedown_vision", {
@@ -1839,6 +1821,7 @@ function queueDeathTriggeredEffects(
       [...game.state.setup.playerIds],
     priorityPlayerId: instance.ownerPlayerId,
     passedPlayerIds: [],
+    openedBy: "triggeredAbility" as const,
   };
   chain.items.push(items[0]!);
   chain.priorityPlayerId = instance.ownerPlayerId;
@@ -2201,6 +2184,24 @@ function resourceDomainForBinding(
   }
   return domain.slice(0, 1).toUpperCase() + domain.slice(1);
 }
+
+function addPublicReveal(
+  context: BehaviorExecutionContext,
+  cardInstanceIds: string[],
+  prefix: string,
+  index: RuntimeCardIndex,
+) {
+  if (cardInstanceIds.length === 0) return;
+  const cardNames = cardInstanceIds.map(
+    (id) => definitionForInstance(id, index).card.name,
+  );
+  (context.game.state.publicReveals ??= []).push({
+    id: `reveal:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.publicReveals?.length ?? 0}`,
+    message: `${prefix}: ${cardNames.join(", ")}.`,
+    cardInstanceIds,
+  });
+}
+
 function stringParam(binding: BehaviorBinding, key: string) {
   const value = binding.parameters[key];
   if (typeof value !== "string") throw new Error(`Behavior parameter ${key} must be text.`);

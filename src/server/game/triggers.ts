@@ -256,6 +256,7 @@ function appendChainItem(game: GameDocument, item: ChainItem) {
       [...game.state.setup.playerIds],
     priorityPlayerId: item.controllerPlayerId,
     passedPlayerIds: [],
+    openedBy: "triggeredAbility" as const,
   };
   chain.items.push(item);
   chain.priorityPlayerId = item.controllerPlayerId;
@@ -394,7 +395,8 @@ function queueSimultaneousTriggerItems(
       items: [],
       relevantPlayerIds: [...game.state.setup.playerIds],
       priorityPlayerId: controllerPlayerId,
-      passedPlayerIds: []
+      passedPlayerIds: [],
+      openedBy: "triggeredAbility" as const,
     };
     chain.items.push(controlledItems[0]!);
     game.state.chain = chain;

@@ -193,7 +193,7 @@ test("resolves generic optional effect choices through the canonical pending-dec
   assert.equal(next.state.cardStates["p1:bf"]!.exhausted, false);
 });
 
-test("temporarily reveals an opponent hand only while its resolving effect is pending", () => {
+test("publicly reveals an opponent hand without creating an acknowledgement decision", () => {
   const { game, decks } = fixture();
   decks[1]!.instances.push({
     instanceId: "p2:hand-card",
@@ -237,42 +237,35 @@ test("temporarily reveals an opponent hand only while its resolving effect is pe
     clauseId: "reveal",
     decks,
   });
-  assert.equal(game.state.pendingChoice?.type, "effectOption");
-  assert.deepEqual(
-    projectGame({ game, viewerPlayerId: "p1", decks }).players
-      .find((player) => player.playerId === "p2")
-      ?.zones.find((zone) => zone.kind === "hand")?.cards.map((card) => card.name),
-    ["Unit"],
-  );
-  const submit = gameplayActions(game, "p1", decks).find(
-    (action) => action.choice?.kind === "effectOption",
-  )!;
-  const next = performGameplayAction({
-    game,
-    actorPlayerId: "p1",
-    actionId: submit.id,
-    selectedIds: ["continue"],
-    decks,
-    now: "revealed-hand-continue",
-  });
-  assert.deepEqual(next.state.revealedCardInstanceIds, []);
-  assert.deepEqual(next.state.facedownVisibilityGrants, [
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.publicReveals?.map((reveal) => reveal.cardInstanceIds), [
+    ["p2:hand-card"],
+  ]);
+  for (const viewerPlayerId of ["p1", "p2"]) {
+    assert.deepEqual(
+      projectGame({ game, viewerPlayerId, decks }).publicReveals?.[0]?.cards.map(
+        (card) => card.name,
+      ),
+      ["Unit"],
+    );
+  }
+  assert.deepEqual(game.state.facedownVisibilityGrants, [
     { viewerPlayerId: "p1", ownerPlayerId: "p2", expiresAtTurnNumber: 1 },
   ]);
   assert.equal(
-    projectGame({ game: next, viewerPlayerId: "p1", decks }).battlefields[0]
+    projectGame({ game, viewerPlayerId: "p1", decks }).battlefields[0]
       ?.facedownCard?.instanceId,
     "p2:facedown-card",
   );
   assert.deepEqual(
-    projectGame({ game: next, viewerPlayerId: "p1", decks }).players
+    projectGame({ game, viewerPlayerId: "p1", decks }).players
       .find((player) => player.playerId === "p2")
       ?.zones.find((zone) => zone.kind === "hand")?.cards,
     [],
   );
 });
 
-test("publicly reveals a selected top-deck card before drawing it", () => {
+test("publicly reveals a selected top-deck card without blocking its draw", () => {
   const { game, decks } = fixture();
   const snapshot = decks[0]!.snapshot;
   snapshot.cards.push(definition("GEAR", "Gear", "Gear", 0, 0));
@@ -315,6 +308,28 @@ test("publicly reveals a selected top-deck card before drawing it", () => {
   const select = gameplayActions(game, "p1", decks).find(
     (action) => action.choice?.kind === "effectSelection",
   )!;
+  const selectionProjection = projectGame({ game, viewerPlayerId: "p1", decks });
+  assert.deepEqual(
+    selectionProjection.pendingChoice?.type === "effectSelection"
+      ? selectionProjection.pendingChoice.visibleCards?.map((card) => card.name)
+      : [],
+    ["Gear", "Unit"],
+  );
+  assert.deepEqual(select.targets[0]?.legalIds, ["p1:gear"]);
+  const declined = performGameplayAction({
+    game: structuredClone(game),
+    actorPlayerId: "p1",
+    actionId: select.id,
+    selectedIds: [],
+    decks,
+    now: "search-decline",
+  });
+  assert.equal(declined.state.pendingChoice, null);
+  assert.equal(declined.state.players.p1!.zones.hand.includes("p1:gear"), false);
+  assert.deepEqual(
+    [...declined.state.players.p1!.zones.mainDeck].sort(),
+    ["p1:draw", "p1:gear"],
+  );
   const revealed = performGameplayAction({
     game,
     actorPlayerId: "p1",
@@ -323,30 +338,16 @@ test("publicly reveals a selected top-deck card before drawing it", () => {
     decks,
     now: "search-select",
   });
-  assert.equal(revealed.state.pendingChoice?.type, "effectOption");
+  assert.equal(revealed.state.pendingChoice, null);
   for (const viewerPlayerId of ["p1", "p2"]) {
     const projection = projectGame({ game: revealed, viewerPlayerId, decks });
     assert.deepEqual(
-      projection.pendingChoice?.type === "effectOption"
-        ? projection.pendingChoice.revealedCards.map((card) => card.name)
-        : [],
+      projection.publicReveals?.[0]?.cards.map((card) => card.name),
       ["Gear"],
     );
   }
-  const continueAction = gameplayActions(revealed, "p1", decks).find(
-    (action) => action.choice?.kind === "effectOption",
-  )!;
-  const next = performGameplayAction({
-    game: revealed,
-    actorPlayerId: "p1",
-    actionId: continueAction.id,
-    selectedIds: ["continue"],
-    decks,
-    now: "search-reveal-continue",
-  });
-  assert.deepEqual(next.state.revealedCardInstanceIds, []);
-  assert.ok(next.state.players.p1!.zones.hand.includes("p1:gear"));
-  assert.ok(next.state.players.p1!.zones.mainDeck.includes("p1:draw"));
+  assert.ok(revealed.state.players.p1!.zones.hand.includes("p1:gear"));
+  assert.ok(revealed.state.players.p1!.zones.mainDeck.includes("p1:draw"));
 });
 
 test("automatically pays card costs with behavior-backed rune abilities", () => {
@@ -435,6 +436,33 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   game.state.cardStates["p1:power-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
   game.state.players.p2!.zones.base.push("p2:enemy");
   game.state.cardStates["p2:enemy"] = { exhausted: false, damage: 0, computedMight: 1 };
+
+  const autoPayGear = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Test Gear",
+  )!;
+  assert.equal(
+    autoPayGear.enabled,
+    true,
+    "a ready Legend Add ability is an eligible automatic payment source",
+  );
+  const autoPaid = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: autoPayGear.id,
+    selectedIds: [],
+    decks,
+    now: "ornn-auto-pay",
+  });
+  assert.equal(autoPaid.state.cardStates["p1:ornn"]?.exhausted, true);
+  assert.ok(autoPaid.state.players.p1!.zones.base.includes("p1:gear"));
+  assert.deepEqual(autoPaid.state.players.p1!.restrictedResources, undefined);
+  assert.equal(
+    gameplayActions(autoPaid, "p1", decks).find(
+      (action) => action.label === "Play Power Unit to Base",
+    )?.enabled,
+    false,
+    "the Gear-only resource cannot pay a Unit's Power cost",
+  );
 
   const addPower = gameplayActions(game, "p1", decks).find(
     (action) => action.sourceCardInstanceId === "p1:ornn",

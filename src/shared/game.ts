@@ -353,6 +353,7 @@ export const gameProjectionSchema = z.object({
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
         presentation: z.enum(["cardSelection", "vision"]),
         revealedCards: z.array(projectedCardViewSchema),
+        visibleCards: z.array(projectedCardViewSchema).default([]).optional(),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
       }),
@@ -393,6 +394,13 @@ export const gameProjectionSchema = z.object({
   players: z.array(projectedPlayerSchema).length(2),
   battlefields: z.array(projectedBattlefieldSchema),
   chain: projectedChainSchema,
+  publicReveals: z.array(
+    z.object({
+      id: z.string().min(1),
+      message: z.string().min(1),
+      cards: z.array(projectedCardViewSchema),
+    }),
+  ).default([]).optional(),
   actions: z.array(projectedActionSchema),
   logEntries: z.array(
     z.object({

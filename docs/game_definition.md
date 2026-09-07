@@ -732,6 +732,17 @@ server-validated.
 The board UI should use the attached screenshot as layout inspiration, not as an
 exact implementation target.
 
+When a player chooses among cards, card images are the primary representation.
+Instructions, selection counts, eligibility, and disabled reasons may accompany
+them, but complete oracle text must not be duplicated beside each card. An
+information-only reveal is not a player decision: it is presented temporarily
+through the viewer-safe projection and recorded in the public log when public.
+
+The board's **Copy state** control copies only the current viewer-safe game
+projection, including timing, Chain, pending choice, resources, and visible
+object state. Manual testers can attach that payload to a defect report; it
+does not mutate the game or bypass hidden-information boundaries.
+
 Required MVP UI regions:
 
 - Opponent area at the top.

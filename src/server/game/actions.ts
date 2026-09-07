@@ -467,6 +467,9 @@ export function performGameplayAction(input: {
     throw new Error("Action is not legal for the current game state.");
   validateActionTargets(projected, input.selectedIds);
   const game = structuredClone(input.game);
+  // Public card reveals are an informational presentation, not a decision.
+  // A later accepted game action replaces the transient presentation.
+  game.state.publicReveals = [];
   const index = createRuntimeCardIndex(input.decks, game);
   const handlers = createPrimitiveHandlers(index);
   const [, , , kind, encodedSource, encodedExtra] = input.actionId.split(":");
@@ -869,6 +872,7 @@ function passPriority(
   if (game.state.chain) {
     const passed = addConsecutivePass(game.state.chain.passedPlayerIds, actor);
     if (passed.length === game.state.chain.relevantPlayerIds.length) {
+      const chainOpenedBy = game.state.chain.openedBy;
       const item = game.state.chain.items.pop();
       if (item?.sourceCardInstanceId) {
         const controller = item.controllerPlayerId;
@@ -1057,14 +1061,16 @@ function passPriority(
       } else {
         game.state.chain = null;
         if (game.state.showdown) {
-          game.state.showdown.focusPlayerId =
-            item?.kind === "trigger"
-              ? item.controllerPlayerId
-              : nextRelevantPlayer(
-                  game,
-                  game.state.showdown.focusPlayerId,
-                  game.state.showdown.relevantPlayerIds,
-                );
+          if (
+            chainOpenedBy !== "triggeredAbility" &&
+            chainOpenedBy !== "addAbility"
+          ) {
+            game.state.showdown.focusPlayerId = nextRelevantPlayer(
+              game,
+              game.state.showdown.focusPlayerId,
+              game.state.showdown.relevantPlayerIds,
+            );
+          }
           game.state.showdown.passedPlayerIds = [];
         }
       }

@@ -166,6 +166,7 @@ const effectSelectionChoiceSchema = z.object({
   sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable().default(null),
   presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
+  visibleCardIds: z.array(z.string().min(1)).optional(),
   minimum: z.number().int().nonnegative(),
   maximum: z.number().int().nonnegative(),
   chainItem: chainItemSchema.nullable().optional(),
@@ -223,6 +224,16 @@ export const gameStateSchema = z.object({
     .array(gameCardDefinitionSchema)
     .default([])
     .optional(),
+  publicReveals: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        message: z.string().min(1),
+        cardInstanceIds: z.array(z.string().min(1)).min(1),
+      }),
+    )
+    .default([])
+    .optional(),
   revealedCardInstanceIds: z.array(z.string().min(1)).default([]).optional(),
   facedownVisibilityGrants: z
     .array(
@@ -241,6 +252,9 @@ export const gameStateSchema = z.object({
       relevantPlayerIds: z.array(z.string().min(1)).min(1),
       priorityPlayerId: z.string().min(1),
       passedPlayerIds: z.array(z.string().min(1)),
+      // A Chain opened by a triggered or Add ability does not pass Focus when
+      // it closes during a Showdown (Core Rules 346.1).
+      openedBy: z.enum(["triggeredAbility", "addAbility"]).optional(),
     })
     .nullable(),
   showdown: z

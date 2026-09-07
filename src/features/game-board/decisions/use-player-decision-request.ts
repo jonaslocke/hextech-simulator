@@ -118,16 +118,24 @@ export function buildPlayerDecisionRequest({
         );
         const visibleCardById = visibleCardsById(sourceProjection);
         const legalIds = requirement?.legalIds ?? [];
+        const visibleCards =
+          (pendingChoice.visibleCards?.length ?? 0) > 0
+            ? pendingChoice.visibleCards ?? []
+            : legalIds.map((id) =>
+                visibleCardById.get(id) ??
+                toProjectedCardPlaceholder(id, cardsByInstanceId[id]),
+              );
 
         return {
           actionId: action.id,
-          cards: legalIds.map((id) =>
-            toDecisionCardFromSources(
-              id,
-              visibleCardById.get(id),
-              cardsByInstanceId[id],
+          cards: visibleCards.map((card) => ({
+            ...toDecisionCardFromSources(
+              card.instanceId,
+              card,
+              cardsByInstanceId[card.instanceId],
             ),
-          ),
+            disabled: !legalIds.includes(card.instanceId),
+          })),
           confirmLabel:
             pendingChoice.sourceZone === "hand"
               ? "Discard selected card"
@@ -483,10 +491,13 @@ function visibleCardsById(projection: GameProjection) {
       .flatMap((zone) => zone.cards)
       .concat(
         projection.pendingChoice?.type === "effectSelection"
-          ? projection.pendingChoice.revealedCards
+          ? [
+              ...projection.pendingChoice.revealedCards,
+              ...(projection.pendingChoice.visibleCards ?? []),
+            ]
           : projection.pendingChoice?.type === "effectOption"
             ? projection.pendingChoice.revealedCards
-          : [],
+            : [],
       )
       .map((card) => [card.instanceId, card]),
   );
@@ -544,7 +555,7 @@ function arraysEqual(left: string[], right: string[]) {
 
 function toDecisionCard(card: ProjectedCardView): PlayerDecisionCard {
   return {
-    description: card.rulesText || card.type,
+    description: card.type,
     id: card.instanceId,
     imageUrl: card.imageUrl ?? undefined,
     label: card.name,
@@ -561,10 +572,35 @@ function toDecisionCardFromSources(
   }
 
   return {
-    description: catalogCard?.text.plain || catalogCard?.classification.type,
+    description: catalogCard?.classification.type,
     id,
     imageUrl: catalogCard?.media.image_url ?? undefined,
     label: catalogCard?.name ?? id,
+  };
+}
+
+function toProjectedCardPlaceholder(
+  instanceId: string,
+  card: BoardCatalogCard | undefined,
+): ProjectedCardView {
+  return {
+    instanceId,
+    ownerPlayerId: "",
+    name: card?.name ?? instanceId,
+    imageUrl: card?.media.image_url ?? null,
+    rulesText: card?.text.plain ?? "",
+    publicCode: card?.public_code ?? instanceId,
+    type: card?.classification.type ?? "Card",
+    supertype: card?.classification.supertype ?? null,
+    domains: card?.classification.domain ?? [],
+    energy: card?.attributes.energy ?? null,
+    might: card?.attributes.might ?? null,
+    power: card?.attributes.power ?? null,
+    computedMight: null,
+    damage: 0,
+    exhausted: false,
+    empowered: false,
+    attachedToCardInstanceId: null,
   };
 }
 
