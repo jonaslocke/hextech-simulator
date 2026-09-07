@@ -110,6 +110,13 @@ export type BoardProjection = {
     | {
         id: string;
         playerId: string;
+        type: "orderReplacements";
+        prompt: string;
+        options: Array<{ id: string; sourceCardInstanceId: string }>;
+      }
+    | {
+        id: string;
+        playerId: string;
         type: "effectSelection";
         prompt: string;
         title: string;
@@ -119,6 +126,16 @@ export type BoardProjection = {
         revealedCards: ProjectedCardView[];
         minimum: number;
         maximum: number;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "effectOption";
+        prompt: string;
+        title: string;
+        waitingMessage: string;
+        options: Array<{ id: string; label: string }>;
+        revealedCards: ProjectedCardView[];
       }
     | {
         id: string;
@@ -146,12 +163,13 @@ export type BoardProjection = {
     cardInstanceId: string;
     units: string[];
     attachedCardInstanceIds: string[];
-    facedownSlot: null;
+    facedownSlot: string | null;
   }>;
   cardStates: Record<
     string,
     {
       exhausted: boolean;
+      empowered?: boolean;
       damage: number;
       computedMight?: number;
       attachedToCardInstanceId?: string | null;
@@ -172,6 +190,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       card.instanceId,
       {
         exhausted: card.exhausted,
+        empowered: card.empowered,
         damage: card.damage,
         ...(card.computedMight === null
           ? {}
@@ -337,7 +356,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         attachedCardInstanceIds: (battlefield.attachedCards ?? []).map(
           (card) => card.instanceId,
         ),
-        facedownSlot: null,
+        facedownSlot: battlefield.facedownCard?.instanceId ?? null,
       })),
       cardStates,
     },

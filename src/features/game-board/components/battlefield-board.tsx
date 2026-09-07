@@ -259,6 +259,7 @@ export const BattlefieldBoard: FC<Props> = ({
     opponentUnits,
     playerAttachments,
     playerUnits,
+    facedownCard,
     img,
   },
   dropStatus = "idle",
@@ -428,7 +429,11 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         <BattlefieldUnitRow
-          cards={[...opponentUnits, ...opponentAttachments]}
+          cards={[
+            ...opponentUnits,
+            ...opponentAttachments,
+            ...(facedownCard ? [facedownCard] : []),
+          ]}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}

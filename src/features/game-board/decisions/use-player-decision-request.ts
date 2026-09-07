@@ -14,7 +14,7 @@ export type PlayerDecisionRequestInput = {
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
-    targetKind: "battlefield" | "card";
+    targetKind: "battlefield" | "card" | "chainItem";
   } | null;
   sourceProjection: GameProjection;
   cardsByInstanceId: Record<string, BoardCatalogCard>;
@@ -238,6 +238,78 @@ export function buildPlayerDecisionRequest({
         };
       }
     }
+
+    if (pendingChoice.type === "effectOption") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "effectOption" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+
+      if (action?.choice?.kind === "effectOption") {
+        return {
+          actionId: action.id,
+          confirmLabel: "Confirm",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: 1,
+            minimum: 1,
+            selectableIds: pendingChoice.options.map((option) => option.id),
+            source: "effect-option",
+          }),
+          description: pendingChoice.prompt,
+          inspection: "none",
+          kind: "optionDecision",
+          options: pendingChoice.options.map((option) => ({
+            id: option.id,
+            label: option.label,
+          })),
+          revealedCards: pendingChoice.revealedCards.map(toDecisionCard),
+          title: pendingChoice.title,
+        };
+      }
+    }
+
+    if (pendingChoice.type === "orderReplacements") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "orderedOptions" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+
+      if (action) {
+        const visibleCardById = visibleCardsById(sourceProjection);
+        return {
+          actionId: action.id,
+          confirmLabel: "Submit order",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.options.length,
+            minimum: pendingChoice.options.length,
+            selectableIds: pendingChoice.options.map((option) => option.id),
+            source: "replacement-order",
+          }),
+          description:
+            "Order replacement effects. The first applicable effect is applied first.",
+          inspection: "publicGameState",
+          kind: "orderedDecision",
+          options: pendingChoice.options.map((option) => {
+            const card = visibleCardById.get(option.sourceCardInstanceId);
+            const catalogCard = cardsByInstanceId[option.sourceCardInstanceId];
+            return {
+              id: option.id,
+              imageUrl: card?.imageUrl ?? catalogCard?.media.image_url ?? undefined,
+              label: card?.name ?? catalogCard?.name ?? option.sourceCardInstanceId,
+            };
+          }),
+          title: pendingChoice.prompt,
+        };
+      }
+    }
   }
 
   const combatDamageAction = sourceProjection.actions.find(
@@ -285,6 +357,14 @@ export function buildPlayerDecisionRequest({
           message: pendingChoice.waitingMessage,
           title: pendingChoice.title,
         };
+      case "effectOption":
+        return {
+          inspection: "none",
+          kind: "pendingDecision",
+          message: pendingChoice.waitingMessage,
+          revealedCards: pendingChoice.revealedCards.map(toDecisionCard),
+          title: pendingChoice.title,
+        };
       case "tokenPlacement":
         return {
           kind: "pendingDecision",
@@ -297,6 +377,14 @@ export function buildPlayerDecisionRequest({
           kind: "pendingDecision",
           message: `Waiting for ${playerName} to choose the order of triggered abilities.`,
           title: "Triggered abilities",
+          tone: "amber",
+        };
+      case "orderReplacements":
+        return {
+          inspection: "none",
+          kind: "pendingDecision",
+          message: `Waiting for ${playerName} to choose the order of replacement effects.`,
+          title: "Replacement effects",
           tone: "amber",
         };
     }
@@ -396,6 +484,8 @@ function visibleCardsById(projection: GameProjection) {
       .concat(
         projection.pendingChoice?.type === "effectSelection"
           ? projection.pendingChoice.revealedCards
+          : projection.pendingChoice?.type === "effectOption"
+            ? projection.pendingChoice.revealedCards
           : [],
       )
       .map((card) => [card.instanceId, card]),

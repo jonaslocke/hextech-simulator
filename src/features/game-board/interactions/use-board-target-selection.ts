@@ -22,7 +22,7 @@ export type BoardTargetSelection = {
   purpose: "choice" | "move" | "play";
   requirement: CombinedTargetRequirement;
   selectedTargetIds: string[];
-  targetKind: "battlefield" | "card";
+  targetKind: "battlefield" | "card" | "chainItem";
 };
 
 type SubmitProjectedAction = (

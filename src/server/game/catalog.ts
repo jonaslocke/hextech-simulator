@@ -91,7 +91,9 @@ export function buildDeckSnapshot(
       cardCode: document.cardCode,
       sourceTextHash: document.sourceTextHash,
       card: document.card,
-      behaviorModel: document.behaviorModel
+      behaviorModel: document.behaviorModel,
+      effectText: document.effectText,
+      effectBehaviorModel: document.effectBehaviorModel,
     });
     if (!result.success) {
       issues.push(`Malformed canonical card ${document.cardCode}: ${result.error.message}`);
@@ -165,6 +167,21 @@ function validateCanonicalDocument(
     validateClause(document.cardCode, clause, definitionsById, issues);
   });
   validateBindings(document.cardCode, "playTimings", document.behaviorModel.playTimings, definitionsById, issues);
+  if (document.effectText && document.effectBehaviorModel) {
+    document.effectBehaviorModel.clauses.forEach((clause, sequence) => {
+      if (clause.sequence !== sequence) {
+        issues.push(`Invalid Effect Text clause sequence for ${document.cardCode}:${clause.id}`);
+      }
+      validateClause(document.cardCode, clause, definitionsById, issues);
+    });
+    validateBindings(
+      document.cardCode,
+      "effectPlayTimings",
+      document.effectBehaviorModel.playTimings,
+      definitionsById,
+      issues,
+    );
+  }
 }
 
 function validateClause(

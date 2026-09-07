@@ -59,7 +59,7 @@ export function performSetupAction(input: {
     if (input.selectedIds.length > 0) applyMulligan(game, input.actorPlayerId, input.selectedIds);
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
-      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken" };
+      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken", playedCardInstanceIds: [] };
       applyStartOfTurn(game);
     }
   }

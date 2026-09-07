@@ -126,6 +126,7 @@ export const gameEventKinds = [
   "card.revealed",
   "card.banished",
   "card.returnedToHand",
+  "card.died",
   "unit.attacks",
   "unit.defends",
   "unit.moved",
@@ -158,6 +159,7 @@ export const targetReferenceKinds = [
   "card",
   "controller_spell",
   "controller_effect",
+  "controller_card",
   "controller_units",
   "enemy_unit",
   "equipment",
@@ -166,6 +168,7 @@ export const targetReferenceKinds = [
   "game",
   "rune",
   "runes",
+  "opponent_spell",
   "source",
   "unit"
 ] as const;
@@ -227,7 +230,8 @@ export const numericModifierOperations = [
 export const behaviorDurationKinds = [
   "thisTurn",
   "whileSourceAtBattlefield",
-  "whileSourceOnBoard"
+  "whileSourceOnBoard",
+  "whileAttached"
 ] as const;
 
 export const numericOperandKinds = [
@@ -262,14 +266,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("amountSource", "string", "How the produced amount is determined.", resourceAmountSources),
       optional("amount", "number", "The produced amount when amountSource is constant."),
       optional("domain", "string", "The produced Power domain.", resourceDomainKinds),
-      required("usage", "string", "What the generated resource may pay for.", resourceUsageKinds)
+      required("usage", "string", "What the generated resource may pay for.", resourceUsageKinds),
+      optional("poolResource", "boolean", "Whether the produced resource is added directly to the normal Rune Pool.")
+      ,optional("killSource", "boolean", "Whether activating the ability also kills its source after it exhausts.")
     ],
     fixedRules: [
       "Exhausting the source is the activation cost.",
       "The ability has Reaction timing.",
       "Abilities that add resources cannot be reacted to."
     ],
-    emitsEvents: ["card.exhausted", "resource.added"],
+    emitsEvents: ["card.exhausted", "card.died", "resource.added"],
     engineSupport: requiresEngineSupport(
       "The catalog contract is reusable; generalized activated resource abilities remain future engine work."
     )
@@ -310,6 +316,21 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "Equip uses server-authoritative activated-ability payment and attachment state."
     )
   }),
+  "ability.empower": primitiveSeed({
+    id: "ability.empower",
+    family: "ability",
+    name: "Empower",
+    description: "Marks the source permanent as Empowered after paying its activated ability cost.",
+    fixedRules: ["A permanent cannot be Empowered more than once."],
+    engineSupport: supported("Empower status and activated-ability payment are server-authoritative.")
+  }),
+  "ability.activated_effect": primitiveSeed({
+    id: "ability.activated_effect",
+    family: "ability",
+    name: "Activated effect",
+    description: "Marks a clause as an activated ability whose listed effects resolve on the chain.",
+    engineSupport: supported("Activated abilities use the shared chain and effect-resolution contract."),
+  }),
   "keyword.quick_draw": primitiveSeed({
     id: "keyword.quick_draw",
     family: "keyword",
@@ -319,6 +340,21 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: supported(
       "Quick-Draw reuses normal Gear play targeting and attachment execution."
     )
+  }),
+  "keyword.temporary": primitiveSeed({
+    id: "keyword.temporary",
+    family: "keyword",
+    name: "Temporary",
+    description: "Kills the permanent at the start of its controller's Beginning Phase, before scoring.",
+    engineSupport: supported("Temporary cleanup is evaluated from canonical board state before Beginning-phase scoring.")
+  }),
+  "type.additional": primitiveSeed({
+    id: "type.additional",
+    family: "keyword",
+    name: "Additional card type",
+    description: "Declares an additional card type for a multi-type game object.",
+    parameters: [required("type", "string", "The additional card type.", ["Gear", "Unit", "Spell", "Rune"])],
+    engineSupport: supported("Card type checks use canonical primary and additional types."),
   }),
   "keyword.hidden": primitiveSeed({
     id: "keyword.hidden",
@@ -473,7 +509,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "On death trigger",
     description: "Creates an effect when a unit dies.",
     parameters: [required("subject", "string", "The death event that fires the trigger.", triggerSubjectKinds)],
-    listensToEvents: ["unit.died"]
+    listensToEvents: ["card.died"]
   }),
   "trigger.end_of_turn": primitiveSeed({
     id: "trigger.end_of_turn",
@@ -574,6 +610,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("readyOnly", "boolean", "Whether only ready units are legal."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
       optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
+      ,optional("requiredDomain", "string", "Required card domain.", resourceDomainKinds)
+      ,optional("inCombatWithEnemyDomain", "string", "Requires combat with an enemy unit of this domain.", resourceDomainKinds)
+      ,optional("targetedByEnemySpellDomain", "string", "Requires being chosen by an enemy spell of this domain.", resourceDomainKinds)
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
@@ -591,7 +630,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("controller", "player", "The required controller relationship."),
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
-      optional("selectionKey", "string", "Stable key used to route this selection.")
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("requiredDomain", "string", "Required card domain.", resourceDomainKinds)
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
@@ -603,12 +643,59 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Selects cards from a specified owner zone.",
     parameters: [
       required("zone", "zone", "The zone containing legal cards."),
-      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit"]),
+      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit", "Gear"]),
       required("owner", "player", "The required owner relationship."),
       required("minimumCount", "number", "The minimum selection count."),
       required("maximumCount", "number", "The maximum selection count.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
+  }),
+  "trigger.hold": primitiveSeed({
+    id: "trigger.hold",
+    family: "trigger",
+    name: "Unit hold trigger",
+    description: "Triggers when the source unit holds the battlefield being scored.",
+    listensToEvents: ["battlefield.held"],
+    engineSupport: supported("The held battlefield and unit locations are canonical board state."),
+  }),
+  "selector.source": primitiveSeed({
+    id: "selector.source",
+    family: "selector",
+    name: "Select source card",
+    description: "Offers the source card itself for an optional play-time cost or effect choice.",
+    parameters: [
+      optional("minimumCount", "number", "The minimum number of source selections."),
+      optional("maximumCount", "number", "The maximum number of source selections."),
+      optional("selectionKey", "string", "Stable key used to route the selection."),
+      optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"]),
+    ],
+    engineSupport: supported("The source identity is a canonical runtime instance."),
+  }),
+  "trigger.friendly_unit_combat": primitiveSeed({
+    id: "trigger.friendly_unit_combat",
+    family: "trigger",
+    name: "Friendly unit attacks or defends",
+    description: "Triggers when a unit controlled by this card's controller attacks, defends, or either.",
+    parameters: [
+      required("event", "string", "The combat event.", ["attack", "defend", "attackOrDefend"])
+    ],
+    listensToEvents: ["unit.attacks", "unit.defends"],
+    engineSupport: supported("Combat events retain their controller and subject identity server-side.")
+  }),
+  "selector.gear": primitiveSeed({
+    id: "selector.gear",
+    family: "selector",
+    name: "Select gear",
+    description: "Selects Gear permanents on the board, including attached Gear.",
+    parameters: [
+      optional("controller", "player", "The required controller relationship."),
+      optional("maximumEnergyCost", "number", "Maximum printed Energy cost."),
+      required("minimumCount", "number", "The minimum selection count."),
+      required("maximumCount", "number", "The maximum selection count."),
+      optional("selectionKey", "string", "Stable key used to route this selection.")
+    ],
+    targetingRequirements: ["target must be a Gear permanent on the board"],
+    engineSupport: supported("Gear targets are derived from canonical board and attachment state.")
   }),
   "selector.battlefield": primitiveSeed({
     id: "selector.battlefield",
@@ -620,6 +707,30 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("maximumCount", "number", "The maximum selection count.")
     ],
     engineSupport: requiresEngineSupport("Battlefield effect selection requires runtime projection support.")
+  }),
+  "selector.chain_item": primitiveSeed({
+    id: "selector.chain_item",
+    family: "selector",
+    name: "Select chain item",
+    description:
+      "Selects a spell or ability currently on the chain, with optional controller, printed-cost, and chosen-target restrictions.",
+    parameters: [
+      required("itemKind", "string", "The eligible chain-item kind.", ["spell", "spellOrAbility"]),
+      optional("controller", "player", "The eligible controller relationship."),
+      optional("maximumEnergyCost", "number", "Maximum printed Energy cost for an eligible spell."),
+      optional("maximumPowerCost", "number", "Maximum printed Power cost for an eligible spell."),
+      optional("choosesControlledCardType", "string", "Requires the item to choose a controlled card of this type.", ["Unit", "Gear", "UnitOrGear"]),
+      required("minimumCount", "number", "The minimum selection count."),
+      required("maximumCount", "number", "The maximum selection count."),
+      optional("selectionKey", "string", "Stable key used to route this selection.")
+    ],
+    fixedRules: [
+      "Only currently finalized chain items are legal targets.",
+      "A counter effect cannot select itself.",
+      "Printed card costs are used for card-cost restrictions."
+    ],
+    targetingRequirements: ["target must be a qualifying spell or ability on the chain"],
+    engineSupport: supported("Chain-item choices and counter resolution are server-authoritative.")
   }),
   "selector.token": primitiveSeed({
     id: "selector.token",
@@ -786,6 +897,74 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["unit.died"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
   }),
+  "action.draw_by_controlled_battlefield_count": primitiveSeed({
+    id: "action.draw_by_controlled_battlefield_count",
+    family: "action",
+    name: "Draw by controlled battlefield count",
+    description: "Draws once for each controlled battlefield other than the source battlefield.",
+    engineSupport: supported("Battlefield control is canonical board state."),
+  }),
+  "action.search_top_deck": primitiveSeed({
+    id: "action.search_top_deck",
+    family: "action",
+    name: "Look at top deck cards and draw a matching card",
+    description: "Privately looks at the top cards of the controller's Main Deck, optionally reveals and draws a matching card, then recycles the rest.",
+    parameters: [
+      required("count", "number", "Maximum number of Main Deck cards looked at."),
+      required("cardType", "string", "Card type that may be chosen and drawn.", ["Gear", "Unit", "Spell"]),
+      optional("maximumSelect", "number", "Maximum matching cards that may be drawn."),
+      optional("revealSelected", "boolean", "Whether selected cards are publicly revealed before being drawn."),
+    ],
+    emitsEvents: ["card.drawn", "card.recycled"],
+    engineSupport: supported("The private looked-card set, optional public reveal acknowledgement, and selection are retained in the canonical effect frame."),
+  }),
+  "action.gain_xp": primitiveSeed({
+    id: "action.gain_xp",
+    family: "action",
+    name: "Gain XP",
+    description: "Adds public experience points to the controller.",
+    parameters: [required("amount", "number", "XP gained.")],
+    engineSupport: supported("XP is server-authoritative public player state."),
+  }),
+  "action.reveal_opponent_hand": primitiveSeed({
+    id: "action.reveal_opponent_hand",
+    family: "action",
+    name: "Reveal opponent hand",
+    description: "Reveals an opponent's hand through canonical viewer visibility state.",
+    engineSupport: supported("Hand visibility is projected by the server."),
+  }),
+  "action.grant_facedown_vision": primitiveSeed({
+    id: "action.grant_facedown_vision",
+    family: "action",
+    name: "Grant facedown-card vision",
+    description: "Allows the controller to look at an opponent's facedown cards until the current turn ends.",
+    engineSupport: supported("Viewer-specific facedown visibility is projected from canonical game state."),
+  }),
+  "action.kill_card": primitiveSeed({
+    id: "action.kill_card",
+    family: "action",
+    name: "Kill card",
+    description: "Kills a selected board card and moves it to its owner's trash.",
+    parameters: [optional("selectionKey", "string", "Selector key supplying cards to kill.")],
+    emitsEvents: ["unit.died"],
+    engineSupport: supported("Card-zone and attachment cleanup is server-authoritative.")
+  }),
+  "action.counter_chain_item": primitiveSeed({
+    id: "action.counter_chain_item",
+    family: "action",
+    name: "Counter chain item",
+    description: "Clears selected spells or abilities from the chain without resolving them.",
+    parameters: [
+      required("selectionKey", "string", "Selector key supplying the chain item to counter.")
+    ],
+    fixedRules: [
+      "A countered card or ability does not resolve.",
+      "A countered card is placed in its owner's trash.",
+      "Countering does not refund paid costs.",
+      "A countered card is not considered played."
+    ],
+    engineSupport: supported("Counter resolution removes canonical chain items on the server.")
+  }),
   "action.banish_card": primitiveSeed({
     id: "action.banish_card",
     family: "action",
@@ -849,7 +1028,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Detach equipment",
     description: "Detaches equipment from a unit.",
-    parameters: [required("target", "target", "The equipment to detach.")],
+    parameters: [
+      required("target", "target", "The equipment to detach."),
+      optional("onlyIfEquipment", "boolean", "Silently does nothing when the referenced card is not Equipment."),
+      optional("selectionKey", "string", "Selector key supplying Equipment to detach."),
+      optional("requiresOptionKey", "string", "Only detaches when the named prior optional choice was accepted."),
+    ],
     emitsEvents: ["equipment.detached"]
   }),
   "action.play_token": primitiveSeed({
@@ -864,7 +1048,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         "sourceLocation",
         "base",
         "chooseBaseOrControlledBattlefield"
-      ])
+      ]),
+      optional("entryState", "string", "Whether the token enters ready or exhausted.", ["ready", "exhausted"]),
+      optional("onlyIfPreviousEffectSucceeded", "boolean", "Only plays tokens when the preceding effect succeeded.")
     ],
     emitsEvents: ["card.played"]
   }),
@@ -909,8 +1095,16 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("condition", "string", "Runtime predicate guarding the modifier.", [
         "friendlyDefendsAlone",
         "sourceCombatsAlone",
-        "onlyFriendlyUnitAtLocation"
+        "onlyFriendlyUnitAtLocation",
+        "sourceAttachedThisTurn",
+        "firstCardOfTypePlayedThisTurn",
+        "sourceControllerControlsBattlefield",
+        "sourceEmpowered",
+        "sourceNotEmpowered",
+        "targetDefending"
       ]),
+      optional("cardType", "string", "Restricts a card-cost modifier to this card type.", ["Gear", "Spell", "Unit"]),
+      optional("excludeTokens", "boolean", "Excludes generated token cards from the modifier."),
       optional(
         "duration",
         "duration",
@@ -1022,6 +1216,44 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "The runtime evaluates source-location and event-battlefield unit presence."
     )
   }),
+  "action.optional": primitiveSeed({
+    id: "action.optional",
+    family: "action",
+    name: "Optional effect choice",
+    description: "Offers the controller a yes-or-no choice and records whether they accepted it for a following effect.",
+    parameters: [
+      required("effectKey", "string", "Stable key used by a following effect."),
+      required("prompt", "string", "Prompt shown to the controller."),
+      optional("onlyIfSelectedBy", "string", "Only offers the choice when this selector chose a card."),
+    ],
+    engineSupport: supported("The decision is a server-authoritative pending effect choice."),
+  }),
+  "modifier.ignore_deflect": primitiveSeed({
+    id: "modifier.ignore_deflect",
+    family: "modifier",
+    name: "Ignore Deflect while paying",
+    description: "Causes the controller to ignore Deflect for this card's payment procedure.",
+    engineSupport: supported("Target payment is computed server-side from the card's canonical behavior model."),
+  }),
+  "condition.card_type_presence": primitiveSeed({
+    id: "condition.card_type_presence",
+    family: "condition",
+    name: "Card-type presence",
+    description: "Checks how many cards of a type the controller has on the board.",
+    parameters: [
+      required("cardType", "string", "Card type to count.", ["Gear", "Unit", "Spell", "Rune"]),
+      required("minimumCount", "number", "Minimum matching cards."),
+      optional("excludesSource", "boolean", "Whether the source is excluded from the count."),
+    ],
+    engineSupport: supported("Board card types are evaluated from canonical runtime definitions."),
+  }),
+  "condition.event_subject_combat_alone": primitiveSeed({
+    id: "condition.event_subject_combat_alone",
+    family: "condition",
+    name: "Event subject combats alone",
+    description: "Requires the attacking or defending event subject to be its controller's only unit in that combat role.",
+    engineSupport: supported("The combat role is canonical runtime state.")
+  }),
   "condition.while": primitiveSeed({
     id: "condition.while",
     family: "condition",
@@ -1096,7 +1328,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Requires an additional or alternate cost.",
     parameters: [
       required("amount", "number", "The cost amount."),
-      required("resource", "resource", "The resource paid.", costResourceTypes)
+      required("resource", "resource", "The resource paid.", costResourceTypes),
+      optional("optional", "boolean", "Whether this additional cost may be declined."),
+      optional("selectionKey", "string", "Selector key that records acceptance of this optional cost."),
+      optional("domain", "string", "Required Power domain for a rune cost.", resourceDomainKinds),
     ],
     engineSupport: partiallySupported("Cost payment is foundational, but arbitrary additional and alternate costs need per-primitive validation.")
   }),
@@ -1105,7 +1340,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "cost",
     name: "Exhaust source cost",
     description: "Exhausts the source as a cost.",
-    engineSupport: partiallySupported("Source exhaustion is foundational, but activation context needs per-card validation.")
+    engineSupport: supported("Activation costs are paid server-side before the ability enters the chain.")
   }),
   "cost.exhaust_selected_unit": primitiveSeed({
     id: "cost.exhaust_selected_unit",
@@ -1122,11 +1357,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "replacement.recall_on_next_death",
     family: "replacement",
     name: "Recall on next death",
-    description: "Replaces the selected unit's next death this turn with an exhausted recall.",
+    description: "Replaces a qualifying unit death with an exhausted recall.",
     parameters: [
-      required("selectionKey", "string", "Protected-unit selector key."),
+      optional("selectionKey", "string", "Protected-unit selector key."),
+      optional("target", "string", "The protected unit relationship.", ["attachedTopMost"]),
       required("duration", "duration", "Replacement duration."),
-      optional("exhausted", "boolean", "Whether the recalled unit becomes exhausted.")
+      optional("exhausted", "boolean", "Whether the recalled unit becomes exhausted."),
+      optional("consumeSource", "string", "What happens to the replacement source.", ["kill"]),
     ],
     engineSupport: supported("Stored as a consumable ongoing replacement effect.")
   }),

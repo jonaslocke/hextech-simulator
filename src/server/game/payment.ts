@@ -2,6 +2,7 @@ import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import {
   definitionForInstance,
+  effectivePowerCost,
   recomputeAllMight,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -37,10 +38,17 @@ export function buildPaymentPlan(
   energyCost: number,
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
+  cardInstanceId?: string,
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
-    powerCost: definition.card.attributes.power ?? 0,
+    powerCost: effectivePowerCost(
+      game,
+      playerId,
+      definition,
+      index,
+      cardInstanceId,
+    ),
     allowedPowerDomains: definition.card.classification.domain.filter(
       (domain) => domain !== "Colorless",
     ),
@@ -206,6 +214,7 @@ export function payCardCost(
   energyCost: number,
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
+  cardInstanceId?: string,
 ) {
   const plan = buildPaymentPlan(
     game,
@@ -214,6 +223,7 @@ export function payCardCost(
     energyCost,
     index,
     additionalAnyPower,
+    cardInstanceId,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
   applyPaymentPlan(game, playerId, plan, index);
@@ -234,6 +244,50 @@ export function payAbilityCost(
     index,
   );
   if (!plan) throw new Error("Ability costs cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
+}
+
+export function canPayAdditionalCost(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  costs: { energy: number; power: number; powerDomain?: string },
+  index: RuntimeCardIndex,
+) {
+  return (
+    buildPaymentPlanForRequest(game, playerId, definition, index, {
+      energyCost: costs.energy,
+      powerCost: costs.power,
+      allowedPowerDomains: costs.powerDomain
+        ? [normalizedDomain(costs.powerDomain)]
+        : definition.card.classification.domain.filter(
+            (domain) => domain !== "Colorless",
+          ),
+      context: { kind: "card", cardType: definition.card.classification.type },
+      additionalAnyPower: 0,
+    }) !== null
+  );
+}
+
+export function payAdditionalCost(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  costs: { energy: number; power: number; powerDomain?: string },
+  index: RuntimeCardIndex,
+) {
+  const plan = buildPaymentPlanForRequest(game, playerId, definition, index, {
+    energyCost: costs.energy,
+    powerCost: costs.power,
+    allowedPowerDomains: costs.powerDomain
+      ? [normalizedDomain(costs.powerDomain)]
+      : definition.card.classification.domain.filter(
+          (domain) => domain !== "Colorless",
+        ),
+    context: { kind: "card", cardType: definition.card.classification.type },
+    additionalAnyPower: 0,
+  });
+  if (!plan) throw new Error("Additional card cost cannot be paid.");
   applyPaymentPlan(game, playerId, plan, index);
 }
 
@@ -285,6 +339,12 @@ function applyPaymentPlan(
   }
 }
 
+function normalizedDomain(domain: string) {
+  return domain === "rainbow"
+    ? "Rainbow"
+    : `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`;
+}
+
 export function resourceUsageAllowsPayment(
   usage: string,
   context: PaymentContext,
@@ -331,7 +391,9 @@ export function targetDeflectCost(
   playerId: string,
   selectedIds: readonly string[],
   index: RuntimeCardIndex,
+  ignoreDeflect = false,
 ) {
+  if (ignoreDeflect) return 0;
   return selectedIds.reduce((total, id) => {
     const instance = index.instances.get(id);
     if (!instance || instance.ownerPlayerId === playerId) return total;

@@ -21,6 +21,7 @@ export function attachCardToTopMost(
 
   removeFromAttachmentLocations(game, attachedCardInstanceId);
   state.attachedToCardInstanceId = topMostCardInstanceId;
+  state.attachedAtTurnNumber = game.state.turn?.turnNumber ?? null;
   placeAttachedCardWithTopMost(
     game,
     attachedCardInstanceId,

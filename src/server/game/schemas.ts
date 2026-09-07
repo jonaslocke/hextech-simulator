@@ -39,7 +39,15 @@ export const gameCardDefinitionSchema = z.object({
   cardCode: z.string().min(1),
   sourceTextHash: z.string().min(1),
   card: cardSchema,
-  behaviorModel: behaviorModelSchema
+  behaviorModel: behaviorModelSchema,
+  effectText: z
+    .object({
+      plain: z.string().min(1),
+      sourceImageUrl: z.string().url(),
+    })
+    .nullable()
+    .optional(),
+  effectBehaviorModel: behaviorModelSchema.optional(),
 }).strict();
 
 export const deckEntrySchema = z.object({

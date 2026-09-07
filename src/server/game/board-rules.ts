@@ -13,7 +13,9 @@ export function cleanupBoard(
   index: RuntimeCardIndex
 ): void {
   recomputeAllMight(game, index);
-  cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+  if (cleanupLethalDamage(game, Object.keys(game.state.cardStates), index)) {
+    return;
+  }
   recallUnattachedGearAtBattlefields(game, index);
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);

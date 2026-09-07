@@ -171,10 +171,12 @@ export function useGameBoardActions({
       );
       const actionToSubmit = stagedMoveAction ?? projectedAction;
       const targetKind = actionToSubmit.targets.some(
-        (target) => target.kind === "card",
+        (target) => target.kind === "chainItem",
       )
-        ? "card"
-        : "battlefield";
+        ? "chainItem"
+        : actionToSubmit.targets.some((target) => target.kind === "card")
+          ? "card"
+          : "battlefield";
       const requirement = combineTargetRequirements(actionToSubmit, targetKind);
 
       if (requirement && requirement.maximum > 0) {
@@ -214,7 +216,12 @@ export function useGameBoardActions({
 
   const beginGlobalAction = useCallback(
     (action: GameProjection["actions"][number]) => {
-      const requirement = combineTargetRequirements(action, "card");
+      const targetKind = action.targets.some(
+        (target) => target.kind === "chainItem",
+      )
+        ? "chainItem"
+        : "card";
+      const requirement = combineTargetRequirements(action, targetKind);
       if (!requirement) {
         submitProjectedAction(action.id);
         return;
@@ -233,7 +240,7 @@ export function useGameBoardActions({
               : "play",
         requirement,
         selectedTargetIds: [],
-        targetKind: "card",
+        targetKind,
       });
     },
     [setTargetSelection, submitProjectedAction],

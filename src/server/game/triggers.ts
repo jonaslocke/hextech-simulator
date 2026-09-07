@@ -220,10 +220,12 @@ function continueQueuedChainItems(
       bindingKey: "chain-targets",
       prompt: `Choose targets for ${item.label}`,
       optionKind: requirements.some(
-        (requirement) => requirement.kind === "battlefield",
+        (requirement) => requirement.kind === "chainItem",
       )
-        ? "battlefield"
-        : "card",
+        ? "chainItem"
+        : requirements.some((requirement) => requirement.kind === "battlefield")
+          ? "battlefield"
+          : "card",
       sourceZone:
         sourceZones.size === 1 ? ([...sourceZones][0] ?? null) : null,
       presentation: "cardSelection",

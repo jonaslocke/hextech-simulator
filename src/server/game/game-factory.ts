@@ -77,6 +77,7 @@ export function createMatchGame(input: CreateMatchGameInput): GameDocument {
         {
           playerId,
           points: 0,
+          xp: 0,
           scoredBattlefieldIdsThisTurn: [],
           energy: 0,
           conditionalEnergy: 0,

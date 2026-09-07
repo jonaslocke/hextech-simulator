@@ -36,6 +36,7 @@ export const playerZonesSchema = z.object({
 export const playerStateSchema = z.object({
   playerId: z.string().min(1),
   points: z.number().int().nonnegative().optional(),
+  xp: z.number().int().nonnegative().default(0).optional(),
   scoredBattlefieldIdsThisTurn: z.array(z.string()).optional(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
@@ -57,6 +58,7 @@ export const battlefieldStateSchema = z.object({
   contestedByPlayerId: z.string().nullable().optional(),
   units: z.array(z.string()),
   attachedCardInstanceIds: z.array(z.string()).optional(),
+  facedownCardInstanceId: z.string().min(1).nullable().optional(),
 });
 
 export const setupStateSchema = z.object({
@@ -84,10 +86,12 @@ export const turnStateSchema = z.object({
   phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
   endTriggersQueued: z.boolean().optional(),
   endDelayedEffectsQueued: z.boolean().optional(),
+  playedCardInstanceIds: z.array(z.string().min(1)).default([]).optional(),
 });
 
 export const cardStateSchema = z.object({
   exhausted: z.boolean(),
+  empowered: z.boolean().default(false).optional(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
   objectVersion: z.number().int().nonnegative().optional(),
@@ -95,6 +99,7 @@ export const cardStateSchema = z.object({
   lethalSuppressedDamage: z.number().int().nonnegative().nullable().optional(),
   lethalSuppressedMight: z.number().int().nonnegative().nullable().optional(),
   attachedToCardInstanceId: z.string().min(1).nullable().optional(),
+  attachedAtTurnNumber: z.number().int().positive().nullable().optional(),
 });
 
 export const chainItemSchema = z.object({
@@ -128,6 +133,20 @@ const triggerOrderChoiceSchema = z.object({
   pendingItems: z.array(chainItemSchema),
 });
 
+const replacementOrderChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("orderReplacements"),
+  affectedCardInstanceId: z.string().min(1),
+  options: z.array(
+    z.object({
+      id: z.string().min(1),
+      sourceCardInstanceId: z.string().min(1),
+      kind: z.enum(["attachedEffect", "ongoing"]),
+    }),
+  ).min(2),
+});
+
 const combatDamageChoiceSchema = z.object({
   id: z.string().min(1),
   playerId: z.string().min(1),
@@ -143,7 +162,7 @@ const effectSelectionChoiceSchema = z.object({
   resolutionId: z.string().min(1).nullable(),
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
-  optionKind: z.enum(["card", "battlefield"]).default("card"),
+  optionKind: z.enum(["card", "battlefield", "chainItem"]).default("card"),
   sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable().default(null),
   presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
@@ -153,7 +172,7 @@ const effectSelectionChoiceSchema = z.object({
   targetRequirements: z
     .array(
       z.object({
-        kind: z.enum(["card", "battlefield", "player"]),
+        kind: z.enum(["card", "battlefield", "player", "chainItem"]),
         label: z.string().min(1).optional(),
         selectionKey: z.string().min(1).optional(),
         selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
@@ -164,6 +183,16 @@ const effectSelectionChoiceSchema = z.object({
       }),
     )
     .optional(),
+});
+
+const effectOptionChoiceSchema = z.object({
+  id: z.string().min(1),
+  playerId: z.string().min(1),
+  type: z.literal("effectOption"),
+  resolutionId: z.string().min(1),
+  bindingKey: z.string().min(1),
+  prompt: z.string().min(1),
+  options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).min(1),
 });
 
 const tokenPlacementChoiceSchema = z.object({
@@ -192,6 +221,17 @@ export const gameStateSchema = z.object({
   createdCardInstances: z.array(cardInstanceSchema).default([]).optional(),
   createdCardDefinitions: z
     .array(gameCardDefinitionSchema)
+    .default([])
+    .optional(),
+  revealedCardInstanceIds: z.array(z.string().min(1)).default([]).optional(),
+  facedownVisibilityGrants: z
+    .array(
+      z.object({
+        viewerPlayerId: z.string().min(1),
+        ownerPlayerId: z.string().min(1),
+        expiresAtTurnNumber: z.number().int().positive(),
+      }),
+    )
     .default([])
     .optional(),
   turn: turnStateSchema.nullable(),
@@ -273,16 +313,32 @@ export const gameStateSchema = z.object({
       nextEffectIndex: z.number().int().nonnegative(),
       delayedEffectId: z.string().min(1).nullable(),
       endingPlayerId: z.string().min(1).nullable(),
+      event: z
+        .object({
+          type: z.string(),
+          actorPlayerId: z.string().nullable(),
+          subjectCardInstanceId: z.string().nullable(),
+          values: z.record(
+            z.union([z.string(), z.number(), z.boolean(), z.null()]),
+          ),
+        })
+        .nullable()
+        .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
+      effectOutcomes: z.record(
+        z.union([z.boolean(), z.number(), z.string(), z.array(z.string())]),
+      ).default({}),
     }),
   ),
   pendingChoice: z
     .discriminatedUnion("type", [
       triggerOrderChoiceSchema,
+      replacementOrderChoiceSchema,
       combatDamageChoiceSchema,
       effectSelectionChoiceSchema,
+      effectOptionChoiceSchema,
       tokenPlacementChoiceSchema,
     ])
     .nullable(),
@@ -478,6 +534,7 @@ export function createInitialGame(input: {
         {
           playerId,
           points: 0,
+          xp: 0,
           scoredBattlefieldIdsThisTurn: [],
           energy: 0,
           conditionalEnergy: 0,

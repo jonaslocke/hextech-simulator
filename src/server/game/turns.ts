@@ -1,5 +1,7 @@
 import {
   createRuntimeCardIndex,
+  isTemporaryCard,
+  moveCardToTrash,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
@@ -37,6 +39,9 @@ export function applyStartOfTurn(
     !game.state.pendingChoice
   ) {
     if (turn.phase === "awaken") {
+      game.state.facedownVisibilityGrants = (
+        game.state.facedownVisibilityGrants ?? []
+      ).filter((grant) => grant.expiresAtTurnNumber >= turn.turnNumber);
       for (const candidate of Object.values(game.state.players)) {
         candidate.energy = 0;
         candidate.power = {};
@@ -64,8 +69,24 @@ export function applyStartOfTurn(
     }
 
     if (turn.phase === "beginning") {
-      // Hold is the Beginning step. Advance the checkpoint before dispatching
-      // triggers so resolution resumes at Channel instead of scoring twice.
+      if (index) {
+        const temporary = [
+          ...player.zones.base,
+          ...game.state.battlefields.flatMap((battlefield) => [
+            ...battlefield.units,
+            ...(battlefield.attachedCardInstanceIds ?? []),
+          ]),
+        ].filter(
+          (id) =>
+            index.instances.get(id)?.ownerPlayerId === turn.activePlayerId &&
+            isTemporaryCard(id, index),
+        );
+        for (const id of temporary) moveCardToTrash(game, id, index);
+        if (game.state.chain || game.state.pendingChoice) return;
+      }
+      // Temporary cards leave before the Beginning-step scoring. Once that
+      // cleanup has fully resolved, retain the existing checkpoint behavior so
+      // a scoring trigger cannot score the same battlefield twice.
       turn.phase = "channel";
       if (decks.length) {
         applyHoldScoring(game, turn.activePlayerId, decks);

@@ -230,6 +230,13 @@ function buildBattlefieldData({
       );
     },
   );
+  const facedownCard = battlefield?.facedownSlot
+    ? (buildCard(
+        battlefield.facedownSlot,
+        cardsByInstanceId,
+        projection.cardStates,
+      )[0] ?? null)
+    : null;
 
   return {
     id: battlefield?.battlefieldId ?? `missing:${fallbackSelectedByPlayerId}`,
@@ -252,6 +259,7 @@ function buildBattlefieldData({
     opponentAttachments: attachmentCards
       .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
       .map(({ card }) => card),
+    facedownCard,
   };
 }
 

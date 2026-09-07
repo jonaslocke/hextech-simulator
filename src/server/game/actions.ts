@@ -12,6 +12,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import {
@@ -56,11 +57,13 @@ import {
   buildAbilityPaymentPlan,
   buildPaymentPlan,
   payAbilityCost,
+  payAdditionalCost,
   payCardCost,
   targetDeflectCost,
 } from "./payment";
 import {
   beginEffectResolution,
+  submitEffectOption,
   submitEffectSelection,
   submitTokenPlacement,
   type TokenPlacement,
@@ -141,6 +144,36 @@ export function gameplayActions(
       );
       return actions;
     }
+    if (pendingChoice.type === "effectOption") {
+      const optionIds = pendingChoice.options.map((option) => option.id);
+      actions.push(
+        action(
+          game,
+          "submitChoice",
+          pendingChoice.prompt,
+          null,
+          true,
+          null,
+          undefined,
+          [
+            {
+              kind: "card",
+              label: pendingChoice.prompt,
+              legalIds: optionIds,
+              minimum: 1,
+              maximum: 1,
+            },
+          ],
+          {
+            kind: "effectOption",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+            options: pendingChoice.options,
+          },
+        ),
+      );
+      return actions;
+    }
     if (pendingChoice.type === "tokenPlacement") {
       const destinations = pendingChoice.legalDestinationIds.map((id) => ({
         id,
@@ -168,11 +201,17 @@ export function gameplayActions(
       );
       return actions;
     }
+    const optionIds =
+      pendingChoice.type === "orderReplacements"
+        ? pendingChoice.options.map((option) => option.id)
+        : pendingChoice.optionIds;
     actions.push(
       action(
         game,
         "submitChoice",
-        "Submit trigger order",
+        pendingChoice.type === "orderReplacements"
+          ? "Submit replacement order"
+          : "Submit trigger order",
         null,
         true,
         null,
@@ -180,16 +219,19 @@ export function gameplayActions(
         [
           {
             kind: "card",
-            label: "trigger order",
-            legalIds: pendingChoice.optionIds,
-            minimum: pendingChoice.optionIds.length,
-            maximum: pendingChoice.optionIds.length,
+            label:
+              pendingChoice.type === "orderReplacements"
+                ? "replacement order"
+                : "trigger order",
+            legalIds: optionIds,
+            minimum: optionIds.length,
+            maximum: optionIds.length,
           },
         ],
         {
           kind: "orderedOptions",
           choiceId: pendingChoice.id,
-          optionIds: pendingChoice.optionIds,
+          optionIds,
         },
       ),
     );
@@ -449,7 +491,15 @@ export function performGameplayAction(input: {
       );
       break;
     case "submitChoice":
-      if (game.state.pendingChoice?.type === "orderTriggers") {
+      if (game.state.pendingChoice?.type === "orderReplacements") {
+        submitDeathReplacementOrder(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          index,
+        );
+        cleanupBoard(game, index);
+      } else if (game.state.pendingChoice?.type === "orderTriggers") {
         const orderedIds = [...input.selectedIds];
         submitTriggerOrder(game, input.actorPlayerId, input.selectedIds);
         const orderedItems =
@@ -481,6 +531,18 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+      } else if (game.state.pendingChoice?.type === "effectOption") {
+        submitEffectOption(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "tokenPlacement") {
         submitTokenPlacement(
           game,
@@ -674,7 +736,7 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition, index);
+  const energyCost = effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -684,15 +746,20 @@ function playCard(
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
-  payOptionalPlayCosts(game, definition, selectedIds, index);
+  payOptionalPlayCosts(game, playerId, definition, cardId, selectedIds, index);
   payCardCost(
     game,
     playerId,
     definition,
     energyCost,
     index,
-    targetDeflectCost(playerId, selectedIds, index),
+    targetDeflectCost(playerId, selectedIds, index, ignoresDeflect(definition)),
+    cardId,
   );
+  if (game.state.turn) {
+    game.state.turn.playedCardInstanceIds ??= [];
+    game.state.turn.playedCardInstanceIds.push(cardId);
+  }
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
@@ -844,16 +911,34 @@ function passPriority(
               "Activated ability is unavailable during resolution.",
             );
           }
-          handler.execute(
-            binding,
-            createBehaviorContext(
+          if (binding.behaviorId === "ability.activated_effect") {
+            beginEffectResolution({
               game,
-              controller,
-              item.sourceCardInstanceId,
-              null,
-              validLockedTargets(game, clause, item, controller, handlers),
-            ),
-          );
+              controllerPlayerId: controller,
+              sourceCardInstanceId: item.sourceCardInstanceId,
+              clauseId: clause.id,
+              selectedIds: validLockedTargets(
+                game,
+                clause,
+                item,
+                controller,
+                handlers,
+              ),
+              targetsLocked: true,
+              decks,
+            });
+          } else {
+            handler.execute(
+              binding,
+              createBehaviorContext(
+                game,
+                controller,
+                item.sourceCardInstanceId,
+                null,
+                validLockedTargets(game, clause, item, controller, handlers),
+              ),
+            );
+          }
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(
             definition.behaviorModel,
@@ -893,6 +978,7 @@ function passPriority(
                   handlers,
                 ),
                 targetsLocked: true,
+                event: item.behaviorEvent,
                 decks,
               });
               if (definition.card.classification.type === "Spell") {
@@ -1077,6 +1163,7 @@ function completeEndTurn(
     turnNumber: turn.turnNumber + 1,
     activePlayerId: next,
     phase: "awaken",
+    playedCardInstanceIds: [],
   };
   applyStartOfTurn(game, decks, index);
 }
@@ -1276,13 +1363,15 @@ function addPlayableCardActions(
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
-    const cost = effectiveEnergyCost(game, playerId, definition, index);
+    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId);
     const paymentPlan = buildPaymentPlan(
       game,
       playerId,
       definition,
       cost,
       index,
+      0,
+      cardId,
     );
     const targets = projectedTargets;
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
@@ -1297,7 +1386,12 @@ function addPlayableCardActions(
       .filter((id, position, ids) => ids.indexOf(id) === position)
       .map((targetId) => ({
         targetId,
-        amount: targetDeflectCost(playerId, [targetId], index),
+        amount: targetDeflectCost(
+          playerId,
+          [targetId],
+          index,
+          ignoresDeflect(definition),
+        ),
       }))
       .filter((entry) => entry.amount > 0);
     const costPreview =
@@ -1426,8 +1520,14 @@ function addAbilityActions(
             abilityCosts,
             index,
           ) !== null;
+        const alreadyEmpowered =
+          ability.behaviorId === "ability.empower" &&
+          game.state.cardStates[sourceId]?.empowered === true;
         const enabled =
-          sourceReady && costsPayable && canSatisfyTargetRequirements(targets);
+          sourceReady &&
+          !alreadyEmpowered &&
+          costsPayable &&
+          canSatisfyTargetRequirements(targets);
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
@@ -1440,7 +1540,9 @@ function addAbilityActions(
                 : "Add Energy"
               : ability.behaviorId === "ability.equip"
                 ? "Equip"
-              : `${definition.card.name} ability`;
+              : ability.behaviorId === "ability.empower"
+                ? "Empower"
+                : `${definition.card.name} ability`;
         actions.push(
           action(
             game,
@@ -1450,8 +1552,10 @@ function addAbilityActions(
             enabled,
             enabled
               ? null
-              : sourceReady
-                ? costsPayable
+                : sourceReady
+                ? alreadyEmpowered
+                  ? "Source is already Empowered."
+                  : costsPayable
                   ? "No legal targets are available."
                   : "Ability costs cannot be paid."
                 : "Source is exhausted.",
@@ -1591,6 +1695,15 @@ function executeActivatedAbility(
     return;
   }
   const costs = activationCosts(clause);
+  if (
+    clause.costs.some((cost) => cost.behaviorId === "cost.exhaust_source")
+  ) {
+    const state = game.state.cardStates[sourceId];
+    if (!state || state.exhausted) {
+      throw new Error("Ability source is exhausted.");
+    }
+    state.exhausted = true;
+  }
   if (costs.energy > 0 || costs.power > 0) {
     payAbilityCost(game, actorPlayerId, definition, costs, index);
   }
@@ -1778,7 +1891,9 @@ function captureTargetObjectVersions(
 
 function payOptionalPlayCosts(
   game: GameDocument,
+  playerId: string,
   definition: GameCardDefinition,
+  cardId: string,
   selectedIds: string[],
   index: RuntimeCardIndex,
 ) {
@@ -1787,13 +1902,45 @@ function payOptionalPlayCosts(
       (cost) => cost.behaviorId === "cost.exhaust_selected_unit",
     ),
   );
-  if (!hasExhaustCost || selectedIds.length === 0) return;
-  const selected = selectedIds.find(
-    (id) =>
-      definitionForInstance(id, index).card.classification.type === "Unit" &&
-      !game.state.cardStates[id]?.exhausted,
-  );
-  if (selected) game.state.cardStates[selected]!.exhausted = true;
+  if (hasExhaustCost && selectedIds.length > 0) {
+    const selected = selectedIds.find(
+      (id) =>
+        definitionForInstance(id, index).card.classification.type === "Unit" &&
+        !game.state.cardStates[id]?.exhausted,
+    );
+    if (selected) game.state.cardStates[selected]!.exhausted = true;
+  }
+
+  for (const cost of definition.behaviorModel.clauses.flatMap(
+    (clause) => clause.costs,
+  )) {
+    if (
+      cost.behaviorId !== "cost.pay" ||
+      cost.parameters.optional !== true ||
+      (typeof cost.parameters.selectionKey === "string" &&
+        !selectedIds.includes(cardId))
+    ) {
+      continue;
+    }
+    const amount = cost.parameters.amount;
+    if (typeof amount !== "number" || amount < 0) {
+      throw new Error("Optional card payment cost is malformed.");
+    }
+    const resource = cost.parameters.resource;
+    payAdditionalCost(
+      game,
+      playerId,
+      definition,
+      {
+        energy: resource === "energy" ? amount : 0,
+        power: resource === "rune" ? amount : 0,
+        ...(typeof cost.parameters.domain === "string"
+          ? { powerDomain: cost.parameters.domain }
+          : {}),
+      },
+      index,
+    );
+  }
 }
 
 function hasBehavior(definition: GameCardDefinition, behaviorId: string) {
@@ -1811,24 +1958,37 @@ function validLockedTargets(
   controllerPlayerId: string,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
-  const currentlyLegal = new Set(
-    targetRequirementsForClause(
-      clause,
-      createBehaviorContext(
-        game,
-        controllerPlayerId,
-        item.sourceCardInstanceId!,
-        item.behaviorEvent,
-        [],
-      ),
-      handlers,
-    ).flatMap((requirement) => requirement.legalIds),
+  const requirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(
+      game,
+      controllerPlayerId,
+      item.sourceCardInstanceId!,
+      item.behaviorEvent,
+      [],
+    ),
+    handlers,
+  );
+  const currentlyLegal = new Set(requirements.flatMap((requirement) => requirement.legalIds));
+  const chainItemTargets = new Set(
+    requirements
+      .filter((requirement) => requirement.kind === "chainItem")
+      .flatMap((requirement) => requirement.legalIds),
   );
   return item.targetCardInstanceIds.filter(
     (id) =>
       currentlyLegal.has(id) &&
-      (game.state.cardStates[id]?.objectVersion ?? 0) ===
-        item.targetObjectVersions[id],
+      (chainItemTargets.has(id) ||
+        (game.state.cardStates[id]?.objectVersion ?? 0) ===
+          item.targetObjectVersions[id]),
+  );
+}
+
+function ignoresDeflect(definition: GameCardDefinition) {
+  return definition.behaviorModel.clauses.some((clause) =>
+    clause.effects.some(
+      (binding) => binding.behaviorId === "modifier.ignore_deflect",
+    ),
   );
 }
 

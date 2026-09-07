@@ -36,17 +36,24 @@ export const approvedBehaviorClauseSchema = z.object({
   assignments: z.array(approvedPrimitiveAssignmentSchema),
   unsupportedReason: z.string().nullable()
 }).strict();
+export const approvedEffectTextSchema = z.object({
+  plain: z.string().min(1),
+  sourceImageUrl: z.string().url()
+}).strict();
 export const canonicalCardPublicationInputSchema = z.object({
   cardCode: z.string().min(1),
   card: cardSchema,
   sourceTextHash: z.string().min(1),
   modelingStatus: z.literal("approved"),
   clauses: z.array(approvedBehaviorClauseSchema),
+  effectText: approvedEffectTextSchema.nullable().optional(),
+  effectClauses: z.array(approvedBehaviorClauseSchema).optional(),
   adminNotes: z.string()
 }).strict();
 
 export type ApprovedPrimitiveAssignment = z.infer<typeof approvedPrimitiveAssignmentSchema>;
 export type ApprovedBehaviorClause = z.infer<typeof approvedBehaviorClauseSchema>;
+export type ApprovedEffectText = z.infer<typeof approvedEffectTextSchema>;
 export type CanonicalCardPublicationInput = z.infer<typeof canonicalCardPublicationInputSchema>;
 
 export type CanonicalBehaviorBinding = {
@@ -85,6 +92,8 @@ export type CanonicalCardDocument = {
   modelingStatus: "approved";
   runtimeSupportStatus: EngineSupportStatus;
   behaviorModel: CanonicalBehaviorModel;
+  effectText: ApprovedEffectText | null;
+  effectBehaviorModel: CanonicalBehaviorModel;
   approval: { adminNotes: string; approvedAt: string };
   createdAt: string;
   updatedAt: string;
@@ -134,6 +143,29 @@ export function buildCanonicalCardDocument(
   if (parsed.sourceTextHash !== hashCardRulesText(card)) {
     throw new Error("Card rules text changed after preview.");
   }
+  if (
+    parsed.effectText &&
+    parsed.effectText.sourceImageUrl !== card.media.image_url
+  ) {
+    throw new Error("Effect Text provenance must reference the card's source image.");
+  }
+  if (!parsed.effectText && (parsed.effectClauses?.length ?? 0) > 0) {
+    throw new Error("Effect Text clauses require approved Effect Text.");
+  }
+
+  const effectDocument = parsed.effectText
+    ? buildCanonicalCardDocument(
+        {
+          ...parsed,
+          effectText: null,
+          effectClauses: [],
+          clauses: parsed.effectClauses ?? [],
+        },
+        behaviorCatalog,
+        createdAt,
+        updatedAt,
+      )
+    : null;
 
   const catalogById = new Map(behaviorCatalog.map((behavior) => [behavior.id, behavior]));
   const clauseIds = new Set<string>();
@@ -239,8 +271,16 @@ export function buildCanonicalCardDocument(
     card,
     sourceTextHash: parsed.sourceTextHash,
     modelingStatus: "approved",
-    runtimeSupportStatus: combineSupportStatuses(runtimeSupportStatuses),
+    runtimeSupportStatus: combineSupportStatuses([
+      ...runtimeSupportStatuses,
+      ...(effectDocument ? [effectDocument.runtimeSupportStatus] : []),
+    ]),
     behaviorModel: { playTimings, clauses },
+    effectText: parsed.effectText ?? null,
+    effectBehaviorModel: effectDocument?.behaviorModel ?? {
+      playTimings: [],
+      clauses: [],
+    },
     approval: { adminNotes: parsed.adminNotes, approvedAt: updatedAt },
     createdAt,
     updatedAt

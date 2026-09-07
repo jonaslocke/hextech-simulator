@@ -1,4 +1,5 @@
 import {
+  type BehaviorEvent,
   clauseHasAutomaticAffectedGroup,
   compileBehaviorModel,
   createBehaviorContext,
@@ -24,6 +25,7 @@ export function beginEffectResolution(input: {
   clauseId: string;
   delayedEffectId?: string;
   endingPlayerId?: string;
+  event?: BehaviorEvent | null;
   selectedIds?: string[];
   targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
@@ -37,9 +39,11 @@ export function beginEffectResolution(input: {
     nextEffectIndex: 0,
     delayedEffectId: input.delayedEffectId ?? null,
     endingPlayerId: input.endingPlayerId ?? null,
+    event: input.event ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
+    effectOutcomes: {},
   });
   return resumeEffectResolution(input.game, id, input.decks);
 }
@@ -72,6 +76,24 @@ export function submitEffectSelection(
   const frame = game.state.effectResolutions.find(
     (candidate) => candidate.id === pending.resolutionId,
   );
+  if (!frame) throw new Error("Effect resolution is unavailable.");
+  frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
+  game.state.pendingChoice = null;
+  return resumeEffectResolution(game, frame.id, decks);
+}
+
+export function submitEffectOption(
+  game: GameDocument,
+  playerId: string,
+  selectedIds: string[],
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const pending = game.state.pendingChoice;
+  if (
+    !pending || pending.type !== "effectOption" || pending.playerId !== playerId ||
+    selectedIds.length !== 1 || !pending.options.some((option) => option.id === selectedIds[0])
+  ) throw new Error("Effect option selection is not available.");
+  const frame = game.state.effectResolutions.find((candidate) => candidate.id === pending.resolutionId);
   if (!frame) throw new Error("Effect resolution is unavailable.");
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
   game.state.pendingChoice = null;
@@ -139,7 +161,7 @@ export function resumeEffectResolution(
     game,
     frame.controllerPlayerId,
     frame.sourceCardInstanceId,
-    null,
+    frame.event,
     [],
   );
   for (const { binding, requirement } of selectionRequirementsForClause(
@@ -177,7 +199,9 @@ export function resumeEffectResolution(
             ? `Choose ${requirement.label}`
             : "Choose effect target",
       optionKind:
-        requirement.kind === "battlefield" ? "battlefield" : "card",
+        requirement.kind === "battlefield" || requirement.kind === "chainItem"
+          ? requirement.kind
+          : "card",
       sourceZone: requirement.sourceZone ?? null,
       presentation: "cardSelection",
       legalCardIds: requirement.legalIds,
@@ -201,30 +225,62 @@ export function resumeEffectResolution(
       game,
       frame.controllerPlayerId,
       frame.sourceCardInstanceId,
-      null,
+      frame.event,
       [
         ...new Set([
           ...frame.initialSelectedIds,
           ...selectorSelections,
         ]),
-        ...(frame.selectionsByBinding[bindingKey] ?? []),
+        ...Object.entries(frame.selectionsByBinding)
+          .filter(([key]) => key === bindingKey || key.startsWith(`${bindingKey}:`))
+          .flatMap(([, selected]) => selected),
       ],
-      clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
-        ? { automaticTargets: true }
-        : {},
+      {
+        ...frame.effectOutcomes,
+        ...(clauseHasAutomaticAffectedGroup(clause, selectorContext, handlers)
+          ? { automaticTargets: true }
+          : {}),
+      },
     );
+    for (const selector of clause.selectors) {
+      const selected =
+        frame.selectionsByBinding[
+          `${clause.id}:selectors:${selector.order}`
+        ] ?? [];
+      context.selectedBySelector[
+        `${clause.id}:selectors:${selector.order}`
+      ] = selected;
+      if (typeof selector.parameters.selectionKey === "string") {
+        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+      }
+    }
     const handler = handlers.get(binding.behaviorId);
     if (!handler?.execute)
       throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
     const requirement = handler.choice?.(binding, context) ?? null;
-    if (requirement && !frame.selectionsByBinding[bindingKey]) {
+    const choiceBindingKey = requirement?.choiceKey
+      ? `${bindingKey}:${requirement.choiceKey}`
+      : bindingKey;
+    if (requirement && !frame.selectionsByBinding[choiceBindingKey]) {
+      if (requirement.kind === "option") {
+        game.state.pendingChoice = {
+          id: `choice:${frame.id}:${binding.order}`,
+          playerId: frame.controllerPlayerId,
+          type: "effectOption",
+          resolutionId: frame.id,
+          bindingKey: choiceBindingKey,
+          prompt: requirement.prompt,
+          options: requirement.options ?? [],
+        };
+        return false;
+      }
       if (requirement.kind === "tokenPlacement") {
         game.state.pendingChoice = {
           id: `choice:${frame.id}:${binding.order}`,
           playerId: frame.controllerPlayerId,
           type: "tokenPlacement",
           resolutionId: frame.id,
-          bindingKey,
+          bindingKey: choiceBindingKey,
           prompt: requirement.prompt,
           tokenName: requirement.tokenName ?? "Token",
           count: requirement.maximum,
@@ -243,7 +299,7 @@ export function resumeEffectResolution(
         playerId: frame.controllerPlayerId,
         type: "effectSelection",
         resolutionId: frame.id,
-        bindingKey,
+        bindingKey: choiceBindingKey,
         prompt: requirement.prompt,
         optionKind: "card",
         sourceZone: requirement.sourceZone ?? null,
@@ -255,6 +311,7 @@ export function resumeEffectResolution(
       return false;
     }
     handler.execute(binding, context);
+    frame.effectOutcomes = context.effectOutcomes;
     frame.nextEffectIndex += 1;
   }
 
