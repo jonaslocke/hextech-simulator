@@ -55,6 +55,7 @@ export type Card = {
   supertype?: ProjectedCardView["supertype"];
   type?: ProjectedCardView["type"];
   isExhausted?: boolean;
+  attachedToCardInstanceId?: string | null;
   damage?: number;
   comesToPlayReady?: boolean;
 };

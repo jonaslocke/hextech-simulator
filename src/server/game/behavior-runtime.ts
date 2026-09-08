@@ -97,10 +97,22 @@ export function selectionRequirementsForClause(
   binding: BehaviorBinding;
   requirement: ProjectedTargetRequirement;
 }> {
+  const selectorContext: BehaviorExecutionContext = {
+    ...context,
+    selectedBySelector: { ...context.selectedBySelector },
+  };
   const requirements = clause.selectors.map((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
-    return { binding, requirement: handler.targets(binding, context) };
+    const requirement = handler.targets(binding, selectorContext);
+    const selected = selectedForRequirement(requirement, context.selectedIds);
+    selectorContext.selectedBySelector[
+      `${clause.id}:selectors:${binding.order}`
+    ] = selected;
+    if (typeof binding.parameters.selectionKey === "string") {
+      selectorContext.selectedBySelector[binding.parameters.selectionKey] = selected;
+    }
+    return { binding, requirement };
   });
   const automaticCardIds = new Set(
     requirements

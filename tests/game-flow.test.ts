@@ -7,9 +7,11 @@ import type {
 } from "../src/server/game";
 import {
   createBehaviorContext,
+  applyHoldScoring,
   gameplayActions,
   performGameplayAction,
   projectGame,
+  scoreBattlefield,
   type GameDocument,
 } from "../src/server/game";
 import { cleanupBoard } from "../src/server/game/board-rules";
@@ -193,6 +195,166 @@ test("resolves generic optional effect choices through the canonical pending-dec
   assert.equal(next.state.cardStates["p1:bf"]!.exhausted, false);
 });
 
+test("replaces a non-final Conquer point with a draw, then awards the final point", () => {
+  const { game, decks } = fixture();
+  decks[0]!.instances.push({
+    instanceId: "p1:bf-two",
+    ownerPlayerId: "p1",
+    source: "battlefield",
+    cardCode: "BF",
+  });
+  game.state.cardStates["p1:bf-two"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.battlefields.push({
+    battlefieldId: "p1:bf-two",
+    cardInstanceId: "p1:bf-two",
+    selectedByPlayerId: "p1",
+    units: [],
+  });
+  game.state.players.p1!.points = 7;
+  const handBefore = game.state.players.p1!.zones.hand.length;
+
+  scoreBattlefield(game, "p1", "p1:bf", "conquer", decks);
+  assert.equal(game.state.players.p1!.points, 7);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
+
+  scoreBattlefield(game, "p1", "p1:bf-two", "conquer", decks);
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
+});
+
+test("awards the final point through Hold and does not score a battlefield twice", () => {
+  const { game, decks } = fixture();
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  game.state.players.p1!.points = 7;
+
+  applyHoldScoring(game, "p1", decks);
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+
+  const repeated = fixture();
+  scoreBattlefield(repeated.game, "p1", "p1:bf", "conquer", repeated.decks);
+  scoreBattlefield(repeated.game, "p1", "p1:bf", "conquer", repeated.decks);
+  assert.equal(repeated.game.state.players.p1!.points, 1);
+});
+
+test("finalizes a spell's selected unit and legal move destination before it enters the Chain", () => {
+  const { game: initial, decks } = fixture();
+  let game = structuredClone(initial);
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.behaviorModel.playTimings = [binding("timing.action", 0, {})];
+  spell.behaviorModel.clauses = [
+    clause("move", {
+      selectors: [
+        binding("selector.enemy_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "unit",
+        }),
+        binding("selector.move_destination", 1, {
+          unitSelectionKey: "unit",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "destination",
+        }),
+      ],
+      effects: [
+        binding("action.move_unit", 0, {
+          selectionKey: "unit",
+          destinationSelectionKey: "destination",
+        }),
+      ],
+    }),
+  ];
+  decks[1]!.snapshot.cards = decks[0]!.snapshot.cards;
+  decks[1]!.instances.push(
+    {
+      instanceId: "p2:unit",
+      ownerPlayerId: "p2",
+      source: "mainDeck",
+      cardCode: "UNIT",
+    },
+    {
+      instanceId: "p2:bf",
+      ownerPlayerId: "p2",
+      source: "battlefield",
+      cardCode: "BF",
+    },
+  );
+  game.state.battlefields[0]!.units.push("p2:unit");
+  game.state.battlefields.push({
+    battlefieldId: "p2:bf",
+    cardInstanceId: "p2:bf",
+    selectedByPlayerId: "p2",
+    units: [],
+  });
+  game.state.cardStates["p2:unit"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+  game.state.cardStates["p2:bf"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  assert.deepEqual(
+    play.targets.map((target) => target.kind),
+    ["card", "location"],
+  );
+  assert.throws(
+    () =>
+      performGameplayAction({
+        game,
+        actorPlayerId: "p1",
+        actionId: play.id,
+        selectedIds: ["p2:unit", "p1:bf"],
+        decks,
+        now: "move-invalid",
+      }),
+    /Selected targets are not legal/,
+  );
+
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: ["p2:unit", "p2:bf"],
+    decks,
+    now: "move-played",
+  });
+  assert.deepEqual(game.state.chain?.items[0]?.targetCardInstanceIds, [
+    "p2:unit",
+    "p2:bf",
+  ]);
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `move-pass-${playerId}`,
+    });
+  }
+  assert.deepEqual(game.state.battlefields[0]!.units, []);
+  assert.deepEqual(game.state.battlefields[1]!.units, ["p2:unit"]);
+  assert.equal(game.state.players.p2!.zones.base.includes("p2:unit"), false);
+});
+
 test("publicly reveals an opponent hand without creating an acknowledgement decision", () => {
   const { game, decks } = fixture();
   decks[1]!.instances.push({
@@ -361,6 +523,52 @@ test("automatically pays card costs with behavior-backed rune abilities", () => 
   assert.ok(game.state.players.p1!.zones.base.includes("p1:rune-b"));
   assert.equal(game.state.cardStates["p1:rune-b"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
+});
+
+test("projects printed and effective costs for generic Gear cost modifiers", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("GEAR_COST", "Costed Gear", "Gear", 3, 1));
+  const battlefield = snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [clause("gear discount", {
+    effects: [binding("modifier.modify_numeric_value", 0, {
+      attribute: "energyCost",
+      operation: "reduce",
+      amount: 1,
+      minimum: 0,
+      target: "controller_card",
+      cardType: "Gear",
+      duration: "whileSourceAtBattlefield",
+      condition: "firstCardOfTypePlayedThisTurn",
+    })],
+  })];
+  decks[0]!.instances.push({
+    instanceId: "p1:costed-gear",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "GEAR_COST",
+  });
+  game.state.players.p1!.zones.hand.push("p1:costed-gear");
+  game.state.cardStates["p1:costed-gear"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:costed-gear",
+  )!;
+  assert.deepEqual(play.costPreview, {
+    energy: 2,
+    basePower: 0,
+    effectivePower: 0,
+    printedEnergy: 3,
+    printedPower: 0,
+    availableAnyPower: 0,
+    targetAdditionalPower: [],
+  });
 });
 
 test("uses generic restricted Power for Gear cards and Gear Equip abilities", () => {
@@ -641,7 +849,7 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   assert.ok(atBattlefield.state.players.p1!.zones.base.includes("p1:gear"));
 });
 
-test("Quick-Draw Gear uses normal play target projection and attaches on play", () => {
+test("Quick-Draw Gear enters Base, then attaches through its triggered Chain item", () => {
   const { game, decks } = fixture();
   const snapshot = decks[0]!.snapshot;
   snapshot.cards.push(definition("QUICK_GEAR", "Quick Gear", "Gear", 0, 0));
@@ -650,15 +858,21 @@ test("Quick-Draw Gear uses normal play target projection and attaches on play", 
   )!;
   quickGear.card.tags = ["Equipment"];
   quickGear.behaviorModel.clauses = [clause("quick-draw", {
+    triggers: [binding("trigger.on_play", 0, {
+      actor: "controller",
+      subject: "source",
+    })],
     selectors: [binding("selector.friendly_unit", 0, {
       minimumCount: 1,
       maximumCount: 1,
       area: "board",
       locationRelation: "any",
       controller: "controller",
+      selectionKey: "unit",
     })],
     effects: [binding("action.attach_equipment", 0, {
       target: "friendly_unit",
+      selectionKey: "unit",
     })],
     keywords: [binding("keyword.quick_draw", 0, {})],
   })];
@@ -678,16 +892,46 @@ test("Quick-Draw Gear uses normal play target projection and attaches on play", 
   const play = gameplayActions(game, "p1", decks).find(
     (action) => action.label === "Play Quick Gear",
   )!;
-  assert.equal(play.targets[0]?.legalIds.includes("p1:mover"), true);
-  const next = performGameplayAction({
+  assert.deepEqual(play.targets, []);
+  let next = performGameplayAction({
     game,
     actorPlayerId: "p1",
     actionId: play.id,
-    selectedIds: ["p1:mover"],
+    selectedIds: [],
     decks,
     now: "quick-draw",
   });
   assert.ok(next.state.players.p1!.zones.base.includes("p1:quick-gear"));
+  assert.equal(
+    next.state.cardStates["p1:quick-gear"]!.attachedToCardInstanceId ?? null,
+    null,
+  );
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  const chooseTarget = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  )!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseTarget.id,
+    selectedIds: ["p1:mover"],
+    decks,
+    now: "quick-draw-target",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.kind, "trigger");
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `quick-draw-pass-${playerId}`,
+    });
+  }
   assert.equal(
     next.state.cardStates["p1:quick-gear"]!.attachedToCardInstanceId,
     "p1:mover",
@@ -845,6 +1089,9 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   assert.deepEqual(play.costPreview, {
     energy: 0,
     basePower: 0,
+    effectivePower: 0,
+    printedEnergy: 0,
+    printedPower: 0,
     availableAnyPower: 0,
     targetAdditionalPower: [{ targetId: "p2:deflect", amount: 1 }],
   });

@@ -176,12 +176,19 @@ export function useGameBoardActions({
         ? "chainItem"
         : actionToSubmit.targets.some((target) => target.kind === "card")
           ? "card"
-          : "battlefield";
+          : actionToSubmit.targets.some((target) => target.kind === "location")
+            ? "location"
+            : "battlefield";
       const requirement = combineTargetRequirements(actionToSubmit, targetKind);
+      const followUpLocationRequirement =
+        targetKind !== "location"
+          ? combineTargetRequirements(actionToSubmit, "location") ?? undefined
+          : undefined;
 
       if (requirement && requirement.maximum > 0) {
         setTargetSelection({
           actionId: actionToSubmit.id,
+          followUpLocationRequirement,
           legalTargetIds: requirement.legalIds,
           maxTargets: requirement.maximum,
           minTargets: requirement.minimum,
@@ -220,7 +227,11 @@ export function useGameBoardActions({
         (target) => target.kind === "chainItem",
       )
         ? "chainItem"
-        : "card";
+        : action.targets.some((target) => target.kind === "card")
+          ? "card"
+          : action.targets.some((target) => target.kind === "location")
+            ? "location"
+            : "battlefield";
       const requirement = combineTargetRequirements(action, targetKind);
       if (!requirement) {
         submitProjectedAction(action.id);
@@ -229,6 +240,10 @@ export function useGameBoardActions({
       const kind = action.id.split(":")[3];
       setTargetSelection({
         actionId: action.id,
+        followUpLocationRequirement:
+          targetKind !== "location"
+            ? combineTargetRequirements(action, "location") ?? undefined
+            : undefined,
         legalTargetIds: requirement.legalIds,
         maxTargets: requirement.maximum,
         minTargets: requirement.minimum,
@@ -264,13 +279,16 @@ export function useGameBoardActions({
 
       const mode = enabledModes[0];
 
-      submitPlayCard({
-        canPlay: Boolean(mode),
-        cardInstanceId: card.instanceId,
-        selectedModeId: mode?.id,
-      });
+      if (mode) {
+        beginPlayOrTargetSelection(card, mode.id);
+      }
     },
-    [closeCardActionMenu, setUnitPlayChoice, submitPlayCard, viewerState],
+    [
+      beginPlayOrTargetSelection,
+      closeCardActionMenu,
+      setUnitPlayChoice,
+      viewerState,
+    ],
   );
 
   const openPlayableCardMenu = useCallback(
@@ -289,7 +307,7 @@ export function useGameBoardActions({
           ? modes.map((mode) => ({
               boardLocation: mode.boardLocation,
               id: mode.id,
-              label: mode.label,
+              label: playableCardMenuLabel(mode),
               onSelect: () => beginPlayOrTargetSelection(card, mode.id),
             }))
           : [
@@ -549,6 +567,29 @@ export function useGameBoardActions({
     submitLocationDragMoveAction,
     submitLocationDragPlayAction,
   };
+}
+
+function playableCardMenuLabel(mode: PaymentMode): ReactNode {
+  const preview = mode.costPreview;
+  if (!preview) return mode.label;
+  const effective = `${preview.energy} Energy${
+    preview.effectivePower > 0 ? ` + ${preview.effectivePower} Power` : ""
+  }`;
+  const printed = `${preview.printedEnergy} Energy${
+    preview.printedPower > 0 ? ` + ${preview.printedPower} Power` : ""
+  }`;
+  const modified =
+    preview.energy !== preview.printedEnergy ||
+    preview.effectivePower !== preview.printedPower;
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span>{mode.label}</span>
+      <span className="text-slate-300 text-[11px]">
+        Cost: {effective}
+        {modified ? ` (printed ${printed}; modified by active effects)` : ""}
+      </span>
+    </span>
+  );
 }
 
 function runeActionMenuLabel(

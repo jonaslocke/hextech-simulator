@@ -28,6 +28,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "selector.unit": "executable",
   "selector.friendly_unit": "executable",
   "selector.enemy_unit": "executable",
+  "selector.move_destination": "executable",
   "selector.card": "executable",
   "selector.source": "executable",
   "selector.gear": "executable",

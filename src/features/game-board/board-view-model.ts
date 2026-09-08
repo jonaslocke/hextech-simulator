@@ -51,6 +51,7 @@ export type BoardPlayerProjection = {
       enabled: boolean;
       id: string;
       label: string;
+      costPreview: ProjectedAction["costPreview"];
     }>
   >;
   legalTargetsByCard: Record<
@@ -226,6 +227,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             enabled: action.enabled,
             id: action.id,
             label: action.label,
+            costPreview: action.costPreview,
           })),
         ]),
       );

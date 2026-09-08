@@ -46,6 +46,54 @@ test("Ornn's exact Main Deck and Sideboard compile as approved executable canoni
   assert.ok(
     canonicalCards.every((card) => card.runtimeSupportStatus === "supported"),
   );
+  const canonicalByCode = new Map(
+    canonicalCards.map((card) => [card.cardCode, card]),
+  );
+  const sterak = canonicalByCode.get("SFD-056");
+  assert.equal(sterak?.card.attributes.might, 3);
+  assert.ok(
+    sterak?.behaviorModel.clauses.some((clause) =>
+      clause.keywords.some(
+        (binding) => binding.behaviorId === "keyword.quick_draw",
+      ),
+    ),
+    "Sterak's Gage retains its inherent Quick-Draw keyword",
+  );
+  assert.ok(
+    sterak?.behaviorModel.clauses.some((clause) =>
+      clause.triggers.some(
+        (binding) => binding.behaviorId === "trigger.on_play",
+      ) &&
+      clause.effects.some(
+        (binding) => binding.behaviorId === "action.attach_equipment",
+      ),
+    ),
+    "Sterak's Gage attaches through its on-play triggered ability",
+  );
+  const defy = canonicalByCode.get("OGN-045");
+  const defySelector = defy?.behaviorModel.clauses
+    .flatMap((clause) => clause.selectors)
+    .find((binding) => binding.behaviorId === "selector.chain_item");
+  assert.deepEqual(defySelector?.parameters, {
+    itemKind: "spell",
+    controller: "opponent",
+    maximumEnergyCost: 4,
+    maximumPowerCost: 1,
+    minimumCount: 1,
+    maximumCount: 1,
+    selectionKey: "spell",
+  });
+  const blacksmith = canonicalByCode.get("SFD-058");
+  assert.ok(
+    blacksmith?.behaviorModel.clauses.every((clause) =>
+      clause.effects.some(
+        (binding) =>
+          binding.behaviorId === "action.search_top_deck" &&
+          binding.parameters.maximumSelect === 1,
+      ),
+    ),
+    "Ornn, Blacksmith uses the generic optional one-Gear selection effect",
+  );
   const snapshot = buildDeckSnapshot(source, canonicalCards, behaviorCatalog);
   assert.equal(snapshot.cards.length, 29);
   assert.equal(

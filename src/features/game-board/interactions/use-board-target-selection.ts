@@ -16,13 +16,15 @@ import type { Card } from "../types";
 
 export type BoardTargetSelection = {
   actionId: string;
+  carriedSelectedTargetIds?: string[];
+  followUpLocationRequirement?: CombinedTargetRequirement;
   legalTargetIds: string[];
   maxTargets: number;
   minTargets: number;
   purpose: "choice" | "move" | "play";
   requirement: CombinedTargetRequirement;
   selectedTargetIds: string[];
-  targetKind: "battlefield" | "card" | "chainItem";
+  targetKind: "battlefield" | "card" | "location" | "chainItem";
 };
 
 type SubmitProjectedAction = (
@@ -136,9 +138,39 @@ export function useBoardTargetSelection({
         return false;
       }
 
+      if (
+        selection.followUpLocationRequirement &&
+        selection.targetKind !== "location"
+      ) {
+        const carriedSelectedTargetIds = [
+          ...(selection.carriedSelectedTargetIds ?? []),
+          ...selection.selectedTargetIds,
+        ];
+        const nextRequirement = locationRequirementForSelectedIds(
+          selection.followUpLocationRequirement,
+          carriedSelectedTargetIds,
+        );
+        setTargetSelection({
+          ...selection,
+          carriedSelectedTargetIds,
+          followUpLocationRequirement: undefined,
+          legalTargetIds: nextRequirement.legalIds,
+          maxTargets: nextRequirement.maximum,
+          minTargets: nextRequirement.minimum,
+          requirement: nextRequirement,
+          selectedTargetIds: [],
+          targetKind: "location",
+        });
+        return false;
+      }
+
+      const selectedIds = [
+        ...(selection.carriedSelectedTargetIds ?? []),
+        ...selection.selectedTargetIds,
+      ];
       const selectedAdditionalPower = additionalPowerForTargets(
         targetSelectionAction,
-        selection.selectedTargetIds,
+        selectedIds,
       );
       const missingAdditionalPower = Math.max(
         0,
@@ -155,12 +187,12 @@ export function useBoardTargetSelection({
 
       const accepted = await submitProjectedAction(
         targetSelectionAction?.id ?? selection.actionId,
-        selection.selectedTargetIds,
+        selectedIds,
       );
 
       if (!accepted) return false;
 
-      setPendingSubmittedTargetIds(selection.selectedTargetIds);
+      setPendingSubmittedTargetIds(selectedIds);
       setHoveredTargetCardInstanceId(null);
       setTargetSelection(null);
       return true;
@@ -209,6 +241,7 @@ export function useBoardTargetSelection({
 
       if (
         nextSelection.purpose === "play" &&
+        !nextSelection.followUpLocationRequirement &&
         nextSelection.minTargets === nextSelection.maxTargets &&
         selectedTargetIds.length === nextSelection.maxTargets &&
         targetSelectionIsLegal(nextSelection.requirement, selectedTargetIds) &&
@@ -292,6 +325,22 @@ export function useBoardTargetSelection({
     targetSelection,
     targetSelectionAction,
   };
+}
+
+function locationRequirementForSelectedIds(
+  requirement: CombinedTargetRequirement,
+  selectedIds: readonly string[],
+): CombinedTargetRequirement {
+  const legalIds = [
+    ...new Set(
+      requirement.requirements.flatMap((individual) => {
+        const mappings = individual.legalIdsBySelectedId;
+        if (!mappings) return individual.legalIds;
+        return selectedIds.flatMap((id) => mappings[id] ?? []);
+      }),
+    ),
+  ];
+  return { ...requirement, legalIds };
 }
 
 function actionIdsHaveSameIdentity(left: string, right: string) {

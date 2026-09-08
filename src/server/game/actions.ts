@@ -12,6 +12,7 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  effectivePowerCost,
   submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -739,6 +740,19 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
+  const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
+  const dynamicTargets = compiled.clauses
+    .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
+    .flatMap((clause) =>
+      targetRequirementsForClause(
+        clause,
+        createBehaviorContext(game, playerId, cardId, null, selectedIds),
+        handlers,
+      ),
+    );
+  if (dynamicTargets.some((target) => target.kind === "location")) {
+    validateTargetRequirements(dynamicTargets, selectedIds);
+  }
   const energyCost = effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
     type: "card.played",
@@ -1370,6 +1384,13 @@ function addPlayableCardActions(
         targetRequirementsForClause(clause, context, handlers),
       );
     const cost = effectiveEnergyCost(game, playerId, definition, index, cardId);
+    const effectivePower = effectivePowerCost(
+      game,
+      playerId,
+      definition,
+      index,
+      cardId,
+    );
     const paymentPlan = buildPaymentPlan(
       game,
       playerId,
@@ -1400,19 +1421,20 @@ function addPlayableCardActions(
         ),
       }))
       .filter((entry) => entry.amount > 0);
-    const costPreview =
-      paymentPlan && targetAdditionalPower.length > 0
-        ? {
-            energy: cost,
-            basePower: definition.card.attributes.power ?? 0,
-            availableAnyPower: availableAnyPowerAfterBaseCost(
-              game,
-              playerId,
-              paymentPlan,
-            ),
-            targetAdditionalPower,
-          }
-        : undefined;
+    // This is projection only: payment remains server-owned. Publishing both
+    // printed and evaluated costs lets the client explain modifiers before a
+    // player commits a play, including for disabled actions.
+    const costPreview = {
+      energy: cost,
+      basePower: definition.card.attributes.power ?? 0,
+      effectivePower,
+      printedEnergy: definition.card.attributes.energy ?? 0,
+      printedPower: definition.card.attributes.power ?? 0,
+      availableAnyPower: paymentPlan
+        ? availableAnyPowerAfterBaseCost(game, playerId, paymentPlan)
+        : Object.values(player.power).reduce((total, amount) => total + amount, 0),
+      targetAdditionalPower,
+    };
     const unitDestinations =
       definition.card.classification.type === "Unit"
         ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
@@ -1971,7 +1993,7 @@ function validLockedTargets(
       controllerPlayerId,
       item.sourceCardInstanceId!,
       item.behaviorEvent,
-      [],
+      item.targetCardInstanceIds,
     ),
     handlers,
   );
@@ -1999,17 +2021,24 @@ function ignoresDeflect(definition: GameCardDefinition) {
 }
 
 function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
-  if (action.targets.length === 0) {
+  validateTargetRequirements(action.targets, selectedIds);
+}
+
+function validateTargetRequirements(
+  targets: readonly ProjectedAction["targets"][number][],
+  selectedIds: string[],
+) {
+  if (targets.length === 0) {
     if (selectedIds.length)
       throw new Error("This action does not accept selected targets.");
     return;
   }
-  const legal = new Set(action.targets.flatMap((target) => target.legalIds));
-  const minimum = action.targets.reduce(
+  const legal = new Set(targets.flatMap((target) => target.legalIds));
+  const minimum = targets.reduce(
     (sum, target) => sum + target.minimum,
     0,
   );
-  const maximum = action.targets.reduce(
+  const maximum = targets.reduce(
     (sum, target) => sum + target.maximum,
     0,
   );
@@ -2018,7 +2047,7 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     selectedIds.length > maximum ||
     selectedIds.some((id) => !legal.has(id)) ||
     new Set(selectedIds).size !== selectedIds.length ||
-    action.targets.some((target) => {
+    targets.some((target) => {
       const selectedForTarget = selectedIds.filter((id) =>
         target.legalIds.includes(id),
       ).length;

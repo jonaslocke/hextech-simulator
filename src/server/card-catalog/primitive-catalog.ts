@@ -636,6 +636,19 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
   }),
+  "selector.move_destination": primitiveSeed({
+    id: "selector.move_destination",
+    family: "selector",
+    name: "Select move destination",
+    description: "Selects a legal destination for one or more units moved by an effect.",
+    parameters: [
+      required("unitSelectionKey", "string", "Selection key for the units being moved."),
+      required("minimumCount", "number", "The minimum number of destinations selected."),
+      required("maximumCount", "number", "The maximum number of destinations selected."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+    ],
+    engineSupport: supported("Destinations are derived from canonical board locations and the source unit's current location."),
+  }),
   "selector.card": primitiveSeed({
     id: "selector.card",
     family: "selector",
@@ -772,7 +785,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Move unit",
     description: "Moves a unit between board zones or battlefields.",
     parameters: [
-      required("destination", "zone", "The destination zone or battlefield."),
+      optional("destination", "zone", "A fixed destination zone or battlefield."),
+      optional("destinationSelectionKey", "string", "Selection key for a chosen move destination."),
+      optional("selectionKey", "string", "Selection key for the units being moved."),
       optional("count", "number", "The number of units moved.")
     ],
     emitsEvents: ["unit.moved"],

@@ -278,6 +278,8 @@ export function buildCard(
     {
       domains: card.classification.domain,
       damage: cardStates[cardInstanceId]?.damage,
+      attachedToCardInstanceId:
+        cardStates[cardInstanceId]?.attachedToCardInstanceId ?? null,
       energy: card.attributes.energy ?? undefined,
       img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,

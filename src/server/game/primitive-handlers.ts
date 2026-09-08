@@ -24,6 +24,7 @@ import {
   moveAttachedCardsWithTopMost,
   removeFromAttachmentLocations,
 } from "./attachment-lifecycle";
+import { legalEffectMoveDestinationIds } from "./unit-destinations";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -265,6 +266,36 @@ export function createPrimitiveHandlers(
             cardType === "any" ||
             cardHasType(definitionForInstance(id, index), cardType),
         ),
+        minimum: numberParam(binding, "minimumCount"),
+        maximum: numberParam(binding, "maximumCount"),
+      };
+    },
+  });
+  handlers.set("selector.move_destination", {
+    targets(binding, context) {
+      const unitSelectionKey = stringParam(binding, "unitSelectionKey");
+      const selectedUnitIds = context.selectedBySelector[unitSelectionKey] ?? [];
+      const candidates = selectedUnitIds.length > 0
+        ? selectedUnitIds
+        : boardUnitIds(context.game, index);
+      const legalIdsBySelectedId = Object.fromEntries(
+        candidates.map((unitId) => [
+          unitId,
+          legalEffectMoveDestinationIds(context.game, unitId, index),
+        ]),
+      );
+      const legalIds = [
+        ...new Set(Object.values(legalIdsBySelectedId).flat()),
+      ];
+      return {
+        kind: "location" as const,
+        label: "move destination",
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
+        legalIds,
+        legalIdsBySelectedId,
+        optionLabels: moveDestinationLabels(context.game, index, legalIds),
         minimum: numberParam(binding, "minimumCount"),
         maximum: numberParam(binding, "maximumCount"),
       };
@@ -797,12 +828,29 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.move_unit", {
     execute(binding, context) {
-      if (binding.parameters.destination !== "base") {
-        throw new Error("Unsupported unit movement destination.");
-      }
-      for (const id of context.selectedIds) {
+      const destinationSelectionKey = binding.parameters.destinationSelectionKey;
+      const selectedDestinationIds =
+        typeof destinationSelectionKey === "string"
+          ? context.selectedBySelector[destinationSelectionKey] ?? []
+          : [];
+      const destination =
+        selectedDestinationIds[0] ??
+        (typeof binding.parameters.destination === "string"
+          ? binding.parameters.destination
+          : null);
+      if (!destination) throw new Error("Move destination is unavailable.");
+      const selected = selectionFor(binding, context);
+      const targetIds = selected.length > 0
+        ? selected
+        : context.selectedIds.filter((id) =>
+            boardUnitIds(context.game, index).includes(id),
+          );
+      for (const id of targetIds) {
         const owner = index.instances.get(id)?.ownerPlayerId;
         if (!owner) continue;
+        if (!legalEffectMoveDestinationIds(context.game, id, index).includes(destination)) {
+          continue;
+        }
         for (const player of Object.values(context.game.state.players)) {
           player.zones.base = player.zones.base.filter(
             (candidate) => candidate !== id,
@@ -813,14 +861,25 @@ export function createPrimitiveHandlers(
             (candidate) => candidate !== id,
           );
         }
-        context.game.state.players[owner]!.zones.base.push(id);
+        if (destination === "base") {
+          context.game.state.players[owner]!.zones.base.push(id);
+        } else {
+          const battlefield = context.game.state.battlefields.find(
+            (candidate) => candidate.battlefieldId === destination,
+          );
+          if (!battlefield) continue;
+          battlefield.units.push(id);
+          if (battlefield.controllerPlayerId !== owner) {
+            battlefield.contestedByPlayerId = owner;
+          }
+        }
         moveAttachedCardsWithTopMost(context.game, id, index);
         const events = (context.game.state.queuedBehaviorEvents ??= []);
         events.push({
           type: "unit.moved",
           actorPlayerId: context.controllerPlayerId,
           subjectCardInstanceId: id,
-          values: { destination: "base" },
+          values: { destination },
         });
       }
     },
@@ -1212,6 +1271,35 @@ function selectorTargets(
     minimum: automatic ? 0 : typeof binding.parameters.minimumCount === "number" ? binding.parameters.minimumCount : 1,
     maximum: automatic ? 0 : typeof binding.parameters.maximumCount === "number" ? binding.parameters.maximumCount : 1
   };
+}
+
+function boardUnitIds(game: GameDocument, index: RuntimeCardIndex) {
+  return [
+    ...Object.values(game.state.players).flatMap((player) => player.zones.base),
+    ...game.state.battlefields.flatMap((battlefield) => battlefield.units),
+  ].filter((id) =>
+    index.instances.has(id) && cardHasType(definitionForInstance(id, index), "Unit"),
+  );
+}
+
+function moveDestinationLabels(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  destinationIds: readonly string[],
+) {
+  return Object.fromEntries(
+    destinationIds.map((id) => [
+      id,
+      id === "base"
+        ? "Target unit's Base"
+        : definitionForInstance(
+            game.state.battlefields.find(
+              (battlefield) => battlefield.battlefieldId === id,
+            )!.cardInstanceId,
+            index,
+          ).card.name,
+    ]),
+  );
 }
 
 function damageTargets(

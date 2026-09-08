@@ -225,7 +225,9 @@ function continueQueuedChainItems(
         ? "chainItem"
         : requirements.some((requirement) => requirement.kind === "battlefield")
           ? "battlefield"
-          : "card",
+          : requirements.some((requirement) => requirement.kind === "location")
+            ? "location"
+            : "card",
       sourceZone:
         sourceZones.size === 1 ? ([...sourceZones][0] ?? null) : null,
       presentation: "cardSelection",

@@ -31,7 +31,10 @@ export function scoreBattlefield(
   player.scoredBattlefieldIdsThisTurn = [...scored, battlefieldId];
   const points = player.points ?? 0;
   const requirement = victoryRequirement(game, decks);
-  const isFinalPoint = points === requirement - 1;
+  // Rule 471.1.b applies once a Conquer would award a point while the
+  // player is one point from the Victory Score or already above that
+  // threshold. A prior non-final scoring effect can leave a player above it.
+  const isFinalPoint = points >= requirement - 1;
   const hasScoredEveryBattlefield = game.state.battlefields.every(
     (battlefield) =>
       player.scoredBattlefieldIdsThisTurn!.includes(battlefield.battlefieldId),

@@ -34,7 +34,7 @@ const models: Record<string, Clause[]> = {
     [["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], ["action", "action.search_top_deck", { count: 4, cardType: "Gear", maximumSelect: 1, revealSelected: true }]],
     [["trigger", "trigger.hold", {}], ["action", "action.search_top_deck", { count: 4, cardType: "Gear", maximumSelect: 1, revealSelected: true }]],
   ],
-  "OGN-043": [[["timing", "timing.action", {}], ["selector", "selector.enemy_unit", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "opponent", excludesSource: false }], ["action", "action.move_unit", { destination: "base" }]]],
+  "OGN-043": [[["timing", "timing.action", {}], ["selector", "selector.enemy_unit", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "opponent", excludesSource: false, selectionKey: "unit" }], ["selector", "selector.move_destination", { unitSelectionKey: "unit", minimumCount: 1, maximumCount: 1, selectionKey: "destination" }], ["action", "action.move_unit", { selectionKey: "unit", destinationSelectionKey: "destination" }]]],
   "OGN-044": [[["selector", "selector.source", { minimumCount: 0, maximumCount: 1, selectionKey: "additional-calm", selectionPurpose: "optionalCost" }], ["cost", "cost.pay", { amount: 1, resource: "rune", optional: true, selectionKey: "additional-calm", domain: "calm" }], ["action", "action.draw_by_optional_cost", { selectionKey: "additional-calm", paidCount: 1, unpaidCount: 0 }]]],
   "OGN-045": [[["timing", "timing.reaction", {}], ["selector", "selector.chain_item", { itemKind: "spell", controller: "opponent", maximumEnergyCost: 4, maximumPowerCost: 1, minimumCount: 1, maximumCount: 1, selectionKey: "spell" }], ["action", "action.counter_chain_item", { selectionKey: "spell" }]]],
   "OGN-060": [[["trigger", "trigger.friendly_unit_combat", { event: "attackOrDefend" }], ["condition", "condition.event_subject_combat_alone", {}], ["modifier", "modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 1, target: "event_subject", duration: "thisTurn" }]]],
@@ -46,9 +46,15 @@ const models: Record<string, Clause[]> = {
     [["ability", "ability.activated_effect", {}], ["cost", "cost.pay", { amount: 1, resource: "energy" }], ["cost", "cost.pay", { amount: 1, resource: "rune" }], ["cost", "cost.exhaust_source", {}], ["action", "action.kill_card", { target: "source" }], ["action", "action.draw_cards", { player: "controller", count: 1 }]],
   ],
   "SFD-051": [[friendlyUnit(), ["ability", "ability.equip", {}], ["cost", "cost.pay", { amount: 1, resource: "rune" }]]],
-  "SFD-056": [[["keyword", "keyword.quick_draw", {}], ["timing", "timing.reaction", {}], friendlyUnit(), ["action", "action.attach_equipment", { target: "friendly_unit" }], ["ability", "ability.equip", {}], ["cost", "cost.pay", { amount: 1, resource: "rune" }]]],
+  "SFD-056": [
+    [["keyword", "keyword.quick_draw", {}], ["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], friendlyUnit("unit"), ["action", "action.attach_equipment", { target: "friendly_unit", selectionKey: "unit" }]],
+    [["ability", "ability.equip", {}], friendlyUnit("unit"), ["cost", "cost.pay", { amount: 1, resource: "rune" }]],
+  ],
   "SFD-061": [[["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], ["selector", "selector.card", { zone: "trash", cardType: "Gear", owner: "controller", minimumCount: 1, maximumCount: 1 }], ["action", "action.return_to_hand", { target: "card" }]]],
-  "SFD-064": [[["keyword", "keyword.quick_draw", {}], ["timing", "timing.reaction", {}], friendlyUnit(), ["action", "action.attach_equipment", { target: "friendly_unit" }], ["ability", "ability.equip", {}], ["cost", "cost.pay", { amount: 1, resource: "rune" }]]],
+  "SFD-064": [
+    [["keyword", "keyword.quick_draw", {}], ["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], friendlyUnit("unit"), ["action", "action.attach_equipment", { target: "friendly_unit", selectionKey: "unit" }]],
+    [["ability", "ability.equip", {}], friendlyUnit("unit"), ["cost", "cost.pay", { amount: 1, resource: "rune" }]],
+  ],
   "OGN-081": [[["ability", "ability.exhaust_for_resource", { resourceType: "power", amountSource: "constant", amount: 1, domain: "calm", usage: "unrestricted" }]]],
   "UNL-053": [
     [["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], ["action", "action.draw_cards", { player: "controller", count: 1 }]],

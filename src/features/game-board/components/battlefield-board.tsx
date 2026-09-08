@@ -429,11 +429,8 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         <BattlefieldUnitRow
-          cards={[
-            ...opponentUnits,
-            ...opponentAttachments,
-            ...(facedownCard ? [facedownCard] : []),
-          ]}
+          attachments={opponentAttachments}
+          cards={[...opponentUnits, ...(facedownCard ? [facedownCard] : [])]}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -444,6 +441,7 @@ export const BattlefieldBoard: FC<Props> = ({
         />
 
         <BattlefieldUnitRow
+          attachments={playerAttachments}
           cards={playerUnits}
           dragSourceLocation={
             enablePlayerUnitLocationDrag
@@ -459,17 +457,6 @@ export const BattlefieldBoard: FC<Props> = ({
           stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
           zoneAnimationId={`battlefield:${id}:player`}
         />
-        <BattlefieldUnitRow
-          cards={playerAttachments}
-          className="border-none pt-0"
-          hiddenCardInstanceIds={hiddenCardInstanceIds}
-          highlightedCardInstanceIds={highlightedCardInstanceIds}
-          onCardPointerEnter={onCardPointerEnter}
-          onCardPointerLeave={onCardPointerLeave}
-          onCardPrimaryAction={onCardPrimaryAction}
-          side="player"
-          zoneAnimationId={`battlefield:${id}:player-attachments`}
-        />
       </div>
 
       <div className="relative h-8.5 overflow-visible">
@@ -484,6 +471,7 @@ export const BattlefieldBoard: FC<Props> = ({
 };
 
 function BattlefieldUnitRow({
+  attachments = [],
   cards,
   className,
   dragSourceLocation,
@@ -496,6 +484,7 @@ function BattlefieldUnitRow({
   zoneAnimationId,
   stagedMovementCardInstanceIds,
 }: {
+  attachments?: Card[];
   cards: Card[];
   className?: string;
   dragSourceLocation?: BoardDragSourceLocation;
@@ -553,20 +542,107 @@ function BattlefieldUnitRow({
           />
         );
 
-        if (!dragSourceLocation || !unit.instanceId) {
-          return <div key={key}>{tile}</div>;
-        }
+        const hostTile =
+          !dragSourceLocation || !unit.instanceId ? (
+            tile
+          ) : (
+            <DraggableLocationCard
+              cardInstanceId={unit.instanceId}
+              sourceLocation={dragSourceLocation}
+            >
+              {tile}
+            </DraggableLocationCard>
+          );
+        const attachedCards = attachments.filter(
+          (attachment) =>
+            attachment.attachedToCardInstanceId === unit.instanceId,
+        );
 
         return (
-          <DraggableLocationCard
-            cardInstanceId={unit.instanceId}
+          <div
+            className={cn(
+              "relative flex min-h-38 min-w-27 items-start",
+              attachedCards.length > 0 && "pr-7 pb-7",
+            )}
             key={key}
-            sourceLocation={dragSourceLocation}
           >
-            {tile}
-          </DraggableLocationCard>
+            {hostTile}
+            {attachedCards.map((attachment, attachmentIndex) => (
+              <div
+                className="absolute left-6 top-7"
+                key={attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`}
+                style={{ zIndex: attachmentIndex + 1 }}
+              >
+                <CardTile
+                  enableHoverPreview
+                  isHighlighted={
+                    attachment.instanceId
+                      ? highlightedCardInstanceIds?.has(attachment.instanceId)
+                      : false
+                  }
+                  isTransferHidden={
+                    attachment.instanceId
+                      ? hiddenCardInstanceIds?.has(attachment.instanceId)
+                      : false
+                  }
+                  onPrimaryAction={
+                    onCardPrimaryAction
+                      ? (event) => onCardPrimaryAction(attachment, event)
+                      : undefined
+                  }
+                  onHighlightPointerEnter={
+                    onCardPointerEnter
+                      ? () => onCardPointerEnter(attachment)
+                      : undefined
+                  }
+                  onHighlightPointerLeave={
+                    onCardPointerLeave
+                      ? () => onCardPointerLeave(attachment)
+                      : undefined
+                  }
+                  {...attachment}
+                />
+              </div>
+            ))}
+          </div>
         );
       })}
+      {attachments
+        .filter(
+          (attachment) =>
+            !cards.some(
+              (card) => card.instanceId === attachment.attachedToCardInstanceId,
+            ),
+        )
+        .map((attachment, index) => (
+          <div key={attachment.instanceId ?? `${attachment.name}-${index}`}>
+            <CardTile
+              enableHoverPreview
+              isHighlighted={
+                attachment.instanceId
+                  ? highlightedCardInstanceIds?.has(attachment.instanceId)
+                  : false
+              }
+              isTransferHidden={
+                attachment.instanceId
+                  ? hiddenCardInstanceIds?.has(attachment.instanceId)
+                  : false
+              }
+              onPrimaryAction={
+                onCardPrimaryAction
+                  ? (event) => onCardPrimaryAction(attachment, event)
+                  : undefined
+              }
+              onHighlightPointerEnter={
+                onCardPointerEnter ? () => onCardPointerEnter(attachment) : undefined
+              }
+              onHighlightPointerLeave={
+                onCardPointerLeave ? () => onCardPointerLeave(attachment) : undefined
+              }
+              {...attachment}
+            />
+          </div>
+        ))}
     </motion.div>
   );
 }

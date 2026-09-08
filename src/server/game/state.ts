@@ -162,7 +162,7 @@ const effectSelectionChoiceSchema = z.object({
   resolutionId: z.string().min(1).nullable(),
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
-  optionKind: z.enum(["card", "battlefield", "chainItem"]).default("card"),
+  optionKind: z.enum(["card", "battlefield", "location", "chainItem"]).default("card"),
   sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable().default(null),
   presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
@@ -173,11 +173,13 @@ const effectSelectionChoiceSchema = z.object({
   targetRequirements: z
     .array(
       z.object({
-        kind: z.enum(["card", "battlefield", "player", "chainItem"]),
+        kind: z.enum(["card", "battlefield", "location", "player", "chainItem"]),
         label: z.string().min(1).optional(),
         selectionKey: z.string().min(1).optional(),
         selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+        legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
+        optionLabels: z.record(z.string().min(1)).optional(),
         legalIds: z.array(z.string().min(1)),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),

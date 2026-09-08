@@ -768,7 +768,13 @@ export const GameBoard: FC<GameBoardProps> = ({
                     availableAnyPower:
                       targetSelectionAction.costPreview.availableAnyPower,
                     basePower: targetSelectionAction.costPreview.basePower,
+                    effectivePower:
+                      targetSelectionAction.costPreview.effectivePower,
                     energy: targetSelectionAction.costPreview.energy,
+                    printedEnergy:
+                      targetSelectionAction.costPreview.printedEnergy,
+                    printedPower:
+                      targetSelectionAction.costPreview.printedPower,
                     sourceNames: selectedDeflectSources.map(
                       (source) =>
                         cardsByInstanceId[source.targetId]?.name ??
@@ -862,6 +868,48 @@ export const GameBoard: FC<GameBoardProps> = ({
             }))}
           selectionMode="single"
           title="Choose a Battlefield"
+        />
+      )}
+      {targetSelection?.targetKind === "location" && (
+        <ChoiceDialog
+          confirmLabel="Choose destination"
+          decisionKey={`location:${targetSelection.actionId}`}
+          description="Choose the location where the selected unit will move."
+          interactionSuspended={decisionInspection.isInspecting}
+          isOpen
+          isSubmitting={isSubmittingAction}
+          isVisible={!decisionInspection.isInspecting}
+          onCancel={() => setTargetSelection(null)}
+          onConfirm={(selectedIds) =>
+            submitTargetedPlay({
+              ...targetSelection,
+              selectedTargetIds: selectedIds,
+            })
+          }
+          options={targetSelection.legalTargetIds.map((id) => {
+            const optionLabels = targetSelection.requirement.requirements
+              .flatMap((requirement) =>
+                requirement.optionLabels
+                  ? [[id, requirement.optionLabels[id]] as const]
+                  : [],
+              )
+              .find(([, label]) => Boolean(label));
+            const battlefield = sourceProjection.battlefields.find(
+              (candidate) => candidate.battlefieldId === id,
+            );
+            return {
+              description:
+                id === "base"
+                  ? "Move to the selected unit's Base."
+                  : "Move to this battlefield.",
+              id,
+              imageOrientation: battlefield ? ("landscape" as const) : undefined,
+              imageUrl: battlefield?.card.imageUrl ?? undefined,
+              label: optionLabels?.[1] ?? battlefield?.card.name ?? id,
+            };
+          })}
+          selectionMode="single"
+          title="Choose a Move Destination"
         />
       )}
       {targetSelection?.targetKind === "chainItem" && (

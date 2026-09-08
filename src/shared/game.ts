@@ -16,11 +16,15 @@ export const runeResourceTypes = ["energy", "power"] as const;
 
 export const projectedTargetRequirementSchema = z
   .object({
-    kind: z.enum(["card", "battlefield", "player", "chainItem"]),
+    kind: z.enum(["card", "battlefield", "location", "player", "chainItem"]),
     label: z.string().min(1).optional(),
     selectionKey: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
     sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+    // A later location choice can be constrained by an earlier selected
+    // object (for example, a unit's legal move destinations).
+    legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
+    optionLabels: z.record(z.string().min(1)).optional(),
     legalIds: z.array(z.string().min(1)),
     minimum: z.number().int().nonnegative(),
     maximum: z.number().int().nonnegative(),
@@ -40,6 +44,9 @@ export const projectedActionSchema = z.object({
     .object({
       energy: z.number().int().nonnegative(),
       basePower: z.number().int().nonnegative(),
+      effectivePower: z.number().int().nonnegative(),
+      printedEnergy: z.number().int().nonnegative(),
+      printedPower: z.number().int().nonnegative(),
       availableAnyPower: z.number().int().nonnegative(),
       targetAdditionalPower: z.array(
         z.object({

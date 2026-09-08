@@ -162,7 +162,7 @@ export function resumeEffectResolution(
     frame.controllerPlayerId,
     frame.sourceCardInstanceId,
     frame.event,
-    [],
+    frame.targetsLocked ? frame.initialSelectedIds : [],
   );
   for (const { binding, requirement } of selectionRequirementsForClause(
     clause,
@@ -199,7 +199,9 @@ export function resumeEffectResolution(
             ? `Choose ${requirement.label}`
             : "Choose effect target",
       optionKind:
-        requirement.kind === "battlefield" || requirement.kind === "chainItem"
+        requirement.kind === "battlefield" ||
+        requirement.kind === "location" ||
+        requirement.kind === "chainItem"
           ? requirement.kind
           : "card",
       sourceZone: requirement.sourceZone ?? null,
