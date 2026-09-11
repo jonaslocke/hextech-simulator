@@ -339,7 +339,9 @@ export function projectGame(input: {
       : null,
     publicReveals: (input.game.state.publicReveals ?? []).map((reveal) => ({
       id: reveal.id,
-      message: reveal.message,
+      message: reveal.handReveal
+        ? `${reveal.handReveal.sourceName} revealed ${input.playerNames?.[reveal.handReveal.playerId] ?? reveal.handReveal.playerId}'s hand: ${reveal.handReveal.cardNames.join(", ")}.`
+        : reveal.message,
       cards: reveal.cardInstanceIds.map(view),
     })),
     actions: (input.game.status === "setup_pending"
@@ -352,7 +354,10 @@ export function projectGame(input: {
     }),
     logEntries: (input.events ?? []).map((event) => ({
       id: event.id,
-      message: event.message,
+      message: event.type === "cards.revealed" && typeof event.payload?.handOwnerPlayerId === "string" &&
+        typeof event.payload.revealSourceName === "string" && typeof event.payload.revealedCardNames === "string"
+        ? `${event.payload.revealSourceName} revealed ${input.playerNames?.[event.payload.handOwnerPlayerId] ?? event.payload.handOwnerPlayerId}'s hand: ${event.payload.revealedCardNames}.`
+        : event.message,
       createdAt: event.createdAt,
     })),
   });

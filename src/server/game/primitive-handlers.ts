@@ -548,6 +548,7 @@ export function createPrimitiveHandlers(
         [...context.game.state.players[opponentId]!.zones.hand],
         `${definitionForInstance(context.sourceCardInstanceId, index).card.name} revealed ${opponentId}'s hand`,
         index,
+        opponentId,
       );
     },
   });
@@ -969,7 +970,7 @@ export function createPrimitiveHandlers(
       const usage = stringParam(binding, "usage");
       if (binding.parameters.resourceType === "power") {
         const domain = resourceDomainForBinding(binding, context, index);
-        if (binding.parameters.poolResource === true) {
+        if (usage === "unrestricted" || binding.parameters.poolResource === true) {
           player.power[domain] = (player.power[domain] ?? 0) + amount;
           return;
         }
@@ -1082,6 +1083,17 @@ export function createPrimitiveHandlers(
       ) {
         return null;
       }
+      const selected = typeof selectionKey === "string"
+        ? context.selectedBySelector[selectionKey] ?? []
+        : context.selectedIds;
+      const requiredTag = binding.parameters.onlyIfSelectedHasTag;
+      if (
+        (typeof requiredTag === "string" || binding.parameters.onlyIfSelectedAttached === true) &&
+        !selected.some((id) =>
+          (typeof requiredTag !== "string" || definitionForInstance(id, index).card.tags.includes(requiredTag)) &&
+          (binding.parameters.onlyIfSelectedAttached !== true || Boolean(context.game.state.cardStates[id]?.attachedToCardInstanceId)),
+        )
+      ) return null;
       return {
         kind: "option" as const,
         legalIds: ["yes", "no"],
@@ -2278,6 +2290,7 @@ function addPublicReveal(
   cardInstanceIds: string[],
   prefix: string,
   index: RuntimeCardIndex,
+  handOwnerPlayerId?: string,
 ) {
   if (cardInstanceIds.length === 0) return;
   const cardNames = cardInstanceIds.map(
@@ -2287,6 +2300,11 @@ function addPublicReveal(
     id: `reveal:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.publicReveals?.length ?? 0}`,
     message: `${prefix}: ${cardNames.join(", ")}.`,
     cardInstanceIds,
+    ...(handOwnerPlayerId ? { handReveal: {
+      playerId: handOwnerPlayerId,
+      sourceName: definitionForInstance(context.sourceCardInstanceId, index).card.name,
+      cardNames,
+    } } : {}),
   });
 }
 

@@ -335,7 +335,7 @@ export function buildPlayerDecisionRequest({
   }
 
   const activeNonBoardCardDecision = activeTargetSelection
-    ? mapActiveNonBoardCardDecision({
+    ? mapActiveCardDecision({
         activeTargetSelection,
         cardsByInstanceId,
         sourceProjection,
@@ -401,7 +401,7 @@ export function buildPlayerDecisionRequest({
   return null;
 }
 
-function mapActiveNonBoardCardDecision({
+function mapActiveCardDecision({
   activeTargetSelection,
   cardsByInstanceId,
   sourceProjection,
@@ -411,7 +411,7 @@ function mapActiveNonBoardCardDecision({
 >): PlayerDecisionRequest | null {
   if (
     !activeTargetSelection ||
-    activeTargetSelection.targetKind !== "card" ||
+    !["card", "chainItem"].includes(activeTargetSelection.targetKind) ||
     activeTargetSelection.legalTargetIds.length === 0
   ) {
     return null;
@@ -423,6 +423,36 @@ function mapActiveNonBoardCardDecision({
 
   if (!action) {
     return null;
+  }
+
+  if (activeTargetSelection.targetKind === "chainItem") {
+    const legalIds = action.targets.filter((target) => target.kind === "chainItem")
+      .flatMap((target) => target.legalIds);
+    return {
+      actionId: action.id,
+      canCancel: true,
+      cards: (sourceProjection.chain?.items ?? []).map((item) => ({
+        id: item.id,
+        label: item.label,
+        imageUrl: item.card?.imageUrl ?? undefined,
+        disabled: !legalIds.includes(item.id),
+      })),
+      confirmLabel: "Choose chain item",
+      decisionKey: createDecisionKey({
+        actorPlayerId: sourceProjection.viewerPlayerId,
+        decisionId: action.id,
+        kind: "activeTargetSelection",
+        selectableIds: legalIds,
+        source: "chainItem",
+      }),
+      description: "Choose the spell or ability affected by this action.",
+      inspection: "publicGameState",
+      kind: "cardSelection",
+      minSelected: activeTargetSelection.minTargets,
+      maxSelected: activeTargetSelection.maxTargets,
+      selectionMode: activeTargetSelection.maxTargets === 1 ? "single" : "multiple",
+      title: "Choose a Chain Item",
+    };
   }
 
   const cardLocationById = cardLocationsById(sourceProjection);

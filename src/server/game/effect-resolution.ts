@@ -27,6 +27,7 @@ export function beginEffectResolution(input: {
   endingPlayerId?: string;
   event?: BehaviorEvent | null;
   selectedIds?: string[];
+  selectionOverrides?: Record<string, string[]>;
   targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
@@ -41,6 +42,7 @@ export function beginEffectResolution(input: {
     endingPlayerId: input.endingPlayerId ?? null,
     event: input.event ?? null,
     initialSelectedIds: input.selectedIds ?? [],
+    initialSelectionOverrides: input.selectionOverrides ?? {},
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
     effectOutcomes: {},
@@ -149,6 +151,7 @@ export function resumeEffectResolution(
   if (!frame) throw new Error("Effect resolution is unavailable.");
   const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
+  const initialSelectionOverrides = frame.initialSelectionOverrides ?? {};
   const definition = definitionForInstance(frame.sourceCardInstanceId, index);
   const clause = compileBehaviorModel(
     definition.behaviorModel,
@@ -163,6 +166,8 @@ export function resumeEffectResolution(
     frame.sourceCardInstanceId,
     frame.event,
     frame.targetsLocked ? frame.initialSelectedIds : [],
+    {},
+    initialSelectionOverrides,
   );
   for (const { binding, requirement } of selectionRequirementsForClause(
     clause,
@@ -172,9 +177,16 @@ export function resumeEffectResolution(
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
     if (frame.targetsLocked) {
-      const lockedSelections = frame.initialSelectedIds
-        .filter((id) => requirement.legalIds.includes(id))
-        .slice(0, requirement.maximum);
+      const selectionKey = binding.parameters.selectionKey;
+      const lockedSelections =
+        typeof selectionKey === "string" &&
+        Object.hasOwn(initialSelectionOverrides, selectionKey)
+          ? (initialSelectionOverrides[selectionKey] ?? [])
+              .filter((id) => requirement.legalIds.includes(id))
+              .slice(0, requirement.maximum)
+          : frame.initialSelectedIds
+              .filter((id) => requirement.legalIds.includes(id))
+              .slice(0, requirement.maximum);
       if (lockedSelections.length < requirement.minimum) {
         finishResolutionFrame(game, frame.id, frame.delayedEffectId);
         return true;

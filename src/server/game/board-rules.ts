@@ -12,6 +12,8 @@ export function cleanupBoard(
   game: GameDocument,
   index: RuntimeCardIndex
 ): void {
+  // Rules 321–321.1: defer the outstanding Cleanup until resolution completes.
+  if (game.state.chain?.resolvingItemId || game.state.effectResolutions.length) return;
   recomputeAllMight(game, index);
   if (cleanupLethalDamage(game, Object.keys(game.state.cardStates), index)) {
     return;

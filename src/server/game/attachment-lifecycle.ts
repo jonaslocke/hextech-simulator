@@ -101,7 +101,7 @@ export function recallUnattachedGearAtBattlefields(
       ) {
         continue;
       }
-      battlefield.attachedCardInstanceIds = attachedIds.filter(
+      battlefield.attachedCardInstanceIds = (battlefield.attachedCardInstanceIds ?? []).filter(
         (id) => id !== cardInstanceId,
       );
       const ownerPlayerId = index.instances.get(cardInstanceId)?.ownerPlayerId;

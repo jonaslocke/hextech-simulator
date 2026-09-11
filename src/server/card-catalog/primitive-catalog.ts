@@ -1240,6 +1240,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("effectKey", "string", "Stable key used by a following effect."),
       required("prompt", "string", "Prompt shown to the controller."),
       optional("onlyIfSelectedBy", "string", "Only offers the choice when this selector chose a card."),
+      optional("onlyIfSelectedHasTag", "string", "Only offers the choice when a selected card has this tag."),
+      optional("onlyIfSelectedAttached", "boolean", "Only offers the choice when a selected card is currently attached."),
     ],
     engineSupport: supported("The decision is a server-authoritative pending effect choice."),
   }),

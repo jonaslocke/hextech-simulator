@@ -49,16 +49,20 @@ export function applyStartOfTurn(
         candidate.restrictedResources = { energy: {}, power: {} };
       }
       player.scoredBattlefieldIdsThisTurn = [];
-      const controlledBattlefieldUnits = game.state.battlefields
-        .flatMap((battlefield) => battlefield.units)
+      const controlledBattlefieldCards = game.state.battlefields
+        .flatMap((battlefield) => [
+          ...battlefield.units,
+          ...(battlefield.attachedCardInstanceIds ?? []),
+        ])
         .filter(
           (cardId) =>
             index?.instances.get(cardId)?.ownerPlayerId ===
             turn.activePlayerId,
         );
       for (const cardId of [
+        ...(player.zones.legend ? [player.zones.legend] : []),
         ...player.zones.base,
-        ...controlledBattlefieldUnits,
+        ...controlledBattlefieldCards,
       ]) {
         if (game.state.cardStates[cardId]) {
           game.state.cardStates[cardId]!.exhausted = false;

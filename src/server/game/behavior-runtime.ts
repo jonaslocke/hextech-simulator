@@ -16,6 +16,11 @@ export type BehaviorExecutionContext = {
   event: BehaviorEvent | null;
   selectedIds: string[];
   selectedBySelector: Record<string, string[]>;
+  // Some choices are committed as part of a server-issued play mode rather
+  // than supplied as a player-targeting interaction. Keep them keyed to the
+  // canonical selector so independent optional costs cannot alias one another
+  // merely because they select the same source card.
+  selectionOverrides: Record<string, string[]>;
   effectOutcomes: Record<string, boolean | number | string | string[]>;
 };
 
@@ -105,7 +110,7 @@ export function selectionRequirementsForClause(
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
     const requirement = handler.targets(binding, selectorContext);
-    const selected = selectedForRequirement(requirement, context.selectedIds);
+    const selected = selectedForBinding(binding, requirement, context);
     selectorContext.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
@@ -186,7 +191,7 @@ export function executeBehaviorClause(input: {
     const requirement = handler.targets(binding, context);
     const selected = requirement.maximum === 0
       ? requirement.legalIds
-      : selectedForRequirement(requirement, context.selectedIds);
+      : selectedForBinding(binding, requirement, context);
     context.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
@@ -332,8 +337,18 @@ export function createBehaviorContext(
   event: BehaviorEvent | null,
   selectedIds: string[],
   effectOutcomes: Record<string, boolean | number | string | string[]> = {},
+  selectionOverrides: Record<string, string[]> = {},
 ): BehaviorExecutionContext {
-  return { game, controllerPlayerId, sourceCardInstanceId, event, selectedIds, selectedBySelector: {}, effectOutcomes };
+  return {
+    game,
+    controllerPlayerId,
+    sourceCardInstanceId,
+    event,
+    selectedIds,
+    selectedBySelector: {},
+    selectionOverrides,
+    effectOutcomes,
+  };
 }
 
 function matches(binding: BehaviorBinding, context: BehaviorExecutionContext, handlers: BehaviorHandlerRegistry): boolean {
@@ -372,4 +387,21 @@ function validateSelections(requirements: ProjectedTargetRequirement[], selected
 }
 function selectedForRequirement(requirement: ProjectedTargetRequirement, selectedIds: string[]) {
   return selectedIds.filter((id) => requirement.legalIds.includes(id)).slice(0, requirement.maximum);
+}
+
+function selectedForBinding(
+  binding: BehaviorBinding,
+  requirement: ProjectedTargetRequirement,
+  context: BehaviorExecutionContext,
+) {
+  const selectionKey = binding.parameters.selectionKey;
+  if (
+    typeof selectionKey === "string" &&
+    Object.hasOwn(context.selectionOverrides, selectionKey)
+  ) {
+    return context.selectionOverrides[selectionKey]!.filter((id) =>
+      requirement.legalIds.includes(id),
+    );
+  }
+  return selectedForRequirement(requirement, context.selectedIds);
 }

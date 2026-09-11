@@ -21,6 +21,8 @@ import type {
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import type { BattlefieldData, Card } from "../types";
 import { CardTile } from "./card-tile";
+import { AttachmentCardGroup } from "./attachment-card-group";
+import { groupCardsByAttachment } from "./attachment-layout";
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
@@ -507,7 +509,7 @@ function BattlefieldUnitRow({
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
-      {cards.map((unit, index) => {
+      {groupCardsByAttachment([...cards, ...attachments]).map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
           <CardTile
@@ -542,8 +544,9 @@ function BattlefieldUnitRow({
           />
         );
 
+        const isUnit = cards.some((card) => card.instanceId === unit.instanceId);
         const hostTile =
-          !dragSourceLocation || !unit.instanceId ? (
+          !isUnit || !dragSourceLocation || !unit.instanceId ? (
             tile
           ) : (
             <DraggableLocationCard
@@ -553,27 +556,13 @@ function BattlefieldUnitRow({
               {tile}
             </DraggableLocationCard>
           );
-        const attachedCards = attachments.filter(
-          (attachment) =>
-            attachment.attachedToCardInstanceId === unit.instanceId,
-        );
-
         return (
-          <div
-            className={cn(
-              "relative flex min-h-38 min-w-27 items-start",
-              attachedCards.length > 0 && "pr-7 pb-7",
-            )}
+          <AttachmentCardGroup
             key={key}
-          >
-            {hostTile}
-            {attachedCards.map((attachment, attachmentIndex) => (
-              <div
-                className="absolute left-6 top-7"
-                key={attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`}
-                style={{ zIndex: attachmentIndex + 1 }}
-              >
-                <CardTile
+            host={hostTile}
+            attachments={attachedCards.map((attachment, attachmentIndex) => ({
+              id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
+              card: <CardTile
                   enableHoverPreview
                   isHighlighted={
                     attachment.instanceId
@@ -600,49 +589,13 @@ function BattlefieldUnitRow({
                       ? () => onCardPointerLeave(attachment)
                       : undefined
                   }
+                  showMight
                   {...attachment}
-                />
-              </div>
-            ))}
-          </div>
+                />,
+            }))}
+          />
         );
       })}
-      {attachments
-        .filter(
-          (attachment) =>
-            !cards.some(
-              (card) => card.instanceId === attachment.attachedToCardInstanceId,
-            ),
-        )
-        .map((attachment, index) => (
-          <div key={attachment.instanceId ?? `${attachment.name}-${index}`}>
-            <CardTile
-              enableHoverPreview
-              isHighlighted={
-                attachment.instanceId
-                  ? highlightedCardInstanceIds?.has(attachment.instanceId)
-                  : false
-              }
-              isTransferHidden={
-                attachment.instanceId
-                  ? hiddenCardInstanceIds?.has(attachment.instanceId)
-                  : false
-              }
-              onPrimaryAction={
-                onCardPrimaryAction
-                  ? (event) => onCardPrimaryAction(attachment, event)
-                  : undefined
-              }
-              onHighlightPointerEnter={
-                onCardPointerEnter ? () => onCardPointerEnter(attachment) : undefined
-              }
-              onHighlightPointerLeave={
-                onCardPointerLeave ? () => onCardPointerLeave(attachment) : undefined
-              }
-              {...attachment}
-            />
-          </div>
-        ))}
     </motion.div>
   );
 }

@@ -912,39 +912,6 @@ export const GameBoard: FC<GameBoardProps> = ({
           title="Choose a Move Destination"
         />
       )}
-      {targetSelection?.targetKind === "chainItem" && (
-        <ChoiceDialog
-          confirmLabel="Choose chain item"
-          decisionKey={`chain-item:${targetSelection.actionId}`}
-          description="Choose the spell or ability affected by this action."
-          interactionSuspended={decisionInspection.isInspecting}
-          isOpen
-          isSubmitting={isSubmittingAction}
-          isVisible={!decisionInspection.isInspecting}
-          onCancel={() => setTargetSelection(null)}
-          onConfirm={(selectedIds) =>
-            submitTargetedPlay({
-              ...targetSelection,
-              selectedTargetIds: selectedIds,
-            })
-          }
-          options={(sourceProjection.chain?.items ?? [])
-            .filter((item) => targetSelection.legalTargetIds.includes(item.id))
-            .map((item) => ({
-              description:
-                item.kind === "spell"
-                  ? "Spell"
-                  : item.kind === "ability"
-                    ? "Ability"
-                    : "Triggered ability",
-              id: item.id,
-              imageUrl: item.card?.imageUrl ?? undefined,
-              label: item.label,
-            }))}
-          selectionMode="single"
-          title="Choose a Chain Item"
-        />
-      )}
       {!decisionInspection.isInspecting && unitPlayChoice && (
         <ChoiceDialog
           confirmLabel="Play unit"

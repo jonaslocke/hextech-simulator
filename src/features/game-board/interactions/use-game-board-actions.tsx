@@ -297,17 +297,18 @@ export function useGameBoardActions({
         return;
       }
 
-      const modes = (
-        viewerState.availablePaymentModes[card.instanceId] ?? []
-      ).filter((mode) => mode.enabled);
+      const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
 
       openCardActionMenu(
         event,
         modes.length > 0
           ? modes.map((mode) => ({
               boardLocation: mode.boardLocation,
+              disabled: !mode.enabled,
               id: mode.id,
-              label: playableCardMenuLabel(mode),
+              label: mode.enabled
+                ? playableCardMenuLabel(mode)
+                : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
               onSelect: () => beginPlayOrTargetSelection(card, mode.id),
             }))
           : [
@@ -352,15 +353,17 @@ export function useGameBoardActions({
       }
       const cardActions = sourceActions(card.instanceId);
       if (cardActions.length === 0) return;
+      const powerDomain = cardActions
+        .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
+        .find((domain) => domain !== undefined);
       openCardActionMenu(
         event,
         cardActions.map((action) => ({
           boardLocation: action.presentation.boardLocation,
+          accessibleLabel: resourceActionAccessibleLabel(action, powerDomain),
           disabled: !action.enabled,
           id: action.id,
-          label: action.enabled
-            ? action.label
-            : `${action.label} (${action.disabledReason ?? "unavailable"})`,
+          label: resourceActionMenuLabel(action, powerDomain),
           onSelect: () => beginPlayOrTargetSelection(card, action.id),
         })),
       );
@@ -388,10 +391,10 @@ export function useGameBoardActions({
       openCardActionMenu(
         event,
         runeActions.map((action) => ({
-          accessibleLabel: runeActionAccessibleLabel(action, powerDomain),
+          accessibleLabel: resourceActionAccessibleLabel(action, powerDomain),
           disabled: !action.enabled,
           id: action.id,
-          label: runeActionMenuLabel(action, powerDomain),
+          label: resourceActionMenuLabel(action, powerDomain),
           onSelect: () => submitRuneAction(action.id),
         })),
       );
@@ -581,6 +584,7 @@ function playableCardMenuLabel(mode: PaymentMode): ReactNode {
   const modified =
     preview.energy !== preview.printedEnergy ||
     preview.effectivePower !== preview.printedPower;
+  if (!modified) return mode.label;
   return (
     <span className="flex flex-col gap-0.5">
       <span>{mode.label}</span>
@@ -592,7 +596,7 @@ function playableCardMenuLabel(mode: PaymentMode): ReactNode {
   );
 }
 
-function runeActionMenuLabel(
+function resourceActionMenuLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ): ReactNode {
@@ -632,7 +636,7 @@ function runeActionMenuLabel(
   );
 }
 
-function runeActionAccessibleLabel(
+function resourceActionAccessibleLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ) {

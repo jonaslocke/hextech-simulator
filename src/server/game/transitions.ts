@@ -39,7 +39,14 @@ export function stateChangeEvents(
       type: "cards.revealed",
       actorPlayerId: null,
       message: reveal.message,
-      payload: { revealId: reveal.id },
+      payload: {
+        revealId: reveal.id,
+        ...(reveal.handReveal ? {
+          handOwnerPlayerId: reveal.handReveal.playerId,
+          revealSourceName: reveal.handReveal.sourceName,
+          revealedCardNames: reveal.handReveal.cardNames.join(", "),
+        } : {}),
+      },
     });
   }
   if (!before.state.showdown && after.state.showdown) {

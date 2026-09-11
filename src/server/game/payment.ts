@@ -22,6 +22,12 @@ export type PaymentPlan = {
   powerRuneIds: string[];
 };
 
+export type AdditionalCardCost = {
+  energy: number;
+  power: number;
+  powerDomain?: string;
+};
+
 type PowerSourceUse = {
   id: string;
   amount: number;
@@ -264,6 +270,79 @@ export function payCardCost(
   applyPaymentPlan(game, playerId, plan, index);
 }
 
+/**
+ * Optional play costs are a single payment commitment. Validate the complete
+ * sequence on an isolated state before mutating the authoritative game so a
+ * later additional cost can never leave a partially-paid card play behind.
+ */
+export function canPayCardCosts(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  energyCost: number,
+  index: RuntimeCardIndex,
+  additionalAnyPower: number,
+  additionalCosts: readonly AdditionalCardCost[],
+  cardInstanceId?: string,
+) {
+  const preview = structuredClone(game);
+  try {
+    payCardCost(
+      preview,
+      playerId,
+      definition,
+      energyCost,
+      index,
+      additionalAnyPower,
+      cardInstanceId,
+    );
+    additionalCosts.forEach((cost) =>
+      payAdditionalCost(preview, playerId, definition, cost, index),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function payCardCosts(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  energyCost: number,
+  index: RuntimeCardIndex,
+  additionalAnyPower: number,
+  additionalCosts: readonly AdditionalCardCost[],
+  cardInstanceId?: string,
+) {
+  if (
+    !canPayCardCosts(
+      game,
+      playerId,
+      definition,
+      energyCost,
+      index,
+      additionalAnyPower,
+      additionalCosts,
+      cardInstanceId,
+    )
+  ) {
+    throw new Error("Card costs cannot be paid.");
+  }
+  payCardCost(
+    game,
+    playerId,
+    definition,
+    energyCost,
+    index,
+    additionalAnyPower,
+    cardInstanceId,
+  );
+  additionalCosts.forEach((cost) =>
+    payAdditionalCost(game, playerId, definition, cost, index),
+  );
+}
+
 export function payAbilityCost(
   game: GameDocument,
   playerId: string,
@@ -286,7 +365,7 @@ export function canPayAdditionalCost(
   game: GameDocument,
   playerId: string,
   definition: GameCardDefinition,
-  costs: { energy: number; power: number; powerDomain?: string },
+  costs: AdditionalCardCost,
   index: RuntimeCardIndex,
 ) {
   return (
@@ -308,7 +387,7 @@ export function payAdditionalCost(
   game: GameDocument,
   playerId: string,
   definition: GameCardDefinition,
-  costs: { energy: number; power: number; powerDomain?: string },
+  costs: AdditionalCardCost,
   index: RuntimeCardIndex,
 ) {
   const plan = buildPaymentPlanForRequest(game, playerId, definition, index, {

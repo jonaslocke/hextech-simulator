@@ -72,7 +72,7 @@ const models: Record<string, Clause[]> = {
   "VEN-058": [[["keyword", "type.additional", { type: "Gear" }], ["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], ["condition", "condition.card_type_presence", { cardType: "Gear", minimumCount: 3, excludesSource: true }], ["action", "action.draw_cards", { player: "controller", count: 1 }]]],
   "SFD-217": [[["trigger", "trigger.conquer_battlefield", {}], ["action", "action.draw_by_controlled_battlefield_count", {}]]],
   "SFD-213": [[["modifier", "modifier.modify_numeric_value", { attribute: "energyCost", operation: "reduce", operand: "constant", amount: 1, minimum: 0, target: "controller_card", cardType: "Gear", excludeTokens: true, duration: "whileSourceAtBattlefield", condition: "firstCardOfTypePlayedThisTurn" }]]],
-  "SFD-221": [[["trigger", "trigger.conquer_battlefield", {}], ["selector", "selector.gear", { controller: "controller", minimumCount: 0, maximumCount: 1, selectionKey: "gear" }], ["action", "action.ready_cards", { player: "controller", target: "card", selectionKey: "gear" }], ["action", "action.optional", { effectKey: "detach", prompt: "Detach this Equipment?", onlyIfSelectedBy: "gear" }], ["action", "action.detach_equipment", { target: "equipment", selectionKey: "gear", onlyIfEquipment: true, requiresOptionKey: "detach" }]]],
+  "SFD-221": [[["trigger", "trigger.conquer_battlefield", {}], ["selector", "selector.gear", { controller: "controller", minimumCount: 0, maximumCount: 1, selectionKey: "gear" }], ["action", "action.ready_cards", { player: "controller", target: "card", selectionKey: "gear" }], ["action", "action.optional", { effectKey: "detach", prompt: "Detach this Equipment?", onlyIfSelectedBy: "gear", onlyIfSelectedHasTag: "Equipment", onlyIfSelectedAttached: true }], ["action", "action.detach_equipment", { target: "equipment", selectionKey: "gear", onlyIfEquipment: true, requiresOptionKey: "detach" }]]],
   "OGN-089": runeClauses,
   "OGN-042": runeClauses,
   "VEN-040": [[["timing", "timing.reaction", {}], ["selector", "selector.friendly_unit", { minimumCount: 1, maximumCount: 1, area: "board", locationRelation: "any", controller: "controller", excludesSource: false, inCombatWithEnemyDomain: "fury", targetedByEnemySpellDomain: "fury" }], ["modifier", "modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 4, target: "friendly_unit", duration: "thisTurn" }]]],
@@ -127,7 +127,7 @@ function equipmentEffect(cardCode: string, card: Card) {
   }
   if (cardCode === "SFD-042") return {
     text: { plain: "If this was attached to me this turn, I have an additional +2 Might.", sourceImageUrl },
-    clauses: [clause("If this was attached to me this turn, I have an additional +2 Might.", 0, [["modifier", "modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "unit", duration: "whileAttached", condition: "sourceAttachedThisTurn" }]])],
+    clauses: [clause("If this was attached to me this turn, I have an additional +2 Might.", 0, [["modifier", "modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "source", duration: "whileAttached", condition: "sourceAttachedThisTurn" }]])],
   };
   if (cardCode === "SFD-051") return {
     text: { plain: "If I would die, kill this instead. Heal me, exhaust me, and recall me.", sourceImageUrl },
@@ -135,7 +135,7 @@ function equipmentEffect(cardCode: string, card: Card) {
   };
   if (cardCode === "SFD-064") return {
     text: { plain: "[Shield] 2 (+2 Might while I'm a defender.)", sourceImageUrl },
-    clauses: [clause("[Shield] 2 (+2 Might while I'm a defender.)", 0, [["keyword", "keyword.shield", { amount: 2 }], ["modifier", "modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 2, target: "unit", duration: "whileAttached", condition: "targetDefending" }]])],
+    clauses: [clause("[Shield] 2 (+2 Might while I'm a defender.)", 0, [["keyword", "keyword.shield", { amount: 2 }]])],
   };
   return null;
 }

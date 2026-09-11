@@ -1,6 +1,7 @@
 "use client";
 
 import type { PlayerDecisionCard } from "./player-decision-types";
+import { DecisionCardFace } from "./decision-card-face";
 
 export function PublicRevealedCards({
   cards,
@@ -19,20 +20,10 @@ export function PublicRevealedCards({
       <div className="flex gap-3 overflow-x-auto pb-2">
         {cards.map((card) => (
           <article
-            className="shrink-0"
+            className="w-28 shrink-0"
             key={card.id}
           >
-            {card.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element -- Card art is sourced from the server-projected catalog.
-              <img
-                alt={card.label}
-                className="shadow-lg rounded-md w-28 h-40 object-contain"
-                src={card.imageUrl}
-              />
-            )}
-            <p className="mt-1 max-w-28 font-medium text-slate-100 text-xs leading-tight">
-              {card.label}
-            </p>
+            <DecisionCardFace imageUrl={card.imageUrl} label={card.label} className="h-40" />
           </article>
         ))}
       </div>

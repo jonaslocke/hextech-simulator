@@ -109,6 +109,10 @@ export const chainItemSchema = z.object({
   controllerPlayerId: z.string(),
   sourceCardInstanceId: z.string().nullable(),
   targetCardInstanceIds: z.array(z.string()),
+  // A play-mode choice, such as paying an optional source cost, is persisted
+  // independently from card targets so a later Chain resolution uses the
+  // exact committed mode.
+  initialSelectionOverrides: z.record(z.array(z.string())).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
@@ -232,6 +236,11 @@ export const gameStateSchema = z.object({
         id: z.string().min(1),
         message: z.string().min(1),
         cardInstanceIds: z.array(z.string().min(1)).min(1),
+        handReveal: z.object({
+          playerId: z.string().min(1),
+          sourceName: z.string().min(1),
+          cardNames: z.array(z.string().min(1)),
+        }).optional(),
       }),
     )
     .default([])
@@ -257,6 +266,9 @@ export const gameStateSchema = z.object({
       // A Chain opened by a triggered or Add ability does not pass Focus when
       // it closes during a Showdown (Core Rules 346.1).
       openedBy: z.enum(["triggeredAbility", "addAbility"]).optional(),
+      // Resolution can pause for a persisted choice; the item has not left the
+      // Chain and its removal Cleanup is not yet due (319.5, 321).
+      resolvingItemId: z.string().min(1).optional(),
     })
     .nullable(),
   showdown: z
@@ -341,6 +353,7 @@ export const gameStateSchema = z.object({
         .nullable()
         .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
+      initialSelectionOverrides: z.record(z.array(z.string())).optional(),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
       effectOutcomes: z.record(
