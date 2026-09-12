@@ -8,7 +8,7 @@ import { beginEffectResolution, submitEffectOption } from "../src/server/game/ef
 import { gameplayActions, performGameplayAction } from "../src/server/game/actions";
 import { projectGame } from "../src/server/game/projection";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
-import type { GameCardDefinition } from "../src/server/game/schemas";
+import type { BehaviorBinding, GameCardDefinition } from "../src/server/game/schemas";
 import { ornnGameFixture } from "./helpers/ornn-game-fixture";
 
 test("canonical Cloth Armor grants Shield 2 once, only while its host defends (814.1.c–814.2)", async () => {
@@ -189,6 +189,30 @@ test("canonical Hidden Gear hides, reacts from its required Battlefield, and is 
     (action) => action.sourceCardInstanceId === zhonyaId && action.label.startsWith("Hide "),
   );
   assert.ok(hide?.enabled);
+  game.state.showdown = {
+    kind: "nonCombat",
+    battlefieldId: battlefield.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+  assert.equal(
+    gameplayActions(game, "p1", decks).some((action) => action.id === hide.id),
+    false,
+    "Hide is a Neutral Open discretionary action, not a Showdown action",
+  );
+  assert.throws(
+    () => performGameplayAction({
+      game,
+      actorPlayerId: "p1",
+      actionId: hide.id,
+      selectedIds: [],
+      decks,
+      now: "hidden-showdown-forgery",
+    }),
+    /not legal/,
+  );
+  game.state.showdown = null;
   let current = performGameplayAction({
     game,
     actorPlayerId: "p1",
@@ -268,3 +292,238 @@ test("canonical Hidden Gear hides, reacts from its required Battlefield, and is 
     "a Hidden Gear is first played to the associated Battlefield, then recalled as unattached Gear during Cleanup",
   );
 });
+
+test("Hidden target selection stays at its battlefield unless an explicit different-location restriction makes that impossible", async () => {
+  const local = await hiddenSpellFixture({
+    cardCode: "TST-HIDDEN-LOCAL",
+    name: "Local Hidden Test",
+    locationRelation: "any",
+    effects: [binding("action.kill_card", 1, { target: "enemy_unit", selectionKey: "target" })],
+  });
+  const localAction = hiddenPlayAction(local.current, local.spellId, local.decks);
+  assert.deepEqual(localAction.targets[0]?.legalIds, [local.localEnemy]);
+  assert.throws(
+    () => performGameplayAction({
+      game: local.current,
+      actorPlayerId: "p1",
+      actionId: localAction.id,
+      selectedIds: [local.remoteEnemy],
+      decks: local.decks,
+      now: "hidden-local-forgery",
+    }),
+    /not legal/,
+  );
+  const localPlayed = performGameplayAction({
+    game: local.current,
+    actorPlayerId: "p1",
+    actionId: localAction.id,
+    selectedIds: [local.localEnemy],
+    decks: local.decks,
+    now: "hidden-local-play",
+  });
+  assert.deepEqual(localPlayed.state.chain?.items.at(-1)?.targetCardInstanceIds, [local.localEnemy]);
+
+  const remote = await hiddenSpellFixture({
+    cardCode: "TST-HIDDEN-REMOTE",
+    name: "Remote Hidden Test",
+    // This models an explicit "another location" target such as Tideturner.
+    // The selector itself excludes the associated battlefield, so 811.1.d.2
+    // does not add an impossible local restriction to this individual target.
+    locationRelation: "differentSourceLocation",
+    effects: [binding("action.kill_card", 1, { target: "enemy_unit", selectionKey: "target" })],
+  });
+  const remoteAction = hiddenPlayAction(remote.current, remote.spellId, remote.decks);
+  assert.deepEqual(remoteAction.targets[0]?.legalIds, [remote.remoteEnemy]);
+  const remotePlayed = performGameplayAction({
+    game: remote.current,
+    actorPlayerId: "p1",
+    actionId: remoteAction.id,
+    selectedIds: [remote.remoteEnemy],
+    decks: remote.decks,
+    now: "hidden-remote-play",
+  });
+  assert.deepEqual(remotePlayed.state.chain?.items.at(-1)?.targetCardInstanceIds, [remote.remoteEnemy]);
+});
+
+test("a Hidden play effect places Unit tokens at its associated battlefield", async () => {
+  const fixture = await hiddenSpellFixture({
+    cardCode: "TST-HIDDEN-TOKEN",
+    name: "Hidden Token Test",
+    effects: [binding("action.play_token", 0, {
+      tokenName: "1 :rb_might: Recruit unit",
+      count: 1,
+      placement: "base",
+      entryState: "ready",
+    })],
+  });
+  let current = performGameplayAction({
+    game: fixture.current,
+    actorPlayerId: "p1",
+    actionId: hiddenPlayAction(fixture.current, fixture.spellId, fixture.decks).id,
+    selectedIds: [],
+    decks: fixture.decks,
+    now: "hidden-token-play",
+  });
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(current, playerId, fixture.decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass, `${playerId} receives priority before the Hidden spell resolves`);
+    current = performGameplayAction({
+      game: current,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks: fixture.decks,
+      now: `hidden-token-pass-${playerId}`,
+    });
+  }
+  const tokenId = current.state.battlefields
+    .find((battlefield) => battlefield.battlefieldId === fixture.battlefieldId)
+    ?.units.find((id) => id.includes(":token:"));
+  assert.ok(tokenId);
+  assert.equal(current.state.players.p1!.zones.base.includes(tokenId), false);
+});
+
+async function hiddenSpellFixture(input: {
+  cardCode: string;
+  name: string;
+  locationRelation?: string;
+  effects: BehaviorBinding[];
+}) {
+  const { game, decks, id, place } = await ornnGameFixture();
+  const sourceCards = cardSchema.array().parse(
+    JSON.parse(await readFile("data/sets/ogn.json", "utf8")),
+  );
+  const sourceCard = sourceCards.find(
+    (candidate) => candidate.public_code === "OGN-077/298",
+  );
+  assert.ok(sourceCard, "local OGN source data must supply the test card shape");
+  const card = cardSchema.parse({
+    ...sourceCard,
+    id: input.cardCode,
+    name: input.name,
+    public_code: `${input.cardCode}/1`,
+    attributes: { ...sourceCard.attributes, energy: 0, might: null, power: 0 },
+    classification: { ...sourceCard.classification, type: "Spell" },
+  });
+  const selectors = input.locationRelation
+    ? [binding("selector.enemy_unit", 0, {
+        minimumCount: 1,
+        maximumCount: 1,
+        area: "battlefield",
+        locationRelation: input.locationRelation,
+        controller: "opponent",
+        excludesSource: false,
+        selectionKey: "target",
+      })]
+    : [];
+  const definition: GameCardDefinition = {
+    cardCode: input.cardCode,
+    sourceTextHash: `test:${input.cardCode}`,
+    card,
+    behaviorModel: {
+      playTimings: [],
+      clauses: [{
+        id: "hidden-spell",
+        sequence: 0,
+        sourceText: "Hidden test behavior",
+        normalizedText: "Hidden test behavior",
+        abilities: [],
+        triggers: [],
+        conditions: [],
+        selectors,
+        choices: [],
+        costs: [],
+        timings: [],
+        effects: input.effects,
+        keywords: [binding("keyword.hidden", 0, {})],
+      }],
+    },
+  };
+  decks[0]!.snapshot.cards.push(definition);
+  const spellId = `p1:hidden:${input.cardCode}:1`;
+  decks[0]!.instances.push({
+    instanceId: spellId,
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: input.cardCode,
+  });
+  game.state.cardStates[spellId] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+    objectVersion: 0,
+  };
+  const localEnemy = place("OGN-044", "base", "p2");
+  const remoteEnemy = place("OGN-044", "base", "p2", 1);
+  game.state.players.p2!.zones.base = game.state.players.p2!.zones.base.filter(
+    (id) => id !== localEnemy && id !== remoteEnemy,
+  );
+  const battlefieldId = "hidden-local";
+  game.state.battlefields = [
+    {
+      battlefieldId,
+      cardInstanceId: id("SFD-221"),
+      selectedByPlayerId: "p1",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: [localEnemy],
+      attachedCardInstanceIds: [],
+      facedownCardInstanceId: null,
+    },
+    {
+      battlefieldId: "hidden-remote",
+      cardInstanceId: id("SFD-221", "p2"),
+      selectedByPlayerId: "p2",
+      controllerPlayerId: "p1",
+      contestedByPlayerId: null,
+      units: [remoteEnemy],
+      attachedCardInstanceIds: [],
+      facedownCardInstanceId: null,
+    },
+  ];
+  game.state.players.p1!.zones.hand.push(spellId);
+  game.state.players.p1!.power = { Chaos: 1 };
+  const hide = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === spellId && action.label.startsWith("Hide "),
+  );
+  assert.ok(hide?.enabled);
+  const current = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: hide.id,
+    selectedIds: [],
+    decks,
+    now: `${input.cardCode}:hide`,
+  });
+  current.state.turn!.turnNumber += 1;
+  current.state.showdown = {
+    kind: "nonCombat",
+    battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+  return { current, decks, spellId, battlefieldId, localEnemy, remoteEnemy };
+}
+
+function hiddenPlayAction(
+  game: Parameters<typeof gameplayActions>[0],
+  spellId: string,
+  decks: Parameters<typeof gameplayActions>[2],
+) {
+  const action = gameplayActions(game, "p1", decks).find(
+    (candidate) => candidate.sourceCardInstanceId === spellId && candidate.label.startsWith("Play "),
+  );
+  assert.ok(action?.enabled, "Hidden card must be playable at Reaction timing");
+  return action;
+}
+
+function binding(
+  behaviorId: string,
+  order: number,
+  parameters: Record<string, string | number | boolean | null>,
+): BehaviorBinding {
+  return { behaviorId, order, parameters, confidence: "high" };
+}

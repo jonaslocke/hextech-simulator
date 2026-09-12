@@ -150,6 +150,7 @@ export const unitTargetAreas = ["board", "base", "battlefield", "combat"] as con
 export const unitLocationRelations = [
   "any",
   "sourceLocation",
+  "differentSourceLocation",
   "sharedLocation",
   "currentCombat",
   "eventBattlefield"

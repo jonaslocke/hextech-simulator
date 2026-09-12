@@ -986,6 +986,7 @@ function hideCard(
     !turn ||
     turn.activePlayerId !== playerId ||
     game.state.chain ||
+    game.state.showdown ||
     !hasBehavior(definition, "keyword.hidden") ||
     !(player.zones.hand.includes(cardId) || player.zones.champion === cardId) ||
     !battlefield ||
@@ -2037,7 +2038,7 @@ function addHiddenCardActions(
 
   // Hiding is allowed only during the owner's own Open turn. It is not a Play,
   // so no Chain is created and no Play timing is consulted (811.1.b--811.1.c.3).
-  if (!game.state.chain && turn.activePlayerId === playerId) {
+  if (!game.state.chain && !game.state.showdown && turn.activePlayerId === playerId) {
     const canPayHide = buildAnyPowerPaymentPlan(game, playerId, index) !== null;
     for (const cardId of [
       ...player.zones.hand,

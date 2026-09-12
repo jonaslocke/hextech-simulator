@@ -582,7 +582,7 @@ test("declares emitted events for reusable action primitives", () => {
   );
 });
 
-test("discovers Base, source-location, and shared-location Unit constraints", () => {
+test("discovers Base, source-relative, and shared-location Unit constraints", () => {
   const baseTarget = discoverCardPrimitives(
     createTestCard({
       name: "Yone, Blademaster",
@@ -611,6 +611,13 @@ test("discovers Base, source-location, and shared-location Unit constraints", ()
       text: "Deal 1 to up to three units at the same location."
     })
   );
+  const anotherLocation = discoverCardPrimitives(
+    createTestCard({
+      name: "Tideturner",
+      publicCode: "TST-001/1",
+      text: "Recall an enemy unit at another location."
+    })
+  );
 
   assert.equal(
     findAssignment(baseTarget, "selector.enemy_unit")?.parameters.area,
@@ -629,6 +636,10 @@ test("discovers Base, source-location, and shared-location Unit constraints", ()
   assert.deepEqual(
     pickLocation(findAssignment(sameLocation, "selector.unit")?.parameters),
     { area: "board", locationRelation: "sharedLocation" }
+  );
+  assert.deepEqual(
+    pickLocation(findAssignment(anotherLocation, "selector.enemy_unit")?.parameters),
+    { area: "board", locationRelation: "differentSourceLocation" }
   );
 });
 

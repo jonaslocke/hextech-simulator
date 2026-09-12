@@ -1239,6 +1239,14 @@ function readUnitTargetArea(rulesText: string): string {
 }
 
 function readUnitLocationRelation(rulesText: string): string {
+  if (
+    rulesText.includes("another location") ||
+    rulesText.includes("different location") ||
+    rulesText.includes("another battlefield") ||
+    rulesText.includes("different battlefield")
+  ) {
+    return "differentSourceLocation";
+  }
   if (rulesText.includes("same location") || rulesText.includes("same battlefield")) {
     return "sharedLocation";
   }

@@ -392,7 +392,8 @@ function restrictHiddenPlayRequirement(
   if (
     !battlefieldId ||
     binding.parameters.selectionPurpose === "optionalCost" ||
-    requirement.sourceZone
+    requirement.sourceZone ||
+    binding.parameters.locationRelation === "differentSourceLocation"
   ) {
     return requirement;
   }
