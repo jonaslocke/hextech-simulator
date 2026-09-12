@@ -6,13 +6,21 @@ import { parseDeckList } from "@/server/deck";
 export type { DeckId } from "@/shared/game";
 
 export const DECK_DEFINITIONS_COLLECTION = "deckDefinitions";
-export const CORE_DECK_IDS = [
-  "lux",
-  "annie",
-  "master-yi",
-  "garen",
-  "ornn",
-] as const satisfies DeckId[];
+export const PERMANENT_DECK_DEFINITIONS = [
+  { id: "lux", label: "Lux", sourcePath: "data/decks/lux.dec.txt" },
+  { id: "annie", label: "Annie", sourcePath: "data/decks/annie.dec.txt" },
+  { id: "master-yi", label: "Master Yi", sourcePath: "data/decks/masteryi.dec.txt" },
+  { id: "garen", label: "Garen", sourcePath: "data/decks/garen.dec.txt" },
+  {
+    id: "ornn",
+    label: "Ornn, Fire Below the Mountain",
+    sourcePath: "data/decks/Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt",
+  },
+] as const satisfies readonly { id: DeckId; label: string; sourcePath: string }[];
+export type CoreDeckId = (typeof PERMANENT_DECK_DEFINITIONS)[number]["id"];
+export const CORE_DECK_IDS = PERMANENT_DECK_DEFINITIONS.map(
+  ({ id }) => id,
+) as CoreDeckId[];
 export const SIDEBOARD_VALIDATION_DECK_IDS = [
   "lux-s",
   "annie-s",

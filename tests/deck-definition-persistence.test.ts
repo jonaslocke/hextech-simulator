@@ -158,10 +158,8 @@ test("deck synchronization is confirmation-gated and reset-safe", async () => {
   const resetSource = await readFile("scripts/reset-game-runtime.ts", "utf8");
 
   assert.match(syncSource, /--confirm/);
-  assert.match(syncSource, /data\/decks\/lux\.dec\.txt/);
-  assert.match(syncSource, /data\/decks\/annie\.dec\.txt/);
-  assert.match(syncSource, /data\/decks\/masteryi\.dec\.txt/);
-  assert.match(syncSource, /data\/decks\/garen\.dec\.txt/);
+  assert.match(syncSource, /PERMANENT_DECK_DEFINITIONS/);
+  assert.match(syncSource, /PERMANENT_DECK_DEFINITIONS\.map\(loadSeed\)/);
   assert.doesNotMatch(resetSource, /deckDefinitions/);
 });
 

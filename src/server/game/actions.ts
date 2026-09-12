@@ -993,7 +993,9 @@ function passPriority(
           index,
         );
         if (item.behaviorEvent?.type === "temporary.beginning") {
-          moveCardToTrash(game, item.sourceCardInstanceId, index);
+          if (isCurrentBoardObject(game, item.sourceCardInstanceId, item.sourceObjectVersion)) {
+            moveCardToTrash(game, item.sourceCardInstanceId, index);
+          }
         } else if (item.behaviorEvent?.type === "delayed.effect") {
           const delayedEffectId = item.behaviorEvent.values.delayedEffectId;
           const endingPlayerId = item.behaviorEvent?.values.endingPlayerId;
@@ -2129,6 +2131,21 @@ function captureTargetObjectVersions(
       id,
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
+  );
+}
+
+function isCurrentBoardObject(
+  game: GameDocument,
+  cardInstanceId: string,
+  objectVersion: number | undefined,
+) {
+  if (objectVersion === undefined) return false;
+  if (game.state.cardStates[cardInstanceId]?.objectVersion !== objectVersion) return false;
+  return Object.values(game.state.players).some((player) =>
+    player.zones.base.includes(cardInstanceId),
+  ) || game.state.battlefields.some((battlefield) =>
+    battlefield.units.includes(cardInstanceId) ||
+    (battlefield.attachedCardInstanceIds ?? []).includes(cardInstanceId),
   );
 }
 

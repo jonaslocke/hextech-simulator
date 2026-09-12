@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gameplayActions, performGameplayAction } from "../src/server/game";
+import type { GameCardDefinition } from "../src/server/game";
+import { dispatchBehaviorEvent, gameplayActions, performGameplayAction } from "../src/server/game";
 import { gameFixture } from "./helpers/game-fixture";
 
 test("a card-play Chain retains its origin through a Quick-Draw trigger and passes Focus on closure", async () => {
@@ -30,6 +31,48 @@ test("a card-play Chain retains its origin through a Quick-Draw trigger and pass
   assert.equal(game.state.showdown?.focusPlayerId, "p2");
 });
 
+test("trigger ordering preserves a card-play Chain origin through closure", async () => {
+  const fixture = await gameFixture();
+  let { game } = fixture;
+  const { decks, place } = fixture;
+  const gear = place("SFD-056", "hand");
+  place(addGearPlayTriggerSource(decks, "GEAR-TRIGGER-A").cardCode, "base");
+  place(addGearPlayTriggerSource(decks, "GEAR-TRIGGER-B").cardCode, "base");
+  game.state.showdown = { kind: "nonCombat", battlefieldId: "focus-field", relevantPlayerIds: ["p1", "p2"], focusPlayerId: "p1", passedPlayerIds: [] };
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: gear,
+    values: {},
+  }, decks, { chainOrigin: "cardPlay" });
+
+  assert.equal(game.state.pendingChoice?.type, "orderTriggers");
+  assert.equal(game.state.pendingChoice?.pendingItems.length, 2);
+  assert.ok(game.state.pendingChoice?.pendingItems.every((item) => item.chainOrigin === "cardPlay"));
+  const order = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "orderedOptions");
+  assert.ok(order?.enabled);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: order.id,
+    selectedIds: [...game.state.pendingChoice!.optionIds].reverse(),
+    decks,
+    now: "ordered-card-play-triggers",
+  });
+  assert.equal(game.state.chain?.openedBy, "cardPlay");
+
+  for (let round = 0; round < 2; round += 1) {
+    for (const playerId of ["p1", "p2"]) {
+      const pass = gameplayActions(game, playerId, decks).find((action) => action.label === "Pass priority");
+      assert.ok(pass);
+      game = performGameplayAction({ game, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `ordered-${round}-${playerId}` });
+    }
+  }
+  assert.equal(game.state.chain, null);
+  assert.equal(game.state.showdown?.focusPlayerId, "p2");
+});
+
 for (const openedBy of ["triggeredAbility", "addAbility"] as const) {
   test(`${openedBy} Chains retain Focus when they close`, async () => {
     const fixture = await gameFixture();
@@ -50,4 +93,31 @@ for (const openedBy of ["triggeredAbility", "addAbility"] as const) {
     }
     assert.equal(game.state.showdown?.focusPlayerId, "p1");
   });
+}
+
+function addGearPlayTriggerSource(
+  decks: Awaited<ReturnType<typeof gameFixture>>["decks"],
+  cardCode: string,
+): GameCardDefinition {
+  const template = decks[0]!.snapshot.cards.find((definition) => definition.card.classification.type === "Unit")!;
+  const definition: GameCardDefinition = {
+    ...structuredClone(template),
+    cardCode,
+    card: { ...structuredClone(template.card), id: cardCode, name: cardCode, public_code: `${cardCode}/1` },
+    behaviorModel: {
+      playTimings: [],
+      clauses: [{
+        id: "on-gear-play",
+        sequence: 0,
+        sourceText: "When you play a Gear, observe it.",
+        normalizedText: "When you play a Gear, observe it.",
+        abilities: [],
+        triggers: [{ behaviorId: "trigger.on_play", order: 0, confidence: "high", parameters: { subject: "gear" } }],
+        conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: [],
+      }],
+    },
+  };
+  decks[0]!.snapshot.cards.push(definition);
+  decks[0]!.instances.push({ instanceId: `p1:mainDeck:${cardCode}:1`, ownerPlayerId: "p1", source: "mainDeck", cardCode });
+  return definition;
 }

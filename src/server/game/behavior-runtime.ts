@@ -315,14 +315,24 @@ export function submitTriggerOrder(game: GameDocument, playerId: string, ordered
     throw new Error("Trigger ordering must contain every pending trigger exactly once.");
   }
   const byId = new Map(pending.pendingItems.map((item) => [item.id, item]));
-  const chain = game.state.chain ?? {
+  let chain = game.state.chain;
+  if (!chain) {
+    const origins = new Set(
+      pending.pendingItems.map((item) => item.chainOrigin ?? "triggeredAbility"),
+    );
+    if (origins.size !== 1) {
+      throw new Error("Ordered triggers that open a Chain must share one origin.");
+    }
+    const [openedBy] = origins;
+    chain = {
     items: [],
     relevantPlayerIds: game.state.showdown?.relevantPlayerIds
       ?? [...game.state.setup.playerIds],
     priorityPlayerId: playerId,
     passedPlayerIds: [],
-    openedBy: "triggeredAbility" as const,
-  };
+    openedBy: openedBy!,
+    };
+  }
   chain.items.push(...orderedIds.map((id) => byId.get(id)!));
   chain.priorityPlayerId = playerId;
   chain.passedPlayerIds = [];

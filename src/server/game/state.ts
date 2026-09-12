@@ -113,6 +113,10 @@ export const chainItemSchema = z.object({
   // Needed while a triggered item waits for targets before it can establish
   // the Chain that its originating card play already opened.
   chainOrigin: z.enum(["cardPlay", "triggeredAbility", "addAbility"]).optional(),
+  // A delayed trigger can only affect the source game object that created it.
+  // Card instance IDs persist across zone changes, so identity additionally
+  // requires the object's version at trigger creation.
+  sourceObjectVersion: z.number().int().nonnegative().optional(),
   // A play-mode choice, such as paying an optional source cost, is persisted
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.

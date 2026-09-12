@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { loadCardCatalog, cardSchema, type CardCatalog } from "../src/server/catalog";
 import { validateDeckList } from "../src/server/deck";
+import { CORE_DECK_IDS, PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
 
 const deckDirectory = path.join(process.cwd(), "data", "decks");
 
@@ -28,25 +29,20 @@ async function permanentCatalog(): Promise<CardCatalog> {
   };
 }
 
-async function ornnSourceName() {
-  const names = await readdir(deckDirectory);
-  const name = names.find((candidate) => candidate.startsWith("Ornn,"));
-  assert.ok(name, "the permanent Ornn deck source must exist");
-  return name;
-}
-
 test("validates every permanent deck source through the shared pipeline", async () => {
+  assert.deepEqual(
+    CORE_DECK_IDS,
+    PERMANENT_DECK_DEFINITIONS.map(({ id }) => id),
+    "the validation corpus is the production permanent-deck registry",
+  );
   const catalog = await permanentCatalog();
-  const permanentDecks = [
-    ["annie", "annie.dec.txt"],
-    ["lux", "lux.dec.txt"],
-    ["master-yi", "masteryi.dec.txt"],
-    ["garen", "garen.dec.txt"],
-    ["ornn", await ornnSourceName()],
-  ] as const;
-  for (const [ownerId, filename] of permanentDecks) {
-    const result = validateDeckList(await loadDeck(filename), catalog, { ownerId });
-    assert.equal(result.ok, true, `${ownerId}: ${JSON.stringify(result.issues, null, 2)}`);
+  for (const definition of PERMANENT_DECK_DEFINITIONS) {
+    const source = await readFile(
+      path.join(process.cwd(), definition.sourcePath),
+      "utf8",
+    );
+    const result = validateDeckList(source, catalog, { ownerId: definition.id });
+    assert.equal(result.ok, true, `${definition.id}: ${JSON.stringify(result.issues, null, 2)}`);
   }
 });
 
