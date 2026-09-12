@@ -25,10 +25,10 @@ export async function gameFixture() {
   ), behaviors);
   const runtime = [createRuntimeDeckSnapshot(snapshot, "p1"), createRuntimeDeckSnapshot(snapshot, "p2")] as const;
   const decks: DeckSnapshotDocument[] = runtime.map((deck, i) => ({
-    id: `deck-${i}`, createdAt: now, updatedAt: now, matchId: "ornn-regression", playerId: `p${i + 1}`,
+    id: `deck-${i}`, createdAt: now, updatedAt: now, matchId: "game-fixture", playerId: `p${i + 1}`,
     snapshot, instances: deck.instances,
   }));
-  const game = createInitialGame({ matchId: "ornn-regression", now, rngSeed: "ornn-regression", playerIds: ["p1", "p2"], decks: [...runtime] });
+  const game = createInitialGame({ matchId: "game-fixture", now, rngSeed: "game-fixture", playerIds: ["p1", "p2"], decks: [...runtime] });
   game.status = "in_progress";
   game.state.setup.startingPlayerId = "p1";
   game.state.turn = { activePlayerId: "p1", turnNumber: 3, phase: "action" };

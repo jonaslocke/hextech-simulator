@@ -51,7 +51,8 @@ test("validates every permanent deck source through the shared pipeline", async 
 });
 
 test("accepts the official Rune Pool heading", async () => {
-  const result = validateDeckList(await loadDeck(await ornnSourceName()), await permanentCatalog());
+  const source = (await loadDeck("annie.dec.txt")).replace("Runes:", "Rune Pool:");
+  const result = validateDeckList(source, await permanentCatalog());
   assert.equal(result.ok, true, JSON.stringify(result.issues, null, 2));
   if (result.ok) assert.equal(result.snapshot.runes.reduce((total, entry) => total + entry.quantity, 0), 12);
 });

@@ -1,3 +1,4 @@
+
 Legend:
 1 Akali, Rogue Assassin
 
@@ -5,40 +6,35 @@ Champion:
 1 Akali, Deadly Weapon
 
 MainDeck:
+3 Falling Star
 3 Defy
 3 Discipline
 3 Zhonya's Hourglass
+3 Long Sword
+3 Lonely Poro
 3 Stellacorn Herder
-3 Mournful Witness
+3 Scuttle Crab
 3 Astral Heron
 3 Shuriken Flip
-2 Falling Star
-2 Long Sword
-2 Mischievous Marai
+2 Sky Splitter
+2 En Garde
 2 Back Off
-1 Noxus Hopeful
-1 Block
-1 Not So Fast
-1 Sterak's Gage
-3 Kai'Sa, Survivor
-2 Blitzcrank, Impassive
-1 Darius, Trifarian
+3 Irelia, Fervent
 
 Battlefields:
-1 Sigil of the Storm
+1 Back-Alley Bar
+1 Targon's Peak
 1 Void Gate
-1 Forgotten Monument
 
-Runes:
-6 Fury Rune
-6 Calm Rune
+Rune Pool:
+7 Fury Rune
+5 Calm Rune
 
 Sideboard:
+2 Charm
 2 Ferrous Forerunner
-2 Tomb-Raider Barbara
-1 En Garde
+2 Not So Fast
+1 Adaptatron
 1 Against the Odds
-1 Disarming Rake
-1 Not So Fast
+1 Tomb-Raider Barbara
 1 Akali, Silent
-1 Decree of Focus
