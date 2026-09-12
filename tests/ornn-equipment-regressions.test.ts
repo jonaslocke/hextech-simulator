@@ -6,6 +6,7 @@ import { attachCardToTopMost, detachCard } from "../src/server/game/attachment-l
 import { cleanupBoard } from "../src/server/game/board-rules";
 import { beginEffectResolution, submitEffectOption } from "../src/server/game/effect-resolution";
 import { gameplayActions, performGameplayAction } from "../src/server/game/actions";
+import { projectGame } from "../src/server/game/projection";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
 import type { GameCardDefinition } from "../src/server/game/schemas";
 import { ornnGameFixture } from "./helpers/ornn-game-fixture";
@@ -200,6 +201,16 @@ test("canonical Hidden Gear hides, reacts from its required Battlefield, and is 
   assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, zhonyaId);
   assert.equal(current.state.players.p1!.zones.hand.includes(zhonyaId), false);
   assert.equal(current.state.players.p1!.power.Chaos, 0);
+  assert.equal(
+    projectGame({ game: current, viewerPlayerId: "p1", decks }).battlefields[0]?.facedownCard?.instanceId,
+    zhonyaId,
+    "the owner can inspect their Hidden card",
+  );
+  assert.equal(
+    projectGame({ game: current, viewerPlayerId: "p2", decks }).battlefields[0]?.facedownCard,
+    null,
+    "the opposing projection does not expose a Hidden card",
+  );
   assert.equal(
     gameplayActions(current, "p1", decks).some(
       (action) => action.sourceCardInstanceId === zhonyaId && action.label.startsWith("Play "),
