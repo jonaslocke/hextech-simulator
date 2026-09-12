@@ -5,11 +5,11 @@ import { gameDocumentSchema } from "../src/server/game/state";
 import { attachCardToTopMost } from "../src/server/game/attachment-lifecycle";
 import { cleanupBoard } from "../src/server/game/board-rules";
 import { createRuntimeCardIndex, definitionForInstance } from "../src/server/game/primitive-handlers";
-import { ornnGameFixture } from "./helpers/ornn-game-fixture";
+import { gameFixture } from "./helpers/game-fixture";
 
 for (const openedBy of [undefined, "triggeredAbility", "addAbility"] as const) {
   test(`a ${openedBy ?? "ordinary"} Chain stays closed through a paused detach and cleans up before Focus (319.5, 321, 323.7, 346–346.1)`, async () => {
-    const fixture = await ornnGameFixture();
+    const fixture = await gameFixture();
     let { game } = fixture;
     const { decks, id, place } = fixture;
     const host = place("OGN-044", "base");

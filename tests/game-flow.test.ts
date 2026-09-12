@@ -576,12 +576,12 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   const game = structuredClone(initial);
   const snapshot = decks[0]!.snapshot;
   snapshot.cards.push(
-    definition("ORNN", "Fire Below the Mountain", "Legend", 0, 0),
+    definition("RESOURCE_LEGEND", "Resource Legend", "Legend", 0, 0),
     definition("GEAR", "Test Gear", "Gear", 0, 0, 1),
     definition("POWER_UNIT", "Power Unit", "Unit", 0, 1, 1),
   );
-  const ornn = snapshot.cards.find((card) => card.cardCode === "ORNN")!;
-  ornn.behaviorModel.clauses = [clause("ornn-add", {
+  const resourceLegend = snapshot.cards.find((card) => card.cardCode === "RESOURCE_LEGEND")!;
+  resourceLegend.behaviorModel.clauses = [clause("restricted-add", {
     abilities: [binding("ability.exhaust_for_resource", 0, {
       resourceType: "power",
       amountSource: "constant",
@@ -624,7 +624,7 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
     costs: [binding("cost.pay", 0, { amount: 1, resource: "rune" })],
   })];
   decks[0]!.instances.push(
-    { instanceId: "p1:ornn", ownerPlayerId: "p1", source: "legend", cardCode: "ORNN" },
+    { instanceId: "p1:resource-legend", ownerPlayerId: "p1", source: "legend", cardCode: "RESOURCE_LEGEND" },
     { instanceId: "p1:gear", ownerPlayerId: "p1", source: "mainDeck", cardCode: "GEAR" },
     { instanceId: "p1:power-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "POWER_UNIT" },
   );
@@ -634,12 +634,12 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
     source: "mainDeck",
     cardCode: "UNIT",
   });
-  game.state.players.p1!.zones.legend = "p1:ornn";
+  game.state.players.p1!.zones.legend = "p1:resource-legend";
   game.state.players.p1!.zones.hand.push("p1:gear", "p1:power-unit");
   game.state.players.p1!.zones.base = game.state.players.p1!.zones.base.filter(
     (id) => id !== "p1:rune" && id !== "p1:rune-b",
   );
-  game.state.cardStates["p1:ornn"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:resource-legend"] = { exhausted: false, damage: 0, computedMight: null };
   game.state.cardStates["p1:gear"] = { exhausted: false, damage: 0, computedMight: null };
   game.state.cardStates["p1:power-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
   game.state.players.p2!.zones.base.push("p2:enemy");
@@ -659,9 +659,9 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
     actionId: autoPayGear.id,
     selectedIds: [],
     decks,
-    now: "ornn-auto-pay",
+    now: "restricted-auto-pay",
   });
-  assert.equal(autoPaid.state.cardStates["p1:ornn"]?.exhausted, true);
+  assert.equal(autoPaid.state.cardStates["p1:resource-legend"]?.exhausted, true);
   assert.ok(autoPaid.state.players.p1!.zones.base.includes("p1:gear"));
   assert.deepEqual(autoPaid.state.players.p1!.restrictedResources, undefined);
   assert.equal(
@@ -673,7 +673,7 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   );
 
   const addPower = gameplayActions(game, "p1", decks).find(
-    (action) => action.sourceCardInstanceId === "p1:ornn",
+    (action) => action.sourceCardInstanceId === "p1:resource-legend",
   )!;
   const afterAdd = performGameplayAction({
     game,
@@ -681,7 +681,7 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
     actionId: addPower.id,
     selectedIds: [],
     decks,
-    now: "ornn-add",
+    now: "restricted-add",
   });
   assert.deepEqual(afterAdd.state.players.p1!.restrictedResources, {
     energy: {},

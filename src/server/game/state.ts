@@ -86,6 +86,7 @@ export const turnStateSchema = z.object({
   phase: z.enum(["awaken", "beginning", "channel", "draw", "action", "end"]),
   endTriggersQueued: z.boolean().optional(),
   endDelayedEffectsQueued: z.boolean().optional(),
+  beginningTriggersQueued: z.boolean().optional(),
   playedCardInstanceIds: z.array(z.string().min(1)).default([]).optional(),
 });
 
@@ -100,9 +101,6 @@ export const cardStateSchema = z.object({
   lethalSuppressedMight: z.number().int().nonnegative().nullable().optional(),
   attachedToCardInstanceId: z.string().min(1).nullable().optional(),
   attachedAtTurnNumber: z.number().int().positive().nullable().optional(),
-  // Rule 811.1.b: a facedown card becomes playable from Hidden beginning on
-  // the following turn, not during the turn in which it was hidden.
-  hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
 });
 
 export const chainItemSchema = z.object({
@@ -112,13 +110,13 @@ export const chainItemSchema = z.object({
   controllerPlayerId: z.string(),
   sourceCardInstanceId: z.string().nullable(),
   targetCardInstanceIds: z.array(z.string()),
+  // Needed while a triggered item waits for targets before it can establish
+  // the Chain that its originating card play already opened.
+  chainOrigin: z.enum(["cardPlay", "triggeredAbility", "addAbility"]).optional(),
   // A play-mode choice, such as paying an optional source cost, is persisted
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.
   initialSelectionOverrides: z.record(z.array(z.string())).optional(),
-  // The battlefield associated with a card being played from Hidden. This
-  // persists through Chain priority and effect frames (811.1.d--811.1.d.2.a).
-  hiddenBattlefieldId: z.string().min(1).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
@@ -269,9 +267,9 @@ export const gameStateSchema = z.object({
       relevantPlayerIds: z.array(z.string().min(1)).min(1),
       priorityPlayerId: z.string().min(1),
       passedPlayerIds: z.array(z.string().min(1)),
-      // A Chain opened by a triggered or Add ability does not pass Focus when
-      // it closes during a Showdown (Core Rules 346.1).
-      openedBy: z.enum(["triggeredAbility", "addAbility"]).optional(),
+      // The origin of the Chain, rather than the top-most item still on it,
+      // controls its eventual Focus transition (Core Rules 346.1).
+      openedBy: z.enum(["cardPlay", "triggeredAbility", "addAbility"]).optional(),
       // Resolution can pause for a persisted choice; the item has not left the
       // Chain and its removal Cleanup is not yet due (319.5, 321).
       resolvingItemId: z.string().min(1).optional(),
@@ -360,7 +358,6 @@ export const gameStateSchema = z.object({
         .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
       initialSelectionOverrides: z.record(z.array(z.string())).optional(),
-      hiddenBattlefieldId: z.string().min(1).nullable().optional(),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
       effectOutcomes: z.record(

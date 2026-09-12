@@ -28,7 +28,6 @@ export function beginEffectResolution(input: {
   event?: BehaviorEvent | null;
   selectedIds?: string[];
   selectionOverrides?: Record<string, string[]>;
-  hiddenBattlefieldId?: string | null;
   targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
@@ -44,7 +43,6 @@ export function beginEffectResolution(input: {
     event: input.event ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     initialSelectionOverrides: input.selectionOverrides ?? {},
-    hiddenBattlefieldId: input.hiddenBattlefieldId ?? null,
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
     effectOutcomes: {},
@@ -154,7 +152,6 @@ export function resumeEffectResolution(
   const index = createRuntimeCardIndex(decks, game);
   const handlers = createPrimitiveHandlers(index);
   const initialSelectionOverrides = frame.initialSelectionOverrides ?? {};
-  const hiddenBattlefieldId = frame.hiddenBattlefieldId ?? null;
   const definition = definitionForInstance(frame.sourceCardInstanceId, index);
   const clause = compileBehaviorModel(
     definition.behaviorModel,
@@ -171,7 +168,6 @@ export function resumeEffectResolution(
     frame.targetsLocked ? frame.initialSelectedIds : [],
     {},
     initialSelectionOverrides,
-    hiddenBattlefieldId,
   );
   for (const { binding, requirement } of selectionRequirementsForClause(
     clause,
@@ -260,8 +256,6 @@ export function resumeEffectResolution(
           ? { automaticTargets: true }
           : {}),
       },
-      initialSelectionOverrides,
-      hiddenBattlefieldId,
     );
     for (const selector of clause.selectors) {
       const selected =

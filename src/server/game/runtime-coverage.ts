@@ -43,7 +43,6 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.vision": "executable",
   "keyword.vision": "executable",
   "keyword.quick_draw": "executable",
-  "keyword.hidden": "executable",
   "keyword.temporary": "executable",
   "type.additional": "executable",
   "action.discard_cards": "executable",

@@ -37,10 +37,7 @@ type PowerSourceUse = {
 
 export type PaymentContext =
   | { kind: "card"; cardType: string }
-  | { kind: "ability"; sourceCardType: string }
-  // Hide is neither playing a card nor activating an ability. It may spend
-  // ordinary/unrestricted Power, but not resources restricted to another use.
-  | { kind: "hide" };
+  | { kind: "ability"; sourceCardType: string };
 
 type PaymentRequest = {
   energyCost: number;
@@ -58,13 +55,16 @@ export function buildPaymentPlan(
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
   cardInstanceId?: string,
-  basePowerCost?: number,
 ): PaymentPlan | null {
-  return buildPaymentPlanForRequest(game, playerId, index, {
+  return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
-    powerCost:
-      basePowerCost ??
-      effectivePowerCost(game, playerId, definition, index, cardInstanceId),
+    powerCost: effectivePowerCost(
+      game,
+      playerId,
+      definition,
+      index,
+      cardInstanceId,
+    ),
     allowedPowerDomains: definition.card.classification.domain.filter(
       (domain) => domain !== "Colorless",
     ),
@@ -80,7 +80,7 @@ export function buildAbilityPaymentPlan(
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
 ): PaymentPlan | null {
-  return buildPaymentPlanForRequest(game, playerId, index, {
+  return buildPaymentPlanForRequest(game, playerId, sourceDefinition, index, {
     energyCost: costs.energy,
     powerCost: costs.power,
     allowedPowerDomains: sourceDefinition.card.classification.domain.filter(
@@ -94,41 +94,10 @@ export function buildAbilityPaymentPlan(
   });
 }
 
-/** Rule 811.1.b costs Hide at one Power of any domain ([A]). */
-export function buildAnyPowerPaymentPlan(
-  game: GameDocument,
-  playerId: string,
-  index: RuntimeCardIndex,
-): PaymentPlan | null {
-  const player = game.state.players[playerId]!;
-  const domains = new Set(
-    [...index.definitions.values()]
-      .flatMap((definition) => definition.card.classification.domain)
-      .concat(Object.keys(player.power))
-      .filter((domain) => domain !== "Colorless"),
-  );
-  return buildPaymentPlanForRequest(game, playerId, index, {
-    energyCost: 0,
-    powerCost: 1,
-    allowedPowerDomains: [...domains],
-    context: { kind: "hide" },
-    additionalAnyPower: 0,
-  });
-}
-
-export function payAnyPowerCost(
-  game: GameDocument,
-  playerId: string,
-  index: RuntimeCardIndex,
-) {
-  const plan = buildAnyPowerPaymentPlan(game, playerId, index);
-  if (!plan) throw new Error("Any-Power cost cannot be paid.");
-  applyPaymentPlan(game, playerId, plan, index);
-}
-
 function buildPaymentPlanForRequest(
   game: GameDocument,
   playerId: string,
+  definition: GameCardDefinition,
   index: RuntimeCardIndex,
   request: PaymentRequest,
 ): PaymentPlan | null {
@@ -287,7 +256,6 @@ export function payCardCost(
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
   cardInstanceId?: string,
-  basePowerCost?: number,
 ) {
   const plan = buildPaymentPlan(
     game,
@@ -297,7 +265,6 @@ export function payCardCost(
     index,
     additionalAnyPower,
     cardInstanceId,
-    basePowerCost,
   );
   if (!plan) throw new Error("Card costs cannot be paid.");
   applyPaymentPlan(game, playerId, plan, index);
@@ -317,7 +284,6 @@ export function canPayCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
-  basePowerCost?: number,
 ) {
   const preview = structuredClone(game);
   try {
@@ -329,7 +295,6 @@ export function canPayCardCosts(
       index,
       additionalAnyPower,
       cardInstanceId,
-      basePowerCost,
     );
     additionalCosts.forEach((cost) =>
       payAdditionalCost(preview, playerId, definition, cost, index),
@@ -349,7 +314,6 @@ export function payCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
-  basePowerCost?: number,
 ) {
   if (
     !canPayCardCosts(
@@ -361,7 +325,6 @@ export function payCardCosts(
       additionalAnyPower,
       additionalCosts,
       cardInstanceId,
-      basePowerCost,
     )
   ) {
     throw new Error("Card costs cannot be paid.");
@@ -374,7 +337,6 @@ export function payCardCosts(
     index,
     additionalAnyPower,
     cardInstanceId,
-    basePowerCost,
   );
   additionalCosts.forEach((cost) =>
     payAdditionalCost(game, playerId, definition, cost, index),
@@ -407,7 +369,7 @@ export function canPayAdditionalCost(
   index: RuntimeCardIndex,
 ) {
   return (
-    buildPaymentPlanForRequest(game, playerId, index, {
+    buildPaymentPlanForRequest(game, playerId, definition, index, {
       energyCost: costs.energy,
       powerCost: costs.power,
       allowedPowerDomains: costs.powerDomain
@@ -428,7 +390,7 @@ export function payAdditionalCost(
   costs: AdditionalCardCost,
   index: RuntimeCardIndex,
 ) {
-  const plan = buildPaymentPlanForRequest(game, playerId, index, {
+  const plan = buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost: costs.energy,
     powerCost: costs.power,
     allowedPowerDomains: costs.powerDomain

@@ -8,7 +8,7 @@ import { buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot, type D
 
 // Real source list and publication path: regressions must exercise the canonical
 // models that fresh matches receive, not substitute implementations of the cards.
-export async function ornnGameFixture() {
+export async function gameFixture() {
   const [catalog, source, behaviors] = await Promise.all([
     loadCardCatalog(),
     readFile("data/decks/Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt", "utf8"),

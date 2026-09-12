@@ -1,6 +1,5 @@
 import {
   cleanupLethalDamage,
-  moveFacedownCardToTrash,
   recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
@@ -20,16 +19,6 @@ export function cleanupBoard(
     return;
   }
   recallUnattachedGearAtBattlefields(game, index);
-  // Hidden lasts only while its owner controls the associated Battlefield
-  // (811.1.b). Cleanup disposes of any facedown card whose control condition
-  // no longer holds (323.7) before ordinary board-state reconciliation.
-  for (const battlefield of game.state.battlefields) {
-    const hiddenCardInstanceId = battlefield.facedownCardInstanceId;
-    if (!hiddenCardInstanceId) continue;
-    const ownerPlayerId = index.instances.get(hiddenCardInstanceId)?.ownerPlayerId;
-    if (ownerPlayerId && battlefield.controllerPlayerId === ownerPlayerId) continue;
-    moveFacedownCardToTrash(game, hiddenCardInstanceId, index);
-  }
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
     if (controllers.length === 0) {

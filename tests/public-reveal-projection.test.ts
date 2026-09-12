@@ -3,10 +3,10 @@ import { test } from "node:test";
 import { createBehaviorContext, projectGame } from "../src/server/game";
 import { createPrimitiveHandlers, createRuntimeCardIndex } from "../src/server/game/primitive-handlers";
 import { stateChangeEvents } from "../src/server/game/transitions";
-import { ornnGameFixture } from "./helpers/ornn-game-fixture";
+import { gameFixture } from "./helpers/game-fixture";
 
 test("hand reveals resolve display names, preserve duplicate copies in the public log, and do not expose other private zones", async () => {
-  const { game, decks, place } = await ornnGameFixture();
+  const { game, decks, place } = await gameFixture();
   const revealDefinition = decks[0]!.snapshot.cards.find((definition) => definition.behaviorModel.clauses.some((clause) => clause.effects.some((binding) => binding.behaviorId === "action.reveal_opponent_hand")))!;
   assert.ok(revealDefinition);
   const source = place(revealDefinition.cardCode, "base");

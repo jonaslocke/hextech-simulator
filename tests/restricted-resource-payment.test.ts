@@ -6,10 +6,10 @@ import { buildAbilityPaymentPlan, buildPaymentPlan, payAbilityCost, payCardCost 
 import { cardSchema } from "../src/server/catalog";
 import { createRuntimeCardIndex, definitionForInstance } from "../src/server/game/primitive-handlers";
 import { applyStartOfTurn } from "../src/server/game/turns";
-import { ornnGameFixture } from "./helpers/ornn-game-fixture";
+import { gameFixture } from "./helpers/game-fixture";
 
-test("canonical Seal manual Add produces ordinary Calm beside Ornn's restricted Power (429.1)", async () => {
-  const fixture = await ornnGameFixture();
+test("manual Add keeps restricted and unrestricted Power pools distinct", async () => {
+  const fixture = await gameFixture();
   let { game } = fixture;
   const { decks, id, place } = fixture;
   const seal = place("OGN-081", "base");
@@ -33,8 +33,8 @@ test("canonical Seal manual Add produces ordinary Calm beside Ornn's restricted 
   assert.ok(buildAbilityPaymentPlan(game, "p1", definitionForInstance(id("SFD-042"), index), { energy: 0, power: 1 }, index));
 });
 
-test("Awaken readies the active Legend and attachments before Beginning (315.1.b, 415.3.a)", async () => {
-  const { game, decks, id, place } = await ornnGameFixture();
+test("Awaken readies the active Legend and attachments before Beginning", async () => {
+  const { game, decks, id, place } = await gameFixture();
   const host = place("OGN-044", "base");
   const gear = place("SFD-042", "base");
   const rune = place("OGN-042", "base");
@@ -51,8 +51,8 @@ test("Awaken readies the active Legend and attachments before Beginning (315.1.b
   for (const cardId of inactive) assert.equal(game.state.cardStates[cardId]!.exhausted, true, cardId);
 });
 
-test("Seal automatic payment exhausts the same source and leaves no restricted or lost Power", async () => {
-  const { game, decks, id, place } = await ornnGameFixture();
+test("automatic payment exhausts its resource source without losing or restricting Power", async () => {
+  const { game, decks, id, place } = await gameFixture();
   const seal = place("OGN-081", "base");
   game.state.cardStates[id("SFD-189")]!.exhausted = true;
   const index = createRuntimeCardIndex(decks, game);
@@ -66,8 +66,8 @@ test("Seal automatic payment exhausts the same source and leaves no restricted o
   assert.deepEqual(game.state.players.p1!.restrictedResources, undefined);
 });
 
-test("accepted Kai'Sa spells-only Add remains restricted in manual and automatic payment and readies at Awaken", async () => {
-  const { game: initial, decks, id } = await ornnGameFixture();
+test("spells-only Add remains restricted in manual and automatic payment and readies at Awaken", async () => {
+  const { game: initial, decks, id } = await gameFixture();
   const source = cardSchema.array().parse(JSON.parse(await readFile("data/sets/ogn.json", "utf8")))
     .find((card) => card.public_code === "OGN-247/298");
   assert.ok(source);

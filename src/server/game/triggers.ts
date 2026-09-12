@@ -8,7 +8,8 @@ import {
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
-  definitionForInstance
+  definitionForInstance,
+  isTemporaryCard,
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { ChainItem, GameDocument } from "./state";
@@ -17,14 +18,15 @@ import { beginEffectResolution } from "./effect-resolution";
 export function dispatchBehaviorEvent(
   game: GameDocument,
   event: BehaviorEvent,
-  decks: readonly DeckSnapshotDocument[]
+  decks: readonly DeckSnapshotDocument[],
+  options: { chainOrigin?: "cardPlay" | "triggeredAbility" | "addAbility" } = {},
 ): void {
   for (const { items } of collectBehaviorEventItems(
     game,
     [event],
     decks,
   )) {
-    queueChainItemsForTargets(game, items, decks);
+    queueChainItemsForTargets(game, items, decks, options);
   }
 }
 
@@ -36,6 +38,56 @@ export function dispatchSimultaneousBehaviorEvents(
   for (const { items } of collectBehaviorEventItems(game, events, decks)) {
     queueChainItemsForTargets(game, items, decks);
   }
+}
+
+/**
+ * Beginning Phase work is gathered before scoring. Temporary is a triggered
+ * ability, so it uses the same ordering and response window as every other
+ * beginning trigger instead of changing zones from the turn loop.
+ */
+export function queueBeginningPhaseTriggers(
+  game: GameDocument,
+  decks: readonly DeckSnapshotDocument[],
+): boolean {
+  const turn = game.state.turn;
+  if (!turn) return false;
+  const index = createRuntimeCardIndex(decks, game);
+  const regular = collectBehaviorEventItems(game, [{
+    type: "turn.beginning",
+    actorPlayerId: turn.activePlayerId,
+    subjectCardInstanceId: null,
+    values: {},
+  }], decks).flatMap(({ items }) => items);
+  const temporary = [
+    ...game.state.players[turn.activePlayerId]!.zones.base,
+    ...game.state.battlefields.flatMap((battlefield) => [
+      ...battlefield.units,
+      ...(battlefield.attachedCardInstanceIds ?? []),
+    ]),
+  ].filter((id) =>
+    index.instances.get(id)?.ownerPlayerId === turn.activePlayerId &&
+    isTemporaryCard(id, index),
+  ).map((sourceCardInstanceId): ChainItem => ({
+    id: `trigger:${game.stateVersion}:${sourceCardInstanceId}:temporary`,
+    kind: "trigger",
+    label: definitionForInstance(sourceCardInstanceId, index).card.name,
+    controllerPlayerId: turn.activePlayerId,
+    sourceCardInstanceId,
+    targetCardInstanceIds: [],
+    targetObjectVersions: {},
+    behaviorClauseId: null,
+    activatedBehaviorId: null,
+    behaviorEvent: {
+      type: "temporary.beginning",
+      actorPlayerId: turn.activePlayerId,
+      subjectCardInstanceId: sourceCardInstanceId,
+      values: {},
+    },
+  }));
+  const items = [...regular, ...temporary];
+  if (items.length === 0) return false;
+  queueSimultaneousTriggerItems(game, items, turn.activePlayerId);
+  return true;
 }
 
 function collectBehaviorEventItems(
@@ -81,25 +133,31 @@ export function queueChainItemsForTargets(
   game: GameDocument,
   items: ChainItem[],
   decks: readonly DeckSnapshotDocument[],
-  options: { preserveOrder?: boolean } = {},
+  options: {
+    preserveOrder?: boolean;
+    chainOrigin?: "cardPlay" | "triggeredAbility" | "addAbility";
+  } = {},
 ): void {
-  if (!options.preserveOrder && items.length > 1) {
-    const controllerPlayerId = items[0]?.controllerPlayerId;
+  const queuedItems = options.chainOrigin
+    ? items.map((item) => ({ ...item, chainOrigin: options.chainOrigin }))
+    : items;
+  if (!options.preserveOrder && queuedItems.length > 1) {
+    const controllerPlayerId = queuedItems[0]?.controllerPlayerId;
     if (controllerPlayerId) {
       game.state.queuedTriggerChoices.push({
         id: `choice:${game.stateVersion}:${controllerPlayerId}:triggers`,
         playerId: controllerPlayerId,
         type: "orderTriggers",
-        optionIds: items.map((item) => item.id),
-        pendingItems: items,
+        optionIds: queuedItems.map((item) => item.id),
+        pendingItems: queuedItems,
       });
     }
   }
   game.state.queuedChainItems = [
     ...(game.state.queuedChainItems ?? []),
-    ...items,
+    ...queuedItems,
   ];
-  continueQueuedChainItems(game, decks);
+  continueQueuedChainItems(game, decks, options.chainOrigin);
 }
 
 export function submitChainTargetSelection(
@@ -154,13 +212,14 @@ export function submitChainTargetSelection(
   );
   const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
-  if (!queuedForOrdering) appendChainItem(game, item);
+  if (!queuedForOrdering) appendChainItem(game, item, item.chainOrigin);
   continueQueuedChainItems(game, decks);
 }
 
 function continueQueuedChainItems(
   game: GameDocument,
   decks: readonly DeckSnapshotDocument[],
+  chainOrigin?: "cardPlay" | "triggeredAbility" | "addAbility",
 ) {
   if (game.state.pendingChoice) return;
   const index = createRuntimeCardIndex(decks, game);
@@ -169,7 +228,7 @@ function continueQueuedChainItems(
     const item = game.state.queuedChainItems!.shift()!;
     const waitingForOrder = isQueuedForOrdering(game, item.id);
     if (!item.sourceCardInstanceId || !item.behaviorClauseId) {
-      if (!waitingForOrder) appendChainItem(game, item);
+      if (!waitingForOrder) appendChainItem(game, item, chainOrigin);
       continue;
     }
     const definition = definitionForInstance(
@@ -189,9 +248,6 @@ function continueQueuedChainItems(
             item.sourceCardInstanceId,
             item.behaviorEvent,
             [],
-            {},
-            {},
-            item.hiddenBattlefieldId ?? null,
           ),
           handlers,
         )
@@ -203,12 +259,12 @@ function continueQueuedChainItems(
           new Set(requirement.legalIds).size < requirement.minimum,
       )
     ) {
-      if (!waitingForOrder) appendChainItem(game, item);
+      if (!waitingForOrder) appendChainItem(game, item, chainOrigin);
       else updateQueuedTriggerItem(game, item);
       continue;
     }
     if (item.targetCardInstanceIds.length > 0) {
-      if (!waitingForOrder) appendChainItem(game, item);
+      if (!waitingForOrder) appendChainItem(game, item, chainOrigin);
       else updateQueuedTriggerItem(game, item);
       continue;
     }
@@ -253,7 +309,12 @@ function continueQueuedChainItems(
   queueNextTriggerOrderChoice(game);
 }
 
-function appendChainItem(game: GameDocument, item: ChainItem) {
+function appendChainItem(
+  game: GameDocument,
+  item: ChainItem,
+  chainOrigin: "cardPlay" | "triggeredAbility" | "addAbility" =
+    item.chainOrigin ?? "triggeredAbility",
+) {
   const chain = game.state.chain ?? {
     items: [],
     relevantPlayerIds:
@@ -261,7 +322,7 @@ function appendChainItem(game: GameDocument, item: ChainItem) {
       [...game.state.setup.playerIds],
     priorityPlayerId: item.controllerPlayerId,
     passedPlayerIds: [],
-    openedBy: "triggeredAbility" as const,
+    openedBy: chainOrigin,
   };
   chain.items.push(item);
   chain.priorityPlayerId = item.controllerPlayerId;

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { gameplayActions, performGameplayAction } from "../src/server/game";
-import { ornnGameFixture } from "./helpers/ornn-game-fixture";
+import { gameFixture } from "./helpers/game-fixture";
 
-test("Clockwork Keeper commits its optional Calm payment as a server-issued pre-play mode", async () => {
-  const { game, decks, id, place } = await ornnGameFixture();
+test("an optional additional cost is committed as a server-issued pre-play mode", async () => {
+  const { game, decks, id, place } = await gameFixture();
   const clockwork = place("OGN-044", "hand");
   const drawnCard = id("SFD-042");
   prepareClockworkPayment(game, clockwork, drawnCard, true);
@@ -43,8 +43,8 @@ test("Clockwork Keeper commits its optional Calm payment as a server-issued pre-
   assert.equal(afterNormal.state.pendingChoice, null);
 });
 
-test("Clockwork Keeper pays Calm and draws only in the selected optional mode", async () => {
-  const { game, decks, id, place } = await ornnGameFixture();
+test("an optional additional cost pays and applies its effect only in the selected mode", async () => {
+  const { game, decks, id, place } = await gameFixture();
   const clockwork = place("OGN-044", "hand");
   const drawnCard = id("SFD-042");
   prepareClockworkPayment(game, clockwork, drawnCard, true);
@@ -72,8 +72,8 @@ test("Clockwork Keeper pays Calm and draws only in the selected optional mode", 
   assert.equal(afterOptional.state.pendingChoice, null);
 });
 
-test("Clockwork Keeper keeps the normal mode available when its optional Calm payment is unavailable", async () => {
-  const { game, decks, id, place } = await ornnGameFixture();
+test("an unavailable optional additional cost does not disable the normal mode", async () => {
+  const { game, decks, id, place } = await gameFixture();
   const clockwork = place("OGN-044", "hand");
   prepareClockworkPayment(game, clockwork, id("SFD-042"), false);
 
@@ -90,7 +90,7 @@ test("Clockwork Keeper keeps the normal mode available when its optional Calm pa
 });
 
 function prepareClockworkPayment(
-  game: Awaited<ReturnType<typeof ornnGameFixture>>["game"],
+  game: Awaited<ReturnType<typeof gameFixture>>["game"],
   clockwork: string,
   drawnCard: string,
   includeCalm: boolean,

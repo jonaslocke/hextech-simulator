@@ -1,12 +1,11 @@
 import {
   createRuntimeCardIndex,
-  isTemporaryCard,
-  moveCardToTrash,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import { applyHoldScoring } from "./scoring";
 import type { GameDocument } from "./state";
+import { queueBeginningPhaseTriggers } from "./triggers";
 
 type StartOfTurnPhase = "awaken" | "beginning" | "channel" | "draw";
 
@@ -73,24 +72,14 @@ export function applyStartOfTurn(
     }
 
     if (turn.phase === "beginning") {
-      if (index) {
-        const temporary = [
-          ...player.zones.base,
-          ...game.state.battlefields.flatMap((battlefield) => [
-            ...battlefield.units,
-            ...(battlefield.attachedCardInstanceIds ?? []),
-          ]),
-        ].filter(
-          (id) =>
-            index.instances.get(id)?.ownerPlayerId === turn.activePlayerId &&
-            isTemporaryCard(id, index),
-        );
-        for (const id of temporary) moveCardToTrash(game, id, index);
-        if (game.state.chain || game.state.pendingChoice) return;
+      if (!turn.beginningTriggersQueued) {
+        turn.beginningTriggersQueued = true;
+        if (decks.length && queueBeginningPhaseTriggers(game, decks)) {
+          return;
+        }
       }
-      // Temporary cards leave before the Beginning-step scoring. Once that
-      // cleanup has fully resolved, retain the existing checkpoint behavior so
-      // a scoring trigger cannot score the same battlefield twice.
+      // All beginning triggers, including Temporary, have resolved before
+      // Hold scoring reaches this checkpoint.
       turn.phase = "channel";
       if (decks.length) {
         applyHoldScoring(game, turn.activePlayerId, decks);
