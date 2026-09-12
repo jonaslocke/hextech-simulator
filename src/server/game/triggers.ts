@@ -189,6 +189,9 @@ function continueQueuedChainItems(
             item.sourceCardInstanceId,
             item.behaviorEvent,
             [],
+            {},
+            {},
+            item.hiddenBattlefieldId ?? null,
           ),
           handlers,
         )

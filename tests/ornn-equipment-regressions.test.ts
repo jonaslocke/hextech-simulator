@@ -5,6 +5,7 @@ import { cardSchema } from "../src/server/catalog";
 import { attachCardToTopMost, detachCard } from "../src/server/game/attachment-lifecycle";
 import { cleanupBoard } from "../src/server/game/board-rules";
 import { beginEffectResolution, submitEffectOption } from "../src/server/game/effect-resolution";
+import { gameplayActions, performGameplayAction } from "../src/server/game/actions";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
 import type { GameCardDefinition } from "../src/server/game/schemas";
 import { ornnGameFixture } from "./helpers/ornn-game-fixture";
@@ -113,7 +114,7 @@ test("one Cleanup recalls every detached Gear without restoring an earlier attac
   assert.equal(game.state.cardStates[gears[2]!]!.attachedToCardInstanceId, host);
 });
 
-test("Cleanup recalls canonical Hidden Gear after it was played to its required Battlefield location (149.3, 323.7, 811.1.d.1.a)", async () => {
+test("canonical Hidden Gear hides, reacts from its required Battlefield, and is recalled by Cleanup (149.3, 323.7, 811.1)", async () => {
   const { game, decks, id } = await ornnGameFixture();
   const sourceCards = cardSchema.array().parse(
     JSON.parse(await readFile("data/sets/ogn.json", "utf8")),
@@ -175,15 +176,84 @@ test("Cleanup recalls canonical Hidden Gear after it was played to its required 
     controllerPlayerId: "p1",
     contestedByPlayerId: null,
     units: [],
-    // A Hidden Gear must first enter the battlefield where it was hidden;
-    // Cleanup, not a card-specific shortcut, performs the subsequent Recall.
-    attachedCardInstanceIds: [zhonyaId],
+    attachedCardInstanceIds: [],
     facedownCardInstanceId: null,
   };
   game.state.battlefields = [battlefield];
+  game.state.players.p1!.zones.hand.push(zhonyaId);
+  // [A] is an any-domain Power payment, independent of Zhonya's Calm domain.
+  game.state.players.p1!.power = { Chaos: 1 };
 
-  cleanupBoard(game, createRuntimeCardIndex(decks, game));
+  const hide = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === zhonyaId && action.label.startsWith("Hide "),
+  );
+  assert.ok(hide?.enabled);
+  let current = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: hide.id,
+    selectedIds: [],
+    decks,
+    now: "hidden-hide",
+  });
+  assert.equal(current.state.chain, null, "Hide is not a Play and never opens a Chain");
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, zhonyaId);
+  assert.equal(current.state.players.p1!.zones.hand.includes(zhonyaId), false);
+  assert.equal(current.state.players.p1!.power.Chaos, 0);
+  assert.equal(
+    gameplayActions(current, "p1", decks).some(
+      (action) => action.sourceCardInstanceId === zhonyaId && action.label.startsWith("Play "),
+    ),
+    false,
+    "a card cannot be played from Hidden until the next turn",
+  );
 
-  assert.deepEqual(battlefield.attachedCardInstanceIds, []);
-  assert.ok(game.state.players.p1!.zones.base.includes(zhonyaId));
+  current.state.turn!.turnNumber += 1;
+  current.state.showdown = {
+    kind: "nonCombat",
+    battlefieldId: battlefield.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"],
+    focusPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+  const playHidden = gameplayActions(current, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === zhonyaId && action.label.startsWith("Play "),
+  );
+  assert.ok(playHidden?.enabled);
+  assert.deepEqual(playHidden.presentation.boardLocation, {
+    kind: "battlefield",
+    battlefieldId: battlefield.battlefieldId,
+  });
+  current = performGameplayAction({
+    game: current,
+    actorPlayerId: "p1",
+    actionId: playHidden.id,
+    selectedIds: [],
+    decks,
+    now: "hidden-play",
+  });
+  assert.equal(current.state.chain?.items.at(-1)?.hiddenBattlefieldId, battlefield.battlefieldId);
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, zhonyaId);
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(current, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass, `${playerId} must receive priority before Hidden Gear resolves`);
+    current = performGameplayAction({
+      game: current,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `hidden-pass-${playerId}`,
+    });
+  }
+
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, null);
+  assert.deepEqual(current.state.battlefields[0]!.attachedCardInstanceIds, []);
+  assert.ok(
+    current.state.players.p1!.zones.base.includes(zhonyaId),
+    "a Hidden Gear is first played to the associated Battlefield, then recalled as unattached Gear during Cleanup",
+  );
 });

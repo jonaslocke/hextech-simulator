@@ -363,22 +363,22 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description:
       "Allows a card to be hidden instead of played and later played from its Facedown Zone.",
     fixedRules: [
-      "Rather than play this card, its controller may pay 1 deck-domain Power to hide it.",
+      "Rather than play this card, its controller may pay 1 Power of any domain to hide it.",
       "The destination must be an empty Facedown Zone at a Battlefield controlled by that player.",
       "Hiding is not playing and does not open a chain.",
-      "Beginning on the next player's turn, the hidden card gains Reaction and may be played ignoring its base cost.",
-      "When played from Hidden, every choice is restricted to valid targets at the associated Battlefield.",
+      "Beginning on the next turn, the hidden card gains Reaction and may be played ignoring its base cost.",
+      "When played from Hidden, each target is restricted to valid options at the associated Battlefield unless its explicit targeting restriction makes that impossible.",
       "The card may still be played normally with its normal timing, cost, and targeting restrictions."
     ],
     timingRequirements: [
-      "play from Hidden is available beginning on the next player's turn",
+      "play from Hidden is available beginning on the next turn",
       "play from Hidden gains Reaction timing"
     ],
     targetingRequirements: [
       "when played from Hidden, choices must be at the associated Battlefield"
     ],
-    engineSupport: requiresEngineSupport(
-      "Hidden requires facedown-zone state, play-origin context, conditional timing, cost replacement, and inherited targeting restrictions."
+    engineSupport: supported(
+      "Hide uses facedown Battlefield state and a next-turn Reaction play origin; base-cost replacement, permanent placement, and location-scoped targets are server-enforced."
     )
   }),
   "keyword.assault": primitiveSeed({

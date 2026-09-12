@@ -100,6 +100,9 @@ export const cardStateSchema = z.object({
   lethalSuppressedMight: z.number().int().nonnegative().nullable().optional(),
   attachedToCardInstanceId: z.string().min(1).nullable().optional(),
   attachedAtTurnNumber: z.number().int().positive().nullable().optional(),
+  // Rule 811.1.b: a facedown card becomes playable from Hidden beginning on
+  // the following turn, not during the turn in which it was hidden.
+  hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
 });
 
 export const chainItemSchema = z.object({
@@ -113,6 +116,9 @@ export const chainItemSchema = z.object({
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.
   initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+  // The battlefield associated with a card being played from Hidden. This
+  // persists through Chain priority and effect frames (811.1.d--811.1.d.2.a).
+  hiddenBattlefieldId: z.string().min(1).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
@@ -354,6 +360,7 @@ export const gameStateSchema = z.object({
         .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
       initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+      hiddenBattlefieldId: z.string().min(1).nullable().optional(),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
       effectOutcomes: z.record(

@@ -70,7 +70,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.quick_draw", "keyword.temporary",
+    "keyword.quick_draw", "keyword.temporary", "keyword.hidden",
     "type.additional",
     "modifier.ignore_deflect",
     "keyword.ganking", "cost.exhaust_selected_unit",
@@ -213,6 +213,7 @@ export function createPrimitiveHandlers(
         () => true,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     }
   });
@@ -225,6 +226,7 @@ export function createPrimitiveHandlers(
         (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     }
   });
@@ -239,6 +241,7 @@ export function createPrimitiveHandlers(
           context.controllerPlayerId,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     },
   });
@@ -1192,6 +1195,7 @@ function selectorTargets(
   predicate: (id: string) => boolean,
   sourceCardInstanceId: string,
   lockedSelectedIds: readonly string[] = [],
+  hiddenBattlefieldId: string | null = null,
 ) {
   const baseUnits = game.state.setup.playerIds.flatMap(
     (playerId) => game.state.players[playerId]?.zones.base ?? []
@@ -1256,6 +1260,7 @@ function selectorTargets(
         id,
         sourceCardInstanceId,
         binding.parameters.locationRelation,
+        hiddenBattlefieldId,
       ),
     )
     .filter(
@@ -1835,6 +1840,9 @@ export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCa
   if (zones.champion === id) zones.champion = null;
   game.state.battlefields.forEach((battlefield) => {
     battlefield.units = battlefield.units.filter((item) => item !== id);
+    if (battlefield.facedownCardInstanceId === id) {
+      battlefield.facedownCardInstanceId = null;
+    }
   });
   zones.trash.push(id);
   resetStateAfterLeavingBoard(game, id, index);
@@ -1851,6 +1859,29 @@ export function moveCardToTrash(
     return;
   }
   queueDeathTriggeredEffects(game, id, index);
+  const owner = index.instances.get(id)?.ownerPlayerId;
+  if (!owner) throw new Error(`Card owner is unavailable: ${id}`);
+  if (isTokenInstance(id, index)) {
+    ceaseToken(game, id);
+    return;
+  }
+  detachCard(game, id);
+  removeFromAllLocations(game, id);
+  const trash = game.state.players[owner]!.zones.trash;
+  if (!trash.includes(id)) trash.push(id);
+  resetStateAfterLeavingBoard(game, id, index);
+}
+
+/**
+ * Rule 323.7 moves a facedown card to its owner's Trash when its controller
+ * no longer controls the associated Battlefield. This is a zone cleanup, not
+ * a death event, so it intentionally does not collect `card.died` triggers.
+ */
+export function moveFacedownCardToTrash(
+  game: GameDocument,
+  id: string,
+  index: RuntimeCardIndex,
+) {
   const owner = index.instances.get(id)?.ownerPlayerId;
   if (!owner) throw new Error(`Card owner is unavailable: ${id}`);
   if (isTokenInstance(id, index)) {
@@ -2107,6 +2138,9 @@ function removeFromAllLocations(game: GameDocument, id: string) {
     battlefield.units = battlefield.units.filter(
       (candidate) => candidate !== id,
     );
+    if (battlefield.facedownCardInstanceId === id) {
+      battlefield.facedownCardInstanceId = null;
+    }
   }
   removeFromAttachmentLocations(game, id);
 }
@@ -2126,6 +2160,7 @@ function resetStateAfterLeavingBoard(
   state.lethalSuppressedMight = null;
   state.attachedToCardInstanceId = null;
   state.attachedAtTurnNumber = null;
+  state.hiddenAtTurnNumber = null;
   detachCardsFromTopMostLeavingBoard(game, id);
   if (
     index &&
@@ -2159,11 +2194,14 @@ function unitLocationRelationMatches(
   targetId: string,
   sourceId: string,
   relation: unknown,
+  hiddenBattlefieldId: string | null = null,
 ) {
   if (relation !== "sourceLocation" && relation !== "sharedLocation") {
     return true;
   }
-  const sourceLocation = boardLocationForUnit(game, sourceId);
+  const sourceLocation = hiddenBattlefieldId
+    ? { kind: "battlefield" as const, id: hiddenBattlefieldId }
+    : boardLocationForUnit(game, sourceId);
   const targetLocation = boardLocationForUnit(game, targetId);
   return (
     sourceLocation !== null &&

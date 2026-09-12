@@ -21,6 +21,10 @@ export type BehaviorExecutionContext = {
   // canonical selector so independent optional costs cannot alias one another
   // merely because they select the same source card.
   selectionOverrides: Record<string, string[]>;
+  // Non-null only while resolving a card played from Hidden. This is contextual
+  // rather than a card characteristic: a normal play of the same card has no
+  // location restriction (811.1.d).
+  hiddenBattlefieldId: string | null;
   effectOutcomes: Record<string, boolean | number | string | string[]>;
 };
 
@@ -109,7 +113,11 @@ export function selectionRequirementsForClause(
   const requirements = clause.selectors.map((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
-    const requirement = handler.targets(binding, selectorContext);
+    const requirement = restrictHiddenPlayRequirement(
+      handler.targets(binding, selectorContext),
+      binding,
+      selectorContext,
+    );
     const selected = selectedForBinding(binding, requirement, context);
     selectorContext.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
@@ -188,7 +196,11 @@ export function executeBehaviorClause(input: {
   clause.selectors.forEach((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) return;
-    const requirement = handler.targets(binding, context);
+    const requirement = restrictHiddenPlayRequirement(
+      handler.targets(binding, context),
+      binding,
+      context,
+    );
     const selected = requirement.maximum === 0
       ? requirement.legalIds
       : selectedForBinding(binding, requirement, context);
@@ -285,7 +297,21 @@ export function collectTriggeredClauses(input: {
 }): ChainItem[] {
   const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
     if (clause.triggers.length === 0) return [];
-    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, []);
+    const hiddenBattlefieldId =
+      input.event.subjectCardInstanceId === source.sourceCardInstanceId &&
+      typeof input.event.values.hiddenBattlefieldId === "string"
+        ? input.event.values.hiddenBattlefieldId
+        : null;
+    const context = createBehaviorContext(
+      input.game,
+      input.controllerPlayerId,
+      source.sourceCardInstanceId,
+      input.event,
+      [],
+      {},
+      {},
+      hiddenBattlefieldId,
+    );
     if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
     return [{
@@ -295,6 +321,7 @@ export function collectTriggeredClauses(input: {
       controllerPlayerId: input.controllerPlayerId,
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
+      ...(hiddenBattlefieldId ? { hiddenBattlefieldId } : {}),
       targetObjectVersions: {},
       behaviorClauseId: clause.id,
       activatedBehaviorId: null,
@@ -338,6 +365,7 @@ export function createBehaviorContext(
   selectedIds: string[],
   effectOutcomes: Record<string, boolean | number | string | string[]> = {},
   selectionOverrides: Record<string, string[]> = {},
+  hiddenBattlefieldId: string | null = null,
 ): BehaviorExecutionContext {
   return {
     game,
@@ -347,7 +375,45 @@ export function createBehaviorContext(
     selectedIds,
     selectedBySelector: {},
     selectionOverrides,
+    hiddenBattlefieldId,
     effectOutcomes,
+  };
+}
+
+function restrictHiddenPlayRequirement(
+  requirement: ProjectedTargetRequirement,
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+): ProjectedTargetRequirement {
+  const battlefieldId = context.hiddenBattlefieldId;
+  // A source selector is an internal play-cost decision, not a target chosen
+  // from the battlefield. Choices from explicit non-board zones likewise do
+  // not identify a target at a board location.
+  if (
+    !battlefieldId ||
+    binding.parameters.selectionPurpose === "optionalCost" ||
+    requirement.sourceZone
+  ) {
+    return requirement;
+  }
+  if (requirement.kind === "battlefield") {
+    return {
+      ...requirement,
+      legalIds: requirement.legalIds.filter((id) => id === battlefieldId),
+    };
+  }
+  if (requirement.kind !== "card") return requirement;
+  const battlefield = context.game.state.battlefields.find(
+    (candidate) => candidate.battlefieldId === battlefieldId,
+  );
+  if (!battlefield) return { ...requirement, legalIds: [] };
+  const atBattlefield = new Set([
+    ...battlefield.units,
+    ...(battlefield.attachedCardInstanceIds ?? []),
+  ]);
+  return {
+    ...requirement,
+    legalIds: requirement.legalIds.filter((id) => atBattlefield.has(id)),
   };
 }
 
