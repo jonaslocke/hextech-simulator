@@ -18,6 +18,7 @@ import { CardTile } from "./card-tile";
 type PlayerHandFanProps = {
   cards: Card[];
   hiddenCardInstanceIds?: Set<string>;
+  interactionSuspended?: boolean;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
   onPlayCard?: (card: Card) => void;
   /**
@@ -39,6 +40,7 @@ const MENU_INTERACTION_FREEZE_MS = 650;
 export function PlayerHandFan({
   cards,
   hiddenCardInstanceIds,
+  interactionSuspended = false,
   onCardContextAction,
   onPlayCard,
   playerId,
@@ -152,7 +154,7 @@ export function PlayerHandFan({
       event: ReactPointerEvent<HTMLDivElement>,
       options?: { force?: boolean },
     ) => {
-      if (cards.length === 0) {
+      if (interactionSuspended || cards.length === 0) {
         return;
       }
 
@@ -173,7 +175,12 @@ export function PlayerHandFan({
         return currentIndex === nextIndex ? currentIndex : nextIndex;
       });
     },
-    [cards.length, getIndexFromPointerPosition, isPointerSelectionFrozen],
+    [
+      cards.length,
+      getIndexFromPointerPosition,
+      interactionSuspended,
+      isPointerSelectionFrozen,
+    ],
   );
 
   const clearActiveIndex = useCallback(() => {
@@ -208,7 +215,7 @@ export function PlayerHandFan({
 
   const openCardMenuFromEvent = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      if (cards.length === 0) {
+      if (interactionSuspended || cards.length === 0) {
         return;
       }
 
@@ -242,6 +249,7 @@ export function PlayerHandFan({
       clearActiveIndexFromPointer,
       freezePointerSelection,
       getIndexFromPointerPosition,
+      interactionSuspended,
       onCardContextAction,
     ],
   );
@@ -262,6 +270,9 @@ export function PlayerHandFan({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      if (interactionSuspended) {
+        return;
+      }
       switch (event.key) {
         case "ArrowLeft": {
           event.preventDefault();
@@ -310,6 +321,7 @@ export function PlayerHandFan({
       activeIndex,
       cards.length,
       clearActiveIndex,
+      interactionSuspended,
       moveKeyboardSelection,
       releasePointerSelectionFreeze,
       selectCardAtIndex,
@@ -337,7 +349,7 @@ export function PlayerHandFan({
           className="bottom-0 left-1/2 absolute overflow-visible -translate-x-1/2 touch-none pointer-events-auto"
           data-active-index={activeIndex ?? undefined}
           data-zone-animation-id={`${playerId}:hand`}
-          onBlur={(event) => {
+          onBlur={interactionSuspended ? undefined : (event) => {
             const nextFocusedTarget = event.relatedTarget;
 
             if (
@@ -347,26 +359,39 @@ export function PlayerHandFan({
               clearActiveIndexFromPointer();
             }
           }}
-          onClick={openCardMenuFromEvent}
-          onContextMenu={openCardMenuFromEvent}
+          onClick={interactionSuspended ? undefined : openCardMenuFromEvent}
+          onContextMenu={
+            interactionSuspended ? undefined : openCardMenuFromEvent
+          }
           onFocus={() => {
+            if (interactionSuspended) {
+              return;
+            }
             setActiveIndex((currentIndex) => currentIndex ?? 0);
           }}
-          onKeyDown={handleKeyDown}
-          onPointerCancel={clearActiveIndexFromPointer}
-          onPointerDown={(event) => {
+          onKeyDown={interactionSuspended ? undefined : handleKeyDown}
+          onPointerCancel={
+            interactionSuspended ? undefined : clearActiveIndexFromPointer
+          }
+          onPointerDown={interactionSuspended ? undefined : (event) => {
             releasePointerSelectionFreeze();
             updateActiveIndexFromPointer(event, { force: true });
           }}
-          onPointerEnter={updateActiveIndexFromPointer}
-          onPointerLeave={clearActiveIndexFromPointer}
-          onPointerMove={updateActiveIndexFromPointer}
+          onPointerEnter={
+            interactionSuspended ? undefined : updateActiveIndexFromPointer
+          }
+          onPointerLeave={
+            interactionSuspended ? undefined : clearActiveIndexFromPointer
+          }
+          onPointerMove={
+            interactionSuspended ? undefined : updateActiveIndexFromPointer
+          }
           role="listbox"
           style={{
             height: layout.hitAreaHeight,
             width: layout.interactionWidth,
           }}
-          tabIndex={0}
+          tabIndex={interactionSuspended ? -1 : 0}
         >
           <div className="right-0 bottom-0 left-0 absolute h-full overflow-visible pointer-events-none">
             {cards.map((card, index) => {

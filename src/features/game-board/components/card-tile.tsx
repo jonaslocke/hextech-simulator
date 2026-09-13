@@ -136,8 +136,9 @@ export const CardTile: FC<CardTileProps> = ({
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
   const { isLocationDragActive } = useLocationDragState();
-  const reportSelectedCardInstanceIds = useReportCardSelection();
-  const canShowHoverPreview = enableHoverPreview && !isLocationDragActive;
+  const { isReportMode, selectedCardInstanceIds } = useReportCardSelection();
+  const canShowHoverPreview =
+    enableHoverPreview && !isLocationDragActive && !isReportMode;
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
@@ -209,7 +210,7 @@ export const CardTile: FC<CardTileProps> = ({
   };
 
   useEffect(() => {
-    if (!isLocationDragActive) {
+    if (!isLocationDragActive && !isReportMode) {
       return;
     }
 
@@ -219,7 +220,7 @@ export const CardTile: FC<CardTileProps> = ({
     }
 
     setPreviewPosition(null);
-  }, [isLocationDragActive]);
+  }, [isLocationDragActive, isReportMode]);
 
   useEffect(
     () => () => {
@@ -238,7 +239,7 @@ export const CardTile: FC<CardTileProps> = ({
       data-card-orientation={resolvedOrientation}
       className={cn(
         "relative flex justify-center items-center overflow-visible shrink-0",
-        reportSelectedCardInstanceIds?.has(instanceId ?? "") &&
+        selectedCardInstanceIds?.has(instanceId ?? "") &&
           "rounded-md ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-950",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
         isTransferHidden && "invisible pointer-events-none",
@@ -252,10 +253,11 @@ export const CardTile: FC<CardTileProps> = ({
       )}
       onBlur={clearPreview}
       onClick={(event) => {
+        if (isReportMode) return;
         onPrimaryAction?.(event);
       }}
       onContextMenu={(event) => {
-        if (!onContextAction) {
+        if (isReportMode || !onContextAction) {
           return;
         }
 
@@ -265,7 +267,11 @@ export const CardTile: FC<CardTileProps> = ({
       }}
       onFocus={schedulePreview}
       onKeyDown={(event) => {
-        if (!onPrimaryAction || (event.key !== "Enter" && event.key !== " ")) {
+        if (
+          isReportMode ||
+          !onPrimaryAction ||
+          (event.key !== "Enter" && event.key !== " ")
+        ) {
           return;
         }
 
@@ -273,10 +279,12 @@ export const CardTile: FC<CardTileProps> = ({
         onPrimaryAction();
       }}
       onPointerEnter={() => {
+        if (isReportMode) return;
         onHighlightPointerEnter?.();
         schedulePreview();
       }}
       onPointerLeave={() => {
+        if (isReportMode) return;
         onHighlightPointerLeave?.();
         clearPreview();
       }}

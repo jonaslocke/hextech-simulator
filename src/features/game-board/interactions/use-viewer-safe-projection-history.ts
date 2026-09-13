@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import {
   appendViewerSafeProjectionHistory,
-  type StructuredBugReport,
-} from "@/shared/bug-report";
+} from "../bug-report";
+import type { StructuredBugReport } from "@/shared/bug-report";
 import type { GameProjection } from "@/shared/game";
 
 export function useViewerSafeProjectionHistory(projection: GameProjection) {

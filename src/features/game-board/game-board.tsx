@@ -2,14 +2,11 @@
 
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import {
-  cloneViewerSafeProjection,
-  createStructuredBugReport,
-  findRelatedProjectedCard,
   serializeStructuredBugReport,
-  toggleRelatedProjectedCardSelection,
   type StructuredBugReport,
 } from "@/shared/bug-report";
 import type { GameProjection } from "@/shared/game";
+import { copyText } from "@/shared/utils/copy-text";
 import { LayoutGroup } from "motion/react";
 import {
   FC,
@@ -22,6 +19,12 @@ import {
 } from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { areSetsEqual, createAnimationData } from "./board-animation-model";
+import {
+  cloneViewerSafeProjection,
+  createStructuredBugReport,
+  findRelatedProjectedCard,
+  toggleRelatedProjectedCardSelection,
+} from "./bug-report";
 import { buildCard, createBoardModel } from "./board-model";
 import { adaptProjectionToBoard } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
@@ -40,7 +43,6 @@ import {
   BugReportPanel,
   ReportBugButton,
 } from "./components/bug-report-panel";
-import { copyText } from "./components/copy-game-state-button";
 import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
@@ -250,8 +252,10 @@ export const GameBoard: FC<GameBoardProps> = ({
   const decisionInspection = useDecisionInspection({
     request: decisionInspectionRequest,
   });
-  interactionLockedRef.current =
-    decisionInspection.isInspecting || Boolean(bugReportDraft);
+  const isReportMode = Boolean(bugReportDraft);
+  const isInteractionSuspended =
+    decisionInspection.isInspecting || isReportMode;
+  interactionLockedRef.current = isInteractionSuspended;
   const targetSelectionUsesCardPrompt =
     playerDecision?.kind === "cardSelection" &&
     targetSelection?.actionId === playerDecision.actionId;
@@ -380,8 +384,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       : null;
 
   const canUseLocationDrag =
-    !decisionInspection.isInspecting &&
-    !bugReportDraft &&
+    !isInteractionSuspended &&
     !isSubmittingAction &&
     !targetSelection &&
     !playerDecision &&
@@ -483,36 +486,44 @@ export const GameBoard: FC<GameBoardProps> = ({
     setIsChainOverlayOpen,
   ]);
 
-  const boardCardPrimaryAction = decisionInspection.isInspecting
+  const boardCardPrimaryAction = isInteractionSuspended
     ? undefined
     : handleBoardCardPrimaryAction;
-  const boardCardPointerEnter = decisionInspection.isInspecting
+  const boardCardPointerEnter = isInteractionSuspended
     ? undefined
     : handleTargetPointerEnter;
-  const boardCardPointerLeave = decisionInspection.isInspecting
+  const boardCardPointerLeave = isInteractionSuspended
     ? undefined
     : handleTargetPointerLeave;
   const canInspectPublicZones =
     decisionInspection.isInspecting &&
     decisionInspection.policy === "publicGameState";
 
-  const openPlayerTrash = decisionInspection.isInspecting
+  const openPlayerTrash = isReportMode
+    ? undefined
+    : decisionInspection.isInspecting
     ? canInspectPublicZones && board.player.zones.trash.count > 0
       ? () => decisionInspection.inspectZone(board.player.playerId, "trash")
       : undefined
     : () => setOpenZone("playerTrash");
-  const openOpponentTrash = decisionInspection.isInspecting
+  const openOpponentTrash = isReportMode
+    ? undefined
+    : decisionInspection.isInspecting
     ? canInspectPublicZones && board.opponent.zones.trash.count > 0
       ? () => decisionInspection.inspectZone(board.opponent.playerId, "trash")
       : undefined
     : () => setOpenZone("opponentTrash");
-  const openPlayerBanishment = decisionInspection.isInspecting
+  const openPlayerBanishment = isReportMode
+    ? undefined
+    : decisionInspection.isInspecting
     ? canInspectPublicZones && board.player.zones.banishment.count > 0
       ? () =>
           decisionInspection.inspectZone(board.player.playerId, "banishment")
       : undefined
     : () => setOpenZone("banish");
-  const openOpponentBanishment = decisionInspection.isInspecting
+  const openOpponentBanishment = isReportMode
+    ? undefined
+    : decisionInspection.isInspecting
     ? canInspectPublicZones && board.opponent.zones.banishment.count > 0
       ? () =>
           decisionInspection.inspectZone(board.opponent.playerId, "banishment")
@@ -563,21 +574,29 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const handleBoardClickCapture = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
-      if (!bugReportDraft) {
-        if (!decisionInspection.isInspecting) handleTargetClickCapture(event);
+      if (!isReportMode) {
+        if (!isInteractionSuspended) handleTargetClickCapture(event);
         return;
       }
-      if ((event.target as Element).closest('[data-overlay-kind="bug-report"]')) {
+      if (!(event.target instanceof Element)) {
         return;
       }
-      const card = (event.target as Element).closest<HTMLElement>(
+      if (event.target.closest('[data-overlay-kind="bug-report"]')) {
+        return;
+      }
+      const card = event.target.closest<HTMLElement>(
         "[data-card-instance-id]",
       );
       event.preventDefault();
       event.stopPropagation();
       if (card?.dataset.cardInstanceId) toggleBugReportCard(card.dataset.cardInstanceId);
     },
-    [bugReportDraft, decisionInspection.isInspecting, handleTargetClickCapture, toggleBugReportCard],
+    [
+      handleTargetClickCapture,
+      isInteractionSuspended,
+      isReportMode,
+      toggleBugReportCard,
+    ],
   );
 
   const finalizeBugReport = useCallback(async () => {
@@ -625,6 +644,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   return (
     <ReportCardSelectionProvider
+      isReportMode={isReportMode}
       selectedCardInstanceIds={bugReportDraft?.selectedCardInstanceIds ?? null}
     >
     <main
@@ -638,7 +658,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           player={board.player}
           victoryScore={projection.victoryScore}
         />
-        <div className="top-2 right-3 z-10 absolute">
+        <div className="top-2 right-3 z-[2147483647] absolute">
           <ReportBugButton
             isReporting={Boolean(bugReportDraft)}
             onBegin={beginBugReport}
@@ -648,12 +668,14 @@ export const GameBoard: FC<GameBoardProps> = ({
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
-        interactionSuspended={decisionInspection.isInspecting}
+        interactionSuspended={isInteractionSuspended}
         isPromptVisible={!decisionInspection.isInspecting}
         isSubmitting={isSubmittingAction}
-        onCancel={() => setTargetSelection(null)}
+        onCancel={() => {
+          if (!isInteractionSuspended) setTargetSelection(null);
+        }}
         onInspect={
-          decisionInspection.canInspect
+          !isInteractionSuspended && decisionInspection.canInspect
             ? decisionInspection.inspectBoard
             : undefined
         }
@@ -670,7 +692,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           return accepted;
         }}
       />
-      {decisionInspection.isInspecting && (
+      {decisionInspection.isInspecting && !isReportMode && (
         <DecisionInspectionToolbar
           decisionTitle={decisionInspection.decisionTitle}
           onInspectZone={decisionInspection.inspectZone}
@@ -680,7 +702,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           policy={decisionInspection.policy}
         />
       )}
-      {decisionInspection.state.mode === "zone" && (
+      {decisionInspection.state.mode === "zone" && !isReportMode && (
         <DecisionZoneBrowser
           inspectedZone={decisionInspection.state}
           onClose={decisionInspection.closeZone}
@@ -690,7 +712,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         />
       )}
       {showdownPrompt &&
-        !decisionInspection.isInspecting &&
+        !isInteractionSuspended &&
         showdownBattlefieldName &&
         !sourceProjection.pendingChoice && (
           <ShowdownPrompt
@@ -712,10 +734,20 @@ export const GameBoard: FC<GameBoardProps> = ({
         <LocationDragProvider
           activeDragData={activeLocationDrag}
           dragOverlay={activeLocationDragOverlay}
-          onActiveDragDataChange={handleLocationDragDataChange}
-          onDragCancel={handleLocationDragCancel}
-          onDragEnd={handleLocationDragEnd}
-          onDragOver={handleLocationDragOver}
+          onActiveDragDataChange={
+            isInteractionSuspended
+              ? () => undefined
+              : handleLocationDragDataChange
+          }
+          onDragCancel={
+            isInteractionSuspended ? () => undefined : handleLocationDragCancel
+          }
+          onDragEnd={
+            isInteractionSuspended ? () => undefined : handleLocationDragEnd
+          }
+          onDragOver={
+            isInteractionSuspended ? () => undefined : handleLocationDragOver
+          }
         >
           <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
             <PlayerBoard
@@ -800,12 +832,12 @@ export const GameBoard: FC<GameBoardProps> = ({
               onOpenBanish={openPlayerBanishment}
               onOpenTrash={openPlayerTrash}
               onChampionContextAction={
-                decisionInspection.isInspecting
+                isInteractionSuspended
                   ? undefined
                   : handleChampionCardAction
               }
               onChampionPrimaryAction={
-                decisionInspection.isInspecting
+                isInteractionSuspended
                   ? undefined
                   : handleChampionCardAction
               }
@@ -813,12 +845,12 @@ export const GameBoard: FC<GameBoardProps> = ({
               onBoardCardPointerEnter={boardCardPointerEnter}
               onBoardCardPointerLeave={boardCardPointerLeave}
               onRuneContextAction={
-                decisionInspection.isInspecting
+                isInteractionSuspended
                   ? undefined
                   : handleRuneContextAction
               }
               onRunePrimaryAction={
-                decisionInspection.isInspecting
+                isInteractionSuspended
                   ? undefined
                   : handleRunePrimaryAction
               }
@@ -834,19 +866,29 @@ export const GameBoard: FC<GameBoardProps> = ({
         </LocationDragProvider>
         <ActionRail
           concedeDisabled={isSubmittingAction}
-          disabled={decisionInspection.isInspecting || Boolean(bugReportDraft)}
+          disabled={isInteractionSuspended}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
-          onChainOpenChange={setIsChainOverlayOpen}
-          onConcede={concedeAction ? onConcede : undefined}
-          onPassTurn={passFocusAction ? onPass : onEndTurn}
+          onChainOpenChange={
+            isInteractionSuspended ? () => undefined : setIsChainOverlayOpen
+          }
+          onConcede={
+            !isInteractionSuspended && concedeAction ? onConcede : undefined
+          }
+          onPassTurn={
+            isInteractionSuspended
+              ? undefined
+              : passFocusAction
+                ? onPass
+                : onEndTurn
+          }
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn || isSubmittingAction}
           passTurnLabel={isSubmittingAction ? "Submitting…" : passTurnLabel}
           setOpenZone={setOpenZone}
         />
       </section>
-      {!decisionInspection.isInspecting && globalActions.length > 0 && (
+      {!isInteractionSuspended && globalActions.length > 0 && (
         <div className="top-12 left-1/2 z-50 fixed flex gap-2 -translate-x-1/2">
           {globalActions.map((action) => (
             <button
@@ -861,27 +903,41 @@ export const GameBoard: FC<GameBoardProps> = ({
         </div>
       )}
       <ChainOverlay
-        canPassPriority={!decisionInspection.isInspecting && canViewerPassChain}
+        canPassPriority={!isInteractionSuspended && canViewerPassChain}
         chainCards={chainCards}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
-        isCloseDisabled={isChainLockedOpen}
-        interactionSuspended={decisionInspection.isInspecting}
+        isCloseDisabled={isChainLockedOpen || isInteractionSuspended}
+        interactionSuspended={isInteractionSuspended}
         isOpen={isChainOverlayOpen}
         isSubmittingAction={
-          isSubmittingAction || decisionInspection.isInspecting
+          isSubmittingAction || isInteractionSuspended
         }
-        onClose={() => setIsChainOverlayOpen(false)}
-        onItemPointerEnter={(targetCardInstanceIds) =>
-          setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
+        onClose={() => {
+          if (!isInteractionSuspended) setIsChainOverlayOpen(false);
+        }}
+        onItemPointerEnter={
+          isInteractionSuspended
+            ? undefined
+            : (targetCardInstanceIds) =>
+                setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
         }
-        onItemPointerLeave={() => setHighlightedCardInstanceIds(new Set())}
-        onPassPriority={onPassPriority}
+        onItemPointerLeave={
+          isInteractionSuspended
+            ? undefined
+            : () => setHighlightedCardInstanceIds(new Set())
+        }
+        onPassPriority={
+          isInteractionSuspended ? undefined : onPassPriority
+        }
         priorityWindowKey={`${projection.stateVersion}:${passPriorityAction?.id ?? "none"}`}
       />
       <TemporaryZoneOverlay
-        enableCloseShortcut={!decisionInspection.isInspecting}
+        enableCloseShortcut={!isInteractionSuspended}
+        interactionSuspended={isInteractionSuspended}
         logEntries={logEntries}
-        onClose={() => setOpenZone(null)}
+        onClose={() => {
+          if (!isInteractionSuspended) setOpenZone(null);
+        }}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
         opponentTrash={board.opponent.zones.trash}
@@ -894,17 +950,18 @@ export const GameBoard: FC<GameBoardProps> = ({
         cards={board.player.zones.hand.cards}
         hiddenCardInstanceIds={activeTransferCardIds}
         onCardContextAction={
-          decisionInspection.isInspecting
+          isInteractionSuspended
             ? undefined
             : handleCardContextFromHand
         }
         onPlayCard={
-          decisionInspection.isInspecting ? undefined : handlePlayCardFromHand
+          isInteractionSuspended ? undefined : handlePlayCardFromHand
         }
+        interactionSuspended={isInteractionSuspended}
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
       />
-      {!decisionInspection.isInspecting &&
+      {!isInteractionSuspended &&
         targetSelection?.targetKind === "card" &&
         !targetSelectionUsesCardPrompt && (
           <TargetSelectionPrompt
@@ -987,11 +1044,15 @@ export const GameBoard: FC<GameBoardProps> = ({
           headerAction={
             decisionInspection.request?.source === "battlefieldChoice" ? (
               <DecisionInspectionTrigger
-                onInspect={decisionInspection.inspectBoard}
+              onInspect={
+                isInteractionSuspended
+                  ? () => undefined
+                  : decisionInspection.inspectBoard
+              }
               />
             ) : undefined
           }
-          interactionSuspended={decisionInspection.isInspecting}
+          interactionSuspended={isInteractionSuspended}
           isOpen
           isSubmitting={isSubmittingAction}
           isVisible={!decisionInspection.isInspecting}
@@ -1019,7 +1080,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           title="Choose a Battlefield"
         />
       )}
-      {!decisionInspection.isInspecting && unitPlayChoice && (
+      {!isInteractionSuspended && unitPlayChoice && (
         <ChoiceDialog
           confirmLabel="Play unit"
           description="Units may be played to your Base or a battlefield you control."
@@ -1050,7 +1111,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         stateVersion={projection.stateVersion}
         zoneCounts={animationData.zoneCounts}
       />
-      {cardActionMenu && !decisionInspection.isInspecting && (
+      {cardActionMenu && !isInteractionSuspended && (
         <>
           <button
             aria-label="Close card action menu"

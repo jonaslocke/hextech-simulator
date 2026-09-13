@@ -2,17 +2,27 @@
 
 import { createContext, type ReactNode, useContext } from "react";
 
-const ReportCardSelectionContext = createContext<ReadonlySet<string> | null>(null);
+const ReportCardSelectionContext = createContext<{
+  isReportMode: boolean;
+  selectedCardInstanceIds: ReadonlySet<string> | null;
+}>({
+  isReportMode: false,
+  selectedCardInstanceIds: null,
+});
 
 export function ReportCardSelectionProvider({
   children,
+  isReportMode,
   selectedCardInstanceIds,
 }: {
   children: ReactNode;
+  isReportMode: boolean;
   selectedCardInstanceIds: ReadonlySet<string> | null;
 }) {
   return (
-    <ReportCardSelectionContext.Provider value={selectedCardInstanceIds}>
+    <ReportCardSelectionContext.Provider
+      value={{ isReportMode, selectedCardInstanceIds }}
+    >
       {children}
     </ReportCardSelectionContext.Provider>
   );

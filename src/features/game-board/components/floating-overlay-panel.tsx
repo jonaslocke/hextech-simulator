@@ -39,6 +39,7 @@ export function FloatingOverlayPanel({
   enableCloseShortcut = true,
   isCloseDisabled = false,
   isOpen,
+  overlayLayer = "default",
   onClose,
   placement = "primary",
   title,
@@ -50,6 +51,7 @@ export function FloatingOverlayPanel({
   enableCloseShortcut?: boolean;
   isCloseDisabled?: boolean;
   isOpen: boolean;
+  overlayLayer?: "default" | "diagnostic";
   onClose: () => void;
   placement?: FloatingOverlayPlacement;
   title: string;
@@ -218,7 +220,12 @@ export function FloatingOverlayPanel({
   }
 
   return (
-    <div className="z-30 fixed inset-0 overflow-hidden pointer-events-none">
+    <div
+      className={cn(
+        "fixed inset-0 overflow-hidden pointer-events-none",
+        overlayLayer === "diagnostic" ? "z-[2147483647]" : "z-30",
+      )}
+    >
       <div
         aria-label={title}
         data-overlay-kind={dataOverlayKind}

@@ -2,7 +2,11 @@
 
 import { Check, Clipboard, Download, Flag, Save } from "lucide-react";
 import { Button } from "@/shared/components/button";
-import type { StructuredBugReport } from "@/shared/bug-report";
+import {
+  BUG_REPORT_MAX_ISSUE_TEXT_LENGTH,
+  BUG_REPORT_MAX_NOTES_LENGTH,
+  type StructuredBugReport,
+} from "@/shared/bug-report";
 import { FloatingOverlayPanel } from "./floating-overlay-panel";
 
 export type BugReportDraftView = {
@@ -72,6 +76,7 @@ export function BugReportPanel({
       dataOverlayKind="bug-report"
       isOpen
       onClose={onCancel}
+      overlayLayer="diagnostic"
       title="Report bug"
     >
       <p className="mb-3 text-cyan-100/75 text-xs">
@@ -79,15 +84,15 @@ export function BugReportPanel({
       </p>
       <label className="block mb-3 text-sm">
         <span className="mb-1 block font-medium">Actual behavior *</span>
-        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-20 text-sm" onChange={(event) => onActualChange(event.target.value)} value={draft.actual} />
+        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-20 text-sm" maxLength={BUG_REPORT_MAX_ISSUE_TEXT_LENGTH} onChange={(event) => onActualChange(event.target.value)} value={draft.actual} />
       </label>
       <label className="block mb-3 text-sm">
         <span className="mb-1 block font-medium">Expected behavior *</span>
-        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-20 text-sm" onChange={(event) => onExpectedChange(event.target.value)} value={draft.expected} />
+        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-20 text-sm" maxLength={BUG_REPORT_MAX_ISSUE_TEXT_LENGTH} onChange={(event) => onExpectedChange(event.target.value)} value={draft.expected} />
       </label>
       <label className="block mb-3 text-sm">
         <span className="mb-1 block font-medium">Notes</span>
-        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-16 text-sm" onChange={(event) => onNotesChange(event.target.value)} value={draft.notes} />
+        <textarea className="bg-slate-900/80 p-2 border border-white/15 rounded-md w-full min-h-16 text-sm" maxLength={BUG_REPORT_MAX_NOTES_LENGTH} onChange={(event) => onNotesChange(event.target.value)} value={draft.notes} />
       </label>
       <p className="mb-3 text-slate-300 text-xs">{draft.selectedCardCount} related card{draft.selectedCardCount === 1 ? "" : "s"} marked. Recent viewer-safe context is included automatically.</p>
       {artifactPath && (

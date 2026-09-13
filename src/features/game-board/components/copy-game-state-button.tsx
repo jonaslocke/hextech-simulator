@@ -4,6 +4,7 @@ import { Check, Clipboard, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/shared/components/button";
 import type { GameProjection } from "@/shared/game";
+import { copyText } from "@/shared/utils/copy-text";
 import { formatGameStateDiagnostic } from "../game-state-diagnostic";
 
 export function CopyGameStateButton({
@@ -49,26 +50,4 @@ export function CopyGameStateButton({
       )}
     </div>
   );
-}
-
-export async function copyText(value: string): Promise<void> {
-  if (typeof navigator.clipboard?.writeText === "function") {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-
-  const textArea = document.createElement("textarea");
-  textArea.value = value;
-  textArea.setAttribute("readonly", "");
-  textArea.style.position = "fixed";
-  textArea.style.opacity = "0";
-  document.body.appendChild(textArea);
-  textArea.select();
-  try {
-    if (!document.execCommand("copy")) {
-      throw new Error("Copy command was rejected.");
-    }
-  } finally {
-    textArea.remove();
-  }
 }

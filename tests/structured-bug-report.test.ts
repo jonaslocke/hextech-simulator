@@ -1,22 +1,38 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  BUG_REPORT_HISTORY_LIMIT,
   appendViewerSafeProjectionHistory,
   createStructuredBugReport,
   findRelatedProjectedCard,
-  serializeStructuredBugReport,
   toggleRelatedProjectedCardSelection,
+} from "../src/features/game-board/bug-report";
+import {
+  BUG_REPORT_HISTORY_LIMIT,
+  BUG_REPORT_MAX_ISSUE_TEXT_LENGTH,
+  BUG_REPORT_MAX_PAYLOAD_BYTES,
+  BUG_REPORT_MAX_RELATED_CARDS,
+  serializeStructuredBugReport,
 } from "../src/shared/bug-report";
 import type { GameProjection } from "../src/shared/game";
 import {
   bugReportArtifactFilename,
+  BugReportArtifactCapacityError,
+  BugReportArtifactPersistenceDisabledError,
+  LOCAL_BUG_REPORT_ARTIFACTS_ENV,
+  localBugReportArtifactPersistenceEnabled,
+  MAX_LOCAL_BUG_REPORT_ARTIFACTS,
   sanitizeBugReportPathSegment,
   writeBugReportArtifact,
 } from "../src/server/bug-report/artifact-writer";
+import { POST as postBugReport } from "../src/app/api/bug-reports/route";
+
+const enabledLocalEnvironment = {
+  NODE_ENV: "development",
+  [LOCAL_BUG_REPORT_ARTIFACTS_ENV]: "true",
+};
 
 function projection(stateVersion: number): GameProjection {
   return {
@@ -89,20 +105,133 @@ test("toggles only related cards that exist in the captured projection", () => {
   );
 });
 
+test("does not add diagnostic selections beyond the related-card limit", () => {
+  const selectedCardInstanceIds = new Set(
+    Array.from({ length: BUG_REPORT_MAX_RELATED_CARDS }, (_, index) =>
+      index === 0 ? "card-1" : `card-${index + 1}`,
+    ),
+  );
+  assert.deepEqual(
+    toggleRelatedProjectedCardSelection({
+      instanceId: "card-1",
+      projection: projection(3),
+      selectedCardInstanceIds,
+    }),
+    new Set(Array.from(selectedCardInstanceIds).filter((id) => id !== "card-1")),
+  );
+  assert.deepEqual(
+    toggleRelatedProjectedCardSelection({
+      instanceId: "card-1",
+      projection: projection(3),
+      selectedCardInstanceIds: new Set(
+        Array.from({ length: BUG_REPORT_MAX_RELATED_CARDS }, (_, index) =>
+          index === 0 ? "card-2" : `card-${index + 2}`,
+        ),
+      ),
+    }),
+    new Set(
+      Array.from({ length: BUG_REPORT_MAX_RELATED_CARDS }, (_, index) =>
+        index === 0 ? "card-2" : `card-${index + 2}`,
+      ),
+    ),
+  );
+});
+
 test("sanitizes artifact names without allowing path segments", () => {
   assert.equal(sanitizeBugReportPathSegment("../game id"), "game-id");
   const report = createStructuredBugReport({ actual: "actual", expected: "expected", capturedAt: "2026-09-13T12:00:00.000Z", game: projection(3), recentStates: [], relatedCardInstanceIds: [], reportId: "report" });
+  assert.equal(localBugReportArtifactPersistenceEnabled({ [LOCAL_BUG_REPORT_ARTIFACTS_ENV]: "true" }), false);
   assert.equal(bugReportArtifactFilename(report), "2026-09-13T12-00-00-000Z-game-1-v3.json");
+});
+
+test("bounds user-authored text and related-card collections", () => {
+  assert.throws(() =>
+    createStructuredBugReport({
+      actual: "x".repeat(BUG_REPORT_MAX_ISSUE_TEXT_LENGTH + 1),
+      expected: "expected",
+      capturedAt: "2026-09-13T12:00:00.000Z",
+      game: projection(3),
+      recentStates: [],
+      relatedCardInstanceIds: [],
+      reportId: "report",
+    }),
+  );
+  assert.throws(() =>
+    createStructuredBugReport({
+      actual: "actual",
+      expected: "expected",
+      capturedAt: "2026-09-13T12:00:00.000Z",
+      game: projection(3),
+      recentStates: [],
+      relatedCardInstanceIds: Array.from(
+        { length: BUG_REPORT_MAX_RELATED_CARDS + 1 },
+        () => "card-1",
+      ),
+      reportId: "report",
+    }),
+  );
+});
+
+test("requires explicit non-production opt-in for local artifacts", async () => {
+  const report = createStructuredBugReport({ actual: "actual", expected: "expected", capturedAt: "2026-09-13T12:00:00.000Z", game: projection(3), recentStates: [], relatedCardInstanceIds: [], reportId: "report" });
+  assert.equal(localBugReportArtifactPersistenceEnabled({ NODE_ENV: "development" }), false);
+  assert.equal(localBugReportArtifactPersistenceEnabled({ NODE_ENV: "production", [LOCAL_BUG_REPORT_ARTIFACTS_ENV]: "true" }), false);
+  assert.equal(localBugReportArtifactPersistenceEnabled(enabledLocalEnvironment), true);
+  await assert.rejects(
+    () => writeBugReportArtifact({ environment: { NODE_ENV: "development" }, report }),
+    BugReportArtifactPersistenceDisabledError,
+  );
+});
+
+test("rejects oversized report bodies before filesystem persistence", async () => {
+  const response = await postBugReport(
+    new Request("http://localhost/api/bug-reports", {
+      body: "x".repeat(BUG_REPORT_MAX_PAYLOAD_BYTES + 1),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    }),
+  );
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).error.code, "payload_too_large");
 });
 
 test("writes the canonical payload under the workspace bug-report directory", async () => {
   const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "hextech-bug-report-"));
   const report = createStructuredBugReport({ actual: "actual", expected: "expected", capturedAt: "2026-09-13T12:00:00.000Z", game: projection(3), recentStates: [], relatedCardInstanceIds: [], reportId: "report" });
   try {
-    const result = await writeBugReportArtifact({ report, workspaceRoot });
+    const result = await writeBugReportArtifact({
+      environment: enabledLocalEnvironment,
+      report,
+      workspaceRoot,
+    });
     assert.equal(result.artifactPath, ".agent-work/bug-reports/2026-09-13T12-00-00-000Z-game-1-v3.json");
     const written = await readFile(path.join(workspaceRoot, result.artifactPath), "utf8");
     assert.deepEqual(JSON.parse(written), report);
+  } finally {
+    await rm(workspaceRoot, { force: true, recursive: true });
+  }
+});
+
+test("rejects new artifacts after the bounded local directory capacity", async () => {
+  const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "hextech-bug-report-capacity-"));
+  const reportsDirectory = path.join(workspaceRoot, ".agent-work", "bug-reports");
+  const report = createStructuredBugReport({ actual: "actual", expected: "expected", capturedAt: "2026-09-13T12:00:00.000Z", game: projection(3), recentStates: [], relatedCardInstanceIds: [], reportId: "report" });
+  try {
+    await mkdir(reportsDirectory, { recursive: true });
+    await Promise.all(
+      Array.from({ length: MAX_LOCAL_BUG_REPORT_ARTIFACTS }, (_, index) =>
+        writeFile(path.join(reportsDirectory, `existing-${index}.json`), "{}"),
+      ),
+    );
+    await assert.rejects(
+      () =>
+        writeBugReportArtifact({
+          environment: enabledLocalEnvironment,
+          report,
+          workspaceRoot,
+        }),
+      BugReportArtifactCapacityError,
+    );
   } finally {
     await rm(workspaceRoot, { force: true, recursive: true });
   }
