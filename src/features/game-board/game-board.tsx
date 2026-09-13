@@ -1,6 +1,5 @@
 "use client";
 
-import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import {
   serializeStructuredBugReport,
   type StructuredBugReport,
@@ -28,6 +27,7 @@ import {
 import { buildCard, createBoardModel } from "./board-model";
 import { adaptProjectionToBoard } from "./board-view-model";
 import { ActionRail } from "./components/action-rail";
+import { ReportCardChoiceDialog } from "./components/report-card-choice-dialog";
 import { BattlefieldBoard } from "./components/battlefield-board";
 import { CardActionMenu } from "./components/card-action-menu";
 import { DecisionInspectionToolbar } from "./components/decision-inspection-toolbar";
@@ -574,29 +574,11 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const handleBoardClickCapture = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
-      if (!isReportMode) {
-        if (!isInteractionSuspended) handleTargetClickCapture(event);
-        return;
+      if (!isInteractionSuspended) {
+        handleTargetClickCapture(event);
       }
-      if (!(event.target instanceof Element)) {
-        return;
-      }
-      if (event.target.closest('[data-overlay-kind="bug-report"]')) {
-        return;
-      }
-      const card = event.target.closest<HTMLElement>(
-        "[data-card-instance-id]",
-      );
-      event.preventDefault();
-      event.stopPropagation();
-      if (card?.dataset.cardInstanceId) toggleBugReportCard(card.dataset.cardInstanceId);
     },
-    [
-      handleTargetClickCapture,
-      isInteractionSuspended,
-      isReportMode,
-      toggleBugReportCard,
-    ],
+    [handleTargetClickCapture, isInteractionSuspended],
   );
 
   const finalizeBugReport = useCallback(async () => {
@@ -646,6 +628,7 @@ export const GameBoard: FC<GameBoardProps> = ({
     <ReportCardSelectionProvider
       isReportMode={isReportMode}
       selectedCardInstanceIds={bugReportDraft?.selectedCardInstanceIds ?? null}
+      toggleCardInstanceId={toggleBugReportCard}
     >
     <main
       className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"
@@ -669,7 +652,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
         interactionSuspended={isInteractionSuspended}
-        isPromptVisible={!isInteractionSuspended}
+        isPromptVisible={!decisionInspection.isInspecting}
         isSubmitting={isSubmittingAction}
         onCancel={() => {
           if (!isInteractionSuspended) setTargetSelection(null);
@@ -1037,7 +1020,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           />
         )}
       {targetSelection?.targetKind === "battlefield" && (
-        <ChoiceDialog
+        <ReportCardChoiceDialog
           confirmLabel="Choose battlefield"
           decisionKey={`battlefield:${targetSelection.actionId}`}
           description="Choose the battlefield affected by this action."
@@ -1055,7 +1038,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           interactionSuspended={isInteractionSuspended}
           isOpen
           isSubmitting={isSubmittingAction}
-          isVisible={!isInteractionSuspended}
+          isVisible={!decisionInspection.isInspecting}
           onCancel={() => setTargetSelection(null)}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({
@@ -1071,6 +1054,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             )
             .map((battlefield) => ({
               description: battlefield.card.rulesText || "Battlefield",
+              diagnosticCardInstanceId: battlefield.card.instanceId,
               id: battlefield.battlefieldId,
               imageOrientation: "landscape" as const,
               imageUrl: battlefield.card.imageUrl ?? undefined,
@@ -1081,7 +1065,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         />
       )}
       {!isInteractionSuspended && unitPlayChoice && (
-        <ChoiceDialog
+        <ReportCardChoiceDialog
           confirmLabel="Play unit"
           description="Units may be played to your Base or a battlefield you control."
           isOpen

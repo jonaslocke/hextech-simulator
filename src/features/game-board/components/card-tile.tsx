@@ -13,6 +13,7 @@ import {
 import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
 import { useLocationDragState } from "../drag-and-drop/location-drag-provider";
+import { routeReportCardInteraction } from "../bug-report";
 import { useReportCardSelection } from "../report-card-selection-context";
 
 const CARD_ASPECT_RATIO = 130 / 181;
@@ -136,7 +137,11 @@ export const CardTile: FC<CardTileProps> = ({
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
   const { isLocationDragActive } = useLocationDragState();
-  const { isReportMode, selectedCardInstanceIds } = useReportCardSelection();
+  const {
+    isReportMode,
+    selectedCardInstanceIds,
+    toggleCardInstanceId,
+  } = useReportCardSelection();
   const canShowHoverPreview =
     enableHoverPreview && !isLocationDragActive && !isReportMode;
 
@@ -253,8 +258,12 @@ export const CardTile: FC<CardTileProps> = ({
       )}
       onBlur={clearPreview}
       onClick={(event) => {
-        if (isReportMode) return;
-        onPrimaryAction?.(event);
+        routeReportCardInteraction({
+          instanceId,
+          isReportMode,
+          onDiagnosticToggle: toggleCardInstanceId,
+          onGameplayInteraction: () => onPrimaryAction?.(event),
+        });
       }}
       onContextMenu={(event) => {
         if (isReportMode || !onContextAction) {
@@ -267,6 +276,20 @@ export const CardTile: FC<CardTileProps> = ({
       }}
       onFocus={schedulePreview}
       onKeyDown={(event) => {
+        if (
+          isReportMode &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          routeReportCardInteraction({
+            instanceId,
+            isReportMode,
+            onDiagnosticToggle: toggleCardInstanceId,
+            onGameplayInteraction: () => undefined,
+          });
+          return;
+        }
+
         if (
           isReportMode ||
           !onPrimaryAction ||

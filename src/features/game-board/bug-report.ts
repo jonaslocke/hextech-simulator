@@ -121,6 +121,25 @@ export function toggleRelatedProjectedCardSelection(input: {
   return selectedCardInstanceIds;
 }
 
+export function routeReportCardInteraction(input: {
+  instanceId?: string;
+  isReportMode: boolean;
+  onDiagnosticToggle: (instanceId: string) => void;
+  onGameplayInteraction: () => void;
+}): "diagnostic" | "gameplay" | "ignored" {
+  if (!input.isReportMode) {
+    input.onGameplayInteraction();
+    return "gameplay";
+  }
+
+  if (!input.instanceId) {
+    return "ignored";
+  }
+
+  input.onDiagnosticToggle(input.instanceId);
+  return "diagnostic";
+}
+
 export function createStructuredBugReport(input: {
   actual: string;
   capturedAt: string;

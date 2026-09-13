@@ -7,6 +7,7 @@ import {
   appendViewerSafeProjectionHistory,
   createStructuredBugReport,
   findRelatedProjectedCard,
+  routeReportCardInteraction,
   toggleRelatedProjectedCardSelection,
 } from "../src/features/game-board/bug-report";
 import {
@@ -103,6 +104,51 @@ test("toggles only related cards that exist in the captured projection", () => {
     [...toggleRelatedProjectedCardSelection({ instanceId: "unknown", projection: captured, selectedCardInstanceIds: selected })],
     ["card-1"],
   );
+});
+
+test("routes report-mode card interactions without invoking gameplay selection", () => {
+  const diagnosticToggles: string[] = [];
+  let gameplayInteractions = 0;
+
+  assert.equal(
+    routeReportCardInteraction({
+      instanceId: "card-1",
+      isReportMode: true,
+      onDiagnosticToggle: (instanceId) => diagnosticToggles.push(instanceId),
+      onGameplayInteraction: () => {
+        gameplayInteractions += 1;
+      },
+    }),
+    "diagnostic",
+  );
+  assert.deepEqual(diagnosticToggles, ["card-1"]);
+  assert.equal(gameplayInteractions, 0);
+
+  assert.equal(
+    routeReportCardInteraction({
+      instanceId: "card-1",
+      isReportMode: false,
+      onDiagnosticToggle: (instanceId) => diagnosticToggles.push(instanceId),
+      onGameplayInteraction: () => {
+        gameplayInteractions += 1;
+      },
+    }),
+    "gameplay",
+  );
+  assert.deepEqual(diagnosticToggles, ["card-1"]);
+  assert.equal(gameplayInteractions, 1);
+
+  assert.equal(
+    routeReportCardInteraction({
+      isReportMode: true,
+      onDiagnosticToggle: (instanceId) => diagnosticToggles.push(instanceId),
+      onGameplayInteraction: () => {
+        gameplayInteractions += 1;
+      },
+    }),
+    "ignored",
+  );
+  assert.equal(gameplayInteractions, 1);
 });
 
 test("does not add diagnostic selections beyond the related-card limit", () => {

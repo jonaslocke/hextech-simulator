@@ -3,6 +3,8 @@
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
+import { routeReportCardInteraction } from "../bug-report";
+import { useReportCardSelection } from "../report-card-selection-context";
 import {
   useCallback,
   useEffect,
@@ -14,6 +16,7 @@ import {
 
 export type CardSelectionPromptOption = {
   description?: string;
+  diagnosticCardInstanceId?: string;
   disabled?: boolean;
   id: string;
   imageUrl?: string;
@@ -100,6 +103,11 @@ export function CardSelectionPrompt({
 }: CardSelectionPromptProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const {
+    isReportMode,
+    selectedCardInstanceIds: selectedReportCardInstanceIds,
+    toggleCardInstanceId,
+  } = useReportCardSelection();
 
   const optionById = useMemo(
     () => new Map(options.map((option) => [option.id, option])),
@@ -338,6 +346,18 @@ export function CardSelectionPrompt({
     ],
   );
 
+  const selectOptionForCurrentMode = useCallback(
+    (option: CardSelectionPromptOption) => {
+      routeReportCardInteraction({
+        instanceId: option.diagnosticCardInstanceId,
+        isReportMode,
+        onDiagnosticToggle: toggleCardInstanceId,
+        onGameplayInteraction: () => selectOption(option),
+      });
+    },
+    [isReportMode, selectOption, toggleCardInstanceId],
+  );
+
   if (!isOpen) {
     return null;
   }
@@ -382,9 +402,10 @@ export function CardSelectionPrompt({
               <CardChoiceGrid
                 cardSize={cardSize}
                 interactionSuspended={interactionSuspended}
+                isReportMode={isReportMode}
                 maxSelected={maxSelected}
                 onOrderChange={updateOrderedIds}
-                onSelect={selectOption}
+                onSelect={selectOptionForCurrentMode}
                 options={
                   selectionMode === "ordered"
                     ? sortOptions(options, orderedIds)
@@ -394,6 +415,7 @@ export function CardSelectionPrompt({
                 selectedIds={currentSelectedIds}
                 selectionLimitReached={selectionLimitReached}
                 selectionMode={selectionMode}
+                selectedReportCardInstanceIds={selectedReportCardInstanceIds}
               />
             ) : selectionMode === "ordered" ? (
               <OrderedChoiceList
@@ -405,12 +427,14 @@ export function CardSelectionPrompt({
             ) : (
               <ChoiceList
                 interactionSuspended={interactionSuspended}
+                isReportMode={isReportMode}
                 maxSelected={maxSelected}
-                onSelect={selectOption}
+                onSelect={selectOptionForCurrentMode}
                 options={options}
                 selectedIds={selectedIds}
                 selectionLimitReached={selectionLimitReached}
                 selectionMode={selectionMode}
+                selectedReportCardInstanceIds={selectedReportCardInstanceIds}
               />
             )}
           </div>
@@ -600,6 +624,7 @@ function clearStoredDecisionDraft(storageKey: string | null) {
 function CardChoiceGrid({
   cardSize,
   interactionSuspended,
+  isReportMode,
   maxSelected,
   onOrderChange,
   onSelect,
@@ -608,9 +633,11 @@ function CardChoiceGrid({
   selectedIds,
   selectionLimitReached,
   selectionMode,
+  selectedReportCardInstanceIds,
 }: {
   cardSize: CardSelectionPromptCardSize;
   interactionSuspended: boolean;
+  isReportMode: boolean;
   maxSelected?: number;
   onOrderChange: (ids: string[]) => void;
   onSelect: (option: CardSelectionPromptOption) => void;
@@ -619,6 +646,7 @@ function CardChoiceGrid({
   selectedIds: string[];
   selectionLimitReached: boolean;
   selectionMode: CardSelectionPromptSelectionMode;
+  selectedReportCardInstanceIds: ReadonlySet<string> | null;
 }) {
   const compactGrid = options.length > 3;
   const gridColumnClass = getCardGridColumnClass(cardSize);
@@ -641,8 +669,15 @@ function CardChoiceGrid({
         const isSelected = selectedIndex >= 0;
         const disabledByLimit =
           selectionMode === "multiple" && !isSelected && selectionLimitReached;
+        const isDiagnosticSelectable =
+          isReportMode && Boolean(option.diagnosticCardInstanceId);
+        const isReportSelected = Boolean(
+          option.diagnosticCardInstanceId &&
+            selectedReportCardInstanceIds?.has(option.diagnosticCardInstanceId),
+        );
         const disabled = Boolean(
-          interactionSuspended || option.disabled || disabledByLimit,
+          !isDiagnosticSelectable &&
+            (interactionSuspended || option.disabled || disabledByLimit),
         );
 
         return (
@@ -662,10 +697,11 @@ function CardChoiceGrid({
                 isSelected
                   ? "border-cyan-300 bg-cyan-300/[0.07] ring-2 ring-inset ring-cyan-300/65 shadow-cyan-300/10"
                   : "border-white/10",
+                isReportSelected && "outline-2 outline-amber-300 outline-offset-2",
                 disabled && "cursor-not-allowed opacity-40 grayscale",
               )}
               data-selected={isSelected ? "true" : "false"}
-              disabled={disabled || selectionMode === "ordered"}
+              disabled={disabled || (selectionMode === "ordered" && !isReportMode)}
               onClick={() => onSelect(option)}
               type="button"
             >
@@ -688,6 +724,11 @@ function CardChoiceGrid({
               {isSelected && (
                 <span className="top-2 right-2 absolute flex justify-center items-center bg-cyan-300 shadow-black/40 shadow-lg border border-cyan-100/60 rounded-full size-7 font-black text-slate-950 text-xs">
                   {selectionMode === "ordered" ? selectedIndex + 1 : "✓"}
+                </span>
+              )}
+              {isReportSelected && (
+                <span className="top-2 left-2 absolute bg-amber-300 shadow-black/40 shadow-lg border border-amber-100/60 rounded-full px-1.5 py-0.5 font-bold text-[9px] text-slate-950 uppercase tracking-wide">
+                  Report
                 </span>
               )}
             </button>
@@ -738,20 +779,24 @@ function CardChoiceGrid({
 
 function ChoiceList({
   interactionSuspended,
+  isReportMode,
   maxSelected,
   onSelect,
   options,
   selectedIds,
   selectionLimitReached,
   selectionMode,
+  selectedReportCardInstanceIds,
 }: {
   interactionSuspended: boolean;
+  isReportMode: boolean;
   maxSelected?: number;
   onSelect: (option: CardSelectionPromptOption) => void;
   options: CardSelectionPromptOption[];
   selectedIds: string[];
   selectionLimitReached: boolean;
   selectionMode: Exclude<CardSelectionPromptSelectionMode, "ordered">;
+  selectedReportCardInstanceIds: ReadonlySet<string> | null;
 }) {
   return (
     <div className="gap-2 grid pr-1 max-h-112 overflow-auto">
@@ -759,8 +804,15 @@ function ChoiceList({
         const isSelected = selectedIds.includes(option.id);
         const disabledByLimit =
           selectionMode === "multiple" && !isSelected && selectionLimitReached;
+        const isDiagnosticSelectable =
+          isReportMode && Boolean(option.diagnosticCardInstanceId);
+        const isReportSelected = Boolean(
+          option.diagnosticCardInstanceId &&
+            selectedReportCardInstanceIds?.has(option.diagnosticCardInstanceId),
+        );
         const disabled = Boolean(
-          interactionSuspended || option.disabled || disabledByLimit,
+          !isDiagnosticSelectable &&
+            (interactionSuspended || option.disabled || disabledByLimit),
         );
 
         return (
@@ -771,6 +823,7 @@ function ChoiceList({
               isSelected
                 ? "border-cyan-300 bg-cyan-300/15 ring-1 ring-cyan-300/50"
                 : "border-white/10 hover:border-cyan-300/40 hover:bg-cyan-300/4",
+              isReportSelected && "outline-2 outline-amber-300 outline-offset-2",
             )}
             disabled={disabled}
             key={option.id}
@@ -779,6 +832,11 @@ function ChoiceList({
           >
             <OptionImage option={option} />
             <OptionText option={option} />
+            {isReportSelected && (
+              <span className="bg-amber-300 px-1.5 py-0.5 rounded font-bold text-[9px] text-slate-950 uppercase tracking-wide">
+                Report
+              </span>
+            )}
             {selectionMode === "multiple" && maxSelected !== undefined && (
               <span className="ml-auto text-slate-500 text-xs">
                 {isSelected ? "Selected" : `Max ${maxSelected}`}

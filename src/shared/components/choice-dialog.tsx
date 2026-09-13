@@ -8,6 +8,7 @@ import { GameActionButton } from "@/features/game-board/components/game-action-b
 
 export type ChoiceDialogOption = {
   description?: string;
+  diagnosticCardInstanceId?: string;
   disabled?: boolean;
   id: string;
   imageOrientation?: "auto" | "portrait" | "landscape";
@@ -16,6 +17,10 @@ export type ChoiceDialogOption = {
 };
 
 export type ChoiceDialogProps = {
+  diagnosticCardSelection?: {
+    selectedCardInstanceIds: ReadonlySet<string>;
+    toggleCardInstanceId: (instanceId: string) => void;
+  };
   headerAction?: ReactNode;
   interactionSuspended?: boolean;
   isVisible?: boolean;
@@ -33,6 +38,7 @@ export type ChoiceDialogProps = {
 
 export function ChoiceDialog({
   confirmLabel,
+  diagnosticCardSelection,
   headerAction,
   interactionSuspended = false,
   isVisible = true,
@@ -110,6 +116,7 @@ export function ChoiceDialog({
 
           {selectionMode === "single" ? (
             <SingleChoiceList
+              diagnosticCardSelection={diagnosticCardSelection}
               interactionSuspended={interactionSuspended}
               onSelect={setSelectedId}
               options={options}
@@ -117,6 +124,7 @@ export function ChoiceDialog({
             />
           ) : (
             <OrderedChoiceList
+              diagnosticCardSelection={diagnosticCardSelection}
               interactionSuspended={interactionSuspended}
               onOrderChange={setOrderedIds}
               options={options}
@@ -152,11 +160,13 @@ export function ChoiceDialog({
 }
 
 function SingleChoiceList({
+  diagnosticCardSelection,
   interactionSuspended,
   onSelect,
   options,
   selectedId,
 }: {
+  diagnosticCardSelection?: ChoiceDialogProps["diagnosticCardSelection"];
   interactionSuspended: boolean;
   onSelect: (id: string) => void;
   options: ChoiceDialogOption[];
@@ -166,6 +176,15 @@ function SingleChoiceList({
     <div className="gap-2 grid pr-1 max-h-112 overflow-auto">
       {options.map((option) => {
         const isSelected = selectedId === option.id;
+        const isDiagnosticSelectable = Boolean(
+          diagnosticCardSelection && option.diagnosticCardInstanceId,
+        );
+        const isDiagnosticSelected = Boolean(
+          option.diagnosticCardInstanceId &&
+            diagnosticCardSelection?.selectedCardInstanceIds.has(
+              option.diagnosticCardInstanceId,
+            ),
+        );
 
         return (
           <button
@@ -176,14 +195,34 @@ function SingleChoiceList({
               isSelected
                 ? "border-cyan-300/80 bg-cyan-300/12 shadow-[0_0_18px_rgba(34,211,238,0.12)]"
                 : "border-white/10 hover:border-cyan-300/45 hover:bg-cyan-300/5.5",
+              isDiagnosticSelected && "outline-2 outline-amber-300 outline-offset-2",
             )}
-            disabled={interactionSuspended || option.disabled}
+            disabled={
+              !isDiagnosticSelectable && (interactionSuspended || option.disabled)
+            }
             key={option.id}
-            onClick={() => onSelect(option.id)}
+            onClick={() => {
+              if (
+                diagnosticCardSelection &&
+                option.diagnosticCardInstanceId
+              ) {
+                diagnosticCardSelection.toggleCardInstanceId(
+                  option.diagnosticCardInstanceId,
+                );
+                return;
+              }
+
+              onSelect(option.id);
+            }}
             type="button"
           >
             <OptionImage option={option} />
             <OptionText option={option} />
+            {isDiagnosticSelected && (
+              <span className="bg-amber-300 px-1.5 py-0.5 rounded font-bold text-[9px] text-slate-950 uppercase tracking-wide">
+                Report
+              </span>
+            )}
           </button>
         );
       })}
@@ -192,11 +231,13 @@ function SingleChoiceList({
 }
 
 function OrderedChoiceList({
+  diagnosticCardSelection,
   interactionSuspended,
   onOrderChange,
   options,
   orderedIds,
 }: {
+  diagnosticCardSelection?: ChoiceDialogProps["diagnosticCardSelection"];
   interactionSuspended: boolean;
   onOrderChange: (ids: string[]) => void;
   options: ChoiceDialogOption[];
@@ -212,14 +253,32 @@ function OrderedChoiceList({
         if (!option) {
           return null;
         }
+        const isDiagnosticSelected = Boolean(
+          option.diagnosticCardInstanceId &&
+            diagnosticCardSelection?.selectedCardInstanceIds.has(
+              option.diagnosticCardInstanceId,
+            ),
+        );
 
         return (
           <li
             className={cn(
               "items-center gap-3 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] p-2 border rounded-lg min-h-20",
               "border-white/10 bg-white/5.5 shadow-sm shadow-black/25",
+              diagnosticCardSelection &&
+                option.diagnosticCardInstanceId &&
+                "cursor-pointer",
+              isDiagnosticSelected && "outline-2 outline-amber-300 outline-offset-2",
             )}
             key={id}
+            onClick={
+              diagnosticCardSelection && option.diagnosticCardInstanceId
+                ? () =>
+                    diagnosticCardSelection.toggleCardInstanceId(
+                      option.diagnosticCardInstanceId!,
+                    )
+                : undefined
+            }
           >
             <span className="flex justify-center items-center bg-slate-800/80 shadow-black/20 shadow-inner border border-white/10 rounded-md size-8 font-mono font-semibold text-slate-200 text-xs shrink-0">
               {index + 1}

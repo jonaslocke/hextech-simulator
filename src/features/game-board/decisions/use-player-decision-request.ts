@@ -224,6 +224,8 @@ export function buildPlayerDecisionRequest({
 
             return {
               description: item ? formatChainItemKind(item.kind) : undefined,
+              diagnosticCardInstanceId:
+                item?.card?.instanceId ?? cardInstanceId ?? undefined,
               id,
               imageUrl:
                 item?.card?.imageUrl ??
@@ -455,6 +457,7 @@ function arraysEqual(left: string[], right: string[]) {
 function toDecisionCard(card: ProjectedCardView): PlayerDecisionCard {
   return {
     description: card.rulesText || card.type,
+    diagnosticCardInstanceId: card.instanceId,
     id: card.instanceId,
     imageUrl: card.imageUrl ?? undefined,
     label: card.name,
@@ -472,6 +475,7 @@ function toDecisionCardFromSources(
 
   return {
     description: catalogCard?.text.plain || catalogCard?.classification.type,
+    diagnosticCardInstanceId: id,
     id,
     imageUrl: catalogCard?.media.image_url ?? undefined,
     label: catalogCard?.name ?? id,
