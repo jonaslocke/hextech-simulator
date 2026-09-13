@@ -658,7 +658,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           player={board.player}
           victoryScore={projection.victoryScore}
         />
-        <div className="top-2 right-3 z-[2147483647] absolute">
+        <div className="top-14 right-3 z-[2147483647] absolute">
           <ReportBugButton
             isReporting={Boolean(bugReportDraft)}
             onBegin={beginBugReport}
