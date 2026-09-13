@@ -69,7 +69,7 @@ accepted GREEN
 If true RED demonstration is impractical, document why and use the strongest
 deterministic evidence available. Never claim RED that was not observed.
 
-Use `skills/behavior-change-tdd-SKILL.md` for the procedure.
+Use `behavior-change-tdd` for the procedure.
 
 ## 4. Regression scope follows consumers
 

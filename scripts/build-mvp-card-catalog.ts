@@ -70,11 +70,18 @@ if (process.argv.includes("--check")) {
   const currentGenerated = await readFile(GENERATED_OUTPUT_PATH, "utf8").catch(
     () => "",
   );
-  if (current !== output || currentGenerated !== generatedOutput) {
+  if (
+    normalizeLineEndings(current) !== output ||
+    normalizeLineEndings(currentGenerated) !== generatedOutput
+  ) {
     throw new Error(`${OUTPUT_PATH} is not synchronized. Run npm run catalog:build-mvp.`);
   }
 } else {
   await mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
   await writeFile(OUTPUT_PATH, output, "utf8");
   await writeFile(GENERATED_OUTPUT_PATH, generatedOutput, "utf8");
+}
+
+function normalizeLineEndings(value: string) {
+  return value.replaceAll("\r\n", "\n");
 }

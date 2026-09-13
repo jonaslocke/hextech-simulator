@@ -8,8 +8,8 @@ Read only the relevant portions of `docs/game_definition.md`, `docs/testing.md`,
 and the local rules/card data required by the change.
 
 For shared engine or corpus-capability work, use
-`skills/engine-change-impact-SKILL.md`. For reusable behavior fixes/extensions,
-also use `skills/behavior-change-tdd-SKILL.md`.
+`engine-change-impact`. For reusable behavior fixes/extensions, also use
+`behavior-change-tdd`.
 
 ## High-risk invariants
 

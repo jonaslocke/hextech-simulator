@@ -12,7 +12,7 @@ canonical testing contract.
   Do not delete, weaken, or rewrite them merely because new production code
   breaks them.
 - New reusable behavior normally adds focused **FAIL_TO_PASS** coverage. Use
-  `skills/behavior-change-tdd-SKILL.md` for the procedure.
+  `behavior-change-tdd` for the procedure.
 - Changing an accepted expectation requires the semantic-change gate in
   `docs/testing.md` before the expectation is edited.
 - Permanent deck validation must derive from the canonical production registry;

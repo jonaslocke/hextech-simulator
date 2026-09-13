@@ -3,6 +3,42 @@ import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
+class TailBuffer {
+  private lines: string[] = [];
+  private partial = "";
+
+  constructor(
+    private readonly maxLines: number,
+    private readonly maxChars: number,
+  ) {}
+
+  push(chunk: string) {
+    const parts = (this.partial + chunk).split(/\r?\n/);
+    this.partial = parts.pop() ?? "";
+    this.lines.push(...parts);
+
+    if (this.lines.length > this.maxLines) {
+      this.lines.splice(0, this.lines.length - this.maxLines);
+    }
+
+    this.trimChars();
+  }
+
+  text() {
+    const complete = [...this.lines, ...(this.partial ? [this.partial] : [])];
+    return complete.join("\n").slice(-this.maxChars);
+  }
+
+  private trimChars() {
+    while (
+      this.lines.join("\n").length > this.maxChars &&
+      this.lines.length > 1
+    ) {
+      this.lines.shift();
+    }
+  }
+}
+
 const MAX_DIAGNOSTIC_LINES = 80;
 const MAX_DIAGNOSTIC_CHARS = 12_000;
 
@@ -14,10 +50,11 @@ const checks = [
   { name: "build", command: "npm", args: ["run", "build"] },
 ] as const;
 
-const base = process.argv
-  .find((argument) => argument.startsWith("--base="))
-  ?.slice("--base=".length)
-  .trim();
+const base = (
+  process.argv
+    .find((argument) => argument.startsWith("--base="))
+    ?.slice("--base=".length) ?? process.env.npm_config_base
+)?.trim();
 
 const runId = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
 const logDirectory = path.join(".agent-work", "verify", runId);
@@ -33,7 +70,7 @@ if (base) {
   const result = await runCheck("diff-check", "git", [
     "diff",
     "--check",
-    `${base}...HEAD`,
+    base,
   ]);
   if (!result.ok) fail("diff-check", result);
   console.log("✓ diff-check");
@@ -94,40 +131,4 @@ function fail(
   }
   console.error(`\nFull log: ${result.logPath}`);
   process.exit(result.status || 1);
-}
-
-class TailBuffer {
-  private lines: string[] = [];
-  private partial = "";
-
-  constructor(
-    private readonly maxLines: number,
-    private readonly maxChars: number,
-  ) {}
-
-  push(chunk: string) {
-    const parts = (this.partial + chunk).split(/\r?\n/);
-    this.partial = parts.pop() ?? "";
-    this.lines.push(...parts);
-
-    if (this.lines.length > this.maxLines) {
-      this.lines.splice(0, this.lines.length - this.maxLines);
-    }
-
-    this.trimChars();
-  }
-
-  text() {
-    const complete = [...this.lines, ...(this.partial ? [this.partial] : [])];
-    return complete.join("\n").slice(-this.maxChars);
-  }
-
-  private trimChars() {
-    while (
-      this.lines.join("\n").length > this.maxChars &&
-      this.lines.length > 1
-    ) {
-      this.lines.shift();
-    }
-  }
 }

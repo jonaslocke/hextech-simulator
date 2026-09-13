@@ -77,12 +77,14 @@ semantic decisions, Remaining work, Relevant files, and Relevant authorities.
 ## Workflow routing
 
 - Changes under `src/server/game/**`: read `src/server/game/AGENTS.md`; use
-  `skills/engine-change-impact-SKILL.md` for shared engine/corpus work.
+  `engine-change-impact` for shared engine/corpus work.
 - Tests under `tests/**`: read `tests/AGENTS.md`; use
-  `skills/behavior-change-tdd-SKILL.md` for reusable behavior fixes/extensions.
-- Independent review: use `skills/technical-pr-review-SKILL.md`.
-- Player decisions, UI, action buttons, rules lookup, and architecture migrations:
-  use the existing matching repository skill.
+  `behavior-change-tdd` for reusable behavior fixes/extensions.
+- Independent review: use `technical-pr-review`.
+- Player decisions: `player-decision-system`; gameplay action buttons:
+  `game-action-buttons`; standard UI: `shadcn-first-ui-development`; rules lookup:
+  `riftbound-local-rules-reference`; architecture migrations:
+  `refactor-to-feature-architecture`.
 
 Skills define procedures; durable docs define what is true.
 

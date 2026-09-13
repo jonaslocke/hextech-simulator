@@ -1,8 +1,8 @@
 # Hextech Coding-Agent Benchmark
 
-**Version:** 1.0  
-**Status:** Ready for use  
-**Visibility:** Project-safe / agent-readable  
+**Version:** 1.0
+**Status:** Ready for use
+**Visibility:** Project-safe / agent-readable
 **Purpose:** Evaluate and evolve the coding-agent harness used by Hextech Simulator.
 
 ## 1. What this benchmark measures
@@ -262,9 +262,9 @@ The benchmark is designed to evaluate the following minimal harness:
 - `src/server/game/AGENTS.md` — engine-specific non-negotiables;
 - `tests/AGENTS.md` — test ownership and accepted-contract lifecycle;
 - `docs/testing.md` — durable detailed testing authority;
-- `skills/engine-change-impact-SKILL.md`;
-- `skills/behavior-change-tdd-SKILL.md`;
-- `skills/technical-pr-review-SKILL.md`;
+- `.agents/skills/engine-change-impact/SKILL.md`;
+- `.agents/skills/behavior-change-tdd/SKILL.md`;
+- `.agents/skills/technical-pr-review/SKILL.md`;
 - a deterministic `verify:pr` command;
 - `.agent-work/` as a gitignored ephemeral workspace.
 
