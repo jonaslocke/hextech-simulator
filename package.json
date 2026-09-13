@@ -20,7 +20,8 @@
     "start": "tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\""
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "verify:pr": "node --import tsx scripts/verify-pr.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

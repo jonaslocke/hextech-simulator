@@ -1,156 +1,94 @@
 # Agent Instructions
 
-## Purpose and precedence
+## Precedence
 
-This file defines repository-wide operating rules for agents. The current task
-defines the requested outcome; these instructions define how to perform it.
+The task defines the requested outcome; repository instructions define how to
+perform it. Before changing a file, read this file and any more-specific
+`AGENTS.md` that applies to the target path. More-specific instructions win.
 
-Before changing a file, read this file and any more-specific `AGENTS.md` that
-applies to the target path. A more-specific instruction takes precedence. If a
-task conflicts with a durable contract or requires an unresolved product,
-rules, security, or persistence decision, explain the conflict before making a
-behavior-changing or irreversible choice.
+If a task conflicts with a durable authority or requires an unresolved product,
+rules, security, persistence, or accepted-semantic decision, surface the
+conflict before making the behavior-changing or irreversible choice.
 
-## Understand before changing
+## Start with repository evidence
 
-Use repository evidence rather than assumptions. Before implementation, inspect:
+Before implementation:
 
-1. Git state and applicable instructions.
-2. The durable source of truth for the affected concern.
-3. Existing implementation, contracts, and tests.
-4. Actual scripts and tooling in `package.json`.
+1. inspect Git state and applicable instructions;
+2. locate the authority for the affected concern;
+3. search for the existing owner, consumers, and tests before creating anything;
+4. inspect actual scripts/tooling rather than assuming commands.
 
-Preserve behavior unless the task explicitly requests a change. Keep work to
-the smallest coherent scope. Do not mix unrelated cleanup, dependency upgrades,
-formatting, renames, or architecture refactors into a feature or defect fix.
-Preserve unrelated working-tree changes.
+Keep the change to the smallest coherent scope and preserve unrelated working
+behavior and working-tree changes.
 
-## Sources of truth
-
-Read the authority that owns the concern; do not duplicate its detailed rules
-in this file.
+## Authority routing
 
 | Concern | Authority |
 | --- | --- |
-| Code organization and boundaries | `docs/architecture.md` |
-| Current product and engine contracts | `docs/game_definition.md` |
-| Project map and technology summary | `docs/project-overview.md` |
-| Core Riftbound rules | `docs/riftbound_core_rules_reference.md` |
-| Deck construction and legality | `docs/deck_validation.md` |
-| Card behavior and canonical approval | `docs/card_behavior.md` |
-| Showdown-specific recorded decisions | `docs/showdown-rules-decision-ledger.md` |
-| Full-corpus ingestion work | `docs/full-card-ingestion/plan.md` and `tracking.md` |
-| Testing contracts and automated-test ownership | `docs/testing.md` |
-| Active, verified issue tracking | `docs/BETA-ISSUES.md` |
+| Architecture and code boundaries | `docs/architecture.md` |
+| Product and engine contracts | `docs/game_definition.md` |
+| Project map | `docs/project-overview.md` |
+| Riftbound rules | `docs/riftbound_core_rules_reference.md` |
+| Deck construction | `docs/deck_validation.md` |
+| Card behavior/publication | `docs/card_behavior.md` |
+| Showdown decisions | `docs/showdown-rules-decision-ledger.md` |
+| Full-corpus ingestion | `docs/full-card-ingestion/plan.md`, `tracking.md` |
+| Testing | `docs/testing.md` |
+| Active verified issues | `docs/BETA-ISSUES.md` |
 
-For rules work, use the local rules-reference skill. Core rules come from the
-local reference and card-specific behavior comes from local set data; do not use
-online rulings as rules authority.
+`docs/coding-agent-benchmark.md` is for harness design/evaluation only. Do not
+load it for ordinary product, gameplay, UI, or backend implementation.
 
-## Architecture and ownership
+For gameplay rules, use the local rules-reference skill. Local rules and local
+card/set data are authoritative; online rulings are not project rules authority.
 
-This is one fullstack Next.js application. Use the established top-level
-boundaries:
+## Universal constraints
+
+- Preserve established `src/app`, `src/features`, `src/server`, and `src/shared`
+  ownership; keep routes/actions thin and server game rules authoritative.
+- Treat external/persisted input as untrusted and use established schemas.
+- Do not hand-edit generated catalog outputs. Do not run mutating catalog/reset
+  scripts without explicit authorization.
+- Follow nearby naming/import conventions and durable architecture guidance;
+  avoid unrelated cleanup or refactors.
+- Only durable project artifacts belong in Git.
+
+## Context discipline
+
+Use progressive retrieval by default:
 
 ```text
-src/app       Next.js routes, layouts, and thin HTTP adapters
-src/features  Product UI and client workflows
-src/server    Framework-free backend domain logic and persistence
-src/shared    Generic UI, utilities, and transport contracts
+search -> locate -> inspect the smallest useful range -> reason -> expand if needed
 ```
 
-Keep feature-specific code with its owning feature. Move code to `shared` only
-when it is independent of feature language, reusable by unrelated features, and
-improves ownership rather than obscuring it.
+Do not routinely load complete large JSON/set data, rules references, generated
+files, logs, or command output when filtered evidence is sufficient. Expand
+context whenever lifecycle, semantics, consumers, or architecture cannot be
+understood safely from the smaller range.
 
-Keep pages, route handlers, and Server Actions thin. Server modules own rules,
-legality, payment, authorization, persistence, hidden-information handling, and
-viewer projections. They must not import React, Next.js, or feature UI modules.
+Use focused checks while investigating. Use `npm run verify:pr` for final PR
+readiness when full validation is warranted. Keep verbose temporary evidence,
+logs, plans, and investigation notes under `.agent-work/`.
 
-Use services, repositories, and policies where their responsibilities are
-distinct. Do not mechanically create layers or disrupt coherent backend domains
-such as `server/game`, `server/deck`, `server/card-catalog`, and
-`server/online-matchmaking`.
+For dependent task handoffs, preserve only: Changed, Validated, Important
+semantic decisions, Remaining work, Relevant files, and Relevant authorities.
 
-## Code conventions
+## Workflow routing
 
-- Use kebab-case for ordinary authored file names; retain framework-required,
-  generated, configuration, dynamic-route, and source-data names.
-- Use PascalCase for React components, camelCase for functions and variables,
-  and UPPER_CASE for fixed constants.
-- Prefer one file per meaningful exported component. Extract private components
-  for distinct responsibility, reuse, independent testing, client runtime, or
-  clearer readability—not merely file length.
-- Components are Server Components by default. Add `"use client"` only where
-  browser behavior is needed and isolate that behavior as narrowly as practical.
-- Use absolute imports across root or feature boundaries and relative imports
-  within a feature when clearer. Avoid deep cross-feature internals and cycles.
+- Changes under `src/server/game/**`: read `src/server/game/AGENTS.md`; use
+  `skills/engine-change-impact-SKILL.md` for shared engine/corpus work.
+- Tests under `tests/**`: read `tests/AGENTS.md`; use
+  `skills/behavior-change-tdd-SKILL.md` for reusable behavior fixes/extensions.
+- Independent review: use `skills/technical-pr-review-SKILL.md`.
+- Player decisions, UI, action buttons, rules lookup, and architecture migrations:
+  use the existing matching repository skill.
 
-## Data, generated output, and persistence
-
-Treat external, browser, imported, and persisted data as untrusted until it is
-validated through the established schemas and contracts. Do not invent fallback
-values that hide invalid durable data.
-
-`data/catalog/mvp.json` and
-`src/server/catalog/fixed-mvp-cards.generated.ts` are generated outputs. Change
-their inputs, then use the catalog build/check script; never hand-edit them.
-
-Catalog synchronization and reset scripts can mutate MongoDB or generated data.
-Do not run them during unrelated work or without explicit task authorization.
-
-## Testing and validation
-
-`docs/testing.md` is the authority for automated-test ownership and testing
-boundaries.
-
-The current Node test-runner convention is `tests/**/*.test.ts`; do not relocate
-tests merely to colocate them. Add focused tests for stable behavior, contracts,
-and deterministic regressions. Do not delete valid tests to make a change pass.
-
-Before adding a gameplay test, identify the reusable primitive, behavior family,
-rules contract, subsystem, or generic validation pipeline that owns the behavior.
-Cards and decks may expose gaps or provide fixture data, but they do not become
-automated-test boundaries merely because they introduced the work. A confirmed
-card defect must be regressed at the reusable owner whenever the defect is
-actually shared-system behavior.
-
-Do not create card-by-card or deck-by-deck gameplay suites during corpus
-expansion. Deck construction and legality belong to the canonical generic
-deck-validation pipeline. Every permanent deck definition must pass that same
-pipeline rather than receiving its own validation suite.
-
-Name tests after the durable contract they protect. If a real card is used as
-fixture data, the test name, ownership, and assertions must still describe the
-generic behavior.
-
-Validate in proportion to risk using actual scripts, normally progressing from
-focused checks to `npm run typecheck`, `npm run lint`, `npm test`, and
-`npm run build` as applicable. Manually validate gameplay and interactive UI
-when automated checks cannot prove the affected workflow. Report only commands
-actually run and any remaining risk.
-
-The full-card-ingestion program has its own explicit manual-acceptance gates;
-do not apply those program gates to unrelated tasks.
-
-## Skills and durable artifacts
-
-Use the repository skills when their scope applies:
-
-- local rules reference for gameplay-rule work;
-- Player Decision System for eligible player-choice work;
-- shadcn-first UI development for UI work;
-- Game Action Buttons for gameplay CTA/keybind work; and
-- feature-architecture refactor for intentional architecture migrations.
-
-Only add repository files that provide ongoing project value. Do not retain
-one-off plans, discovery notes, temporary validation files, screenshots, reports,
-debugging scripts, or generated exports unless they have been deliberately
-promoted into a maintained authority.
+Skills define procedures; durable docs define what is true.
 
 ## Completion
 
-Before completion, review the diff and confirm that it contains only the
-requested durable changes, appropriate tests and documentation, no accidental
-generated output or secrets, and no temporary artifacts. Report what changed,
-what was validated, manual validation when applicable, and unresolved risks.
+Review the final diff for scope, durable ownership, accidental generated output,
+secrets, and temporary artifacts. Report only validation actually run and any
+remaining risk. A green suite is evidence, not proof that scope, architecture,
+or semantics are correct.
