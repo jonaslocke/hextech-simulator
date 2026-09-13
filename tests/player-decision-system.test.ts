@@ -175,6 +175,119 @@ test("Chain choices reuse card selection, preserve item identity, and disable in
   assert.deepEqual(createSelectionIntent(decision.actionId, ["chain-2"]), { actionId: "counter", selectedIds: ["chain-2"] });
 });
 
+test("maps projected source cards to replacement-order diagnostic identities", () => {
+  const sourceCard = card("replacement-source");
+  const action = cardTargetAction({
+    id: "replacement-order-action",
+    label: "replacement order",
+    legalIds: ["replacement-option"],
+  });
+  action.choice = {
+    choiceId: "replacement-choice",
+    kind: "orderedOptions",
+    optionIds: ["replacement-option"],
+  };
+  const projection = projectionWith({
+    actions: [action],
+    pendingChoice: {
+      id: "replacement-choice",
+      options: [
+        { id: "replacement-option", sourceCardInstanceId: sourceCard.instanceId },
+      ],
+      playerId: "player-1",
+      prompt: "Order replacement effects.",
+      type: "orderReplacements",
+    },
+  });
+  projection.battlefields = [
+    {
+      attachedCards: [sourceCard],
+      battlefieldId: "battlefield-1",
+      card: card("battlefield-card", "Battlefield"),
+      contestedByPlayerId: null,
+      controllerPlayerId: "player-1",
+      facedownCard: null,
+      selectedByPlayerId: "player-1",
+      units: [],
+    },
+  ];
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "orderedDecision");
+  if (decision?.kind !== "orderedDecision") return;
+  assert.deepEqual(
+    decision.options.map(({ diagnosticCardInstanceId, id }) => ({
+      diagnosticCardInstanceId,
+      id,
+    })),
+    [{ diagnosticCardInstanceId: sourceCard.instanceId, id: "replacement-option" }],
+  );
+});
+
+test("maps diagnostic identities only for Chain items with projected cards", () => {
+  const action = cardTargetAction({
+    id: "chain-target-action",
+    label: "Chain item",
+    legalIds: ["card-chain-item", "opaque-chain-item"],
+  });
+  action.targets[0]!.kind = "chainItem";
+  const projection = projectionWith({ actions: [action], pendingChoice: null });
+  projection.chain = {
+    items: [
+      {
+        card: card("chain-card"),
+        controllerPlayerId: "player-2",
+        id: "card-chain-item",
+        kind: "spell",
+        label: "Projected chain card",
+        sourceCardInstanceId: "chain-card",
+        targetCardInstanceIds: [],
+      },
+      {
+        card: null,
+        controllerPlayerId: "player-2",
+        id: "opaque-chain-item",
+        kind: "ability",
+        label: "Opaque chain ability",
+        sourceCardInstanceId: "opaque-source",
+        targetCardInstanceIds: [],
+      },
+    ],
+    passedPlayerIds: [],
+    priorityPlayerId: "player-1",
+    relevantPlayerIds: ["player-1", "player-2"],
+  };
+
+  const decision = buildPlayerDecisionRequest({
+    activeTargetSelection: {
+      actionId: action.id,
+      legalTargetIds: ["card-chain-item", "opaque-chain-item"],
+      maxTargets: 1,
+      minTargets: 1,
+      targetKind: "chainItem",
+    },
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.deepEqual(
+    decision.cards.map(({ diagnosticCardInstanceId, id }) => ({
+      diagnosticCardInstanceId,
+      id,
+    })),
+    [
+      { diagnosticCardInstanceId: "chain-card", id: "card-chain-item" },
+      { diagnosticCardInstanceId: undefined, id: "opaque-chain-item" },
+    ],
+  );
+});
+
 test("keeps initiated battlefield card targets out of card selection prompts", () => {
   const battlefieldUnit = card("battlefield-unit", "Unit");
   const action = cardTargetAction({

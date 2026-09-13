@@ -57,6 +57,16 @@ export function findRelatedProjectedCard(
         role: "unit",
       });
     }
+    const attachment = battlefield.attachedCards?.find(
+      (card) => card.instanceId === instanceId,
+    );
+    if (attachment) {
+      return relatedCard(attachment, {
+        kind: "battlefield",
+        battlefieldId: battlefield.battlefieldId,
+        role: "attachment",
+      });
+    }
     if (battlefield.facedownCard?.instanceId === instanceId) {
       return relatedCard(battlefield.facedownCard, {
         kind: "battlefield",
@@ -91,9 +101,10 @@ export function findRelatedProjectedCard(
     }
   }
   if (pendingChoice?.type === "effectSelection") {
-    const card = pendingChoice.revealedCards.find(
-      (entry) => entry.instanceId === instanceId,
-    );
+    const card = [
+      ...pendingChoice.revealedCards,
+      ...(pendingChoice.visibleCards ?? []),
+    ].find((entry) => entry.instanceId === instanceId);
     if (card) {
       return relatedCard(card, {
         kind: "pendingChoice",

@@ -92,6 +92,37 @@ test("locates diagnostic card identities in projected locations only", () => {
   assert.equal(findRelatedProjectedCard(projection(3), "missing"), null);
 });
 
+test("locates attached battlefield and effect-selection visible cards", () => {
+  const captured = projection(3);
+  const attachedCard = card("attached-card", "player-1");
+  const visibleCard = card("visible-choice-card", "player-1");
+  captured.battlefields[0]!.attachedCards = [attachedCard];
+  captured.pendingChoice = {
+    id: "effect-choice",
+    maximum: 1,
+    minimum: 1,
+    playerId: "player-1",
+    presentation: "cardSelection",
+    prompt: "Choose a visible card.",
+    revealedCards: [],
+    sourceZone: "hand",
+    title: "Card selection",
+    type: "effectSelection",
+    visibleCards: [visibleCard],
+    waitingMessage: "Waiting for a choice.",
+  };
+
+  assert.deepEqual(findRelatedProjectedCard(captured, attachedCard.instanceId)?.location, {
+    kind: "battlefield",
+    battlefieldId: "bf-1",
+    role: "attachment",
+  });
+  assert.deepEqual(findRelatedProjectedCard(captured, visibleCard.instanceId)?.location, {
+    kind: "pendingChoice",
+    choiceId: "effect-choice",
+  });
+});
+
 test("toggles only related cards that exist in the captured projection", () => {
   const captured = projection(3);
   const selected = toggleRelatedProjectedCardSelection({ instanceId: "card-1", projection: captured, selectedCardInstanceIds: new Set() });

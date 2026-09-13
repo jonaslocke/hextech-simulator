@@ -21,7 +21,7 @@ const relatedCardLocationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("battlefield"),
     battlefieldId: z.string().min(1),
-    role: z.enum(["battlefield", "unit", "facedown"]),
+    role: z.enum(["battlefield", "unit", "attachment", "facedown"]),
   }),
   z.object({ kind: z.literal("setupBattlefieldPool") }),
   z.object({ kind: z.literal("chain"), chainItemId: z.string().min(1) }),

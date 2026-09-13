@@ -311,6 +311,7 @@ export function buildPlayerDecisionRequest({
             const card = visibleCardById.get(option.sourceCardInstanceId);
             const catalogCard = cardsByInstanceId[option.sourceCardInstanceId];
             return {
+              diagnosticCardInstanceId: card?.instanceId,
               id: option.id,
               imageUrl: card?.imageUrl ?? catalogCard?.media.image_url ?? undefined,
               label: card?.name ?? catalogCard?.name ?? option.sourceCardInstanceId,
@@ -434,6 +435,7 @@ function mapActiveCardDecision({
       actionId: action.id,
       canCancel: true,
       cards: (sourceProjection.chain?.items ?? []).map((item) => ({
+        diagnosticCardInstanceId: item.card?.instanceId,
         id: item.id,
         label: item.label,
         imageUrl: item.card?.imageUrl ?? undefined,
@@ -517,10 +519,18 @@ function mapActiveCardDecision({
 }
 
 function visibleCardsById(projection: GameProjection) {
+  const battlefieldCards = projection.battlefields.flatMap((battlefield) => [
+    battlefield.card,
+    ...battlefield.units,
+    ...(battlefield.attachedCards ?? []),
+    ...(battlefield.facedownCard ? [battlefield.facedownCard] : []),
+  ]);
+
   return new Map(
     projection.players
       .flatMap((player) => player.zones)
       .flatMap((zone) => zone.cards)
+      .concat(battlefieldCards)
       .concat(
         projection.pendingChoice?.type === "effectSelection"
           ? [
