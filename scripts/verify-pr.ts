@@ -70,7 +70,7 @@ if (base) {
   const result = await runCheck("diff-check", "git", [
     "diff",
     "--check",
-    base,
+    `${base}...HEAD`,
   ]);
   if (!result.ok) fail("diff-check", result);
   console.log("✓ diff-check");
