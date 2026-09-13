@@ -10,11 +10,15 @@ import type { TokenPlacementDecisionRequest } from "./player-decision-types";
 
 export function TokenPlacementPrompt({
   decision,
+  interactionSuspended,
   isSubmitting,
+  isVisible,
   onSubmit,
 }: {
   decision: TokenPlacementDecisionRequest;
+  interactionSuspended: boolean;
   isSubmitting: boolean;
+  isVisible: boolean;
   onSubmit: (
     placements: Array<{ destinationId: string; count: number }>,
   ) => void;
@@ -44,6 +48,10 @@ export function TokenPlacementPrompt({
   const canConfirm = assigned === decision.count;
 
   function setCount(destinationId: string, nextCount: number) {
+    if (interactionSuspended) {
+      return;
+    }
+
     setCounts((current) => ({
       ...current,
       [destinationId]: Math.max(0, Math.min(decision.count, nextCount)),
@@ -52,9 +60,15 @@ export function TokenPlacementPrompt({
 
   return (
     <DialogPortal>
-      <div className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100">
+      <div
+        aria-hidden={!isVisible || undefined}
+        className={cn(
+          "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/70 backdrop-blur-sm p-4 text-slate-100",
+          !isVisible && "invisible pointer-events-none",
+        )}
+      >
         <section
-          aria-modal="true"
+          aria-modal={isVisible ? "true" : undefined}
           className={cn(
             "gap-4 grid rounded-xl w-full max-w-xl overflow-hidden",
             "border border-cyan-300/25 bg-slate-950/82 p-4 shadow-2xl shadow-black/80 ring-1 ring-cyan-300/10",
@@ -86,7 +100,7 @@ export function TokenPlacementPrompt({
                     </div>
                   </div>
                   <Button
-                    disabled={count <= 0}
+                    disabled={interactionSuspended || count <= 0}
                     onClick={() => setCount(destination.id, count - 1)}
                     type="button"
                     variant="secondary"
@@ -97,7 +111,7 @@ export function TokenPlacementPrompt({
                     {count}
                   </span>
                   <Button
-                    disabled={assigned >= decision.count}
+                    disabled={interactionSuspended || assigned >= decision.count}
                     onClick={() => setCount(destination.id, count + 1)}
                     type="button"
                     variant="secondary"
@@ -115,7 +129,8 @@ export function TokenPlacementPrompt({
             </span>
             <GameActionButton
               actionSlot="primary"
-              isBusy={!canConfirm || isSubmitting}
+              disabled={interactionSuspended || !canConfirm}
+              isBusy={isSubmitting}
               onAction={() =>
                 onSubmit(
                   decision.destinations

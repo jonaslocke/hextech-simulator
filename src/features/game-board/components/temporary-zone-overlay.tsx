@@ -13,6 +13,7 @@ type TemporaryZoneOverlayZone = Exclude<TemporaryZone, "chain">;
 
 export function TemporaryZoneOverlay({
   enableCloseShortcut = true,
+  interactionSuspended = false,
   logEntries,
   onClose,
   openZone,
@@ -23,6 +24,7 @@ export function TemporaryZoneOverlay({
   playerTrash,
 }: {
   enableCloseShortcut?: boolean;
+  interactionSuspended?: boolean;
   logEntries: GameLogEntry[];
   onClose: () => void;
   openZone: TemporaryZoneOverlayZone;
@@ -43,6 +45,7 @@ export function TemporaryZoneOverlay({
     <FloatingOverlayPanel
       closeLabel="Close temporary zone"
       enableCloseShortcut={enableCloseShortcut}
+      isCloseDisabled={interactionSuspended}
       isOpen={Boolean(openZone)}
       onClose={onClose}
       placement={placement}

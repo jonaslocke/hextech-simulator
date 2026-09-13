@@ -19,6 +19,7 @@ export function CardFace({
       )}
     >
       {card?.imageUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- Sideboarding card art is supplied by the catalog. */
         <img
           alt={card.name}
           className="h-full w-full object-cover"

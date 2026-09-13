@@ -1,6 +1,10 @@
 "use client";
 
-import { CardSelectionPrompt, GameBoard } from "@/features/game-board";
+import {
+  CardSelectionPrompt,
+  GameBoard,
+  type ReportCardSelectionState,
+} from "@/features/game-board";
 import {
   SideboardingScreen,
   validateDeckClient,
@@ -9,7 +13,7 @@ import {
 } from "@/features/sideboarding";
 import { Button } from "@/shared/components/button";
 import type { DeckId, MatchProjection } from "@/shared/game";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionSubmissionGuard } from "../action-submission-guard";
 import {
   concedeMatchClient,
@@ -51,6 +55,8 @@ export function MatchSimulator({
   const [viewerSeat, setViewerSeat] = useState<SeatKey>(onlineSeat);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reportCardSelection, setReportCardSelection] =
+    useState<ReportCardSelectionState | null>(null);
   const [acknowledgedGameResultKeys, setAcknowledgedGameResultKeys] = useState(
     () => new Set<string>(),
   );
@@ -72,6 +78,12 @@ export function MatchSimulator({
     ? `${projection.viewerPlayerId}:${projection.stateVersion}:${projection.currentGame.stateVersion}:${projection.status}:${projection.currentGameId}`
     : null;
   const previousProjectionIdentityRef = useRef(projectionIdentity);
+  const handleReportCardSelectionChange = useCallback(
+    (selection: ReportCardSelectionState | null) => {
+      setReportCardSelection(selection);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (
@@ -631,6 +643,7 @@ export function MatchSimulator({
   });
 
   const mulliganOptions = handCards.map((card) => ({
+    diagnosticCardInstanceId: card.instanceId,
     id: card.instanceId,
     imageUrl: card.imageUrl ?? undefined,
     label: card.name,
@@ -669,6 +682,7 @@ export function MatchSimulator({
             : "Turn order will be determined after both players lock their battlefield choices."
         }
         decisionKey={battlefieldSelection.decisionKey}
+        interactionSuspended={Boolean(reportCardSelection?.isReportMode)}
         isSubmitting={busy}
         isOpen={battlefieldSelection.options.length > 0}
         onConfirm={([battlefieldId]) => {
@@ -681,6 +695,7 @@ export function MatchSimulator({
         }}
         options={battlefieldSelection.options}
         presentation="cards"
+        reportCardSelection={reportCardSelection}
         selectionMode="single"
         title="Choose Battlefield"
       />
@@ -689,6 +704,7 @@ export function MatchSimulator({
         confirmLabel="Choose starting player"
         decisionKey={`setup:starting-player:${projection.viewerPlayerId}:${startingPlayerAction?.id ?? "closed"}`}
         description="The selected player will take the first turn of this game."
+        interactionSuspended={Boolean(reportCardSelection?.isReportMode)}
         isSubmitting={busy}
         isOpen={Boolean(startingPlayerAction)}
         onConfirm={([playerId]) => {
@@ -701,6 +717,7 @@ export function MatchSimulator({
         }}
         options={startingPlayerOptions}
         presentation="list"
+        reportCardSelection={reportCardSelection}
         selectionMode="single"
         title="Choose Starting Player"
       />
@@ -715,6 +732,7 @@ export function MatchSimulator({
           .sort()
           .join(",")}`}
         isOpen={Boolean(mulliganAction)}
+        interactionSuspended={Boolean(reportCardSelection?.isReportMode)}
         isSubmitting={busy}
         maxSelected={2}
         minSelected={0}
@@ -725,6 +743,7 @@ export function MatchSimulator({
         }}
         options={mulliganOptions}
         presentation="cards"
+        reportCardSelection={reportCardSelection}
         selectionMode="multiple"
         title="Choose Mulligan"
       />
@@ -740,6 +759,7 @@ export function MatchSimulator({
         }}
         isSubmittingAction={busy}
         onPerformAction={performAction}
+        onReportCardSelectionChange={handleReportCardSelectionChange}
         projection={gameProjection}
       />
     </main>

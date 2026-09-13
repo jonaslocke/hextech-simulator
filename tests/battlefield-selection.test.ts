@@ -19,6 +19,10 @@ test("preserves battlefield draft identity across unrelated state versions", () 
 
   assert.equal(refreshed.decisionKey, first.decisionKey);
   assert.deepEqual(refreshed.options.map((option) => option.id), ["bf-1"]);
+  assert.deepEqual(
+    refreshed.options.map((option) => option.diagnosticCardInstanceId),
+    ["bf-1"],
+  );
   assert.equal(
     refreshed.actionByBattlefieldId.get("bf-1")?.id,
     "state:2:setup:lockBattlefield:bf-1",

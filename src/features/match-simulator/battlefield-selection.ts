@@ -32,6 +32,7 @@ export function buildBattlefieldSelectionModel(input: {
       const action = actionByBattlefieldId.get(id)!;
       const card = battlefieldById.get(id);
       return {
+        diagnosticCardInstanceId: id,
         id,
         imageUrl: card?.imageUrl ?? undefined,
         label: card?.name ?? action.label,

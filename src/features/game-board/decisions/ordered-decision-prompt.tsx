@@ -1,7 +1,7 @@
 "use client";
 
-import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { ReactNode } from "react";
+import { ReportCardChoiceDialog } from "../components/report-card-choice-dialog";
 import type { OrderedDecisionRequest } from "./player-decision-types";
 
 export function OrderedDecisionPrompt({
@@ -20,7 +20,7 @@ export function OrderedDecisionPrompt({
   onSubmit: (orderedIds: string[]) => void;
 }) {
   return (
-    <ChoiceDialog
+    <ReportCardChoiceDialog
       confirmLabel={decision.confirmLabel}
       decisionKey={decision.decisionKey}
       description={decision.description}

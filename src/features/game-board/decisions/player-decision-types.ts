@@ -10,6 +10,7 @@ export type PlayerDecisionIntent = {
 };
 
 export type PlayerDecisionCard = {
+  diagnosticCardInstanceId?: string;
   id: string;
   label: string;
   description?: string;
