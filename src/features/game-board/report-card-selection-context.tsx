@@ -2,11 +2,13 @@
 
 import { createContext, type ReactNode, useContext } from "react";
 
-const ReportCardSelectionContext = createContext<{
+export type ReportCardSelectionState = {
   isReportMode: boolean;
   selectedCardInstanceIds: ReadonlySet<string> | null;
   toggleCardInstanceId: (instanceId: string) => void;
-}>({
+};
+
+const ReportCardSelectionContext = createContext<ReportCardSelectionState>({
   isReportMode: false,
   selectedCardInstanceIds: null,
   toggleCardInstanceId: () => undefined,

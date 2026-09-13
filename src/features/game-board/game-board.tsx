@@ -78,7 +78,10 @@ import {
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
-import { ReportCardSelectionProvider } from "./report-card-selection-context";
+import {
+  ReportCardSelectionProvider,
+  type ReportCardSelectionState,
+} from "./report-card-selection-context";
 
 type BugReportDraft = {
   actual: string;
@@ -103,6 +106,9 @@ type GameBoardProps = {
   projection: GameProjection;
   scores?: Partial<Record<string, number>>;
   matchContext?: MatchHudContext;
+  onReportCardSelectionChange?: (
+    selection: ReportCardSelectionState | null,
+  ) => void;
 };
 
 export const GameBoard: FC<GameBoardProps> = ({
@@ -112,6 +118,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   projection: sourceProjection,
   scores = {},
   matchContext,
+  onReportCardSelectionChange,
 }) => {
   const adapted = useMemo(
     () => adaptProjectionToBoard(sourceProjection),
@@ -572,6 +579,25 @@ export const GameBoard: FC<GameBoardProps> = ({
     });
   }, []);
 
+  const reportCardSelection = useMemo<ReportCardSelectionState>(
+    () => ({
+      isReportMode,
+      selectedCardInstanceIds:
+        bugReportDraft?.selectedCardInstanceIds ?? null,
+      toggleCardInstanceId: toggleBugReportCard,
+    }),
+    [bugReportDraft?.selectedCardInstanceIds, isReportMode, toggleBugReportCard],
+  );
+
+  useEffect(() => {
+    onReportCardSelectionChange?.(reportCardSelection);
+  }, [onReportCardSelectionChange, reportCardSelection]);
+
+  useEffect(
+    () => () => onReportCardSelectionChange?.(null),
+    [onReportCardSelectionChange],
+  );
+
   const handleBoardClickCapture = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
       if (!isInteractionSuspended) {
@@ -626,9 +652,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   return (
     <ReportCardSelectionProvider
-      isReportMode={isReportMode}
-      selectedCardInstanceIds={bugReportDraft?.selectedCardInstanceIds ?? null}
-      toggleCardInstanceId={toggleBugReportCard}
+      {...reportCardSelection}
     >
     <main
       className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"

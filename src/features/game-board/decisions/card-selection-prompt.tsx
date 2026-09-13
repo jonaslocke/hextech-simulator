@@ -4,7 +4,10 @@ import { GameActionButton } from "@/features/game-board/components/game-action-b
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
 import { routeReportCardInteraction } from "../bug-report";
-import { useReportCardSelection } from "../report-card-selection-context";
+import {
+  type ReportCardSelectionState,
+  useReportCardSelection,
+} from "../report-card-selection-context";
 import {
   useCallback,
   useEffect,
@@ -72,6 +75,11 @@ export type CardSelectionPromptProps = {
    */
   persistDraft?: boolean;
   presentation?: CardSelectionPromptPresentation;
+  /**
+   * Supplies report-card selection to prompts rendered outside the game-board
+   * subtree, such as simultaneous setup choices.
+   */
+  reportCardSelection?: ReportCardSelectionState | null;
   selectionMode?: CardSelectionPromptSelectionMode;
   title: string;
 };
@@ -98,16 +106,18 @@ export function CardSelectionPrompt({
   options,
   persistDraft = true,
   presentation = "auto",
+  reportCardSelection,
   selectionMode = "single",
   title,
 }: CardSelectionPromptProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const contextReportCardSelection = useReportCardSelection();
   const {
     isReportMode,
     selectedCardInstanceIds: selectedReportCardInstanceIds,
     toggleCardInstanceId,
-  } = useReportCardSelection();
+  } = reportCardSelection ?? contextReportCardSelection;
 
   const optionById = useMemo(
     () => new Map(options.map((option) => [option.id, option])),
