@@ -13,6 +13,7 @@ import {
 import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
 import { useLocationDragState } from "../drag-and-drop/location-drag-provider";
+import { useReportCardSelection } from "../report-card-selection-context";
 
 const CARD_ASPECT_RATIO = 130 / 181;
 const LANDSCAPE_CARD_ASPECT_RATIO = 181 / 130;
@@ -135,6 +136,7 @@ export const CardTile: FC<CardTileProps> = ({
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
   const { isLocationDragActive } = useLocationDragState();
+  const reportSelectedCardInstanceIds = useReportCardSelection();
   const canShowHoverPreview = enableHoverPreview && !isLocationDragActive;
 
   const footprintStyle = {
@@ -236,6 +238,8 @@ export const CardTile: FC<CardTileProps> = ({
       data-card-orientation={resolvedOrientation}
       className={cn(
         "relative flex justify-center items-center overflow-visible shrink-0",
+        reportSelectedCardInstanceIds?.has(instanceId ?? "") &&
+          "rounded-md ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-950",
         (onPrimaryAction || onContextAction) && "cursor-pointer",
         isTransferHidden && "invisible pointer-events-none",
         previewPosition

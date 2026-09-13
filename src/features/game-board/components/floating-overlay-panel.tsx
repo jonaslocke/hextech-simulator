@@ -35,6 +35,7 @@ export function FloatingOverlayPanel({
   children,
   className,
   closeLabel = "Close overlay",
+  dataOverlayKind,
   enableCloseShortcut = true,
   isCloseDisabled = false,
   isOpen,
@@ -45,6 +46,7 @@ export function FloatingOverlayPanel({
   children: ReactNode;
   className?: string;
   closeLabel?: string;
+  dataOverlayKind?: string;
   enableCloseShortcut?: boolean;
   isCloseDisabled?: boolean;
   isOpen: boolean;
@@ -219,6 +221,7 @@ export function FloatingOverlayPanel({
     <div className="z-30 fixed inset-0 overflow-hidden pointer-events-none">
       <div
         aria-label={title}
+        data-overlay-kind={dataOverlayKind}
         className={cn(
           "fixed bg-slate-950/55 supports-backdrop-filter:bg-slate-950/45 shadow-2xl shadow-black/60 backdrop-blur-md p-3 border border-white/15 rounded-xl outline-none ring-1 ring-cyan-300/10 w-84 text-slate-100 pointer-events-auto select-none",
           position

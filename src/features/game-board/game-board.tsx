@@ -1,9 +1,25 @@
 "use client";
 
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
+import {
+  cloneViewerSafeProjection,
+  createStructuredBugReport,
+  findRelatedProjectedCard,
+  serializeStructuredBugReport,
+  toggleRelatedProjectedCardSelection,
+  type StructuredBugReport,
+} from "@/shared/bug-report";
 import type { GameProjection } from "@/shared/game";
 import { LayoutGroup } from "motion/react";
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FC,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import cardBackImage from "../../../assets/cardback.jpg";
 import { areSetsEqual, createAnimationData } from "./board-animation-model";
 import { buildCard, createBoardModel } from "./board-model";
@@ -20,6 +36,11 @@ import {
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
 import { ChainOverlay } from "./components/chain-overlay";
+import {
+  BugReportPanel,
+  ReportBugButton,
+} from "./components/bug-report-panel";
+import { copyText } from "./components/copy-game-state-button";
 import { PlayerBoard } from "./components/player-board";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
@@ -35,6 +56,10 @@ import {
 } from "./drag-and-drop/location-drag-actions";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
 import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
+import {
+  persistStructuredBugReport,
+  useViewerSafeProjectionHistory,
+} from "./interactions/use-viewer-safe-projection-history";
 import { useCardActionMenu } from "./interactions/use-card-action-menu";
 import { useChainOverlayState } from "./interactions/use-chain-overlay-state";
 import { resolveDecisionInspectionRequest } from "./interactions/decision-inspection-request";
@@ -51,6 +76,18 @@ import {
   targetSelectionIsLegal,
 } from "./model";
 import { Card, ChainCardEntry, TemporaryZone } from "./types";
+import { ReportCardSelectionProvider } from "./report-card-selection-context";
+
+type BugReportDraft = {
+  actual: string;
+  capturedAt: string;
+  expected: string;
+  game: GameProjection;
+  notes: string;
+  recentStates: GameProjection[];
+  reportId: string;
+  selectedCardInstanceIds: Set<string>;
+};
 
 type GameBoardProps = {
   isSubmittingAction?: boolean;
@@ -79,6 +116,17 @@ export const GameBoard: FC<GameBoardProps> = ({
     [sourceProjection],
   );
   const { cardsByInstanceId, projection } = adapted;
+  const projectionHistoryRef = useViewerSafeProjectionHistory(sourceProjection);
+  const [bugReportDraft, setBugReportDraft] = useState<BugReportDraft | null>(
+    null,
+  );
+  const [finalizedBugReport, setFinalizedBugReport] =
+    useState<StructuredBugReport | null>(null);
+  const [bugReportArtifactPath, setBugReportArtifactPath] = useState<string | null>(
+    null,
+  );
+  const [bugReportError, setBugReportError] = useState<string | null>(null);
+  const [isSavingBugReport, setIsSavingBugReport] = useState(false);
 
   const logEntries = sourceProjection.logEntries.map((entry, index) => ({
     ...entry,
@@ -202,7 +250,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   const decisionInspection = useDecisionInspection({
     request: decisionInspectionRequest,
   });
-  interactionLockedRef.current = decisionInspection.isInspecting;
+  interactionLockedRef.current =
+    decisionInspection.isInspecting || Boolean(bugReportDraft);
   const targetSelectionUsesCardPrompt =
     playerDecision?.kind === "cardSelection" &&
     targetSelection?.actionId === playerDecision.actionId;
@@ -332,6 +381,7 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const canUseLocationDrag =
     !decisionInspection.isInspecting &&
+    !bugReportDraft &&
     !isSubmittingAction &&
     !targetSelection &&
     !playerDecision &&
@@ -469,19 +519,132 @@ export const GameBoard: FC<GameBoardProps> = ({
       : undefined
     : () => setOpenZone("banish");
 
+  const beginBugReport = useCallback(() => {
+    const game = cloneViewerSafeProjection(sourceProjection);
+    setBugReportDraft({
+      actual: "",
+      capturedAt: new Date().toISOString(),
+      expected: "",
+      game,
+      notes: "",
+      recentStates: projectionHistoryRef.current
+        .filter((entry) => entry.stateVersion !== game.stateVersion)
+        .map(cloneViewerSafeProjection),
+      reportId: createBugReportId(),
+      selectedCardInstanceIds: new Set(),
+    });
+    setFinalizedBugReport(null);
+    setBugReportArtifactPath(null);
+    setBugReportError(null);
+  }, [projectionHistoryRef, sourceProjection]);
+
+  const cancelBugReport = useCallback(() => {
+    setBugReportDraft(null);
+    setFinalizedBugReport(null);
+    setBugReportArtifactPath(null);
+    setBugReportError(null);
+  }, []);
+
+  const toggleBugReportCard = useCallback((instanceId: string) => {
+    setBugReportDraft((current) => {
+      if (!current || !findRelatedProjectedCard(current.game, instanceId)) {
+        return current;
+      }
+      return {
+        ...current,
+        selectedCardInstanceIds: toggleRelatedProjectedCardSelection({
+          instanceId,
+          projection: current.game,
+          selectedCardInstanceIds: current.selectedCardInstanceIds,
+        }),
+      };
+    });
+  }, []);
+
+  const handleBoardClickCapture = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      if (!bugReportDraft) {
+        if (!decisionInspection.isInspecting) handleTargetClickCapture(event);
+        return;
+      }
+      if ((event.target as Element).closest('[data-overlay-kind="bug-report"]')) {
+        return;
+      }
+      const card = (event.target as Element).closest<HTMLElement>(
+        "[data-card-instance-id]",
+      );
+      event.preventDefault();
+      event.stopPropagation();
+      if (card?.dataset.cardInstanceId) toggleBugReportCard(card.dataset.cardInstanceId);
+    },
+    [bugReportDraft, decisionInspection.isInspecting, handleTargetClickCapture, toggleBugReportCard],
+  );
+
+  const finalizeBugReport = useCallback(async () => {
+    if (!bugReportDraft) return;
+    const report = createStructuredBugReport({
+      actual: bugReportDraft.actual,
+      capturedAt: bugReportDraft.capturedAt,
+      expected: bugReportDraft.expected,
+      game: bugReportDraft.game,
+      notes: bugReportDraft.notes,
+      recentStates: bugReportDraft.recentStates,
+      relatedCardInstanceIds: [...bugReportDraft.selectedCardInstanceIds],
+      reportId: bugReportDraft.reportId,
+    });
+    setFinalizedBugReport(report);
+    setIsSavingBugReport(true);
+    setBugReportError(null);
+    try {
+      setBugReportArtifactPath(await persistStructuredBugReport(report));
+    } catch (error) {
+      setBugReportError(
+        error instanceof Error
+          ? error.message
+          : "Copy or export the finalized report instead.",
+      );
+    } finally {
+      setIsSavingBugReport(false);
+    }
+  }, [bugReportDraft]);
+
+  const copyFinalizedBugReport = useCallback(async () => {
+    if (!finalizedBugReport) return;
+    await copyText(serializeStructuredBugReport(finalizedBugReport));
+  }, [finalizedBugReport]);
+
+  const exportFinalizedBugReport = useCallback(() => {
+    if (!finalizedBugReport) return;
+    const blob = new Blob([`${serializeStructuredBugReport(finalizedBugReport)}\n`], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `bug-report-${finalizedBugReport.match.gameId}-v${finalizedBugReport.match.stateVersion}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [finalizedBugReport]);
+
   return (
+    <ReportCardSelectionProvider
+      selectedCardInstanceIds={bugReportDraft?.selectedCardInstanceIds ?? null}
+    >
     <main
       className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"
-      onClickCapture={
-        decisionInspection.isInspecting ? undefined : handleTargetClickCapture
-      }
+      onClickCapture={handleBoardClickCapture}
     >
-      <ScoreHeader
-        matchContext={matchContext}
-        opponent={board.opponent}
-        player={board.player}
-        victoryScore={projection.victoryScore}
-      />
+      <div className="relative">
+        <ScoreHeader
+          matchContext={matchContext}
+          opponent={board.opponent}
+          player={board.player}
+          victoryScore={projection.victoryScore}
+        />
+        <div className="top-2 right-3 z-10 absolute">
+          <ReportBugButton
+            isReporting={Boolean(bugReportDraft)}
+            onBegin={beginBugReport}
+          />
+        </div>
+      </div>
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
@@ -671,7 +834,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         </LocationDragProvider>
         <ActionRail
           concedeDisabled={isSubmittingAction}
-          disabled={decisionInspection.isInspecting}
+          disabled={decisionInspection.isInspecting || Boolean(bugReportDraft)}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
           onChainOpenChange={setIsChainOverlayOpen}
@@ -906,8 +1069,43 @@ export const GameBoard: FC<GameBoardProps> = ({
         </>
       )}
     </main>
+    <BugReportPanel
+      artifactPath={bugReportArtifactPath}
+      draft={
+        bugReportDraft
+          ? {
+              actual: bugReportDraft.actual,
+              expected: bugReportDraft.expected,
+              notes: bugReportDraft.notes,
+              selectedCardCount: bugReportDraft.selectedCardInstanceIds.size,
+              stateVersion: bugReportDraft.game.stateVersion,
+            }
+          : null
+      }
+      error={bugReportError}
+      isSaving={isSavingBugReport}
+      onActualChange={(actual) =>
+        setBugReportDraft((current) => current ? { ...current, actual } : current)
+      }
+      onCancel={cancelBugReport}
+      onCopy={copyFinalizedBugReport}
+      onExpectedChange={(expected) =>
+        setBugReportDraft((current) => current ? { ...current, expected } : current)
+      }
+      onExport={exportFinalizedBugReport}
+      onFinalize={finalizeBugReport}
+      onNotesChange={(notes) =>
+        setBugReportDraft((current) => current ? { ...current, notes } : current)
+      }
+      report={finalizedBugReport}
+    />
+    </ReportCardSelectionProvider>
   );
 };
+
+function createBugReportId() {
+  return globalThis.crypto?.randomUUID?.() ?? `report-${Date.now()}`;
+}
 
 function targetSelectionHasOptionalCost(
   targetSelection: NonNullable<
