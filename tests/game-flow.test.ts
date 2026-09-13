@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DeckSnapshotDocument } from "../src/server/game";
-import { gameplayActions, performGameplayAction, type GameDocument } from "../src/server/game";
+import type {
+  BehaviorBinding,
+  BehaviorClause,
+  DeckSnapshotDocument,
+} from "../src/server/game";
+import {
+  createBehaviorContext,
+  applyHoldScoring,
+  gameplayActions,
+  performGameplayAction,
+  projectGame,
+  scoreBattlefield,
+  type GameDocument,
+} from "../src/server/game";
+import { cleanupBoard } from "../src/server/game/board-rules";
+import { beginEffectResolution } from "../src/server/game/effect-resolution";
+import {
+  createPrimitiveHandlers,
+  createRuntimeCardIndex,
+  recomputeMight,
+} from "../src/server/game/primitive-handlers";
 
 test("generates and validates generic turn, resource, movement, and priority actions", () => {
   const { game: initial, decks } = fixture();
@@ -114,6 +133,385 @@ test("awakening readies only the new turn player's battlefield units", () => {
   assert.equal(nextTurn.state.cardStates["p1:mover"]!.exhausted, true);
 });
 
+test("resolves generic optional effect choices through the canonical pending-decision contract", () => {
+  const { game, decks } = fixture();
+  const battlefield = decks[0]!.snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [
+    clause("optional", {
+      effects: [
+        binding("action.optional", 0, {
+          effectKey: "ready-source",
+          prompt: "Ready this card?",
+        }),
+        binding("action.ready_cards", 1, {
+          player: "controller",
+          target: "source",
+        }),
+      ],
+    }),
+  ];
+  game.state.cardStates["p1:bf"]!.exhausted = true;
+
+  assert.equal(
+    beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "p1:bf",
+      clauseId: "optional",
+      decks,
+    }),
+    false,
+  );
+  assert.equal(game.state.pendingChoice?.type, "effectOption");
+  const ownerProjection = projectGame({ game, viewerPlayerId: "p1", decks });
+  const opponentProjection = projectGame({ game, viewerPlayerId: "p2", decks });
+  assert.equal(ownerProjection.pendingChoice?.type, "effectOption");
+  assert.deepEqual(
+    ownerProjection.pendingChoice?.type === "effectOption"
+      ? ownerProjection.pendingChoice.options.map((option) => option.id)
+      : [],
+    ["yes", "no"],
+  );
+  assert.deepEqual(
+    opponentProjection.pendingChoice?.type === "effectOption"
+      ? opponentProjection.pendingChoice.options
+      : [],
+    [],
+  );
+  const submit = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectOption",
+  )!;
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: submit.id,
+    selectedIds: ["yes"],
+    decks,
+    now: "effect-option",
+  });
+  assert.equal(next.state.pendingChoice, null);
+  assert.equal(next.state.cardStates["p1:bf"]!.exhausted, false);
+});
+
+test("replaces a non-final Conquer point with a draw, then awards the final point", () => {
+  const { game, decks } = fixture();
+  decks[0]!.instances.push({
+    instanceId: "p1:bf-two",
+    ownerPlayerId: "p1",
+    source: "battlefield",
+    cardCode: "BF",
+  });
+  game.state.cardStates["p1:bf-two"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.battlefields.push({
+    battlefieldId: "p1:bf-two",
+    cardInstanceId: "p1:bf-two",
+    selectedByPlayerId: "p1",
+    units: [],
+  });
+  game.state.players.p1!.points = 7;
+  const handBefore = game.state.players.p1!.zones.hand.length;
+
+  scoreBattlefield(game, "p1", "p1:bf", "conquer", decks);
+  assert.equal(game.state.players.p1!.points, 7);
+  assert.equal(game.state.players.p1!.zones.hand.length, handBefore + 1);
+
+  scoreBattlefield(game, "p1", "p1:bf-two", "conquer", decks);
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+  assert.equal(game.status, "complete");
+});
+
+test("awards the final point through Hold and does not score a battlefield twice", () => {
+  const { game, decks } = fixture();
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  game.state.players.p1!.points = 7;
+
+  applyHoldScoring(game, "p1", decks);
+  assert.equal(game.state.players.p1!.points, 8);
+  assert.equal(game.winnerPlayerId, "p1");
+
+  const repeated = fixture();
+  scoreBattlefield(repeated.game, "p1", "p1:bf", "conquer", repeated.decks);
+  scoreBattlefield(repeated.game, "p1", "p1:bf", "conquer", repeated.decks);
+  assert.equal(repeated.game.state.players.p1!.points, 1);
+});
+
+test("finalizes a spell's selected unit and legal move destination before it enters the Chain", () => {
+  const { game: initial, decks } = fixture();
+  let game = structuredClone(initial);
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.behaviorModel.playTimings = [binding("timing.action", 0, {})];
+  spell.behaviorModel.clauses = [
+    clause("move", {
+      selectors: [
+        binding("selector.enemy_unit", 0, {
+          area: "board",
+          locationRelation: "any",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "unit",
+        }),
+        binding("selector.move_destination", 1, {
+          unitSelectionKey: "unit",
+          minimumCount: 1,
+          maximumCount: 1,
+          selectionKey: "destination",
+        }),
+      ],
+      effects: [
+        binding("action.move_unit", 0, {
+          selectionKey: "unit",
+          destinationSelectionKey: "destination",
+        }),
+      ],
+    }),
+  ];
+  decks[1]!.snapshot.cards = decks[0]!.snapshot.cards;
+  decks[1]!.instances.push(
+    {
+      instanceId: "p2:unit",
+      ownerPlayerId: "p2",
+      source: "mainDeck",
+      cardCode: "UNIT",
+    },
+    {
+      instanceId: "p2:bf",
+      ownerPlayerId: "p2",
+      source: "battlefield",
+      cardCode: "BF",
+    },
+  );
+  game.state.battlefields[0]!.units.push("p2:unit");
+  game.state.battlefields.push({
+    battlefieldId: "p2:bf",
+    cardInstanceId: "p2:bf",
+    selectedByPlayerId: "p2",
+    units: [],
+  });
+  game.state.cardStates["p2:unit"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+  game.state.cardStates["p2:bf"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  assert.deepEqual(
+    play.targets.map((target) => target.kind),
+    ["card", "location"],
+  );
+  assert.throws(
+    () =>
+      performGameplayAction({
+        game,
+        actorPlayerId: "p1",
+        actionId: play.id,
+        selectedIds: ["p2:unit", "p1:bf"],
+        decks,
+        now: "move-invalid",
+      }),
+    /Selected targets are not legal/,
+  );
+
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: ["p2:unit", "p2:bf"],
+    decks,
+    now: "move-played",
+  });
+  assert.deepEqual(game.state.chain?.items[0]?.targetCardInstanceIds, [
+    "p2:unit",
+    "p2:bf",
+  ]);
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `move-pass-${playerId}`,
+    });
+  }
+  assert.deepEqual(game.state.battlefields[0]!.units, []);
+  assert.deepEqual(game.state.battlefields[1]!.units, ["p2:unit"]);
+  assert.equal(game.state.players.p2!.zones.base.includes("p2:unit"), false);
+});
+
+test("publicly reveals an opponent hand without creating an acknowledgement decision", () => {
+  const { game, decks } = fixture();
+  decks[1]!.instances.push({
+    instanceId: "p2:hand-card",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  }, {
+    instanceId: "p2:facedown-card",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.players.p2!.zones.hand = ["p2:hand-card"];
+  game.state.cardStates["p2:hand-card"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+  game.state.cardStates["p2:facedown-card"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+  game.state.battlefields[0]!.facedownCardInstanceId = "p2:facedown-card";
+  const battlefield = decks[0]!.snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [
+    clause("reveal", {
+      effects: [
+        binding("action.reveal_opponent_hand", 0, {}),
+        binding("action.grant_facedown_vision", 1, {}),
+      ],
+    }),
+  ];
+
+  beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:bf",
+    clauseId: "reveal",
+    decks,
+  });
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.publicReveals?.map((reveal) => reveal.cardInstanceIds), [
+    ["p2:hand-card"],
+  ]);
+  for (const viewerPlayerId of ["p1", "p2"]) {
+    assert.deepEqual(
+      projectGame({ game, viewerPlayerId, decks }).publicReveals?.[0]?.cards.map(
+        (card) => card.name,
+      ),
+      ["Unit"],
+    );
+  }
+  assert.deepEqual(game.state.facedownVisibilityGrants, [
+    { viewerPlayerId: "p1", ownerPlayerId: "p2", expiresAtTurnNumber: 1 },
+  ]);
+  assert.equal(
+    projectGame({ game, viewerPlayerId: "p1", decks }).battlefields[0]
+      ?.facedownCard?.instanceId,
+    "p2:facedown-card",
+  );
+  assert.deepEqual(
+    projectGame({ game, viewerPlayerId: "p1", decks }).players
+      .find((player) => player.playerId === "p2")
+      ?.zones.find((zone) => zone.kind === "hand")?.cards,
+    [],
+  );
+});
+
+test("publicly reveals a selected top-deck card without blocking its draw", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("GEAR", "Gear", "Gear", 0, 0));
+  decks[0]!.instances.push({
+    instanceId: "p1:gear",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "GEAR",
+  });
+  game.state.players.p1!.zones.mainDeck = ["p1:gear", "p1:draw"];
+  game.state.cardStates["p1:gear"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  const battlefield = snapshot.cards.find((card) => card.cardCode === "BF")!;
+  battlefield.behaviorModel.clauses = [
+    clause("search", {
+      effects: [
+        binding("action.search_top_deck", 0, {
+          count: 2,
+          cardType: "Gear",
+          maximumSelect: 1,
+          revealSelected: true,
+        }),
+      ],
+    }),
+  ];
+
+  assert.equal(
+    beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "p1:bf",
+      clauseId: "search",
+      decks,
+    }),
+    false,
+  );
+  const select = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  )!;
+  const selectionProjection = projectGame({ game, viewerPlayerId: "p1", decks });
+  assert.deepEqual(
+    selectionProjection.pendingChoice?.type === "effectSelection"
+      ? selectionProjection.pendingChoice.visibleCards?.map((card) => card.name)
+      : [],
+    ["Gear", "Unit"],
+  );
+  assert.deepEqual(select.targets[0]?.legalIds, ["p1:gear"]);
+  const declined = performGameplayAction({
+    game: structuredClone(game),
+    actorPlayerId: "p1",
+    actionId: select.id,
+    selectedIds: [],
+    decks,
+    now: "search-decline",
+  });
+  assert.equal(declined.state.pendingChoice, null);
+  assert.equal(declined.state.players.p1!.zones.hand.includes("p1:gear"), false);
+  assert.deepEqual(
+    [...declined.state.players.p1!.zones.mainDeck].sort(),
+    ["p1:draw", "p1:gear"],
+  );
+  const revealed = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: select.id,
+    selectedIds: ["p1:gear"],
+    decks,
+    now: "search-select",
+  });
+  assert.equal(revealed.state.pendingChoice, null);
+  for (const viewerPlayerId of ["p1", "p2"]) {
+    const projection = projectGame({ game: revealed, viewerPlayerId, decks });
+    assert.deepEqual(
+      projection.publicReveals?.[0]?.cards.map((card) => card.name),
+      ["Gear"],
+    );
+  }
+  assert.ok(revealed.state.players.p1!.zones.hand.includes("p1:gear"));
+  assert.ok(revealed.state.players.p1!.zones.mainDeck.includes("p1:draw"));
+});
+
 test("automatically pays card costs with behavior-backed rune abilities", () => {
   const { game: initial, decks } = fixture();
   const play = gameplayActions(initial, "p1", decks).find(
@@ -125,6 +523,497 @@ test("automatically pays card costs with behavior-backed rune abilities", () => 
   assert.ok(game.state.players.p1!.zones.base.includes("p1:rune-b"));
   assert.equal(game.state.cardStates["p1:rune-b"]!.exhausted, false);
   assert.ok(game.state.players.p1!.zones.base.includes("p1:unit"));
+});
+
+test("projects printed and effective costs for generic Gear cost modifiers", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("GEAR_COST", "Costed Gear", "Gear", 3, 1));
+  const battlefield = snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [clause("gear discount", {
+    effects: [binding("modifier.modify_numeric_value", 0, {
+      attribute: "energyCost",
+      operation: "reduce",
+      amount: 1,
+      minimum: 0,
+      target: "controller_card",
+      cardType: "Gear",
+      duration: "whileSourceAtBattlefield",
+      condition: "firstCardOfTypePlayedThisTurn",
+    })],
+  })];
+  decks[0]!.instances.push({
+    instanceId: "p1:costed-gear",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "GEAR_COST",
+  });
+  game.state.players.p1!.zones.hand.push("p1:costed-gear");
+  game.state.cardStates["p1:costed-gear"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:costed-gear",
+  )!;
+  assert.deepEqual(play.costPreview, {
+    energy: 2,
+    basePower: 0,
+    effectivePower: 0,
+    printedEnergy: 3,
+    printedPower: 0,
+    availableAnyPower: 0,
+    targetAdditionalPower: [],
+  });
+});
+
+test("uses generic restricted Power for Gear cards and Gear Equip abilities", () => {
+  const { game: initial, decks } = fixture();
+  const game = structuredClone(initial);
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(
+    definition("RESOURCE_LEGEND", "Resource Legend", "Legend", 0, 0),
+    definition("GEAR", "Test Gear", "Gear", 0, 0, 1),
+    definition("POWER_UNIT", "Power Unit", "Unit", 0, 1, 1),
+  );
+  const resourceLegend = snapshot.cards.find((card) => card.cardCode === "RESOURCE_LEGEND")!;
+  resourceLegend.behaviorModel.clauses = [clause("restricted-add", {
+    abilities: [binding("ability.exhaust_for_resource", 0, {
+      resourceType: "power",
+      amountSource: "constant",
+      amount: 1,
+      domain: "rainbow",
+      usage: "cardOrAbility:Gear",
+    })],
+  })];
+  const gear = snapshot.cards.find((card) => card.cardCode === "GEAR")!;
+  gear.card.tags = ["Equipment"];
+  gear.card.attributes.might = 2;
+  gear.effectText = {
+    plain: "[Shield] 2. If this was attached to me this turn, I have an additional +2 Might.",
+    sourceImageUrl: "https://example.test/test-gear.png",
+  };
+  gear.effectBehaviorModel = {
+    playTimings: [],
+    clauses: [clause("effect-shield", {
+      keywords: [binding("keyword.shield", 0, { amount: 2 })],
+      effects: [binding("modifier.modify_numeric_value", 1, {
+        attribute: "might",
+        operation: "increase",
+        operand: "constant",
+        amount: 2,
+        target: "source",
+        duration: "whileAttached",
+        condition: "sourceAttachedThisTurn",
+      })],
+    })],
+  };
+  gear.behaviorModel.clauses = [clause("equip", {
+    abilities: [binding("ability.equip", 0, {})],
+    selectors: [binding("selector.friendly_unit", 0, {
+      minimumCount: 1,
+      maximumCount: 1,
+      area: "board",
+      locationRelation: "any",
+      controller: "controller",
+    })],
+    costs: [binding("cost.pay", 0, { amount: 1, resource: "rune" })],
+  })];
+  decks[0]!.instances.push(
+    { instanceId: "p1:resource-legend", ownerPlayerId: "p1", source: "legend", cardCode: "RESOURCE_LEGEND" },
+    { instanceId: "p1:gear", ownerPlayerId: "p1", source: "mainDeck", cardCode: "GEAR" },
+    { instanceId: "p1:power-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "POWER_UNIT" },
+  );
+  decks[1]!.instances.push({
+    instanceId: "p2:enemy",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.legend = "p1:resource-legend";
+  game.state.players.p1!.zones.hand.push("p1:gear", "p1:power-unit");
+  game.state.players.p1!.zones.base = game.state.players.p1!.zones.base.filter(
+    (id) => id !== "p1:rune" && id !== "p1:rune-b",
+  );
+  game.state.cardStates["p1:resource-legend"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:gear"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:power-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p2!.zones.base.push("p2:enemy");
+  game.state.cardStates["p2:enemy"] = { exhausted: false, damage: 0, computedMight: 1 };
+
+  const autoPayGear = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Test Gear",
+  )!;
+  assert.equal(
+    autoPayGear.enabled,
+    true,
+    "a ready Legend Add ability is an eligible automatic payment source",
+  );
+  const autoPaid = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: autoPayGear.id,
+    selectedIds: [],
+    decks,
+    now: "restricted-auto-pay",
+  });
+  assert.equal(autoPaid.state.cardStates["p1:resource-legend"]?.exhausted, true);
+  assert.ok(autoPaid.state.players.p1!.zones.base.includes("p1:gear"));
+  assert.deepEqual(autoPaid.state.players.p1!.restrictedResources, undefined);
+  assert.equal(
+    gameplayActions(autoPaid, "p1", decks).find(
+      (action) => action.label === "Play Power Unit to Base",
+    )?.enabled,
+    false,
+    "the Gear-only resource cannot pay a Unit's Power cost",
+  );
+
+  const addPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:resource-legend",
+  )!;
+  const afterAdd = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: addPower.id,
+    selectedIds: [],
+    decks,
+    now: "restricted-add",
+  });
+  assert.deepEqual(afterAdd.state.players.p1!.restrictedResources, {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Rainbow: 1 } },
+  });
+  assert.equal(
+    gameplayActions(afterAdd, "p1", decks).find(
+      (action) => action.label === "Play Power Unit to Base",
+    )?.enabled,
+    false,
+  );
+  const playGear = gameplayActions(afterAdd, "p1", decks).find(
+    (action) => action.label === "Play Test Gear",
+  )!;
+  const afterGear = performGameplayAction({
+    game: afterAdd,
+    actorPlayerId: "p1",
+    actionId: playGear.id,
+    selectedIds: [],
+    decks,
+    now: "play-gear",
+  });
+  assert.ok(afterGear.state.players.p1!.zones.base.includes("p1:gear"));
+  assert.deepEqual(afterGear.state.players.p1!.restrictedResources, {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Rainbow: 0 } },
+  });
+
+  afterGear.state.players.p1!.restrictedResources = {
+    energy: {},
+    power: { "cardOrAbility:Gear": { Mind: 1 } },
+  };
+  const equip = gameplayActions(afterGear, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:gear" && action.label === "Equip",
+  )!;
+  assert.equal(equip.targets[0]?.legalIds.includes("p1:mover"), true);
+  assert.equal(equip.targets[0]?.legalIds.includes("p2:enemy"), false);
+  assert.throws(
+    () => performGameplayAction({
+      game: afterGear,
+      actorPlayerId: "p1",
+      actionId: equip.id,
+      selectedIds: ["p2:enemy"],
+      decks,
+      now: "forged-equip",
+    }),
+    /target/i,
+  );
+  let afterActivate = performGameplayAction({
+    game: afterGear,
+    actorPlayerId: "p1",
+    actionId: equip.id,
+    selectedIds: ["p1:mover"],
+    decks,
+    now: "activate-equip",
+  });
+  assert.equal(
+    afterActivate.state.players.p1!.restrictedResources?.power["cardOrAbility:Gear"]?.Mind,
+    0,
+  );
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(afterActivate, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    afterActivate = performGameplayAction({
+      game: afterActivate,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `equip-pass-${playerId}`,
+    });
+  }
+  assert.equal(
+    afterActivate.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    "p1:mover",
+  );
+  assert.equal(afterActivate.state.cardStates["p1:gear"]!.attachedAtTurnNumber, 1);
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 5);
+  afterActivate.state.cardStates["p1:mover"]!.combatRole = "defender";
+  recomputeMight(afterActivate, "p1:mover", createRuntimeCardIndex(decks, afterActivate));
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 7);
+  afterActivate.state.cardStates["p1:mover"]!.combatRole = null;
+  recomputeMight(afterActivate, "p1:mover", createRuntimeCardIndex(decks, afterActivate));
+  afterActivate.state.turn!.turnNumber = 2;
+  recomputeMight(afterActivate, "p1:mover", createRuntimeCardIndex(decks, afterActivate));
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 3);
+  assert.equal(
+    gameplayActions(afterActivate, "p1", decks).some(
+      (action) => action.sourceCardInstanceId === "p1:gear" && action.label === "Equip",
+    ),
+    false,
+  );
+
+  const runtimeIndex = createRuntimeCardIndex(decks, afterActivate);
+  createPrimitiveHandlers(runtimeIndex)
+    .get("action.detach_equipment")!
+    .execute!(
+      binding("action.detach_equipment", 0, { target: "equipment" }),
+      createBehaviorContext(
+        afterActivate,
+        "p1",
+        "p1:bf",
+        null,
+        ["p1:gear"],
+      ),
+    );
+  assert.equal(
+    afterActivate.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    null,
+  );
+  assert.equal(afterActivate.state.cardStates["p1:mover"]!.computedMight, 1);
+
+  createPrimitiveHandlers(runtimeIndex)
+    .get("action.attach_equipment")!
+    .execute!(
+      binding("action.attach_equipment", 0, { target: "friendly_unit" }),
+      createBehaviorContext(
+        afterActivate,
+        "p1",
+        "p1:gear",
+        null,
+        ["p1:mover"],
+      ),
+    );
+
+  const move = gameplayActions(afterActivate, "p1", decks).find(
+    (action) =>
+      action.sourceCardInstanceId === "p1:mover" &&
+      action.label === "Move to Arena",
+  )!;
+  const atBattlefield = performGameplayAction({
+    game: afterActivate,
+    actorPlayerId: "p1",
+    actionId: move.id,
+    selectedIds: [],
+    decks,
+    now: "move-equipped-unit",
+  });
+  assert.equal(atBattlefield.state.players.p1!.zones.base.includes("p1:gear"), false);
+  assert.deepEqual(
+    atBattlefield.state.battlefields[0]!.attachedCardInstanceIds,
+    ["p1:gear"],
+  );
+  assert.deepEqual(
+    projectGame({
+      game: atBattlefield,
+      viewerPlayerId: "p1",
+      decks,
+    }).battlefields[0]!.attachedCards?.map((card) => card.instanceId),
+    ["p1:gear"],
+  );
+
+  atBattlefield.state.cardStates["p1:mover"]!.damage = 5;
+  cleanupBoard(atBattlefield, createRuntimeCardIndex(decks, atBattlefield));
+  assert.ok(atBattlefield.state.players.p1!.zones.trash.includes("p1:mover"));
+  assert.equal(
+    atBattlefield.state.cardStates["p1:gear"]!.attachedToCardInstanceId,
+    null,
+  );
+  assert.deepEqual(
+    atBattlefield.state.battlefields[0]!.attachedCardInstanceIds,
+    [],
+  );
+  assert.ok(atBattlefield.state.players.p1!.zones.base.includes("p1:gear"));
+});
+
+test("Quick-Draw Gear enters Base, then attaches through its triggered Chain item", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("QUICK_GEAR", "Quick Gear", "Gear", 0, 0));
+  const quickGear = snapshot.cards.find(
+    (card) => card.cardCode === "QUICK_GEAR",
+  )!;
+  quickGear.card.tags = ["Equipment"];
+  quickGear.behaviorModel.clauses = [clause("quick-draw", {
+    triggers: [binding("trigger.on_play", 0, {
+      actor: "controller",
+      subject: "source",
+    })],
+    selectors: [binding("selector.friendly_unit", 0, {
+      minimumCount: 1,
+      maximumCount: 1,
+      area: "board",
+      locationRelation: "any",
+      controller: "controller",
+      selectionKey: "unit",
+    })],
+    effects: [binding("action.attach_equipment", 0, {
+      target: "friendly_unit",
+      selectionKey: "unit",
+    })],
+    keywords: [binding("keyword.quick_draw", 0, {})],
+  })];
+  decks[0]!.instances.push({
+    instanceId: "p1:quick-gear",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "QUICK_GEAR",
+  });
+  game.state.players.p1!.zones.hand.push("p1:quick-gear");
+  game.state.cardStates["p1:quick-gear"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const play = gameplayActions(game, "p1", decks).find(
+    (action) => action.label === "Play Quick Gear",
+  )!;
+  assert.deepEqual(play.targets, []);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "quick-draw",
+  });
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:quick-gear"));
+  assert.equal(
+    next.state.cardStates["p1:quick-gear"]!.attachedToCardInstanceId ?? null,
+    null,
+  );
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  const chooseTarget = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  )!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseTarget.id,
+    selectedIds: ["p1:mover"],
+    decks,
+    now: "quick-draw-target",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.kind, "trigger");
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `quick-draw-pass-${playerId}`,
+    });
+  }
+  assert.equal(
+    next.state.cardStates["p1:quick-gear"]!.attachedToCardInstanceId,
+    "p1:mover",
+  );
+});
+
+test("orders multiple attached death replacements through the canonical player decision", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  for (const code of ["GUARDIAN_A", "GUARDIAN_B"]) {
+    snapshot.cards.push(definition(code, "Test Guardian", "Gear", 0, 0));
+    const guardian = snapshot.cards.find((card) => card.cardCode === code)!;
+    guardian.card.tags = ["Equipment"];
+    guardian.effectText = {
+      plain: "If I would die, kill this instead. Heal me, exhaust me, and recall me.",
+      sourceImageUrl: `https://example.test/${code}.png`,
+    };
+    guardian.effectBehaviorModel = {
+      playTimings: [],
+      clauses: [clause("guardian-replacement", {
+        effects: [binding("replacement.recall_on_next_death", 0, {
+          target: "attachedTopMost",
+          duration: "whileAttached",
+          exhausted: true,
+          consumeSource: "kill",
+        })],
+      })],
+    };
+    decks[0]!.instances.push({
+      instanceId: `p1:${code.toLowerCase()}`,
+      ownerPlayerId: "p1",
+      source: "mainDeck",
+      cardCode: code,
+    });
+    game.state.players.p1!.zones.base.push(`p1:${code.toLowerCase()}`);
+    game.state.cardStates[`p1:${code.toLowerCase()}`] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: null,
+    };
+  }
+  const index = createRuntimeCardIndex(decks, game);
+  for (const guardianId of ["p1:guardian_a", "p1:guardian_b"]) {
+    createPrimitiveHandlers(index)
+      .get("action.attach_equipment")!
+      .execute!(
+        binding("action.attach_equipment", 0, { target: "friendly_unit" }),
+        createBehaviorContext(game, "p1", guardianId, null, ["p1:mover"]),
+      );
+  }
+
+  game.state.cardStates["p1:mover"]!.damage = 1;
+  cleanupBoard(game, index);
+  assert.equal(game.state.pendingChoice?.type, "orderReplacements");
+  if (game.state.pendingChoice?.type !== "orderReplacements") return;
+  assert.equal(game.state.pendingChoice.playerId, "p1");
+  assert.deepEqual(
+    game.state.pendingChoice.options.map((option) => option.sourceCardInstanceId).sort(),
+    ["p1:guardian_a", "p1:guardian_b"],
+  );
+  assert.equal(projectGame({ game, viewerPlayerId: "p1", decks }).pendingChoice?.type, "orderReplacements");
+
+  const replacementOrder = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "orderedOptions",
+  )!;
+  const selectedOrder = [...game.state.pendingChoice.options]
+    .reverse()
+    .map((option) => option.id);
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: replacementOrder.id,
+    selectedIds: selectedOrder,
+    decks,
+    now: "choose-guardian-replacement",
+  });
+  assert.equal(next.state.pendingChoice, null);
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:mover"));
+  assert.equal(next.state.cardStates["p1:mover"]!.damage, 0);
+  assert.equal(next.state.cardStates["p1:mover"]!.exhausted, true);
+  assert.ok(next.state.players.p1!.zones.trash.includes("p1:guardian_b"));
+  assert.equal(next.state.cardStates["p1:guardian_a"]!.attachedToCardInstanceId, null);
 });
 
 test("projects Deflect before payment and requires its Power in the Rune Pool", () => {
@@ -200,6 +1089,9 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   assert.deepEqual(play.costPreview, {
     energy: 0,
     basePower: 0,
+    effectivePower: 0,
+    printedEnergy: 0,
+    printedPower: 0,
     availableAnyPower: 0,
     targetAdditionalPower: [{ targetId: "p2:deflect", amount: 1 }],
   });
@@ -231,6 +1123,130 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   });
   assert.equal(next.state.players.p1!.power.Mind, 0);
   assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
+});
+
+test("counters a qualifying chain spell through the generic chain-target primitive", () => {
+  const { game: initial, decks } = fixture();
+  let game = initial;
+  const snapshot = decks[0]!.snapshot;
+  const defy = definition("DEFY", "Defy", "Spell", 0, 0) as DeckSnapshotDocument["snapshot"]["cards"][number];
+  defy.behaviorModel.playTimings = [binding("timing.reaction", 0, {})];
+  defy.behaviorModel.clauses = [clause("counter", {
+    selectors: [binding("selector.chain_item", 0, {
+      itemKind: "spell",
+      controller: "opponent",
+      maximumEnergyCost: 4,
+      maximumPowerCost: 1,
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "counterTarget",
+    })],
+    effects: [binding("action.counter_chain_item", 0, {
+      selectionKey: "counterTarget",
+    })],
+  })];
+  const lowCostSpell = definition("LOW", "Low Cost Spell", "Spell", 4, 0, 1) as DeckSnapshotDocument["snapshot"]["cards"][number];
+  lowCostSpell.behaviorModel.clauses = [clause("draw", {
+    effects: [binding("action.draw_cards", 0, { player: "controller", count: 1 })],
+  })];
+  const highCostSpell = definition("HIGH", "High Cost Spell", "Spell", 5, 0, 0) as DeckSnapshotDocument["snapshot"]["cards"][number];
+  highCostSpell.behaviorModel.clauses = [clause("draw", {
+    effects: [binding("action.draw_cards", 0, { player: "controller", count: 1 })],
+  })];
+  snapshot.cards.push(defy, lowCostSpell, highCostSpell);
+  decks[0]!.instances.push({
+    instanceId: "p1:defy",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "DEFY",
+  });
+  decks[1]!.instances.push(
+    {
+      instanceId: "p2:low",
+      ownerPlayerId: "p2",
+      source: "mainDeck",
+      cardCode: "LOW",
+    },
+    {
+      instanceId: "p2:high",
+      ownerPlayerId: "p2",
+      source: "mainDeck",
+      cardCode: "HIGH",
+    },
+  );
+  game.state.players.p1!.zones.hand.push("p1:defy");
+  game.state.cardStates["p1:defy"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p2:low"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p2:high"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.chain = {
+    items: [
+      {
+        id: "chain:low",
+        kind: "spell",
+        label: "Low Cost Spell",
+        controllerPlayerId: "p2",
+        sourceCardInstanceId: "p2:low",
+        targetCardInstanceIds: [],
+        targetObjectVersions: {},
+        behaviorClauseId: "draw",
+        activatedBehaviorId: null,
+        behaviorEvent: null,
+      },
+      {
+        id: "chain:high",
+        kind: "spell",
+        label: "High Cost Spell",
+        controllerPlayerId: "p2",
+        sourceCardInstanceId: "p2:high",
+        targetCardInstanceIds: [],
+        targetObjectVersions: {},
+        behaviorClauseId: "draw",
+        activatedBehaviorId: null,
+        behaviorEvent: null,
+      },
+    ],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p1",
+    passedPlayerIds: [],
+  };
+
+  const counter = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:defy",
+  )!;
+  assert.deepEqual(counter.targets, [{
+    kind: "chainItem",
+    label: "spell on the chain",
+    selectionKey: "counterTarget",
+    legalIds: ["chain:low"],
+    minimum: 1,
+    maximum: 1,
+  }]);
+  game = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: counter.id,
+    selectedIds: ["chain:low"],
+    decks,
+    now: "play-defy",
+  });
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(game, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    game = performGameplayAction({
+      game,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `pass-${playerId}`,
+    });
+  }
+  assert.deepEqual(game.state.chain?.items.map((item) => item.id), ["chain:high"]);
+  assert.ok(game.state.players.p1!.zones.trash.includes("p1:defy"));
+  assert.ok(game.state.players.p2!.zones.trash.includes("p2:low"));
+  assert.equal(game.state.players.p2!.zones.trash.includes("p2:high"), false);
+  assert.equal(game.state.players.p2!.zones.hand.length, 0);
 });
 
 test("plays battlefield-scoped group damage with only the location selected", () => {
@@ -547,7 +1563,7 @@ function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   return { game, decks };
 }
 
-function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Battlefield", energy: number, might: number, power = 0) {
+function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" | "Gear" | "Legend" | "Battlefield", energy: number, might: number, power = 0) {
   const runeClauses = type === "Rune" ? [{
     id: "energy", sequence: 0, sourceText: "", normalizedText: "",
     abilities: [{ behaviorId: "ability.exhaust_for_resource", parameters: { resourceType: "energy", amountSource: "constant", amount: 1, usage: "unrestricted" }, confidence: "high" as const, order: 0 }],
@@ -558,4 +1574,37 @@ function definition(code: string, name: string, type: "Rune" | "Unit" | "Spell" 
     triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: []
   }] : [];
   return { cardCode: code, sourceTextHash: "h", behaviorModel: { playTimings: [], clauses: runeClauses }, card: { id: code, name, public_code: `${code}/1`, attributes: { energy, might, power }, classification: { type, supertype: type === "Rune" ? "Basic" as const : null, domain: ["Mind"] }, text: { plain: "" }, set: { set_id: "T", label: "Test" }, media: {}, tags: [], metadata: {} } };
+}
+
+function binding(
+  behaviorId: string,
+  order: number,
+  parameters: Record<string, string | number | boolean | null>,
+): BehaviorBinding {
+  return { behaviorId, parameters, confidence: "high" as const, order };
+}
+
+function clause(
+  id: string,
+  input: Partial<BehaviorClause>,
+): BehaviorClause {
+  return { ...emptyClause(id), ...input };
+}
+
+function emptyClause(id: string): BehaviorClause {
+  return {
+    id,
+    sequence: 0,
+    sourceText: "",
+    normalizedText: "",
+    abilities: [],
+    triggers: [],
+    conditions: [],
+    selectors: [],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  };
 }

@@ -14,7 +14,7 @@ export type PlayerDecisionRequestInput = {
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
-    targetKind: "battlefield" | "card";
+    targetKind: "battlefield" | "card" | "location" | "chainItem";
   } | null;
   sourceProjection: GameProjection;
   cardsByInstanceId: Record<string, BoardCatalogCard>;
@@ -118,16 +118,24 @@ export function buildPlayerDecisionRequest({
         );
         const visibleCardById = visibleCardsById(sourceProjection);
         const legalIds = requirement?.legalIds ?? [];
+        const visibleCards =
+          (pendingChoice.visibleCards?.length ?? 0) > 0
+            ? pendingChoice.visibleCards ?? []
+            : legalIds.map((id) =>
+                visibleCardById.get(id) ??
+                toProjectedCardPlaceholder(id, cardsByInstanceId[id]),
+              );
 
         return {
           actionId: action.id,
-          cards: legalIds.map((id) =>
-            toDecisionCardFromSources(
-              id,
-              visibleCardById.get(id),
-              cardsByInstanceId[id],
+          cards: visibleCards.map((card) => ({
+            ...toDecisionCardFromSources(
+              card.instanceId,
+              card,
+              cardsByInstanceId[card.instanceId],
             ),
-          ),
+            disabled: !legalIds.includes(card.instanceId),
+          })),
           confirmLabel:
             pendingChoice.sourceZone === "hand"
               ? "Discard selected card"
@@ -238,6 +246,78 @@ export function buildPlayerDecisionRequest({
         };
       }
     }
+
+    if (pendingChoice.type === "effectOption") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "effectOption" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+
+      if (action?.choice?.kind === "effectOption") {
+        return {
+          actionId: action.id,
+          confirmLabel: "Confirm",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: 1,
+            minimum: 1,
+            selectableIds: pendingChoice.options.map((option) => option.id),
+            source: "effect-option",
+          }),
+          description: pendingChoice.prompt,
+          inspection: "none",
+          kind: "optionDecision",
+          options: pendingChoice.options.map((option) => ({
+            id: option.id,
+            label: option.label,
+          })),
+          revealedCards: pendingChoice.revealedCards.map(toDecisionCard),
+          title: pendingChoice.title,
+        };
+      }
+    }
+
+    if (pendingChoice.type === "orderReplacements") {
+      const action = sourceProjection.actions.find(
+        (candidate) =>
+          candidate.choice?.kind === "orderedOptions" &&
+          candidate.choice.choiceId === pendingChoice.id,
+      );
+
+      if (action) {
+        const visibleCardById = visibleCardsById(sourceProjection);
+        return {
+          actionId: action.id,
+          confirmLabel: "Submit order",
+          decisionKey: createDecisionKey({
+            actorPlayerId: pendingChoice.playerId,
+            decisionId: pendingChoice.id,
+            kind: pendingChoice.type,
+            maximum: pendingChoice.options.length,
+            minimum: pendingChoice.options.length,
+            selectableIds: pendingChoice.options.map((option) => option.id),
+            source: "replacement-order",
+          }),
+          description:
+            "Order replacement effects. The first applicable effect is applied first.",
+          inspection: "publicGameState",
+          kind: "orderedDecision",
+          options: pendingChoice.options.map((option) => {
+            const card = visibleCardById.get(option.sourceCardInstanceId);
+            const catalogCard = cardsByInstanceId[option.sourceCardInstanceId];
+            return {
+              id: option.id,
+              imageUrl: card?.imageUrl ?? catalogCard?.media.image_url ?? undefined,
+              label: card?.name ?? catalogCard?.name ?? option.sourceCardInstanceId,
+            };
+          }),
+          title: pendingChoice.prompt,
+        };
+      }
+    }
   }
 
   const combatDamageAction = sourceProjection.actions.find(
@@ -255,7 +335,7 @@ export function buildPlayerDecisionRequest({
   }
 
   const activeNonBoardCardDecision = activeTargetSelection
-    ? mapActiveNonBoardCardDecision({
+    ? mapActiveCardDecision({
         activeTargetSelection,
         cardsByInstanceId,
         sourceProjection,
@@ -285,6 +365,14 @@ export function buildPlayerDecisionRequest({
           message: pendingChoice.waitingMessage,
           title: pendingChoice.title,
         };
+      case "effectOption":
+        return {
+          inspection: "none",
+          kind: "pendingDecision",
+          message: pendingChoice.waitingMessage,
+          revealedCards: pendingChoice.revealedCards.map(toDecisionCard),
+          title: pendingChoice.title,
+        };
       case "tokenPlacement":
         return {
           kind: "pendingDecision",
@@ -299,13 +387,21 @@ export function buildPlayerDecisionRequest({
           title: "Triggered abilities",
           tone: "amber",
         };
+      case "orderReplacements":
+        return {
+          inspection: "none",
+          kind: "pendingDecision",
+          message: `Waiting for ${playerName} to choose the order of replacement effects.`,
+          title: "Replacement effects",
+          tone: "amber",
+        };
     }
   }
 
   return null;
 }
 
-function mapActiveNonBoardCardDecision({
+function mapActiveCardDecision({
   activeTargetSelection,
   cardsByInstanceId,
   sourceProjection,
@@ -315,7 +411,7 @@ function mapActiveNonBoardCardDecision({
 >): PlayerDecisionRequest | null {
   if (
     !activeTargetSelection ||
-    activeTargetSelection.targetKind !== "card" ||
+    !["card", "chainItem"].includes(activeTargetSelection.targetKind) ||
     activeTargetSelection.legalTargetIds.length === 0
   ) {
     return null;
@@ -327,6 +423,36 @@ function mapActiveNonBoardCardDecision({
 
   if (!action) {
     return null;
+  }
+
+  if (activeTargetSelection.targetKind === "chainItem") {
+    const legalIds = action.targets.filter((target) => target.kind === "chainItem")
+      .flatMap((target) => target.legalIds);
+    return {
+      actionId: action.id,
+      canCancel: true,
+      cards: (sourceProjection.chain?.items ?? []).map((item) => ({
+        id: item.id,
+        label: item.label,
+        imageUrl: item.card?.imageUrl ?? undefined,
+        disabled: !legalIds.includes(item.id),
+      })),
+      confirmLabel: "Choose chain item",
+      decisionKey: createDecisionKey({
+        actorPlayerId: sourceProjection.viewerPlayerId,
+        decisionId: action.id,
+        kind: "activeTargetSelection",
+        selectableIds: legalIds,
+        source: "chainItem",
+      }),
+      description: "Choose the spell or ability affected by this action.",
+      inspection: "publicGameState",
+      kind: "cardSelection",
+      minSelected: activeTargetSelection.minTargets,
+      maxSelected: activeTargetSelection.maxTargets,
+      selectionMode: activeTargetSelection.maxTargets === 1 ? "single" : "multiple",
+      title: "Choose a Chain Item",
+    };
   }
 
   const cardLocationById = cardLocationsById(sourceProjection);
@@ -395,8 +521,13 @@ function visibleCardsById(projection: GameProjection) {
       .flatMap((zone) => zone.cards)
       .concat(
         projection.pendingChoice?.type === "effectSelection"
-          ? projection.pendingChoice.revealedCards
-          : [],
+          ? [
+              ...projection.pendingChoice.revealedCards,
+              ...(projection.pendingChoice.visibleCards ?? []),
+            ]
+          : projection.pendingChoice?.type === "effectOption"
+            ? projection.pendingChoice.revealedCards
+            : [],
       )
       .map((card) => [card.instanceId, card]),
   );
@@ -454,7 +585,7 @@ function arraysEqual(left: string[], right: string[]) {
 
 function toDecisionCard(card: ProjectedCardView): PlayerDecisionCard {
   return {
-    description: card.rulesText || card.type,
+    description: card.type,
     id: card.instanceId,
     imageUrl: card.imageUrl ?? undefined,
     label: card.name,
@@ -471,10 +602,35 @@ function toDecisionCardFromSources(
   }
 
   return {
-    description: catalogCard?.text.plain || catalogCard?.classification.type,
+    description: catalogCard?.classification.type,
     id,
     imageUrl: catalogCard?.media.image_url ?? undefined,
     label: catalogCard?.name ?? id,
+  };
+}
+
+function toProjectedCardPlaceholder(
+  instanceId: string,
+  card: BoardCatalogCard | undefined,
+): ProjectedCardView {
+  return {
+    instanceId,
+    ownerPlayerId: "",
+    name: card?.name ?? instanceId,
+    imageUrl: card?.media.image_url ?? null,
+    rulesText: card?.text.plain ?? "",
+    publicCode: card?.public_code ?? instanceId,
+    type: card?.classification.type ?? "Card",
+    supertype: card?.classification.supertype ?? null,
+    domains: card?.classification.domain ?? [],
+    energy: card?.attributes.energy ?? null,
+    might: card?.attributes.might ?? null,
+    power: card?.attributes.power ?? null,
+    computedMight: null,
+    damage: 0,
+    exhausted: false,
+    empowered: false,
+    attachedToCardInstanceId: null,
   };
 }
 

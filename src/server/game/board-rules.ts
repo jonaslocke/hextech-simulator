@@ -3,6 +3,7 @@ import {
   recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
+import { recallUnattachedGearAtBattlefields } from "./attachment-lifecycle";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { scoreBattlefield } from "./scoring";
@@ -11,8 +12,13 @@ export function cleanupBoard(
   game: GameDocument,
   index: RuntimeCardIndex
 ): void {
+  // Rules 321–321.1: defer the outstanding Cleanup until resolution completes.
+  if (game.state.chain?.resolvingItemId || game.state.effectResolutions.length) return;
   recomputeAllMight(game, index);
-  cleanupLethalDamage(game, Object.keys(game.state.cardStates), index);
+  if (cleanupLethalDamage(game, Object.keys(game.state.cardStates), index)) {
+    return;
+  }
+  recallUnattachedGearAtBattlefields(game, index);
   for (const battlefield of game.state.battlefields) {
     const controllers = unitControllers(game, battlefield.units, index);
     if (controllers.length === 0) {

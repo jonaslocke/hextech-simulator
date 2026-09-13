@@ -77,6 +77,61 @@ test("publishes executable and vanilla behavior models", () => {
   assert.deepEqual(vanilla.behaviorModel, { playTimings: [], clauses: [] });
 });
 
+test("stores approved Equipment Effect Text outside immutable source card data", () => {
+  const card = {
+    ...createCard(),
+    id: "TST-042/100",
+    name: "Test Equipment",
+    public_code: "TST-042/100",
+    classification: { ...createCard().classification, type: "Gear" as const },
+    media: { image_url: "https://example.test/test-equipment.png" },
+    tags: ["Equipment"],
+  };
+  const input: CanonicalCardPublicationInput = {
+    cardCode: "TST-042",
+    card,
+    sourceTextHash: hashCardRulesText(card),
+    modelingStatus: "approved",
+    adminNotes: "Effect Text transcribed from the supplied card face.",
+    clauses: [],
+    effectText: {
+      plain: "[Shield] 2",
+      sourceImageUrl: "https://example.test/test-equipment.png",
+    },
+    effectClauses: [
+      {
+        id: "effect-shield",
+        sourceText: "[Shield] 2",
+        normalizedText: "[Shield] 2",
+        unsupportedReason: null,
+        assignments: [
+          {
+            primitiveId: "keyword.shield",
+            family: "keyword",
+            sourceText: "[Shield] 2",
+            parameters: { amount: 2 },
+            confidence: "high",
+          },
+        ],
+      },
+    ],
+  };
+
+  const document = buildCanonicalCardDocument(
+    input,
+    buildPrimitiveCatalog(),
+    "a",
+    "b",
+  );
+
+  assert.deepEqual(document.effectText, input.effectText);
+  assert.equal(
+    document.effectBehaviorModel.clauses[0]?.keywords[0]?.behaviorId,
+    "keyword.shield",
+  );
+  assert.equal(card.text.plain, createCard().text.plain);
+});
+
 test("allows multiple canonical cards to reference one reusable behavior", () => {
   const firstInput = createPublicationInput();
   const secondCard = {

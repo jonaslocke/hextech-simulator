@@ -6,6 +6,9 @@ import {
 } from "./types";
 
 const sectionSet = new Set<string>(deckSectionNames);
+const sectionAliases: Readonly<Record<string, DeckSectionName>> = {
+  "Rune Pool": "Runes",
+};
 
 export function parseDeckList(sourceText: string): ParsedDeck {
   const sections: Record<DeckSectionName, DeckEntry[]> = {
@@ -32,11 +35,12 @@ export function parseDeckList(sourceText: string): ParsedDeck {
     if (trimmed.endsWith(":")) {
       const sectionName = trimmed.slice(0, -1);
 
-      if (!sectionSet.has(sectionName)) {
+      const canonicalSection = sectionAliases[sectionName] ?? sectionName;
+      if (!sectionSet.has(canonicalSection)) {
         throw new Error(`Unknown deck section "${sectionName}" on line ${lineNumber}.`);
       }
 
-      currentSection = sectionName as DeckSectionName;
+      currentSection = canonicalSection as DeckSectionName;
       continue;
     }
 

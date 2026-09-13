@@ -32,7 +32,7 @@ type ModelExpectation = {
 
 const EXPECTED_MODELS: Record<string, ModelExpectation> = {
   "OGS-021": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], conditions: [["condition.compare_numeric_value", { valueSource: "eventSubject.printedEnergyCost", operator: "greaterThanOrEqual", comparisonValue: 5 }, 2]], effects: [["action.draw_cards", { player: "controller", count: 1 }, 1]] }] },
-  "OGS-014": { clauses: [{ sequence: 0, abilities: [["ability.exhaust_for_resource", { resourceType: "energy", amountSource: "constant", amount: 2, usage: "spellsOnly" }, 0]] }] },
+  "OGS-014": { clauses: [{ sequence: 0, abilities: [["ability.exhaust_for_resource", { resourceType: "energy", amountSource: "constant", amount: 2, usage: "card:Spell" }, 0]] }] },
   "OGN-095": { playTimings: [["timing.reaction", {}, 0]], clauses: [{ sequence: 0, selectors: [["selector.unit", unitSelector("any", 1, 1, "board"), 1]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "reduce", operand: "constant", amount: 1, target: "unit", duration: "thisTurn", minimum: 1 }, 2]] }, { sequence: 1, effects: [["action.draw_cards", { player: "controller", count: 1 }, 0]] }] },
   "OGN-210": { clauses: [{ sequence: 0, keywords: [["keyword.assault", { amount: 1 }, 0]] }] },
   "OGN-103": { clauses: [{ sequence: 0, triggers: [["trigger.on_play", { actor: "controller", subject: "spell" }, 0]], effects: [["modifier.modify_numeric_value", { attribute: "might", operation: "increase", operand: "constant", amount: 1, target: "source", duration: "thisTurn" }, 1]] }] },

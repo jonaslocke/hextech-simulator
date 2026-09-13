@@ -2,6 +2,7 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { dispatchBehaviorEvent } from "./triggers";
 import { victoryRequirement } from "./victory";
+import { advanceGameObjectIncarnation } from "./primitive-handlers";
 
 export function applyHoldScoring(
   game: GameDocument,
@@ -62,7 +63,10 @@ export function scoreBattlefield(
 function drawOne(game: GameDocument, playerId: string) {
   const player = game.state.players[playerId]!;
   const cardId = player.zones.mainDeck.shift();
-  if (cardId) player.zones.hand.push(cardId);
+  if (cardId) {
+    player.zones.hand.push(cardId);
+    advanceGameObjectIncarnation(game, cardId);
+  }
 }
 
 function requireBattlefield(game: GameDocument, battlefieldId: string) {

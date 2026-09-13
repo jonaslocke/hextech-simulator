@@ -1,6 +1,7 @@
 import type { ProjectedAction } from "../../shared/game";
 import { createHash } from "node:crypto";
 import type { DeckRuntimeSnapshot, GameDocument } from "./state";
+import { advanceGameObjectIncarnation } from "./primitive-handlers";
 import { applyStartOfTurn } from "./turns";
 
 export function setupActions(game: GameDocument, actorPlayerId: string): ProjectedAction[] {
@@ -59,7 +60,7 @@ export function performSetupAction(input: {
     if (input.selectedIds.length > 0) applyMulligan(game, input.actorPlayerId, input.selectedIds);
     if (game.state.setup.playerIds.every((id) => game.state.setup.mulligans[id]?.status === "locked")) {
       game.status = "in_progress";
-      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken" };
+      game.state.turn = { turnNumber: 1, activePlayerId: game.state.setup.startingPlayerId!, phase: "awaken", playedCardInstanceIds: [] };
       applyStartOfTurn(game);
     }
   }
@@ -97,6 +98,7 @@ function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckR
     player.zones.mainDeck = deterministicShuffle(player.zones.mainDeck, `${game.id}:${playerId}:main`);
     player.zones.runeDeck = deterministicShuffle(player.zones.runeDeck, `${game.id}:${playerId}:rune`);
     player.zones.hand = player.zones.mainDeck.splice(0, 4);
+    player.zones.hand.forEach((id) => advanceGameObjectIncarnation(game, id));
     const selected = game.state.setup.battlefieldChoices[playerId]!.cardInstanceId!;
     game.state.battlefields.push({
       battlefieldId: selected,
@@ -104,7 +106,8 @@ function initializeBoardAndHands(game: GameDocument, decks: Record<string, DeckR
       selectedByPlayerId: playerId,
       controllerPlayerId: null,
       contestedByPlayerId: null,
-      units: []
+      units: [],
+      attachedCardInstanceIds: [],
     });
   }
 }
@@ -113,7 +116,10 @@ function applyMulligan(game: GameDocument, playerId: string, selected: string[])
   const zones = game.state.players[playerId]!.zones;
   zones.hand = zones.hand.filter((id) => !selected.includes(id));
   zones.mainDeck.push(...selected);
-  zones.hand.push(...zones.mainDeck.splice(0, selected.length));
+  selected.forEach((id) => advanceGameObjectIncarnation(game, id));
+  const redrawn = zones.mainDeck.splice(0, selected.length);
+  zones.hand.push(...redrawn);
+  redrawn.forEach((id) => advanceGameObjectIncarnation(game, id));
 }
 
 function deterministicShuffle(values: string[], seed: string): string[] {

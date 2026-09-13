@@ -30,6 +30,25 @@ export function stateChangeEvents(
   after: GameDocument
 ): GameTransitionEvent[] {
   const events: GameTransitionEvent[] = [];
+  const previousPublicRevealIds = new Set(
+    (before.state.publicReveals ?? []).map((reveal) => reveal.id),
+  );
+  for (const reveal of after.state.publicReveals ?? []) {
+    if (previousPublicRevealIds.has(reveal.id)) continue;
+    events.push({
+      type: "cards.revealed",
+      actorPlayerId: null,
+      message: reveal.message,
+      payload: {
+        revealId: reveal.id,
+        ...(reveal.handReveal ? {
+          handOwnerPlayerId: reveal.handReveal.playerId,
+          revealSourceName: reveal.handReveal.sourceName,
+          revealedCardNames: reveal.handReveal.cardNames.join(", "),
+        } : {}),
+      },
+    });
+  }
   if (!before.state.showdown && after.state.showdown) {
     events.push({
       type: "showdown.started",

@@ -55,6 +55,7 @@ export type Card = {
   supertype?: ProjectedCardView["supertype"];
   type?: ProjectedCardView["type"];
   isExhausted?: boolean;
+  attachedToCardInstanceId?: string | null;
   damage?: number;
   comesToPlayReady?: boolean;
 };
@@ -85,6 +86,9 @@ export type BattlefieldData = {
   description: string;
   playerUnits: Card[];
   opponentUnits: Card[];
+  playerAttachments: Card[];
+  opponentAttachments: Card[];
+  facedownCard: Card | null;
   img: HTMLImageElement["src"];
 };
 

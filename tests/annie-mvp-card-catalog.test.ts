@@ -9,7 +9,7 @@ import {
   previewCardCatalogImport,
 } from "../src/server/card-catalog";
 import type { Card } from "../src/server/catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import { buildDeckSnapshot } from "../src/server/game";
 
 const EXPECTED_ANNIE_PRIMITIVES: Record<string, string[]> = {
@@ -49,7 +49,23 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
   const behaviorCatalog = await buildCurrentBehaviorCatalog();
   const luxDeck = parseDeckList(await readFile("data/decks/lux.dec.txt", "utf8"));
   const luxNames = new Set(luxDeck.entries.map((entry) => entry.name));
-  const uploaded = JSON.parse(rawJson) as Card[];
+  const allUploaded = JSON.parse(rawJson) as Card[];
+  const cardsByName = new Map(allUploaded.map((card) => [card.name, card]));
+  const uploaded = [
+    ...new Map(
+      (
+        await Promise.all(
+          ["lux.dec.txt", "annie.dec.txt", "masteryi.dec.txt"].map(
+            async (filename) =>
+              parseDeckList(await readFile(`data/decks/${filename}`, "utf8"))
+                .entries
+                .map((entry) => resolveDeckCard({ byName: cardsByName }, entry.name))
+                .filter((card): card is Card => Boolean(card)),
+          ),
+        )
+      ).flat().map((card) => [card.public_code, card]),
+    ).values(),
+  ];
   const persistedLux = new Map(
     uploaded
       .filter((card) => luxNames.has(card.name))
@@ -69,7 +85,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
   );
   const preview = await previewCardCatalogImport({
     sourceLabel: "data/catalog/mvp.json",
-    rawJson,
+    rawJson: JSON.stringify(uploaded),
     behaviorCatalog,
     existingCardLookup: async () => persistedLux,
   });
@@ -149,7 +165,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
 
   const reupload = await previewCardCatalogImport({
     sourceLabel: "data/catalog/mvp.json",
-    rawJson,
+    rawJson: JSON.stringify(uploaded),
     behaviorCatalog,
     existingCardLookup: async () =>
       new Map(

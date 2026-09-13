@@ -35,6 +35,12 @@ export type BoardPlayerProjection = {
     conditionalEnergy: Record<string, { amount: number; restriction: "spell" }>;
     energy: number;
     power: Record<string, number>;
+    restrictedEnergy: Record<string, { amount: number; restriction: string }>;
+    restrictedPower: Array<{
+      amount: number;
+      domain: string;
+      restriction: string;
+    }>;
   };
   availableAbilityIdsByCard: Record<string, string[]>;
   availablePaymentModes: Record<
@@ -45,6 +51,7 @@ export type BoardPlayerProjection = {
       enabled: boolean;
       id: string;
       label: string;
+      costPreview: ProjectedAction["costPreview"];
     }>
   >;
   legalTargetsByCard: Record<
@@ -104,6 +111,13 @@ export type BoardProjection = {
     | {
         id: string;
         playerId: string;
+        type: "orderReplacements";
+        prompt: string;
+        options: Array<{ id: string; sourceCardInstanceId: string }>;
+      }
+    | {
+        id: string;
+        playerId: string;
         type: "effectSelection";
         prompt: string;
         title: string;
@@ -113,6 +127,16 @@ export type BoardProjection = {
         revealedCards: ProjectedCardView[];
         minimum: number;
         maximum: number;
+      }
+    | {
+        id: string;
+        playerId: string;
+        type: "effectOption";
+        prompt: string;
+        title: string;
+        waitingMessage: string;
+        options: Array<{ id: string; label: string }>;
+        revealedCards: ProjectedCardView[];
       }
     | {
         id: string;
@@ -139,11 +163,18 @@ export type BoardProjection = {
     contestedByPlayerId: string | null;
     cardInstanceId: string;
     units: string[];
-    facedownSlot: null;
+    attachedCardInstanceIds: string[];
+    facedownSlot: string | null;
   }>;
   cardStates: Record<
     string,
-    { exhausted: boolean; damage: number; computedMight?: number }
+    {
+      exhausted: boolean;
+      empowered?: boolean;
+      damage: number;
+      computedMight?: number;
+      attachedToCardInstanceId?: string | null;
+    }
   >;
 };
 
@@ -160,10 +191,14 @@ export function adaptProjectionToBoard(projection: GameProjection): {
       card.instanceId,
       {
         exhausted: card.exhausted,
+        empowered: card.empowered,
         damage: card.damage,
         ...(card.computedMight === null
           ? {}
           : { computedMight: card.computedMight }),
+        ...(card.attachedToCardInstanceId === null
+          ? {}
+          : { attachedToCardInstanceId: card.attachedToCardInstanceId }),
       },
     ]),
   );
@@ -192,6 +227,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             enabled: action.enabled,
             id: action.id,
             label: action.label,
+            costPreview: action.costPreview,
           })),
         ]),
       );
@@ -238,6 +274,23 @@ export function adaptProjectionToBoard(projection: GameProjection): {
                   >),
             energy: player.energy,
             power: player.power,
+            restrictedEnergy: Object.fromEntries(
+              Object.entries(player.restrictedResources?.energy ?? {}).map(
+                ([restriction, amount]) => [
+                  restriction,
+                  { amount, restriction },
+                ],
+              ),
+            ),
+            restrictedPower: Object.entries(
+              player.restrictedResources?.power ?? {},
+            ).flatMap(([restriction, domains]) =>
+              Object.entries(domains).map(([domain, amount]) => ({
+                amount,
+                domain,
+                restriction,
+              })),
+            ),
           },
           availableAbilityIdsByCard: Object.fromEntries(
             Object.entries(bySource).map(([sourceId, sourceActions]) => [
@@ -302,7 +355,10 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         contestedByPlayerId: battlefield.contestedByPlayerId,
         cardInstanceId: battlefield.card.instanceId,
         units: battlefield.units.map((unit) => unit.instanceId),
-        facedownSlot: null,
+        attachedCardInstanceIds: (battlefield.attachedCards ?? []).map(
+          (card) => card.instanceId,
+        ),
+        facedownSlot: battlefield.facedownCard?.instanceId ?? null,
       })),
       cardStates,
     },
@@ -317,6 +373,7 @@ function allVisibleCards(projection: GameProjection): ProjectedCardView[] {
     ...projection.battlefields.flatMap((battlefield) => [
       battlefield.card,
       ...battlefield.units,
+      ...(battlefield.attachedCards ?? []),
       ...(battlefield.facedownCard ? [battlefield.facedownCard] : []),
     ]),
     ...(projection.chain?.items.flatMap((item) =>

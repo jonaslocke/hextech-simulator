@@ -3,6 +3,7 @@
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
+import { DecisionCardFace } from "./decision-card-face";
 import {
   useCallback,
   useEffect,
@@ -669,21 +670,11 @@ function CardChoiceGrid({
               onClick={() => onSelect(option)}
               type="button"
             >
-              {option.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- Choice cards may use catalog or local card assets.
-                <img
-                  alt={option.label}
-                  className={cx(
-                    "block w-full rounded-lg object-contain shadow-xl shadow-black/60 transition group-hover:scale-[1.015] group-disabled:scale-100",
-                    imageHeightClass,
-                  )}
-                  src={option.imageUrl}
-                />
-              ) : (
-                <span className="flex justify-center items-center bg-slate-900/80 p-3 border border-white/10 rounded-lg aspect-130/181 font-semibold text-slate-200 text-sm text-center">
-                  {option.label}
-                </span>
-              )}
+              <DecisionCardFace
+                imageUrl={option.imageUrl}
+                label={option.label}
+                className={cx("transition group-hover:scale-[1.015] group-disabled:scale-100", imageHeightClass)}
+              />
 
               {isSelected && (
                 <span className="top-2 right-2 absolute flex justify-center items-center bg-cyan-300 shadow-black/40 shadow-lg border border-cyan-100/60 rounded-full size-7 font-black text-slate-950 text-xs">

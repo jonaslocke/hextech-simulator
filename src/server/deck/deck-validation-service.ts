@@ -16,7 +16,7 @@ const ACTIVE_CARD_COUNT = 40;
 const MAIN_DECK_COPY_COUNT = 39;
 const RUNE_DECK_COUNT = 12;
 const BATTLEFIELD_COUNT = 3;
-const SIDEBOARD_CAPACITY = 8;
+const SIDEBOARD_CAPACITY = 10;
 const MAIN_DECK_TYPES = new Set(["Gear", "Spell", "Unit"]);
 
 type ResolvedCopy = {
@@ -331,7 +331,7 @@ function validateCounts(
   if (sections.sideboard.length > SIDEBOARD_CAPACITY) {
     reasons.push({
       code: "deck.sideboardSize",
-      message: "Sideboard can contain at most 8 cards.",
+      message: "Sideboard can contain at most 10 cards.",
       section: "sideboard",
     });
   }

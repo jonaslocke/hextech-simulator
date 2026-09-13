@@ -17,6 +17,7 @@ export type ChoiceDialogOption = {
 
 export type ChoiceDialogProps = {
   headerAction?: ReactNode;
+  supplement?: ReactNode;
   interactionSuspended?: boolean;
   isVisible?: boolean;
   confirmLabel?: string;
@@ -34,6 +35,7 @@ export type ChoiceDialogProps = {
 export function ChoiceDialog({
   confirmLabel,
   headerAction,
+  supplement,
   interactionSuspended = false,
   isVisible = true,
   decisionKey,
@@ -107,6 +109,8 @@ export function ChoiceDialog({
             </div>
             {headerAction}
           </header>
+
+          {supplement}
 
           {selectionMode === "single" ? (
             <SingleChoiceList

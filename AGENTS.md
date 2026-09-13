@@ -40,6 +40,7 @@ in this file.
 | Card behavior and canonical approval | `docs/card_behavior.md` |
 | Showdown-specific recorded decisions | `docs/showdown-rules-decision-ledger.md` |
 | Full-corpus ingestion work | `docs/full-card-ingestion/plan.md` and `tracking.md` |
+| Testing contracts and automated-test ownership | `docs/testing.md` |
 | Active, verified issue tracking | `docs/BETA-ISSUES.md` |
 
 For rules work, use the local rules-reference skill. Core rules come from the
@@ -100,9 +101,28 @@ Do not run them during unrelated work or without explicit task authorization.
 
 ## Testing and validation
 
+`docs/testing.md` is the authority for automated-test ownership and testing
+boundaries.
+
 The current Node test-runner convention is `tests/**/*.test.ts`; do not relocate
 tests merely to colocate them. Add focused tests for stable behavior, contracts,
 and deterministic regressions. Do not delete valid tests to make a change pass.
+
+Before adding a gameplay test, identify the reusable primitive, behavior family,
+rules contract, subsystem, or generic validation pipeline that owns the behavior.
+Cards and decks may expose gaps or provide fixture data, but they do not become
+automated-test boundaries merely because they introduced the work. A confirmed
+card defect must be regressed at the reusable owner whenever the defect is
+actually shared-system behavior.
+
+Do not create card-by-card or deck-by-deck gameplay suites during corpus
+expansion. Deck construction and legality belong to the canonical generic
+deck-validation pipeline. Every permanent deck definition must pass that same
+pipeline rather than receiving its own validation suite.
+
+Name tests after the durable contract they protect. If a real card is used as
+fixture data, the test name, ownership, and assertions must still describe the
+generic behavior.
 
 Validate in proportion to risk using actual scripts, normally progressing from
 focused checks to `npm run typecheck`, `npm run lint`, `npm test`, and

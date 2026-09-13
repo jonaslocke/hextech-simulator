@@ -50,7 +50,10 @@ export function TargetSelectionPrompt({
     additionalPower: number;
     availableAnyPower: number;
     basePower: number;
+    effectivePower: number;
     energy: number;
+    printedEnergy: number;
+    printedPower: number;
     sourceNames: string[];
   };
   isSubmitting?: boolean;
@@ -278,13 +281,23 @@ export function TargetSelectionPrompt({
               Power.
             </div>
             <div className="mt-1 text-amber-100/80">
-              Base cost: {costPreview.energy} Energy
-              {costPreview.basePower > 0
-                ? ` + ${costPreview.basePower} Power`
+              Effective base cost: {costPreview.energy} Energy
+              {costPreview.effectivePower > 0
+                ? ` + ${costPreview.effectivePower} Power`
                 : ""}
               {" · "}New cost: {costPreview.energy} Energy +{" "}
-              {costPreview.basePower + costPreview.additionalPower} Power
+              {costPreview.effectivePower + costPreview.additionalPower} Power
             </div>
+            {(costPreview.energy !== costPreview.printedEnergy ||
+              costPreview.effectivePower !== costPreview.printedPower) && (
+              <div className="mt-1 text-amber-100/80">
+                Printed cost: {costPreview.printedEnergy} Energy
+                {costPreview.printedPower > 0
+                  ? ` + ${costPreview.printedPower} Power`
+                  : ""}
+                {" · "}modified by active effects
+              </div>
+            )}
             {costPreview.sourceNames.length > 0 && (
               <div className="mt-1 text-amber-100/80">
                 Deflect sources: {costPreview.sourceNames.join(", ")}

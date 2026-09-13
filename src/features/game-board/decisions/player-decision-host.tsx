@@ -129,6 +129,7 @@ export function PlayerDecisionHost({
       return (
         <PendingDecisionStatus
           message={decision.message}
+          revealedCards={decision.revealedCards}
           title={decision.title}
           tone={decision.tone}
         />
