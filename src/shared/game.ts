@@ -16,11 +16,15 @@ export const runeResourceTypes = ["energy", "power"] as const;
 
 export const projectedTargetRequirementSchema = z
   .object({
-    kind: z.enum(["card", "battlefield", "player"]),
+    kind: z.enum(["card", "battlefield", "location", "player", "chainItem"]),
     label: z.string().min(1).optional(),
     selectionKey: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
     sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+    // A later location choice can be constrained by an earlier selected
+    // object (for example, a unit's legal move destinations).
+    legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
+    optionLabels: z.record(z.string().min(1)).optional(),
     legalIds: z.array(z.string().min(1)),
     minimum: z.number().int().nonnegative(),
     maximum: z.number().int().nonnegative(),
@@ -40,6 +44,9 @@ export const projectedActionSchema = z.object({
     .object({
       energy: z.number().int().nonnegative(),
       basePower: z.number().int().nonnegative(),
+      effectivePower: z.number().int().nonnegative(),
+      printedEnergy: z.number().int().nonnegative(),
+      printedPower: z.number().int().nonnegative(),
       availableAnyPower: z.number().int().nonnegative(),
       targetAdditionalPower: z.array(
         z.object({
@@ -67,6 +74,14 @@ export const projectedActionSchema = z.object({
         kind: z.literal("effectSelection"),
         choiceId: z.string().min(1),
         prompt: z.string().min(1),
+      }),
+      z.object({
+        kind: z.literal("effectOption"),
+        choiceId: z.string().min(1),
+        prompt: z.string().min(1),
+        options: z.array(
+          z.object({ id: z.string().min(1), label: z.string().min(1) }),
+        ),
       }),
       z.object({
         kind: z.literal("tokenPlacement"),
@@ -152,6 +167,7 @@ export const deckIdSchema = z.enum([
   "annie-s",
   "master-yi-s",
   "garen-s",
+  "ornn",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
@@ -179,6 +195,8 @@ export const projectedCardViewSchema = z.object({
   computedMight: z.number().nullable(),
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
+  empowered: z.boolean().optional(),
+  attachedToCardInstanceId: z.string().min(1).nullable().optional(),
 });
 
 export const projectedZoneSchema = z.object({
@@ -202,9 +220,16 @@ export const projectedPlayerSchema = z.object({
   displayName: z.string().min(1).max(32),
   isViewer: z.boolean(),
   points: z.number().int().nonnegative(),
+  xp: z.number().int().nonnegative().optional(),
   energy: z.number().int().nonnegative(),
   conditionalEnergy: z.number().int().nonnegative(),
   power: z.record(z.number().int().nonnegative()),
+  restrictedResources: z
+    .object({
+      energy: z.record(z.number().int().nonnegative()),
+      power: z.record(z.record(z.number().int().nonnegative())),
+    })
+    .optional(),
   zones: z.array(projectedZoneSchema),
 });
 
@@ -215,6 +240,7 @@ export const projectedBattlefieldSchema = z.object({
   contestedByPlayerId: z.string().min(1).nullable(),
   card: projectedCardViewSchema,
   units: z.array(projectedCardViewSchema),
+  attachedCards: z.array(projectedCardViewSchema).optional(),
   facedownCard: projectedCardViewSchema.nullable().default(null),
 });
 
@@ -313,6 +339,18 @@ export const gameProjectionSchema = z.object({
         pendingChainItems: z.array(projectedChainItemSchema),
       }),
       z.object({
+        type: z.literal("orderReplacements"),
+        id: z.string().min(1),
+        playerId: z.string().min(1),
+        prompt: z.string().min(1),
+        options: z.array(
+          z.object({
+            id: z.string().min(1),
+            sourceCardInstanceId: z.string().min(1),
+          }),
+        ),
+      }),
+      z.object({
         type: z.literal("effectSelection"),
         id: z.string().min(1),
         playerId: z.string().min(1),
@@ -322,8 +360,19 @@ export const gameProjectionSchema = z.object({
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
         presentation: z.enum(["cardSelection", "vision"]),
         revealedCards: z.array(projectedCardViewSchema),
+        visibleCards: z.array(projectedCardViewSchema).default([]).optional(),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
+      }),
+      z.object({
+        type: z.literal("effectOption"),
+        id: z.string().min(1),
+        playerId: z.string().min(1),
+        prompt: z.string().min(1),
+        title: z.string().min(1),
+        waitingMessage: z.string().min(1),
+        options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })),
+        revealedCards: z.array(projectedCardViewSchema),
       }),
       z.object({
         type: z.literal("tokenPlacement"),
@@ -352,6 +401,13 @@ export const gameProjectionSchema = z.object({
   players: z.array(projectedPlayerSchema).length(2),
   battlefields: z.array(projectedBattlefieldSchema),
   chain: projectedChainSchema,
+  publicReveals: z.array(
+    z.object({
+      id: z.string().min(1),
+      message: z.string().min(1),
+      cards: z.array(projectedCardViewSchema),
+    }),
+  ).default([]).optional(),
   actions: z.array(projectedActionSchema),
   logEntries: z.array(
     z.object({

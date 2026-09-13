@@ -21,6 +21,8 @@ import type {
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import type { BattlefieldData, Card } from "../types";
 import { CardTile } from "./card-tile";
+import { AttachmentCardGroup } from "./attachment-card-group";
+import { groupCardsByAttachment } from "./attachment-layout";
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
@@ -255,8 +257,11 @@ export const BattlefieldBoard: FC<Props> = ({
     description,
     id,
     name,
+    opponentAttachments,
     opponentUnits,
+    playerAttachments,
     playerUnits,
+    facedownCard,
     img,
   },
   dropStatus = "idle",
@@ -426,7 +431,8 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         <BattlefieldUnitRow
-          cards={opponentUnits}
+          attachments={opponentAttachments}
+          cards={[...opponentUnits, ...(facedownCard ? [facedownCard] : [])]}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -437,6 +443,7 @@ export const BattlefieldBoard: FC<Props> = ({
         />
 
         <BattlefieldUnitRow
+          attachments={playerAttachments}
           cards={playerUnits}
           dragSourceLocation={
             enablePlayerUnitLocationDrag
@@ -466,6 +473,7 @@ export const BattlefieldBoard: FC<Props> = ({
 };
 
 function BattlefieldUnitRow({
+  attachments = [],
   cards,
   className,
   dragSourceLocation,
@@ -478,6 +486,7 @@ function BattlefieldUnitRow({
   zoneAnimationId,
   stagedMovementCardInstanceIds,
 }: {
+  attachments?: Card[];
   cards: Card[];
   className?: string;
   dragSourceLocation?: BoardDragSourceLocation;
@@ -500,7 +509,7 @@ function BattlefieldUnitRow({
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
-      {cards.map((unit, index) => {
+      {groupCardsByAttachment([...cards, ...attachments]).map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
           <CardTile
@@ -535,18 +544,56 @@ function BattlefieldUnitRow({
           />
         );
 
-        if (!dragSourceLocation || !unit.instanceId) {
-          return <div key={key}>{tile}</div>;
-        }
-
+        const isUnit = cards.some((card) => card.instanceId === unit.instanceId);
+        const hostTile =
+          !isUnit || !dragSourceLocation || !unit.instanceId ? (
+            tile
+          ) : (
+            <DraggableLocationCard
+              cardInstanceId={unit.instanceId}
+              sourceLocation={dragSourceLocation}
+            >
+              {tile}
+            </DraggableLocationCard>
+          );
         return (
-          <DraggableLocationCard
-            cardInstanceId={unit.instanceId}
+          <AttachmentCardGroup
             key={key}
-            sourceLocation={dragSourceLocation}
-          >
-            {tile}
-          </DraggableLocationCard>
+            host={hostTile}
+            attachments={attachedCards.map((attachment, attachmentIndex) => ({
+              id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
+              card: <CardTile
+                  enableHoverPreview
+                  isHighlighted={
+                    attachment.instanceId
+                      ? highlightedCardInstanceIds?.has(attachment.instanceId)
+                      : false
+                  }
+                  isTransferHidden={
+                    attachment.instanceId
+                      ? hiddenCardInstanceIds?.has(attachment.instanceId)
+                      : false
+                  }
+                  onPrimaryAction={
+                    onCardPrimaryAction
+                      ? (event) => onCardPrimaryAction(attachment, event)
+                      : undefined
+                  }
+                  onHighlightPointerEnter={
+                    onCardPointerEnter
+                      ? () => onCardPointerEnter(attachment)
+                      : undefined
+                  }
+                  onHighlightPointerLeave={
+                    onCardPointerLeave
+                      ? () => onCardPointerLeave(attachment)
+                      : undefined
+                  }
+                  showMight
+                  {...attachment}
+                />,
+            }))}
+          />
         );
       })}
     </motion.div>

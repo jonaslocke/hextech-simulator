@@ -151,6 +151,30 @@ test("maps an initiated non-board card target to a card selection decision", () 
   assert.equal(decision.actionId, "return-action");
 });
 
+test("Chain choices reuse card selection, preserve item identity, and disable ineligible copies", () => {
+  const action = cardTargetAction({ id: "counter", label: "spell", legalIds: ["chain-2"] });
+  action.targets[0]!.kind = "chainItem";
+  const projection = projectionWith({ actions: [action], pendingChoice: null });
+  projection.chain = {
+    priorityPlayerId: "player-1", relevantPlayerIds: ["player-1", "player-2"], passedPlayerIds: [],
+    items: ["chain-1", "chain-2"].map((id) => ({
+      id, label: "Same printed spell", kind: "spell", controllerPlayerId: "player-2",
+      sourceCardInstanceId: "same-card-source", targetCardInstanceIds: [], card: card("same-card-source"),
+    })),
+  };
+  const decision = buildPlayerDecisionRequest({
+    sourceProjection: projection, cardsByInstanceId: {},
+    activeTargetSelection: { actionId: action.id, targetKind: "chainItem", legalTargetIds: ["chain-2"], minTargets: 1, maxTargets: 1 },
+  });
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.deepEqual(decision.cards.map(({ id, disabled, imageUrl }) => ({ id, disabled, imageUrl })), [
+    { id: "chain-1", disabled: true, imageUrl: "/card.webp" },
+    { id: "chain-2", disabled: false, imageUrl: "/card.webp" },
+  ]);
+  assert.deepEqual(createSelectionIntent(decision.actionId, ["chain-2"]), { actionId: "counter", selectedIds: ["chain-2"] });
+});
+
 test("keeps initiated battlefield card targets out of card selection prompts", () => {
   const battlefieldUnit = card("battlefield-unit", "Unit");
   const action = cardTargetAction({

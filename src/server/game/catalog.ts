@@ -11,6 +11,10 @@ import {
   type PrimitiveCatalogEntry,
 } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
+import {
+  deckCardNameAliases,
+  deckCardNameLookupCandidates,
+} from "../deck/card-name";
 import { parseDeckList } from "../deck";
 import { getRuntimeCoverageStatus } from "./runtime-coverage";
 import {
@@ -43,7 +47,7 @@ export async function buildDeckSnapshotFromSource(
 ): Promise<DeckSnapshot> {
   const parsedDeck = parseDeckList(sourceText);
   const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
-  const queryNames = [...new Set(names.flatMap(cardNameLookupCandidates))];
+  const queryNames = [...new Set(names.flatMap(deckCardNameLookupCandidates))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
     db.collection<CanonicalCardStoredDocument>(CANONICAL_CARDS_COLLECTION)
       .find({ "card.name": { $in: queryNames } }).toArray(),
@@ -63,7 +67,7 @@ export function buildDeckSnapshot(
   const cardsByName = new Map<string, CanonicalCardDocument>();
   for (const document of canonicalCards) {
     cardsByName.set(document.card.name, document);
-    for (const alias of legacyCardNameAliases(document.card.name)) {
+    for (const alias of deckCardNameAliases(document.card)) {
       cardsByName.set(alias, document);
     }
   }
@@ -87,7 +91,9 @@ export function buildDeckSnapshot(
       cardCode: document.cardCode,
       sourceTextHash: document.sourceTextHash,
       card: document.card,
-      behaviorModel: document.behaviorModel
+      behaviorModel: document.behaviorModel,
+      effectText: document.effectText,
+      effectBehaviorModel: document.effectBehaviorModel,
     });
     if (!result.success) {
       issues.push(`Malformed canonical card ${document.cardCode}: ${result.error.message}`);
@@ -101,7 +107,7 @@ export function buildDeckSnapshot(
   const cardsByNameResolved = new Map<string, GameCardDefinition>();
   for (const definition of cards) {
     cardsByNameResolved.set(definition.card.name, definition);
-    for (const alias of legacyCardNameAliases(definition.card.name)) {
+    for (const alias of deckCardNameAliases(definition.card)) {
       cardsByNameResolved.set(alias, definition);
     }
   }
@@ -137,21 +143,6 @@ export function buildDeckSnapshot(
   });
 }
 
-function legacyCardNameAliases(name: string): string[] {
-  if (name.startsWith("Master Yi, ")) {
-    return [name.replace(/^Master Yi, /, "Yi, ")];
-  }
-
-  return [];
-}
-
-function cardNameLookupCandidates(name: string): string[] {
-  if (name.startsWith("Yi, ")) {
-    return [name, name.replace(/^Yi, /, "Master Yi, ")];
-  }
-
-  return [name];
-}
 
 function validateCanonicalDocument(
   document: CanonicalCardDocument,
@@ -176,6 +167,21 @@ function validateCanonicalDocument(
     validateClause(document.cardCode, clause, definitionsById, issues);
   });
   validateBindings(document.cardCode, "playTimings", document.behaviorModel.playTimings, definitionsById, issues);
+  if (document.effectText && document.effectBehaviorModel) {
+    document.effectBehaviorModel.clauses.forEach((clause, sequence) => {
+      if (clause.sequence !== sequence) {
+        issues.push(`Invalid Effect Text clause sequence for ${document.cardCode}:${clause.id}`);
+      }
+      validateClause(document.cardCode, clause, definitionsById, issues);
+    });
+    validateBindings(
+      document.cardCode,
+      "effectPlayTimings",
+      document.effectBehaviorModel.playTimings,
+      definitionsById,
+      issues,
+    );
+  }
 }
 
 function validateClause(

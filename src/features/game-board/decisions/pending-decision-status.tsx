@@ -3,6 +3,8 @@
 import { Hourglass } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/utils/cn";
+import type { PlayerDecisionCard } from "./player-decision-types";
+import { PublicRevealedCards } from "./public-revealed-cards";
 
 type PendingDecisionStatusTone = "cyan" | "amber";
 
@@ -10,10 +12,12 @@ export function PendingDecisionStatus({
   message,
   title,
   tone = "cyan",
+  revealedCards = [],
 }: {
   message: ReactNode;
   title: string;
   tone?: PendingDecisionStatusTone;
+  revealedCards?: PlayerDecisionCard[];
 }) {
   return (
     <section
@@ -52,6 +56,7 @@ export function PendingDecisionStatus({
           <p className="text-slate-200 text-sm">{message}</p>
         </div>
       </div>
+      <PublicRevealedCards cards={revealedCards} />
     </section>
   );
 }

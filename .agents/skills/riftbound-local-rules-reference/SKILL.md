@@ -1,3 +1,8 @@
+---
+name: riftbound-local-rules-reference
+description: Use for Hextech Riftbound rules validation, implementation, debugging, or discussion; rely only on the local core rules reference.
+---
+
 # Riftbound Local Rules Reference Skill
 
 ## Purpose

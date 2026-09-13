@@ -1,17 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { getMongoClient, getMongoDatabaseName } from "../src/server/db";
+import { PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
 import { syncDeckDefinitions } from "../src/server/services/deck-catalog-service";
 
 if (!process.argv.includes("--confirm")) {
   throw new Error("Refusing to synchronize deck definitions without --confirm.");
 }
 
-const seeds = await Promise.all([
-  loadSeed("lux", "Lux", "data/decks/lux.dec.txt"),
-  loadSeed("annie", "Annie", "data/decks/annie.dec.txt"),
-  loadSeed("master-yi", "Master Yi", "data/decks/masteryi.dec.txt"),
-  loadSeed("garen", "Garen", "data/decks/garen.dec.txt"),
-]);
+const seeds = await Promise.all(PERMANENT_DECK_DEFINITIONS.map(loadSeed));
 const client = await getMongoClient();
 
 try {
@@ -27,14 +23,10 @@ try {
   await client.close();
 }
 
-async function loadSeed(
-  id: "lux" | "annie" | "master-yi" | "garen",
-  label: string,
-  filePath: string,
-) {
+async function loadSeed(seed: (typeof PERMANENT_DECK_DEFINITIONS)[number]) {
   return {
-    id,
-    label,
-    sourceText: await readFile(filePath, "utf8"),
+    id: seed.id,
+    label: seed.label,
+    sourceText: await readFile(seed.sourcePath, "utf8"),
   };
 }

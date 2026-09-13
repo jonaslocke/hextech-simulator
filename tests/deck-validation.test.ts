@@ -1,73 +1,70 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { loadCardCatalog } from "../src/server/catalog";
+import { loadCardCatalog, cardSchema, type CardCatalog } from "../src/server/catalog";
 import { validateDeckList } from "../src/server/deck";
+import { CORE_DECK_IDS, PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
+
+const deckDirectory = path.join(process.cwd(), "data", "decks");
 
 async function loadDeck(filename: string) {
-  return readFile(path.join(process.cwd(), "data", "decks", filename), "utf8");
+  return readFile(path.join(deckDirectory, filename), "utf8");
 }
 
-test("validates all playable starter fixture decks", async () => {
-  const catalog = await loadCardCatalog();
-  const annie = validateDeckList(await loadDeck("annie.dec.txt"), catalog, {
-    ownerId: "annie"
-  });
-  const lux = validateDeckList(await loadDeck("lux.dec.txt"), catalog, {
-    ownerId: "lux"
-  });
-  const masterYi = validateDeckList(
-    await loadDeck("masteryi.dec.txt"),
-    catalog,
-    { ownerId: "master-yi" },
+async function permanentCatalog(): Promise<CardCatalog> {
+  const mvp = await loadCardCatalog();
+  const setDirectory = path.join(process.cwd(), "data", "sets");
+  const setCards = (await Promise.all(
+    (await readdir(setDirectory)).map(async (filename) =>
+      cardSchema.array().parse(JSON.parse(await readFile(path.join(setDirectory, filename), "utf8"))),
+    ),
+  )).flat();
+  const cards = [...mvp.cards, ...setCards.filter((card) => !mvp.byPublicCode.has(card.public_code))];
+  return {
+    ...mvp,
+    cards,
+    byName: new Map(cards.map((card) => [card.name, card])),
+    byPublicCode: new Map(cards.map((card) => [card.public_code, card])),
+  };
+}
+
+test("validates every permanent deck source through the shared pipeline", async () => {
+  assert.deepEqual(
+    CORE_DECK_IDS,
+    PERMANENT_DECK_DEFINITIONS.map(({ id }) => id),
+    "the validation corpus is the production permanent-deck registry",
   );
-
-  assert.equal(annie.ok, true, JSON.stringify(annie.issues, null, 2));
-  assert.equal(lux.ok, true, JSON.stringify(lux.issues, null, 2));
-  assert.equal(masterYi.ok, true, JSON.stringify(masterYi.issues, null, 2));
-
-  if (annie.ok) {
-    assert.equal(annie.snapshot.legend.name, "Dark Child - Starter");
-    assert.equal(annie.snapshot.champion.name, "Annie, Stubborn");
-    assert.equal(annie.snapshot.instances.length, 56);
-  }
-
-  if (lux.ok) {
-    assert.equal(lux.snapshot.legend.name, "Lady of Luminosity - Starter");
-    assert.equal(lux.snapshot.champion.name, "Lux, Crownguard");
-    assert.equal(lux.snapshot.instances.length, 56);
-  }
-  if (masterYi.ok) {
-    assert.equal(masterYi.snapshot.legend.name, "Wuju Bladesman - Starter");
-    assert.equal(masterYi.snapshot.champion.name, "Yi, Honed");
-    assert.equal(masterYi.snapshot.instances.length, 56);
+  const catalog = await permanentCatalog();
+  for (const definition of PERMANENT_DECK_DEFINITIONS) {
+    const source = await readFile(
+      path.join(process.cwd(), definition.sourcePath),
+      "utf8",
+    );
+    const result = validateDeckList(source, catalog, { ownerId: definition.id });
+    assert.equal(result.ok, true, `${definition.id}: ${JSON.stringify(result.issues, null, 2)}`);
   }
 });
 
-test("rejects non-official Main Deck section spelling", async () => {
-  const catalog = await loadCardCatalog();
-  const source = (await loadDeck("annie.dec.txt")).replace("MainDeck:", "Main Deck:");
-  const result = validateDeckList(source, catalog);
-
-  assert.equal(result.ok, false);
-  assert.equal(result.issues[0]?.code, "deck.parse");
+test("accepts the official Rune Pool heading", async () => {
+  const source = (await loadDeck("annie.dec.txt")).replace("Runes:", "Rune Pool:");
+  const result = validateDeckList(source, await permanentCatalog());
+  assert.equal(result.ok, true, JSON.stringify(result.issues, null, 2));
+  if (result.ok) assert.equal(result.snapshot.runes.reduce((total, entry) => total + entry.quantity, 0), 12);
 });
 
-test("rejects unknown cards", async () => {
-  const catalog = await loadCardCatalog();
-  const source = (await loadDeck("annie.dec.txt")).replace("3 Gust", "3 Missing Card");
-  const result = validateDeckList(source, catalog);
-
-  assert.equal(result.ok, false);
-  assert.equal(result.issues.some((issue) => issue.code === "deck.unknownCard"), true);
+test("rejects malformed section headings and unknown cards", async () => {
+  const catalog = await permanentCatalog();
+  const source = await loadDeck("annie.dec.txt");
+  assert.equal(validateDeckList(source.replace("MainDeck:", "Main Deck:"), catalog).issues[0]?.code, "deck.parse");
+  const unknown = validateDeckList(source.replace("3 Gust", "3 Missing Card"), catalog);
+  assert.equal(unknown.issues.some((issue) => issue.code === "deck.unknownCard"), true);
 });
 
-test("rejects champion that does not match the legend tag", async () => {
-  const catalog = await loadCardCatalog();
+test("rejects a Champion that does not match the Legend tag", async () => {
+  const catalog = await permanentCatalog();
   const source = (await loadDeck("annie.dec.txt")).replace("1 Annie, Stubborn", "1 Lux, Crownguard");
   const result = validateDeckList(source, catalog);
-
   assert.equal(result.ok, false);
   assert.equal(result.issues.some((issue) => issue.code === "deck.championTag"), true);
 });

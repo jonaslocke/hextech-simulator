@@ -20,6 +20,8 @@ import type {
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
+import { AttachmentCardGroup } from "./attachment-card-group";
+import { groupCardsByAttachment } from "./attachment-layout";
 import { ZoneArea } from "./zone-area";
 
 type BaseLineProps = {
@@ -142,6 +144,8 @@ const BaseLine = ({
         <ZoneCards
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onCardPrimaryAction={onBoardCardPrimaryAction}
+          onCardContextAction={onBoardCardPrimaryAction}
           zone={player.zones.legend}
         />
       </ZoneArea>
@@ -592,59 +596,65 @@ function CardList({
 
   const content = (
     <>
-      {cards.map((card, index) => {
+      {groupCardsByAttachment(cards).map(({ host: card, attachments }, index) => {
         const key = card.instanceId ?? `${card.name}-${index}`;
-        const tile = (
+        const createTile = (item: Card) => (
           <CardTile
             enableHoverPreview={!onClick}
             isHighlighted={
-              card.instanceId
-                ? highlightedCardInstanceIds?.has(card.instanceId)
+              item.instanceId
+                ? highlightedCardInstanceIds?.has(item.instanceId)
                 : false
             }
             isTransferHidden={
-              card.instanceId
-                ? hiddenCardInstanceIds?.has(card.instanceId)
+              item.instanceId
+                ? hiddenCardInstanceIds?.has(item.instanceId)
                 : false
             }
             onContextAction={
               onCardContextAction
-                ? (event) => onCardContextAction(card, event)
+                ? (event) => onCardContextAction(item, event)
                 : undefined
             }
             onPrimaryAction={
               onCardPrimaryAction
-                ? (event) => onCardPrimaryAction(card, event)
+                ? (event) => onCardPrimaryAction(item, event)
                 : undefined
             }
             onHighlightPointerEnter={
-              onCardPointerEnter ? () => onCardPointerEnter(card) : undefined
+              onCardPointerEnter ? () => onCardPointerEnter(item) : undefined
             }
             onHighlightPointerLeave={
-              onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
+              onCardPointerLeave ? () => onCardPointerLeave(item) : undefined
             }
             showMight={showMight}
             isStagedForMovement={
-              card.instanceId
-                ? stagedMovementCardInstanceIds?.has(card.instanceId)
+              item.instanceId
+                ? stagedMovementCardInstanceIds?.has(item.instanceId)
                 : false
             }
-            {...card}
+            {...item}
           />
         );
+        const tile = createTile(card);
 
-        if (!dragSourceLocation || !card.instanceId) {
-          return <div key={key}>{tile}</div>;
-        }
-
-        return (
+        const host = !dragSourceLocation || !card.instanceId ? tile : (
           <DraggableLocationCard
             cardInstanceId={card.instanceId}
-            key={key}
             sourceLocation={dragSourceLocation}
           >
             {tile}
           </DraggableLocationCard>
+        );
+        return (
+          <AttachmentCardGroup
+            attachments={attachments.map((attachment, attachmentIndex) => ({
+              id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
+              card: createTile(attachment),
+            }))}
+            host={host}
+            key={key}
+          />
         );
       })}
       {count !== undefined && count > 0 && (

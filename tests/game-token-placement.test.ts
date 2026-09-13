@@ -11,7 +11,7 @@ import {
   createRuntimeCardIndex,
   moveUnitToTrash,
 } from "../src/server/game/primitive-handlers";
-import { gameplayActions, performGameplayAction } from "../src/server/game";
+import { gameplayActions, performGameplayAction, projectGame } from "../src/server/game";
 import type { BehaviorBinding, GameCardDefinition } from "../src/server/game";
 import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { GameDocument } from "../src/server/game/state";
@@ -152,6 +152,44 @@ test("tokens cease to exist instead of remaining in non-board zones", () => {
   assert.equal(game.state.players.p1!.zones.trash.includes(tokenId), false);
   assert.equal(game.state.players.p1!.zones.base.includes(tokenId), false);
   assert.equal(game.state.cardStates[tokenId], undefined);
+});
+
+test("token projections retain generated keyword text", () => {
+  const source = unit("SOURCE", "Sprite Caller", [
+    clause("sprite", {
+      effects: [
+        binding("action.play_token", 0, {
+          tokenName: "ready 3 :rb_might: Sprite unit",
+          count: 1,
+          placement: "base",
+          entryState: "ready",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+
+  assert.equal(
+    beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "source",
+      clauseId: "sprite",
+      decks,
+    }),
+    true,
+  );
+  const spriteId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(spriteId);
+  const sprite = projectGame({ game, viewerPlayerId: "p1", decks }).players
+    .find((player) => player.playerId === "p1")
+    ?.zones.find((zone) => zone.kind === "base")?.cards.find(
+      (card) => card.instanceId === spriteId,
+    );
+  assert.equal(sprite?.rulesText, "Temporary");
 });
 
 test("fixed-location token creation plays token at source location", () => {
@@ -437,7 +475,7 @@ test("unit presence condition detects ready enemy units at source location", () 
   assert.equal(game.state.cardStates.drake?.computedMight, 3);
 });
 
-test("attack triggers return showdown focus to the trigger controller", () => {
+test("an initial Combat Chain opened by a defending trigger retains the attacker's Focus", () => {
   const drake = unit("DRAKE", "Dune Drake", [
     clause("attack-ready-enemy", {
       triggers: [binding("trigger.attack", 0, {})],
@@ -454,7 +492,7 @@ test("attack triggers return showdown focus to the trigger controller", () => {
     }),
   ]);
   const { game, decks } = fixture([drake, battlefield("BF", "Field")]);
-  decks[0]!.instances.push(instance("drake", "p1", "DRAKE"));
+  decks[1]!.instances.push(instance("drake", "p2", "DRAKE"));
   decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
   game.state.cardStates.drake = cardState(2);
   game.state.cardStates["bf-card"] = cardState(null);
@@ -477,7 +515,7 @@ test("attack triggers return showdown focus to the trigger controller", () => {
         id: "trigger:dune",
         kind: "trigger",
         label: "Dune Drake",
-        controllerPlayerId: "p1",
+        controllerPlayerId: "p2",
         sourceCardInstanceId: "drake",
         targetCardInstanceIds: [],
         targetObjectVersions: {},
@@ -492,12 +530,15 @@ test("attack triggers return showdown focus to the trigger controller", () => {
       },
     ],
     relevantPlayerIds: ["p1", "p2"],
-    priorityPlayerId: "p1",
+    priorityPlayerId: "p2",
     passedPlayerIds: [],
+    openedBy: "triggeredAbility",
   };
 
-  let next = passPriority(game, "p1", decks);
-  next = passPriority(next, "p2", decks);
+  let next = passPriority(game, "p2", decks);
+  assert.equal(next.state.chain?.priorityPlayerId, "p1");
+  assert.equal(next.state.showdown?.focusPlayerId, "p1");
+  next = passPriority(next, "p1", decks);
 
   assert.equal(next.state.chain, null);
   assert.equal(next.state.showdown?.focusPlayerId, "p1");

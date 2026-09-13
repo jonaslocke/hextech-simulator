@@ -10,7 +10,7 @@
 
 Expand Hextech Simulator's executable Riftbound card corpus through eight complete tournament decks, delivered as eight sequential pull requests.
 
-The decks are the **scope boundaries**, not the architecture boundaries. The implementation must continue the project's card-corpus model: card behavior is expressed through reusable primitives, canonical card models, server-authoritative rules, persisted player decisions where needed, and normal deck publication. No behavior may be implemented only because a specific deck or card name is being played.
+The decks are the **scope boundaries**, not the architecture boundaries. They are also **not automated-test boundaries**. The implementation must continue the project's card-corpus model: card behavior is expressed through reusable primitives, canonical card models, server-authoritative rules, persisted player decisions where needed, and normal deck publication. No behavior may be implemented or permanently tested only because a specific deck or card name is being played.
 
 At the end of this program:
 
@@ -35,7 +35,7 @@ This document defines the workflow, sequencing, PR gates, scope, and completion 
 
 `project-context.md` defines the current project architecture, runtime ownership, existing BO3/sideboarding foundation, card-ingestion model, validation philosophy, and current technical baseline.
 
-Existing repository instructions such as `AGENTS.md`, `docs/architecture.md`, and applicable project skills remain binding unless this plan explicitly changes the workflow for this program.
+Existing repository instructions such as `AGENTS.md`, `docs/architecture.md`, `docs/testing.md`, and applicable project skills remain binding unless this plan explicitly changes the workflow for this program.
 
 ### 2.2 Gameplay behavior
 
@@ -126,6 +126,28 @@ The following are prohibited:
 - implementing a card only for the exact interaction sequence exercised during manual validation.
 
 If multiple cards use the same semantic behavior family, the PR should extend or reuse the same primitive family when the rules support doing so.
+
+### 4.4 Testing boundary for corpus expansion
+
+The current deck determines which cards, dependencies, and missing reusable
+capabilities must become executable in the PR. It does not own the automated
+tests created because of that work.
+
+Automated gameplay tests added during a deck PR must target the reusable
+primitive, behavior family, rules contract, subsystem, or generic validation
+pipeline that owns the behavior. Do not create permanent gameplay suites named
+or structured around the current card, Champion, Legend, deck, set, or PR.
+
+A real card may be used as fixture data when useful, but the test name,
+ownership, assertions, and durable purpose must remain generic.
+
+Deck construction and legality are validated through the canonical generic
+deck-validation pipeline. Every permanent deck definition must pass that
+pipeline. Do not create a deck-specific automated suite merely to reassert
+generic Main Deck, Sideboard, Rune, Battlefield, copy-limit, domain, or
+canonical-resolution rules.
+
+The complete current deck remains a manual-validation scope under Gate E.
 
 ---
 
@@ -263,10 +285,11 @@ At minimum, the PR must demonstrate:
 - every card required by the exact deck and Sideboard can resolve to an approved/executable canonical definition;
 - no required model is stale, unsupported, malformed, or dependent on an unimplemented binding;
 - required token/generated definitions are present and executable;
-- the exact registered deck configuration validates under the existing deck rules;
+- the permanent deck definition is discovered by and passes the canonical generic deck-validation pipeline;
 - the permanent deck definition can be synchronized/loaded through the normal catalog path;
 - a fresh match can be constructed from the updated canonical/deck data;
-- focused deterministic tests cover new primitive behavior and confirmed regressions where appropriate;
+- focused deterministic tests cover new primitive, behavior-family, rules-contract, subsystem, or generic-validation behavior and confirmed regressions where appropriate;
+- no new automated gameplay suite treats the current card or deck as the durable test boundary;
 - existing relevant regression suites pass;
 - `npm run typecheck` passes;
 - the full existing automated test suite passes unless a known unrelated baseline failure is explicitly documented;
@@ -320,6 +343,10 @@ The reviewer must challenge at least the following:
 
 - Are shared primitive changes evaluated against accepted consumers?
 - Are narrow deterministic tests added for stable behavior that changed?
+- Are tests validating reusable behavior/rules/subsystem contracts rather than a named card or delivery deck?
+- When a real card is used as fixture data, is the durable test contract still generic?
+- Are permanent decks validated through the canonical data-driven deck-validation pipeline rather than one suite per deck?
+- Did any manual defect produce a regression at the reusable owner that actually failed?
 - Are tests validating behavior contracts rather than mirroring temporary implementation structure?
 
 The reviewer records findings on the PR. Codex addresses them. The review/fix cycle repeats until the reviewer explicitly approves the current revision.
@@ -413,7 +440,7 @@ Codex is responsible for:
 - token/generated dependency work;
 - permanent deck integration;
 - appropriate UI/projection work when a rules decision requires player input;
-- focused automated tests and regression updates;
+- focused automated tests and regression updates at the reusable owning primitive, behavior family, rules contract, subsystem, or generic validation pipeline;
 - technical readiness checks;
 - addressing every valid reviewer finding;
 - fixing confirmed manual-validation defects at the generic owning layer.
@@ -456,7 +483,7 @@ The PR description or linked durable tracking artifact must include:
 5. **Canonical card changes** — cards added or corrected for the current deck.
 6. **Architecture/contracts changed** — state, primitives, actions, projections, decisions, persistence, deck IDs, or UI changes, if any.
 7. **Accepted primitive impact** — required impact/regression proposal and its approval when an accepted primitive changed semantics.
-8. **Automated validation** — focused tests and standard technical gates run.
+8. **Automated validation** — reusable contracts covered, generic deck/catalog validation used, and standard technical gates run. Do not report card/deck-specific gameplay suites as the durability mechanism.
 9. **Independent review status** — findings addressed and final reviewer approval.
 10. **Manual validation record** — scenarios executed, defects found/fixed, regression scenarios, and final result.
 11. **User acceptance** — explicit acceptance before merge.
@@ -471,7 +498,7 @@ Corpus expansion is cumulative. A later deck may exercise or extend behavior fir
 
 ### 10.1 When no accepted behavior changes
 
-If a PR only adds new cards using already accepted semantics, regression scope should remain focused. The agent should prove the current deck and relevant shared contracts without replaying every previously accepted deck.
+If a PR only adds new cards using already accepted semantics, regression scope should remain focused. Existing generic primitive/subsystem and deck-validation contracts should remain the automated proof. Do not create new card- or deck-specific gameplay suites merely because the corpus gained new cards. The current deck is proven as a complete experience through manual validation without replaying every previously accepted deck.
 
 ### 10.2 When shared implementation changes without semantic change
 
@@ -627,7 +654,9 @@ A deck PR is **Done** only when all statements below are true.
 
 ### Quality gates
 
-- Focused automated coverage is appropriate for new/changed behavior.
+- Focused automated coverage is owned by the reusable primitive, behavior family, rules contract, subsystem, or generic validation pipeline that changed.
+- No card/deck-specific gameplay suite was added merely because the current deck defined delivery scope.
+- The permanent deck definition passes the canonical generic deck-validation pipeline.
 - Applicable regression checks pass.
 - Typecheck, test suite, lint, production build, diff check, and relevant catalog/deck checks satisfy technical readiness.
 - Independent reviewer approves the final revision.
@@ -701,6 +730,7 @@ Throughout all eight PRs:
 10. **Accepted behavior is cumulative.** Later PRs reuse earlier accepted work and cannot silently regress it.
 11. **Review and manual acceptance are separate gates.** Both are mandatory.
 12. **No next PR before merge.** The next dependency plan must use the actually accepted corpus, not a hypothetical future baseline.
+13. **Tests follow reusable ownership, not delivery scope.** Cards and decks can expose gaps and provide fixtures, but automated gameplay tests belong to primitives, behavior families, rules contracts, subsystems, and generic validation pipelines. Every permanent deck definition must pass the same canonical deck-validation pipeline.
 
 ---
 
@@ -728,3 +758,7 @@ Exact deck file
 The controlling principle for the entire program is:
 
 > **The deck defines what must become playable; the engine implementation must make those cards reusable beyond that deck.**
+
+The testing corollary is:
+
+> **The card or deck may expose the gap; the reusable owner acquires the automated test.**

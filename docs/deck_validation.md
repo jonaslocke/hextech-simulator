@@ -22,6 +22,31 @@ authority.
 Card identity and copy limits use canonical gameplay identity rather than an
 art variant, display label, or imported-printing name.
 
+## Permanent deck validation
+
+Every permanent deck definition must pass the canonical deck-validation pipeline.
+
+Permanent decks are data consumed by the validator; they are not independent
+validation systems. The automated suite must apply the same generic,
+data-driven deck-validation contract to every applicable permanent deck
+definition.
+
+Do not create one automated validation suite per deck to reassert generic
+construction rules. A specific permanent deck may be one input in the generic
+validation corpus, but rules such as Sideboard limits, Rune count, Battlefield
+count, copy limits, domain legality, Champion/Legend requirements, section
+legality, and canonical card resolution remain owned by the shared validator.
+
+When a new permanent deck is added, the expected automated evidence is that it
+is discovered by and passes the existing canonical validation pipeline. If the
+new deck exposes a missing validation rule, implement and test that rule in the
+generic validator so the same contract applies to every permanent deck.
+
+Complete gameplay behavior of a particular deck is not a deck-validator
+responsibility. Card/deck gameplay acceptance follows the applicable manual
+validation process, while reusable gameplay behavior is protected by the
+generic testing contracts in `docs/testing.md`.
+
 ## Match and sideboarding validation
 
 The server resolves submitted registered-card-copy IDs against the player’s

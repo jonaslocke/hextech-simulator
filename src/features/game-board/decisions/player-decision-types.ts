@@ -58,6 +58,7 @@ export type OptionDecisionRequest = DecisionInspectionCapability & {
   title: string;
   description?: string;
   options: PlayerDecisionOption[];
+  revealedCards?: PlayerDecisionCard[];
   confirmLabel?: string;
   canCancel?: boolean;
 };
@@ -84,6 +85,7 @@ export type PendingDecisionRequest = DecisionInspectionCapability & {
   title: string;
   message: ReactNode;
   tone?: "cyan" | "amber";
+  revealedCards?: PlayerDecisionCard[];
 };
 
 export type TokenPlacementDecisionRequest = DecisionInspectionCapability & {

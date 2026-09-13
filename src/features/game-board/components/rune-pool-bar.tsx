@@ -13,6 +13,8 @@ export function RunePoolBar({ runePool }: { runePool: RunePool | undefined }) {
   const energy = runePool?.energy ?? 0;
   const conditionalEnergy = runePool?.conditionalEnergy ?? {};
   const power = runePool?.power ?? {};
+  const restrictedEnergy = runePool?.restrictedEnergy ?? {};
+  const restrictedPower = runePool?.restrictedPower ?? [];
 
   const conditionalEntries = Object.entries(conditionalEnergy).filter(
     ([, entry]) => entry.amount > 0,
@@ -23,9 +25,23 @@ export function RunePoolBar({ runePool }: { runePool: RunePool | undefined }) {
     .sort(
       ([left], [right]) => powerDomainOrder(left) - powerDomainOrder(right),
     );
+  const restrictedEnergyEntries = Object.values(restrictedEnergy).filter(
+    (entry) => entry.amount > 0,
+  );
+  const restrictedPowerEntries = restrictedPower
+    .filter((entry) => entry.amount > 0)
+    .sort(
+      (left, right) =>
+        powerDomainOrder(left.domain) - powerDomainOrder(right.domain) ||
+        left.restriction.localeCompare(right.restriction),
+    );
 
   const hasRunePool =
-    energy > 0 || powerEntries.length > 0 || conditionalEntries.length > 0;
+    energy > 0 ||
+    powerEntries.length > 0 ||
+    conditionalEntries.length > 0 ||
+    restrictedEnergyEntries.length > 0 ||
+    restrictedPowerEntries.length > 0;
 
   if (!hasRunePool) {
     return null;
@@ -68,6 +84,17 @@ export function RunePoolBar({ runePool }: { runePool: RunePool | undefined }) {
           </RunePoolChip>
         ))}
 
+        {restrictedEnergyEntries.map((entry) => (
+          <RunePoolChip
+            key={entry.restriction}
+            label={`${formatRestriction(entry.restriction)} Energy`}
+            tone="restricted"
+            title={`${entry.amount} ${formatRestriction(entry.restriction).toLowerCase()} Energy`}
+          >
+            <EnergyResource compact value={entry.amount} />
+          </RunePoolChip>
+        ))}
+
         {powerEntries.map(([domain, amount]) => (
           <RunePoolChip
             key={domain}
@@ -78,6 +105,20 @@ export function RunePoolBar({ runePool }: { runePool: RunePool | undefined }) {
             <DomainIcon decorative domain={domain} />
             <span className="font-mono font-bold tabular-nums text-white">
               {amount}
+            </span>
+          </RunePoolChip>
+        ))}
+
+        {restrictedPowerEntries.map((entry) => (
+          <RunePoolChip
+            key={`${entry.restriction}:${entry.domain}`}
+            label={`${formatRestriction(entry.restriction)} ${formatDomain(entry.domain)} Power`}
+            tone="restricted"
+            title={`${entry.amount} ${formatRestriction(entry.restriction).toLowerCase()} ${formatDomain(entry.domain)} Power`}
+          >
+            <DomainIcon decorative domain={entry.domain} />
+            <span className="font-mono font-bold tabular-nums text-white">
+              {entry.amount}
             </span>
           </RunePoolChip>
         ))}
@@ -95,7 +136,7 @@ function RunePoolChip({
   children: ReactNode;
   label: string;
   title: string;
-  tone: "energy" | "power" | "spell";
+  tone: "energy" | "power" | "spell" | "restricted";
 }) {
   return (
     <span
@@ -104,6 +145,8 @@ function RunePoolChip({
         tone === "energy" &&
           "border-amber-200/25 bg-amber-300/10 text-amber-100",
         tone === "spell" && "border-cyan-200/25 bg-cyan-300/10 text-cyan-100",
+        tone === "restricted" &&
+          "border-rose-200/25 bg-rose-300/10 text-rose-100",
         tone === "power" &&
           "border-violet-200/25 bg-violet-300/10 text-violet-100",
       )}
@@ -113,6 +156,18 @@ function RunePoolChip({
       {children}
     </span>
   );
+}
+
+function formatRestriction(restriction: string) {
+  if (restriction === "spellsOnly" || restriction === "card:Spell") {
+    return "Spell-only";
+  }
+  const match = restriction.match(/^(card|cardOrAbility):(Unit|Gear|Spell)$/);
+  if (!match) return "Restricted";
+  const [, scope, cardType] = match;
+  return scope === "cardOrAbility"
+    ? `${cardType}-only`
+    : `${cardType} card-only`;
 }
 
 function powerDomainOrder(domain: string) {

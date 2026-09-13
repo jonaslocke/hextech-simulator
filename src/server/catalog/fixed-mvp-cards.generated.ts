@@ -1782,7 +1782,7 @@ export const fixedMvpCards = [
   },
   {
     "id": "09397732-5f8d-412c-ae14-c8d84ed02ee6",
-    "name": "Yi, Honed",
+    "name": "Master Yi, Honed",
     "riftbound_id": "ogs-009-024",
     "public_code": "OGS-009/024",
     "collector_number": 9,
@@ -2265,7 +2265,7 @@ export const fixedMvpCards = [
   },
   {
     "id": "38052469-6e48-46ae-b0e9-acb9012a71bd",
-    "name": "Yi, Meditative",
+    "name": "Master Yi, Meditative",
     "riftbound_id": "ogs-004-024",
     "public_code": "OGS-004/024",
     "collector_number": 4,
@@ -2533,5 +2533,1153 @@ export const fixedMvpCards = [
     "tcgplayer_id": "652926",
     "orientation": "portrait",
     "ligamagic_id": "142"
+  },
+  {
+    "id": "3f2bf419-d73a-4d97-957c-51c609d1a74b",
+    "name": "Fire Below the Mountain",
+    "riftbound_id": "sfd-189-221",
+    "public_code": "SFD-189/221",
+    "collector_number": 189,
+    "attributes": {
+      "energy": null,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Legend",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Calm",
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>:rb_exhaust:: [Reaction] — [Add] :rb_rune_rainbow:. Use only to play gear or use gear abilities. <em>(Abilities that add resources can't be reacted to.)</em></p>",
+      "plain": ":rb_exhaust:: [Reaction] — [Add] :rb_rune_rainbow:. Use only to play gear or use gear abilities. (Abilities that add resources can't be reacted to.)"
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/ed58d654034d545e54c85d836f3a6552772dd75b-744x1039.png",
+      "artist": "Pandart Studio",
+      "accessibility_text": "Riftbound Legend: Fire Below the Mountain. [T]: [Reaction] — [Add] [A]. Use only to play gear or use gear abilities. (Abilities that add resources can't be reacted to.)"
+    },
+    "tags": [
+      "Ornn"
+    ],
+    "metadata": {
+      "clean_name": "Fire Below the Mountain",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "664924",
+    "orientation": "portrait",
+    "ligamagic_id": "479"
+  },
+  {
+    "id": "92abdf1a-b2e8-4e74-bc2b-885c7ee8304d",
+    "name": "Ornn, Blacksmith",
+    "riftbound_id": "sfd-058-221",
+    "public_code": "SFD-058/221",
+    "collector_number": 58,
+    "attributes": {
+      "energy": 5,
+      "might": 5,
+      "power": 1
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": "Champion",
+      "rarity": "Epic",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play me or when I hold, look at the top 4 cards of your Main Deck. You may reveal a gear from among them and draw it. Then recycle the rest.</p>",
+      "plain": "When you play me or when I hold, look at the top 4 cards of your Main Deck. You may reveal a gear from among them and draw it. Then recycle the rest."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/77b48a28f48f26714f4bcf860379945a2d7186aa-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Unit: Ornn, Blacksmith. When you play me or when I hold, look at the top 4 cards of your Main Deck. You may reveal a gear from among them and draw it. Then recycle the rest."
+    },
+    "tags": [
+      "Ornn",
+      "Freljord"
+    ],
+    "metadata": {
+      "clean_name": "Ornn Blacksmith",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666414",
+    "orientation": "portrait",
+    "ligamagic_id": "406"
+  },
+  {
+    "id": "1435abee-3b70-406a-90ab-000a0e24ac02",
+    "name": "Charm",
+    "riftbound_id": "ogn-043-298",
+    "public_code": "OGN-043/298",
+    "collector_number": 43,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>Move an enemy unit.</p>",
+      "plain": "Move an enemy unit."
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/62ae564505db8fcba70605eac2083ac2d4397b5a-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Spell: Charm. Move an enemy unit."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Charm",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652819",
+    "orientation": "portrait",
+    "ligamagic_id": "43"
+  },
+  {
+    "id": "b1f97cbb-ac21-4d88-a4ad-618ec5689d62",
+    "name": "Clockwork Keeper",
+    "riftbound_id": "ogn-044-298",
+    "public_code": "OGN-044/298",
+    "collector_number": 44,
+    "attributes": {
+      "energy": 2,
+      "might": 2,
+      "power": null
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>As you play me, you may pay :rb_rune_calm: as an additional cost. If you do, draw 1.</p>",
+      "plain": "As you play me, you may pay :rb_rune_calm: as an additional cost. If you do, draw 1."
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/417e606418349bb25d4b07d460fa043ad85f2778-744x1039.png",
+      "artist": "Polar Engine Studio",
+      "accessibility_text": "Riftbound Unit: Clockwork Keeper. As you play me, you may pay [C] as an additional cost. If you do, draw 1."
+    },
+    "tags": [
+      "Shurima"
+    ],
+    "metadata": {
+      "clean_name": "Clockwork Keeper",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652820",
+    "orientation": "portrait",
+    "ligamagic_id": "44"
+  },
+  {
+    "id": "6e6df901-c806-4e44-87da-aa294f7edf52",
+    "name": "Defy",
+    "riftbound_id": "ogn-045-298",
+    "public_code": "OGN-045/298",
+    "collector_number": 45,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Reaction] <em>(Play any time, even before spells and abilities resolve.)</em><br />Counter a spell that costs no more than :rb_energy_4: and no more than :rb_rune_rainbow:.</p>",
+      "plain": "[Reaction] (Play any time, even before spells and abilities resolve.)Counter a spell that costs no more than :rb_energy_4: and no more than :rb_rune_rainbow:."
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/4989bfcc4bd7be77051f0c2c349a981ba9c273e0-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Spell: Defy. [Reaction] (Play any time, even before spells and abilities resolve.)\nCounter a spell that costs no more than [4] and no more than [A]."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Defy",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652821",
+    "orientation": "portrait",
+    "ligamagic_id": "45"
+  },
+  {
+    "id": "c61dd400-aacc-47ef-9fc9-6f5e3e31d194",
+    "name": "Mask of Foresight",
+    "riftbound_id": "ogn-060-298",
+    "public_code": "OGN-060/298",
+    "collector_number": 60,
+    "attributes": {
+      "energy": 2,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>When a friendly unit attacks or defends alone, give it +1 :rb_might: this turn.</p>",
+      "plain": "When a friendly unit attacks or defends alone, give it +1 :rb_might: this turn."
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/03824709acbb4151d13b083a842c4702a3e61221-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Gear: Mask of Foresight. When a friendly unit attacks or defends alone, give it +1 [S] this turn."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Mask of Foresight",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652836",
+    "orientation": "portrait",
+    "ligamagic_id": "60"
+  },
+  {
+    "id": "0ee38ac0-6325-41af-b311-699b83dbeac3",
+    "name": "Pit Crew",
+    "riftbound_id": "ogn-091-298",
+    "public_code": "OGN-091/298",
+    "collector_number": 91,
+    "attributes": {
+      "energy": 3,
+      "might": 3,
+      "power": null
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play a gear, ready me.</p>",
+      "plain": "When you play a gear, ready me."
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8023223b55adc44bafe1f8c5f305d3dde6f6d114-744x1039.png",
+      "artist": "Chris Kintner",
+      "accessibility_text": "Riftbound Unit: Pit Crew. When you play a gear, ready me."
+    },
+    "tags": [
+      "Bandle City"
+    ],
+    "metadata": {
+      "clean_name": "Pit Crew",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652872",
+    "orientation": "portrait",
+    "ligamagic_id": "91"
+  },
+  {
+    "id": "81db2e11-ee65-48e2-b8cd-59c6faa04254",
+    "name": "Brutalizer",
+    "riftbound_id": "sfd-042-221",
+    "public_code": "SFD-042/221",
+    "collector_number": 42,
+    "attributes": {
+      "energy": 2,
+      "might": 1,
+      "power": null
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Equip] :rb_rune_calm: <em>(:rb_rune_calm:: Attach this to a unit you control.)</em></p>",
+      "plain": "[Equip] :rb_rune_calm: (:rb_rune_calm:: Attach this to a unit you control.)"
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/3a0de7eec3de501f79f33c09b43c7fe42721d10d-744x1039.png",
+      "artist": "黯荧岛Dark Glow",
+      "accessibility_text": "Riftbound Gear: Brutalizer. [Equip] [C] ([C]: Attach this to a unit you control.)"
+    },
+    "tags": [
+      "Equipment"
+    ],
+    "metadata": {
+      "clean_name": "Brutalizer",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666373",
+    "orientation": "portrait",
+    "ligamagic_id": "396"
+  },
+  {
+    "id": "fd6dccac-7ced-46ca-bcef-beb9de690165",
+    "name": "Poro Snax",
+    "riftbound_id": "sfd-046-221",
+    "public_code": "SFD-046/221",
+    "collector_number": 46,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play this, draw 1.<br />:rb_energy_1::rb_rune_calm:, :rb_exhaust:, Kill this: Draw 1.</p>",
+      "plain": "When you play this, draw 1.:rb_energy_1::rb_rune_calm:, :rb_exhaust:, Kill this: Draw 1."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8caaa64513b5ba57d676c7b2b9ee64af61711539-744x1039.png",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Gear: Poro Snax. When you play this, draw 1.\n[1][C], [T], Kill this: Draw 1."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Poro Snax",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666842",
+    "orientation": "portrait",
+    "ligamagic_id": "582"
+  },
+  {
+    "id": "012e677e-c89d-4031-bddd-098ecc40c729",
+    "name": "Guardian Angel",
+    "riftbound_id": "sfd-051-221",
+    "public_code": "SFD-051/221",
+    "collector_number": 51,
+    "attributes": {
+      "energy": 2,
+      "might": 1,
+      "power": null
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Equip] :rb_rune_calm: <em>(:rb_rune_calm:: Attach this to a unit you control.)</em></p>",
+      "plain": "[Equip] :rb_rune_calm: (:rb_rune_calm:: Attach this to a unit you control.)"
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/d09a797345659a1853d6d12910cf3c634990ea0c-744x1039.png",
+      "artist": "黯荧岛Dark Glow",
+      "accessibility_text": "Riftbound Gear: Guardian Angel. [Equip] [C] ([C]: Attach this to a unit you control.)"
+    },
+    "tags": [
+      "Equipment"
+    ],
+    "metadata": {
+      "clean_name": "Guardian Angel",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "663435",
+    "orientation": "portrait",
+    "ligamagic_id": "401"
+  },
+  {
+    "id": "645c3ced-f5de-409a-90c1-c98414d3bc7b",
+    "name": "Sterak's Gage",
+    "riftbound_id": "sfd-056-221",
+    "public_code": "SFD-056/221",
+    "collector_number": 56,
+    "attributes": {
+      "energy": 3,
+      "might": 3,
+      "power": 2
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Quick-Draw] <em>(This has [Reaction]. When you play it, attach it to a unit you control.)</em><br />[Equip] :rb_rune_calm: <em>(:rb_rune_calm:: Attach this to a unit you control.)</em></p>",
+      "plain": "[Quick-Draw] (This has [Reaction]. When you play it, attach it to a unit you control.)[Equip] :rb_rune_calm: (:rb_rune_calm:: Attach this to a unit you control.)"
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/df16e6b668fc6771ff657512deba1bf48363e23a-744x1039.png",
+      "artist": "黯荧岛Dark Glow",
+      "accessibility_text": "Riftbound Gear: Sterak's Gage. [Quick-Draw] (This has [Reaction]. When you play it, attach it to a unit you control.)\n[Equip] [C] ([C]: Attach this to a unit you control.)"
+    },
+    "tags": [
+      "Equipment"
+    ],
+    "metadata": {
+      "clean_name": "Steraks Gage",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "663434",
+    "orientation": "portrait",
+    "ligamagic_id": "404"
+  },
+  {
+    "id": "98454abe-9d6d-458f-ae0b-768c6fa2c748",
+    "name": "Aspiring Engineer",
+    "riftbound_id": "sfd-061-221",
+    "public_code": "SFD-061/221",
+    "collector_number": 61,
+    "attributes": {
+      "energy": 3,
+      "might": 3,
+      "power": 1
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play me, return a gear from your trash to your hand.</p>",
+      "plain": "When you play me, return a gear from your trash to your hand."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/5d61995ae384bcee56838beb0eb6d83bf5faefad-744x1039.png",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Unit: Aspiring Engineer. When you play me, return a gear from your trash to your hand."
+    },
+    "tags": [
+      "Piltover"
+    ],
+    "metadata": {
+      "clean_name": "Aspiring Engineer",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666491",
+    "orientation": "portrait",
+    "ligamagic_id": "537"
+  },
+  {
+    "id": "39c2bbd8-dee9-4175-bcd0-62152547a091",
+    "name": "Cloth Armor",
+    "riftbound_id": "sfd-064-221",
+    "public_code": "SFD-064/221",
+    "collector_number": 64,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Quick-Draw] <em>(This has [Reaction]. When you play it, attach it to a unit you control.)</em><br />[Equip] :rb_rune_mind: <em>(:rb_rune_mind:: Attach this to a unit you control.)</em></p>",
+      "plain": "[Quick-Draw] (This has [Reaction]. When you play it, attach it to a unit you control.)[Equip] :rb_rune_mind: (:rb_rune_mind:: Attach this to a unit you control.)"
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/fe02bf01609ff2e6cc6fa8fbd578fd596ab5cb84-744x1039.png",
+      "artist": "黯荧岛Dark Glow",
+      "accessibility_text": "Riftbound Gear: Cloth Armor. [Quick-Draw] (This has [Reaction]. When you play it, attach it to a unit you control.)\n[Equip] [C] ([C]: Attach this to a unit you control.)"
+    },
+    "tags": [
+      "Equipment"
+    ],
+    "metadata": {
+      "clean_name": "Cloth Armor",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666852",
+    "orientation": "portrait",
+    "ligamagic_id": "585"
+  },
+  {
+    "id": "5db3489f-83e2-40ba-80f6-1745a160afad",
+    "name": "Seal of Focus",
+    "riftbound_id": "ogn-081-298",
+    "public_code": "OGN-081/298",
+    "collector_number": 81,
+    "attributes": {
+      "energy": 0,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Epic",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>:rb_exhaust:: [Reaction] — [Add] :rb_rune_calm:. <em>(Abilities that add resources can't be reacted to.)</em></p>",
+      "plain": ":rb_exhaust:: [Reaction] — [Add] :rb_rune_calm:. (Abilities that add resources can't be reacted to.)"
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/288c300c4e4cb10ecfe6c3cbb543d0636b306852-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Gear: Seal of Focus. [T]: [Reaction] — [Add] [C]. (Abilities that add resources can't be reacted to.)"
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Seal of Focus",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652861",
+    "orientation": "portrait",
+    "ligamagic_id": "81"
+  },
+  {
+    "id": "69c43cd2c2f7428c5d24b4e2",
+    "name": "Scuttle Crab",
+    "riftbound_id": "unl-053-219",
+    "public_code": "UNL-053/219",
+    "collector_number": 53,
+    "attributes": {
+      "energy": 2,
+      "might": 0,
+      "power": null
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>(Units with 0 :rb_might: can conquer and hold.)<br />When you play me, draw 1.<br />[Deathknell][&gt;] Choose an opponent. They reveal their hand. You can look at their facedown cards this turn. Gain 1 XP. (When I die, get the effects.)</p>",
+      "plain": "(Units with 0 :rb_might: can conquer and hold.)When you play me, draw 1.[Deathknell][&gt;] Choose an opponent. They reveal their hand. You can look at their facedown cards this turn. Gain 1 XP. (When I die, get the effects.)"
+    },
+    "set": {
+      "set_id": "UNL",
+      "label": "Unleashed"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8c9a251b2deb21716fba0ac83c6aac96563fa19d-744x1039.png",
+      "artist": "黯荧岛Dark Glow",
+      "accessibility_text": "Riftbound Unit: Scuttle Crab. (Units with 0 [S] can conquer and hold.)\nWhen you play me, draw 1.\n[Deathknell][>] Choose an opponent. They reveal their hand. You can look at their facedown cards this turn. Gain 1 XP. (When I die, get the effects.)"
+    },
+    "tags": [
+      "Bilgewater"
+    ],
+    "metadata": {
+      "clean_name": "Scuttle Crab",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-03-25T19:51:46.695993+00:00"
+    },
+    "tcgplayer_id": "685519",
+    "orientation": "portrait"
+  },
+  {
+    "id": "69c4407d9288b1e85d94de92",
+    "name": "Sprite Fountain",
+    "riftbound_id": "unl-078-219",
+    "public_code": "UNL-078/219",
+    "collector_number": 78,
+    "attributes": {
+      "energy": 2,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Temporary] (Kill this at the start of its controller's Beginning Phase, before scoring.)<br />When you play this, play a ready 3 :rb_might: Sprite unit token with [Temporary] to your base.<br />[Deathknell][&gt;] Repeat this gear's play effect. (When this dies, get the effect.)</p>",
+      "plain": "[Temporary] (Kill this at the start of its controller's Beginning Phase, before scoring.)When you play this, play a ready 3 :rb_might: Sprite unit token with [Temporary] to your base.[Deathknell][&gt;] Repeat this gear's play effect. (When this dies, get the effect.)"
+    },
+    "set": {
+      "set_id": "UNL",
+      "label": "Unleashed"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/fcb3ea3e8f829b8dc845fbf49080552d635bb47b-744x1039.png",
+      "artist": "Envar Studio",
+      "accessibility_text": "Riftbound Gear: Sprite Fountain. [Temporary] (Kill this at the start of its controller's Beginning Phase, before scoring.)\nWhen you play this, play a ready 3 [S] Sprite unit token with [Temporary] to your base.\n[Deathknell][>] Repeat this gear's play effect. (When this dies, get the effect.)"
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Sprite Fountain",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-03-25T20:07:25.171369+00:00"
+    },
+    "tcgplayer_id": "685589",
+    "orientation": "portrait"
+  },
+  {
+    "id": "6a590ef00e5d4c92d5d1efed",
+    "name": "Helm of Suppression",
+    "riftbound_id": "ven-045-166",
+    "public_code": "VEN-045/166",
+    "collector_number": 45,
+    "attributes": {
+      "energy": 4,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Gear",
+      "supertype": null,
+      "rarity": "Epic",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Empower] :rb_energy_4::rb_rune_calm: (:rb_energy_4::rb_rune_calm:: Empower this. Use only if not Empowered.)<br />Opponents' spells cost :rb_energy_1: more. If this is [Empowered], they cost :rb_energy_1::rb_rune_rainbow: more instead.</p>",
+      "plain": "[Empower] :rb_energy_4::rb_rune_calm: (:rb_energy_4::rb_rune_calm:: Empower this. Use only if not Empowered.)Opponents' spells cost :rb_energy_1: more. If this is [Empowered], they cost :rb_energy_1::rb_rune_rainbow: more instead."
+    },
+    "set": {
+      "set_id": "VEN",
+      "label": "Vendetta"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/ecfe67bbdc04f5c16a845ccc7a1b8d534195ca70-744x1039.png?accountingTag=RB",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Gear: Helm of Suppression. [Empower] [4][C] ([4][C]: Empower this. Use only if not Empowered.)\nOpponents' spells cost [1] more. If this is [Empowered], they cost [1][A] more instead."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Helm of Suppression",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-07-16T17:03:44.333882+00:00"
+    },
+    "tcgplayer_id": null,
+    "orientation": "portrait"
+  },
+  {
+    "id": "6a56ab98ff602fd324f4764b",
+    "name": "Patched Porobot",
+    "riftbound_id": "ven-058-166",
+    "public_code": "VEN-058/166",
+    "collector_number": 58,
+    "attributes": {
+      "energy": 2,
+      "might": 2,
+      "power": null
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>(I enter exhausted.)<br />When you play me, if you control 3 or more other gear, draw 1.</p>",
+      "plain": "(I enter exhausted.)When you play me, if you control 3 or more other gear, draw 1."
+    },
+    "set": {
+      "set_id": "VEN",
+      "label": "Vendetta"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/7667d7e0c902782c38221e9326d1bb98181ec17f-744x1039.png?accountingTag=RB",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Unit, Gear: Patched Porobot. (I enter exhausted.)\nWhen you play me, if you control 3 or more other gear, draw 1."
+    },
+    "tags": [
+      "Mech",
+      "Poro",
+      "Piltover"
+    ],
+    "metadata": {
+      "clean_name": "Patched Porobot",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-07-14T21:35:20.998400+00:00"
+    },
+    "tcgplayer_id": "706079",
+    "orientation": "portrait"
+  },
+  {
+    "id": "7dd3ce40-baf7-4de4-80fd-d104813a277a",
+    "name": "Seat of Power",
+    "riftbound_id": "sfd-217-221",
+    "public_code": "SFD-217/221",
+    "collector_number": 217,
+    "attributes": {
+      "energy": null,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Battlefield",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Colorless"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you conquer here, draw 1 for each other battlefield you or allies control.</p>",
+      "plain": "When you conquer here, draw 1 for each other battlefield you or allies control."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8b9db30f8eedd5e5463a0fceaeaf90069bce39ae-1039x744.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Battlefield: Seat of Power. When you conquer here, draw 1 for each other battlefield you or allies control."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Seat of Power",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666876",
+    "orientation": "landscape",
+    "ligamagic_id": "641"
+  },
+  {
+    "id": "323503b3-b79d-4814-8925-941e24e58dba",
+    "name": "Ornn's Forge",
+    "riftbound_id": "sfd-213-221",
+    "public_code": "SFD-213/221",
+    "collector_number": 213,
+    "attributes": {
+      "energy": null,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Battlefield",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Colorless"
+      ]
+    },
+    "text": {
+      "rich": "<p>While you control this battlefield, the first friendly non-token gear played each turn costs :rb_energy_1: less.</p>",
+      "plain": "While you control this battlefield, the first friendly non-token gear played each turn costs :rb_energy_1: less."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e228948bc7a6d8ee858fbc0bed3d93a53f467097-1039x744.png",
+      "artist": "Envar Studio",
+      "accessibility_text": "Riftbound Battlefield: Ornn's Forge. While you control this battlefield, the first friendly non-token gear played each turn costs [1] less."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Ornns Forge",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666492",
+    "orientation": "landscape",
+    "ligamagic_id": "555"
+  },
+  {
+    "id": "5975b423-2e08-497a-9f96-07f25399ab9b",
+    "name": "Veiled Temple",
+    "riftbound_id": "sfd-221-221",
+    "public_code": "SFD-221/221",
+    "collector_number": 221,
+    "attributes": {
+      "energy": null,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Battlefield",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Colorless"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you conquer here, you may ready a friendly gear. If it's an Equipment, you may detach it.</p>",
+      "plain": "When you conquer here, you may ready a friendly gear. If it's an Equipment, you may detach it."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/6f2b38874a09b3e3df3fe584ea77e84aa5423e37-1039x744.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Battlefield: Veiled Temple. When you conquer here, you may ready a friendly gear. If it's an Equipment, you may detach it."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Veiled Temple",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666879",
+    "orientation": "landscape",
+    "ligamagic_id": "644"
+  },
+  {
+    "id": "6a56aba0ff602fd324f47680",
+    "name": "Decree of Focus",
+    "riftbound_id": "ven-040-166",
+    "public_code": "VEN-040/166",
+    "collector_number": 40,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Reaction] (Play any time, even before spells and abilities resolve.)<br />Choose a friendly unit that's in combat with an enemy Fury (:rb_rune_fury:) unit or that's being chosen by an enemy Fury spell. Give it +4 :rb_might: this turn.</p>",
+      "plain": "[Reaction] (Play any time, even before spells and abilities resolve.)Choose a friendly unit that's in combat with an enemy Fury (:rb_rune_fury:) unit or that's being chosen by an enemy Fury spell. Give it +4 :rb_might: this turn."
+    },
+    "set": {
+      "set_id": "VEN",
+      "label": "Vendetta"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/3f9a1b209cfd6097bac6fa9aec57531e300ef511-744x1039.png?accountingTag=RB",
+      "artist": "Envar Studio",
+      "accessibility_text": "Riftbound Spell: Decree of Focus. [Reaction] (Play any time, even before spells and abilities resolve.)\nChoose a friendly unit that's in combat with an enemy Fury ([R]) unit or that's being chosen by an enemy Fury spell. Give it +4 [S] this turn."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Decree of Focus",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-07-14T21:35:28.136479+00:00"
+    },
+    "tcgplayer_id": null,
+    "orientation": "portrait"
+  },
+  {
+    "id": "6a56ab95ff602fd324f4760f",
+    "name": "Decree of Insight",
+    "riftbound_id": "ven-061-166",
+    "public_code": "VEN-061/166",
+    "collector_number": 61,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Rare",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Reaction] (Play any time, even before spells and abilities resolve.)<br />Ignore [Deflect] while paying this spell's cost.<br />Give an enemy Body (:rb_rune_body:) unit -5 :rb_might: this turn.</p>",
+      "plain": "[Reaction] (Play any time, even before spells and abilities resolve.)Ignore [Deflect] while paying this spell's cost.Give an enemy Body (:rb_rune_body:) unit -5 :rb_might: this turn."
+    },
+    "set": {
+      "set_id": "VEN",
+      "label": "Vendetta"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/da019355562b207814be6aec55bccf415bd416df-744x1039.png?accountingTag=RB",
+      "artist": "Envar Studio",
+      "accessibility_text": "Riftbound Spell: Decree of Insight. [Reaction] (Play any time, even before spells and abilities resolve.)\nIgnore [Deflect] while paying this spell's cost.\nGive an enemy Body ([O]) unit -5 [S] this turn."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Decree of Insight",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false,
+      "updated_on": "2026-07-14T21:35:17.616734+00:00"
+    },
+    "tcgplayer_id": "706019",
+    "orientation": "portrait"
+  },
+  {
+    "id": "743053e3-09a6-40ee-8f99-29101cd50375",
+    "name": "Disarming Rake",
+    "riftbound_id": "sfd-032-221",
+    "public_code": "SFD-032/221",
+    "collector_number": 32,
+    "attributes": {
+      "energy": 3,
+      "might": 2,
+      "power": 1
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play me, you may kill a gear.</p>",
+      "plain": "When you play me, you may kill a gear."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/523732db17d8cf3c7c55f57c5dfb397b73e2b116-744x1039.png",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Unit: Disarming Rake. When you play me, you may kill a gear."
+    },
+    "tags": [
+      "Demacia"
+    ],
+    "metadata": {
+      "clean_name": "Disarming Rake",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666580",
+    "orientation": "portrait",
+    "ligamagic_id": "531"
+  },
+  {
+    "id": "92ccf312-f43f-429c-800f-c371a55d36ab",
+    "name": "Not So Fast",
+    "riftbound_id": "sfd-045-221",
+    "public_code": "SFD-045/221",
+    "collector_number": 45,
+    "attributes": {
+      "energy": 2,
+      "might": null,
+      "power": 1
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Calm"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Reaction] <em>(Play any time, even before spells and abilities resolve.)</em><br />Counter an enemy spell or ability that chooses a friendly unit or gear.</p>",
+      "plain": "[Reaction] (Play any time, even before spells and abilities resolve.)Counter an enemy spell or ability that chooses a friendly unit or gear."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e576fefdce72ad862a7e374bf8c0fd509f359da9-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Spell: Not So Fast. [Reaction] (Play any time, even before spells and abilities resolve.)\nCounter an enemy spell or ability that chooses a friendly unit or gear."
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Not So Fast",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "665592",
+    "orientation": "portrait",
+    "ligamagic_id": "397"
+  },
+  {
+    "id": "8b0f5d65-c80e-48a7-b417-323dcde78840",
+    "name": "Pickpocket",
+    "riftbound_id": "sfd-074-221",
+    "public_code": "SFD-074/221",
+    "collector_number": 74,
+    "attributes": {
+      "energy": 3,
+      "might": 3,
+      "power": null
+    },
+    "classification": {
+      "type": "Unit",
+      "supertype": null,
+      "rarity": "Uncommon",
+      "domain": [
+        "Mind"
+      ]
+    },
+    "text": {
+      "rich": "<p>When you play me, you may kill a gear with Energy cost no more than :rb_energy_1:. If you do, play a Gold gear token exhausted.</p>",
+      "plain": "When you play me, you may kill a gear with Energy cost no more than :rb_energy_1:. If you do, play a Gold gear token exhausted."
+    },
+    "set": {
+      "set_id": "SFD",
+      "label": "SFD"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/ebf54af997e53079e1a476feb0411d1791b20f7e-744x1039.png",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Unit: Pickpocket. When you play me, you may kill a gear with Energy cost no more than [1]. If you do, play a Gold gear token exhausted."
+    },
+    "tags": [
+      "Zaun"
+    ],
+    "metadata": {
+      "clean_name": "Pickpocket",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "666861",
+    "orientation": "portrait",
+    "ligamagic_id": "591"
   }
 ] satisfies Card[];

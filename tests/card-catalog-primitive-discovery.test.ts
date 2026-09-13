@@ -918,7 +918,7 @@ test("reuses exhaust-for-resource behavior for Lux and variable converters", () 
       resourceType: "energy",
       amountSource: "constant",
       amount: 2,
-      usage: "spellsOnly"
+      usage: "card:Spell"
     }
   );
   assert.deepEqual(

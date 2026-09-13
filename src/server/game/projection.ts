@@ -9,6 +9,7 @@ import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
 import { victoryRequirement } from "./victory";
+import { cardHasType } from "./primitive-handlers";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -51,9 +52,9 @@ export function projectGame(input: {
       ownerPlayerId: instance.ownerPlayerId,
       name: card.name,
       imageUrl: card.media.image_url ?? null,
-      rulesText: card.text.plain,
+      rulesText: displayRulesText(definition),
       publicCode: card.public_code,
-      type: card.classification.type,
+      type: displayCardTypes(definition).join(" / "),
       supertype: card.classification.supertype,
       domains: card.classification.domain,
       energy: card.attributes.energy,
@@ -62,7 +63,22 @@ export function projectGame(input: {
       computedMight: state.computedMight,
       damage: state.damage,
       exhausted: state.exhausted,
+      empowered: state.empowered ?? false,
+      attachedToCardInstanceId: state.attachedToCardInstanceId ?? null,
     };
+  };
+  const canViewFacedownCard = (id: string) => {
+    const ownerPlayerId = instances.get(id)?.ownerPlayerId;
+    return (
+      ownerPlayerId === input.viewerPlayerId ||
+      (input.game.state.facedownVisibilityGrants ?? []).some(
+        (grant) =>
+          grant.viewerPlayerId === input.viewerPlayerId &&
+          grant.ownerPlayerId === ownerPlayerId &&
+          grant.expiresAtTurnNumber >=
+            (input.game.state.turn?.turnNumber ?? 0),
+      )
+    );
   };
   const players = input.game.state.setup.playerIds.map((playerId) => {
     const player = input.game.state.players[playerId]!;
@@ -77,7 +93,11 @@ export function projectGame(input: {
         kind === "hand"
           ? isViewer
             ? "private"
-            : "secret"
+            : ids.some((id) =>
+                  (input.game.state.revealedCardInstanceIds ?? []).includes(id),
+                )
+              ? "public"
+              : "secret"
           : ["mainDeck", "runeDeck"].includes(kind)
             ? "secret"
             : "public";
@@ -85,7 +105,16 @@ export function projectGame(input: {
         kind,
         visibility,
         count: ids.length,
-        cards: visibility === "secret" ? [] : ids.map(view),
+        cards:
+          visibility === "secret"
+            ? []
+            : kind === "hand" && !isViewer
+              ? ids
+                  .filter((id) =>
+                    (input.game.state.revealedCardInstanceIds ?? []).includes(id),
+                  )
+                  .map(view)
+              : ids.map(view),
       };
     });
     return {
@@ -93,9 +122,11 @@ export function projectGame(input: {
       displayName: input.playerNames?.[playerId] ?? playerId,
       isViewer,
       points: player.points ?? 0,
+      xp: player.xp ?? 0,
       energy: player.energy,
       conditionalEnergy: player.conditionalEnergy,
       power: player.power,
+      restrictedResources: player.restrictedResources ?? { energy: {}, power: {} },
       zones,
     };
   });
@@ -172,6 +203,20 @@ export function projectGame(input: {
                   )
                 : [],
           }
+        : input.game.state.pendingChoice?.type === "orderReplacements"
+          ? {
+              type: "orderReplacements",
+              id: input.game.state.pendingChoice.id,
+              playerId: input.game.state.pendingChoice.playerId,
+              prompt: "Choose the order for replacement effects.",
+              options:
+                input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                  ? input.game.state.pendingChoice.options.map((option) => ({
+                      id: option.id,
+                      sourceCardInstanceId: option.sourceCardInstanceId,
+                    }))
+                  : [],
+            }
         : input.game.state.pendingChoice?.type === "effectSelection"
           ? {
               type: "effectSelection",
@@ -191,9 +236,34 @@ export function projectGame(input: {
                 input.game.state.pendingChoice.presentation === "vision"
                   ? input.game.state.pendingChoice.legalCardIds.map(view)
                   : [],
+              visibleCards:
+                input.game.state.pendingChoice.playerId ===
+                input.viewerPlayerId
+                  ? (input.game.state.pendingChoice.visibleCardIds ?? []).map(view)
+                  : [],
               minimum: input.game.state.pendingChoice.minimum,
               maximum: input.game.state.pendingChoice.maximum,
             }
+          : input.game.state.pendingChoice?.type === "effectOption"
+            ? {
+                type: "effectOption",
+                id: input.game.state.pendingChoice.id,
+                playerId: input.game.state.pendingChoice.playerId,
+                prompt: input.game.state.pendingChoice.prompt,
+                title: "Choose an option",
+                waitingMessage:
+                  input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                    ? input.game.state.pendingChoice.prompt
+                    : `Waiting for the other player to complete: ${input.game.state.pendingChoice.prompt}`,
+                options:
+                  input.game.state.pendingChoice.playerId === input.viewerPlayerId
+                    ? input.game.state.pendingChoice.options.map((option) => ({
+                        ...option,
+                      }))
+                    : [],
+                revealedCards: (input.game.state.revealedCardInstanceIds ?? [])
+                  .map(view),
+              }
           : input.game.state.pendingChoice?.type === "assignCombatDamage"
             ? {
                 type: "assignCombatDamage",
@@ -250,7 +320,12 @@ export function projectGame(input: {
       contestedByPlayerId: battlefield.contestedByPlayerId ?? null,
       card: view(battlefield.cardInstanceId),
       units: battlefield.units.map(view),
-      facedownCard: null,
+      attachedCards: (battlefield.attachedCardInstanceIds ?? []).map(view),
+      facedownCard:
+        battlefield.facedownCardInstanceId &&
+        canViewFacedownCard(battlefield.facedownCardInstanceId)
+          ? view(battlefield.facedownCardInstanceId)
+          : null,
     })),
     chain: input.game.state.chain
       ? {
@@ -262,6 +337,13 @@ export function projectGame(input: {
           passedPlayerIds: input.game.state.chain.passedPlayerIds,
         }
       : null,
+    publicReveals: (input.game.state.publicReveals ?? []).map((reveal) => ({
+      id: reveal.id,
+      message: reveal.handReveal
+        ? `${reveal.handReveal.sourceName} revealed ${input.playerNames?.[reveal.handReveal.playerId] ?? reveal.handReveal.playerId}'s hand: ${reveal.handReveal.cardNames.join(", ")}.`
+        : reveal.message,
+      cards: reveal.cardInstanceIds.map(view),
+    })),
     actions: (input.game.status === "setup_pending"
       ? setupActions(input.game, input.viewerPlayerId)
       : gameplayActions(input.game, input.viewerPlayerId, input.decks)
@@ -272,7 +354,10 @@ export function projectGame(input: {
     }),
     logEntries: (input.events ?? []).map((event) => ({
       id: event.id,
-      message: event.message,
+      message: event.type === "cards.revealed" && typeof event.payload?.handOwnerPlayerId === "string" &&
+        typeof event.payload.revealSourceName === "string" && typeof event.payload.revealedCardNames === "string"
+        ? `${event.payload.revealSourceName} revealed ${input.playerNames?.[event.payload.handOwnerPlayerId] ?? event.payload.handOwnerPlayerId}'s hand: ${event.payload.revealedCardNames}.`
+        : event.message,
       createdAt: event.createdAt,
     })),
   });
@@ -298,6 +383,26 @@ function projectChainItem(
           : definitionKind(item.sourceCardInstanceId, definitions, instances),
     card: item.sourceCardInstanceId ? view(item.sourceCardInstanceId) : null,
   };
+}
+
+function displayCardTypes(
+  definition: DeckSnapshotDocument["snapshot"]["cards"][number],
+) {
+  const primary = definition.card.classification.type;
+  const additional = ["Unit", "Gear", "Spell", "Rune", "Battlefield", "Legend"]
+    .filter((type) => type !== primary && cardHasType(definition, type));
+  return [primary, ...additional];
+}
+
+function displayRulesText(
+  definition: DeckSnapshotDocument["snapshot"]["cards"][number],
+) {
+  if (definition.card.text.plain.trim()) return definition.card.text.plain;
+  return [...new Set(
+    definition.behaviorModel.clauses
+      .map((clause) => clause.sourceText.trim())
+      .filter(Boolean),
+  )].join("\n");
 }
 
 function waitingReason(

@@ -221,6 +221,22 @@ function buildBattlefieldData({
       ownerPlayerId,
     }));
   });
+  const attachmentCards = (battlefield?.attachedCardInstanceIds ?? []).flatMap(
+    (cardInstanceId) => {
+      const ownerPlayerId =
+        cardOwnerByInstanceId[cardInstanceId] ?? battlefield?.selectedByPlayerId;
+      return buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates).map(
+        (card) => ({ card, ownerPlayerId }),
+      );
+    },
+  );
+  const facedownCard = battlefield?.facedownSlot
+    ? (buildCard(
+        battlefield.facedownSlot,
+        cardsByInstanceId,
+        projection.cardStates,
+      )[0] ?? null)
+    : null;
 
   return {
     id: battlefield?.battlefieldId ?? `missing:${fallbackSelectedByPlayerId}`,
@@ -237,6 +253,13 @@ function buildBattlefieldData({
     opponentUnits: unitCards
       .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
       .map(({ card }) => card),
+    playerAttachments: attachmentCards
+      .filter(({ ownerPlayerId }) => ownerPlayerId === viewerPlayerId)
+      .map(({ card }) => card),
+    opponentAttachments: attachmentCards
+      .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
+      .map(({ card }) => card),
+    facedownCard,
   };
 }
 
@@ -255,6 +278,8 @@ export function buildCard(
     {
       domains: card.classification.domain,
       damage: cardStates[cardInstanceId]?.damage,
+      attachedToCardInstanceId:
+        cardStates[cardInstanceId]?.attachedToCardInstanceId ?? null,
       energy: card.attributes.energy ?? undefined,
       img: card.media.image_url ?? cardBackImage.src,
       instanceId: cardInstanceId,

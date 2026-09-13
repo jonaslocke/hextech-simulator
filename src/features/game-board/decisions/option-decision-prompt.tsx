@@ -3,6 +3,7 @@
 import { ChoiceDialog } from "@/shared/components/choice-dialog";
 import type { ReactNode } from "react";
 import type { OptionDecisionRequest } from "./player-decision-types";
+import { PublicRevealedCards } from "./public-revealed-cards";
 
 export function OptionDecisionPrompt({
   decision,
@@ -35,6 +36,7 @@ export function OptionDecisionPrompt({
       onConfirm={onSubmit}
       options={decision.options}
       selectionMode="single"
+      supplement={<PublicRevealedCards cards={decision.revealedCards ?? []} />}
       title={decision.title}
     />
   );

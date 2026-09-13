@@ -12,6 +12,10 @@ import {
   createRuntimeCardIndex,
   definitionForInstance,
   effectiveEnergyCost,
+  effectivePowerCost,
+  advanceGameObjectIncarnation,
+  moveCardToTrash,
+  submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
 import {
@@ -22,6 +26,7 @@ import {
   resolveNonCombatShowdown,
   unitControllers,
 } from "./board-rules";
+import { moveAttachedCardsWithTopMost } from "./attachment-lifecycle";
 import {
   beginCombatDamage,
   combatChoiceTargets,
@@ -37,7 +42,7 @@ import {
   submitChainTargetSelection,
 } from "./triggers";
 import type { DeckSnapshotDocument } from "./repositories";
-import type { GameCardDefinition } from "./schemas";
+import type { BehaviorBinding, BehaviorClause, GameCardDefinition } from "./schemas";
 import type { ChainItem, GameDocument } from "./state";
 import {
   addConsecutivePass,
@@ -52,12 +57,17 @@ import {
 } from "./transitions";
 import {
   availableAnyPowerAfterBaseCost,
+  buildAbilityPaymentPlan,
   buildPaymentPlan,
-  payCardCost,
+  canPayCardCosts,
+  payAbilityCost,
+  payCardCosts,
   targetDeflectCost,
+  type AdditionalCardCost,
 } from "./payment";
 import {
   beginEffectResolution,
+  submitEffectOption,
   submitEffectSelection,
   submitTokenPlacement,
   type TokenPlacement,
@@ -138,6 +148,36 @@ export function gameplayActions(
       );
       return actions;
     }
+    if (pendingChoice.type === "effectOption") {
+      const optionIds = pendingChoice.options.map((option) => option.id);
+      actions.push(
+        action(
+          game,
+          "submitChoice",
+          pendingChoice.prompt,
+          null,
+          true,
+          null,
+          undefined,
+          [
+            {
+              kind: "card",
+              label: pendingChoice.prompt,
+              legalIds: optionIds,
+              minimum: 1,
+              maximum: 1,
+            },
+          ],
+          {
+            kind: "effectOption",
+            choiceId: pendingChoice.id,
+            prompt: pendingChoice.prompt,
+            options: pendingChoice.options,
+          },
+        ),
+      );
+      return actions;
+    }
     if (pendingChoice.type === "tokenPlacement") {
       const destinations = pendingChoice.legalDestinationIds.map((id) => ({
         id,
@@ -165,11 +205,17 @@ export function gameplayActions(
       );
       return actions;
     }
+    const optionIds =
+      pendingChoice.type === "orderReplacements"
+        ? pendingChoice.options.map((option) => option.id)
+        : pendingChoice.optionIds;
     actions.push(
       action(
         game,
         "submitChoice",
-        "Submit trigger order",
+        pendingChoice.type === "orderReplacements"
+          ? "Submit replacement order"
+          : "Submit trigger order",
         null,
         true,
         null,
@@ -177,16 +223,19 @@ export function gameplayActions(
         [
           {
             kind: "card",
-            label: "trigger order",
-            legalIds: pendingChoice.optionIds,
-            minimum: pendingChoice.optionIds.length,
-            maximum: pendingChoice.optionIds.length,
+            label:
+              pendingChoice.type === "orderReplacements"
+                ? "replacement order"
+                : "trigger order",
+            legalIds: optionIds,
+            minimum: optionIds.length,
+            maximum: optionIds.length,
           },
         ],
         {
           kind: "orderedOptions",
           choiceId: pendingChoice.id,
-          optionIds: pendingChoice.optionIds,
+          optionIds,
         },
       ),
     );
@@ -422,6 +471,9 @@ export function performGameplayAction(input: {
     throw new Error("Action is not legal for the current game state.");
   validateActionTargets(projected, input.selectedIds);
   const game = structuredClone(input.game);
+  // Public card reveals are an informational presentation, not a decision.
+  // A later accepted game action replaces the transient presentation.
+  game.state.publicReveals = [];
   const index = createRuntimeCardIndex(input.decks, game);
   const handlers = createPrimitiveHandlers(index);
   const [, , , kind, encodedSource, encodedExtra] = input.actionId.split(":");
@@ -446,7 +498,16 @@ export function performGameplayAction(input: {
       );
       break;
     case "submitChoice":
-      if (game.state.pendingChoice?.type === "orderTriggers") {
+      if (game.state.pendingChoice?.type === "orderReplacements") {
+        submitDeathReplacementOrder(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          index,
+        );
+        completeChainResolution(game, index, input.decks);
+        cleanupBoard(game, index);
+      } else if (game.state.pendingChoice?.type === "orderTriggers") {
         const orderedIds = [...input.selectedIds];
         submitTriggerOrder(game, input.actorPlayerId, input.selectedIds);
         const orderedItems =
@@ -478,6 +539,19 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+      } else if (game.state.pendingChoice?.type === "effectOption") {
+        submitEffectOption(
+          game,
+          input.actorPlayerId,
+          input.selectedIds,
+          input.decks,
+        );
+        completeChainResolution(game, index, input.decks);
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "tokenPlacement") {
         submitTokenPlacement(
           game,
@@ -485,6 +559,7 @@ export function performGameplayAction(input: {
           input.tokenPlacements ?? [],
           input.decks,
         );
+        completeChainResolution(game, index, input.decks);
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);
@@ -497,6 +572,7 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+        completeChainResolution(game, index, input.decks);
         queueChainItemsForTargets(game, [], input.decks);
         drainQueuedBehaviorEvents(game, input.decks);
         resetChainPriorityToTopItem(game);
@@ -545,6 +621,7 @@ export function performGameplayAction(input: {
         }
         player.zones.base.push(cardId);
         game.state.cardStates[cardId]!.exhausted = true;
+        moveAttachedCardsWithTopMost(game, cardId, index);
         cleanupBoard(game, index);
         dispatchBehaviorEvent(
           game,
@@ -647,7 +724,7 @@ function playCard(
   game: GameDocument,
   playerId: string,
   cardId: string,
-  destinationId: string,
+  playExtra: string,
   selectedIds: string[],
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
@@ -655,7 +732,29 @@ function playCard(
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
+  const { destinationId, optionalCostKeys } = decodePlayExtra(playExtra);
+  const optionalSourceCosts = optionalSourcePlayCosts(definition);
+  const optionalSourceCostKeys = new Set(
+    optionalSourceCosts.map((payment) => payment.selectionKey),
+  );
+  if (optionalCostKeys.some((key) => !optionalSourceCostKeys.has(key))) {
+    throw new Error("Optional play cost is not available for this card.");
+  }
+  const optionalCosts = optionalSourceCosts
+    .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
+    .flatMap((payment) => payment.costs);
+  const selectionOverrides = Object.fromEntries(
+    optionalSourceCosts.map((payment) => [
+      payment.selectionKey,
+      optionalCostKeys.includes(payment.selectionKey) ? [cardId] : [],
+    ]),
+  );
+  // The source id permits canonical selector validation while the keyed
+  // overrides retain which individual optional costs were actually chosen.
+  const allSelectedIds =
+    optionalCostKeys.length > 0 ? [...selectedIds, cardId] : selectedIds;
   const isUnit = definition.card.classification.type === "Unit";
+  const isGear = definition.card.classification.type === "Gear";
   const showdownAtPlayStart = game.state.showdown;
   const destinationBattlefield =
     isUnit && destinationId !== "base"
@@ -669,7 +768,28 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition, index);
+  const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
+  const dynamicTargets = compiled.clauses
+    .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
+    .flatMap((clause) =>
+      targetRequirementsForClause(
+        clause,
+        createBehaviorContext(
+          game,
+          playerId,
+          cardId,
+          null,
+          allSelectedIds,
+          {},
+          selectionOverrides,
+        ),
+        handlers,
+      ),
+    );
+  if (dynamicTargets.some((target) => target.kind === "location")) {
+    validateTargetRequirements(dynamicTargets, selectedIds);
+  }
+  const energyCost = effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -679,21 +799,60 @@ function playCard(
       "eventSubject.effectiveEnergyCost": energyCost,
     },
   };
-  payOptionalPlayCosts(game, definition, selectedIds, index);
-  payCardCost(
+  const additionalAnyPower = targetDeflectCost(
+    playerId,
+    selectedIds,
+    index,
+    ignoresDeflect(definition),
+  );
+  payCardCosts(
     game,
     playerId,
     definition,
     energyCost,
     index,
-    targetDeflectCost(playerId, selectedIds, index),
+    additionalAnyPower,
+    optionalCosts,
+    cardId,
   );
+  payOptionalNonResourcePlayCosts(
+    game,
+    playerId,
+    definition,
+    selectedIds,
+    index,
+  );
+  if (game.state.turn) {
+    game.state.turn.playedCardInstanceIds ??= [];
+    game.state.turn.playedCardInstanceIds.push(cardId);
+  }
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
+  if (isGear) {
+    // Rules 143.1.a.1, 144.1, and 563.1.d: Gear enters ready at its
+    // controller's Base and does not use a Unit play destination.
+    player.zones.base.push(cardId);
+    advanceGameObjectIncarnation(game, cardId);
+    game.state.cardStates[cardId]!.exhausted = false;
+    executeImmediateClauses(
+      game,
+      definition,
+      playerId,
+      cardId,
+      allSelectedIds,
+      handlers,
+      undefined,
+      selectionOverrides,
+    );
+    dispatchBehaviorEvent(game, playEvent, decks, { chainOrigin: "cardPlay" });
+    cleanupBoard(game, index);
+    return;
+  }
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
+    advanceGameObjectIncarnation(game, cardId);
     if (
       destinationBattlefield &&
       destinationBattlefield.controllerPlayerId == null
@@ -706,8 +865,10 @@ function playCard(
       definition,
       playerId,
       cardId,
-      selectedIds,
+      allSelectedIds,
       handlers,
+      undefined,
+      selectionOverrides,
     );
     if (
       game.state.ongoingEffects.some(
@@ -731,14 +892,16 @@ function playCard(
     }
     return;
   }
+  advanceGameObjectIncarnation(game, cardId);
   const item = {
     id: `chain:${game.stateVersion + 1}:${cardId}`,
     kind: "spell" as const,
     label: definition.card.name,
     controllerPlayerId: playerId,
     sourceCardInstanceId: cardId,
-    targetCardInstanceIds: selectedIds,
-    targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
+    targetCardInstanceIds: allSelectedIds,
+    initialSelectionOverrides: selectionOverrides,
+    targetObjectVersions: captureTargetObjectVersions(game, allSelectedIds),
     behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
@@ -770,6 +933,52 @@ function spellResolutionClauseId(
   return clauses.length === 1 ? clauses[0]!.id : null;
 }
 
+/** Finish the same persisted resolution after either Priority or a choice.
+ * No Chain removal, Cleanup, or Focus transfer may occur while it is paused.
+ */
+function completeChainResolution(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const chain = game.state.chain;
+  if (!chain?.resolvingItemId || game.state.effectResolutions.length || game.state.pendingChoice) return;
+  const item = chain.items.find((candidate) => candidate.id === chain.resolvingItemId);
+  if (!item) throw new Error("Resolving Chain item is unavailable.");
+  chain.items = chain.items.filter((candidate) => candidate.id !== item.id);
+  delete chain.resolvingItemId;
+  if (item.kind === "spell" && item.sourceCardInstanceId) {
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
+    game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+    advanceGameObjectIncarnation(game, item.sourceCardInstanceId);
+    dispatchBehaviorEvent(game, item.behaviorEvent?.type === "card.played"
+      ? item.behaviorEvent
+      : {
+          type: "card.played",
+          actorPlayerId: item.controllerPlayerId,
+          subjectCardInstanceId: item.sourceCardInstanceId,
+          values: {
+            "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0,
+            "eventSubject.effectiveEnergyCost": effectiveEnergyCost(game, item.controllerPlayerId, definition, index),
+          },
+        }, decks);
+  }
+  cleanupBoard(game, index);
+  if (chain.items.length) {
+    chain.priorityPlayerId = chain.items.at(-1)!.controllerPlayerId;
+    chain.passedPlayerIds = [];
+  } else if (!game.state.pendingChoice && !(game.state.queuedChainItems?.length)) {
+    game.state.chain = null;
+    if (game.state.showdown) {
+      if (chain.openedBy !== "triggeredAbility" && chain.openedBy !== "addAbility") {
+        game.state.showdown.focusPlayerId = nextRelevantPlayer(game, game.state.showdown.focusPlayerId, game.state.showdown.relevantPlayerIds);
+      }
+      game.state.showdown.passedPlayerIds = [];
+    }
+  }
+}
+
 function passPriority(
   game: GameDocument,
   actor: string,
@@ -780,17 +989,23 @@ function passPriority(
   if (game.state.chain) {
     const passed = addConsecutivePass(game.state.chain.passedPlayerIds, actor);
     if (passed.length === game.state.chain.relevantPlayerIds.length) {
-      const item = game.state.chain.items.pop();
+      const item = game.state.chain.items.at(-1);
+      if (item) game.state.chain.resolvingItemId = item.id;
       if (item?.sourceCardInstanceId) {
         const controller = item.controllerPlayerId;
-        const owner = index.instances.get(
-          item.sourceCardInstanceId,
-        )!.ownerPlayerId;
         const definition = definitionForInstance(
           item.sourceCardInstanceId,
           index,
         );
-        if (item.behaviorEvent?.type === "delayed.effect") {
+        if (item.behaviorEvent?.type === "temporary.beginning") {
+          if (isCurrentBoardObject(
+            game,
+            item.sourceCardInstanceId,
+            item.sourceGameObjectIncarnation,
+          )) {
+            moveCardToTrash(game, item.sourceCardInstanceId, index);
+          }
+        } else if (item.behaviorEvent?.type === "delayed.effect") {
           const delayedEffectId = item.behaviorEvent.values.delayedEffectId;
           const endingPlayerId = item.behaviorEvent?.values.endingPlayerId;
           if (
@@ -822,16 +1037,37 @@ function passPriority(
               "Activated ability is unavailable during resolution.",
             );
           }
-          handler.execute(
-            binding,
-            createBehaviorContext(
+          if (binding.behaviorId === "ability.activated_effect") {
+            beginEffectResolution({
               game,
-              controller,
-              item.sourceCardInstanceId,
-              null,
-              validLockedTargets(game, clause, item, controller, handlers),
-            ),
-          );
+              controllerPlayerId: controller,
+              sourceCardInstanceId: item.sourceCardInstanceId,
+              clauseId: clause.id,
+              selectedIds: validLockedTargets(
+                game,
+                clause,
+                item,
+                controller,
+                handlers,
+              ),
+              selectionOverrides: item.initialSelectionOverrides,
+              targetsLocked: true,
+              decks,
+            });
+          } else {
+            handler.execute(
+              binding,
+              createBehaviorContext(
+                game,
+                controller,
+                item.sourceCardInstanceId,
+                null,
+                validLockedTargets(game, clause, item, controller, handlers),
+                {},
+                item.initialSelectionOverrides ?? {},
+              ),
+            );
+          }
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(
             definition.behaviorModel,
@@ -854,6 +1090,8 @@ function passPriority(
                   item.sourceCardInstanceId,
                   item.behaviorEvent,
                   item.targetCardInstanceIds,
+                  {},
+                  item.initialSelectionOverrides ?? {},
                 ),
                 handlers,
               });
@@ -870,36 +1108,11 @@ function passPriority(
                   controller,
                   handlers,
                 ),
+                selectionOverrides: item.initialSelectionOverrides,
                 targetsLocked: true,
+                event: item.behaviorEvent,
                 decks,
               });
-              if (definition.card.classification.type === "Spell") {
-                game.state.players[owner]!.zones.trash.push(
-                  item.sourceCardInstanceId,
-                );
-                dispatchBehaviorEvent(
-                  game,
-                  item.behaviorEvent?.type === "card.played"
-                    ? item.behaviorEvent
-                    : {
-                        type: "card.played",
-                        actorPlayerId: controller,
-                        subjectCardInstanceId: item.sourceCardInstanceId,
-                        values: {
-                          "eventSubject.printedEnergyCost":
-                            definition.card.attributes.energy ?? 0,
-                          "eventSubject.effectiveEnergyCost":
-                            effectiveEnergyCost(
-                              game,
-                              controller,
-                              definition,
-                              index,
-                            ),
-                        },
-                      },
-                  decks,
-                );
-              }
             }
           }
         } else {
@@ -911,56 +1124,11 @@ function passPriority(
             item.targetCardInstanceIds,
             handlers,
             item.targetObjectVersions,
+            item.initialSelectionOverrides ?? {},
           );
-          if (definition.card.classification.type === "Spell") {
-            game.state.players[owner]!.zones.trash.push(
-              item.sourceCardInstanceId,
-            );
-            dispatchBehaviorEvent(
-              game,
-              item.behaviorEvent?.type === "card.played"
-                ? item.behaviorEvent
-                : {
-                    type: "card.played",
-                    actorPlayerId: controller,
-                    subjectCardInstanceId: item.sourceCardInstanceId,
-                    values: {
-                      "eventSubject.printedEnergyCost":
-                        definition.card.attributes.energy ?? 0,
-                      "eventSubject.effectiveEnergyCost": effectiveEnergyCost(
-                        game,
-                        controller,
-                        definition,
-                        index,
-                      ),
-                    },
-                  },
-              decks,
-            );
-          }
         }
       }
-      if (game.state.chain.items.length) {
-        game.state.chain = {
-          ...game.state.chain,
-          priorityPlayerId: game.state.chain.items.at(-1)!.controllerPlayerId,
-          passedPlayerIds: [],
-        };
-      } else {
-        game.state.chain = null;
-        if (game.state.showdown) {
-          game.state.showdown.focusPlayerId =
-            item?.kind === "trigger"
-              ? item.controllerPlayerId
-              : nextRelevantPlayer(
-                  game,
-                  game.state.showdown.focusPlayerId,
-                  game.state.showdown.relevantPlayerIds,
-                );
-          game.state.showdown.passedPlayerIds = [];
-        }
-      }
-      cleanupBoard(game, index);
+      completeChainResolution(game, index, decks);
       drainQueuedBehaviorEvents(game, decks);
       resetChainPriorityToTopItem(game);
       openPendingShowdown(game, index, decks);
@@ -1055,6 +1223,7 @@ function completeEndTurn(
     turnNumber: turn.turnNumber + 1,
     activePlayerId: next,
     phase: "awaken",
+    playedCardInstanceIds: [],
   };
   applyStartOfTurn(game, decks, index);
 }
@@ -1093,6 +1262,8 @@ function action(
     source === null ? "_" : encodeURIComponent(source),
   ];
   if (extra !== undefined) parts.push(encodeURIComponent(extra));
+  const boardDestination =
+    kind === "play" && extra ? decodePlayExtra(extra).destinationId : extra;
   const surface =
     kind === "submitChoice"
       ? "choice-dialog"
@@ -1121,10 +1292,14 @@ function action(
           ? "Choose the order for triggered abilities."
           : null,
       boardLocation:
-        (kind === "play" || kind === "move" || kind === "moveMany") && extra
-          ? extra === "base"
+        (kind === "play" || kind === "move" || kind === "moveMany") &&
+        boardDestination
+          ? boardDestination === "base"
             ? { kind: "base" as const }
-            : { kind: "battlefield" as const, battlefieldId: extra }
+            : {
+                kind: "battlefield" as const,
+                battlefieldId: boardDestination,
+              }
           : null,
     },
   };
@@ -1149,6 +1324,7 @@ function moveUnitsToBattlefield(
     }
     battlefield.units.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
+    moveAttachedCardsWithTopMost(game, cardId, index);
   }
   markBattlefieldContested(game, battlefieldId, actorPlayerId);
   cleanupBoard(game, index);
@@ -1218,6 +1394,152 @@ function resetChainPriorityToTopItem(game: GameDocument) {
   chain.passedPlayerIds = [];
 }
 
+type OptionalSourcePlayCost = {
+  selectionKey: string;
+  costs: AdditionalCardCost[];
+};
+
+function optionalSourcePlayCosts(
+  definition: GameCardDefinition,
+): OptionalSourcePlayCost[] {
+  const sourceSelectionKeys = new Set(
+    definition.behaviorModel.clauses.flatMap((clause) =>
+      clause.selectors.flatMap((selector) =>
+        selector.behaviorId === "selector.source" &&
+        selector.parameters.selectionPurpose === "optionalCost" &&
+        typeof selector.parameters.selectionKey === "string"
+          ? [selector.parameters.selectionKey]
+          : [],
+      ),
+    ),
+  );
+  return [...sourceSelectionKeys].sort().flatMap((selectionKey) => {
+    const costs = definition.behaviorModel.clauses.flatMap((clause) =>
+      clause.costs
+        .filter(
+          (cost) =>
+            cost.behaviorId === "cost.pay" &&
+            cost.parameters.optional === true &&
+            cost.parameters.selectionKey === selectionKey,
+        )
+        .map(optionalPaymentCost),
+    );
+    return costs.length ? [{ selectionKey, costs }] : [];
+  });
+}
+
+function optionalPaymentCost(binding: BehaviorBinding): AdditionalCardCost {
+  const amount = binding.parameters.amount;
+  const resource = binding.parameters.resource;
+  if (
+    typeof amount !== "number" ||
+    amount < 0 ||
+    (resource !== "energy" && resource !== "rune")
+  ) {
+    throw new Error("Optional card payment cost is malformed.");
+  }
+  return {
+    energy: resource === "energy" ? amount : 0,
+    power: resource === "rune" ? amount : 0,
+    ...(typeof binding.parameters.domain === "string"
+      ? { powerDomain: binding.parameters.domain }
+      : {}),
+  };
+}
+
+function optionalPlayCostModes(
+  payments: readonly OptionalSourcePlayCost[],
+): string[][] {
+  return payments.reduce<string[][]>(
+    (modes, payment) => [
+      ...modes,
+      ...modes.map((mode) => [...mode, payment.selectionKey]),
+    ],
+    [[]],
+  );
+}
+
+function encodePlayExtra(
+  destinationId: string | undefined,
+  optionalCostKeys: readonly string[],
+) {
+  if (optionalCostKeys.length === 0) return destinationId;
+  return `play:${JSON.stringify({
+    destinationId: destinationId ?? null,
+    optionalCostKeys,
+  })}`;
+}
+
+function decodePlayExtra(extra: string): {
+  destinationId: string;
+  optionalCostKeys: string[];
+} {
+  if (!extra.startsWith("play:")) {
+    return { destinationId: extra, optionalCostKeys: [] };
+  }
+  try {
+    const parsed: unknown = JSON.parse(extra.slice("play:".length));
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !Array.isArray((parsed as { optionalCostKeys?: unknown }).optionalCostKeys)
+    ) {
+      throw new Error();
+    }
+    const destinationId = (parsed as { destinationId?: unknown }).destinationId;
+    const optionalCostKeys = (parsed as { optionalCostKeys: unknown[] })
+      .optionalCostKeys;
+    if (
+      (destinationId !== null && typeof destinationId !== "string") ||
+      optionalCostKeys.some((key) => typeof key !== "string") ||
+      new Set(optionalCostKeys).size !== optionalCostKeys.length
+    ) {
+      throw new Error();
+    }
+    return {
+      destinationId: destinationId ?? "",
+      optionalCostKeys: optionalCostKeys as string[],
+    };
+  } catch {
+    throw new Error("Play mode is malformed.");
+  }
+}
+
+function playActionLabel(input: {
+  definition: GameCardDefinition;
+  destinationName: string;
+  energyCost: number;
+  effectivePower: number;
+  additionalCosts: readonly AdditionalCardCost[];
+  hasOptionalModes: boolean;
+}) {
+  const base = input.destinationName
+    ? `Play ${input.definition.card.name} to ${input.destinationName}`
+    : `Play ${input.definition.card.name}`;
+  if (!input.hasOptionalModes) return base;
+  const costs = [
+    `${input.energyCost} Energy`,
+    ...(input.effectivePower > 0 ? [`${input.effectivePower} Power`] : []),
+    ...input.additionalCosts.flatMap((cost) => [
+      ...(cost.energy > 0 ? [`${cost.energy} Energy`] : []),
+      ...(cost.power > 0
+        ? [
+            `${cost.power}${
+              cost.powerDomain
+                ? ` ${displayPowerDomain(cost.powerDomain)}`
+                : ""
+            } Power`,
+          ]
+        : []),
+    ]),
+  ];
+  return `${base} (${costs.join(" + ")})`;
+}
+
+function displayPowerDomain(domain: string) {
+  return `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`;
+}
+
 function addPlayableCardActions(
   actions: ProjectedAction[],
   game: GameDocument,
@@ -1233,12 +1555,14 @@ function addPlayableCardActions(
     ...(player.zones.champion ? [player.zones.champion] : []),
   ]) {
     const definition = definitionForInstance(cardId, index);
-    if (!["Unit", "Spell"].includes(definition.card.classification.type))
+    if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const timings = compiled.playTimings.map((binding) => binding.behaviorId);
     const hasAction = timings.includes("timing.action");
-    const hasReaction = timings.includes("timing.reaction");
+    const hasReaction =
+      timings.includes("timing.reaction") ||
+      hasBehavior(definition, "keyword.quick_draw");
     if (timing === "showdownOpen" && !hasAction && !hasReaction) continue;
     if (
       (timing === "neutralClosed" || timing === "showdownClosed") &&
@@ -1246,48 +1570,71 @@ function addPlayableCardActions(
     )
       continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
+    const optionalSourceCosts = optionalSourcePlayCosts(definition);
+    const optionalSourceCostKeys = new Set(
+      optionalSourceCosts.map((payment) => payment.selectionKey),
+    );
     const projectedTargets = compiled.clauses
       .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
-    const cost = effectiveEnergyCost(game, playerId, definition, index);
+    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId);
+    const effectivePower = effectivePowerCost(
+      game,
+      playerId,
+      definition,
+      index,
+      cardId,
+    );
     const paymentPlan = buildPaymentPlan(
       game,
       playerId,
       definition,
       cost,
       index,
+      0,
+      cardId,
     );
-    const targets = projectedTargets;
+    // Source-selected resource costs are committed by a play mode, not a
+    // target prompt. Other optional selectors (for example, exhaust a unit)
+    // stay as their existing player-decision flow.
+    const targets = projectedTargets.filter(
+      (target) =>
+        !(
+          target.selectionPurpose === "optionalCost" &&
+          target.selectionKey &&
+          optionalSourceCostKeys.has(target.selectionKey)
+        ),
+    );
     const hasLegalTargets = canSatisfyTargetRequirements(targets);
-    const enabled = paymentPlan !== null && hasLegalTargets;
-    const disabledReason = !hasLegalTargets
-      ? "No legal targets are available."
-      : paymentPlan
-        ? null
-        : "Card costs cannot be paid.";
     const targetAdditionalPower = targets
       .flatMap((requirement) => requirement.legalIds)
       .filter((id, position, ids) => ids.indexOf(id) === position)
       .map((targetId) => ({
         targetId,
-        amount: targetDeflectCost(playerId, [targetId], index),
+        amount: targetDeflectCost(
+          playerId,
+          [targetId],
+          index,
+          ignoresDeflect(definition),
+        ),
       }))
       .filter((entry) => entry.amount > 0);
-    const costPreview =
-      paymentPlan && targetAdditionalPower.length > 0
-        ? {
-            energy: cost,
-            basePower: definition.card.attributes.power ?? 0,
-            availableAnyPower: availableAnyPowerAfterBaseCost(
-              game,
-              playerId,
-              paymentPlan,
-            ),
-            targetAdditionalPower,
-          }
-        : undefined;
+    // This is projection only: payment remains server-owned. Publishing both
+    // printed and evaluated costs lets the client explain modifiers before a
+    // player commits a play, including for disabled actions.
+    const costPreview = {
+      energy: cost,
+      basePower: definition.card.attributes.power ?? 0,
+      effectivePower,
+      printedEnergy: definition.card.attributes.energy ?? 0,
+      printedPower: definition.card.attributes.power ?? 0,
+      availableAnyPower: paymentPlan
+        ? availableAnyPowerAfterBaseCost(game, playerId, paymentPlan)
+        : Object.values(player.power).reduce((total, amount) => total + amount, 0),
+      targetAdditionalPower,
+    };
     const unitDestinations =
       definition.card.classification.type === "Unit"
         ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
@@ -1303,25 +1650,49 @@ function addPlayableCardActions(
                   ).card.name,
           }))
         : null;
-    for (const destination of unitDestinations ?? [
-      { id: undefined, name: "" },
-    ]) {
-      actions.push(
-        action(
+    for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
+      for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
+        const additionalCosts = optionalSourceCosts
+          .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
+          .flatMap((payment) => payment.costs);
+        const costsPayable = canPayCardCosts(
           game,
-          "play",
-          unitDestinations
-            ? `Play ${definition.card.name} to ${destination.name}`
-            : `Play ${definition.card.name}`,
+          playerId,
+          definition,
+          cost,
+          index,
+          0,
+          additionalCosts,
           cardId,
-          enabled,
-          disabledReason,
-          destination.id,
-          targets,
-          undefined,
-          costPreview,
-        ),
-      );
+        );
+        const enabled = costsPayable && hasLegalTargets;
+        const disabledReason = !hasLegalTargets
+          ? "No legal targets are available."
+          : costsPayable
+            ? null
+            : "Card costs cannot be paid.";
+        actions.push(
+          action(
+            game,
+            "play",
+            playActionLabel({
+              definition,
+              destinationName: destination.name,
+              energyCost: cost,
+              effectivePower,
+              additionalCosts,
+              hasOptionalModes: optionalSourceCosts.length > 0,
+            }),
+            cardId,
+            enabled,
+            disabledReason,
+            encodePlayExtra(destination.id, optionalCostKeys),
+            targets,
+            undefined,
+            costPreview,
+          ),
+        );
+      }
     }
   }
   void decks;
@@ -1366,6 +1737,7 @@ function addAbilityActions(
     ),
   ];
   for (const sourceId of controlled) {
+    if (game.state.cardStates[sourceId]?.attachedToCardInstanceId) continue;
     const definition = definitionForInstance(sourceId, index);
     const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
     const activations = compiled.clauses.flatMap((clause) =>
@@ -1391,15 +1763,38 @@ function addAbilityActions(
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
-        const enabled = sourceReady && canSatisfyTargetRequirements(targets);
+        const abilityCosts = activationCosts(clause);
+        const costsPayable =
+          buildAbilityPaymentPlan(
+            game,
+            playerId,
+            definition,
+            abilityCosts,
+            index,
+          ) !== null;
+        const alreadyEmpowered =
+          ability.behaviorId === "ability.empower" &&
+          game.state.cardStates[sourceId]?.empowered === true;
+        const enabled =
+          sourceReady &&
+          !alreadyEmpowered &&
+          costsPayable &&
+          canSatisfyTargetRequirements(targets);
         const label =
           ability.behaviorId === "ability.recycle_for_power"
             ? `Add Power [${powerDomain}]`
             : ability.behaviorId === "ability.exhaust_for_resource"
-              ? ability.parameters.usage === "spellsOnly"
+              ? ability.parameters.resourceType === "power"
+                ? `Add Power [${String(ability.parameters.domain ?? powerDomain)}]`
+                : ability.parameters.usage === "spellsOnly" ||
+                    ability.parameters.usage === "card:Spell"
                 ? "Add spell Energy"
                 : "Add Energy"
-              : `${definition.card.name} ability`;
+              : ability.behaviorId === "ability.equip"
+                ? "Equip"
+              : ability.behaviorId === "ability.empower"
+                ? "Empower"
+                : `${definition.card.name} ability`;
         actions.push(
           action(
             game,
@@ -1409,8 +1804,12 @@ function addAbilityActions(
             enabled,
             enabled
               ? null
-              : sourceReady
-                ? "No legal targets are available."
+                : sourceReady
+                ? alreadyEmpowered
+                  ? "Source is already Empowered."
+                  : costsPayable
+                  ? "No legal targets are available."
+                  : "Ability costs cannot be paid."
                 : "Source is exhausted.",
             `${clause.id}|${ability.behaviorId}`,
             targets,
@@ -1527,7 +1926,7 @@ function executeActivatedAbility(
   const binding = clause?.abilities.find(
     (item) => item.behaviorId === behaviorId,
   );
-  if (!binding) throw new Error("Activated ability is unavailable.");
+  if (!binding || !clause) throw new Error("Activated ability is unavailable.");
   const handler = handlers.get(binding.behaviorId);
   if (!handler?.execute) {
     throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
@@ -1546,6 +1945,19 @@ function executeActivatedAbility(
       game.state.showdown.passedPlayerIds = [];
     }
     return;
+  }
+  const costs = activationCosts(clause);
+  if (
+    clause.costs.some((cost) => cost.behaviorId === "cost.exhaust_source")
+  ) {
+    const state = game.state.cardStates[sourceId];
+    if (!state || state.exhausted) {
+      throw new Error("Ability source is exhausted.");
+    }
+    state.exhausted = true;
+  }
+  if (costs.energy > 0 || costs.power > 0) {
+    payAbilityCost(game, actorPlayerId, definition, costs, index);
   }
   const item = {
     id: `ability:${game.stateVersion + 1}:${sourceId}:${clauseId}`,
@@ -1572,6 +1984,24 @@ function executeActivatedAbility(
   game.state.chain.passedPlayerIds = [];
 }
 
+function activationCosts(clause: BehaviorClause) {
+  return clause.costs.reduce(
+    (total, cost) => {
+      if (cost.behaviorId !== "cost.pay") return total;
+      const amount = cost.parameters.amount;
+      const resource = cost.parameters.resource;
+      if (typeof amount !== "number" || amount < 0 || typeof resource !== "string") {
+        throw new Error("Activated ability payment cost is malformed.");
+      }
+      if (resource === "energy") total.energy += amount;
+      else if (resource === "rune") total.power += amount;
+      else throw new Error(`Unsupported activated ability cost resource: ${resource}`);
+      return total;
+    },
+    { energy: 0, power: 0 },
+  );
+}
+
 function isAddResourceAbility(behaviorId: string) {
   return (
     behaviorId === "ability.exhaust_for_resource" ||
@@ -1587,6 +2017,7 @@ function executeImmediateClauses(
   selectedIds: string[],
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   targetObjectVersions?: Record<string, number>,
+  selectionOverrides: Record<string, string[]> = {},
 ) {
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
   const effectOutcomes: Record<string, boolean | number | string | string[]> =
@@ -1611,6 +2042,7 @@ function executeImmediateClauses(
         null,
         clauseSelections,
         effectOutcomes,
+        selectionOverrides,
       ),
       handlers,
       allowUnavailableSelections: targetObjectVersions !== undefined,
@@ -1658,7 +2090,16 @@ function clauseCanRequirePlaySelections(
   definition: GameCardDefinition,
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
 ) {
-  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (
+    clause.triggers.length > 0 ||
+    (clause.abilities.length > 0 &&
+      !(definition.card.classification.type === "Gear" &&
+        clause.keywords.some(
+          (binding) => binding.behaviorId === "keyword.quick_draw",
+        )))
+  ) {
+    return false;
+  }
   if (definition.card.classification.type !== "Unit") return true;
   return !looksLikeNonPlayUnitText(clause.sourceText);
 }
@@ -1667,7 +2108,16 @@ function clauseCanResolveImmediately(
   definition: GameCardDefinition,
   clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
 ) {
-  if (clause.triggers.length > 0 || clause.abilities.length > 0) return false;
+  if (
+    clause.triggers.length > 0 ||
+    (clause.abilities.length > 0 &&
+      !(definition.card.classification.type === "Gear" &&
+        clause.keywords.some(
+          (binding) => binding.behaviorId === "keyword.quick_draw",
+        )))
+  ) {
+    return false;
+  }
   if (definition.card.classification.type !== "Unit") return true;
   return !looksLikeNonPlayUnitText(clause.sourceText);
 }
@@ -1693,8 +2143,27 @@ function captureTargetObjectVersions(
   );
 }
 
-function payOptionalPlayCosts(
+function isCurrentBoardObject(
   game: GameDocument,
+  cardInstanceId: string,
+  gameObjectIncarnation: number | undefined,
+) {
+  if (gameObjectIncarnation === undefined) return false;
+  if (
+    (game.state.cardStates[cardInstanceId]?.gameObjectIncarnation ?? 0) !==
+    gameObjectIncarnation
+  ) return false;
+  return Object.values(game.state.players).some((player) =>
+    player.zones.base.includes(cardInstanceId),
+  ) || game.state.battlefields.some((battlefield) =>
+    battlefield.units.includes(cardInstanceId) ||
+    (battlefield.attachedCardInstanceIds ?? []).includes(cardInstanceId),
+  );
+}
+
+function payOptionalNonResourcePlayCosts(
+  game: GameDocument,
+  playerId: string,
   definition: GameCardDefinition,
   selectedIds: string[],
   index: RuntimeCardIndex,
@@ -1704,13 +2173,15 @@ function payOptionalPlayCosts(
       (cost) => cost.behaviorId === "cost.exhaust_selected_unit",
     ),
   );
-  if (!hasExhaustCost || selectedIds.length === 0) return;
-  const selected = selectedIds.find(
-    (id) =>
-      definitionForInstance(id, index).card.classification.type === "Unit" &&
-      !game.state.cardStates[id]?.exhausted,
-  );
-  if (selected) game.state.cardStates[selected]!.exhausted = true;
+  if (hasExhaustCost && selectedIds.length > 0) {
+    const selected = selectedIds.find(
+      (id) =>
+        definitionForInstance(id, index).card.classification.type === "Unit" &&
+        !game.state.cardStates[id]?.exhausted,
+    );
+    if (selected) game.state.cardStates[selected]!.exhausted = true;
+  }
+
 }
 
 function hasBehavior(definition: GameCardDefinition, behaviorId: string) {
@@ -1728,39 +2199,61 @@ function validLockedTargets(
   controllerPlayerId: string,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
-  const currentlyLegal = new Set(
-    targetRequirementsForClause(
-      clause,
-      createBehaviorContext(
-        game,
-        controllerPlayerId,
-        item.sourceCardInstanceId!,
-        item.behaviorEvent,
-        [],
-      ),
-      handlers,
-    ).flatMap((requirement) => requirement.legalIds),
+  const requirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(
+      game,
+      controllerPlayerId,
+      item.sourceCardInstanceId!,
+      item.behaviorEvent,
+      item.targetCardInstanceIds,
+      {},
+      item.initialSelectionOverrides ?? {},
+    ),
+    handlers,
+  );
+  const currentlyLegal = new Set(requirements.flatMap((requirement) => requirement.legalIds));
+  const chainItemTargets = new Set(
+    requirements
+      .filter((requirement) => requirement.kind === "chainItem")
+      .flatMap((requirement) => requirement.legalIds),
   );
   return item.targetCardInstanceIds.filter(
     (id) =>
       currentlyLegal.has(id) &&
-      (game.state.cardStates[id]?.objectVersion ?? 0) ===
-        item.targetObjectVersions[id],
+      (chainItemTargets.has(id) ||
+        (game.state.cardStates[id]?.objectVersion ?? 0) ===
+          item.targetObjectVersions[id]),
+  );
+}
+
+function ignoresDeflect(definition: GameCardDefinition) {
+  return definition.behaviorModel.clauses.some((clause) =>
+    clause.effects.some(
+      (binding) => binding.behaviorId === "modifier.ignore_deflect",
+    ),
   );
 }
 
 function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
-  if (action.targets.length === 0) {
+  validateTargetRequirements(action.targets, selectedIds);
+}
+
+function validateTargetRequirements(
+  targets: readonly ProjectedAction["targets"][number][],
+  selectedIds: string[],
+) {
+  if (targets.length === 0) {
     if (selectedIds.length)
       throw new Error("This action does not accept selected targets.");
     return;
   }
-  const legal = new Set(action.targets.flatMap((target) => target.legalIds));
-  const minimum = action.targets.reduce(
+  const legal = new Set(targets.flatMap((target) => target.legalIds));
+  const minimum = targets.reduce(
     (sum, target) => sum + target.minimum,
     0,
   );
-  const maximum = action.targets.reduce(
+  const maximum = targets.reduce(
     (sum, target) => sum + target.maximum,
     0,
   );
@@ -1769,7 +2262,7 @@ function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
     selectedIds.length > maximum ||
     selectedIds.some((id) => !legal.has(id)) ||
     new Set(selectedIds).size !== selectedIds.length ||
-    action.targets.some((target) => {
+    targets.some((target) => {
       const selectedForTarget = selectedIds.filter((id) =>
         target.legalIds.includes(id),
       ).length;

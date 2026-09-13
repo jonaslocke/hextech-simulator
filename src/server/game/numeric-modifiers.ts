@@ -30,11 +30,20 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     value = applyNumericOperation(value, modifier);
   }
 
-  for (const { binding, conditions, controllerPlayerId, sourceId } of input.index
+  for (const {
+    binding,
+    conditions,
+    controllerPlayerId,
+    sourceId,
+    attachedEffectSourceId,
+  } of input.index
     ? activeContinuousBindings(input.game, input.index)
     : []) {
     const targetsCandidate =
       binding.parameters.target === input.targetScope ||
+      binding.parameters.target === "controller_card" ||
+      (binding.parameters.target === "opponent_spell" &&
+        input.targetScope === "controller_spell" && input.cardType === "Spell") ||
       (binding.parameters.target === "unit" &&
         input.targetScope === "source" &&
         input.targetCardInstanceId) ||
@@ -47,9 +56,15 @@ export function effectiveNumericValue(input: NumericValueInput): number {
       !targetsCandidate ||
       (input.controllerPlayerId &&
         controllerPlayerId !== input.controllerPlayerId &&
-        binding.parameters.target !== "unit") ||
+        binding.parameters.target !== "unit" &&
+        binding.parameters.target !== "opponent_spell") ||
       (input.targetScope === "controller_spell" &&
-        input.cardType !== "Spell") ||
+        input.cardType !== "Spell" &&
+        binding.parameters.target !== "controller_card") ||
+      !bindingCardTypeMatches(binding, input) ||
+      (binding.parameters.excludeTokens === true &&
+        input.targetCardInstanceId !== undefined &&
+        input.index?.instances.get(input.targetCardInstanceId)?.source === "token") ||
       (binding.parameters.target === "source" &&
         input.targetScope === "source" &&
         input.targetCardInstanceId !== sourceId)
@@ -62,6 +77,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
         input,
         controllerPlayerId,
         sourceId,
+        attachedEffectSourceId,
       )
     ) continue;
     if (
@@ -118,6 +134,7 @@ function continuousConditionApplies(
   input: NumericValueInput,
   controllerPlayerId: string,
   sourceId: string,
+  attachedEffectSourceId?: string,
 ) {
   const condition = binding.parameters.condition;
   const targetId = input.targetCardInstanceId;
@@ -142,6 +159,13 @@ function continuousConditionApplies(
   }
   const role = input.game.state.cardStates[targetId]?.combatRole;
   if (typeof condition !== "string") return true;
+  if (condition === "sourceAttachedThisTurn") {
+    const attachmentSourceId = attachedEffectSourceId ?? sourceId;
+    return (
+      input.game.state.cardStates[attachmentSourceId]?.attachedAtTurnNumber ===
+      input.game.state.turn?.turnNumber
+    );
+  }
   if (condition === "sourceCombatsAlone") {
     return targetId === sourceId &&
       (role === "attacker" || role === "defender") &&
@@ -151,7 +175,74 @@ function continuousConditionApplies(
     return role === "defender" &&
       combatRoleCount(input.game, input.index, controllerPlayerId, "defender") === 1;
   }
+  if (condition === "firstCardOfTypePlayedThisTurn") {
+    const cardType =
+      typeof binding.parameters.cardType === "string"
+        ? binding.parameters.cardType
+        : input.cardType;
+    return !input.game.state.turn?.playedCardInstanceIds?.some((id) => {
+      const instance = input.index!.instances.get(id);
+      if (!instance) return false;
+      return (
+        instance.ownerPlayerId === input.controllerPlayerId &&
+        definitionHasType(
+          input.index!.definitions.get(instance.cardCode),
+          cardType,
+        )
+      );
+    });
+  }
+  if (condition === "sourceControllerControlsBattlefield") {
+    return input.game.state.battlefields.some(
+      (battlefield) =>
+        battlefield.cardInstanceId === sourceId &&
+        battlefield.controllerPlayerId === controllerPlayerId,
+    );
+  }
+  if (condition === "sourceEmpowered") {
+    return input.game.state.cardStates[sourceId]?.empowered === true;
+  }
+  if (condition === "sourceNotEmpowered") {
+    return input.game.state.cardStates[sourceId]?.empowered !== true;
+  }
+  if (condition === "targetDefending") {
+    return input.game.state.cardStates[targetId]?.combatRole === "defender";
+  }
   return true;
+}
+
+function bindingCardTypeMatches(
+  binding: BehaviorBinding,
+  input: NumericValueInput,
+) {
+  if (typeof binding.parameters.cardType !== "string") return true;
+  if (!input.targetCardInstanceId || !input.index) {
+    return input.cardType === binding.parameters.cardType;
+  }
+  const instance = input.index.instances.get(input.targetCardInstanceId);
+  return definitionHasType(
+    instance ? input.index.definitions.get(instance.cardCode) : undefined,
+    binding.parameters.cardType,
+  );
+}
+
+function definitionHasType(
+  definition: RuntimeCardIndex["definitions"] extends Map<string, infer T>
+    ? T | undefined
+    : never,
+  type: string | undefined,
+) {
+  if (!definition || !type) return false;
+  return (
+    definition.card.classification.type === type ||
+    definition.behaviorModel.clauses.some((clause) =>
+      clause.keywords.some(
+        (binding) =>
+          binding.behaviorId === "type.additional" &&
+          binding.parameters.type === type,
+      ),
+    )
+  );
 }
 
 function sameBoardLocation(
@@ -202,14 +293,23 @@ function combatRoleCount(
 export function isContinuousDuration(duration: unknown): boolean {
   return (
     duration === "whileSourceAtBattlefield" ||
-    duration === "whileSourceOnBoard"
+    duration === "whileSourceOnBoard" ||
+    duration === "whileAttached"
   );
 }
+
+type ActiveContinuousBinding = {
+  binding: BehaviorBinding;
+  conditions: BehaviorClause["conditions"];
+  controllerPlayerId: string;
+  sourceId: string;
+  attachedEffectSourceId?: string;
+};
 
 function activeContinuousBindings(
   game: GameDocument,
   index: RuntimeCardIndex,
-) {
+): ActiveContinuousBinding[] {
   const sourceIds = [
     ...game.state.setup.playerIds.flatMap((playerId) => {
       const player = game.state.players[playerId]!;
@@ -225,10 +325,14 @@ function activeContinuousBindings(
     ]),
   ];
 
-  return [...new Set(sourceIds)].flatMap((sourceId) => {
+  const printedRuleBindings = [...new Set(sourceIds)].flatMap((sourceId) => {
     const instance = index.instances.get(sourceId);
     const definition = instance && index.definitions.get(instance.cardCode);
-    if (!instance || !definition) return [];
+    if (
+      !instance ||
+      !definition ||
+      game.state.cardStates[sourceId]?.attachedToCardInstanceId
+    ) return [];
     return definition.behaviorModel.clauses.flatMap((clause) =>
       clause.effects.flatMap((binding) => {
         const continuousBinding = continuousNumericBinding(clause, binding);
@@ -250,6 +354,33 @@ function activeContinuousBindings(
       }),
     );
   });
+  const effectTextBindings = Object.entries(game.state.cardStates).flatMap(
+    ([attachedEffectSourceId, state]) => {
+      const sourceId = state.attachedToCardInstanceId;
+      if (!sourceId) return [];
+      const instance = index.instances.get(attachedEffectSourceId);
+      const definition = instance && index.definitions.get(instance.cardCode);
+      if (!instance || !definition?.effectText || !definition.effectBehaviorModel) {
+        return [];
+      }
+      return definition.effectBehaviorModel.clauses.flatMap((clause) =>
+        clause.effects.flatMap((binding) => {
+          const continuousBinding = continuousNumericBinding(clause, binding);
+          return continuousBinding &&
+            continuousBinding.parameters.duration === "whileAttached"
+            ? [{
+                binding: continuousBinding,
+                conditions: clause.conditions,
+                controllerPlayerId: instance.ownerPlayerId,
+                sourceId,
+                attachedEffectSourceId,
+              }]
+            : [];
+        }),
+      );
+    },
+  );
+  return [...printedRuleBindings, ...effectTextBindings];
 }
 
 function continuousNumericBinding(
@@ -297,6 +428,9 @@ function sourceIsActive(
   sourceId: string,
   duration: unknown,
 ) {
+  if (duration === "whileAttached") {
+    return Boolean(game.state.cardStates[sourceId]?.attachedToCardInstanceId);
+  }
   if (duration === "whileSourceAtBattlefield") {
     return game.state.battlefields.some((battlefield) =>
       battlefield.cardInstanceId === sourceId ||
