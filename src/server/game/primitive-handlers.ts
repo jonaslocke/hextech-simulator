@@ -464,7 +464,12 @@ export function createPrimitiveHandlers(
       const ids = playerId ? [playerId] : [...context.game.state.setup.playerIds];
       for (const id of ids) {
         ensureMainDeck(context.game, id, index);
-        draw(context.game.state.players[id]!.zones.mainDeck, context.game.state.players[id]!.zones.hand, count);
+        draw(
+          context.game,
+          context.game.state.players[id]!.zones.mainDeck,
+          context.game.state.players[id]!.zones.hand,
+          count,
+        );
       }
     }
   });
@@ -480,7 +485,7 @@ export function createPrimitiveHandlers(
       ).length;
       const player = context.game.state.players[context.controllerPlayerId]!;
       ensureMainDeck(context.game, context.controllerPlayerId, index);
-      draw(player.zones.mainDeck, player.zones.hand, count);
+      draw(context.game, player.zones.mainDeck, player.zones.hand, count);
     },
   });
   handlers.set("action.search_top_deck", {
@@ -511,7 +516,9 @@ export function createPrimitiveHandlers(
       const looked = player.zones.mainDeck.slice(0, numberParam(binding, "count"));
       const selected = new Set(context.selectedIds.filter((id) => looked.includes(id)));
       player.zones.mainDeck = player.zones.mainDeck.filter((id) => !looked.includes(id));
-      player.zones.hand.push(...looked.filter((id) => selected.has(id)));
+      const drawn = looked.filter((id) => selected.has(id));
+      player.zones.hand.push(...drawn);
+      drawn.forEach((id) => advanceGameObjectIncarnation(context.game, id));
       player.zones.mainDeck.push(
         ...deterministicallyRecycle(
           looked.filter((id) => !selected.has(id)),
@@ -585,7 +592,7 @@ export function createPrimitiveHandlers(
       );
       const player = context.game.state.players[context.controllerPlayerId]!;
       ensureMainDeck(context.game, context.controllerPlayerId, index);
-      draw(player.zones.mainDeck, player.zones.hand, count);
+      draw(context.game, player.zones.mainDeck, player.zones.hand, count);
     },
   });
   handlers.set("action.channel_or_draw", {
@@ -594,6 +601,7 @@ export function createPrimitiveHandlers(
       const count = numberParam(binding, "channelCount");
       const moved = player.zones.runeDeck.splice(0, count);
       player.zones.base.push(...moved);
+      moved.forEach((id) => advanceGameObjectIncarnation(context.game, id));
       if (binding.parameters.entryState === "exhausted") {
         moved.forEach((id) => {
           context.game.state.cardStates[id]!.exhausted = true;
@@ -602,6 +610,7 @@ export function createPrimitiveHandlers(
       if (moved.length === 0) {
         ensureMainDeck(context.game, context.controllerPlayerId, index);
         draw(
+          context.game,
           player.zones.mainDeck,
           player.zones.hand,
           numberParam(binding, "fallbackDrawCount"),
@@ -660,7 +669,10 @@ export function createPrimitiveHandlers(
         (id) => !selected.includes(id),
       );
       player.zones.trash.push(...selected);
-      selected.forEach((id) => incrementObjectVersion(context.game, id));
+      selected.forEach((id) => {
+        incrementObjectVersion(context.game, id);
+        advanceGameObjectIncarnation(context.game, id);
+      });
     },
   });
   handlers.set("action.channel_runes", {
@@ -671,6 +683,7 @@ export function createPrimitiveHandlers(
         const player = context.game.state.players[id]!;
         const moved = player.zones.runeDeck.splice(0, count);
         player.zones.base.push(...moved);
+        moved.forEach((cardId) => advanceGameObjectIncarnation(context.game, cardId));
         if (binding.parameters.entryState === "exhausted") moved.forEach((cardId) => { context.game.state.cardStates[cardId]!.exhausted = true; });
       }
       recomputeAllMight(context.game, index);
@@ -1021,7 +1034,10 @@ export function createPrimitiveHandlers(
         const owner = index.instances.get(item.sourceCardInstanceId)?.ownerPlayerId;
         if (!owner) continue;
         const trash = context.game.state.players[owner]!.zones.trash;
-        if (!trash.includes(item.sourceCardInstanceId)) trash.push(item.sourceCardInstanceId);
+        if (!trash.includes(item.sourceCardInstanceId)) {
+          trash.push(item.sourceCardInstanceId);
+          advanceGameObjectIncarnation(context.game, item.sourceCardInstanceId);
+        }
       }
     },
   });
@@ -1470,6 +1486,7 @@ function playToken(
     exhausted: input.entryState === "exhausted",
     damage: 0,
     computedMight: definition.card.attributes.might,
+    gameObjectIncarnation: 0,
     objectVersion: 0,
   };
   if (input.destinationId === "base") {
@@ -1714,6 +1731,18 @@ function unitsAtPresenceLocation(
 export function incrementObjectVersion(game: GameDocument, id: string) {
   const state = game.state.cardStates[id];
   if (state) state.objectVersion = (state.objectVersion ?? 0) + 1;
+}
+
+/**
+ * Records an identity-changing zone transition. This is deliberately separate
+ * from objectVersion, which protects mutable snapshots and also changes after
+ * ordinary state updates such as damage.
+ */
+export function advanceGameObjectIncarnation(game: GameDocument, id: string) {
+  const state = game.state.cardStates[id];
+  if (state) {
+    state.gameObjectIncarnation = (state.gameObjectIncarnation ?? 0) + 1;
+  }
 }
 export function recomputeMight(
   game: GameDocument,
@@ -2054,7 +2083,7 @@ function recallUnitAfterDeathReplacement(
   if (!owner) throw new Error(`Unit owner is unavailable: ${id}`);
   removeFromAllLocations(game, id);
   game.state.players[owner]!.zones.base.push(id);
-  resetStateAfterLeavingBoard(game, id, index);
+  resetStateAfterLeavingBoard(game, id, index, false);
   const state = game.state.cardStates[id]!;
   state.exhausted = true;
   recomputeMight(game, id, index);
@@ -2113,10 +2142,12 @@ function resetStateAfterLeavingBoard(
   game: GameDocument,
   id: string,
   index?: RuntimeCardIndex,
+  createsNewGameObject = true,
 ) {
   const state = game.state.cardStates[id];
   if (!state) return;
   incrementObjectVersion(game, id);
+  if (createsNewGameObject) advanceGameObjectIncarnation(game, id);
   state.damage = 0;
   state.exhausted = false;
   state.empowered = false;
@@ -2313,7 +2344,16 @@ function stringParam(binding: BehaviorBinding, key: string) {
   if (typeof value !== "string") throw new Error(`Behavior parameter ${key} must be text.`);
   return value;
 }
-function draw(source: string[], destination: string[], count: number) { destination.push(...source.splice(0, Math.min(count, source.length))); }
+function draw(
+  game: GameDocument,
+  source: string[],
+  destination: string[],
+  count: number,
+) {
+  const drawn = source.splice(0, Math.min(count, source.length));
+  destination.push(...drawn);
+  drawn.forEach((id) => advanceGameObjectIncarnation(game, id));
+}
 
 function ensureMainDeck(
   game: GameDocument,
@@ -2333,6 +2373,7 @@ function ensureMainDeck(
       ),
   );
   player.zones.trash = [];
+  player.zones.mainDeck.forEach((id) => advanceGameObjectIncarnation(game, id));
   const opponentId = game.state.setup.playerIds.find((id) => id !== playerId)!;
   const opponent = game.state.players[opponentId]!;
   opponent.points = (opponent.points ?? 0) + 1;

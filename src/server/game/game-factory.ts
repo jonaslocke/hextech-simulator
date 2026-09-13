@@ -117,6 +117,7 @@ export function createMatchGame(input: CreateMatchGameInput): GameDocument {
           exhausted: false,
           damage: 0,
           computedMight: definition.card.attributes.might,
+          gameObjectIncarnation: 0,
           objectVersion: 0,
         },
       ] as const;

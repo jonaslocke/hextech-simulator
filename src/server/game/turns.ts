@@ -1,4 +1,5 @@
 import {
+  advanceGameObjectIncarnation,
   createRuntimeCardIndex,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -92,6 +93,7 @@ export function applyStartOfTurn(
         turn.turnNumber === 2 &&
         turn.activePlayerId !== game.state.setup.startingPlayerId;
       draw(
+        game,
         player.zones.runeDeck,
         player.zones.base,
         isNonStartingPlayersFirstTurn ? 3 : 2,
@@ -101,13 +103,20 @@ export function applyStartOfTurn(
     }
 
     if (turn.phase === "draw") {
-      draw(player.zones.mainDeck, player.zones.hand, 1);
+      draw(game, player.zones.mainDeck, player.zones.hand, 1);
       turn.phase = "action";
     }
     return;
   }
 }
 
-function draw(source: string[], destination: string[], count: number) {
-  destination.push(...source.splice(0, Math.min(count, source.length)));
+function draw(
+  game: GameDocument,
+  source: string[],
+  destination: string[],
+  count: number,
+) {
+  const drawn = source.splice(0, Math.min(count, source.length));
+  destination.push(...drawn);
+  drawn.forEach((id) => advanceGameObjectIncarnation(game, id));
 }

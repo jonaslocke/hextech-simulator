@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GameCardDefinition } from "../src/server/game";
 import { gameplayActions, performGameplayAction } from "../src/server/game";
-import { createRuntimeCardIndex, moveCardToTrash } from "../src/server/game/primitive-handlers";
+import {
+  createPrimitiveHandlers,
+  createRuntimeCardIndex,
+  moveCardToTrash,
+} from "../src/server/game/primitive-handlers";
+import { createBehaviorContext } from "../src/server/game/behavior-runtime";
 import { applyStartOfTurn } from "../src/server/game/turns";
 import { gameFixture } from "./helpers/game-fixture";
 
@@ -14,7 +19,7 @@ test("Temporary enters the Beginning trigger ordering and remains until its trig
   const temporaryId = place(temporary.cardCode, "base");
   const holdingUnit = place("OGN-044", "base");
   game.state.players.p1!.zones.base = game.state.players.p1!.zones.base.filter((id) => id !== holdingUnit);
-  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, objectVersion: 0 };
+  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, gameObjectIncarnation: 0, objectVersion: 0 };
   game.state.turn = { turnNumber: 3, activePlayerId: "p1", phase: "beginning" };
   game.state.battlefields = [{
     battlefieldId: "temporary-field",
@@ -47,8 +52,8 @@ test("multiple Beginning triggers use the generic trigger-order decision", async
   const { game, decks, place } = await gameFixture();
   const first = place(addTemporaryDefinition(decks, "TEMPORARY-A").cardCode, "base");
   const second = place(addTemporaryDefinition(decks, "TEMPORARY-B").cardCode, "base");
-  game.state.cardStates[first] = { exhausted: false, damage: 0, computedMight: 1, objectVersion: 0 };
-  game.state.cardStates[second] = { exhausted: false, damage: 0, computedMight: 1, objectVersion: 0 };
+  game.state.cardStates[first] = { exhausted: false, damage: 0, computedMight: 1, gameObjectIncarnation: 0, objectVersion: 0 };
+  game.state.cardStates[second] = { exhausted: false, damage: 0, computedMight: 1, gameObjectIncarnation: 0, objectVersion: 0 };
   game.state.turn = { turnNumber: 3, activePlayerId: "p1", phase: "beginning" };
 
   applyStartOfTurn(game, decks);
@@ -57,15 +62,43 @@ test("multiple Beginning triggers use the generic trigger-order decision", async
   assert.equal(game.state.pendingChoice?.pendingItems.length, 2);
 });
 
+test("Temporary resolves after nonlethal damage to the same game object", async () => {
+  const fixture = await gameFixture();
+  let { game } = fixture;
+  const { decks, place } = fixture;
+  const temporaryId = place(addTemporaryDefinition(decks, "TEMPORARY-DAMAGE").cardCode, "base");
+  game.state.cardStates[temporaryId] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 2,
+    gameObjectIncarnation: 0,
+    objectVersion: 0,
+  };
+  game.state.turn = { turnNumber: 3, activePlayerId: "p1", phase: "beginning" };
+  applyStartOfTurn(game, decks);
+  assert.equal(game.state.chain?.items[0]?.sourceGameObjectIncarnation, 0);
+
+  createPrimitiveHandlers(createRuntimeCardIndex(decks, game)).get("action.deal_damage")!.execute!(
+    { behaviorId: "action.deal_damage", confidence: "high", order: 0, parameters: { amount: 1, target: "unit" } },
+    createBehaviorContext(game, "p1", temporaryId, null, [temporaryId]),
+  );
+  assert.equal(game.state.cardStates[temporaryId]!.damage, 1);
+  assert.equal(game.state.cardStates[temporaryId]!.objectVersion, 1);
+  assert.equal(game.state.cardStates[temporaryId]!.gameObjectIncarnation, 0);
+
+  game = resolveChain(game, decks);
+  assert.ok(game.state.players.p1!.zones.trash.includes(temporaryId));
+});
+
 test("a stale Temporary trigger does not repeat death processing after its source left play", async () => {
   const fixture = await gameFixture();
   let { game } = fixture;
   const { decks, place } = fixture;
   const temporaryId = place(addTemporaryDefinition(decks, "TEMPORARY-DEATH", true).cardCode, "base");
-  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, objectVersion: 0 };
+  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, gameObjectIncarnation: 0, objectVersion: 0 };
   game.state.turn = { turnNumber: 3, activePlayerId: "p1", phase: "beginning" };
   applyStartOfTurn(game, decks);
-  assert.equal(game.state.chain?.items[0]?.sourceObjectVersion, 0);
+  assert.equal(game.state.chain?.items[0]?.sourceGameObjectIncarnation, 0);
 
   moveCardToTrash(game, temporaryId, createRuntimeCardIndex(decks, game));
   assert.equal(game.state.players.p1!.zones.trash.filter((id) => id === temporaryId).length, 1);
@@ -80,7 +113,7 @@ test("a stale Temporary trigger cannot kill a later incarnation of the same card
   let { game } = fixture;
   const { decks, place } = fixture;
   const temporaryId = place(addTemporaryDefinition(decks, "TEMPORARY-INCARNATION").cardCode, "base");
-  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, objectVersion: 0 };
+  game.state.cardStates[temporaryId] = { exhausted: false, damage: 0, computedMight: 1, gameObjectIncarnation: 0, objectVersion: 0 };
   game.state.turn = { turnNumber: 3, activePlayerId: "p1", phase: "beginning" };
   applyStartOfTurn(game, decks);
 
@@ -88,6 +121,7 @@ test("a stale Temporary trigger cannot kill a later incarnation of the same card
   game.state.players.p1!.zones.trash = game.state.players.p1!.zones.trash.filter((id) => id !== temporaryId);
   game.state.players.p1!.zones.base.push(temporaryId);
   assert.equal(game.state.cardStates[temporaryId]!.objectVersion, 1);
+  assert.equal(game.state.cardStates[temporaryId]!.gameObjectIncarnation, 1);
 
   game = resolveChain(game, decks);
 

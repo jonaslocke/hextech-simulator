@@ -73,7 +73,8 @@ export function queueBeginningPhaseTriggers(
     label: definitionForInstance(sourceCardInstanceId, index).card.name,
     controllerPlayerId: turn.activePlayerId,
     sourceCardInstanceId,
-    sourceObjectVersion: game.state.cardStates[sourceCardInstanceId]?.objectVersion ?? 0,
+    sourceGameObjectIncarnation:
+      game.state.cardStates[sourceCardInstanceId]?.gameObjectIncarnation ?? 0,
     targetCardInstanceIds: [],
     targetObjectVersions: {},
     behaviorClauseId: null,

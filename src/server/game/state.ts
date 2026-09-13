@@ -95,6 +95,10 @@ export const cardStateSchema = z.object({
   empowered: z.boolean().default(false).optional(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
+  // Changes only when a zone transition creates a new game object. Unlike
+  // objectVersion, ordinary state changes such as taking damage do not affect
+  // this identity.
+  gameObjectIncarnation: z.number().int().nonnegative().optional(),
   objectVersion: z.number().int().nonnegative().optional(),
   combatRole: z.enum(["attacker", "defender"]).nullable().optional(),
   lethalSuppressedDamage: z.number().int().nonnegative().nullable().optional(),
@@ -115,8 +119,8 @@ export const chainItemSchema = z.object({
   chainOrigin: z.enum(["cardPlay", "triggeredAbility", "addAbility"]).optional(),
   // A delayed trigger can only affect the source game object that created it.
   // Card instance IDs persist across zone changes, so identity additionally
-  // requires the object's version at trigger creation.
-  sourceObjectVersion: z.number().int().nonnegative().optional(),
+  // requires the source's game-object incarnation at trigger creation.
+  sourceGameObjectIncarnation: z.number().int().nonnegative().optional(),
   // A play-mode choice, such as paying an optional source cost, is persisted
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.
@@ -599,6 +603,7 @@ export function createInitialGame(input: {
           damage: 0,
           computedMight: cardByCode(deck, instance.cardCode).card.attributes
             .might,
+          gameObjectIncarnation: 0,
           objectVersion: 0,
         },
       ]),

@@ -1,6 +1,7 @@
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import {
+  advanceGameObjectIncarnation,
   definitionForInstance,
   effectivePowerCost,
   recomputeAllMight,
@@ -455,6 +456,7 @@ function applyPaymentPlan(
       (candidate) => candidate !== id,
     );
     player.zones.runeDeck.push(id);
+    advanceGameObjectIncarnation(game, id);
     const state = game.state.cardStates[id];
     if (state) {
       state.damage = 0;

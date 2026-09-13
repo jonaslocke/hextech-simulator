@@ -13,6 +13,7 @@ import {
   definitionForInstance,
   effectiveEnergyCost,
   effectivePowerCost,
+  advanceGameObjectIncarnation,
   moveCardToTrash,
   submitDeathReplacementOrder,
   type RuntimeCardIndex,
@@ -832,6 +833,7 @@ function playCard(
     // Rules 143.1.a.1, 144.1, and 563.1.d: Gear enters ready at its
     // controller's Base and does not use a Unit play destination.
     player.zones.base.push(cardId);
+    advanceGameObjectIncarnation(game, cardId);
     game.state.cardStates[cardId]!.exhausted = false;
     executeImmediateClauses(
       game,
@@ -850,6 +852,7 @@ function playCard(
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
     else player.zones.base.push(cardId);
+    advanceGameObjectIncarnation(game, cardId);
     if (
       destinationBattlefield &&
       destinationBattlefield.controllerPlayerId == null
@@ -889,6 +892,7 @@ function playCard(
     }
     return;
   }
+  advanceGameObjectIncarnation(game, cardId);
   const item = {
     id: `chain:${game.stateVersion + 1}:${cardId}`,
     kind: "spell" as const,
@@ -947,6 +951,7 @@ function completeChainResolution(
     const definition = definitionForInstance(item.sourceCardInstanceId, index);
     const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
     game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+    advanceGameObjectIncarnation(game, item.sourceCardInstanceId);
     dispatchBehaviorEvent(game, item.behaviorEvent?.type === "card.played"
       ? item.behaviorEvent
       : {
@@ -993,7 +998,11 @@ function passPriority(
           index,
         );
         if (item.behaviorEvent?.type === "temporary.beginning") {
-          if (isCurrentBoardObject(game, item.sourceCardInstanceId, item.sourceObjectVersion)) {
+          if (isCurrentBoardObject(
+            game,
+            item.sourceCardInstanceId,
+            item.sourceGameObjectIncarnation,
+          )) {
             moveCardToTrash(game, item.sourceCardInstanceId, index);
           }
         } else if (item.behaviorEvent?.type === "delayed.effect") {
@@ -2137,10 +2146,13 @@ function captureTargetObjectVersions(
 function isCurrentBoardObject(
   game: GameDocument,
   cardInstanceId: string,
-  objectVersion: number | undefined,
+  gameObjectIncarnation: number | undefined,
 ) {
-  if (objectVersion === undefined) return false;
-  if (game.state.cardStates[cardInstanceId]?.objectVersion !== objectVersion) return false;
+  if (gameObjectIncarnation === undefined) return false;
+  if (
+    (game.state.cardStates[cardInstanceId]?.gameObjectIncarnation ?? 0) !==
+    gameObjectIncarnation
+  ) return false;
   return Object.values(game.state.players).some((player) =>
     player.zones.base.includes(cardInstanceId),
   ) || game.state.battlefields.some((battlefield) =>
