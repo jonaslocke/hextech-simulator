@@ -12,6 +12,10 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!localBugReportArtifactPersistenceEnabled()) {
+    return artifactPersistenceDisabledResponse();
+  }
+
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > BUG_REPORT_MAX_PAYLOAD_BYTES) {
     return payloadTooLargeResponse();
@@ -33,20 +37,6 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return invalidPayloadResponse();
   }
-  if (!localBugReportArtifactPersistenceEnabled()) {
-    return NextResponse.json(
-      {
-        accepted: false,
-        error: {
-          code: "artifact_persistence_disabled",
-          message:
-            "Local bug report storage is disabled. Copy or export the report instead.",
-        },
-      },
-      { status: 503 },
-    );
-  }
-
   try {
     const result = await writeBugReportArtifact({ report: parsed.data });
     return NextResponse.json({ accepted: true, ...result }, { status: 201 });
@@ -65,6 +55,20 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
+}
+
+function artifactPersistenceDisabledResponse() {
+  return NextResponse.json(
+    {
+      accepted: false,
+      error: {
+        code: "artifact_persistence_disabled",
+        message:
+          "Local bug report storage is disabled. Copy or export the report instead.",
+      },
+    },
+    { status: 503 },
+  );
 }
 
 function invalidPayloadResponse() {

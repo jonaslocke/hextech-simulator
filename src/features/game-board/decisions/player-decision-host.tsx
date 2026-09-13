@@ -119,7 +119,9 @@ export function PlayerDecisionHost({
       return (
         <TokenPlacementPrompt
           decision={decision}
+          interactionSuspended={interactionSuspended}
           isSubmitting={isSubmitting}
+          isVisible={isPromptVisible}
           onSubmit={(placements) =>
             onIntent(createTokenPlacementIntent(decision.actionId, placements))
           }

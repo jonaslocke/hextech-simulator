@@ -669,7 +669,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         cardsByInstanceId={cardsByInstanceId}
         decision={playerDecision}
         interactionSuspended={isInteractionSuspended}
-        isPromptVisible={!decisionInspection.isInspecting}
+        isPromptVisible={!isInteractionSuspended}
         isSubmitting={isSubmittingAction}
         onCancel={() => {
           if (!isInteractionSuspended) setTargetSelection(null);
@@ -1055,7 +1055,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           interactionSuspended={isInteractionSuspended}
           isOpen
           isSubmitting={isSubmittingAction}
-          isVisible={!decisionInspection.isInspecting}
+          isVisible={!isInteractionSuspended}
           onCancel={() => setTargetSelection(null)}
           onConfirm={(selectedIds) =>
             submitTargetedPlay({

@@ -183,16 +183,38 @@ test("requires explicit non-production opt-in for local artifacts", async () => 
   );
 });
 
-test("rejects oversized report bodies before filesystem persistence", async () => {
-  const response = await postBugReport(
-    new Request("http://localhost/api/bug-reports", {
-      body: "x".repeat(BUG_REPORT_MAX_PAYLOAD_BYTES + 1),
-      headers: { "content-type": "application/json" },
-      method: "POST",
-    }),
+test("rejects disabled persistence before processing the report payload", async () => {
+  await withArtifactPersistenceEnvironment(
+    { NODE_ENV: "production", [LOCAL_BUG_REPORT_ARTIFACTS_ENV]: "true" },
+    async () => {
+      const response = await postBugReport(
+        new Request("http://localhost/api/bug-reports", {
+          body: "not valid JSON",
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        }),
+      );
+      assert.equal(response.status, 503);
+      assert.equal(
+        (await response.json()).error.code,
+        "artifact_persistence_disabled",
+      );
+    },
   );
-  assert.equal(response.status, 413);
-  assert.equal((await response.json()).error.code, "payload_too_large");
+});
+
+test("rejects oversized report bodies in the enabled local endpoint", async () => {
+  await withArtifactPersistenceEnvironment(enabledLocalEnvironment, async () => {
+    const response = await postBugReport(
+      new Request("http://localhost/api/bug-reports", {
+        body: "x".repeat(BUG_REPORT_MAX_PAYLOAD_BYTES + 1),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    );
+    assert.equal(response.status, 413);
+    assert.equal((await response.json()).error.code, "payload_too_large");
+  });
 });
 
 test("writes the canonical payload under the workspace bug-report directory", async () => {
@@ -236,3 +258,36 @@ test("rejects new artifacts after the bounded local directory capacity", async (
     await rm(workspaceRoot, { force: true, recursive: true });
   }
 });
+
+async function withArtifactPersistenceEnvironment(
+  environment: Record<string, string>,
+  callback: () => Promise<void>,
+) {
+  const processEnvironment = process.env as Record<string, string | undefined>;
+  const previousNodeEnvironment = processEnvironment.NODE_ENV;
+  const previousArtifactFlag = processEnvironment[LOCAL_BUG_REPORT_ARTIFACTS_ENV];
+  processEnvironment.NODE_ENV = environment.NODE_ENV;
+  processEnvironment[LOCAL_BUG_REPORT_ARTIFACTS_ENV] =
+    environment[LOCAL_BUG_REPORT_ARTIFACTS_ENV];
+
+  try {
+    await callback();
+  } finally {
+    restoreProcessEnvironmentVariable("NODE_ENV", previousNodeEnvironment);
+    restoreProcessEnvironmentVariable(
+      LOCAL_BUG_REPORT_ARTIFACTS_ENV,
+      previousArtifactFlag,
+    );
+  }
+}
+
+function restoreProcessEnvironmentVariable(
+  name: string,
+  value: string | undefined,
+) {
+  if (value === undefined) {
+    delete (process.env as Record<string, string | undefined>)[name];
+  } else {
+    (process.env as Record<string, string | undefined>)[name] = value;
+  }
+}
