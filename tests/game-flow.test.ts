@@ -572,6 +572,62 @@ test("projects printed and effective costs for generic Gear cost modifiers", () 
   });
 });
 
+test("control-dependent Battlefield discounts use the current controller and every predicate", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(definition("GEAR_COST", "Costed Gear", "Gear", 3, 1));
+  const battlefield = snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  )!;
+  battlefield.behaviorModel.clauses = [clause("controlled gear discount", {
+    effects: [binding("modifier.modify_numeric_value", 0, {
+      attribute: "energyCost",
+      operation: "reduce",
+      amount: 1,
+      minimum: 0,
+      target: "controller_card",
+      cardType: "Gear",
+      excludeTokens: true,
+      duration: "whileSourceAtBattlefield",
+      condition: "firstCardOfTypePlayedThisTurn",
+      conditions: "sourceControllerControlsBattlefield",
+    })],
+  })];
+  for (const playerId of ["p1", "p2"] as const) {
+    const instanceId = `${playerId}:costed-gear`;
+    decks[playerId === "p1" ? 0 : 1]!.instances.push({
+      instanceId,
+      ownerPlayerId: playerId,
+      source: "mainDeck",
+      cardCode: "GEAR_COST",
+    });
+    game.state.players[playerId]!.zones.hand.push(instanceId);
+    game.state.cardStates[instanceId] = {
+      exhausted: false,
+      damage: 0,
+      computedMight: null,
+    };
+  }
+  const index = createRuntimeCardIndex(decks, game);
+  const gear = snapshot.cards.find((card) => card.cardCode === "GEAR_COST")!;
+
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  assert.equal(effectiveEnergyCost(game, "p1", gear, index, "p1:costed-gear"), 2);
+  assert.equal(effectiveEnergyCost(game, "p2", gear, index, "p2:costed-gear"), 3);
+
+  game.state.battlefields[0]!.controllerPlayerId = "p2";
+  assert.equal(effectiveEnergyCost(game, "p1", gear, index, "p1:costed-gear"), 3);
+  assert.equal(effectiveEnergyCost(game, "p2", gear, index, "p2:costed-gear"), 2);
+
+  game.state.turn!.playedCardInstanceIds = ["p2:costed-gear"];
+  assert.equal(effectiveEnergyCost(game, "p2", gear, index, "p2:costed-gear"), 3);
+
+  game.state.turn!.playedCardInstanceIds = [];
+  game.state.battlefields[0]!.controllerPlayerId = null;
+  assert.equal(effectiveEnergyCost(game, "p1", gear, index, "p1:costed-gear"), 3);
+  assert.equal(effectiveEnergyCost(game, "p2", gear, index, "p2:costed-gear"), 3);
+});
+
 test("applies continuous opponent spell costs only to the opposing controller", () => {
   const { game, decks } = fixture();
   const snapshot = decks[0]!.snapshot;

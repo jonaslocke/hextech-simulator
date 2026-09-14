@@ -139,14 +139,15 @@ function continuousConditionApplies(
   sourceId: string,
   attachedEffectSourceId?: string,
 ) {
-  const condition = binding.parameters.condition;
+  const conditions = numericModifierConditions(binding);
   const targetId = input.targetCardInstanceId;
   const needsTarget =
     binding.parameters.excludesSource === true ||
     binding.parameters.locationRelation === "sourceLocation" ||
     binding.parameters.locationRelation === "sharedLocation" ||
-    typeof condition === "string";
-  if (!targetId || !input.index) return !needsTarget;
+    conditions.length > 0;
+  const index = input.index;
+  if (!targetId || !index) return !needsTarget;
   if (
     binding.parameters.excludesSource === true &&
     targetId === sourceId
@@ -161,7 +162,30 @@ function continuousConditionApplies(
     return false;
   }
   const role = input.game.state.cardStates[targetId]?.combatRole;
-  if (typeof condition !== "string") return true;
+  return conditions.every((condition) => continuousConditionMatches(
+    condition,
+    input,
+    controllerPlayerId,
+    sourceId,
+    attachedEffectSourceId,
+    binding,
+    targetId,
+    index,
+    role,
+  ));
+}
+
+function continuousConditionMatches(
+  condition: string,
+  input: NumericValueInput,
+  controllerPlayerId: string,
+  sourceId: string,
+  attachedEffectSourceId: string | undefined,
+  binding: BehaviorBinding,
+  targetId: string,
+  index: RuntimeCardIndex,
+  role: string | null | undefined,
+) {
   if (condition === "sourceAttachedThisTurn") {
     const attachmentSourceId = attachedEffectSourceId ?? sourceId;
     return (
@@ -172,11 +196,11 @@ function continuousConditionApplies(
   if (condition === "sourceCombatsAlone") {
     return targetId === sourceId &&
       (role === "attacker" || role === "defender") &&
-      combatRoleCount(input.game, input.index, controllerPlayerId, role) === 1;
+      combatRoleCount(input.game, index, controllerPlayerId, role) === 1;
   }
   if (condition === "friendlyDefendsAlone") {
     return role === "defender" &&
-      combatRoleCount(input.game, input.index, controllerPlayerId, "defender") === 1;
+      combatRoleCount(input.game, index, controllerPlayerId, "defender") === 1;
   }
   if (condition === "firstCardOfTypePlayedThisTurn") {
     const cardType =
@@ -184,12 +208,12 @@ function continuousConditionApplies(
         ? binding.parameters.cardType
         : input.cardType;
     return !input.game.state.turn?.playedCardInstanceIds?.some((id) => {
-      const instance = input.index!.instances.get(id);
+      const instance = index.instances.get(id);
       if (!instance) return false;
       return (
         instance.ownerPlayerId === input.controllerPlayerId &&
         definitionHasType(
-          input.index!.definitions.get(instance.cardCode),
+          index.definitions.get(instance.cardCode),
           cardType,
         )
       );
@@ -212,6 +236,13 @@ function continuousConditionApplies(
     return input.game.state.cardStates[targetId]?.combatRole === "defender";
   }
   return true;
+}
+
+function numericModifierConditions(binding: BehaviorBinding): string[] {
+  return [binding.parameters.condition, binding.parameters.conditions]
+    .flatMap((value) => typeof value === "string" ? value.split("|") : [])
+    .map((condition) => condition.trim())
+    .filter(Boolean);
 }
 
 function bindingCardTypeMatches(
@@ -349,7 +380,11 @@ function activeContinuousBindings(
               {
                 binding: continuousBinding,
                 conditions: clause.conditions,
-                controllerPlayerId: instance.ownerPlayerId,
+                controllerPlayerId: continuousSourceController(
+                  game,
+                  sourceId,
+                  instance.ownerPlayerId,
+                ),
                 sourceId,
               },
             ]
@@ -384,6 +419,16 @@ function activeContinuousBindings(
     },
   );
   return [...printedRuleBindings, ...effectTextBindings];
+}
+
+function continuousSourceController(
+  game: GameDocument,
+  sourceId: string,
+  ownerPlayerId: string,
+) {
+  return game.state.battlefields.find(
+    (battlefield) => battlefield.cardInstanceId === sourceId,
+  )?.controllerPlayerId ?? ownerPlayerId;
 }
 
 function continuousNumericBinding(

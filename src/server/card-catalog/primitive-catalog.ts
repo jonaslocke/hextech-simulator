@@ -244,6 +244,18 @@ export const numericOperandKinds = [
   "eventAmount"
 ] as const;
 
+export const numericModifierConditionKinds = [
+  "friendlyDefendsAlone",
+  "sourceCombatsAlone",
+  "onlyFriendlyUnitAtLocation",
+  "sourceAttachedThisTurn",
+  "firstCardOfTypePlayedThisTurn",
+  "sourceControllerControlsBattlefield",
+  "sourceEmpowered",
+  "sourceNotEmpowered",
+  "targetDefending"
+] as const;
+
 export const tokenKinds = [
   "1 :rb_might: Recruit unit",
   "2 :rb_might: Sand Soldier unit",
@@ -1107,17 +1119,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("selectionKey", "string", "Selector key supplying affected units."),
       optional("locationRelation", "locationRelation", "How affected units relate to the source location."),
       optional("excludesSource", "boolean", "Whether the source card is excluded from affected units."),
-      optional("condition", "string", "Runtime predicate guarding the modifier.", [
-        "friendlyDefendsAlone",
-        "sourceCombatsAlone",
-        "onlyFriendlyUnitAtLocation",
-        "sourceAttachedThisTurn",
-        "firstCardOfTypePlayedThisTurn",
-        "sourceControllerControlsBattlefield",
-        "sourceEmpowered",
-        "sourceNotEmpowered",
-        "targetDefending"
-      ]),
+      optional("condition", "string", "Runtime predicate guarding the modifier.", numericModifierConditionKinds),
+      optional("conditions", "string", "Additional runtime predicates joined by |; every predicate must match."),
       optional("cardType", "string", "Restricts a card-cost modifier to this card type.", ["Gear", "Spell", "Unit"]),
       optional("excludeTokens", "boolean", "Excludes generated token cards from the modifier."),
       optional(
@@ -1544,6 +1547,18 @@ function validateNumericModifier(
       parameterName: "amount",
       message: 'Parameter "amount" cannot be negative; use the reduce operation.'
     });
+  }
+
+  const conditions = assignment.parameters.conditions;
+  if (typeof conditions === "string") {
+    for (const condition of conditions.split("|").map((item) => item.trim())) {
+      if (!numericModifierConditionKinds.includes(condition as never)) {
+        issues.push({
+          parameterName: "conditions",
+          message: `Unknown numeric modifier condition "${condition}".`
+        });
+      }
+    }
   }
 }
 
