@@ -7,6 +7,7 @@ import type {
 } from "../src/server/game";
 import {
   createBehaviorContext,
+  effectiveEnergyCost,
   applyHoldScoring,
   gameplayActions,
   performGameplayAction,
@@ -569,6 +570,59 @@ test("projects printed and effective costs for generic Gear cost modifiers", () 
     availableAnyPower: 0,
     targetAdditionalPower: [],
   });
+});
+
+test("applies continuous opponent spell costs only to the opposing controller", () => {
+  const { game, decks } = fixture();
+  const snapshot = decks[0]!.snapshot;
+  snapshot.cards.push(
+    definition("SPELL_COST", "Costed Spell", "Spell", 1, 0),
+    definition("SPELL_TAX", "Spell Tax", "Legend", 0, 0),
+  );
+  const spellTax = snapshot.cards.find((card) => card.cardCode === "SPELL_TAX")!;
+  spellTax.behaviorModel.clauses = [clause("opponent spell tax", {
+    effects: [binding("modifier.modify_numeric_value", 0, {
+      attribute: "energyCost",
+      operation: "increase",
+      amount: 1,
+      target: "opponent_spell",
+      duration: "whileSourceOnBoard",
+    })],
+  })];
+  decks[0]!.instances.push(
+    { instanceId: "p1:spell-tax", ownerPlayerId: "p1", source: "mainDeck", cardCode: "SPELL_TAX" },
+    { instanceId: "p1:costed-spell", ownerPlayerId: "p1", source: "mainDeck", cardCode: "SPELL_COST" },
+  );
+  decks[1]!.instances.push({
+    instanceId: "p2:costed-spell",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "SPELL_COST",
+  });
+  game.state.players.p1!.zones.base.push("p1:spell-tax");
+  game.state.players.p1!.zones.hand.push("p1:costed-spell");
+  game.state.players.p2!.zones.hand.push("p2:costed-spell");
+  game.state.cardStates["p1:spell-tax"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.cardStates["p1:costed-spell"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+  game.state.cardStates["p2:costed-spell"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  const index = createRuntimeCardIndex(decks, game);
+  const spell = snapshot.cards.find((card) => card.cardCode === "SPELL_COST")!;
+
+  assert.equal(effectiveEnergyCost(game, "p1", spell, index, "p1:costed-spell"), 1);
+  assert.equal(effectiveEnergyCost(game, "p2", spell, index, "p2:costed-spell"), 2);
 });
 
 test("uses generic restricted Power for Gear cards and Gear Equip abilities", () => {

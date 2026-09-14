@@ -58,6 +58,9 @@ export function effectiveNumericValue(input: NumericValueInput): number {
         controllerPlayerId !== input.controllerPlayerId &&
         binding.parameters.target !== "unit" &&
         binding.parameters.target !== "opponent_spell") ||
+      (binding.parameters.target === "opponent_spell" &&
+        (input.controllerPlayerId === undefined ||
+          controllerPlayerId === input.controllerPlayerId)) ||
       (input.targetScope === "controller_spell" &&
         input.cardType !== "Spell" &&
         binding.parameters.target !== "controller_card") ||
