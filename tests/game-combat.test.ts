@@ -32,6 +32,66 @@ test("resolves one-on-one combat simultaneously and conquers with a survivor", (
   assert.equal(game.state.cardStates.attacker!.combatRole, null);
 });
 
+test("preserves a generic Battlefield conquer trigger's target choice after combat scoring", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 4,
+    defenders: [{ id: "defender", might: 2 }],
+  });
+  const battlefieldDefinition = decks[0]!.snapshot.cards.find(
+    (card) => card.cardCode === "BF",
+  );
+  assert.ok(battlefieldDefinition);
+  battlefieldDefinition.behaviorModel.clauses = [{
+    id: "conquer-selects-friendly-unit",
+    sequence: 0,
+    sourceText: "When you conquer here, choose a friendly unit.",
+    normalizedText: "",
+    abilities: [],
+    triggers: [{
+      behaviorId: "trigger.conquer_battlefield",
+      parameters: {},
+      confidence: "high",
+      order: 0,
+    }],
+    conditions: [],
+    selectors: [{
+      behaviorId: "selector.friendly_unit",
+      parameters: {
+        minimumCount: 1,
+        maximumCount: 1,
+        area: "board",
+        locationRelation: "any",
+        controller: "controller",
+      },
+      confidence: "high",
+      order: 1,
+    }],
+    choices: [],
+    costs: [],
+    timings: [],
+    effects: [],
+    keywords: [],
+  }];
+
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
+  assert.equal(game.state.players.p1!.points, 1);
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  assert.equal(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.chainItem?.sourceCardInstanceId
+      : null,
+    "battlefield",
+  );
+  assert.deepEqual(
+    game.state.pendingChoice?.type === "effectSelection"
+      ? game.state.pendingChoice.legalCardIds
+      : [],
+    ["attacker"],
+  );
+});
+
 test.skip("requires lethal Tank assignment before non-Tank combat damage", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 5,

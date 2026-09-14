@@ -309,7 +309,6 @@ function resolveCombat(
       recomputeMight(game, id, index);
     }
   }
-  game.state.pendingChoice = null;
   game.state.showdown = null;
   game.state.combat = null;
   cleanupBoard(game, index);
