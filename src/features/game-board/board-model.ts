@@ -1,4 +1,5 @@
 import cardBackImage from "../../../assets/cardback.jpg";
+import { filterCardsForZone } from "./board-card-visibility";
 import type {
   BoardCatalogCard,
   BoardPlayerProjection,
@@ -173,11 +174,12 @@ function buildZone(
   cardsByInstanceId: Record<string, BoardCatalogCard>,
   projection: BoardProjection,
 ): ZoneData {
-  const cards = zone.cardInstanceIds
-    .flatMap((cardInstanceId) =>
+  const cards = filterCardsForZone(
+    kind,
+    zone.cardInstanceIds.flatMap((cardInstanceId) =>
       buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
-    )
-    .filter((card) => isCardAllowedInZone(kind, card));
+    ),
+  );
 
   return {
     cards,
@@ -210,11 +212,10 @@ function buildBattlefieldData({
   const unitCards = (battlefield?.units ?? []).flatMap((cardInstanceId) => {
     const ownerPlayerId =
       cardOwnerByInstanceId[cardInstanceId] ?? battlefield?.selectedByPlayerId;
-    const card = buildCard(
-      cardInstanceId,
-      cardsByInstanceId,
-      projection.cardStates,
-    ).filter((item) => isCardAllowedInZone("battlefield", item));
+    const card = filterCardsForZone(
+      "battlefield",
+      buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates),
+    );
 
     return card.map((item) => ({
       card: item,
@@ -297,31 +298,6 @@ export function buildCard(
       type: card.classification.type,
     },
   ];
-}
-
-function isCardAllowedInZone(kind: ZoneKind, card: Card) {
-  switch (kind) {
-    case "legend":
-      return card.type === "Legend";
-    case "champion":
-      return card.type === "Unit" && card.supertype === "Champion";
-    case "runeDeck":
-      return card.type === "Rune";
-    case "battlefield":
-      return card.type === "Unit";
-    case "hand":
-    case "mainDeck":
-      return (
-        card.type === "Gear" || card.type === "Spell" || card.type === "Unit"
-      );
-    case "base":
-      return (
-        card.type === "Rune" || card.type === "Gear" || card.type === "Unit"
-      );
-    case "banishment":
-    case "trash":
-      return true;
-  }
 }
 
 function inferCardOwners(
