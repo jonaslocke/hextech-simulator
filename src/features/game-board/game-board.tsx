@@ -1163,8 +1163,8 @@ export const GameBoard: FC<GameBoardProps> = ({
       )}
       {!isInteractionSuspended && unitPlayChoice && (
         <ReportCardChoiceDialog
-          confirmLabel="Play unit"
-          description="Units may be played to your Base or a battlefield you control."
+          confirmLabel="Play card"
+          description="Choose a destination or payment option for this card."
           isOpen
           isSubmitting={isSubmittingAction}
           onCancel={() => setUnitPlayChoice(null)}
@@ -1181,7 +1181,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
           }))}
           selectionMode="single"
-          title={`Choose where to play ${unitPlayChoice.card.name}`}
+          title={`Choose how to play ${unitPlayChoice.card.name}`}
         />
       )}
       <CardZoneTransferOverlay

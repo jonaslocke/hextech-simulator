@@ -463,17 +463,24 @@ Automatic payment rules:
 - Do not choose non-resource costs automatically unless a selected payment mode
   requires them and there is only one legal way to pay them.
 
-Optional payment modes are selected before payment validation. The payment
-system does not ask strategic questions; it validates the selected payment mode
-and applies costs. Viewer-safe projections expose legal available actions and
-payment modes for the current game state so the client can present choices such
-as:
+Optional payment modes are selected before payment validation. Automatic card
+payment remains deterministic when there is one material source allocation.
+When eligible restricted and unrestricted Power sources offer distinct
+allocations, the existing server-issued play modes expose those alternatives.
+Equivalent source/Rune permutations do not add choices. Already pooled resource
+priority is unchanged. The server regenerates the selected mode and applies its
+exact allocation; the client never submits a payment plan. These variants compose
+with destinations, optional costs and targets through the existing mode chooser.
+Viewer-safe projections expose legal available actions and payment modes for the
+current game state so the client can present choices such as:
 
 - Pay regular card cost.
 - Pay Accelerate.
 - Pay Repeat once.
 - Pay Hidden alternative cost.
 - Pay other optional additional costs exposed by card text.
+- Use eligible restricted Power sources or preserve them by using unrestricted
+  sources for automatic card payment.
 
 ### Equip payment from the Rune Pool
 
@@ -493,8 +500,8 @@ unrestricted resources, using the shared payment planner.
 Adding resources is an immediate game action. Cancelling the Equip prompt
 does not undo those actions or spend the pooled resources. They remain subject
 to normal pool clearing. No persisted pending-payment state or match migration
-is required. This replaces automatic source selection for Equip only; other
-ability and card payments retain their existing behavior.
+is required. Equip remains separate from automatic card-payment source variants;
+other ability payments retain their existing behavior.
 
 The prompt uses the same activation-cost calculation as execution, rather than
 the card's printed play cost. Future Equip cost modifiers must extend that shared
