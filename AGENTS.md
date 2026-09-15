@@ -94,3 +94,21 @@ Review the final diff for scope, durable ownership, accidental generated output,
 secrets, and temporary artifacts. Report only validation actually run and any
 remaining risk. A green suite is evidence, not proof that scope, architecture,
 or semantics are correct.
+
+### Commit and push
+
+Unless the user explicitly requests local-only work or no push, push completed
+commits to the task branch's remote before reporting completion or handing work
+to a reviewer. Creating a commit is not a complete handoff until it is available
+on the remote. This instruction authorizes the push without another confirmation.
+
+- Run the required validation and review the committed scope before pushing.
+- Use the branch's configured upstream. For a new task branch, establish an
+  upstream on the repository's intended remote; do not push unrelated branches.
+- Use a normal push. Do not force-push or rewrite shared history without explicit
+  authorization.
+- Verify the remote branch contains the completed local HEAD after pushing.
+- If a push fails, investigate and retry when safe. If blocked by credentials,
+  permissions, remote divergence, or an unclear destination, report the blocker
+  and identify the unpushed commits; do not claim the reviewer can access them.
+- Include the pushed branch and commit in the final handoff.
