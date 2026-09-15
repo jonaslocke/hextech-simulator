@@ -7,6 +7,7 @@ import {
   ComponentProps,
   FC,
   MouseEvent,
+  ReactNode,
   useEffect,
   useRef,
   useState,
@@ -22,7 +23,6 @@ import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { groupCardsByAttachment } from "./attachment-layout";
-import { useAttachmentGroupLayout } from "../use-attachment-group-layout";
 import { ZoneArea } from "./zone-area";
 
 type BaseLineProps = {
@@ -157,7 +157,7 @@ const BaseLine = ({
         isHightlighted={isBaseHighlighted || isHightlighted}
         ref={baseUnitsDroppable.setNodeRef}
       >
-        <CardList
+        <BasePermanentList
           cards={baseUnits}
           dragSourceLocation={enableLocationDrag ? { kind: "base" } : undefined}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
@@ -508,21 +508,7 @@ function TrashZone({
   );
 }
 
-function CardList({
-  cards,
-  count,
-  dragSourceLocation,
-  highlightedCardInstanceIds,
-  hiddenCardInstanceIds,
-  onCardContextAction,
-  onCardPrimaryAction,
-  onCardPointerEnter,
-  onCardPointerLeave,
-  onClick,
-  layout = "row",
-  showMight = false,
-  stagedMovementCardInstanceIds,
-}: {
+type CardListProps = {
   cards: Card[];
   count?: number;
   dragSourceLocation?: BoardDragSourceLocation;
@@ -539,19 +525,86 @@ function CardList({
   layout?: "row" | "scroll" | "wrap";
   showMight?: boolean;
   stagedMovementCardInstanceIds?: Set<string>;
-}) {
+};
+
+function CardList({ cards, ...props }: CardListProps) {
+  return (
+    <CardListLayout cards={cards} {...props}>
+      {cards.map((card, index) => (
+        <CardListCard key={card.instanceId ?? `${card.name}-${index}`} card={card} {...props} />
+      ))}
+    </CardListLayout>
+  );
+}
+
+// Attachment relationships affect only Base permanents, never generic zones.
+function BasePermanentList({ cards, ...props }: CardListProps) {
+  return (
+    <CardListLayout cards={cards} {...props}>
+      {groupCardsByAttachment(cards).map(({ host, attachments }, index) => {
+        const key = host.instanceId ?? `${host.name}-${index}`;
+        if (attachments.length === 0) {
+          return <CardListCard key={key} card={host} {...props} />;
+        }
+        return (
+          <AttachmentCardGroup
+            key={key}
+            groupId={key}
+            host={<CardListCard card={host} {...props} />}
+            attachments={attachments.map((card, attachmentIndex) => ({
+              id: card.instanceId ?? `${card.name}-${attachmentIndex}`,
+              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} />,
+            }))}
+          />
+        );
+      })}
+    </CardListLayout>
+  );
+}
+
+function CardListCard({
+  card,
+  dragSourceLocation,
+  highlightedCardInstanceIds,
+  hiddenCardInstanceIds,
+  onCardContextAction,
+  onCardPrimaryAction,
+  onCardPointerEnter,
+  onCardPointerLeave,
+  onClick,
+  showMight = false,
+  stagedMovementCardInstanceIds,
+}: Omit<CardListProps, "cards"> & { card: Card }) {
+  const tile = (
+    <CardTile
+      enableHoverPreview={!onClick}
+      isHighlighted={card.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
+      isTransferHidden={card.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
+      onContextAction={onCardContextAction ? (event) => onCardContextAction(card, event) : undefined}
+      onPrimaryAction={onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
+      onHighlightPointerEnter={onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
+      onHighlightPointerLeave={onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
+      showMight={showMight}
+      isStagedForMovement={card.instanceId ? stagedMovementCardInstanceIds?.has(card.instanceId) : false}
+      {...card}
+    />
+  );
+  return !dragSourceLocation || !card.instanceId ? <div>{tile}</div> : (
+    <DraggableLocationCard cardInstanceId={card.instanceId} sourceLocation={dragSourceLocation}>
+      {tile}
+    </DraggableLocationCard>
+  );
+}
+
+function CardListLayout({
+  cards,
+  children,
+  count,
+  onClick,
+  layout = "row",
+}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout"> & { children: ReactNode }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
-  const attachmentGroups = groupCardsByAttachment(cards);
-  const attachmentExtent = useAttachmentGroupLayout({
-    containerRef: wrapContainerRef,
-    enabled: !onClick && layout === "wrap",
-    groups: attachmentGroups.map(({ host, attachments }, index) => ({
-      id: host.instanceId ?? `${host.name}-${index}`,
-      isUnit: host.type?.split(" / ").includes("Unit") ?? false,
-      attachmentIds: attachments.flatMap((card) => card.instanceId ? [card.instanceId] : []),
-    })),
-  });
 
   useEffect(() => {
     if (layout !== "wrap" || !wrapContainerRef.current) {
@@ -599,7 +652,7 @@ function CardList({
       cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
     };
-  }, [cards.length, layout]);
+  }, [children, layout]);
 
   if (cards.length === 0) {
     return null;
@@ -607,68 +660,7 @@ function CardList({
 
   const content = (
     <>
-      {attachmentGroups.map(({ host: card, attachments }, index) => {
-        const key = card.instanceId ?? `${card.name}-${index}`;
-        const createTile = (item: Card) => (
-          <CardTile
-            enableHoverPreview={!onClick}
-            isHighlighted={
-              item.instanceId
-                ? highlightedCardInstanceIds?.has(item.instanceId)
-                : false
-            }
-            isTransferHidden={
-              item.instanceId
-                ? hiddenCardInstanceIds?.has(item.instanceId)
-                : false
-            }
-            onContextAction={
-              onCardContextAction
-                ? (event) => onCardContextAction(item, event)
-                : undefined
-            }
-            onPrimaryAction={
-              onCardPrimaryAction
-                ? (event) => onCardPrimaryAction(item, event)
-                : undefined
-            }
-            onHighlightPointerEnter={
-              onCardPointerEnter ? () => onCardPointerEnter(item) : undefined
-            }
-            onHighlightPointerLeave={
-              onCardPointerLeave ? () => onCardPointerLeave(item) : undefined
-            }
-            showMight={showMight}
-            isStagedForMovement={
-              item.instanceId
-                ? stagedMovementCardInstanceIds?.has(item.instanceId)
-                : false
-            }
-            {...item}
-          />
-        );
-        const tile = createTile(card);
-
-        const host = !dragSourceLocation || !card.instanceId ? tile : (
-          <DraggableLocationCard
-            cardInstanceId={card.instanceId}
-            sourceLocation={dragSourceLocation}
-          >
-            {tile}
-          </DraggableLocationCard>
-        );
-        return (
-          <AttachmentCardGroup
-            groupId={key}
-            attachments={attachments.map((attachment, attachmentIndex) => ({
-              id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
-              card: createTile(attachment),
-            }))}
-            host={host}
-            key={key}
-          />
-        );
-      })}
+      {children}
       {count !== undefined && count > 0 && (
         <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
           {count}
@@ -685,12 +677,11 @@ function CardList({
     return (
       <div
         className={cn(
-          "relative flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-auto [overflow-anchor:none]",
+          "flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
           hasWrappedRows ? "content-start" : "content-center",
         )}
         ref={wrapContainerRef}
       >
-        {attachmentExtent && <span aria-hidden className="pointer-events-none shrink-0" style={attachmentExtent} />}
         {content}
       </div>
     );

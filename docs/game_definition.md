@@ -796,19 +796,14 @@ card. Equipment uses its host's visual row even when their owners differ.
 Grouping and destinations follow the next projection without client attachment
 rules or optimistic attachment state.
 
-On an attachment change, retain the receiving Unit's exact screen position.
-Neighboring groups yield to its expanded footprint without overlapping; vacated
-gaps are allowed. Detach and reprojection retain the host's position and the
-remaining attachment order. Base and Battlefield share this visual placement
-logic and permit horizontal scrolling when the expanded group needs it. Keep
-the row viewport and current scroll extent stable during these changes so that
-scrollbar appearance or scroll clamping does not displace the Unit.
-
-This is a limited exception to the zone-layout freeze for attachment anchoring.
-Normal flow applies until attachment changes require anchoring; viewport resize
-or a Unit changing location recalculates placement. Position measurements are
-transient UI state, not game state or attachment-order authority. Attachment
-gameplay rules, general card scaling, and unrelated zones remain unchanged.
+A Unit and its Equipment form one visual attachment group that participates
+naturally in the containing zone's normal layout. Attachment-aware rendering is
+limited to Base permanents and Battlefield Unit rows, and only hosts with at
+least one attachment use the group presentation. Units without Equipment and
+unattached Gear render as ordinary cards. Generic zones, including Champion,
+Legend, and Runes, use direct card rendering and their normal alignment.
+Attachment changes use ordinary zone reflow without retained coordinates,
+collision displacement, synthetic extents, or attachment-specific scrolling.
 
 When a player chooses among cards, card images are the primary representation.
 Instructions, selection counts, eligibility, and disabled reasons may accompany
