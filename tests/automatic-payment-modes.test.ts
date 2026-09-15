@@ -1,42 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { gameplayActions, performGameplayAction, projectGame, type BehaviorBinding } from "../src/server/game";
-import { buildPaymentPlan } from "../src/server/game/payment";
-import { createRuntimeCardIndex } from "../src/server/game/primitive-handlers";
 import { adaptProjectionToBoard } from "../src/features/game-board/board-view-model";
 import { paymentCardId, paymentSourceFixture, restrictedSourceId, unrestrictedSourceId } from "./helpers/payment-source-fixture";
-
-test("both restricted and unrestricted sources can pay the same card while default planning follows source order", async () => {
-  const { game, decks, card } = await paymentSourceFixture();
-  const index = createRuntimeCardIndex(decks, game);
-  const plan = (state = game) => buildPaymentPlan(state, "p1", card, 0, index);
-  assert.deepEqual(plan()?.powerSourceUses.map((source) => source.id), [unrestrictedSourceId]);
-  const onlyRestricted = structuredClone(game);
-  onlyRestricted.state.cardStates[unrestrictedSourceId]!.exhausted = true;
-  assert.deepEqual(plan(onlyRestricted)?.powerSourceUses.map((source) => source.id), [restrictedSourceId]);
-  const onlyUnrestricted = structuredClone(game);
-  onlyUnrestricted.state.cardStates[restrictedSourceId]!.exhausted = true;
-  assert.deepEqual(plan(onlyUnrestricted)?.powerSourceUses.map((source) => source.id), [unrestrictedSourceId]);
-  const reversed = structuredClone(game);
-  reversed.state.players.p1!.zones.base = [restrictedSourceId];
-  reversed.state.players.p1!.zones.legend = unrestrictedSourceId;
-  assert.deepEqual(plan(reversed)?.powerSourceUses.map((source) => source.id), [restrictedSourceId]);
-});
-
-test("each selected source variant consumes exactly its own source and preserves the alternative", async () => {
-  const { game, decks } = await paymentSourceFixture();
-  for (const [label, used, preserved] of [
-    [/unrestricted Power/i, unrestrictedSourceId, restrictedSourceId],
-    [/Gear-restricted Power/i, restrictedSourceId, unrestrictedSourceId],
-  ] as const) {
-    const action = gameplayActions(game, "p1", decks).find((a) => a.sourceCardInstanceId === paymentCardId && label.test(a.label))!;
-    const after = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [], now: "payment" });
-    assert.equal(after.state.cardStates[used]!.exhausted, true);
-    assert.equal(after.state.cardStates[preserved]!.exhausted, false);
-    assert.ok(after.state.players.p1!.zones.base.includes(paymentCardId));
-    assert.equal(game.state.cardStates[used]!.exhausted, false);
-  }
-});
 
 test("one material allocation keeps one direct mode and equivalent source instances add no modes", async () => {
   const { game, decks, unrestricted } = await paymentSourceFixture();
@@ -66,38 +32,22 @@ test("already pooled eligible Power keeps pool priority and creates no source ch
   assert.equal(after.state.cardStates[restrictedSourceId]!.exhausted, false);
 });
 
-test("equivalent matching Runes use deterministic order within the unrestricted alternative", async () => {
-  const { game, decks, unrestricted } = await paymentSourceFixture();
-  unrestricted.card.classification.type = "Rune";
-  unrestricted.behaviorModel.clauses[0]!.abilities = [{ behaviorId: "ability.recycle_for_power", order: 0, confidence: "high", parameters: {} }];
-  const otherRune = "p1:equivalent-rune";
-  decks[0]!.instances.push({ instanceId: otherRune, cardCode: unrestricted.cardCode, ownerPlayerId: "p1", source: "runeDeck" });
-  game.state.cardStates[otherRune] = { exhausted: false, damage: 0, computedMight: null };
-  game.state.players.p1!.zones.base.push(otherRune);
-  const modes = gameplayActions(game, "p1", decks).filter((a) => a.sourceCardInstanceId === paymentCardId);
-  assert.equal(modes.length, 2, "one restricted alternative and one deterministic Rune allocation");
-  const mode = modes.find((a) => /unrestricted Power/.test(a.label))!;
-  const after = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: mode.id, selectedIds: [], now: "rune" });
-  assert.ok(after.state.players.p1!.zones.runeDeck.includes(unrestrictedSourceId));
-  assert.ok(after.state.players.p1!.zones.base.includes(otherRune));
-  assert.equal(after.state.cardStates[restrictedSourceId]!.exhausted, false);
-});
-
-test("material variants reject stale, unavailable and forged actions through normal regeneration", async () => {
+test("automatic payment rejects stale, unavailable and forged actions through normal regeneration", async () => {
   const { game, decks } = await paymentSourceFixture();
-  const action = gameplayActions(game, "p1", decks).find((a) => a.sourceCardInstanceId === paymentCardId && /Gear-restricted/.test(a.label))!;
+  const action = gameplayActions(game, "p1", decks).find((a) => a.sourceCardInstanceId === paymentCardId)!;
   const submit = (state = game, actionId = action.id) => performGameplayAction({ game: state, decks, actorPlayerId: "p1", actionId, selectedIds: [], now: "stale" });
   const stale = structuredClone(game);
   stale.stateVersion++;
   assert.throws(() => submit(stale), /not legal/);
   const unavailable = structuredClone(game);
   unavailable.state.cardStates[restrictedSourceId]!.exhausted = true;
+  unavailable.state.cardStates[unrestrictedSourceId]!.exhausted = true;
   assert.throws(() => submit(unavailable), /not legal/);
   assert.throws(() => submit(game, action.id + "forged"), /not legal/);
   assert.equal(game.state.cardStates[unrestrictedSourceId]!.exhausted, false);
 });
 
-test("optional costs compose with source variants and equivalent mixed permutations collapse", async () => {
+test("optional costs remain real modes without automatic source alternatives", async () => {
   const { game, decks, card, unrestricted, restricted } = await paymentSourceFixture();
   const binding = (behaviorId: string, parameters: BehaviorBinding["parameters"]): BehaviorBinding => ({ behaviorId, parameters, order: 0, confidence: "high" });
   card.behaviorModel.clauses = [{
@@ -111,32 +61,30 @@ test("optional costs compose with source variants and equivalent mixed permutati
     game.state.players.p1!.zones.base.push(id);
   }
   const modes = gameplayActions(game, "p1", decks).filter((a) => a.sourceCardInstanceId === paymentCardId);
-  assert.equal(modes.length, 5, "two base variants and three distinct two-Power allocations");
+  assert.equal(modes.length, 2, "normal and optional-cost modes only");
   const optional = modes.filter((a) => a.label.includes("Calm Power"));
-  assert.equal(optional.length, 3);
-  assert.equal(new Set(optional.map((a) => a.label)).size, 3);
+  assert.equal(optional.length, 1);
+  assert.equal(new Set(optional.map((a) => a.label)).size, 1);
   for (const mode of optional) {
     const after = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: mode.id, selectedIds: [], now: "optional" });
     const used = [unrestrictedSourceId, restrictedSourceId, "p1:unrestricted-2", "p1:restricted-2"].filter((id) => after.state.cardStates[id]!.exhausted);
     assert.equal(used.length, 2);
-    if (/2 Gear-restricted/.test(mode.label)) assert.ok(used.every((id) => id.includes(":restricted")));
-    if (/2 unrestricted/.test(mode.label)) assert.ok(used.every((id) => id.includes(":unrestricted")));
+    assert.ok(used.every((id) => id.includes(":restricted")));
   }
 });
 
-test("material source alternatives become distinct server-issued modes in the existing projection", async () => {
+test("automatic sources never become extra modes in the existing projection", async () => {
   const { game, decks } = await paymentSourceFixture();
   const actions = gameplayActions(game, "p1", decks).filter((a) => a.sourceCardInstanceId === paymentCardId);
-  assert.equal(actions.length, 2);
+  assert.equal(actions.length, 1);
   assert.ok(actions.every((a) => a.enabled));
-  assert.equal(new Set(actions.map((a) => a.id)).size, 2);
-  assert.ok(actions.some((a) => /unrestricted Power/i.test(a.label)));
-  assert.ok(actions.some((a) => /Gear-restricted Power/i.test(a.label)));
+  assert.equal(new Set(actions.map((a) => a.id)).size, 1);
+  assert.equal(actions[0]!.label, "Play Payment card");
   const board = adaptProjectionToBoard(projectGame({ game, decks, viewerPlayerId: "p1" }));
   assert.deepEqual(board.projection.players.p1!.availablePaymentModes[paymentCardId]?.map((m) => m.label), actions.map((a) => a.label));
 });
 
-test("a single viable combined allocation is preserved even when the default source order cannot pay an optional cost", async () => {
+test("restriction priority preserves a shared Energy source for an optional cost", async () => {
   const { game, decks, card, unrestricted } = await paymentSourceFixture();
   unrestricted.behaviorModel.clauses[0]!.abilities.push({ behaviorId: "ability.exhaust_for_resource", order: 1, confidence: "high",
     parameters: { resourceType: "energy", amount: 1, usage: "unrestricted" } });
@@ -153,7 +101,7 @@ test("a single viable combined allocation is preserved even when the default sou
   assert.equal(after.state.cardStates[restrictedSourceId]!.exhausted, true);
 });
 
-test("restricted source alternatives compose with Unit destinations and existing target requirements", async () => {
+test("automatic payment preserves Unit destinations and target-specific Deflect requirements", async () => {
   const { game, decks, card, restricted } = await paymentSourceFixture();
   card.card.classification.type = "Unit";
   restricted.behaviorModel.clauses[0]!.abilities[0]!.parameters.usage = "card:Unit";
@@ -170,12 +118,12 @@ test("restricted source alternatives compose with Unit destinations and existing
   game.state.players.p1!.power = { Mind: 1 };
   card.behaviorModel.clauses[0]!.keywords.push({ behaviorId: "keyword.deflect", order: 0, confidence: "high", parameters: { amount: 1 } });
   const modes = gameplayActions(game, "p1", decks).filter((a) => a.sourceCardInstanceId === paymentCardId);
-  assert.equal(modes.length, 4);
+  assert.equal(modes.length, 2);
   assert.deepEqual(new Set(modes.map((a) => a.presentation.boardLocation?.kind)), new Set(["base", "battlefield"]));
   assert.ok(modes.every((mode) => mode.targets.some((target) => target.legalIds.includes(targetId))));
   for (const mode of modes) {
     const after = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: mode.id, selectedIds: [targetId], now: "destination" });
-    const used = /Unit-restricted/.test(mode.label) ? restrictedSourceId : unrestrictedSourceId;
+    const used = restrictedSourceId;
     assert.equal(after.state.cardStates[used]!.exhausted, true);
     assert.equal(after.state.players.p1!.power.Mind, 0, "target-specific Deflect remains part of the selected payment");
   }

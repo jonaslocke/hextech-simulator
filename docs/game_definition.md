@@ -448,13 +448,34 @@ Examples:
 
 Automatic payment rules:
 
-- Spend matching domain-specific rune-pool Power before Rainbow Power.
-- Spend Rainbow Power last.
-- For multi-domain Power requirements, spend domains in the card metadata domain
-  order.
-- Spend rune-pool Energy before exhausting ready Runes.
-- Exhaust ready Runes in deterministic board order for missing Energy.
-- Recycle matching Runes in deterministic board order for missing Power.
+- Normalize resource restrictions before evaluating payment. One semantic matcher
+  checks the current card/ability payment against the restriction's allowed sets
+  of payment kinds, card/source types, and any supported payment characteristics.
+  Compact persisted usage identifiers are compatibility inputs, not priorities.
+- Use the same restriction matcher and specificity comparison for Energy and
+  Power, both pooled and generated, including ability and pool-only previews.
+- Spend eligible pooled resources before acquiring more resources. Within each
+  stage, consume more-specific legal restrictions before broader restrictions:
+  A is more specific than B when A's accepted contexts are a proper subset of B's.
+  Preserve unrestricted resources when a narrower legal resource is available.
+- For equivalent usage restrictions, spend matching domain-specific Power before
+  Rainbow. Restriction specificity precedes domain flexibility: narrower-use
+  Rainbow is consumed before broader-use matching domain Power.
+- Equivalent restrictions retain stable source order after domain and acquisition
+  ties. Incomparable restrictions use stable source order directly. Ordering
+  selects the earliest candidate with no more-specific predecessor; it does not
+  assign named restrictions numeric ranks or ask the player to resolve ties.
+  Pooled buckets retain insertion order, with legacy conditional Energy first;
+  within a Power bucket, matching domains follow card metadata order. Generated
+  sources retain Base, Legend, then controlled Battlefield-unit order.
+- Keep acquisition/destructive cost separate. At equivalent restriction and
+  domain flexibility, prefer exhausting an Add source over recycling a Rune.
+  Automatically recycle only Runes already exhausted or scheduled to exhaust for
+  Energy in the same PaymentPlan. Never automatically recycle a still-ready Rune.
+- Energy planning tries the preferred source order while checking unmet Power.
+  For example, with ready Mind then Calm Runes and a cost of 1 Energy + 1 Calm
+  Power, exhaust Calm for Energy and recycle that same Rune for Power. If no safe
+  complete plan exists, the player must prepare the Rune Pool manually.
 - Any simultaneous recycle of 2 or more Runes places those Runes on the bottom
   of the Rune Deck in seeded random order and logs the random operation. This
   intentional simulator rule applies beyond auto-payment and diverges from the
@@ -463,24 +484,22 @@ Automatic payment rules:
 - Do not choose non-resource costs automatically unless a selected payment mode
   requires them and there is only one legal way to pay them.
 
-Optional payment modes are selected before payment validation. Automatic card
-payment remains deterministic when there is one material source allocation.
-When eligible restricted and unrestricted Power sources offer distinct
-allocations, the existing server-issued play modes expose those alternatives.
-Equivalent source/Rune permutations do not add choices. Already pooled resource
-priority is unchanged. The server regenerates the selected mode and applies its
-exact allocation; the client never submits a payment plan. These variants compose
-with destinations, optional costs and targets through the existing mode chooser.
-Viewer-safe projections expose legal available actions and payment modes for the
-current game state so the client can present choices such as:
+Automatic resource allocation is deterministic and never creates player-facing
+payment-source modes. Players control resource use through existing manual Add
+and recycle actions before playing a card; manual ready-Rune recycling remains
+legal. Restricted overflow retains its restriction. Deflect continues to require
+eligible manually pooled Power. The server revalidates and pays the complete
+selected cost commitment atomically; clients never submit resource plans.
+
+Real play modes are selected before payment validation. Destinations, optional
+additional costs, alternate play modes and target requirements retain their
+existing server-issued action and projection flow. The client can present:
 
 - Pay regular card cost.
 - Pay Accelerate.
 - Pay Repeat once.
 - Pay Hidden alternative cost.
 - Pay other optional additional costs exposed by card text.
-- Use eligible restricted Power sources or preserve them by using unrestricted
-  sources for automatic card payment.
 
 ### Equip payment from the Rune Pool
 
@@ -500,8 +519,8 @@ unrestricted resources, using the shared payment planner.
 Adding resources is an immediate game action. Cancelling the Equip prompt
 does not undo those actions or spend the pooled resources. They remain subject
 to normal pool clearing. No persisted pending-payment state or match migration
-is required. Equip remains separate from automatic card-payment source variants;
-other ability payments retain their existing behavior.
+is required. Equip retains its manual pool-only flow and has no automatic-source
+choice prompt.
 
 The prompt uses the same activation-cost calculation as execution, rather than
 the card's printed play cost. Future Equip cost modifiers must extend that shared

@@ -61,7 +61,7 @@ import {
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
   buildPaymentPlan,
-  cardPaymentVariants,
+  canPayCardCosts,
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
@@ -748,7 +748,7 @@ function playCard(
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
-  const { destinationId, optionalCostKeys, sourceVariant } = decodePlayExtra(playExtra);
+  const { destinationId, optionalCostKeys } = decodePlayExtra(playExtra);
   const optionalSourceCosts = optionalSourcePlayCosts(definition);
   const optionalSourceCostKeys = new Set(
     optionalSourceCosts.map((payment) => payment.selectionKey),
@@ -830,7 +830,6 @@ function playCard(
     additionalAnyPower,
     optionalCosts,
     cardId,
-    sourceVariant,
   );
   payOptionalNonResourcePlayCosts(
     game,
@@ -1481,20 +1480,17 @@ function optionalPlayCostModes(
 function encodePlayExtra(
   destinationId: string | undefined,
   optionalCostKeys: readonly string[],
-  sourceVariant?: string,
 ) {
-  if (optionalCostKeys.length === 0 && !sourceVariant) return destinationId;
+  if (optionalCostKeys.length === 0) return destinationId;
   return `play:${JSON.stringify({
     destinationId: destinationId ?? null,
     optionalCostKeys,
-    ...(sourceVariant ? { sourceVariant } : {}),
   })}`;
 }
 
 function decodePlayExtra(extra: string): {
   destinationId: string;
   optionalCostKeys: string[];
-  sourceVariant?: string;
 } {
   if (!extra.startsWith("play:")) {
     return { destinationId: extra, optionalCostKeys: [] };
@@ -1511,19 +1507,16 @@ function decodePlayExtra(extra: string): {
     const destinationId = (parsed as { destinationId?: unknown }).destinationId;
     const optionalCostKeys = (parsed as { optionalCostKeys: unknown[] })
       .optionalCostKeys;
-    const sourceVariant = (parsed as { sourceVariant?: unknown }).sourceVariant;
     if (
       (destinationId !== null && typeof destinationId !== "string") ||
       optionalCostKeys.some((key) => typeof key !== "string") ||
-      new Set(optionalCostKeys).size !== optionalCostKeys.length ||
-      (sourceVariant !== undefined && (typeof sourceVariant !== "string" || !/^[a-f0-9]{64}$/.test(sourceVariant)))
+      new Set(optionalCostKeys).size !== optionalCostKeys.length
     ) {
       throw new Error();
     }
     return {
       destinationId: destinationId ?? "",
       optionalCostKeys: optionalCostKeys as string[],
-      ...(typeof sourceVariant === "string" ? { sourceVariant } : {}),
     };
   } catch {
     throw new Error("Play mode is malformed.");
@@ -1656,7 +1649,7 @@ function addPlayableCardActions(
       printedEnergy: definition.card.attributes.energy ?? 0,
       printedPower: definition.card.attributes.power ?? 0,
       availableAnyPower: paymentPlan
-        ? availableAnyPowerAfterBaseCost(game, playerId, paymentPlan)
+        ? availableAnyPowerAfterBaseCost(game, playerId, paymentPlan, { kind: "card", cardType: definition.card.classification.type })
         : Object.values(player.power).reduce((total, amount) => total + amount, 0),
       targetAdditionalPower,
     };
@@ -1680,7 +1673,7 @@ function addPlayableCardActions(
         const additionalCosts = optionalSourceCosts
           .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
           .flatMap((payment) => payment.costs);
-        const variants = cardPaymentVariants(
+        const costsPayable = canPayCardCosts(
           game,
           playerId,
           definition,
@@ -1690,36 +1683,33 @@ function addPlayableCardActions(
           additionalCosts,
           cardId,
         );
-        const costsPayable = variants.length > 0;
         const enabled = costsPayable && hasLegalTargets;
         const disabledReason = !hasLegalTargets
           ? "No legal targets are available."
           : costsPayable
             ? null
             : "Card costs cannot be paid.";
-        for (const variant of variants.length > 0 ? variants : [undefined]) {
-          actions.push(
-            action(
-              game,
-              "play",
-              playActionLabel({
-                definition,
-                destinationName: destination.name,
-                energyCost: cost,
-                effectivePower,
-                additionalCosts,
-                hasOptionalModes: optionalSourceCosts.length > 0,
-              }) + (variants.length > 1 && variant ? ` — ${variant.label}` : ""),
-              cardId,
-              enabled,
-              disabledReason,
-              encodePlayExtra(destination.id, optionalCostKeys, variant && !variant.automatic ? variant.key : undefined),
-              targets,
-              undefined,
-              costPreview,
-            ),
-          );
-        }
+        actions.push(
+          action(
+            game,
+            "play",
+            playActionLabel({
+              definition,
+              destinationName: destination.name,
+              energyCost: cost,
+              effectivePower,
+              additionalCosts,
+              hasOptionalModes: optionalSourceCosts.length > 0,
+            }),
+            cardId,
+            enabled,
+            disabledReason,
+            encodePlayExtra(destination.id, optionalCostKeys),
+            targets,
+            undefined,
+            costPreview,
+          ),
+        );
       }
     }
   }

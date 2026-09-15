@@ -161,6 +161,13 @@ test("projects combined Add and evaluates automatic showdown resources for targe
   assert.deepEqual(cometAction.targets[0]?.legalIds, [enemy]);
 
   game.state.players.p1!.energy = 6;
+  assert.equal(
+    gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === blastOfPower)?.enabled,
+    false,
+    "Pooled Energy does not authorize automatically recycling a still-ready Rune",
+  );
+  // The player can prepare the Rune through its existing Add action.
+  game.state.cardStates[orderRune]!.exhausted = true;
   actions = gameplayActions(game, "p1", decks);
   assert.equal(
     actions.find((action) => action.sourceCardInstanceId === fallingComet)
@@ -182,7 +189,7 @@ test("projects combined Add and evaluates automatic showdown resources for targe
   assert.equal(
     paidGame.state.players.p1!.zones.runeDeck.includes(orderRune),
     true,
-    "Showdown payment should automatically recycle a matching Rune for Power",
+    "Showdown payment should automatically recycle an exhausted matching Rune for Power",
   );
 });
 

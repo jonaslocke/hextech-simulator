@@ -201,6 +201,10 @@ test("Yi, Meditative recomputes when rune count changes during payment", () => {
   recomputeAllMight(game, runtimeIndex);
   assert.equal(game.state.cardStates.yi!.computedMight, 8);
 
+  // Automatic Power may recycle an already-exhausted Rune. This fixture tests
+  // rune-count recomputation, independent of the ready-Rune preparation policy.
+  game.state.cardStates["rune-0"]!.exhausted = true;
+
   payCardCost(
     game,
     "p1",
