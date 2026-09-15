@@ -5,7 +5,7 @@ import type { BoardTargetSelection } from "./use-board-target-selection";
 export type DecisionInspectionRequest = {
   decisionKey: string;
   policy: DecisionInspectionPolicy;
-  source: "battlefieldChoice" | "playerDecision";
+  source: "battlefieldChoice" | "locationChoice" | "playerDecision";
   title: string;
 };
 
@@ -24,15 +24,15 @@ export function resolveDecisionInspectionRequest({
     return playerDecisionRequest;
   }
 
-  if (targetSelection?.targetKind !== "battlefield") {
+  if (targetSelection?.targetKind !== "battlefield" && targetSelection?.targetKind !== "location") {
     return null;
   }
 
   return {
-    decisionKey: `publicGameState:battlefieldChoice:${targetSelection.actionId}`,
+    decisionKey: `publicGameState:${targetSelection.targetKind === "location" ? "locationChoice" : "battlefieldChoice"}:${targetSelection.actionId}`,
     policy: "publicGameState",
-    source: "battlefieldChoice",
-    title: "Choose the battlefield affected by this action.",
+    source: targetSelection.targetKind === "location" ? "locationChoice" : "battlefieldChoice",
+    title: targetSelection.targetKind === "location" ? "Choose a move destination." : "Choose the battlefield affected by this action.",
   };
 }
 

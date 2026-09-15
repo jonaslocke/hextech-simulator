@@ -37,6 +37,8 @@ function renderSegments(segments: CardTextSegment[]) {
             count={segment.count}
             key={key}
             keyword={segment.keyword}
+            pointed={segment.pointed}
+            connected={segment.connected}
           />
         );
       case "resource":
@@ -48,17 +50,30 @@ function renderSegments(segments: CardTextSegment[]) {
 function Keyword({
   count,
   keyword,
+  pointed,
+  connected,
 }: {
   count?: string;
   keyword: CardKeyword;
+  pointed?: boolean;
+  connected?: boolean;
 }) {
+  const asset = getKeywordImagePath(keyword, "lg");
+  const conditional = keyword === "empowered" || keyword === "level";
   return (
-    <span className="mx-0.5 inline-flex items-center gap-1 align-middle font-semibold text-[11px] text-cyan-100">
-      <img
+    <span
+      className="relative inline-flex items-center gap-1 align-middle font-semibold text-[11px] text-cyan-100"
+      style={{ marginLeft: connected ? 0 : 2, marginRight: 2,
+        paddingRight: pointed ? 7 : 0,
+        background: pointed ? (conditional || keyword === "deathknell" ? "#78952e" : "#08766b") : undefined,
+        clipPath: pointed ? `polygon(${connected ? "5px" : "0"} 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%, ${connected ? "5px" : "0"} 50%)` : undefined,
+      }}
+    >
+      {asset ? <img
         alt={formatKeyword(keyword)}
         className="h-4 w-auto object-contain"
-        src={getKeywordImagePath(keyword, "lg")}
-      />
+        src={asset}
+      /> : <span className="px-1 text-slate-950 uppercase italic">{formatKeyword(keyword)}</span>}
       {count && (
         <span className="rounded bg-cyan-200 px-1 text-[10px] font-bold text-slate-950">
           {count}

@@ -27,6 +27,7 @@ import { GameActionButton } from "./game-action-button";
 export function ChainOverlay({
   canPassPriority = false,
   chainCards,
+  highlightedChainIds = [],
   chainPassLabel = "Pass priority",
   isCloseDisabled = false,
   interactionSuspended = false,
@@ -40,13 +41,14 @@ export function ChainOverlay({
 }: {
   canPassPriority?: boolean;
   chainCards: ChainCardEntry[];
+  highlightedChainIds?: string[];
   chainPassLabel?: string;
   isCloseDisabled?: boolean;
   interactionSuspended?: boolean;
   isOpen: boolean;
   isSubmittingAction?: boolean;
   onClose: () => void;
-  onItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
+  onItemPointerEnter?: (targetCardInstanceIds: string[], relationships?: ChainCardEntry["relationships"]) => void;
   onItemPointerLeave?: () => void;
   onPassPriority?: () => void | Promise<unknown>;
   priorityWindowKey?: string;
@@ -166,6 +168,7 @@ export function ChainOverlay({
           <ChainCards
             emptyLabel="The chain is empty."
             entries={chainCards}
+            highlightedChainIds={highlightedChainIds}
             onItemPointerEnter={onItemPointerEnter}
             onItemPointerLeave={onItemPointerLeave}
           />
@@ -240,12 +243,14 @@ export function ChainOverlay({
 function ChainCards({
   emptyLabel,
   entries,
+  highlightedChainIds,
   onItemPointerEnter,
   onItemPointerLeave,
 }: {
   emptyLabel: string;
   entries: ChainCardEntry[];
-  onItemPointerEnter?: (targetCardInstanceIds: string[]) => void;
+  highlightedChainIds: string[];
+  onItemPointerEnter?: (targetCardInstanceIds: string[], relationships?: ChainCardEntry["relationships"]) => void;
   onItemPointerLeave?: () => void;
 }) {
   if (entries.length === 0) {
@@ -260,11 +265,16 @@ function ChainCards({
         <div
           className={cn(
             "items-center gap-2 grid grid-cols-[auto_minmax(0,1fr)] bg-white/[0.07] shadow-black/20 shadow-sm p-2 border border-white/10 border-l-4 rounded",
+            highlightedChainIds.includes(entry.chainItemId) && "ring-2 ring-cyan-200 bg-cyan-300/20",
             entry.controllerSeat === "player"
               ? "border-l-player-accent-border"
               : "border-l-opponent-accent-border",
           )}
           key={entry.chainItemId}
+          tabIndex={0}
+          aria-label={`${entry.card.name}. ${entry.relationships?.labels.join(". ") ?? ""}`}
+          onFocus={() => onItemPointerEnter?.([entry.sourceCardInstanceId, ...(entry.relationships?.cardIds ?? [])].filter((id): id is string => Boolean(id)), entry.relationships)}
+          onBlur={onItemPointerLeave}
           onPointerEnter={() =>
             onItemPointerEnter?.(
               [
@@ -273,6 +283,7 @@ function ChainCards({
               ].filter((cardInstanceId): cardInstanceId is string =>
                 Boolean(cardInstanceId),
               ),
+              entry.relationships,
             )
           }
           onPointerLeave={onItemPointerLeave}
@@ -304,6 +315,7 @@ function ChainCards({
               {entry.card.name}
             </div>
 
+            {entry.relationships?.labels.map((label, index) => <div className="text-cyan-100 text-xs" key={index}>{label}</div>)}
             <div className="text-[11px] text-slate-500">
               {index === 0 ? "Resolves next" : `Resolves ${index + 1}`}
             </div>

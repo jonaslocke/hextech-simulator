@@ -195,7 +195,7 @@ export function CombatDamageDialog({
     <div
       aria-hidden={!isVisible || undefined}
       className={cn(
-        "z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4 select-none",
+        "z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/72 backdrop-blur-sm p-4 select-none",
         !isVisible && "invisible pointer-events-none",
       )}
     >

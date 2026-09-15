@@ -9,6 +9,8 @@ export const cardKeywords = [
   "ganking",
   "hidden",
   "legion",
+  "level",
+  "empowered",
   "mighty",
   "quick-draw",
   "reaction",
@@ -31,7 +33,7 @@ export type CardTextResource =
 export type CardTextSegment =
   | { kind: "text"; value: string }
   | { children: CardTextSegment[]; kind: "parenthetical" }
-  | { count?: string; keyword: CardKeyword; kind: "keyword" }
+  | { count?: string; keyword: CardKeyword; kind: "keyword"; pointed?: boolean; connected?: boolean }
   | { kind: "resource"; resource: CardTextResource };
 
 export type CardTextParagraph = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
+import { ResourceCost } from "./resource-cost";
 import { cn } from "@/shared/utils/cn";
 import type { GameProjection } from "@/shared/game";
 import {
@@ -30,6 +31,7 @@ const DEFAULT_PANEL_HEIGHT = 150;
 
 export function TargetSelectionPrompt({
   canSubmit,
+  canCancel = true,
   cancelLabel = "Cancel",
   confirmLabel = "Play",
   costPreview,
@@ -46,6 +48,7 @@ export function TargetSelectionPrompt({
 }: {
   helperText?: string;
   canSubmit: boolean;
+  canCancel?: boolean;
   cancelLabel?: string;
   confirmLabel?: string;
   poolPayment?: GameProjection["actions"][number]["poolPayment"];
@@ -280,10 +283,7 @@ export function TargetSelectionPrompt({
         {poolPayment && (
           <div aria-live="polite" className="bg-amber-400/10 px-4 py-3 border-amber-300/25 border-b text-amber-50 text-xs">
             <div className="font-semibold">
-              Cost: {poolPayment.energy} Energy
-              {poolPayment.powerCosts
-                ? poolPayment.powerCosts.map((cost, i) => <span key={i}> + {cost.amount} {cost.domains.join(" or ")} Power</span>)
-                : <> + {poolPayment.power} {poolPayment.powerDomains.join(" or ")} Power</>}
+              Cost: <ResourceCost energy={poolPayment.energy} powerCosts={poolPayment.powerCosts ?? [{ amount: poolPayment.power, domains: poolPayment.powerDomains }]} />
             </div>
             <div className="mt-1">
               Eligible Rune Pool: {poolPayment.availableEnergy}/{poolPayment.energy} Energy
@@ -309,23 +309,8 @@ export function TargetSelectionPrompt({
               Power.
             </div>
             <div className="mt-1 text-amber-100/80">
-              Selected cost: {costPreview.energy} Energy
-              {costPreview.effectivePower > 0
-                ? ` + ${costPreview.effectivePower} Power`
-                : ""}
-              {" · "}New cost: {costPreview.energy} Energy +{" "}
-              {costPreview.effectivePower + costPreview.additionalPower} Power
+              Cost: <ResourceCost energy={costPreview.energy} powerCosts={[{ amount: costPreview.effectivePower + costPreview.additionalPower, domains: [] }]} />
             </div>
-            {(costPreview.energy !== costPreview.printedEnergy ||
-              costPreview.effectivePower !== costPreview.printedPower) && (
-              <div className="mt-1 text-amber-100/80">
-                Printed cost: {costPreview.printedEnergy} Energy
-                {costPreview.printedPower > 0
-                  ? ` + ${costPreview.printedPower} Power`
-                  : ""}
-                {" · "}includes selected costs and active effects
-              </div>
-            )}
             {costPreview.sourceNames.length > 0 && (
               <div className="mt-1 text-amber-100/80">
                 Deflect sources: {costPreview.sourceNames.join(", ")}
@@ -342,13 +327,14 @@ export function TargetSelectionPrompt({
         )}
 
         <div className="flex justify-end items-center gap-2 px-4 py-3">
-          <GameActionButton
+          {canCancel && <GameActionButton
             actionSlot="cancel"
+            disabled={isSubmitting}
             onAction={onCancel}
             variant="secondary"
           >
             {cancelLabel}
-          </GameActionButton>
+          </GameActionButton>}
 
           <GameActionButton
             actionSlot="primary"

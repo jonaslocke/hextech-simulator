@@ -7,6 +7,10 @@ export function normalizeCardText(text: string) {
   });
 
   return tokenizedText
+    .replace(/&(?:gt|lt|quot|apos|amp);|&#(?:39|34|62|60);/g, (entity) => ({
+      "&gt;": ">", "&lt;": "<", "&quot;": '"', "&apos;": "'", "&amp;": "&",
+      "&#39;": "'", "&#34;": '"', "&#62;": ">", "&#60;": "<",
+    })[entity] ?? entity)
     .replace(/\*\*/g, "")
     .replace(/_ _/g, " ")
     .replace(/(^|\s)_(?=\s|$)/g, "$1")

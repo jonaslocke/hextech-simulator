@@ -103,6 +103,7 @@ export const CardTile: FC<CardTileProps> = ({
   isExhausted,
   img,
   might,
+  mightModifiers,
   name,
   onContextAction,
   onHighlightPointerEnter,
@@ -137,7 +138,7 @@ export const CardTile: FC<CardTileProps> = ({
     orientation === "auto" ? autoOrientation : orientation;
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
-  const isGear = type?.split(" / ").includes("Gear") ?? false;
+  const isGear = Boolean(type?.split(" / ").includes("Gear") && !type?.split(" / ").includes("Unit"));
   const { isLocationDragActive } = useLocationDragState();
   const {
     isReportMode,
@@ -404,6 +405,7 @@ export const CardTile: FC<CardTileProps> = ({
         energy={energy}
         img={img}
         might={might}
+        mightModifiers={mightModifiers}
         name={name}
         ownerLabel={ownerLabel}
         ownerSeat={ownerSeat}
@@ -425,6 +427,7 @@ function CardHoverPreviewPortal({
   energy,
   img,
   might,
+  mightModifiers,
   name,
   ownerLabel,
   ownerSeat,
@@ -441,6 +444,7 @@ function CardHoverPreviewPortal({
   energy?: number;
   img: string;
   might?: number;
+  mightModifiers?: Card["mightModifiers"];
   name: string;
   ownerLabel?: string;
   ownerSeat?: "player" | "opponent";
@@ -491,6 +495,7 @@ function CardHoverPreviewPortal({
         domains={domains}
         energy={energy}
         might={might}
+        mightModifiers={mightModifiers}
         name={name}
         ownerLabel={ownerLabel}
         ownerSeat={ownerSeat}
@@ -540,6 +545,7 @@ function CardSummary({
   domains,
   energy,
   might,
+  mightModifiers,
   name,
   ownerLabel,
   ownerSeat,
@@ -553,6 +559,7 @@ function CardSummary({
   domains: string[];
   energy?: number;
   might?: number;
+  mightModifiers?: Card["mightModifiers"];
   name: string;
   ownerLabel?: string;
   ownerSeat?: "player" | "opponent";
@@ -619,6 +626,13 @@ function CardSummary({
           )}
         </div>
       )}
+      {mightModifiers && mightModifiers.length > 0 && <section aria-label="Might modifiers" className="text-xs text-slate-200">
+        <div className="font-semibold">Might changes</div>
+        <ul className="mt-1 space-y-1">{mightModifiers.map((entry) => <li key={entry.id}>
+          <strong>{entry.amount > 0 ? "+" : ""}{entry.amount}</strong> {entry.sourceName} · {entry.label}
+          <span className="text-slate-400"> · {({ thisTurn: "this turn", whileAttached: "while attached", whileAttacking: "while attacking", whileDefending: "while defending", whileSourceOnBoard: "while source is on board", whileSourceAtBattlefield: "while source is at battlefield" } as Record<string, string>)[entry.duration] ?? entry.duration}</span>
+        </li>)}</ul>
+      </section>}
       <div className="gap-1.5 grid bg-slate-950/45 shadow-inner p-2 border border-white/10 rounded-md text-slate-100 text-sm">
         {rulesText?.trim() ? (
           <CardRulesText text={rulesText} />

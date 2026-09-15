@@ -7,6 +7,7 @@ import { cn } from "@/shared/utils/cn";
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 
 export type ChoiceDialogOption = {
+  labelContent?: ReactNode;
   description?: string;
   diagnosticCardInstanceId?: string;
   disabled?: boolean;
@@ -360,7 +361,7 @@ function OptionText({ option }: { option: ChoiceDialogOption }) {
   return (
     <span className="min-w-0">
       <span className="block font-semibold text-slate-100 text-sm truncate">
-        {option.label}
+        {option.labelContent ?? option.label}
       </span>
       {option.description && (
         <span className="block mt-0.5 text-slate-400 text-xs line-clamp-2 leading-5">

@@ -9,7 +9,8 @@ import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
 import { victoryRequirement } from "./victory";
-import { cardHasType } from "./primitive-handlers";
+import { cardHasType, evaluateMight } from "./primitive-handlers";
+import { presentNumericContributions } from "./modifier-presentation";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -61,6 +62,9 @@ export function projectGame(input: {
       might: card.attributes.might,
       power: card.attributes.power,
       computedMight: state.computedMight,
+      ...(cardHasType(definition, "Unit") ? { mightModifiers: presentNumericContributions(
+        input.game, { definitions, instances }, evaluateMight(input.game, id, { definitions, instances }).contributions,
+      ) } : {}),
       damage: state.damage,
       exhausted: state.exhausted,
       empowered: state.empowered ?? false,
@@ -347,7 +351,8 @@ export function projectGame(input: {
     actions: (input.game.status === "setup_pending"
       ? setupActions(input.game, input.viewerPlayerId)
       : gameplayActions(input.game, input.viewerPlayerId, input.decks)
-    ).map((action) => {
+    ).filter((action) => !action.id.includes(":action:play:") || action.enabled).map((action) => {
+      if (action.presentation.playCost) return { ...action, label: action.presentation.playCost.label };
       if (!action.id.includes(":setup:lockBattlefield:")) return action;
       const cardId = action.id.split(":").slice(4).join(":");
       return { ...action, label: `Choose ${view(cardId).name}` };

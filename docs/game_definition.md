@@ -1185,6 +1185,40 @@ configuration, and requires server-side deck validation and authorization before
 the next fresh game is created. The Legend, Rune Deck, and registered
 Battlefield pool remain governed by the match policy.
 
+## Card action and board presentation
+
+- Card menus expose playable or resource-preparable modes only. If none is
+  available, the menu shows one disabled "Not playable" entry. Server execution
+  still revalidates the selected mode and its costs.
+- A normal play does not repeat its printed cost. An alternative payment mode
+  displays its full final cost with resource symbols. An increased or decreased
+  cost displays its final value and named public modifier sources, without
+  printed/effective comparison prose.
+- Card previews expose each active Might contribution, including repeated
+  instances, attached Equipment, Assault, Shield, and temporary modifiers.
+  Provenance comes from the same server evaluator as the numeric result; it
+  expires with the underlying effect and must not disclose hidden sources.
+- Location decisions support inspecting the board and returning to the same
+  decision. Chain entries identify their targets and locations, with highlights
+  for cards, Battlefields, Bases, and targeted Chain entries.
+- Public reveal notifications use the existing movable window and card browser.
+  Only new reveal events received while viewing the game open it. Initial/reloaded
+  projection entries are history, never a required acknowledgement. Dismissal
+  does not write server state; the game log remains the historical record.
+- Board dragging is limited to Units. Composite Unit/Gear cards retain both
+  rules types, but use Unit Might-badge placement. A staged targeting/payment
+  interaction suppresses ordinary hand/Champion play menus.
+- Report Bug remains accessible above gameplay decision overlays.
+
+### Optional Quick-Draw attachment — approved product exception
+
+The September 15, 2026 product decision deliberately differs from local core
+rule 819.1.d: the on-play Quick-Draw attachment may be declined. Its Unit selector
+accepts zero or one legal target, and declining resolves the server decision with
+an empty selection. Equip activations still require their Unit target. The
+compiler applies this keyword contract to both existing and new card snapshots;
+it does not modify unrelated selectors or attachment legality.
+
 ## Remaining Open Questions
 
 No open product or implementation questions are currently blocking the first

@@ -1,5 +1,8 @@
 "use client";
 
+import { chainRelationships, type ChainRelationships } from "./chain-relationships";
+import { PlayableCardMenuLabel } from "./components/playable-card-menu-label";
+
 import {
   serializeStructuredBugReport,
   type StructuredBugReport,
@@ -45,7 +48,8 @@ import {
   ReportBugButton,
 } from "./components/bug-report-panel";
 import { PlayerBoard } from "./components/player-board";
-import { PublicRevealToast } from "./components/public-reveal-toast";
+import { PublicRevealWindow } from "./components/public-reveal-window";
+import { DialogPortal } from "@/shared/components/dialog-portal";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
 import { ScoreHeader, type MatchHudContext } from "./components/score-header";
@@ -285,6 +289,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       controllerSeat: "opponent" as const,
     };
   };
+  const [hoveredChainRelationships, setHoveredChainRelationships] = useState<ChainRelationships | null>(null);
   const chainCards: ChainCardEntry[] = (projection.chain?.items ?? []).flatMap(
     (item) => {
       const displayCardInstanceId =
@@ -306,6 +311,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             ...controllerDetails,
             sourceCardInstanceId: item.sourceCardInstanceId,
             targetCardInstanceIds: item.targetCardInstanceIds,
+            relationships: chainRelationships(sourceProjection, item),
           }));
         }
       }
@@ -322,6 +328,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           ...controllerDetails,
           sourceCardInstanceId: item.sourceCardInstanceId,
           targetCardInstanceIds: item.targetCardInstanceIds,
+          relationships: chainRelationships(sourceProjection, item),
         },
       ];
     },
@@ -423,6 +430,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   useEffect(() => {
     if (!isChainLockedOpen || !isChainOverlayOpen) {
       setHighlightedCardInstanceIds(new Set());
+      setHoveredChainRelationships(null);
     }
   }, [isChainLockedOpen, isChainOverlayOpen]);
 
@@ -670,7 +678,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           player={board.player}
           victoryScore={projection.victoryScore}
         />
-        <div className="top-14 right-3 z-[2147483647] absolute flex gap-2">
+        <div className="top-14 right-32 z-[2147483646] absolute flex gap-2">
           {process.env.NODE_ENV === "development" && debugDrawAction && (
             <Button
               className="h-7 px-2 text-xs"
@@ -682,10 +690,6 @@ export const GameBoard: FC<GameBoardProps> = ({
               {debugDrawAction.label}
             </Button>
           )}
-          <ReportBugButton
-            isReporting={Boolean(bugReportDraft)}
-            onBegin={beginBugReport}
-          />
         </div>
       </div>
       <PlayerDecisionHost
@@ -783,6 +787,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               onOpenTrash={openOpponentTrash}
               player={board.opponent}
               isActivePlayer={isOpponentActive}
+              isBaseHighlighted={hoveredChainRelationships?.basePlayerIds.includes(board.opponent.playerId)}
               isMirrored
             />
             <LayoutGroup id="battlefield-showdown-layout">
@@ -794,6 +799,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                   hiddenCardInstanceIds={activeTransferCardIds}
                   isHighlighted={
+                    Boolean(hoveredChainRelationships?.battlefieldIds.includes(board.playerBattlefield.id)) ||
                     (hoveredBoardLocation?.kind === "battlefield" &&
                       hoveredBoardLocation.battlefieldId ===
                         board.playerBattlefield.id) ||
@@ -822,6 +828,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                   hiddenCardInstanceIds={activeTransferCardIds}
                   isHighlighted={
+                    Boolean(hoveredChainRelationships?.battlefieldIds.includes(board.opponentBattlefield.id)) ||
                     (hoveredBoardLocation?.kind === "battlefield" &&
                       hoveredBoardLocation.battlefieldId ===
                         board.opponentBattlefield.id) ||
@@ -849,6 +856,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={activeTransferCardIds}
               isBaseHighlighted={
+                Boolean(hoveredChainRelationships?.basePlayerIds.includes(board.player.playerId)) ||
                 hoveredBoardLocation?.kind === "base" ||
                 isMovementDraftDestination({ kind: "base" })
               }
@@ -925,10 +933,11 @@ export const GameBoard: FC<GameBoardProps> = ({
           ))}
         </div>
       )}
-      <PublicRevealToast reveals={sourceProjection.publicReveals} />
+      <PublicRevealWindow key={sourceProjection.id} reveals={sourceProjection.publicReveals} />
       <ChainOverlay
         canPassPriority={!isInteractionSuspended && canViewerPassChain}
         chainCards={chainCards}
+        highlightedChainIds={hoveredChainRelationships?.chainIds ?? []}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
         isCloseDisabled={isChainLockedOpen || isInteractionSuspended}
         interactionSuspended={isInteractionSuspended}
@@ -942,13 +951,15 @@ export const GameBoard: FC<GameBoardProps> = ({
         onItemPointerEnter={
           isInteractionSuspended
             ? undefined
-            : (targetCardInstanceIds) =>
-                setHighlightedCardInstanceIds(new Set(targetCardInstanceIds))
+            : (targetCardInstanceIds, relationships) => {
+                setHighlightedCardInstanceIds(new Set(targetCardInstanceIds));
+                setHoveredChainRelationships(relationships ?? null);
+              }
         }
         onItemPointerLeave={
           isInteractionSuspended
             ? undefined
-            : () => setHighlightedCardInstanceIds(new Set())
+            : () => { setHighlightedCardInstanceIds(new Set()); setHoveredChainRelationships(null); }
         }
         onPassPriority={
           isInteractionSuspended ? undefined : onPassPriority
@@ -989,6 +1000,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         (targetSelection?.targetKind === "card" || targetSelection?.targetKind === "payment") &&
         !targetSelectionUsesCardPrompt && (
           <TargetSelectionPrompt
+            canCancel={targetSelection.purpose !== "choice" || targetSelection.minTargets === 0}
             canSubmit={
               !isSubmittingAction &&
               targetSelectionIsLegal(
@@ -1027,14 +1039,18 @@ export const GameBoard: FC<GameBoardProps> = ({
             maxTargets={targetSelection.maxTargets}
             minTargets={targetSelection.minTargets}
             isSubmitting={isSubmittingAction}
-            onCancel={() => setTargetSelection(null)}
+            onCancel={() => {
+              if (targetSelection.purpose === "choice" && targetSelection.minTargets === 0) {
+                void submitTargetedPlay({ ...targetSelection, selectedTargetIds: [] });
+              } else if (targetSelection.purpose !== "choice") setTargetSelection(null);
+            }}
             onSubmit={() => submitTargetedPlay()}
             selectedCount={targetSelection.selectedTargetIds.length}
             cancelLabel={
               targetSelection.purpose === "move"
                 ? "Cancel move"
                 : targetSelection.purpose === "choice"
-                  ? "Close"
+                  ? targetSelection.minTargets === 0 ? "Decline" : "Choose a target"
                   : "Cancel"
             }
             confirmLabel={
@@ -1125,6 +1141,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           confirmLabel="Choose destination"
           decisionKey={`location:${targetSelection.actionId}`}
           description="Choose the location where the selected unit will move."
+          headerAction={<DecisionInspectionTrigger onInspect={decisionInspection.inspectBoard} />}
           interactionSuspended={isInteractionSuspended}
           isOpen
           isSubmitting={isSubmittingAction}
@@ -1176,6 +1193,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             if (actionId) beginPlayOrTargetSelection(card, actionId);
           }}
           options={unitPlayChoice.modes.map((mode) => ({
+            labelContent: <PlayableCardMenuLabel mode={mode} />,
             disabled: !mode.enabled,
             id: mode.id,
             label: mode.enabled
@@ -1213,6 +1231,11 @@ export const GameBoard: FC<GameBoardProps> = ({
         </>
       )}
     </main>
+    <DialogPortal>
+      <div className="fixed top-14 right-3 z-[2147483647]">
+        <ReportBugButton isReporting={Boolean(bugReportDraft)} onBegin={beginBugReport} />
+      </div>
+    </DialogPortal>
     <BugReportPanel
       artifactPath={bugReportArtifactPath}
       draft={

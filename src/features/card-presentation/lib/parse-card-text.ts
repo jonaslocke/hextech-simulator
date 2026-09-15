@@ -23,7 +23,7 @@ export function parseCardText(text: string): CardTextParagraph[] {
 function parseInlineText(text: string): CardTextSegment[] {
   const segments = text.split(/(\([^)]*\)|\[[^\]]+\]|:rb_[a-z0-9_]+:)/g);
 
-  return segments.flatMap((segment): CardTextSegment[] => {
+  const parsed = segments.flatMap((segment): CardTextSegment[] => {
     if (!segment) {
       return [];
     }
@@ -51,6 +51,33 @@ function parseInlineText(text: string): CardTextSegment[] {
 
     return [{ kind: "text", value: segment }];
   });
+  const result: CardTextSegment[] = [];
+  for (let i = 0; i < parsed.length; i++) {
+    const segment = parsed[i]!;
+    if (segment.kind === "text" && /^\s*\[>>\]$/.test(segment.value)) {
+      let previousIndex = result.length - 1;
+      while (previousIndex >= 0) {
+        const candidate = result[previousIndex]!;
+        if (candidate.kind !== "text" || candidate.value.trim()) break;
+        previousIndex--;
+      }
+      const previous = result[previousIndex];
+      const next = parsed[i + 1];
+      if (previous?.kind === "keyword" && next?.kind === "keyword") {
+        result.splice(previousIndex + 1);
+        next.connected = true;
+        continue;
+      }
+    }
+    if (segment.kind === "text" && segment.value === "[>]" && result.at(-1)?.kind === "keyword") {
+      const previous = result.at(-1) as Extract<CardTextSegment, { kind: "keyword" }>;
+      previous.pointed = true;
+      previous.connected ??= false;
+      continue;
+    }
+    result.push(segment);
+  }
+  return result;
 }
 
 function parseKeywordOrText(value: string): CardTextSegment {

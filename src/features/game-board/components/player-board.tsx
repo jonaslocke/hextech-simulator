@@ -589,7 +589,7 @@ function CardListCard({
       {...card}
     />
   );
-  return !dragSourceLocation || !card.instanceId ? <div>{tile}</div> : (
+  return !dragSourceLocation || !card.instanceId || !card.type?.split(" / ").includes("Unit") ? <div>{tile}</div> : (
     <DraggableLocationCard cardInstanceId={card.instanceId} sourceLocation={dragSourceLocation}>
       {tile}
     </DraggableLocationCard>

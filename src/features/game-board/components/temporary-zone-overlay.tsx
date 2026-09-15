@@ -79,7 +79,7 @@ export function TemporaryZoneOverlay({
   );
 }
 
-function ZoneCards({
+export function ZoneCards({
   cards,
   emptyLabel,
 }: {

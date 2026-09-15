@@ -13,6 +13,7 @@ import type { CardInstance, GameDocument } from "./state";
 import { createHash } from "node:crypto";
 import {
   effectiveNumericValue,
+  type NumericContribution,
   isContinuousDuration,
 } from "./numeric-modifiers";
 import { numericConditionMatches } from "./numeric-condition";
@@ -1042,7 +1043,8 @@ export function createPrimitiveHandlers(
     },
   });
   handlers.set("action.attach_equipment", {
-    execute(_binding, context) {
+    execute(binding, context) {
+      if (binding.parameters.optional === true && context.selectedIds.length === 0) return;
       attachEquipmentToSelectedUnit(context, index);
     },
   });
@@ -1164,8 +1166,10 @@ export function effectiveEnergyCost(
   definition: GameCardDefinition,
   index?: RuntimeCardIndex,
   cardInstanceId?: string,
+  onContribution?: (contribution: NumericContribution) => void,
 ): number {
   return effectiveNumericValue({
+    onContribution,
     attribute: "energyCost",
     baseValue: definition.card.attributes.energy ?? 0,
     cardType: definition.card.classification.type,
@@ -1749,7 +1753,13 @@ export function recomputeMight(
   id: string,
   index: RuntimeCardIndex,
 ) {
+  game.state.cardStates[id]!.computedMight = evaluateMight(game, id, index).value;
+}
+
+export function evaluateMight(game: GameDocument, id: string, index: RuntimeCardIndex) {
+  const contributions: NumericContribution[] = [];
   let value = effectiveNumericValue({
+    onContribution: (entry) => contributions.push(entry),
     attribute: "might",
     baseValue: definitionForInstance(id, index).card.attributes.might ?? 0,
     controllerPlayerId: index.instances.get(id)?.ownerPlayerId,
@@ -1760,19 +1770,24 @@ export function recomputeMight(
   });
   const combatRole = game.state.cardStates[id]?.combatRole;
   if (combatRole === "attacker") {
-    value += keywordAmount(id, "keyword.assault", index, game);
+    const entries = keywordContributions(id, "keyword.assault", index, game);
+    value += entries.reduce((sum, entry) => sum + entry.amount, 0);
+    contributions.push(...entries);
   }
   if (combatRole === "defender") {
-    value += keywordAmount(id, "keyword.shield", index, game);
+    const entries = keywordContributions(id, "keyword.shield", index, game);
+    value += entries.reduce((sum, entry) => sum + entry.amount, 0);
+    contributions.push(...entries);
   }
   value += attachedCardIds(game, id).reduce(
-    (total, attachedCardInstanceId) =>
-      total +
-      (definitionForInstance(attachedCardInstanceId, index).card.attributes
-        .might ?? 0),
+    (total, attachedCardInstanceId) => {
+      const amount = definitionForInstance(attachedCardInstanceId, index).card.attributes.might ?? 0;
+      contributions.push({ id: `equipment:${attachedCardInstanceId}`, sourceCardInstanceId: attachedCardInstanceId, amount, duration: "whileAttached", label: "Equipment" });
+      return total + amount;
+    },
     0,
   );
-  game.state.cardStates[id]!.computedMight = Math.max(0, value);
+  return { value: Math.max(0, value), contributions };
 }
 
 export function effectivePowerCost(
@@ -1781,8 +1796,10 @@ export function effectivePowerCost(
   definition: GameCardDefinition,
   index?: RuntimeCardIndex,
   cardInstanceId?: string,
+  onContribution?: (contribution: NumericContribution) => void,
 ): number {
   return effectiveNumericValue({
+    onContribution,
     attribute: "powerCost",
     baseValue: definition.card.attributes.power ?? 0,
     cardType: definition.card.classification.type,
@@ -1800,25 +1817,20 @@ export function keywordAmount(
   index: RuntimeCardIndex,
   game?: GameDocument,
 ) {
+  return keywordContributions(cardInstanceId, behaviorId, index, game).reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+function keywordContributions(cardInstanceId: string, behaviorId: string, index: RuntimeCardIndex, game?: GameDocument): NumericContribution[] {
   const definition = definitionForInstance(cardInstanceId, index);
-  const attachedEffectClauses = game
-    ? attachedCardIds(game, cardInstanceId).flatMap(
-        (attachedCardInstanceId) =>
-          definitionForInstance(attachedCardInstanceId, index)
-            .effectBehaviorModel?.clauses ?? [],
-      )
-    : [];
-  return [...definition.behaviorModel.clauses, ...attachedEffectClauses]
-    .flatMap((clause) => clause.keywords)
+  const sources = [{ id: cardInstanceId, clauses: definition.behaviorModel.clauses },
+    ...(game ? attachedCardIds(game, cardInstanceId).map((id) => ({ id, clauses: definitionForInstance(id, index).effectBehaviorModel?.clauses ?? [] })) : [])];
+  return sources.flatMap((source) => source.clauses.flatMap((clause) => clause.keywords
     .filter((binding) => binding.behaviorId === behaviorId)
-    .reduce(
-      (sum, binding) =>
-        sum +
-        (typeof binding.parameters.amount === "number"
-          ? binding.parameters.amount
-          : 1),
-      0,
-    );
+    .map((binding) => ({ id: `${source.id}:${clause.id}:${binding.order}`, sourceCardInstanceId: source.id,
+      amount: typeof binding.parameters.amount === "number" ? binding.parameters.amount : 1,
+      duration: behaviorId === "keyword.assault" ? "whileAttacking" : "whileDefending",
+      label: behaviorId === "keyword.assault" ? "Assault" : "Shield",
+    }))));
 }
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {

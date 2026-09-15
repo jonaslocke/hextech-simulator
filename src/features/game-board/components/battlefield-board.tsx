@@ -545,7 +545,7 @@ function BattlefieldUnitRow({
           />
         );
 
-        const isUnit = cards.some((card) => card.instanceId === unit.instanceId);
+        const isUnit = unit.type?.split(" / ").includes("Unit") && cards.some((card) => card.instanceId === unit.instanceId);
         const hostTile =
           !isUnit || !dragSourceLocation || !unit.instanceId ? (
             tile

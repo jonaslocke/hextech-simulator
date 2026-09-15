@@ -45,7 +45,7 @@ export function DecisionZoneBrowser({
   return (
     <DialogPortal>
       <div
-        className="z-[2147483647] fixed inset-0 flex justify-center items-center bg-black/62 backdrop-blur-sm p-4"
+        className="z-[2147483646] fixed inset-0 flex justify-center items-center bg-black/62 backdrop-blur-sm p-4"
         role="presentation"
       >
         <section

@@ -57,10 +57,12 @@ export type Card = {
   isExhausted?: boolean;
   attachedToCardInstanceId?: string | null;
   damage?: number;
+  mightModifiers?: ProjectedCardView["mightModifiers"];
   comesToPlayReady?: boolean;
 };
 
 export type ChainCardEntry = {
+  relationships?: import("./chain-relationships").ChainRelationships;
   card: Card;
   chainItemId: string;
   controllerPlayerId: string;

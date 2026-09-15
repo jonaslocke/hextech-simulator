@@ -15,6 +15,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { BoardPlayerProjection } from "../board-view-model";
+import { PlayableCardMenuLabel } from "../components/playable-card-menu-label";
 import type { CardActionMenuItem } from "../components/card-action-menu";
 import { combineTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
@@ -273,11 +274,11 @@ export function useGameBoardActions({
     (card: Card) => {
       closeCardActionMenu();
 
-      if (!card.instanceId || !viewerState) {
+      if (targetSelection || !card.instanceId || !viewerState) {
         return;
       }
 
-      const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+      const modes = (viewerState.availablePaymentModes[card.instanceId] ?? []).filter((mode) => mode.enabled);
       const enabledModes = modes.filter((candidate) => candidate.enabled);
 
       if (enabledModes.length > 1) {
@@ -295,17 +296,18 @@ export function useGameBoardActions({
       beginPlayOrTargetSelection,
       closeCardActionMenu,
       setUnitPlayChoice,
+      targetSelection,
       viewerState,
     ],
   );
 
   const openPlayableCardMenu = useCallback(
     (card: Card, event: MouseEvent<HTMLElement>) => {
-      if (!card.instanceId || !viewerState) {
+      if (targetSelection || !card.instanceId || !viewerState) {
         return;
       }
 
-      const modes = viewerState.availablePaymentModes[card.instanceId] ?? [];
+      const modes = (viewerState.availablePaymentModes[card.instanceId] ?? []).filter((mode) => mode.enabled);
 
       openCardActionMenu(
         event,
@@ -315,7 +317,7 @@ export function useGameBoardActions({
               disabled: !mode.enabled,
               id: mode.id,
               label: mode.enabled
-                ? playableCardMenuLabel(mode)
+                ? <PlayableCardMenuLabel mode={mode} />
                 : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
               onSelect: () => beginPlayOrTargetSelection(card, mode.id),
             }))
@@ -328,7 +330,7 @@ export function useGameBoardActions({
             ],
       );
     },
-    [beginPlayOrTargetSelection, openCardActionMenu, viewerState],
+    [beginPlayOrTargetSelection, openCardActionMenu, targetSelection, viewerState],
   );
 
   const handleCardContextFromHand = useCallback(
@@ -585,30 +587,6 @@ export function useGameBoardActions({
     submitLocationDragMoveAction,
     submitLocationDragPlayAction,
   };
-}
-
-function playableCardMenuLabel(mode: PaymentMode): ReactNode {
-  const preview = mode.costPreview;
-  if (!preview) return mode.label;
-  const effective = `${preview.energy} Energy${
-    preview.effectivePower > 0 ? ` + ${preview.effectivePower} Power` : ""
-  }`;
-  const printed = `${preview.printedEnergy} Energy${
-    preview.printedPower > 0 ? ` + ${preview.printedPower} Power` : ""
-  }`;
-  const modified =
-    preview.energy !== preview.printedEnergy ||
-    preview.effectivePower !== preview.printedPower;
-  if (!modified) return mode.label;
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span>{mode.label}</span>
-      <span className="text-slate-300 text-[11px]">
-        Cost: {effective}
-        {modified ? ` (printed ${printed}; modified by active effects)` : ""}
-      </span>
-    </span>
-  );
 }
 
 function resourceActionMenuLabel(

@@ -1,4 +1,6 @@
 import type { ProjectedAction } from "../../shared/game";
+import type { NumericContribution } from "./numeric-modifiers";
+import { presentNumericContributions } from "./modifier-presentation";
 import {
   compileBehaviorModel,
   createBehaviorContext,
@@ -1599,13 +1601,15 @@ function addPlayableCardActions(
       .flatMap((clause) =>
         targetRequirementsForClause(clause, context, handlers),
       );
-    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId);
+    const costContributions: NumericContribution[] = [];
+    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
     const effectivePower = effectivePowerCost(
       game,
       playerId,
       definition,
       index,
       cardId,
+      (entry) => costContributions.push(entry),
     );
     // Source-selected resource costs are committed by a play mode, not a
     // target prompt. Other optional selectors (for example, exhaust a unit)
@@ -1704,6 +1708,11 @@ function addPlayableCardActions(
             payment,
           ),
         );
+        actions[actions.length - 1]!.presentation.playCost = {
+          label: destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`,
+          showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
+          modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
+        };
       }
     }
   }

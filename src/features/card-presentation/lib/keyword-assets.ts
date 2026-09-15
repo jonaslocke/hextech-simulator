@@ -41,10 +41,10 @@ import type { CardKeyword } from "../types";
 type KeywordSize = "md" | "lg";
 type KeywordAsset = typeof accelerate64;
 
-const keywordAssets: Record<
+const keywordAssets: Partial<Record<
   CardKeyword,
   Record<KeywordSize, KeywordAsset>
-> = {
+>> = {
   accelerate: { md: accelerate64, lg: accelerate128 },
   action: { md: action64, lg: action128 },
   add: { md: add64, lg: add128 },
@@ -70,5 +70,5 @@ export function getKeywordImagePath(
   keyword: CardKeyword,
   size: KeywordSize = "md",
 ) {
-  return keywordAssets[keyword][size].src;
+  return keywordAssets[keyword]?.[size].src;
 }

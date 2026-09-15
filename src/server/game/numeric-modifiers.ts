@@ -4,6 +4,7 @@ import type { GameDocument } from "./state";
 import { numericConditionMatches } from "./numeric-condition";
 
 type NumericValueInput = {
+  onContribution?: (contribution: NumericContribution) => void;
   attribute: string;
   baseValue: number;
   cardType?: string;
@@ -12,6 +13,14 @@ type NumericValueInput = {
   index?: RuntimeCardIndex;
   targetCardInstanceId?: string;
   targetScope: string;
+};
+
+export type NumericContribution = {
+  id: string;
+  sourceCardInstanceId: string | null;
+  amount: number;
+  duration: string;
+  label?: string;
 };
 
 export function effectiveNumericValue(input: NumericValueInput): number {
@@ -27,7 +36,9 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     ) {
       continue;
     }
+    const before = value;
     value = applyNumericOperation(value, modifier);
+    input.onContribution?.({ id: modifier.id, sourceCardInstanceId: modifier.sourceCardInstanceId, amount: value - before, duration: modifier.duration });
   }
 
   for (const {
@@ -97,6 +108,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     ) {
       continue;
     }
+    const before = value;
     value = applyNumericOperation(value, {
       amount: numberParameter(binding, "amount"),
       minimum:
@@ -105,6 +117,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
           : null,
       operation: stringParameter(binding, "operation"),
     });
+    input.onContribution?.({ id: `${attachedEffectSourceId ?? sourceId}:${binding.order}:${input.attribute}`, sourceCardInstanceId: attachedEffectSourceId ?? sourceId, amount: value - before, duration: String(binding.parameters.duration ?? "continuous") });
   }
 
   for (const modifier of input.game.state.modifiers) {
@@ -115,9 +128,12 @@ export function effectiveNumericValue(input: NumericValueInput): number {
     ) {
       continue;
     }
+    const before = value;
     value = applyNumericOperation(value, modifier);
+    input.onContribution?.({ id: modifier.id, sourceCardInstanceId: modifier.sourceCardInstanceId, amount: value - before, duration: modifier.duration });
   }
 
+  if (value < 0) input.onContribution?.({ id: "minimum", sourceCardInstanceId: null, amount: -value, duration: "continuous", label: "Minimum Might / cost" });
   return Math.max(0, value);
 }
 

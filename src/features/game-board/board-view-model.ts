@@ -52,6 +52,8 @@ export type BoardPlayerProjection = {
       id: string;
       label: string;
       costPreview: ProjectedAction["costPreview"];
+      playCost?: ProjectedAction["presentation"]["playCost"];
+      poolPayment?: ProjectedAction["poolPayment"];
     }>
   >;
   legalTargetsByCard: Record<
@@ -173,6 +175,7 @@ export type BoardProjection = {
       empowered?: boolean;
       damage: number;
       computedMight?: number;
+      mightModifiers?: ProjectedCardView["mightModifiers"];
       attachedToCardInstanceId?: string | null;
     }
   >;
@@ -193,6 +196,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         exhausted: card.exhausted,
         empowered: card.empowered,
         damage: card.damage,
+        mightModifiers: card.mightModifiers,
         ...(card.computedMight === null
           ? {}
           : { computedMight: card.computedMight }),
@@ -228,6 +232,8 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             id: action.id,
             label: action.label,
             costPreview: action.costPreview,
+            playCost: action.presentation.playCost,
+            poolPayment: action.poolPayment,
           })),
         ]),
       );

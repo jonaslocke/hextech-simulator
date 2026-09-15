@@ -67,6 +67,18 @@ export function compileBehaviorModel(
   model.playTimings.forEach((binding) => requireHandler(binding, handlers));
   const ids = new Set<string>();
   const clauses = model.clauses.map((clause, sequence) => {
+    // Product decision: Quick-Draw's on-play attachment is optional. Normalize
+    // here so existing match snapshots receive the same contract as new ones.
+    // Equip activations and unrelated selectors retain their cardinality.
+    if (clause.keywords.some((binding) => binding.behaviorId === "keyword.quick_draw") &&
+        clause.triggers.some((binding) => binding.behaviorId === "trigger.on_play")) {
+      const attachmentKeys = new Set(clause.effects.filter((binding) => binding.behaviorId === "action.attach_equipment").map((binding) => binding.parameters.selectionKey));
+      clause = { ...clause, selectors: clause.selectors.map((binding) =>
+        attachmentKeys.has(binding.parameters.selectionKey) && binding.parameters.maximumCount === 1
+          ? { ...binding, parameters: { ...binding.parameters, minimumCount: 0 } }
+          : binding), effects: clause.effects.map((binding) => binding.behaviorId === "action.attach_equipment"
+            ? { ...binding, parameters: { ...binding.parameters, optional: true } } : binding) };
+    }
     if (clause.sequence !== sequence) throw new Error(`Behavior clause sequence is invalid: ${clause.id}`);
     if (ids.has(clause.id)) throw new Error(`Duplicate behavior clause id: ${clause.id}`);
     ids.add(clause.id);

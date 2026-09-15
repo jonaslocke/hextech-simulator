@@ -115,6 +115,11 @@ export const projectedActionSchema = z.object({
     .nullable()
     .optional(),
   presentation: z.object({
+    playCost: z.object({
+      label: z.string(),
+      showCost: z.boolean(),
+      modifierSources: z.array(z.string()),
+    }).optional(),
     surface: z.enum([
       "setup-dialog",
       "card-menu",
@@ -203,6 +208,9 @@ export const projectedCardViewSchema = z.object({
   might: z.number().nullable(),
   power: z.number().nullable(),
   computedMight: z.number().nullable(),
+  mightModifiers: z.array(z.object({
+    id: z.string(), amount: z.number(), sourceName: z.string(), label: z.string(), duration: z.string(),
+  })).optional(),
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
   empowered: z.boolean().optional(),
