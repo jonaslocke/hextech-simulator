@@ -1,8 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { autoAssignCombatDamage, type CombatDamageAssignmentTarget } from "../src/features/game-board/combat-damage-assignment";
+import { autoAssignCombatDamage, compareCombatDamageTargets, type CombatDamageAssignmentTarget } from "../src/features/game-board/combat-damage-assignment";
 
 const target = (unitId: string, lethalAmount: number, priorityOrder = 1): CombatDamageAssignmentTarget => ({ unitId, lethalAmount, priorityOrder });
+
+test("auto-assignment deals lethal damage from weakest to strongest and puts excess on the strongest", () => {
+  const targets = [target("strongest", 8), target("weakest", 3), target("middle", 5), target("equal-first", 4), target("equal-second", 4)];
+  assert.deepEqual(autoAssignCombatDamage(26, targets), [
+    { targetUnitId: "weakest", amount: 3 },
+    { targetUnitId: "equal-first", amount: 4 },
+    { targetUnitId: "equal-second", amount: 4 },
+    { targetUnitId: "middle", amount: 5 },
+    { targetUnitId: "strongest", amount: 10 },
+  ]);
+  assert.deepEqual(autoAssignCombatDamage(7, targets), [
+    { targetUnitId: "weakest", amount: 3 },
+    { targetUnitId: "equal-first", amount: 4 },
+  ]);
+});
 
 test("auto-assignment selects an available lethal recipient before a nonlethal fallback in the same priority group", () => {
   assert.deepEqual(autoAssignCombatDamage(3, [target("defender-large", 5), target("defender-small", 3)]), [
@@ -16,13 +31,13 @@ test("auto-assignment preserves the single-target and empty-combat defaults", ()
   assert.deepEqual(autoAssignCombatDamage(0, []), []);
 });
 
-test("insufficient damage preserves the first-recipient fallback rather than sorting by Might", () => {
-  assert.deepEqual(autoAssignCombatDamage(2, [target("first", 5), target("second", 3)]), [{ targetUnitId: "first", amount: 2 }]);
+test("insufficient damage is assigned to the weakest recipient", () => {
+  assert.deepEqual(autoAssignCombatDamage(2, [target("first", 5), target("second", 3)]), [{ targetUnitId: "second", amount: 2 }]);
 });
 
-test("lethal ties preserve original recipient order rather than maximizing kills", () => {
+test("weaker recipients receive lethal before stronger recipients", () => {
   const targets = [target("first", 3), target("second", 2), target("third", 1)];
-  assert.deepEqual(autoAssignCombatDamage(3, targets), [{ targetUnitId: "first", amount: 3 }]);
+  assert.deepEqual(autoAssignCombatDamage(3, targets), [{ targetUnitId: "third", amount: 1 }, { targetUnitId: "second", amount: 2 }]);
   assert.deepEqual(autoAssignCombatDamage(3, targets), autoAssignCombatDamage(3, targets));
 });
 
@@ -46,13 +61,23 @@ test("auto-assignment uses projected remaining lethal damage without recalculati
   ]);
 });
 
-test("lethal selection is reconsidered after each assignment and partial damage falls back to the first remaining recipient", () => {
+test("weakest-first allocation assigns a partial remainder only after weaker recipients receive lethal", () => {
   const targets = [target("first", 3), target("large", 5), target("small", 2)];
   assert.deepEqual(autoAssignCombatDamage(5, targets), [
-    { targetUnitId: "first", amount: 3 }, { targetUnitId: "small", amount: 2 },
+    { targetUnitId: "small", amount: 2 }, { targetUnitId: "first", amount: 3 },
   ]);
   assert.deepEqual(autoAssignCombatDamage(6, targets), [
-    { targetUnitId: "first", amount: 3 }, { targetUnitId: "small", amount: 2 }, { targetUnitId: "large", amount: 1 },
+    { targetUnitId: "small", amount: 2 }, { targetUnitId: "first", amount: 3 }, { targetUnitId: "large", amount: 1 },
+  ]);
+});
+
+test("display ordering is weakest-first within priority groups with stable equal-strength ties", () => {
+  const targets = [target("backline", 1, 2), target("large-tank", 5, 0), target("equal-first", 4), target("small-tank", 2, 0), target("weak", 3), target("equal-second", 4)];
+  assert.deepEqual([...targets].sort(compareCombatDamageTargets).map(({ unitId }) => unitId), [
+    "small-tank", "large-tank", "weak", "equal-first", "equal-second", "backline",
+  ]);
+  assert.deepEqual(autoAssignCombatDamage(4, [target("equal-first", 4), target("equal-second", 4)]), [
+    { targetUnitId: "equal-first", amount: 4 },
   ]);
 });
 

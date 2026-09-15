@@ -11,27 +11,26 @@ export type CombatDamageAssignmentTarget = {
   priorityOrder: number;
 };
 
+// Shared by the display and suggestion so both use the same weakest-first order.
+// Equal lethal thresholds retain input order through stable Array.sort.
+export function compareCombatDamageTargets(
+  left: CombatDamageAssignmentTarget,
+  right: CombatDamageAssignmentTarget,
+): number {
+  return left.priorityOrder - right.priorityOrder ||
+    left.lethalAmount - right.lethalAmount;
+}
+
 export function autoAssignCombatDamage(
   totalDamage: number,
   targets: readonly CombatDamageAssignmentTarget[],
 ): CombatDamageAllocation[] {
   let remainingDamage = totalDamage;
   const allocations: CombatDamageAllocation[] = [];
-  const orderedTargets = [...targets].sort(
-    (left, right) => left.priorityOrder - right.priorityOrder,
-  );
+  const orderedTargets = [...targets].sort(compareCombatDamageTargets);
 
-  while (remainingDamage > 0 && orderedTargets.length > 0) {
-    const priorityOrder = orderedTargets[0]!.priorityOrder;
-    // Keep the historical recipient order, but do not spend the remainder on
-    // a nonlethal target when a lethal assignment exists in this priority group.
-    // Never skip an incomplete Tank/standard group to reach a later group.
-    const lethalIndex = orderedTargets.findIndex(
-      (target) => target.priorityOrder === priorityOrder &&
-        target.lethalAmount <= remainingDamage,
-    );
-    const [target] = orderedTargets.splice(lethalIndex < 0 ? 0 : lethalIndex, 1);
-    if (!target) break;
+  for (const target of orderedTargets) {
+    if (remainingDamage <= 0) break;
     const amount = Math.min(target.lethalAmount, remainingDamage);
     if (amount <= 0) continue;
     allocations.push({ targetUnitId: target.unitId, amount });

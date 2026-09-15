@@ -5,7 +5,7 @@ import { cn } from "@/shared/utils/cn";
 import type { MouseEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { BoardCatalogCard } from "../board-view-model";
-import { autoAssignCombatDamage } from "../combat-damage-assignment";
+import { autoAssignCombatDamage, compareCombatDamageTargets } from "../combat-damage-assignment";
 import type { Card } from "../types";
 import { CardTile, type CardTileSize } from "./card-tile";
 import { GameActionButton } from "./game-action-button";
@@ -27,7 +27,6 @@ type DamageTargetViewModel = {
   card: Card;
   hasBackline: boolean;
   hasTank: boolean;
-  index: number;
   isLethalAssigned: boolean;
   isPartial: boolean;
   lethalAmount: number;
@@ -64,7 +63,7 @@ export function CombatDamageDialog({
   const targets = useMemo(
     () =>
       choice.targets
-        .map((target, index) => {
+        .map((target) => {
           const catalogCard = cardsByInstanceId[target.unitId];
           const card = buildCard(target.unitId, catalogCard);
           const hasBackline = hasBacklineKeyword(card.rulesText);
@@ -80,7 +79,6 @@ export function CombatDamageDialog({
             card,
             hasBackline,
             hasTank,
-            index,
             isLethalAssigned: amount >= lethalAmount,
             isPartial: amount > 0 && amount < lethalAmount,
             lethalAmount,
@@ -89,11 +87,7 @@ export function CombatDamageDialog({
             unitId: target.unitId,
           } satisfies DamageTargetViewModel;
         })
-        .sort(
-          (left, right) =>
-            left.priorityOrder - right.priorityOrder ||
-            left.index - right.index,
-        ),
+        .sort(compareCombatDamageTargets),
     [amounts, cardsByInstanceId, choice.targets],
   );
 

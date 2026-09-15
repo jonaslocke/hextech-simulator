@@ -558,6 +558,24 @@ attack/defend trigger events, legal Action/Reaction play, recall, Control,
 Conquer, scoring, and victory. Team play, third-player invitations, Hidden,
 Ganking, and Vision remain separate boundaries.
 
+### Combat assignment suggestions
+
+The combat prompt displays recipients from weakest to strongest within each
+mandatory priority group: Tank, standard, then Backline. Strength here means
+the server-projected additional damage required for lethal, including current
+effective Might and already marked damage. Equal thresholds retain their
+original relative order.
+
+Auto assign follows that same order, assigning lethal before moving to the
+next recipient. If the remaining damage is insufficient, it assigns that
+remainder to the next recipient. After all recipients receive lethal, excess
+damage goes to the final recipient. Players may still manually choose another
+legal order; the server remains authoritative for allocation validation.
+
+This product policy supersedes the earlier input-order-first suggestion policy.
+It affects client display and suggestions only; saved matches require no
+migration and existing allocations are not rewritten automatically.
+
 ## Card Runtime And Primitive Coverage
 
 Current implementation note: approved canonical behavior models are snapshotted
