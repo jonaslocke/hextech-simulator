@@ -45,6 +45,25 @@ test("large Rune pools reject Energy and domain shortages while retaining manual
   assert.ok(elapsed < 1000, `action projections took ${elapsed.toFixed(0)} ms`);
 });
 
+test("unrelated card-type cost modifiers do not enumerate impossible Rune preparation", async () => {
+  const f = await preparationFixture(7, 0, 6);
+  f.card.card.classification.type = "Unit";
+  f.restricted.behaviorModel.clauses[0]!.effects = [
+    { behaviorId: "modifier.modify_numeric_value", order: 0, confidence: "high",
+      parameters: { attribute: "energyCost", operation: "reduce", amount: 1,
+        target: "controller_card", cardType: "Gear", duration: "whileSourceOnBoard" } },
+    { behaviorId: "modifier.modify_numeric_value", order: 1, confidence: "high",
+      parameters: { attribute: "energyCost", operation: "increase", amount: 1,
+        target: "opponent_spell", duration: "whileSourceOnBoard" } },
+  ];
+  const before = structuredClone(f.game);
+  const start = performance.now();
+  assert.equal(play(f).enabled, false);
+  assert.deepEqual(f.game, before);
+  const elapsed = performance.now() - start;
+  assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
+});
+
 test("capacity pruning preserves preparation that removes a continuous cost increase", async () => {
   const f = await preparationFixture(1, 0, 1);
   f.unrestricted.behaviorModel.clauses[0]!.effects = [{
@@ -58,6 +77,30 @@ test("capacity pruning preserves preparation that removes a continuous cost incr
   assert.equal(action.poolPayment?.canPay, false);
   assert.equal(action.enabled, true, "combined Add removes the increase and leaves enough Energy");
   assert.deepEqual(f.game, before);
+});
+
+test("capacity pruning retains relevant Spell and additional-type cost changes", async () => {
+  for (const cardType of ["Spell", "Unit"] as const) {
+    const f = await preparationFixture(1, 0, 1);
+    f.card.card.classification.type = cardType;
+    f.card.behaviorModel.clauses = [{
+      ...structuredClone(f.unrestricted.behaviorModel.clauses[0]!),
+      abilities: [],
+      keywords: cardType === "Unit" ? [{ behaviorId: "type.additional", order: 0, confidence: "high", parameters: { type: "Gear" } }] : [],
+    }];
+    f.unrestricted.behaviorModel.clauses[0]!.effects = [{
+      behaviorId: "modifier.modify_numeric_value", order: 0, confidence: "high",
+      parameters: { attribute: "energyCost", operation: "increase", amount: 2,
+        target: cardType === "Spell" ? "controller_spell" : "controller_card",
+        ...(cardType === "Unit" ? { cardType: "Gear" } : {}), duration: "whileSourceOnBoard" },
+    }];
+    const before = structuredClone(f.game);
+    const action = play(f);
+    assert.equal(action.costPreview?.energy, 3);
+    assert.equal(action.poolPayment?.canPay, false);
+    assert.equal(action.enabled, true, "recycling the source removes a relevant increase");
+    assert.deepEqual(f.game, before);
+  }
 });
 
 test("capacity is only an upper bound and cannot enable incompatible resource alternatives", async () => {

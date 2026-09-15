@@ -72,10 +72,7 @@ export function effectiveNumericValue(input: NumericValueInput): number {
       (binding.parameters.target === "opponent_spell" &&
         (input.controllerPlayerId === undefined ||
           controllerPlayerId === input.controllerPlayerId)) ||
-      (input.targetScope === "controller_spell" &&
-        input.cardType !== "Spell" &&
-        binding.parameters.target !== "controller_card") ||
-      !bindingCardTypeMatches(binding, input) ||
+      !numericBindingMatchesCardType(binding, input) ||
       (binding.parameters.excludeTokens === true &&
         input.targetCardInstanceId !== undefined &&
         input.index?.instances.get(input.targetCardInstanceId)?.source === "token") ||
@@ -261,10 +258,14 @@ function numericModifierConditions(binding: BehaviorBinding): string[] {
     .filter(Boolean);
 }
 
-function bindingCardTypeMatches(
+/** Static type eligibility shared with payment-capacity bounds. Resource Add
+ * actions can change conditions and source presence, but not the card's types. */
+export function numericBindingMatchesCardType(
   binding: BehaviorBinding,
-  input: NumericValueInput,
+  input: Pick<NumericValueInput, "cardType" | "targetScope" | "targetCardInstanceId" | "index">,
 ) {
+  if (input.targetScope === "controller_spell" &&
+    input.cardType !== "Spell" && binding.parameters.target !== "controller_card") return false;
   if (typeof binding.parameters.cardType !== "string") return true;
   if (!input.targetCardInstanceId || !input.index) {
     return input.cardType === binding.parameters.cardType;

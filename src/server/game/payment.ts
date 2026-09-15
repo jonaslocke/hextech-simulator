@@ -3,6 +3,7 @@ import { candidateIsEligible, orderPaymentCandidates, type PaymentCandidate } fr
 export { resourceUsageAllowsPayment, type PaymentContext } from "./payment-restrictions";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
+import { numericBindingMatchesCardType } from "./numeric-modifiers";
 import {
   advanceGameObjectIncarnation,
   definitionForInstance,
@@ -340,9 +341,15 @@ export function cardPaymentExceedsResourceCapacity(
     ...Object.entries(game.state.cardStates).filter(([, state]) => state.attachedToCardInstanceId).map(([id]) => id),
   ].filter((id): id is string => Boolean(id)));
   const boardDefinitions = [...boardIds].map((id) => definitionForInstance(id, index));
+  // Ignore only statically incompatible types. Do not filter by current
+  // conditions or source activity: Add may change either during preparation.
   const mutableCost = (attribute: string) => game.state.modifiers.some((modifier) => modifier.attribute === attribute) ||
     boardDefinitions.some((card) => [card.behaviorModel, card.effectBehaviorModel].some((model) =>
-      model?.clauses.some((clause) => clause.effects.some((effect) => effect.parameters.attribute === attribute))));
+      model?.clauses.some((clause) => clause.effects.some((effect) => effect.parameters.attribute === attribute &&
+        numericBindingMatchesCardType(effect, {
+          cardType: definition.card.classification.type, targetScope: "controller_spell",
+          targetCardInstanceId: cardInstanceId, index,
+        })))));
   const minimumEnergy = (mutableCost("energyCost") ? 0 : energyCost) + additionalCosts.reduce((sum, cost) => sum + cost.energy, 0);
   const powerCosts = [
     { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
