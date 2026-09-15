@@ -89,6 +89,7 @@ type CardTileProps = Card & {
 };
 
 export const CardTile: FC<CardTileProps> = ({
+  attachedToCardInstanceId,
   domains = [],
   enableHoverPreview = false,
   enableZoneAnimation = true,
@@ -136,6 +137,7 @@ export const CardTile: FC<CardTileProps> = ({
     orientation === "auto" ? autoOrientation : orientation;
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
+  const isGear = type?.split(" / ").includes("Gear") ?? false;
   const { isLocationDragActive } = useLocationDragState();
   const {
     isReportMode,
@@ -316,6 +318,7 @@ export const CardTile: FC<CardTileProps> = ({
       tabIndex={canShowHoverPreview && focusablePreview ? 0 : undefined}
     >
       <motion.div
+        data-card-face
         animate={{
           rotate: isExhausted && !preserveOrientation ? 90 : 0,
           scale: isExhausted && !preserveOrientation ? 0.98 : 1,
@@ -368,11 +371,13 @@ export const CardTile: FC<CardTileProps> = ({
             width: dimensions.width,
           }}
         />
-        {showMight && might !== undefined && (
+        {showMight && might !== undefined && !(isGear && attachedToCardInstanceId) && (
           <span
             className={cn(
               "absolute flex justify-center items-center bg-white shadow border border-slate-900/70 rounded-full font-bold text-slate-950",
               sizeConfig.mightBadgeClassName,
+              isGear && "top-auto",
+              isGear && (size === "xl" ? "-bottom-2" : size === "lg" ? "-bottom-1.5" : "-bottom-1"),
             )}
           >
             {might}

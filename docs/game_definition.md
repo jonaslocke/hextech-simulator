@@ -782,6 +782,13 @@ the Equipment's own card identity, interactions, preview, and exhaustion state.
 Hover/focus may lift a strip without reflowing the group. Unattached Gear remains
 an independent board item.
 
+Equipment art is occluded by the actual card faces, not clipped to a rectangular
+strip: art exposed above or below an exhausted Unit remains visible and
+interactive. Empty card footprints must not intercept those interactions.
+Gear's Might badge sits at the card's bottom-right corner and is hidden while
+attached; its full-card preview still retains its Might information. Unit Might
+badges retain their existing presentation.
+
 Attachment display order follows the authoritative location arrays: oldest
 nearest the Unit, newest farthest right. Board movement preserves that order;
 detaching preserves the remaining relative order and reattaching appends the

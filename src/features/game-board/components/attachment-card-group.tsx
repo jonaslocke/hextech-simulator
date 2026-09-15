@@ -18,7 +18,7 @@ export function AttachmentCardGroup({
     paddingRight: `calc(var(--attachment-strip-width) * ${attachments.length})`,
   } as CSSProperties;
   return (
-    <div className="relative flex shrink-0 min-h-38 min-w-27 items-start" data-attachment-group-id={groupId}>
+    <div className="relative flex shrink-0 min-h-38 min-w-27 items-start pointer-events-none [&_[data-card-face]]:pointer-events-auto" data-attachment-group-id={groupId}>
       <div className="relative flex items-start" style={layout}>
         <div className="relative shrink-0" style={{ zIndex: attachments.length + 1 }}>
           {host}
@@ -30,10 +30,9 @@ export function AttachmentCardGroup({
             style={{
               right: `calc(var(--attachment-strip-width) * ${attachments.length - index - 1})`,
               zIndex: attachments.length - index,
-              // Keep exposed art and pointer hit areas aligned even when an
-              // exhausted neighbor has a shorter, rotated card face. The small
-              // outside allowance preserves the existing Might badge/ring.
-              clipPath: "inset(-8px -4px -8px calc(100% - var(--attachment-strip-width)))",
+              // Let the actual card faces occlude one another. An exhausted
+              // host exposes Equipment above/below it; its empty footprint
+              // must neither clip that art nor intercept its pointer events.
             }}
           >
             {attachment.card}
