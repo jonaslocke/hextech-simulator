@@ -46,6 +46,7 @@ type PaymentRequest = {
   allowedPowerDomains: string[];
   context: PaymentContext;
   additionalAnyPower: number;
+  poolOnly?: boolean;
 };
 
 export function buildPaymentPlan(
@@ -80,6 +81,7 @@ export function buildAbilityPaymentPlan(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
+  options: { poolOnly?: boolean } = {},
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, sourceDefinition, index, {
     energyCost: costs.energy,
@@ -92,7 +94,43 @@ export function buildAbilityPaymentPlan(
       sourceCardType: sourceDefinition.card.classification.type,
     },
     additionalAnyPower: 0,
+    poolOnly: options.poolOnly,
   });
+}
+
+export function abilityPoolPaymentPreview(
+  game: GameDocument,
+  playerId: string,
+  sourceDefinition: GameCardDefinition,
+  costs: { energy: number; power: number },
+  index: RuntimeCardIndex,
+) {
+  const player = game.state.players[playerId]!;
+  const context: PaymentContext = {
+    kind: "ability",
+    sourceCardType: sourceDefinition.card.classification.type,
+  };
+  const powerDomains = sourceDefinition.card.classification.domain.filter(
+    (domain) => domain !== "Colorless",
+  );
+  const availableEnergy = player.energy + Object.entries(
+    player.restrictedResources?.energy ?? {},
+  ).reduce((sum, [usage, amount]) =>
+    sum + (resourceUsageAllowsPayment(usage, context) ? amount : 0), 0);
+  const eligiblePower = (power: Record<string, number>) => Object.entries(power)
+    .reduce((sum, [domain, amount]) =>
+      sum + (powerDomainCanPay(domain, powerDomains) ? amount : 0), 0);
+  const availablePower = eligiblePower(player.power) + Object.entries(
+    player.restrictedResources?.power ?? {},
+  ).reduce((sum, [usage, power]) =>
+    sum + (resourceUsageAllowsPayment(usage, context) ? eligiblePower(power) : 0), 0);
+  return {
+    ...costs,
+    powerDomains,
+    availableEnergy,
+    availablePower,
+    canPay: buildAbilityPaymentPlan(game, playerId, sourceDefinition, costs, index, { poolOnly: true }) !== null,
+  };
 }
 
 function buildPaymentPlanForRequest(
@@ -142,7 +180,7 @@ function buildPaymentPlanForRequest(
       generatedConditionalEnergy += unusedEnergy;
     else generatedPooledEnergy += unusedEnergy;
   };
-  const sourceIds = paymentResourceSourceIds(game, playerId, index);
+  const sourceIds = request.poolOnly ? [] : paymentResourceSourceIds(game, playerId, index);
   for (const id of sourceIds) {
     const ability = exhaustForEnergyAbility(id, request.context, index);
     if (ability?.usage === "spellsOnly") consumeEnergySource(id);
@@ -206,7 +244,7 @@ function buildPaymentPlanForRequest(
     }
   }
   const powerRuneIds: string[] = [];
-  for (const id of player.zones.base) {
+  for (const id of request.poolOnly ? [] : player.zones.base) {
     if (remainingPower === 0) break;
     if (!hasAbility(id, "ability.recycle_for_power", index)) continue;
     const runeDomain = definitionForInstance(id, index).card.classification
@@ -350,6 +388,7 @@ export function payAbilityCost(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
+  options: { poolOnly?: boolean } = {},
 ) {
   const plan = buildAbilityPaymentPlan(
     game,
@@ -357,8 +396,11 @@ export function payAbilityCost(
     sourceDefinition,
     costs,
     index,
+    options,
   );
-  if (!plan) throw new Error("Ability costs cannot be paid.");
+  if (!plan) throw new Error(options.poolOnly
+    ? "Add enough eligible Energy and Power to the Rune Pool before confirming."
+    : "Ability costs cannot be paid.");
   applyPaymentPlan(game, playerId, plan, index);
 }
 

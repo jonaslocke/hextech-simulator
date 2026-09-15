@@ -177,7 +177,8 @@ export function useBoardTargetSelection({
         selectedAdditionalPower -
           (targetSelectionAction?.costPreview?.availableAnyPower ?? 0),
       );
-      if (missingAdditionalPower > 0) {
+      if (missingAdditionalPower > 0 || !targetSelectionAction?.enabled ||
+        targetSelectionAction.poolPayment?.canPay === false) {
         return false;
       }
 
@@ -241,6 +242,7 @@ export function useBoardTargetSelection({
 
       if (
         nextSelection.purpose === "play" &&
+        !targetSelectionAction?.poolPayment &&
         !nextSelection.followUpLocationRequirement &&
         nextSelection.minTargets === nextSelection.maxTargets &&
         selectedTargetIds.length === nextSelection.maxTargets &&

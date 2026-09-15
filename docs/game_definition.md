@@ -475,6 +475,31 @@ as:
 - Pay Hidden alternative cost.
 - Pay other optional additional costs exposed by card text.
 
+### Equip payment from the Rune Pool
+
+Equip uses player-added resources, following the Deflect interaction. Opening
+Equip stages its target selection and displays the current server-calculated
+activation cost and eligible pooled Energy and Power. Add-resource actions stay
+available on the board while the prompt is open. The player chooses which
+sources to exhaust or recycle through those existing actions.
+
+Confirmation is available only when the current Rune Pool can pay the complete
+cost, including its Power domain and usage restrictions. The server revalidates
+the target, timing, cost, and pool at submission, then pays from the pool before
+placing Equip on the Chain. Equip never automatically exhausts or recycles
+resource sources. Restricted eligible pooled resources are spent before
+unrestricted resources, using the shared payment planner.
+
+Adding resources is an immediate game action. Cancelling the Equip prompt
+does not undo those actions or spend the pooled resources. They remain subject
+to normal pool clearing. No persisted pending-payment state or match migration
+is required. This replaces automatic source selection for Equip only; other
+ability and card payments retain their existing behavior.
+
+The prompt uses the same activation-cost calculation as execution, rather than
+the card's printed play cost. Future Equip cost modifiers must extend that shared
+server calculation so the preview and actual payment continue to agree.
+
 When a card can be played in multiple modes, projection should expose legal
 payment options to the client. For example, `Bellows Breath` should offer
 regular play and play-with-Repeat when both are legal. Repeat can be paid at

@@ -59,6 +59,7 @@ import {
 import {
   availableAnyPowerAfterBaseCost,
   buildAbilityPaymentPlan,
+  abilityPoolPaymentPreview,
   buildPaymentPlan,
   canPayCardCosts,
   payAbilityCost,
@@ -1268,6 +1269,7 @@ function action(
   targets: ProjectedAction["targets"] = [],
   choice?: ProjectedAction["choice"],
   costPreview?: ProjectedAction["costPreview"],
+  poolPayment?: ProjectedAction["poolPayment"],
 ): ProjectedAction {
   const parts = [
     "game",
@@ -1293,6 +1295,7 @@ function action(
     disabledReason,
     targets,
     costPreview,
+    poolPayment,
     choice,
     presentation: {
       surface,
@@ -1828,6 +1831,11 @@ function addAbilityActions(
                 : "Source is exhausted.",
             `${clause.id}|${ability.behaviorId}`,
             targets,
+            undefined,
+            undefined,
+            ability.behaviorId === "ability.equip"
+              ? abilityPoolPaymentPreview(game, playerId, definition, abilityCosts, index)
+              : undefined,
           ),
         );
       }
@@ -1972,7 +1980,9 @@ function executeActivatedAbility(
     state.exhausted = true;
   }
   if (costs.energy > 0 || costs.power > 0) {
-    payAbilityCost(game, actorPlayerId, definition, costs, index);
+    payAbilityCost(game, actorPlayerId, definition, costs, index, {
+      poolOnly: binding.behaviorId === "ability.equip",
+    });
   }
   const item = {
     id: `ability:${game.stateVersion + 1}:${sourceId}:${clauseId}`,

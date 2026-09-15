@@ -40,6 +40,14 @@ export const projectedActionSchema = z.object({
   enabled: z.boolean(),
   disabledReason: z.string().min(1).nullable(),
   targets: z.array(projectedTargetRequirementSchema),
+  poolPayment: z.object({
+    energy: z.number().int().nonnegative(),
+    power: z.number().int().nonnegative(),
+    powerDomains: z.array(z.string().min(1)),
+    availableEnergy: z.number().int().nonnegative(),
+    availablePower: z.number().int().nonnegative(),
+    canPay: z.boolean(),
+  }).optional(),
   costPreview: z
     .object({
       energy: z.number().int().nonnegative(),

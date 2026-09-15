@@ -2,6 +2,7 @@
 
 import { GameActionButton } from "@/features/game-board/components/game-action-button";
 import { cn } from "@/shared/utils/cn";
+import type { GameProjection } from "@/shared/game";
 import {
   PointerEvent as ReactPointerEvent,
   useCallback,
@@ -32,6 +33,7 @@ export function TargetSelectionPrompt({
   cancelLabel = "Cancel",
   confirmLabel = "Play",
   costPreview,
+  poolPayment,
   helperText,
   isSubmitting = false,
   maxTargets,
@@ -46,6 +48,7 @@ export function TargetSelectionPrompt({
   canSubmit: boolean;
   cancelLabel?: string;
   confirmLabel?: string;
+  poolPayment?: GameProjection["actions"][number]["poolPayment"];
   costPreview?: {
     additionalPower: number;
     availableAnyPower: number;
@@ -273,6 +276,25 @@ export function TargetSelectionPrompt({
             selectedCount={selectedCount}
           />
         </div>
+
+        {poolPayment && (
+          <div aria-live="polite" className="bg-amber-400/10 px-4 py-3 border-amber-300/25 border-b text-amber-50 text-xs">
+            <div className="font-semibold">
+              Cost: {poolPayment.energy} Energy + {poolPayment.power}{" "}
+              {poolPayment.powerDomains.join(" or ")} Power
+            </div>
+            <div className="mt-1">
+              Eligible Rune Pool: {poolPayment.availableEnergy}/{poolPayment.energy} Energy
+              {" · "}{poolPayment.availablePower}/{poolPayment.power} Power
+            </div>
+            <div className="mt-2">
+              {poolPayment.canPay
+                ? "Payment is ready. Confirm when your target is selected."
+                : "Use your resource sources to add Energy and Power to the Rune Pool before confirming."}
+              {" "}Cancelling keeps added resources in the pool.
+            </div>
+          </div>
+        )}
 
         {costPreview && costPreview.additionalPower > 0 && (
           <div className="bg-amber-400/10 px-4 py-3 border-amber-300/25 border-b text-amber-50 text-xs">

@@ -995,7 +995,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                 targetSelection.requirement,
                 targetSelection.selectedTargetIds,
               ) &&
-              missingDeflectPower === 0
+              missingDeflectPower === 0 &&
+              Boolean(targetSelectionAction?.enabled) &&
+              targetSelectionAction?.poolPayment?.canPay !== false
             }
             costPreview={
               targetSelectionAction?.costPreview
@@ -1019,6 +1021,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                 : undefined
             }
+            poolPayment={targetSelectionAction?.poolPayment}
             maxTargets={targetSelection.maxTargets}
             minTargets={targetSelection.minTargets}
             isSubmitting={isSubmittingAction}
@@ -1033,7 +1036,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                   : "Cancel"
             }
             confirmLabel={
-              targetSelectionHasOptionalCost(targetSelection)
+              targetSelectionAction?.poolPayment
+                ? targetSelectionAction.label
+                : targetSelectionHasOptionalCost(targetSelection)
                 ? targetSelection.selectedTargetIds.length > 0
                   ? "Exhaust unit"
                   : "Decline"
@@ -1044,7 +1049,9 @@ export const GameBoard: FC<GameBoardProps> = ({
                     : "Play"
             }
             title={
-              targetSelection.purpose === "move"
+              targetSelectionAction?.poolPayment
+                ? targetSelectionAction.label
+                : targetSelection.purpose === "move"
                 ? moveSelectionTitle(
                     sourceProjection.actions.find(
                       (action) => action.id === targetSelection.actionId,

@@ -343,7 +343,8 @@ export function useGameBoardActions({
 
   const handleBoardCardPrimaryAction = useCallback(
     (card: Card, event?: MouseEvent<HTMLElement>) => {
-      if (targetSelection) {
+      if (targetSelection && card.instanceId &&
+        targetSelection.legalTargetIds.includes(card.instanceId)) {
         chooseBoardTarget(card.instanceId);
         return;
       }
@@ -351,7 +352,9 @@ export function useGameBoardActions({
       if (!card.instanceId || !event) {
         return;
       }
-      const cardActions = sourceActions(card.instanceId);
+      const cardActions = sourceActions(card.instanceId).filter(
+        (action) => !targetSelection || action.label.startsWith("Add "),
+      );
       if (cardActions.length === 0) return;
       const powerDomain = cardActions
         .map((action) => action.label.match(/^Add Power \[(.+)]$/)?.[1])
@@ -364,7 +367,9 @@ export function useGameBoardActions({
           disabled: !action.enabled,
           id: action.id,
           label: resourceActionMenuLabel(action, powerDomain),
-          onSelect: () => beginPlayOrTargetSelection(card, action.id),
+          onSelect: () => action.label.startsWith("Add ")
+            ? submitRuneAction(action.id)
+            : beginPlayOrTargetSelection(card, action.id),
         })),
       );
     },
@@ -373,6 +378,7 @@ export function useGameBoardActions({
       chooseBoardTarget,
       openCardActionMenu,
       sourceActions,
+      submitRuneAction,
       targetSelection,
     ],
   );
