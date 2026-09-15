@@ -11,6 +11,7 @@ import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
   definitionForInstance,
+  draw,
   effectiveEnergyCost,
   effectivePowerCost,
   advanceGameObjectIncarnation,
@@ -94,6 +95,17 @@ export function gameplayActions(
   const actions: ProjectedAction[] = [
     action(game, "concede", "Concede Game", null),
   ];
+  // Debug intents still pass through normal authorization, versioning, and logging.
+  if (process.env.NODE_ENV === "development") {
+    const disabledReason = game.state.pendingChoice
+      ? "Finish the current choice before drawing a debug card."
+      : player.zones.mainDeck.length === 0
+        ? "Your main deck is empty."
+        : null;
+    actions.push(
+      action(game, "debugDraw", "Debug: Draw card", null, disabledReason === null, disabledReason),
+    );
+  }
   if (game.state.pendingChoice) {
     const pendingChoice = game.state.pendingChoice;
     if (pendingChoice.playerId !== actorPlayerId) return actions;
@@ -485,6 +497,9 @@ export function performGameplayAction(input: {
   const player = game.state.players[input.actorPlayerId]!;
 
   switch (kind) {
+    case "debugDraw":
+      draw(game, player.zones.mainDeck, player.zones.hand, 1);
+      break;
     case "play":
       playCard(
         game,

@@ -2344,7 +2344,7 @@ function stringParam(binding: BehaviorBinding, key: string) {
   if (typeof value !== "string") throw new Error(`Behavior parameter ${key} must be text.`);
   return value;
 }
-function draw(
+export function draw(
   game: GameDocument,
   source: string[],
   destination: string[],

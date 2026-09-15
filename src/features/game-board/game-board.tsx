@@ -5,6 +5,7 @@ import {
   type StructuredBugReport,
 } from "@/shared/bug-report";
 import type { GameProjection } from "@/shared/game";
+import { Button } from "@/shared/components/button";
 import { copyText } from "@/shared/utils/copy-text";
 import { LayoutGroup } from "motion/react";
 import {
@@ -143,6 +144,9 @@ export const GameBoard: FC<GameBoardProps> = ({
     sequence: index + 1,
   }));
   const interactionLockedRef = useRef(false);
+  const debugDrawAction = sourceProjection.actions.find((action) =>
+    action.id.split(":")[3] === "debugDraw",
+  );
   const submitProjectedAction = useCallback(
     (
       actionId: string | undefined,
@@ -666,7 +670,18 @@ export const GameBoard: FC<GameBoardProps> = ({
           player={board.player}
           victoryScore={projection.victoryScore}
         />
-        <div className="top-14 right-3 z-[2147483647] absolute">
+        <div className="top-14 right-3 z-[2147483647] absolute flex gap-2">
+          {process.env.NODE_ENV === "development" && debugDrawAction && (
+            <Button
+              className="h-7 px-2 text-xs"
+              disabled={!debugDrawAction.enabled || isSubmittingAction || isInteractionSuspended}
+              onClick={() => void submitProjectedAction(debugDrawAction.id)}
+              title={debugDrawAction.disabledReason ?? "Draw the top card of your main deck into your hand"}
+              variant="secondary"
+            >
+              {debugDrawAction.label}
+            </Button>
+          )}
           <ReportBugButton
             isReporting={Boolean(bugReportDraft)}
             onBegin={beginBugReport}

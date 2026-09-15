@@ -417,6 +417,7 @@ export function useGameBoardActions({
           action.presentation.surface === "action-rail" &&
           action.id.split(":")[3] !== "moveMany" &&
           action.id.split(":")[3] !== "concede" &&
+          action.id.split(":")[3] !== "debugDraw" &&
           !["End turn", "Pass focus", "Pass priority"].includes(action.label) &&
           action.choice?.kind !== "combatDamage",
       ),

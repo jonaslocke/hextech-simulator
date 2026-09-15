@@ -1639,6 +1639,85 @@ test("playing a permitted Unit to an open battlefield starts a Showdown before C
   assert.equal(next.state.players.p1!.points, 1);
 });
 
+test("development debug draw moves only the actor's top card without advancing the turn", () => {
+  withNodeEnvironment("development", () => {
+    const { game, decks } = fixture();
+    game.state.turn!.activePlayerId = "p2";
+    game.state.players.p1!.zones.hand = ["p1:spell"];
+    game.state.players.p1!.zones.mainDeck.push("p1:unit");
+    const before = structuredClone(game);
+    const draw = gameplayActions(game, "p1", decks).find((action) => action.id.includes(":debugDraw:"));
+    assert.ok(draw?.enabled);
+    const next = performGameplayAction({ game, actorPlayerId: "p1", actionId: draw.id, selectedIds: [], decks, now: "debug-draw" });
+    assert.deepEqual(next.state.players.p1!.zones.hand, [...game.state.players.p1!.zones.hand, "p1:draw"]);
+    assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit"]);
+    assert.equal(next.state.cardStates["p1:draw"]!.gameObjectIncarnation, 1);
+    assert.deepEqual(next.state.players.p2, game.state.players.p2);
+    assert.deepEqual(next.state.turn, game.state.turn);
+    assert.equal(next.stateVersion, game.stateVersion + 1);
+    assert.equal(next.updatedAt, "debug-draw");
+    assert.deepEqual(game, before);
+    assert.throws(() => performGameplayAction({ game: next, actorPlayerId: "p1", actionId: draw.id, selectedIds: [], decks, now: "stale" }), /not legal/);
+    next.state.players.p1!.zones.mainDeck = [];
+    const emptyDraw = gameplayActions(next, "p1", decks).find((action) => action.id.includes(":debugDraw:"));
+    assert.equal(emptyDraw?.enabled, false);
+    assert.throws(() => performGameplayAction({ game: next, actorPlayerId: "p1", actionId: emptyDraw!.id, selectedIds: [], decks, now: "empty" }), /not legal/);
+  });
+});
+
+test("debug draw is rejected outside development even with a previously issued action ID", () => {
+  const { game, decks } = fixture();
+  const actionId = withNodeEnvironment("development", () => {
+    const draw = gameplayActions(game, "p1", decks).find((action) => action.id.includes(":debugDraw:"));
+    assert.ok(draw);
+    return draw.id;
+  });
+  for (const environment of ["production", "test", undefined]) {
+    withNodeEnvironment(environment, () => {
+      assert.equal(gameplayActions(game, "p1", decks).some((action) => action.id === actionId), false);
+      assert.throws(() => performGameplayAction({ game, actorPlayerId: "p1", actionId, selectedIds: [], decks, now: "rejected" }), /not legal/);
+    });
+  }
+});
+
+test("debug draw cannot bypass player membership, setup, or completed games", () => {
+  withNodeEnvironment("development", () => {
+    const { game, decks } = fixture();
+    const actionId = `game:${game.stateVersion}:action:debugDraw:_`;
+    assert.throws(() => performGameplayAction({ game, actorPlayerId: "spectator", actionId, selectedIds: [], decks, now: "rejected" }), /not legal/);
+    for (const status of ["setup_pending", "complete"] as const) {
+      game.status = status;
+      assert.equal(gameplayActions(game, "p1", decks).length, 0);
+      assert.throws(() => performGameplayAction({ game, actorPlayerId: "p1", actionId, selectedIds: [], decks, now: "rejected" }), /not legal/);
+    }
+  });
+});
+
+test("debug draw waits for pending choices to finish", () => {
+  withNodeEnvironment("development", () => {
+    const { game, decks } = fixture();
+    game.state.pendingChoice = {
+      id: "pending", type: "orderTriggers", playerId: "p1", optionIds: [], pendingItems: [],
+    };
+    const draw = gameplayActions(game, "p1", decks).find((action) => action.id.includes(":debugDraw:"));
+    assert.equal(draw?.enabled, false);
+    assert.throws(() => performGameplayAction({ game, actorPlayerId: "p1", actionId: draw!.id, selectedIds: [], decks, now: "rejected" }), /not legal/);
+  });
+});
+
+function withNodeEnvironment<T>(environment: string | undefined, run: () => T): T {
+  const variables: Record<string, string | undefined> = process.env;
+  const previous = variables.NODE_ENV;
+  try {
+    if (environment === undefined) delete variables.NODE_ENV;
+    else variables.NODE_ENV = environment;
+    return run();
+  } finally {
+    if (previous === undefined) delete variables.NODE_ENV;
+    else variables.NODE_ENV = previous;
+  }
+}
+
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const cards = [
     definition("RUNE", "Rune", "Rune", 0, 0),
