@@ -5,6 +5,7 @@ import { cn } from "@/shared/utils/cn";
 import type { MouseEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { BoardCatalogCard } from "../board-view-model";
+import { autoAssignCombatDamage } from "../combat-damage-assignment";
 import type { Card } from "../types";
 import { CardTile, type CardTileSize } from "./card-tile";
 import { GameActionButton } from "./game-action-button";
@@ -180,35 +181,11 @@ export function CombatDamageDialog({
       return;
     }
 
-    let remainingDamage = choice.totalDamage;
-    const nextAmounts: Record<string, number> = {};
-    const nextAssignmentOrder: string[] = [];
-
-    for (const target of targets) {
-      if (remainingDamage <= 0) {
-        break;
-      }
-
-      const amount = Math.min(target.lethalAmount, remainingDamage);
-
-      if (amount <= 0) {
-        continue;
-      }
-
-      nextAmounts[target.unitId] = amount;
-      nextAssignmentOrder.push(target.unitId);
-      remainingDamage -= amount;
-    }
-
-    const lastAssignedUnitId = nextAssignmentOrder.at(-1);
-
-    if (remainingDamage > 0 && lastAssignedUnitId) {
-      nextAmounts[lastAssignedUnitId] =
-        (nextAmounts[lastAssignedUnitId] ?? 0) + remainingDamage;
-    }
-
-    setAmounts(nextAmounts);
-    setAssignmentOrder(nextAssignmentOrder);
+    const suggested = autoAssignCombatDamage(choice.totalDamage, targets);
+    setAmounts(Object.fromEntries(
+      suggested.map(({ targetUnitId, amount }) => [targetUnitId, amount]),
+    ));
+    setAssignmentOrder(suggested.map(({ targetUnitId }) => targetUnitId));
   };
 
   const resetAssignments = () => {

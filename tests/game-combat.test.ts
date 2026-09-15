@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { autoAssignCombatDamage } from "../src/features/game-board/combat-damage-assignment";
+import { buildPlayerDecisionRequest } from "../src/features/game-board/decisions/use-player-decision-request";
+import { createCombatDamageIntent } from "../src/features/game-board/decisions/player-decision-intent";
 import {
   cleanupBoard,
   createRuntimeCardIndex,
@@ -320,6 +323,69 @@ test("clears surviving damage before temporary Might expires at end of turn", ()
   assert.equal(game.state.cardStates.attacker!.damage, 0);
   assert.equal(game.state.cardStates.attacker!.computedMight, 2);
   assert.equal(game.state.modifiers.length, 0);
+});
+
+test("combat suggestions use projected effective Might and marked damage through the decision and submission pipeline", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 1,
+    attackerAssault: 2,
+    defenders: [{ id: "large", might: 6 }, { id: "damaged", might: 2, shield: 3 }],
+  });
+  const showdown = moveAttacker(initial, decks);
+  showdown.state.cardStates.damaged!.damage = 2;
+  const game = passShowdown(showdown, decks);
+  assert.equal(game.state.cardStates.attacker!.computedMight, 3);
+  assert.equal(game.state.cardStates.damaged!.computedMight, 5);
+  const projection = projectGame({ game, decks, viewerPlayerId: "p1" });
+  const decision = buildPlayerDecisionRequest({ sourceProjection: projection, cardsByInstanceId: {} });
+  assert.equal(decision?.kind, "combatDamage");
+  if (decision?.kind !== "combatDamage") return;
+  assert.equal(decision.choice.totalDamage, 3);
+  assert.deepEqual(decision.choice.targets, [
+    { unitId: "large", lethalAmount: 6, hasTank: false },
+    { unitId: "damaged", lethalAmount: 3, hasTank: false },
+  ]);
+  const allocations = autoAssignCombatDamage(decision.choice.totalDamage, decision.choice.targets.map((target) => ({ ...target, priorityOrder: target.hasTank ? 0 : 1 })));
+  assert.deepEqual(allocations, [{ targetUnitId: "damaged", amount: 3 }]);
+  const intent = createCombatDamageIntent(decision.actionId, allocations);
+  const next = performGameplayAction({ game, decks, actorPlayerId: "p1", ...intent, selectedIds: intent.selectedIds ?? [], now: "suggested" });
+  assert.ok(next.state.players.p2!.zones.trash.includes("damaged"));
+  assert.ok(next.state.battlefields[0]!.units.includes("large"));
+
+  // A suggestion is only a default. Another legal distribution remains valid.
+  const manual = createCombatDamageIntent(decision.actionId, [{ targetUnitId: "large", amount: 3 }]);
+  const overridden = performGameplayAction({ game, decks, actorPlayerId: "p1", ...manual, selectedIds: manual.selectedIds ?? [], now: "manual" });
+  assert.ok(overridden.state.battlefields[0]!.units.includes("damaged"));
+  assert.ok(overridden.state.battlefields[0]!.units.includes("large"));
+});
+
+test("combat auto-assignment and manual overrides remain subject to server Tank and allocation validation", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 5,
+    defenders: [{ id: "tank", might: 3, tank: true }, { id: "other", might: 3 }],
+  });
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+  const action = gameplayActions(game, "p1", decks).find((entry) => entry.choice?.kind === "combatDamage")!;
+  assert.equal(action.choice?.kind, "combatDamage");
+  if (action.choice?.kind !== "combatDamage") return;
+  const allocations = autoAssignCombatDamage(action.choice.totalDamage, action.choice.targets.map((target) => ({ ...target, priorityOrder: target.hasTank ? 0 : 1 })));
+  assert.deepEqual(allocations, [{ targetUnitId: "tank", amount: 3 }, { targetUnitId: "other", amount: 2 }]);
+  const submit = (values: typeof allocations) => performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [], allocations: values, now: "assign" });
+  assert.doesNotThrow(() => submit(allocations));
+  assert.throws(() => submit([{ targetUnitId: "tank", amount: 2 }, { targetUnitId: "other", amount: 3 }]), /Tank units must be assigned lethal damage first/);
+  assert.throws(() => submit([{ targetUnitId: "other", amount: 2 }, { targetUnitId: "tank", amount: 3 }]), /Tank units must be assigned lethal damage first/);
+  assert.throws(() => submit([{ targetUnitId: "tank", amount: 4 }]), /All available combat damage/);
+  assert.throws(() => submit([{ targetUnitId: "tank", amount: 6 }]), /All available combat damage/);
+  assert.throws(() => submit([{ targetUnitId: "unknown", amount: 5 }]), /invalid target or amount/);
+  assert.throws(() => submit([{ targetUnitId: "tank", amount: 2.5 }, { targetUnitId: "other", amount: 2.5 }]), /invalid target or amount/);
+  assert.throws(() => submit([{ targetUnitId: "tank", amount: 2 }, { targetUnitId: "tank", amount: 3 }]), /only once/);
+});
+
+test("the server still rejects nonlethal spreads between ordinary combat recipients", () => {
+  const { game: initial, decks } = combatFixture({ attackerMight: 3, defenders: [{ id: "first", might: 3 }, { id: "second", might: 3 }] });
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+  const action = gameplayActions(game, "p1", decks).find((entry) => entry.choice?.kind === "combatDamage")!;
+  assert.throws(() => performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [], allocations: [{ targetUnitId: "first", amount: 1 }, { targetUnitId: "second", amount: 2 }], now: "spread" }), /lethal damage before assigning another unit/);
 });
 
 function moveAttacker(
