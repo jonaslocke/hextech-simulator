@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  combineTargetRequirements,
   targetSelectionCanAdd,
   targetSelectionIsLegal,
   type CombinedTargetRequirement,
@@ -24,7 +25,8 @@ export type BoardTargetSelection = {
   purpose: "choice" | "move" | "play";
   requirement: CombinedTargetRequirement;
   selectedTargetIds: string[];
-  targetKind: "battlefield" | "card" | "location" | "chainItem";
+  targetKind: "battlefield" | "card" | "location" | "chainItem" | "payment";
+  preparingPayment?: boolean;
 };
 
 type SubmitProjectedAction = (
@@ -41,6 +43,16 @@ type UseBoardTargetSelectionArgs = {
 };
 
 const EMPTY_TARGET_IDS: string[] = [];
+
+export function createCardPaymentPreparation(action: GameProjection["actions"][number]): BoardTargetSelection | null {
+  if (!action.enabled || action.poolPayment?.mode !== "card" || action.poolPayment.canPay) return null;
+  return {
+    actionId: action.id, purpose: "play", targetKind: "payment", preparingPayment: true,
+    legalTargetIds: [], minTargets: 0, maxTargets: 0, selectedTargetIds: [],
+    // No gameplay target exists; this is an empty selection aggregate.
+    requirement: { requirements: [], legalIds: [], minimum: 0, maximum: 0 },
+  };
+}
 
 export function useBoardTargetSelection({
   actions,
@@ -66,7 +78,7 @@ export function useBoardTargetSelection({
   targetSelection: BoardTargetSelection | null;
   targetSelectionAction: GameProjection["actions"][number] | undefined;
 } {
-  const [targetSelection, setTargetSelection] =
+  const [storedSelection, setTargetSelection] =
     useState<BoardTargetSelection | null>(null);
   const [hoveredTargetCardInstanceId, setHoveredTargetCardInstanceId] =
     useState<string | null>(null);
@@ -74,16 +86,19 @@ export function useBoardTargetSelection({
     string[]
   >([]);
 
-  const targetSelectionAction = targetSelection
-    ? (actions.find((action) => action.id === targetSelection.actionId) ??
+  const targetSelectionAction = storedSelection
+    ? (actions.find((action) => action.id === storedSelection.actionId) ??
       actions.find((action) =>
-        actionIdsHaveSameIdentity(action.id, targetSelection.actionId),
+        actionIdsHaveSameIdentity(action.id, storedSelection.actionId),
       ))
     : undefined;
+  const targetSelection = storedSelection
+    ? rebindStagedSelection(storedSelection, targetSelectionAction)
+    : null;
 
   const selectedDeflectSources =
     targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
-      targetSelection?.selectedTargetIds.includes(source.targetId),
+      [...(targetSelection?.carriedSelectedTargetIds ?? []), ...(targetSelection?.selectedTargetIds ?? [])].includes(source.targetId),
     ) ?? [];
   const selectedDeflectPower = selectedDeflectSources.reduce(
     (total, source) => total + source.amount,
@@ -179,8 +194,18 @@ export function useBoardTargetSelection({
       );
       if (missingAdditionalPower > 0 || !targetSelectionAction?.enabled ||
         targetSelectionAction.poolPayment?.canPay === false) {
+        // Battlefield/Chain selection uses its established selector first.
+        // Once selected, hand off to the same movable preparation surface so
+        // resource sources remain accessible without losing the real targets.
+        if (targetSelectionAction?.enabled && selection.targetKind !== "card" && selection.targetKind !== "payment") {
+          setTargetSelection({ ...selection, targetKind: "payment", preparingPayment: true,
+            carriedSelectedTargetIds: selectedIds, selectedTargetIds: [], legalTargetIds: [], minTargets: 0, maxTargets: 0,
+            requirement: { requirements: [], legalIds: [], minimum: 0, maximum: 0 } });
+        }
         return false;
       }
+
+      if (!stagedTargetsAreCurrent(selection, targetSelectionAction)) return false;
 
       if (selection.purpose === "move" || selection.purpose === "play") {
         capturePendingAnimationSnapshot?.();
@@ -242,7 +267,8 @@ export function useBoardTargetSelection({
 
       if (
         nextSelection.purpose === "play" &&
-        !targetSelectionAction?.poolPayment &&
+        !nextSelection.preparingPayment &&
+        (!targetSelectionAction?.poolPayment || targetSelectionAction.poolPayment.mode === "card") &&
         !nextSelection.followUpLocationRequirement &&
         nextSelection.minTargets === nextSelection.maxTargets &&
         selectedTargetIds.length === nextSelection.maxTargets &&
@@ -353,6 +379,34 @@ function actionIdsHaveSameIdentity(left: string, right: string) {
     rightParts.length >= 5 &&
     leftParts.slice(2).join(":") === rightParts.slice(2).join(":")
   );
+}
+
+/** Rebind the intent, including its optional/destination action identity, to the
+ * current projection. Selection legality never comes from a stale target list. */
+export function rebindStagedSelection(selection: BoardTargetSelection, action: GameProjection["actions"][number] | undefined): BoardTargetSelection {
+  if (!action) return selection;
+  const requirement = selection.targetKind === "payment" ? selection.requirement
+    : combineTargetRequirements(action, selection.targetKind);
+  if (!requirement) return { ...selection, legalTargetIds: [], requirement: { ...selection.requirement, legalIds: [] } };
+  const current = selection.targetKind === "location" && selection.carriedSelectedTargetIds
+    ? locationRequirementForSelectedIds(requirement, selection.carriedSelectedTargetIds) : requirement;
+  return { ...selection, actionId: action.id, requirement: current,
+    preparingPayment: selection.preparingPayment || (action.poolPayment?.mode === "card" && !action.poolPayment.canPay),
+    followUpLocationRequirement: selection.followUpLocationRequirement
+      ? combineTargetRequirements(action, "location") ?? undefined : undefined,
+    legalTargetIds: current.legalIds, minTargets: current.minimum, maxTargets: current.maximum,
+    selectedTargetIds: selection.selectedTargetIds.filter((id) => current.legalIds.includes(id)) };
+}
+
+export function stagedTargetsAreCurrent(selection: BoardTargetSelection, action: GameProjection["actions"][number] | undefined) {
+  if (!action) return false;
+  const selected = [...(selection.carriedSelectedTargetIds ?? []), ...selection.selectedTargetIds];
+  return new Set(selected).size === selected.length &&
+    selected.every((id) => action.targets.some((target) => target.legalIds.includes(id))) &&
+    action.targets.every((target) => {
+      const count = selected.filter((id) => target.legalIds.includes(id)).length;
+      return count >= target.minimum && count <= target.maximum;
+    });
 }
 
 function additionalPowerForTargets(

@@ -18,7 +18,7 @@ import type { BoardPlayerProjection } from "../board-view-model";
 import type { CardActionMenuItem } from "../components/card-action-menu";
 import { combineTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
-import type { BoardTargetSelection } from "./use-board-target-selection";
+import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
 
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
@@ -170,6 +170,8 @@ export function useGameBoardActions({
         card.instanceId,
       );
       const actionToSubmit = stagedMoveAction ?? projectedAction;
+      if (!actionToSubmit.enabled) return;
+      const preparingPayment = actionToSubmit.poolPayment?.mode === "card" && !actionToSubmit.poolPayment.canPay;
       const targetKind = actionToSubmit.targets.some(
         (target) => target.kind === "chainItem",
       )
@@ -196,7 +198,13 @@ export function useGameBoardActions({
           requirement,
           selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
           targetKind,
+          preparingPayment,
         });
+        return;
+      }
+
+      if (preparingPayment) {
+        setTargetSelection(createCardPaymentPreparation(actionToSubmit));
         return;
       }
 

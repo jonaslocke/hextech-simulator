@@ -316,6 +316,50 @@ export function canPayCardCosts(
     additionalAnyPower, additionalCosts, cardInstanceId) !== null;
 }
 
+/** Card preparation reports ordinary safe-plan readiness, never pool-only
+ * readiness. Each optional Power cost keeps its own domain requirement. */
+export function cardPaymentPreview(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  energyCost: number,
+  index: RuntimeCardIndex,
+  additionalCosts: readonly AdditionalCardCost[],
+  cardInstanceId: string,
+) {
+  const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
+  const powerCosts = [
+    { amount: effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
+  ].filter((cost) => cost.amount > 0);
+  const powerDomains = [...new Set(powerCosts.flatMap((cost) => cost.domains))];
+  const eligible = pooledCandidates(game.state.players[playerId]!, powerDomains).filter((candidate) =>
+    candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }, powerDomains));
+  const canPay = canPayCardCosts(game, playerId, definition, energyCost, index, 0, additionalCosts, cardInstanceId);
+  let availableAnyPower = 0;
+  let upper = pooledCandidates(game.state.players[playerId]!, []).filter((candidate) => candidate.kind === "power" &&
+    candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }))
+    .reduce((sum, candidate) => sum + candidate.amount, 0);
+  // Evaluate the whole chosen optional-cost commitment, not just its base cost,
+  // before advertising how much additional target Power can safely be paid.
+  if (canPay) while (availableAnyPower < upper) {
+    const amount = Math.ceil((availableAnyPower + upper) / 2);
+    if (canPayCardCosts(game, playerId, definition, energyCost, index, amount, additionalCosts, cardInstanceId)) availableAnyPower = amount;
+    else upper = amount - 1;
+  }
+  return {
+    availableAnyPower,
+    mode: "card" as const,
+    energy: energyCost + additionalCosts.reduce((sum, cost) => sum + cost.energy, 0),
+    power: powerCosts.reduce((sum, cost) => sum + cost.amount, 0),
+    powerDomains,
+    powerCosts,
+    availableEnergy: eligible.filter((candidate) => candidate.kind === "energy").reduce((sum, candidate) => sum + candidate.amount, 0),
+    availablePower: eligible.filter((candidate) => candidate.kind === "power").reduce((sum, candidate) => sum + candidate.amount, 0),
+    canPay,
+  };
+}
+
 function cardPaymentPlans(
   game: GameDocument,
   playerId: string,

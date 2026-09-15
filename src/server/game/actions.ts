@@ -57,11 +57,10 @@ import {
   type GameTransition,
 } from "./transitions";
 import {
-  availableAnyPowerAfterBaseCost,
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
-  buildPaymentPlan,
   canPayCardCosts,
+  cardPaymentPreview,
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
@@ -482,6 +481,8 @@ export function performGameplayAction(input: {
   const projected = legal.find((candidate) => candidate.id === input.actionId);
   if (!projected || !projected.enabled)
     throw new Error("Action is not legal for the current game state.");
+  if (projected.poolPayment?.mode === "card" && projected.poolPayment.canPay === false)
+    throw new Error("Add enough resources before confirming this action.");
   validateActionTargets(projected, input.selectedIds);
   const game = structuredClone(input.game);
   // Public card reveals are an informational presentation, not a decision.
@@ -1605,15 +1606,6 @@ function addPlayableCardActions(
       index,
       cardId,
     );
-    const paymentPlan = buildPaymentPlan(
-      game,
-      playerId,
-      definition,
-      cost,
-      index,
-      0,
-      cardId,
-    );
     // Source-selected resource costs are committed by a play mode, not a
     // target prompt. Other optional selectors (for example, exhaust a unit)
     // stay as their existing player-decision flow.
@@ -1648,9 +1640,6 @@ function addPlayableCardActions(
       effectivePower,
       printedEnergy: definition.card.attributes.energy ?? 0,
       printedPower: definition.card.attributes.power ?? 0,
-      availableAnyPower: paymentPlan
-        ? availableAnyPowerAfterBaseCost(game, playerId, paymentPlan, { kind: "card", cardType: definition.card.classification.type })
-        : Object.values(player.power).reduce((total, amount) => total + amount, 0),
       targetAdditionalPower,
     };
     const unitDestinations =
@@ -1673,20 +1662,23 @@ function addPlayableCardActions(
         const additionalCosts = optionalSourceCosts
           .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
           .flatMap((payment) => payment.costs);
-        const costsPayable = canPayCardCosts(
+        const { availableAnyPower, ...payment } = cardPaymentPreview(
           game,
           playerId,
           definition,
           cost,
           index,
-          0,
           additionalCosts,
           cardId,
         );
-        const enabled = costsPayable && hasLegalTargets;
+        const costsPayable = payment.canPay;
+        const preparable = !costsPayable && hasLegalTargets && canPrepareCardPayment(
+          game, playerId, decks, definition, additionalCosts, cardId, timing,
+        );
+        const enabled = (costsPayable || preparable) && hasLegalTargets;
         const disabledReason = !hasLegalTargets
           ? "No legal targets are available."
-          : costsPayable
+          : costsPayable || preparable
             ? null
             : "Card costs cannot be paid.";
         actions.push(
@@ -1707,13 +1699,66 @@ function addPlayableCardActions(
             encodePlayExtra(destination.id, optionalCostKeys),
             targets,
             undefined,
-            costPreview,
+            { ...costPreview, energy: payment.energy, effectivePower: payment.power, availableAnyPower },
+            payment,
           ),
         );
       }
     }
   }
-  void decks;
+}
+
+/** Reachability through actual legal Add actions, isolated from canonical state.
+ * This never returns or applies an automatic plan and never relaxes Rune safety.
+ * Resource actions exhaust/remove their source, so the search is finite. */
+function canPrepareCardPayment(
+  game: GameDocument,
+  playerId: string,
+  decks: readonly DeckSnapshotDocument[],
+  definition: GameCardDefinition,
+  additionalCosts: readonly AdditionalCardCost[],
+  cardId: string,
+  timing: TurnTiming,
+) {
+  const visited = new Set<string>();
+  const search = (state: GameDocument): boolean => {
+    // Rune Deck order cannot affect this payment. Collapsing commuting Add
+    // sequences avoids traversing every permutation of identical preparation.
+    const keyState = structuredClone(state.state);
+    keyState.players[playerId]!.zones.runeDeck.sort();
+    const key = JSON.stringify(keyState);
+    if (visited.has(key)) return false;
+    visited.add(key);
+    const index = createRuntimeCardIndex(decks, state);
+    if (canPayCardCosts(state, playerId, definition,
+      effectiveEnergyCost(state, playerId, definition, index, cardId), index, 0, additionalCosts, cardId)) return true;
+    const handlers = createPrimitiveHandlers(index);
+    const abilities: ProjectedAction[] = [];
+    addAbilityActions(abilities, state, playerId, index, handlers, timing);
+    // Try combined Add first: it often supplies both missing resources in one
+    // legal action. This order only accelerates feasibility; it chooses nothing
+    // for the player and never becomes an execution plan.
+    abilities.sort((a, b) => Number(b.id.split(":")[3] === "activateMany") - Number(a.id.split(":")[3] === "activateMany"));
+    for (const ability of abilities) {
+      if (!ability.enabled || ability.targets.some((target) => target.minimum > 0)) continue;
+      const [, , , kind, encodedSource, encodedExtra] = ability.id.split(":");
+      const source = decodeURIComponent(encodedSource);
+      const extra = decodeURIComponent(encodedExtra ?? "");
+      const steps: Array<{ clauseId: string; behaviorId: string }> = kind === "activateMany"
+        ? JSON.parse(extra)
+        : kind === "activate" ? [{ clauseId: extra.split("|")[0]!, behaviorId: extra.split("|")[1]! }] : [];
+      if (steps.length === 0 || steps.some((step) => !isAddResourceAbility(step.behaviorId))) continue;
+      const next = structuredClone(state);
+      const nextIndex = createRuntimeCardIndex(decks, next);
+      const nextHandlers = createPrimitiveHandlers(nextIndex);
+      try {
+        for (const step of steps) executeActivatedAbility(next, playerId, source, step.clauseId, step.behaviorId, [], nextIndex, nextHandlers);
+      } catch { continue; }
+      if (search(next)) return true;
+    }
+    return false;
+  };
+  return search(structuredClone(game));
 }
 
 function canSatisfyTargetRequirements(

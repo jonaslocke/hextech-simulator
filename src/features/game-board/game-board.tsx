@@ -59,7 +59,7 @@ import {
   type BoardDropLocation,
 } from "./drag-and-drop/location-drag-actions";
 import { LocationDragProvider } from "./drag-and-drop/location-drag-provider";
-import { useBoardTargetSelection } from "./interactions/use-board-target-selection";
+import { stagedTargetsAreCurrent, useBoardTargetSelection } from "./interactions/use-board-target-selection";
 import {
   persistStructuredBugReport,
   useViewerSafeProjectionHistory,
@@ -986,7 +986,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerId={board.player.playerId}
       />
       {!isInteractionSuspended &&
-        targetSelection?.targetKind === "card" &&
+        (targetSelection?.targetKind === "card" || targetSelection?.targetKind === "payment") &&
         !targetSelectionUsesCardPrompt && (
           <TargetSelectionPrompt
             canSubmit={
@@ -995,6 +995,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                 targetSelection.requirement,
                 targetSelection.selectedTargetIds,
               ) &&
+              (Boolean(targetSelection.followUpLocationRequirement) || stagedTargetsAreCurrent(targetSelection, targetSelectionAction)) &&
               missingDeflectPower === 0 &&
               Boolean(targetSelectionAction?.enabled) &&
               targetSelectionAction?.poolPayment?.canPay !== false
@@ -1021,7 +1022,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   }
                 : undefined
             }
-            poolPayment={targetSelectionAction?.poolPayment}
+            poolPayment={targetSelection.preparingPayment || targetSelectionAction?.poolPayment?.mode !== "card"
+              ? targetSelectionAction?.poolPayment : undefined}
             maxTargets={targetSelection.maxTargets}
             minTargets={targetSelection.minTargets}
             isSubmitting={isSubmittingAction}

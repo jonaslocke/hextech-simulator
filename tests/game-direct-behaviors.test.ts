@@ -162,7 +162,7 @@ test("projects combined Add and evaluates automatic showdown resources for targe
 
   game.state.players.p1!.energy = 6;
   assert.equal(
-    gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === blastOfPower)?.enabled,
+    gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === blastOfPower)?.poolPayment?.canPay,
     false,
     "Pooled Energy does not authorize automatically recycling a still-ready Rune",
   );

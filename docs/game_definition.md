@@ -501,6 +501,47 @@ existing server-issued action and projection flow. The client can present:
 - Pay Hidden alternative cost.
 - Pay other optional additional costs exposed by card text.
 
+### Card-play resource preparation
+
+Card play distinguishes three payment states:
+
+1. **Safe automatic payment:** the normal deterministic planner can pay the
+   selected mode. Play proceeds through its normal target/destination flow with
+   no resource-preparation prompt.
+2. **Preparable payment:** no safe automatic plan currently exists, but a sequence
+   of currently legal manual Add actions can make one possible. The server keeps
+   the action stageable and projects preparation readiness. Beginning the play
+   opens the existing movable Rune Pool prompt and does not submit the card.
+3. **Unpayable:** neither a safe plan nor a manual preparation path exists. The
+   action remains disabled with its ordinary payment failure reason.
+
+Feasibility is server-owned reachability through supported Add actions on copied
+state, using the existing legality, timing and resource handlers. It never
+relaxes the automatic planner's ban on recycling ready Runes. No partial
+automatic payment happens while evaluating or staging preparation.
+
+Card `poolPayment.mode = "card"` means `canPay` is readiness of the complete
+normal safe payment plan, including the chosen optional costs. It does **not**
+mean the entire cost must be pooled. For a 1 Energy + 2 Power cost with two ready
+matching Runes, manually adding one Power can suffice: the remaining Rune can
+still supply Energy and safely recycle for the other Power at confirmation.
+Projected Power requirements preserve each optional cost's domain restriction.
+Deflect readiness accounts for the full chosen cost commitment and target Power.
+
+Preparation without gameplay targets is a first-class interaction with no
+synthetic target requirement. Real target and destination choices remain intact.
+After each Add action, the staged intent rebinds to the regenerated action with
+the same source, destination and optional mode. Current targets are revalidated;
+confirmation requires current readiness and sufficient target/Deflect payment.
+
+Add actions are ordinary immediate authoritative actions. Cancelling preparation
+only cancels the local play intent; it does not undo Add actions, restore recycled
+Runes, or clear the resources added to the pool. Final confirmation submits the
+current normal play action, which revalidates and pays exactly once. No client
+resource inference, optimistic pool changes, or payment-source chooser is used.
+No match migration is required; existing matches receive these actions from the
+updated server.
+
 ### Equip payment from the Rune Pool
 
 Equip uses player-added resources, following the Deflect interaction. Opening

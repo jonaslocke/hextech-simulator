@@ -258,10 +258,10 @@ export function TargetSelectionPrompt({
             <div className="font-semibold text-sm leading-tight">
               {title ?? targetRequirementLabel}
             </div>
-            <div className="mt-1 text-slate-400 text-xs">
+            {maxTargets > 0 && <div className="mt-1 text-slate-400 text-xs">
               {selectedCount}/{maxTargets} selected
               {isOptional ? " · you may play without selecting targets" : ""}
-            </div>
+            </div>}
             {helperText && (
               <div className="mt-1 text-cyan-100/75 text-xs leading-snug">
                 {helperText}
@@ -269,26 +269,32 @@ export function TargetSelectionPrompt({
             )}
           </div>
 
-          <TargetCountBadge
+          {maxTargets > 0 && <TargetCountBadge
             canSubmit={canSubmit}
             maxTargets={maxTargets}
             minTargets={minTargets}
             selectedCount={selectedCount}
-          />
+          />}
         </div>
 
         {poolPayment && (
           <div aria-live="polite" className="bg-amber-400/10 px-4 py-3 border-amber-300/25 border-b text-amber-50 text-xs">
             <div className="font-semibold">
-              Cost: {poolPayment.energy} Energy + {poolPayment.power}{" "}
-              {poolPayment.powerDomains.join(" or ")} Power
+              Cost: {poolPayment.energy} Energy
+              {poolPayment.powerCosts
+                ? poolPayment.powerCosts.map((cost, i) => <span key={i}> + {cost.amount} {cost.domains.join(" or ")} Power</span>)
+                : <> + {poolPayment.power} {poolPayment.powerDomains.join(" or ")} Power</>}
             </div>
             <div className="mt-1">
               Eligible Rune Pool: {poolPayment.availableEnergy}/{poolPayment.energy} Energy
               {" · "}{poolPayment.availablePower}/{poolPayment.power} Power
             </div>
             <div className="mt-2">
-              {poolPayment.canPay
+              {poolPayment.mode === "card"
+                ? poolPayment.canPay
+                  ? "Payment is ready. Confirm to play."
+                  : "Automatic payment will not recycle a ready Rune. Add the missing resources to your Rune Pool, then confirm. Other resources can still be paid automatically."
+                : poolPayment.canPay
                 ? "Payment is ready. Confirm when your target is selected."
                 : "Use your resource sources to add Energy and Power to the Rune Pool before confirming."}
               {" "}Cancelling keeps added resources in the pool.
@@ -303,7 +309,7 @@ export function TargetSelectionPrompt({
               Power.
             </div>
             <div className="mt-1 text-amber-100/80">
-              Effective base cost: {costPreview.energy} Energy
+              Selected cost: {costPreview.energy} Energy
               {costPreview.effectivePower > 0
                 ? ` + ${costPreview.effectivePower} Power`
                 : ""}
@@ -317,7 +323,7 @@ export function TargetSelectionPrompt({
                 {costPreview.printedPower > 0
                   ? ` + ${costPreview.printedPower} Power`
                   : ""}
-                {" · "}modified by active effects
+                {" · "}includes selected costs and active effects
               </div>
             )}
             {costPreview.sourceNames.length > 0 && (

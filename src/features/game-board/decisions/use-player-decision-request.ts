@@ -14,7 +14,7 @@ export type PlayerDecisionRequestInput = {
     legalTargetIds: string[];
     maxTargets: number;
     minTargets: number;
-    targetKind: "battlefield" | "card" | "location" | "chainItem";
+    targetKind: "battlefield" | "card" | "location" | "chainItem" | "payment";
   } | null;
   sourceProjection: GameProjection;
   cardsByInstanceId: Record<string, BoardCatalogCard>;
