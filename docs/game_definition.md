@@ -1193,7 +1193,9 @@ Battlefield pool remain governed by the match policy.
 - A normal play does not repeat its printed cost. An alternative payment mode
   displays its full final cost with resource symbols. An increased or decreased
   cost displays its final value and named public modifier sources, without
-  printed/effective comparison prose.
+  printed/effective comparison prose. Energy uses a numeric value; Power uses
+  one domain symbol per Power required, repeating symbols instead of displaying
+  a numeric Power count.
 - Card previews expose each active Might contribution, including repeated
   instances, attached Equipment, Assault, Shield, and temporary modifiers.
   Provenance comes from the same server evaluator as the numeric result; it
