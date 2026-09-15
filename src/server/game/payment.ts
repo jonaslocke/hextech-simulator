@@ -316,6 +316,77 @@ export function canPayCardCosts(
     additionalAnyPower, additionalCosts, cardInstanceId) !== null;
 }
 
+/** A necessary capacity check, never a payment plan or a proof of legality.
+ * Count every resource alternative independently, including manually recycled
+ * ready Runes. Ignoring activation costs/timing and conflicting alternatives
+ * deliberately overestimates supply: only a shortage can prune preparation. */
+export function cardPaymentExceedsResourceCapacity(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  index: RuntimeCardIndex,
+  energyCost: number,
+  additionalCosts: readonly AdditionalCardCost[],
+  cardInstanceId: string,
+) {
+  const context: PaymentContext = { kind: "card", cardType: definition.card.classification.type };
+  const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
+  // Add can remove a continuous cost modifier or change its condition. Unless
+  // this dimension is invariant, zero is the conservative base-cost bound.
+  // Optional resource commitments are fixed by the selected play mode.
+  const boardIds = new Set([
+    ...Object.values(game.state.players).flatMap((player) => [...player.zones.base, player.zones.legend, player.zones.champion]),
+    ...game.state.battlefields.flatMap((battlefield) => [battlefield.cardInstanceId, ...battlefield.units]),
+    ...Object.entries(game.state.cardStates).filter(([, state]) => state.attachedToCardInstanceId).map(([id]) => id),
+  ].filter((id): id is string => Boolean(id)));
+  const boardDefinitions = [...boardIds].map((id) => definitionForInstance(id, index));
+  const mutableCost = (attribute: string) => game.state.modifiers.some((modifier) => modifier.attribute === attribute) ||
+    boardDefinitions.some((card) => [card.behaviorModel, card.effectBehaviorModel].some((model) =>
+      model?.clauses.some((clause) => clause.effects.some((effect) => effect.parameters.attribute === attribute))));
+  const minimumEnergy = (mutableCost("energyCost") ? 0 : energyCost) + additionalCosts.reduce((sum, cost) => sum + cost.energy, 0);
+  const powerCosts = [
+    { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
+  ].filter((cost) => cost.amount > 0);
+  const capacity = pooledCandidates(game.state.players[playerId]!, []);
+  const add = (kind: PaymentCandidate["kind"], amount: number, usage: string, domain?: string) => {
+    capacity.push({ kind, amount, usage, domain, restriction: normalizeResourceRestriction(usage), acquisition: "pool", order: capacity.length });
+  };
+  const sources = new Set(paymentResourceSourceIds(game, playerId, index));
+  // Removing a host can expose an attached resource source. Count it too,
+  // regardless of whether a legal preparation sequence actually exposes it.
+  for (const [id, state] of Object.entries(game.state.cardStates)) {
+    if (state.attachedToCardInstanceId && index.instances.get(id)?.ownerPlayerId === playerId) sources.add(id);
+  }
+  for (const id of sources) {
+    const source = definitionForInstance(id, index);
+    for (const ability of source.behaviorModel.clauses.flatMap((clause) => clause.abilities)) {
+      if (ability.behaviorId === "ability.recycle_for_power") {
+        add("power", 1, "unrestricted", source.card.classification.domain[0] ?? "Rainbow");
+      }
+      if (ability.behaviorId !== "ability.exhaust_for_resource" || game.state.cardStates[id]?.exhausted) continue;
+      const { amount, usage, resourceType, domain, poolResource } = ability.parameters;
+      if (typeof amount !== "number" || amount <= 0 || typeof usage !== "string") continue;
+      if (resourceType !== "power") add("energy", amount, usage);
+      else {
+        const producedDomain = domain === "sourceDomain"
+          ? source.card.classification.domain.find((value) => value !== "Colorless") ?? "Rainbow"
+          : typeof domain === "string" ? domain.slice(0, 1).toUpperCase() + domain.slice(1) : "Rainbow";
+        add("power", amount, poolResource === true ? "unrestricted" : usage, producedDomain);
+        // The automatic planner normalizes domain casing; counting its form
+        // too keeps this an upper bound for both manual and automatic paths.
+        if (normalizedDomain(producedDomain) !== producedDomain) add("power", amount, usage, normalizedDomain(producedDomain));
+      }
+    }
+  }
+  const available = (kind: PaymentCandidate["kind"], allowedDomains?: readonly string[]) => capacity
+    .filter((candidate) => candidate.kind === kind && candidateIsEligible(candidate, context, allowedDomains))
+    .reduce((sum, candidate) => sum + candidate.amount, 0);
+  return available("energy") < minimumEnergy ||
+    powerCosts.some((cost) => available("power", cost.domains) < cost.amount) ||
+    available("power", [...new Set(powerCosts.flatMap((cost) => cost.domains))]) < powerCosts.reduce((sum, cost) => sum + cost.amount, 0);
+}
+
 /** Card preparation reports ordinary safe-plan readiness, never pool-only
  * readiness. Each optional Power cost keeps its own domain requirement. */
 export function cardPaymentPreview(

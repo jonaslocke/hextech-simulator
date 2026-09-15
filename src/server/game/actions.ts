@@ -61,6 +61,7 @@ import {
   abilityPoolPaymentPreview,
   canPayCardCosts,
   cardPaymentPreview,
+  cardPaymentExceedsResourceCapacity,
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
@@ -1720,6 +1721,12 @@ function canPrepareCardPayment(
   cardId: string,
   timing: TurnTiming,
 ) {
+  const index = createRuntimeCardIndex(decks, game);
+  if (cardPaymentExceedsResourceCapacity(game, playerId, definition, index,
+    effectiveEnergyCost(game, playerId, definition, index, cardId), additionalCosts, cardId)) return false;
+  // Supported Add handlers change resource/board state, not runtime card
+  // definitions or instances. Reuse their index throughout this local search.
+  const handlers = createPrimitiveHandlers(index);
   const visited = new Set<string>();
   const search = (state: GameDocument): boolean => {
     // Rune Deck order cannot affect this payment. Collapsing commuting Add
@@ -1729,10 +1736,8 @@ function canPrepareCardPayment(
     const key = JSON.stringify(keyState);
     if (visited.has(key)) return false;
     visited.add(key);
-    const index = createRuntimeCardIndex(decks, state);
     if (canPayCardCosts(state, playerId, definition,
       effectiveEnergyCost(state, playerId, definition, index, cardId), index, 0, additionalCosts, cardId)) return true;
-    const handlers = createPrimitiveHandlers(index);
     const abilities: ProjectedAction[] = [];
     addAbilityActions(abilities, state, playerId, index, handlers, timing);
     // Try combined Add first: it often supplies both missing resources in one
@@ -1749,10 +1754,8 @@ function canPrepareCardPayment(
         : kind === "activate" ? [{ clauseId: extra.split("|")[0]!, behaviorId: extra.split("|")[1]! }] : [];
       if (steps.length === 0 || steps.some((step) => !isAddResourceAbility(step.behaviorId))) continue;
       const next = structuredClone(state);
-      const nextIndex = createRuntimeCardIndex(decks, next);
-      const nextHandlers = createPrimitiveHandlers(nextIndex);
       try {
-        for (const step of steps) executeActivatedAbility(next, playerId, source, step.clauseId, step.behaviorId, [], nextIndex, nextHandlers);
+        for (const step of steps) executeActivatedAbility(next, playerId, source, step.clauseId, step.behaviorId, [], index, handlers);
       } catch { continue; }
       if (search(next)) return true;
     }

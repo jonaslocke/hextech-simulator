@@ -15,6 +15,62 @@ const addPower = (f: Awaited<ReturnType<typeof preparationFixture>>) => {
   f.game = performGameplayAction({ game: f.game, decks: f.decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [], now: "add" });
 };
 
+test("unaffordable resource capacity does not enumerate ready Rune combinations", async () => {
+  const f = await preparationFixture(0, 7, 6);
+  const before = structuredClone(f.game);
+  const start = performance.now();
+  assert.equal(play(f).enabled, false);
+  const elapsed = performance.now() - start;
+  assert.deepEqual(f.game, before);
+  // A generous budget for slow CI; the regression took over eight seconds
+  // with just six Runes. Fixture construction is outside the measurement.
+  assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
+});
+
+test("large Rune pools reject Energy and domain shortages while retaining manual preparation", async () => {
+  const f = await preparationFixture(13, 0, 12);
+  const before = structuredClone(f.game);
+  const start = performance.now();
+  assert.equal(play(f).enabled, false);
+  f.card.card.attributes.energy = 0;
+  f.card.card.attributes.power = 1;
+  f.card.card.classification.domain = ["Mind"];
+  assert.equal(play(f).enabled, false);
+  f.card.card.classification.domain = ["Calm"];
+  const preparable = play(f);
+  assert.equal(preparable.enabled, true);
+  assert.equal(preparable.poolPayment?.canPay, false);
+  assert.deepEqual(f.game, before);
+  const elapsed = performance.now() - start;
+  assert.ok(elapsed < 1000, `action projections took ${elapsed.toFixed(0)} ms`);
+});
+
+test("capacity pruning preserves preparation that removes a continuous cost increase", async () => {
+  const f = await preparationFixture(1, 0, 1);
+  f.unrestricted.behaviorModel.clauses[0]!.effects = [{
+    behaviorId: "modifier.modify_numeric_value", order: 0, confidence: "high",
+    parameters: { attribute: "energyCost", operation: "increase", amount: 2,
+      target: "controller_card", duration: "whileSourceOnBoard" },
+  }];
+  const before = structuredClone(f.game);
+  const action = play(f);
+  assert.equal(action.costPreview?.energy, 3);
+  assert.equal(action.poolPayment?.canPay, false);
+  assert.equal(action.enabled, true, "combined Add removes the increase and leaves enough Energy");
+  assert.deepEqual(f.game, before);
+});
+
+test("capacity is only an upper bound and cannot enable incompatible resource alternatives", async () => {
+  const f = await preparationFixture(1, 1, 1);
+  f.unrestricted.behaviorModel.clauses[0]!.abilities[1] = {
+    behaviorId: "ability.exhaust_for_resource", order: 1, confidence: "high",
+    parameters: { resourceType: "power", amount: 1, domain: "sourceDomain", usage: "unrestricted" },
+  };
+  const before = structuredClone(f.game);
+  assert.equal(play(f).enabled, false, "the only source cannot exhaust twice");
+  assert.deepEqual(f.game, before);
+});
+
 test("power-only ready Rune payment is stageable without automatic mutation or execution", async () => {
   const f = await preparationFixture();
   const before = structuredClone(f.game);
