@@ -224,7 +224,11 @@ function buildBattlefieldData({
   });
   const attachmentCards = (battlefield?.attachedCardInstanceIds ?? []).flatMap(
     (cardInstanceId) => {
-      const ownerPlayerId =
+      const hostId = projection.cardStates[cardInstanceId]?.attachedToCardInstanceId;
+      // Choose the host's visual row without changing the Equipment's identity
+      // or ownership. An attachment can belong to the other player.
+      const hostRow = unitCards.find(({ card }) => card.instanceId === hostId);
+      const ownerPlayerId = hostRow?.ownerPlayerId ??
         cardOwnerByInstanceId[cardInstanceId] ?? battlefield?.selectedByPlayerId;
       return buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates).map(
         (card) => ({ card, ownerPlayerId }),

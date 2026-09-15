@@ -36,10 +36,15 @@ export function moveAttachedCardsWithTopMost(
   topMostCardInstanceId: string,
   index: RuntimeCardIndex,
 ) {
-  for (const attachedCardInstanceId of attachedCardIds(
-    game,
-    topMostCardInstanceId,
-  )) {
+  // Location arrays retain attachment age; card-state insertion order does not.
+  // Snapshot before relocating cards, with the existing relationship lookup as
+  // a fallback for older states missing a location-list entry.
+  const locatedIds = [
+    ...Object.values(game.state.players).flatMap((player) => player.zones.base),
+    ...game.state.battlefields.flatMap((field) => field.attachedCardInstanceIds ?? []),
+  ].filter((id) => game.state.cardStates[id]?.attachedToCardInstanceId === topMostCardInstanceId);
+  const orderedIds = new Set([...locatedIds, ...attachedCardIds(game, topMostCardInstanceId)]);
+  for (const attachedCardInstanceId of orderedIds) {
     placeAttachedCardWithTopMost(
       game,
       attachedCardInstanceId,

@@ -775,6 +775,34 @@ server-validated.
 The board UI should use the attached screenshot as layout inspiration, not as an
 exact implementation target.
 
+A Unit and its attached Equipment form one board-layout group in Base and at
+Battlefields. The Unit stays fully visible; each Equipment exposes a strip to
+its right (20% of the existing card width, with a 24px minimum). Each strip keeps
+the Equipment's own card identity, interactions, preview, and exhaustion state.
+Hover/focus may lift a strip without reflowing the group. Unattached Gear remains
+an independent board item.
+
+Attachment display order follows the authoritative location arrays: oldest
+nearest the Unit, newest farthest right. Board movement preserves that order;
+detaching preserves the remaining relative order and reattaching appends the
+card. Equipment uses its host's visual row even when their owners differ.
+Grouping and destinations follow the next projection without client attachment
+rules or optimistic attachment state.
+
+On an attachment change, retain the receiving Unit's exact screen position.
+Neighboring groups yield to its expanded footprint without overlapping; vacated
+gaps are allowed. Detach and reprojection retain the host's position and the
+remaining attachment order. Base and Battlefield share this visual placement
+logic and permit horizontal scrolling when the expanded group needs it. Keep
+the row viewport and current scroll extent stable during these changes so that
+scrollbar appearance or scroll clamping does not displace the Unit.
+
+This is a limited exception to the zone-layout freeze for attachment anchoring.
+Normal flow applies until attachment changes require anchoring; viewport resize
+or a Unit changing location recalculates placement. Position measurements are
+transient UI state, not game state or attachment-order authority. Attachment
+gameplay rules, general card scaling, and unrelated zones remain unchanged.
+
 When a player chooses among cards, card images are the primary representation.
 Instructions, selection counts, eligibility, and disabled reasons may accompany
 them, but complete oracle text must not be duplicated beside each card. An

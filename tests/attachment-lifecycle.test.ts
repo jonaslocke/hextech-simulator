@@ -1,10 +1,38 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attachCardToTopMost, detachCard } from "../src/server/game/attachment-lifecycle";
+import { attachCardToTopMost, detachCard, moveAttachedCardsWithTopMost } from "../src/server/game/attachment-lifecycle";
 import { cleanupBoard } from "../src/server/game/board-rules";
 import { beginEffectResolution, submitEffectOption } from "../src/server/game/effect-resolution";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
 import { gameFixture } from "./helpers/game-fixture";
+
+test("attachment display order survives board moves, detach and reattach", async () => {
+  const { game, decks, id, place } = await gameFixture();
+  const host = place("OGN-044", "base");
+  const createdFirst = place("SFD-042", "base");
+  const createdSecond = place("SFD-042", "base", "p1", 1);
+  const createdThird = place("SFD-064", "base");
+  const index = createRuntimeCardIndex(decks, game);
+  const order = [createdThird, createdFirst, createdSecond];
+  for (const gear of order) attachCardToTopMost(game, gear, host, index);
+  const base = game.state.players.p1!.zones;
+  assert.deepEqual(base.base.filter((id) => order.includes(id)), order);
+
+  const field = { battlefieldId: "field", cardInstanceId: id("SFD-221"), selectedByPlayerId: "p1", controllerPlayerId: "p1", units: [host], attachedCardInstanceIds: [] as string[] };
+  base.base = base.base.filter((id) => id !== host);
+  game.state.battlefields = [field];
+  moveAttachedCardsWithTopMost(game, host, index);
+  assert.deepEqual(field.attachedCardInstanceIds, order, "moving must preserve attachment age, not card creation order");
+
+  detachCard(game, createdFirst);
+  field.units = [];
+  base.base.push(host);
+  moveAttachedCardsWithTopMost(game, host, index);
+  assert.deepEqual(base.base.filter((id) => order.includes(id)), [createdThird, createdSecond]);
+  assert.deepEqual(field.attachedCardInstanceIds, [createdFirst]);
+  attachCardToTopMost(game, createdFirst, host, index);
+  assert.deepEqual(base.base.filter((id) => order.includes(id)), [createdThird, createdSecond, createdFirst]);
+});
 
 test("an attached Shield modifier applies once to its host only while it defends", async () => {
   const { game, decks, place } = await gameFixture();

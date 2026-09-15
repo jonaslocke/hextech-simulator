@@ -22,6 +22,7 @@ import { Card, PlayerData, ZoneData } from "../types";
 import { CardTile } from "./card-tile";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { groupCardsByAttachment } from "./attachment-layout";
+import { useAttachmentGroupLayout } from "../use-attachment-group-layout";
 import { ZoneArea } from "./zone-area";
 
 type BaseLineProps = {
@@ -541,6 +542,16 @@ function CardList({
 }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
+  const attachmentGroups = groupCardsByAttachment(cards);
+  const attachmentExtent = useAttachmentGroupLayout({
+    containerRef: wrapContainerRef,
+    enabled: !onClick && layout === "wrap",
+    groups: attachmentGroups.map(({ host, attachments }, index) => ({
+      id: host.instanceId ?? `${host.name}-${index}`,
+      isUnit: host.type?.split(" / ").includes("Unit") ?? false,
+      attachmentIds: attachments.flatMap((card) => card.instanceId ? [card.instanceId] : []),
+    })),
+  });
 
   useEffect(() => {
     if (layout !== "wrap" || !wrapContainerRef.current) {
@@ -596,7 +607,7 @@ function CardList({
 
   const content = (
     <>
-      {groupCardsByAttachment(cards).map(({ host: card, attachments }, index) => {
+      {attachmentGroups.map(({ host: card, attachments }, index) => {
         const key = card.instanceId ?? `${card.name}-${index}`;
         const createTile = (item: Card) => (
           <CardTile
@@ -648,6 +659,7 @@ function CardList({
         );
         return (
           <AttachmentCardGroup
+            groupId={key}
             attachments={attachments.map((attachment, attachmentIndex) => ({
               id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
               card: createTile(attachment),
@@ -673,11 +685,12 @@ function CardList({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
+          "relative flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-auto [overflow-anchor:none]",
           hasWrappedRows ? "content-start" : "content-center",
         )}
         ref={wrapContainerRef}
       >
+        {attachmentExtent && <span aria-hidden className="pointer-events-none shrink-0" style={attachmentExtent} />}
         {content}
       </div>
     );

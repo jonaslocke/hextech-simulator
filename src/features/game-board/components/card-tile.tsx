@@ -501,7 +501,7 @@ function CardHoverPreviewPortal({
   );
 }
 
-function getCardTileDimensions(
+export function getCardTileDimensions(
   size: CardTileSize,
   orientation: ResolvedCardTileOrientation,
 ) {

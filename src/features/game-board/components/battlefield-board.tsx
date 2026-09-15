@@ -23,6 +23,7 @@ import type { BattlefieldData, Card } from "../types";
 import { CardTile } from "./card-tile";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { groupCardsByAttachment } from "./attachment-layout";
+import { useAttachmentGroupLayout } from "../use-attachment-group-layout";
 
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
@@ -181,7 +182,7 @@ const battlefieldDescriptionBar = cva([
 
 const battlefieldUnitRow = cva(
   [
-    "flex flex-wrap gap-2 min-h-0 overflow-auto",
+    "relative flex flex-wrap gap-2 min-h-0 overflow-auto [overflow-anchor:none]",
     "[scrollbar-color:rgba(103,232,249,0.25)_transparent]",
   ],
   {
@@ -502,14 +503,26 @@ function BattlefieldUnitRow({
   zoneAnimationId: string;
   stagedMovementCardInstanceIds?: Set<string>;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const attachmentGroups = groupCardsByAttachment([...cards, ...attachments]);
+  const attachmentExtent = useAttachmentGroupLayout({
+    containerRef: rowRef,
+    groups: attachmentGroups.map(({ host, attachments }, index) => ({
+      id: host.instanceId ?? `${host.name}-${index}`,
+      isUnit: host.type?.split(" / ").includes("Unit") ?? false,
+      attachmentIds: attachments.flatMap((card) => card.instanceId ? [card.instanceId] : []),
+    })),
+  });
   return (
     <motion.div
       className={cn(battlefieldUnitRow({ side }), className)}
       data-zone-animation-id={zoneAnimationId}
-      layout
+      layout={!attachmentExtent}
+      ref={rowRef}
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
-      {groupCardsByAttachment([...cards, ...attachments]).map(({ host: unit, attachments: attachedCards }, index) => {
+      {attachmentExtent && <span aria-hidden className="pointer-events-none shrink-0" style={attachmentExtent} />}
+      {attachmentGroups.map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
           <CardTile
@@ -558,6 +571,7 @@ function BattlefieldUnitRow({
           );
         return (
           <AttachmentCardGroup
+            groupId={key}
             key={key}
             host={hostTile}
             attachments={attachedCards.map((attachment, attachmentIndex) => ({

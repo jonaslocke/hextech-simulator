@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  attachmentCardOffset,
-  attachmentGroupPadding,
   groupCardsByAttachment,
 } from "../src/features/game-board/components/attachment-layout";
 
@@ -18,11 +16,38 @@ test("one canonical attachment grouping drives Base and Battlefield cards withou
     { host: cards[0], attachments: [cards[1], cards[2], cards[3]] },
     { host: cards[4], attachments: [] },
   ]);
-  const positions = [0, 1, 2].map(attachmentCardOffset);
-  assert.equal(new Set(positions.map(({ left, top }) => `${left}:${top}`)).size, 3);
-  assert.ok((positions[2]!.left as number) < 30, "attachment fan stays close to its host");
-  assert.ok((attachmentGroupPadding(3).paddingBottom as number) > 0);
-  assert.ok((attachmentGroupPadding(3).paddingRight as number) > 0);
+});
+
+test("groups preserve projected attachment order, independent state and identity across reprojection", () => {
+  const host = { instanceId: "unit-a", isExhausted: true, might: 5 };
+  const otherHost = { instanceId: "unit-b", isExhausted: false, might: 2 };
+  const oldest = { instanceId: "gear-z", attachedToCardInstanceId: host.instanceId, isExhausted: false, might: 1 };
+  const middle = { instanceId: "gear-a", attachedToCardInstanceId: host.instanceId, isExhausted: true, might: 3 };
+  const newest = { instanceId: "gear-m", attachedToCardInstanceId: host.instanceId, isExhausted: false, might: 2 };
+  const otherGear = { instanceId: "gear-b", attachedToCardInstanceId: otherHost.instanceId, isExhausted: true, might: 1 };
+  const cards = [host, otherHost, oldest, otherGear, middle, newest];
+  const groups = groupCardsByAttachment(cards);
+  assert.deepEqual(groups, [
+    { host, attachments: [oldest, middle, newest] },
+    { host: otherHost, attachments: [otherGear] },
+  ]);
+  assert.equal(groups[0]!.host, host);
+  assert.equal(groups[0]!.attachments[1], middle);
+  assert.deepEqual(groupCardsByAttachment(structuredClone(cards)), groups);
+
+  const detached = cards.map((card) => card === middle ? { ...middle, attachedToCardInstanceId: null } : card);
+  assert.deepEqual(groupCardsByAttachment(detached)[0]!.attachments, [oldest, newest]);
+  assert.equal(groupCardsByAttachment(detached).length, 3);
+  const reattached = [...detached.filter((card) => card.instanceId !== middle.instanceId), middle];
+  assert.deepEqual(groupCardsByAttachment(reattached)[0]!.attachments, [oldest, newest, middle]);
+});
+
+test("one attachment is one group and absent hosts do not hide projected cards", () => {
+  const host = { instanceId: "unit" };
+  const gear = { instanceId: "gear", attachedToCardInstanceId: "unit" };
+  assert.deepEqual(groupCardsByAttachment([host, gear]), [{ host, attachments: [gear] }]);
+  assert.deepEqual(groupCardsByAttachment([gear]), [{ host: gear, attachments: [] }]);
+  assert.deepEqual(groupCardsByAttachment([]), []);
 });
 
 test("a detached card becomes its own group while the remaining attachments retain their host", () => {
