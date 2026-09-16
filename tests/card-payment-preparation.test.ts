@@ -5,7 +5,7 @@ import { buildPaymentPlan } from "../src/server/game/payment";
 import { createRuntimeCardIndex } from "../src/server/game/primitive-handlers";
 import { createCardPaymentPreparation, rebindStagedSelection, stagedTargetsAreCurrent, type BoardTargetSelection } from "../src/features/game-board/interactions/use-board-target-selection";
 import { combineTargetRequirements } from "../src/features/game-board/model";
-import { paymentCardId, unrestrictedSourceId } from "./helpers/payment-source-fixture";
+import { paymentCardId, restrictedSourceId, unrestrictedSourceId } from "./helpers/payment-source-fixture";
 
 import { preparationFixture } from "./helpers/card-payment-preparation-fixture";
 
@@ -61,6 +61,30 @@ test("unrelated card-type cost modifiers do not enumerate impossible Rune prepar
   assert.equal(play(f).enabled, false);
   assert.deepEqual(f.game, before);
   const elapsed = performance.now() - start;
+  assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
+});
+
+test("opponent cost modifiers invariant under Add prune impossible Rune preparation", async () => {
+  const f = await preparationFixture(7, 0, 6);
+  f.card.card.classification.type = "Spell";
+  f.restricted.behaviorModel.clauses[0]!.abilities = [];
+  f.restricted.behaviorModel.clauses[0]!.effects = [{
+    behaviorId: "modifier.modify_numeric_value", order: 0, confidence: "high",
+    parameters: { attribute: "energyCost", operation: "increase", amount: 1,
+      target: "opponent_spell", duration: "whileSourceOnBoard" },
+  }];
+  f.game.state.players.p1!.zones.legend = null;
+  f.game.state.players.p2!.zones.base.push(restrictedSourceId);
+  const sourceInstance = f.decks.flatMap((deck) => deck.instances)
+    .find((instance) => instance.instanceId === restrictedSourceId)!;
+  sourceInstance.ownerPlayerId = "p2";
+  const before = structuredClone(f.game);
+  const start = performance.now();
+  const action = play(f);
+  const elapsed = performance.now() - start;
+  assert.equal(action.costPreview?.energy, 8);
+  assert.equal(action.enabled, false);
+  assert.deepEqual(f.game, before);
   assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
 });
 

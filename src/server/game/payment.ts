@@ -332,19 +332,35 @@ export function cardPaymentExceedsResourceCapacity(
 ) {
   const context: PaymentContext = { kind: "card", cardType: definition.card.classification.type };
   const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
-  // Add can remove a continuous cost modifier or change its condition. Unless
-  // this dimension is invariant, zero is the conservative base-cost bound.
+  const sources = new Set(paymentResourceSourceIds(game, playerId, index));
+  // Only cards whose state or attachment can change through the acting
+  // player's supported Add actions can change a continuous cost modifier.
+  // Keep attached descendants conservative: removing their Top-Most resource
+  // source detaches them and may end a whileAttached modifier.
+  const mutableSourceIds = new Set([...sources].filter((id) =>
+    definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+      clause.abilities.some((ability) =>
+        ability.behaviorId === "ability.exhaust_for_resource" ||
+        ability.behaviorId === "ability.recycle_for_power"))));
+  let addedAttachedSource = true;
+  while (addedAttachedSource) {
+    addedAttachedSource = false;
+    for (const [id, state] of Object.entries(game.state.cardStates)) {
+      if (!state.attachedToCardInstanceId ||
+        !mutableSourceIds.has(state.attachedToCardInstanceId) ||
+        mutableSourceIds.has(id)) continue;
+      mutableSourceIds.add(id);
+      addedAttachedSource = true;
+    }
+  }
+  // Add can remove a reachable continuous modifier or change its condition.
   // Optional resource commitments are fixed by the selected play mode.
-  const boardIds = new Set([
-    ...Object.values(game.state.players).flatMap((player) => [...player.zones.base, player.zones.legend, player.zones.champion]),
-    ...game.state.battlefields.flatMap((battlefield) => [battlefield.cardInstanceId, ...battlefield.units]),
-    ...Object.entries(game.state.cardStates).filter(([, state]) => state.attachedToCardInstanceId).map(([id]) => id),
-  ].filter((id): id is string => Boolean(id)));
-  const boardDefinitions = [...boardIds].map((id) => definitionForInstance(id, index));
-  // Ignore only statically incompatible types. Do not filter by current
-  // conditions or source activity: Add may change either during preparation.
-  const mutableCost = (attribute: string) => game.state.modifiers.some((modifier) => modifier.attribute === attribute) ||
-    boardDefinitions.some((card) => [card.behaviorModel, card.effectBehaviorModel].some((model) =>
+  const mutableDefinitions = [...mutableSourceIds].map((id) => definitionForInstance(id, index));
+  const mutableCost = (attribute: string) => game.state.modifiers.some((modifier) =>
+    modifier.attribute === attribute &&
+    modifier.sourceCardInstanceId !== null &&
+    mutableSourceIds.has(modifier.sourceCardInstanceId)) ||
+    mutableDefinitions.some((card) => [card.behaviorModel, card.effectBehaviorModel].some((model) =>
       model?.clauses.some((clause) => clause.effects.some((effect) => effect.parameters.attribute === attribute &&
         numericBindingMatchesCardType(effect, {
           cardType: definition.card.classification.type, targetScope: "controller_spell",
@@ -359,7 +375,6 @@ export function cardPaymentExceedsResourceCapacity(
   const add = (kind: PaymentCandidate["kind"], amount: number, usage: string, domain?: string) => {
     capacity.push({ kind, amount, usage, domain, restriction: normalizeResourceRestriction(usage), acquisition: "pool", order: capacity.length });
   };
-  const sources = new Set(paymentResourceSourceIds(game, playerId, index));
   // Removing a host can expose an attached resource source. Count it too,
   // regardless of whether a legal preparation sequence actually exposes it.
   for (const [id, state] of Object.entries(game.state.cardStates)) {
