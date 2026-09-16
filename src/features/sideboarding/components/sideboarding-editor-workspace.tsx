@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { SideboardingDraftAction } from "../sideboarding-draft-reducer";
 import type { SideboardingEditorMode } from "../sideboarding-types";
 import type { SideboardingViewModel } from "../sideboarding-view-model";
@@ -8,11 +8,6 @@ import { EditorToolbar } from "./editor-toolbar";
 import { IndividualCardGrid } from "./individual-card-grid";
 import { MainDeckEditor } from "./main-deck-editor";
 import { SideboardEditor } from "./sideboard-editor";
-
-const CARD_WORKSPACE_STYLE = {
-  "--sideboarding-card-width":
-    "clamp(4.5rem, min(calc((100cqw - 4.5rem) * 0.125), calc((100dvh - 19rem) * 0.117647)), 7.25rem)",
-} as CSSProperties;
 
 export function SideboardingEditorWorkspace({
   disabled,
@@ -101,11 +96,11 @@ function CardWorkspace({
 }) {
   return (
     <div
-      className="min-h-0 flex-1 overflow-hidden p-2.5 [container-type:inline-size]"
-      style={CARD_WORKSPACE_STYLE}
+      className="min-h-0 flex-1 overflow-auto p-2.5 [container-type:inline-size]"
+      style={viewModel.cardWorkspaceStyle}
     >
       <CardWorkspaceSection
-        countLabel={`${viewModel.counts.mainDeck} editable cards`}
+        countLabel={`${viewModel.countLabels.active} · ${viewModel.mainDeckCountingLabel} · ${viewModel.countLabels.mainDeck}`}
         title="Main Deck"
       >
         {mode === "grid" ? (
@@ -146,7 +141,7 @@ function CardWorkspace({
       <div className="my-2 border-t border-white/15" />
 
       <CardWorkspaceSection
-        countLabel={`${viewModel.counts.sideboard}/8 cards`}
+        countLabel={viewModel.countLabels.sideboard}
         title="Sideboard"
       >
         {mode === "grid" ? (

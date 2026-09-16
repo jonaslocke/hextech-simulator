@@ -6,7 +6,7 @@ import {
   buildCanonicalCardDocument, buildCurrentBehaviorCatalog, hashCardRulesText
 } from "../src/server/card-catalog";
 import { loadCardCatalog } from "../src/server/catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import {
   buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot,
   gameplayActions, isAbilityTimingAllowed, performGameplayAction,
@@ -253,7 +253,7 @@ function relocateToBattlefield(game: ReturnType<typeof createInitialGame>, id: s
 async function fixtureSnapshot() {
   const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
   const catalog = await loadCardCatalog();
-  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => entry.name))].map((name) => catalog.byName.get(name)!);
+  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => resolveDeckCard(catalog, entry)!))];
   const primitives = await buildCurrentBehaviorCatalog();
   const report = analyzeCardBehaviorSuggestions(cards, [], primitives);
   const documents = cards.map((card) => {

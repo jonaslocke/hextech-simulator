@@ -12,7 +12,7 @@ import {
   type CanonicalCardPublicationInput
 } from "../src/server/card-catalog";
 import { loadCardCatalog, type Card } from "../src/server/catalog";
-import { validateDeckList } from "../src/server/deck";
+import { validateDeckConstruction } from "../src/server/deck";
 
 type BindingExpectation = [string, Record<string, unknown>, number];
 type ClauseExpectation = {
@@ -126,7 +126,7 @@ async function loadLuxBehaviorReport() {
   const [catalog, deckText, behaviorCatalog] = await Promise.all([
     loadCardCatalog(), readFile(deckPath, "utf8"), buildCurrentBehaviorCatalog()
   ]);
-  const validation = validateDeckList(deckText, catalog, { ownerId: "lux-mvp" });
+  const validation = validateDeckConstruction(deckText, catalog, { ownerId: "lux-mvp" });
   if (!validation.ok) assert.fail(JSON.stringify(validation.issues));
   const cards = [...new Map(validation.snapshot.instances.map((instance) => [instance.card.public_code, instance.card])).values()];
   const report = analyzeCardBehaviorSuggestions(cards, [deckPath], behaviorCatalog);

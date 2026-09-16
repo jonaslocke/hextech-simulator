@@ -22,7 +22,7 @@ test("combined MVP upload contains every playable deck card exactly once", async
     const deck = parseDeckList(await readFile(deckPath, "utf8"));
     for (const entry of deck.entries) {
       assert.ok(
-        resolveDeckCard({ byName }, entry.name),
+        resolveDeckCard({ byName, cards }, entry),
         `${entry.name} is missing from MVP upload`,
       );
     }

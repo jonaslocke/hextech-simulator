@@ -44,7 +44,7 @@ backend domain, not by mandatory abstract layers:
 
 ```text
 server/game/               match lifecycle, rules, timing, projections, combat
-server/deck/               parsing and legality
+server/deck/               Deck Validation, input adapters, identity and policy
 server/card-catalog/       behavior definitions and canonical publication
 server/catalog/            local set-data contracts and loading
 server/online-matchmaking/ rooms and socket coordination
@@ -84,6 +84,15 @@ reimplemented in React. The client renders projected state and submits intents.
 
 Avoid circular dependencies. A feature should not reach into another feature's
 internal component tree when that feature can expose an intentional public API.
+
+Deck Validation in `src/server/deck` owns construction policy, strict external
+card-name resolution, aggregate validity, constraints, and rejection reasons.
+Text and registered-copy adapters feed the same construction evaluator. It
+consumes catalog/publication and runtime readiness owners rather than maintaining
+a separate implementation registry. Browser consumers use the thin validation
+API; server consumers call the feature directly. Match orchestration supplies
+trusted registration context. Sideboarding renders returned metadata and reasons
+and owns draft interaction and layout, without duplicating deck policy.
 
 ## Components and client boundaries
 

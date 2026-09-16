@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { loadCardCatalog } from "../src/server/catalog";
 import { analyzeCardBehaviorSuggestions, buildBehaviorDefinitionDocument, buildCanonicalCardDocument, buildCurrentBehaviorCatalog, hashCardRulesText } from "../src/server/card-catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import { buildDeckSnapshot, createInitialGame, createRuntimeDeckSnapshot, performSetupAction, projectGame, setupActions } from "../src/server/game";
 
 test("completes setup through projected opaque actions", async () => {
@@ -41,7 +41,7 @@ test("completes setup through projected opaque actions", async () => {
 async function fixtureSnapshot() {
   const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
   const catalog = await loadCardCatalog();
-  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => entry.name))].map((name) => catalog.byName.get(name)!);
+  const cards = [...new Set(parseDeckList(sourceText).entries.map((entry) => resolveDeckCard(catalog, entry)!))];
   const primitives = await buildCurrentBehaviorCatalog();
   const report = analyzeCardBehaviorSuggestions(cards, [], primitives);
   const docs = cards.map((card) => {

@@ -1,59 +1,42 @@
 "use client";
 
 import { useCallback } from "react";
-import type {
-  DeckValidationRequest,
-  DeckValidationResponse,
+import {
+  fingerprintDeckValidationRequest,
+  type DeckValidationRequest,
+  type DeckValidationResponse,
 } from "@/shared/deck-validation";
 import type {
   MatchProjection,
   SideboardingSessionInput,
 } from "@/shared/game";
 import { SideboardingScreen } from "../sideboarding-screen";
-import { fingerprintDeckValidationRequest } from "../use-sideboarding-validation";
+import { validateDeckClient } from "../api/validate-deck";
+import { buildPlaygroundDecklistRequest } from "../build-playground-decklist-request";
 
 export function SideboardingPlayground({
   projection,
   session,
+  deckNamesByRegisteredId,
 }: {
   projection: MatchProjection;
   session: SideboardingSessionInput;
+  deckNamesByRegisteredId: Record<string, string>;
 }) {
   const validateDeck = useCallback(
-    async (request: DeckValidationRequest): Promise<DeckValidationResponse> => {
-      const fingerprint = fingerprintDeckValidationRequest(request);
-      const mainDeckCount = request.deck.mainDeckRegisteredCardIds.length;
-      const sideboardCount = request.deck.sideboardRegisteredCardIds.length;
-      const reasons: DeckValidationResponse["reasons"] = [];
-
-      if (mainDeckCount !== 39) {
-        reasons.push({
-          code: "playground.mainDeckSize",
-          message: "Main Deck must contain 39 cards.",
-          section: "mainDeck",
-        });
+    async (request: DeckValidationRequest, signal?: AbortSignal): Promise<DeckValidationResponse> => {
+      if (request.input !== "registered") throw new Error("Expected a registered playground draft.");
+      const textRequest = buildPlaygroundDecklistRequest(request, deckNamesByRegisteredId);
+      const result = await validateDeckClient(textRequest, signal);
+      if (result.fingerprint !== fingerprintDeckValidationRequest(textRequest)) {
+        throw new Error("Deck validation returned a result for a different playground draft.");
       }
-      if (sideboardCount > 8) {
-        reasons.push({
-          code: "playground.sideboardSize",
-          message: "Sideboard can contain at most 8 cards.",
-          section: "sideboard",
-        });
-      }
-
       return {
-        legal: reasons.length === 0,
-        fingerprint,
-        reasons,
-        summary: {
-          activeCardCount: mainDeckCount + 1,
-          mainDeckCount,
-          sideboardCount,
-          signatureCount: 0,
-        },
+        ...result,
+        fingerprint: fingerprintDeckValidationRequest(request),
       };
     },
-    [],
+    [deckNamesByRegisteredId],
   );
 
   const handleIntent = useCallback(async () => {

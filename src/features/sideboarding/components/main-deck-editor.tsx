@@ -29,7 +29,10 @@ export function MainDeckEditor({
         <div>
           <h2 className="text-sm font-semibold text-slate-100">Main Deck</h2>
           <p className="text-xs text-slate-500">
-            {viewModel.counts.mainDeck} editable cards
+            {viewModel.countLabels.active} · {viewModel.mainDeckCountingLabel}
+          </p>
+          <p className="text-xs text-slate-500">
+            {viewModel.countLabels.mainDeck}
           </p>
         </div>
       </header>

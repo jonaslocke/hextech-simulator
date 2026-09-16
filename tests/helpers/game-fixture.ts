@@ -15,7 +15,7 @@ export async function gameFixture() {
     buildCurrentBehaviorCatalog(),
   ]);
   const cards = [...new Map(parseDeckList(source).entries.map((entry) => {
-    const card = resolveDeckCard(catalog, entry.name);
+    const card = resolveDeckCard(catalog, entry);
     assert.ok(card, `Missing source card: ${entry.name}`);
     return [card.public_code.split("/")[0]!, card] as const;
   })).values()];

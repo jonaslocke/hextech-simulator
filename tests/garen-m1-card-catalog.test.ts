@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
@@ -12,11 +11,10 @@ import {
   type CanonicalCardPublicationInput,
 } from "../src/server/card-catalog";
 import {
-  cardSetFileSchema,
+  loadSourceCardCatalog,
   type Card,
-  type CardCatalog,
 } from "../src/server/catalog";
-import { parseDeckList, validateDeckList } from "../src/server/deck";
+import { parseDeckList, validateDeckConstruction } from "../src/server/deck";
 import { buildDeckSnapshot } from "../src/server/game";
 
 type BindingExpectation = [string, Record<string, unknown>, number];
@@ -401,11 +399,11 @@ const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
 test("Garen M1 deck has exact publishable executable behavior models", async () => {
   const deckPath = path.join(process.cwd(), "data", "decks", "garen.dec.txt");
   const [catalog, deckText, behaviorCatalog] = await Promise.all([
-    loadLocalSetCatalog(),
+    loadSourceCardCatalog(),
     readFile(deckPath, "utf8"),
     buildCurrentBehaviorCatalog(),
   ]);
-  const validation = validateDeckList(deckText, catalog, { ownerId: "garen" });
+  const validation = validateDeckConstruction(deckText, catalog, { ownerId: "garen" });
   assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
   if (!validation.ok) return;
 
@@ -451,47 +449,6 @@ test("Garen M1 deck has exact publishable executable behavior models", async () 
   assert.equal(snapshot.cards.length, 21);
   assert.equal(snapshot.entries.length, parsedDeck.entries.length);
 });
-
-async function loadLocalSetCatalog(): Promise<CardCatalog> {
-  const setDirectory = path.join(process.cwd(), "data", "sets");
-  const setFiles = (await readdir(setDirectory))
-    .filter((filename) => filename.endsWith(".json"))
-    .sort();
-  const cards = (
-    await Promise.all(
-      setFiles.map(async (filename) =>
-        cardSetFileSchema.parse(
-          JSON.parse(
-            await readFile(path.join(setDirectory, filename), "utf8"),
-          ),
-        ),
-      ),
-    )
-  ).flat();
-  const byName = new Map<string, Card>();
-  const byPublicCode = new Map<string, Card>();
-  const hash = createHash("sha256");
-
-  hash.update(JSON.stringify(cards));
-  for (const card of cards) {
-    const current = byName.get(card.name);
-    if (
-      !current ||
-      (current.metadata.alternate_art && !card.metadata.alternate_art)
-    ) {
-      byName.set(card.name, card);
-    }
-    byPublicCode.set(card.public_code, card);
-  }
-
-  return {
-    cards,
-    byName,
-    byPublicCode,
-    setFiles,
-    versionHash: hash.digest("hex"),
-  };
-}
 
 function publicationInput(
   card: Card,

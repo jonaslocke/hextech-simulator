@@ -4,6 +4,8 @@ import type {
   SideboardingCardView,
   SideboardingSessionInput,
 } from "@/shared/game";
+import type { DeckValidationConstraints } from "@/shared/deck-validation";
+import { buildSideboardingPresentation } from "./sideboarding-presentation";
 
 export type SideboardingCardGroup = {
   card: SideboardingCardView;
@@ -17,7 +19,8 @@ export type SideboardingCardCopyView = {
   copy: RegisteredCardCopy;
 };
 
-export type SideboardingViewModel = {
+export type SideboardingViewModel = ReturnType<typeof buildSideboardingPresentation> & {
+  constraints: DeckValidationConstraints;
   chosenChampionRegisteredCardId: string;
   chosenChampion: SideboardingCardView | null;
   legend: SideboardingCardView | null;
@@ -47,6 +50,7 @@ export function buildSideboardingViewModel(input: {
   draft: DeckConfiguration;
   selectedRegisteredCardId: string | null;
   session: SideboardingSessionInput;
+  constraints?: DeckValidationConstraints;
 }): SideboardingViewModel {
   const cardPoolById = new Map(
     input.session.registeredCardPool.map((copy) => [
@@ -69,8 +73,17 @@ export function buildSideboardingViewModel(input: {
   const selectedCard = input.selectedRegisteredCardId
     ? (cardByRegisteredId.get(input.selectedRegisteredCardId) ?? null)
     : chosenChampion;
+  const constraints = input.constraints ?? input.session.validationConstraints;
+  const counts = {
+    active: input.draft.mainDeckRegisteredCardIds.length + 1,
+    mainDeck: input.draft.mainDeckRegisteredCardIds.length,
+    chosenChampion: 1,
+    sideboard: input.draft.sideboardRegisteredCardIds.length,
+  };
 
   return {
+    ...buildSideboardingPresentation({ constraints, counts }),
+    constraints,
     chosenChampionRegisteredCardId: input.draft.chosenChampionRegisteredCardId,
     chosenChampion,
     legend,
@@ -131,12 +144,7 @@ export function buildSideboardingViewModel(input: {
     eligibleChosenChampionRegisteredCardIds: new Set(
       input.session.eligibleChosenChampionRegisteredCardIds,
     ),
-    counts: {
-      active: input.draft.mainDeckRegisteredCardIds.length + 1,
-      mainDeck: input.draft.mainDeckRegisteredCardIds.length,
-      chosenChampion: 1,
-      sideboard: input.draft.sideboardRegisteredCardIds.length,
-    },
+    counts,
     changedChosenChampion:
       input.draft.chosenChampionRegisteredCardId !==
       input.session.originalRegisteredDeck.chosenChampionRegisteredCardId,

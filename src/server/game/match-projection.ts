@@ -5,6 +5,7 @@ import {
   type SideboardingCardView,
 } from "@/shared/game";
 import { BO3_MATCH_FEATURES } from "./bo3-match-config";
+import { canonicalGameplayName, getDeckValidationConstraints, isEligibleChosenChampion } from "../deck/construction";
 import { createInitialDeckConfiguration, registeredBattlefieldIds } from "./game-factory";
 import {
   deriveRemainingBattlefieldRegisteredIdsByPlayerId,
@@ -153,6 +154,7 @@ function buildSideboardingSession(input: {
 
   return {
     matchId: input.match.id,
+    validationConstraints: getDeckValidationConstraints(),
     playerId: input.viewerSeat.playerId,
     gameNumber: betweenGames.nextGameNumber,
     expectedIntermissionVersion: input.match.stateVersion,
@@ -217,14 +219,13 @@ function eligibleChosenChampionRegisteredCardIds(
   const definitionsByCode = new Map(
     deck.snapshot.cards.map((definition) => [definition.cardCode, definition]),
   );
+  const cards = deck.snapshot.cards.map((definition) => definition.card);
+  const identityCatalog = { cards, byName: new Map(cards.map((card) => [card.name, card])) };
   const legend = deck.instances.find((copy) => copy.source === "legend");
   const legendDefinition = legend
     ? definitionsByCode.get(legend.cardCode)
     : undefined;
   if (!legend?.registeredCardId || !legendDefinition) return [];
-
-  const legendTags = new Set(legendDefinition.card.tags);
-  const legendDomains = new Set(legendDefinition.card.classification.domain);
 
   return deck.instances
     .filter(
@@ -235,16 +236,7 @@ function eligibleChosenChampionRegisteredCardIds(
     .filter((copy) => {
       const definition = definitionsByCode.get(copy.cardCode);
       if (!definition) return false;
-      const card = definition.card;
-      const isChampionUnit =
-        card.classification.type === "Unit" &&
-        card.classification.supertype === "Champion";
-      const matchesLegendTag = card.tags.some((tag) => legendTags.has(tag));
-      const matchesLegendDomains = card.classification.domain.every((domain) =>
-        legendDomains.has(domain),
-      );
-
-      return isChampionUnit && matchesLegendTag && matchesLegendDomains;
+      return isEligibleChosenChampion(definition.card, legendDefinition.card, identityCatalog);
     })
     .map(requireRegisteredCardId);
 }
@@ -265,10 +257,6 @@ function originalRegisteredDeckConfiguration(
       .map(requireRegisteredCardId),
     battlefieldRegisteredCardIds: registeredBattlefieldIds(registeredCopies),
   };
-}
-
-function canonicalGameplayName(card: { metadata: { clean_name?: string }; name: string }) {
-  return (card.metadata.clean_name ?? card.name).replace(/\s+/g, " ").trim();
 }
 
 function requireRegisteredCardId(copy: CardInstance): string {

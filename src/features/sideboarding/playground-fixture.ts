@@ -10,6 +10,8 @@ import type {
 import { loadCardCatalog } from "@/server/catalog";
 import { deriveCardCodeFromCard } from "@/server/card-catalog/identity";
 import { parseDeckList, type DeckSectionName } from "@/server/deck";
+import { resolveDeckCard } from "@/server/deck/card-name";
+import { getDeckValidationConstraints, isEligibleChosenChampion } from "@/server/deck/construction";
 import type { Card } from "@/server/catalog";
 
 const PLAYGROUND_MATCH_ID = "sideboarding-playground";
@@ -19,6 +21,7 @@ const PLAYGROUND_OPPONENT_ID = "playground-opponent";
 export type SideboardingPlaygroundFixture = {
   projection: MatchProjection;
   session: SideboardingSessionInput;
+  deckNamesByRegisteredId: Record<string, string>;
 };
 
 export async function createSideboardingPlaygroundFixture(): Promise<SideboardingPlaygroundFixture> {
@@ -34,8 +37,9 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   );
   const parsedDeck = parseDeckList(sourceText);
   const catalog = await loadCardCatalog();
-  const cardsByName = new Map(catalog.cards.map((card) => [card.name, card]));
+  const deckNamesByRegisteredId: Record<string, string> = {};
   const cardsByCode: Record<string, SideboardingCardView> = {};
+  const sourceCardsByCode = new Map<string, Card>();
   const registeredCardPool: RegisteredCardCopy[] = [];
   const idsBySection: Record<DeckSectionName, string[]> = {
     Legend: [],
@@ -49,7 +53,7 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   let copyNumber = 0;
 
   for (const entry of parsedDeck.entries) {
-    const card = cardsByName.get(entry.name);
+    const card = resolveDeckCard(catalog, entry);
     if (!card) {
       throw new Error(
         `Playground card is missing from the catalog: ${entry.name}`,
@@ -57,11 +61,13 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
     }
 
     const cardCode = deriveCardCodeFromCard(card);
+    sourceCardsByCode.set(cardCode, card);
     cardsByCode[cardCode] ??= toSideboardingCardView(card, cardCode);
 
     for (let copy = 0; copy < entry.quantity; copy += 1) {
       const registeredCardId = `${PLAYGROUND_MATCH_ID}:${copyNumber}`;
       copyNumber += 1;
+      deckNamesByRegisteredId[registeredCardId] = entry.name;
       registeredCardPool.push({
         registeredCardId,
         cardCode,
@@ -91,22 +97,17 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
   };
 
   const legendCard =
-    cardsByCode[
+    sourceCardsByCode.get(
       registeredCardPool.find(
         (copy) =>
           copy.registeredCardId ===
           originalRegisteredDeck.legendRegisteredCardId,
       )!.cardCode
-    ]!;
+    )!;
   const eligibleChosenChampionRegisteredCardIds = registeredCardPool
     .filter((copy) => {
-      const card = cardsByCode[copy.cardCode];
-      return (
-        card?.type === "Unit" &&
-        card.supertype === "Champion" &&
-        card.tags.some((tag) => legendCard.tags.includes(tag)) &&
-        card.domains.every((domain) => legendCard.domains.includes(domain))
-      );
+      const card = sourceCardsByCode.get(copy.cardCode);
+      return !!card && isEligibleChosenChampion(card, legendCard);
     })
     .map((copy) => copy.registeredCardId);
 
@@ -120,6 +121,7 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
     eligibleChosenChampionRegisteredCardIds,
     registeredCardPool,
     cardsByCode,
+    validationConstraints: getDeckValidationConstraints(),
     context: {
       previousGameWinnerPlayerId: PLAYGROUND_PLAYER_ID,
       previousGameLoserPlayerId: PLAYGROUND_OPPONENT_ID,
@@ -133,6 +135,7 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
 
   return {
     session,
+    deckNamesByRegisteredId,
     projection: createPlaygroundProjection(),
   };
 }

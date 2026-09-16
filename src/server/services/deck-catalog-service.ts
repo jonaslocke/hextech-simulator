@@ -17,6 +17,7 @@ import {
   type DeckDefinitionSeed,
 } from "@/server/game/deck-definition";
 import type { DeckSnapshot } from "@/server/game/schemas";
+import { validateDeckText } from "@/server/deck/deck-validation-service";
 
 export type PlayableDeckOption = { id: DeckId; label: string };
 
@@ -41,6 +42,10 @@ export async function loadDeckSnapshot(
     ]);
   }
 
+  const validation = await validateDeckText({ db, sourceText: definition.sourceText });
+  if (!validation.legal) {
+    throw new GameCatalogError(validation.reasons.map((reason) => reason.message));
+  }
   return buildDeckSnapshotFromSource(db, definition.sourceText);
 }
 
@@ -94,6 +99,10 @@ export async function syncDeckDefinitions(
   const repository = createDeckDefinitionRepository(db);
 
   for (const seed of seeds) {
+    const validation = await validateDeckText({ db, sourceText: seed.sourceText });
+    if (!validation.legal) {
+      throw new GameCatalogError(validation.reasons.map((reason) => reason.message));
+    }
     await buildDeckSnapshotFromSource(db, seed.sourceText);
   }
   const planned = await planDeckDefinitionSync(repository, seeds, now);

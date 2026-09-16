@@ -1,11 +1,12 @@
-import type { DeckValidationRequest } from "@/shared/deck-validation";
+import type { RegisteredDeckValidationRequest } from "@/shared/deck-validation";
 import type { DeckConfiguration, SideboardingSessionInput } from "@/shared/game";
 
 export function buildDeckValidationRequest(input: {
   draft: DeckConfiguration;
   session: SideboardingSessionInput;
-}): DeckValidationRequest {
+}): RegisteredDeckValidationRequest {
   return {
+    input: "registered",
     policy: "riftbound-1v1-match",
     deck: {
       legendRegisteredCardId:

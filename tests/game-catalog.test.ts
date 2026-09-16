@@ -10,18 +10,17 @@ import {
   type CanonicalCardDocument
 } from "../src/server/card-catalog";
 import { loadCardCatalog } from "../src/server/catalog";
-import { parseDeckList } from "../src/server/deck";
+import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import {
   buildDeckSnapshot,
   GameCatalogError,
-  INITIAL_DECK_UNIQUE_CARD_COUNT
 } from "../src/server/game";
 
 test("builds an immutable snapshot for every unique initial-deck card", async () => {
   const fixture = await buildFixture();
   const snapshot = buildDeckSnapshot(fixture.sourceText, fixture.documents, fixture.definitions);
 
-  assert.equal(snapshot.cards.length, INITIAL_DECK_UNIQUE_CARD_COUNT);
+  assert.equal(snapshot.cards.length, new Set(fixture.documents.map((document) => document.cardCode)).size);
   assert.equal(snapshot.entries.length, parseDeckList(fixture.sourceText).entries.length);
   assert.match(snapshot.catalogDigest, /^[a-f0-9]{64}$/);
   assert.ok(snapshot.cards.every((definition) => definition.behaviorModel));
@@ -59,12 +58,22 @@ test("rejects missing, stale, unsynchronized, and uncovered canonical cards", as
   );
 });
 
+test("snapshot resolution does not impose a fixture-specific unique-card minimum", async () => {
+  const fixture = await buildFixture();
+  const entry = parseDeckList(fixture.sourceText).entries.find((item) => item.section === "MainDeck")!;
+  // Snapshot construction is an intermediate catalog stage, not deck legality.
+  const snapshot = buildDeckSnapshot(`MainDeck:\n1 ${entry.name}`, fixture.documents, fixture.definitions);
+  assert.equal(snapshot.cards.length, 1);
+});
+
 async function buildFixture() {
   const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
   const localCatalog = await loadCardCatalog();
   const parsed = parseDeckList(sourceText);
-  const cards = [...new Set(parsed.entries.map((entry) => entry.name))]
-    .map((name) => localCatalog.byName.get(name)!);
+  const cards = [...new Map(parsed.entries.map((entry) => {
+    const card = resolveDeckCard(localCatalog, entry)!;
+    return [card.public_code, card] as const;
+  })).values()];
   const behaviorCatalog = await buildCurrentBehaviorCatalog();
   const suggestions = analyzeCardBehaviorSuggestions(cards, [], behaviorCatalog);
   const suggestionByCode = new Map(suggestions.cards.map((item) => [item.cardCode, item]));

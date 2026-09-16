@@ -1,37 +1,12 @@
 import { createHash } from "node:crypto";
 import type { Db } from "mongodb";
-import {
-  CANONICAL_CARDS_COLLECTION,
-  hashCardRulesText,
-  loadBehaviorDefinitions,
-  validatePrimitiveAssignmentParameters,
-  type CanonicalBehaviorBinding,
-  type CanonicalBehaviorClause,
-  type CanonicalCardDocument,
-  type PrimitiveCatalogEntry,
-} from "../card-catalog";
+import { CANONICAL_CARDS_COLLECTION, loadBehaviorDefinitions, type CanonicalCardDocument } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
-import {
-  deckCardNameAliases,
-  deckCardNameLookupCandidates,
-} from "../deck/card-name";
-import { parseDeckList } from "../deck";
-import { getRuntimeCoverageStatus } from "./runtime-coverage";
-import {
-  compileBehaviorModel,
-} from "./behavior-runtime";
-import { createPrimitiveHandlers } from "./primitive-handlers";
-import {
-  deckSnapshotSchema,
-  gameCardDefinitionSchema,
-  type DeckSnapshot,
-  type GameCardDefinition
-} from "./schemas";
-
-export const INITIAL_DECK_UNIQUE_CARD_COUNT = 21;
-
-type CanonicalCardStoredDocument = CanonicalCardDocument & { _id: string };
-type RuntimeBehaviorDefinition = Omit<PrimitiveCatalogEntry, "examples">;
+import { loadSourceCardCatalog, type CardCatalog } from "../catalog";
+import { resolveDeckCardIdentity } from "../deck/card-name";
+import { parseDeckList } from "../deck/parser";
+import { inspectCanonicalDeckReadiness, type RuntimeBehaviorDefinition } from "./catalog-readiness";
+import { deckSnapshotSchema, type DeckSnapshot } from "./schemas";
 
 export class GameCatalogError extends Error {
   readonly code = "game_catalog_unavailable";
@@ -41,192 +16,59 @@ export class GameCatalogError extends Error {
   }
 }
 
-export async function buildDeckSnapshotFromSource(
-  db: Db,
-  sourceText: string,
-): Promise<DeckSnapshot> {
-  const parsedDeck = parseDeckList(sourceText);
-  const names = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
-  const queryNames = [...new Set(names.flatMap(deckCardNameLookupCandidates))];
+export async function buildDeckSnapshotFromSource(db: Db, sourceText: string): Promise<DeckSnapshot> {
+  const catalog = await loadSourceCardCatalog();
+  const entries = resolveEntries(sourceText, catalog);
+  const codes = [...new Set(entries.map(({ cardCode }) => cardCode))];
   const [storedCards, behaviorDefinitions] = await Promise.all([
-    db.collection<CanonicalCardStoredDocument>(CANONICAL_CARDS_COLLECTION)
-      .find({ "card.name": { $in: queryNames } }).toArray(),
+    db.collection<CanonicalCardDocument>(CANONICAL_CARDS_COLLECTION)
+      .find({ cardCode: { $in: codes } }).toArray(),
     loadBehaviorDefinitions(db),
   ]);
-
-  return buildDeckSnapshot(sourceText, storedCards, behaviorDefinitions);
+  return buildDeckSnapshot(sourceText, storedCards, behaviorDefinitions, catalog);
 }
 
+/** Intermediate executable snapshot construction; Deck Validation owns admission. */
 export function buildDeckSnapshot(
   sourceText: string,
   canonicalCards: readonly CanonicalCardDocument[],
   behaviorDefinitions: readonly RuntimeBehaviorDefinition[],
+  sourceCatalog?: Pick<CardCatalog, "cards" | "byName">,
 ): DeckSnapshot {
-  const parsedDeck = parseDeckList(sourceText);
-  const expectedNames = [...new Set(parsedDeck.entries.map((entry) => entry.name))];
-  const cardsByName = new Map<string, CanonicalCardDocument>();
-  for (const document of canonicalCards) {
-    cardsByName.set(document.card.name, document);
-    for (const alias of deckCardNameAliases(document.card)) {
-      cardsByName.set(alias, document);
-    }
-  }
-  const definitionsById = new Map(behaviorDefinitions.map((definition) => [definition.id, definition]));
-  const issues: string[] = [];
-
-  if (expectedNames.length < INITIAL_DECK_UNIQUE_CARD_COUNT) {
-    issues.push(
-      `Deck must contain at least ${INITIAL_DECK_UNIQUE_CARD_COUNT} unique cards; found ${expectedNames.length}.`
-    );
-  }
-
-  const cards = expectedNames.flatMap((name): GameCardDefinition[] => {
-    const document = cardsByName.get(name);
-    if (!document) {
-      issues.push(`Missing approved canonical card: ${name}`);
-      return [];
-    }
-    validateCanonicalDocument(document, definitionsById, issues);
-    const result = gameCardDefinitionSchema.safeParse({
-      cardCode: document.cardCode,
-      sourceTextHash: document.sourceTextHash,
-      card: document.card,
-      behaviorModel: document.behaviorModel,
-      effectText: document.effectText,
-      effectBehaviorModel: document.effectBehaviorModel,
-    });
-    if (!result.success) {
-      issues.push(`Malformed canonical card ${document.cardCode}: ${result.error.message}`);
-      return [];
-    }
-    return [result.data];
+  const catalog = sourceCatalog ?? {
+    cards: canonicalCards.map((document) => document.card),
+    byName: new Map(canonicalCards.map((document) => [document.card.name, document.card])),
+  };
+  const entries = resolveEntries(sourceText, catalog);
+  const codes = new Set(entries.map(({ cardCode }) => cardCode));
+  const readiness = inspectCanonicalDeckReadiness({
+    cards: canonicalCards.filter((document) => codes.has(document.cardCode)),
+    behaviorDefinitions,
   });
-
-  if (issues.length > 0) throw new GameCatalogError(issues);
-
-  const cardsByNameResolved = new Map<string, GameCardDefinition>();
-  for (const definition of cards) {
-    cardsByNameResolved.set(definition.card.name, definition);
-    for (const alias of deckCardNameAliases(definition.card)) {
-      cardsByNameResolved.set(alias, definition);
-    }
-  }
-  const handlers = createPrimitiveHandlers({
-    definitions: new Map(cards.map((definition) => [definition.cardCode, definition])),
-    instances: new Map(),
-  });
-  for (const definition of cards) {
-    try {
-      compileBehaviorModel(definition.behaviorModel, handlers);
-    } catch (error) {
-      issues.push(
-        `Runtime compilation failed for ${definition.cardCode}: ${
-          error instanceof Error ? error.message : "Unknown runtime error"
-        }`,
-      );
+  const issues = readiness.reasons.map((reason) => reason.message);
+  for (const cardCode of codes) {
+    if (!canonicalCards.some((document) => document.cardCode === cardCode)) {
+      issues.push(`Missing approved canonical card: ${cardCode}`);
     }
   }
   if (issues.length > 0) throw new GameCatalogError(issues);
+  const cards = readiness.cards;
   const digest = createHash("sha256")
     .update(JSON.stringify([...cards].sort((left, right) => left.cardCode.localeCompare(right.cardCode))))
     .digest("hex");
+  return deckSnapshotSchema.parse({ sourceText, catalogDigest: digest, entries, cards });
+}
 
-  return deckSnapshotSchema.parse({
-    sourceText,
-    catalogDigest: digest,
-    entries: parsedDeck.entries.map((entry) => ({
-      section: entry.section,
-      quantity: entry.quantity,
-      cardCode: cardsByNameResolved.get(entry.name)!.cardCode
-    })),
-    cards
+function resolveEntries(sourceText: string, catalog: Pick<CardCatalog, "cards" | "byName">) {
+  const issues: string[] = [];
+  const entries = parseDeckList(sourceText).entries.flatMap((entry) => {
+    const resolved = resolveDeckCardIdentity(catalog, entry);
+    if (!resolved.ok) {
+      issues.push(resolved.message);
+      return [];
+    }
+    return [{ section: entry.section, quantity: entry.quantity, cardCode: deriveCardCodeFromCard(resolved.card) }];
   });
-}
-
-
-function validateCanonicalDocument(
-  document: CanonicalCardDocument,
-  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
-  issues: string[]
-): void {
-  if (document.modelingStatus !== "approved") {
-    issues.push(`Canonical card is not approved: ${document.card.name}`);
-  }
-  if (deriveCardCodeFromCard(document.card) !== document.cardCode) {
-    issues.push(`Canonical identity mismatch: ${document.card.name}`);
-  }
-  if (hashCardRulesText(document.card) !== document.sourceTextHash) {
-    issues.push(`Stale canonical rules text: ${document.card.name}`);
-  }
-
-  const clauses = document.behaviorModel.clauses;
-  clauses.forEach((clause, sequence) => {
-    if (clause.sequence !== sequence) {
-      issues.push(`Invalid clause sequence for ${document.cardCode}:${clause.id}`);
-    }
-    validateClause(document.cardCode, clause, definitionsById, issues);
-  });
-  validateBindings(document.cardCode, "playTimings", document.behaviorModel.playTimings, definitionsById, issues);
-  if (document.effectText && document.effectBehaviorModel) {
-    document.effectBehaviorModel.clauses.forEach((clause, sequence) => {
-      if (clause.sequence !== sequence) {
-        issues.push(`Invalid Effect Text clause sequence for ${document.cardCode}:${clause.id}`);
-      }
-      validateClause(document.cardCode, clause, definitionsById, issues);
-    });
-    validateBindings(
-      document.cardCode,
-      "effectPlayTimings",
-      document.effectBehaviorModel.playTimings,
-      definitionsById,
-      issues,
-    );
-  }
-}
-
-function validateClause(
-  cardCode: string,
-  clause: CanonicalBehaviorClause,
-  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
-  issues: string[]
-): void {
-  for (const [group, bindings] of Object.entries(clause)) {
-    if (!Array.isArray(bindings)) continue;
-    validateBindings(cardCode, `${clause.id}.${group}`, bindings, definitionsById, issues);
-  }
-}
-
-function validateBindings(
-  cardCode: string,
-  group: string,
-  bindings: readonly CanonicalBehaviorBinding[],
-  definitionsById: ReadonlyMap<string, RuntimeBehaviorDefinition>,
-  issues: string[]
-): void {
-  const orders = new Set<number>();
-  for (const binding of bindings) {
-    if (orders.has(binding.order)) issues.push(`Duplicate binding order in ${cardCode}:${group}`);
-    orders.add(binding.order);
-    if (!definitionsById.has(binding.behaviorId)) {
-      issues.push(`Missing synchronized behavior definition: ${binding.behaviorId}`);
-    } else {
-      const definition = definitionsById.get(binding.behaviorId)!;
-      const validation = validatePrimitiveAssignmentParameters({
-        primitiveId: binding.behaviorId,
-        family: definition.family,
-        sourceText: "",
-        parameters: binding.parameters,
-        confidence: binding.confidence
-      }, { ...definition, examples: [] });
-      if (!validation.complete) {
-        issues.push(`Invalid canonical parameters for ${cardCode}:${binding.behaviorId}`);
-      }
-    }
-    const runtimeStatus = getRuntimeCoverageStatus(binding.behaviorId);
-    if (runtimeStatus !== "executable") {
-      issues.push(
-        `Behavior is not executable for ${cardCode}:${group}:${binding.behaviorId} (${runtimeStatus ?? "missing"})`,
-      );
-    }
-  }
+  if (issues.length > 0) throw new GameCatalogError(issues);
+  return entries;
 }

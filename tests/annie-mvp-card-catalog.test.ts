@@ -48,9 +48,10 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
   const rawJson = await readFile("data/catalog/mvp.json", "utf8");
   const behaviorCatalog = await buildCurrentBehaviorCatalog();
   const luxDeck = parseDeckList(await readFile("data/decks/lux.dec.txt", "utf8"));
-  const luxNames = new Set(luxDeck.entries.map((entry) => entry.name));
   const allUploaded = JSON.parse(rawJson) as Card[];
   const cardsByName = new Map(allUploaded.map((card) => [card.name, card]));
+  const luxCodes = new Set(luxDeck.entries.map((entry) =>
+    resolveDeckCard({ byName: cardsByName, cards: allUploaded }, entry)!.public_code));
   const uploaded = [
     ...new Map(
       (
@@ -59,7 +60,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
             async (filename) =>
               parseDeckList(await readFile(`data/decks/${filename}`, "utf8"))
                 .entries
-                .map((entry) => resolveDeckCard({ byName: cardsByName }, entry.name))
+                .map((entry) => resolveDeckCard({ byName: cardsByName }, entry))
                 .filter((card): card is Card => Boolean(card)),
           ),
         )
@@ -68,7 +69,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
   ];
   const persistedLux = new Map(
     uploaded
-      .filter((card) => luxNames.has(card.name))
+      .filter((card) => luxCodes.has(card.public_code))
       .map((card) => {
         const cardCode = card.public_code.split("/")[0]!;
         return [

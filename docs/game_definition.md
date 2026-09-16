@@ -26,8 +26,9 @@ The established playable deck baseline includes:
 - `data/decks/masteryi.dec.txt`
 - `data/decks/garen.dec.txt`
 
-Both fixture decks must pass strict deck validation before they can be used in a
-game. Invalid decks are not playable.
+Every selected deck must pass Deck Validation, including applicable canonical
+publication and executable-runtime readiness, before it can be used in a game.
+Invalid decks are not playable.
 
 ## Product Shape
 
@@ -47,6 +48,11 @@ The supported match format is 1v1 best-of-3. Match-level sideboarding uses a
 server-validated reconfiguration flow between games; it does not transfer
 runtime game state between games. Chat and unrelated account-management product
 features are outside this contract unless separately specified.
+
+Matches are disposable: matches created before relevant project changes are not
+a compatibility target. Preserve current handling without old-match migrations,
+ruleset pinning, recovery, invalidation, or cleanup. This invariant does not
+authorize deleting persisted matches or other data.
 
 ## Technical Stack And Boundaries
 
@@ -233,24 +239,22 @@ compatibility above are preserved. Replay is not MVP scope.
 Deck validation is a hard gate. The server must reject match/game entry for any
 invalid deck.
 
-Required validation:
+`docs/deck_validation.md` owns the requirements and public contract. Decklist text
+and registered configurations enter that same server feature. Match admission,
+deck availability, advisory feedback, and authenticated final sideboarding
+submission consume its result. Unsupported canonical dependencies, including
+Sideboard cards, prevent simulator validity without publishing or repairing them.
 
-- Exactly one Champion Legend in `Legend:`.
-- Exactly one Chosen Champion Unit in `Champion:`.
-- `MainDeck:` section spelling is strict. `Main Deck:` is invalid.
-- Main deck has at least 40 cards counting the chosen champion.
-- Main deck entries use 1-3 copies per entry.
-- Chosen Champion, MainDeck, and Sideboard combined obey max 3 copies by name.
-- Exactly 12 Rune cards.
-- Exactly 3 unique Battlefields.
-- Duplicate names in MainDeck and Sideboard sections are rejected.
-- Every name resolves against `data/sets/*.json`.
-- Section placement matches card type.
-- Chosen Champion tag is compatible with the Champion Legend.
-- Domain identity and signature-card limits are enforced.
+Sideboarding drafts may be invalid while edited. A current valid result enables
+submission, and the server revalidates against the player's registered pool.
+Accepted configurations conserve physical copies and may move extra copies into
+the Main Deck; next-game construction consumes their actual lists.
 
-The fixture decks `annie.dec.txt` and `lux.dec.txt` are the first acceptance
-fixtures. They must stay valid under these rules.
+Sideboarding initially shows All cards without a saved preference. Card grids
+use the validation-provided Sideboard maximum as their column count. The central
+workspace scrolls to expose every row while validation and submission stay
+accessible. Counts and feedback consume validation metadata rather than separate
+UI rules.
 
 ## Match And Game Flow
 
@@ -370,8 +374,8 @@ Unsupported behavior:
 - Rejection leaves canonical state unchanged.
 - Rejection response must identify the unsupported feature and the source card or
   rule when available.
-- A valid deck may contain unsupported cards. Unsupported behavior only blocks
-  the attempted intent that needs it.
+- Deck Validation rejects dependencies without executable canonical models.
+  Intent-time safeguards remain necessary for unsupported execution paths.
 
 ### Rune Pool And Payment System
 

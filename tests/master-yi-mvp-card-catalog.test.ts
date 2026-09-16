@@ -66,7 +66,7 @@ test("Master Yi deck has exact publishable executable behavior models", async ()
   const cards = [
     ...new Map(
       parseDeckList(deckText).entries.flatMap((entry) => {
-        const card = resolveDeckCard({ byName }, entry.name);
+        const card = resolveDeckCard({ byName, cards: allCards }, entry);
         return card ? [[card.public_code, card] as const] : [];
       }),
     ).values(),

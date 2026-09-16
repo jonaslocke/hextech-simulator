@@ -20,28 +20,33 @@ export function SideboardingActions({
   validation: SideboardingValidationState;
   viewModel: SideboardingViewModel;
 }) {
+  const invalidSections = new Set(
+    !validation.pending && !validation.error
+      ? validation.response?.reasons.map((reason) => reason.section)
+      : [],
+  );
+
   return (
     <section className="shrink-0 border-t border-white/10 p-2.5">
       <div className="grid grid-cols-2 gap-1.5 text-[11px]">
         <Count
-          invalid={viewModel.counts.active !== 40}
-          label="Active Deck"
-          value={`${viewModel.counts.active}/40`}
+          invalid={invalidSections.has("mainDeck")}
+          label="Main Deck total"
+          value={viewModel.countLabels.active}
         />
         <Count
-          invalid={viewModel.counts.mainDeck !== 39}
-          label="Main Deck"
-          value={String(viewModel.counts.mainDeck)}
+          label="Editable Main Deck"
+          value={viewModel.countLabels.mainDeck}
         />
         <Count
-          invalid={viewModel.counts.chosenChampion !== 1}
+          invalid={invalidSections.has("chosenChampion")}
           label="Chosen Champion"
-          value={String(viewModel.counts.chosenChampion)}
+          value={viewModel.countLabels.chosenChampion}
         />
         <Count
-          invalid={viewModel.counts.sideboard > 8}
+          invalid={invalidSections.has("sideboard")}
           label="Sideboard"
-          value={`${viewModel.counts.sideboard}/8`}
+          value={viewModel.countLabels.sideboard}
         />
       </div>
 

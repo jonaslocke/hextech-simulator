@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { deckValidationConstraintsSchema } from "./deck-validation";
 
 export const gameZoneKinds = [
   "legend",
@@ -471,6 +472,7 @@ export const sideboardingCardViewSchema = z.object({
 });
 
 export const sideboardingSessionSchema = z.object({
+  validationConstraints: deckValidationConstraintsSchema,
   matchId: z.string().min(1),
   playerId: z.string().min(1),
   gameNumber: z.union([z.literal(2), z.literal(3)]),

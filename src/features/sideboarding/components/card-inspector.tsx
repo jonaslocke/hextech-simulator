@@ -12,15 +12,18 @@ export function CardInspector({
   className?: string;
 }) {
   return (
-    <section className={cn("flex min-h-0 flex-1 flex-col p-2.5", className)}>
+    <section className={cn("flex min-h-48 flex-1 flex-col p-2.5", className)}>
       <h2 className="mb-2 text-sm font-semibold text-slate-100">Preview</h2>
 
-      <div className="mx-auto w-full max-w-[13rem] 2xl:max-w-[14.5rem]">
-        <CardFace card={card} />
+      <div className="min-h-0 flex-1 [container-type:size]">
+        <CardFace
+          card={card}
+          className="mx-auto w-[min(100cqw,calc(100cqh*5/7),14.5rem)]"
+        />
       </div>
 
       {card && (
-        <div className="mt-2.5 min-h-0 overflow-y-auto pr-1">
+        <div className="mt-2.5 max-h-28 shrink-0 overflow-y-auto pr-1">
           <h3 className="font-semibold leading-tight text-slate-100">
             {card.name}
           </h3>

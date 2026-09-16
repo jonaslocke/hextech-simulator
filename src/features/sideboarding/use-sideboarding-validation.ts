@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  DeckValidationRequest,
-  DeckValidationResponse,
+import {
+  fingerprintDeckValidationRequest,
+  type DeckValidationRequest,
+  type DeckValidationResponse,
 } from "@/shared/deck-validation";
 import type { DeckConfiguration, SideboardingSessionInput } from "@/shared/game";
 import { buildDeckValidationRequest } from "./build-deck-validation-request";
@@ -53,6 +54,10 @@ export function useSideboardingValidation(input: {
     const timeoutId = window.setTimeout(() => {
       void validateDeck(request, controller.signal)
         .then((result) => {
+          if (controller.signal.aborted) return;
+          if (result.fingerprint !== fingerprint) {
+            throw new Error("Deck validation returned a result for a different draft. Please retry.");
+          }
           if (latestFingerprintRef.current !== result.fingerprint) return;
           setResponse(result);
           setError(null);
@@ -86,44 +91,18 @@ export function useSideboardingValidation(input: {
   const retry = useCallback(() => {
     setRetryNonce((current) => current + 1);
   }, []);
+  const currentResponse = response?.fingerprint === fingerprint ? response : null;
+  const currentPending = pending || (!currentResponse && !error);
 
   return {
     error,
     isLatestLegal:
-      !pending &&
+      !currentPending &&
       !error &&
-      response?.fingerprint === fingerprint &&
-      response.legal,
-    pending,
+      currentResponse?.legal === true,
+    pending: currentPending,
     request,
-    response,
+    response: currentResponse,
     retry,
   };
-}
-
-export function fingerprintDeckValidationRequest(
-  request: DeckValidationRequest,
-): string {
-  const payload = JSON.stringify({
-    policy: request.policy,
-    deck: {
-      legendRegisteredCardId: request.deck.legendRegisteredCardId,
-      chosenChampionRegisteredCardId:
-        request.deck.chosenChampionRegisteredCardId,
-      mainDeckRegisteredCardIds: [...request.deck.mainDeckRegisteredCardIds],
-      runeDeckRegisteredCardIds: [...request.deck.runeDeckRegisteredCardIds],
-      battlefieldRegisteredCardIds: [
-        ...request.deck.battlefieldRegisteredCardIds,
-      ],
-      sideboardRegisteredCardIds: [...request.deck.sideboardRegisteredCardIds],
-    },
-  });
-  let hash = 2166136261;
-
-  for (let index = 0; index < payload.length; index += 1) {
-    hash ^= payload.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return (hash >>> 0).toString(16);
 }

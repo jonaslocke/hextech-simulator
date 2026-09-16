@@ -53,6 +53,11 @@ card/set data are authoritative; online rulings are not project rules authority.
 - Follow nearby naming/import conventions and durable architecture guidance;
   avoid unrelated cleanup or refactors.
 - Only durable project artifacts belong in Git.
+- Deck validity, rejection reasons, and applicable constraints belong to Deck
+  Validation (`docs/deck_validation.md`); consumers must use that authority.
+- Matches are disposable across relevant project changes. Do not add old-match
+  compatibility, migration, recovery, invalidation, or cleanup behavior. This is
+  not authorization to delete persisted data.
 
 ## Context discipline
 

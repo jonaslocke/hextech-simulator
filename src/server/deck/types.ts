@@ -1,4 +1,5 @@
 import type { Card } from "../catalog";
+import type { DeckValidationReason } from "@/shared/deck-validation";
 
 export const deckSectionNames = [
   "Legend",
@@ -46,11 +47,7 @@ export type DeckSnapshot = {
   instances: RuntimeCardInstance[];
 };
 
-export type DeckValidationIssue = {
-  code: string;
-  message: string;
-  line?: number;
-};
+export type DeckValidationIssue = DeckValidationReason;
 
 export type DeckValidationResult =
   | {

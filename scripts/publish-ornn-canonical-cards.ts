@@ -28,7 +28,7 @@ const [catalog, source, behaviorCatalog] = await Promise.all([
 const parsedDeck = parseDeckList(source);
 const cardsByCode = new Map(
   parsedDeck.entries.map((entry) => {
-    const card = resolveDeckCard(catalog, entry.name);
+    const card = resolveDeckCard(catalog, entry);
     if (!card) throw new Error(`Missing local source card: ${entry.name}`);
     return [card.public_code.split("/")[0]!, card] as const;
   }),

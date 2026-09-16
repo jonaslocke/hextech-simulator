@@ -20,7 +20,7 @@ export function SideboardingRightRail({
   viewModel: SideboardingViewModel;
 }) {
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-white/10 bg-slate-950/75 text-slate-100">
+    <aside className="flex h-full min-h-0 flex-col overflow-y-auto rounded-md border border-white/10 bg-slate-950/75 text-slate-100">
       <CardInspector card={viewModel.selectedCard} />
       <SideboardingActions
         disabled={disabled}

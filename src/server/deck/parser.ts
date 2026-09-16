@@ -48,14 +48,16 @@ export function parseDeckList(sourceText: string): ParsedDeck {
       throw new Error(`Deck entry before section on line ${lineNumber}.`);
     }
 
-    const match = trimmed.match(/^(\d+)\s+(.+)$/);
+    // Consume one quantity delimiter only: additional/trailing whitespace is
+    // part of the submitted name and must survive exact identity validation.
+    const match = lines[index].match(/^\s*(\d+)[ \t](.+)$/);
 
     if (!match) {
       throw new Error(`Invalid deck entry on line ${lineNumber}.`);
     }
 
     const quantity = Number.parseInt(match[1], 10);
-    const name = match[2].trim();
+    const name = match[2];
 
     if (!Number.isSafeInteger(quantity) || quantity <= 0) {
       throw new Error(`Invalid quantity on line ${lineNumber}.`);

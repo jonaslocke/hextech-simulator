@@ -1,80 +1,60 @@
+import type { Db } from "mongodb";
 import {
-  deckValidationRequestSchema,
-  deckValidationResponseSchema,
-  type DeckValidationReason,
-  type DeckValidationRequest,
-  type DeckValidationResponse,
+  registeredDeckValidationRequestSchema, deckValidationResponseSchema, fingerprintDeckValidationRequest,
+  type DeckValidationReason, type RegisteredDeckValidationRequest, type DeckValidationResponse,
   type DeckValidationSection,
 } from "@/shared/deck-validation";
-import type { Card } from "@/server/catalog";
+import { loadSourceCardCatalog, type Card, type CardCatalog } from "@/server/catalog";
+import { hashCardRulesText } from "@/server/card-catalog";
+import { deriveCardCodeFromCard } from "@/server/card-catalog/identity";
 import type { DeckConfiguration } from "@/shared/game";
-import { registeredBattlefieldIds } from "@/server/game/game-factory";
 import type { DeckSnapshotDocument } from "@/server/game/repositories";
 import type { CardInstance } from "@/server/game/state";
+import type { GameCardDefinition } from "@/server/game/schemas";
+import {
+  inspectSnapshotRuntimeReadiness, loadCanonicalDeckReadiness,
+} from "@/server/game/catalog-readiness";
+import {
+  contextualizeReadinessReasons, evaluateDeckConstruction, type ConstructionEntry,
+} from "./construction";
+import { resolveDeckText } from "./validator";
 
-const ACTIVE_CARD_COUNT = 40;
-const MAIN_DECK_COPY_COUNT = 39;
-const RUNE_DECK_COUNT = 12;
-const BATTLEFIELD_COUNT = 3;
-const SIDEBOARD_CAPACITY = 10;
-const MAIN_DECK_TYPES = new Set(["Gear", "Spell", "Unit"]);
-
-type ResolvedCopy = {
-  card: Card;
-  copy: CardInstance;
-  canonicalName: string;
-  registeredCardId: string;
-};
+export { getDeckValidationConstraints, isEligibleChosenChampion } from "./construction";
+export { fingerprintDeckValidationRequest } from "@/shared/deck-validation";
 
 export function buildDeckValidationRequest(input: {
   registeredDeck: DeckSnapshotDocument;
   configuration: DeckConfiguration;
-}): DeckValidationRequest {
-  const legend = input.registeredDeck.instances.find(
-    (copy) => copy.source === "legend",
-  );
-  if (!legend?.registeredCardId) {
-    throw new Error("Registered deck is missing its Champion Legend.");
-  }
-
-  return deckValidationRequestSchema.parse({
+}): RegisteredDeckValidationRequest {
+  const legend = input.registeredDeck.instances.find((copy) => copy.source === "legend");
+  if (!legend?.registeredCardId) throw new Error("Registered deck is missing its Champion Legend.");
+  return registeredDeckValidationRequestSchema.parse({
+    input: "registered",
     policy: "riftbound-1v1-match",
     deck: {
       legendRegisteredCardId: legend.registeredCardId,
-      chosenChampionRegisteredCardId:
-        input.configuration.chosenChampionRegisteredCardId,
+      chosenChampionRegisteredCardId: input.configuration.chosenChampionRegisteredCardId,
       mainDeckRegisteredCardIds: input.configuration.mainDeckRegisteredCardIds,
       runeDeckRegisteredCardIds: input.registeredDeck.instances
-        .filter((copy) => copy.source === "runeDeck")
-        .map(requireRegisteredCardId),
-      battlefieldRegisteredCardIds: registeredBattlefieldIds(
-        input.registeredDeck.instances,
-      ),
-      sideboardRegisteredCardIds:
-        input.configuration.sideboardRegisteredCardIds,
+        .filter((copy) => copy.source === "runeDeck").map(requireRegisteredCardId),
+      battlefieldRegisteredCardIds: input.registeredDeck.instances
+        .filter((copy) => copy.source === "battlefield").map(requireRegisteredCardId),
+      sideboardRegisteredCardIds: input.configuration.sideboardRegisteredCardIds,
     },
   });
 }
 
+/** Registration context comes from server persistence, never from the request envelope. */
 export function validateRegisteredDeckCandidate(input: {
   registeredDeck: DeckSnapshotDocument;
-  request: DeckValidationRequest;
+  request: RegisteredDeckValidationRequest;
+  readinessReasons?: readonly DeckValidationReason[];
 }): DeckValidationResponse {
-  const request = deckValidationRequestSchema.parse(input.request);
-  const fingerprint = fingerprintDeckValidationRequest(request);
+  const request = registeredDeckValidationRequestSchema.parse(input.request);
   const reasons: DeckValidationReason[] = [];
-  const definitionsByCode = new Map(
-    input.registeredDeck.snapshot.cards.map((definition) => [
-      definition.cardCode,
-      definition,
-    ]),
-  );
-  const copiesByRegisteredId = new Map(
-    input.registeredDeck.instances.flatMap((copy) =>
-      copy.registeredCardId ? [[copy.registeredCardId, copy] as const] : [],
-    ),
-  );
-
+  const definitionsByCode = new Map(input.registeredDeck.snapshot.cards.map((definition) => [definition.cardCode, definition]));
+  const copiesByRegisteredId = new Map(input.registeredDeck.instances.flatMap((copy) =>
+    copy.registeredCardId ? [[copy.registeredCardId, copy] as const] : []));
   const sections = {
     legend: [request.deck.legendRegisteredCardId],
     chosenChampion: [request.deck.chosenChampionRegisteredCardId],
@@ -82,117 +62,141 @@ export function validateRegisteredDeckCandidate(input: {
     runeDeck: request.deck.runeDeckRegisteredCardIds,
     battlefields: request.deck.battlefieldRegisteredCardIds,
     sideboard: request.deck.sideboardRegisteredCardIds,
-  } as const;
-
-  const resolved = Object.fromEntries(
-    Object.entries(sections).map(([section, ids]) => [
-      section,
-      ids.flatMap((registeredCardId) => {
-        const copy = copiesByRegisteredId.get(registeredCardId);
-        if (!copy) {
-          reasons.push({
-            code: "deck.unknownRegisteredCard",
-            message: "A submitted card is not part of this registered deck.",
-            section: section as DeckValidationSection,
-            registeredCardId,
-          });
-          return [];
-        }
-
-        const definition = definitionsByCode.get(copy.cardCode);
-        if (!definition) {
-          reasons.push({
-            code: "deck.cardDefinitionMissing",
-            message: "A registered card definition is unavailable.",
-            section: section as DeckValidationSection,
-            registeredCardId,
-          });
-          return [];
-        }
-
-        return [
-          {
-            card: definition.card,
-            copy,
-            canonicalName: canonicalGameplayName(definition.card),
-            registeredCardId,
-          },
-        ];
-      }),
-    ]),
-  ) as Record<DeckValidationSection, ResolvedCopy[]>;
+  } satisfies Record<DeckValidationSection, readonly string[]>;
+  const entries = (Object.entries(sections) as Array<[DeckValidationSection, readonly string[]]>)
+    .flatMap(([section, ids]) => ids.map((registeredCardId): ConstructionEntry => {
+      const context = { section, registeredCardId, quantity: 1 };
+      const copy = copiesByRegisteredId.get(registeredCardId);
+      if (!copy) {
+        reasons.push({
+          ...context, code: "deck.unknownRegisteredCard",
+          message: "A submitted card is not part of this registered deck.",
+        });
+        return context;
+      }
+      const definition = definitionsByCode.get(copy.cardCode);
+      if (!definition) {
+        reasons.push({
+          ...context, cardCode: copy.cardCode, code: "deck.cardDefinitionMissing",
+          message: "A registered card definition is unavailable.",
+        });
+        return { ...context, cardCode: copy.cardCode };
+      }
+      return { ...context, card: definition.card, cardCode: definition.cardCode };
+    }));
 
   validateNoDuplicateRegisteredIds(sections, reasons);
   validateFixedRegisteredSections(input.registeredDeck.instances, sections, reasons);
   validateMutablePartition(input.registeredDeck.instances, sections, reasons);
-  validateCounts(sections, reasons);
-  validateTypePlacement(resolved, reasons);
-  validateChampionCompatibility(resolved, reasons);
-  validateDomainIdentity(resolved, reasons);
-  const signatureCount = validateSignatureCards(resolved, reasons);
-  validateCopyLimits(resolved, reasons);
-
+  const cards = input.registeredDeck.snapshot.cards.map((definition) => definition.card);
+  const construction = evaluateDeckConstruction(entries, {
+    catalog: { cards, byName: new Map(cards.map((card) => [card.name, card])) },
+  });
+  reasons.push(...construction.reasons);
+  reasons.push(...contextualizeReadinessReasons(entries, [
+    ...inspectSnapshotRuntimeReadiness(input.registeredDeck.snapshot.cards),
+    ...(input.readinessReasons ?? []),
+  ]));
   return deckValidationResponseSchema.parse({
-    legal: reasons.length === 0,
-    fingerprint,
-    reasons,
-    summary: {
-      activeCardCount: sections.mainDeck.length + sections.chosenChampion.length,
-      mainDeckCount: sections.mainDeck.length,
-      sideboardCount: sections.sideboard.length,
-      signatureCount,
-    },
+    ...construction, legal: reasons.length === 0, reasons,
+    fingerprint: fingerprintDeckValidationRequest(request),
+  });
+}
+
+/** Read-only text validation is independent of saved decks and match registration. */
+export async function validateDeckText(input: {
+  sourceText: string;
+  catalog?: CardCatalog;
+} & ({ db: Db } | { loadDatabase: () => Promise<Db> })): Promise<DeckValidationResponse> {
+  const catalog = input.catalog ?? await loadSourceCardCatalog();
+  const resolution = resolveDeckText(input.sourceText, catalog);
+  const codes = resolution.entries.flatMap((entry) => entry.cardCode ? [entry.cardCode] : []);
+  const readiness = codes.length
+    ? await loadCanonicalDeckReadiness("db" in input ? input.db : await input.loadDatabase(), codes)
+    : { cards: [], reasons: [] };
+  return validateDeckTextCandidate({
+    sourceText: input.sourceText, catalog, readinessReasons: [
+      ...readiness.reasons,
+      ...inspectDeckSourceFreshness(readiness.cards, resolution.resolvedEntries.map((entry) => entry.card)),
+    ],
+  });
+}
+
+/** Current publication and source evidence for advisory and final registered validation. */
+export async function loadRegisteredDeckReadiness(
+  db: Db, registeredDeck: DeckSnapshotDocument,
+): Promise<DeckValidationReason[]> {
+  const [catalog, readiness] = await Promise.all([
+    loadSourceCardCatalog(),
+    loadCanonicalDeckReadiness(db, registeredDeck.snapshot.cards.map((card) => card.cardCode)),
+  ]);
+  const reasons = [...readiness.reasons];
+  const sourceCards: Card[] = [];
+  for (const definition of [...readiness.cards, ...registeredDeck.snapshot.cards]) {
+    const source = catalog.byPublicCode.get(definition.card.public_code);
+    if (source) sourceCards.push(source);
+    else reasons.push({
+      code: "deck.sourceIdentityMissing", cardCode: definition.cardCode, canonicalName: definition.card.name,
+      message: `Current local source identity is unavailable for ${definition.card.name}.`,
+    });
+  }
+  reasons.push(
+    ...inspectDeckSourceFreshness(readiness.cards, sourceCards),
+    ...inspectDeckSourceFreshness(registeredDeck.snapshot.cards, sourceCards),
+  );
+  return [...new Map(reasons.map((reason) => [JSON.stringify(reason), reason])).values()];
+}
+
+/** Reuse the catalog hash contract to compare approved evidence with current source rules. */
+export function inspectDeckSourceFreshness(
+  canonicalCards: readonly GameCardDefinition[], sourceCards: readonly Card[],
+): DeckValidationReason[] {
+  const sourceByPublicCode = new Map(sourceCards.map((card) => [card.public_code, card]));
+  const sourceByCode = new Map(sourceCards.map((card) => [deriveCardCodeFromCard(card), card]));
+  return canonicalCards.flatMap((definition): DeckValidationReason[] => {
+    const source = sourceByPublicCode.get(definition.card.public_code) ?? sourceByCode.get(definition.cardCode);
+    if (!source || hashCardRulesText(source) === definition.sourceTextHash) return [];
+    return [{
+      code: "deck.canonicalRulesStale", cardCode: definition.cardCode, canonicalName: source.name,
+      message: `Canonical rules text differs from the current local source: ${source.name}.`,
+    }];
+  });
+}
+
+/** Pure adapter for callers that already obtained authoritative catalog evidence. */
+export function validateDeckTextCandidate(input: {
+  sourceText: string;
+  catalog: CardCatalog;
+  readinessReasons: readonly DeckValidationReason[];
+}): DeckValidationResponse {
+  const resolution = resolveDeckText(input.sourceText, input.catalog);
+  const construction = evaluateDeckConstruction(resolution.entries, { namedEntries: true, catalog: input.catalog });
+  const reasons = [
+    ...resolution.issues, ...(
+      resolution.issues.some((issue) => issue.code === "deck.parse") ? [] : construction.reasons
+    ),
+    ...contextualizeReadinessReasons(resolution.entries, input.readinessReasons),
+  ];
+  return deckValidationResponseSchema.parse({
+    ...construction, reasons, legal: reasons.length === 0,
+    fingerprint: fingerprintDeckValidationRequest({
+      input: "text", policy: "riftbound-1v1-match", sourceText: input.sourceText,
+    }),
   });
 }
 
 export function assertLegalRegisteredDeckConfiguration(input: {
   registeredDeck: DeckSnapshotDocument;
   configuration: DeckConfiguration;
+  readinessReasons?: readonly DeckValidationReason[];
 }): DeckValidationResponse {
   const response = validateRegisteredDeckCandidate({
-    registeredDeck: input.registeredDeck,
-    request: buildDeckValidationRequest(input),
+    registeredDeck: input.registeredDeck, request: buildDeckValidationRequest(input),
+    readinessReasons: input.readinessReasons,
   });
-  if (!response.legal) {
-    throw new Error(
-      response.reasons.map((reason) => reason.message).join("; "),
-    );
-  }
-
+  if (!response.legal) throw new Error(response.reasons.map((reason) => reason.message).join("; "));
   return response;
 }
-
-export function fingerprintDeckValidationRequest(
-  request: DeckValidationRequest,
-): string {
-  const payload = JSON.stringify(canonicalizeDeckValidationRequest(request));
-  let hash = 2166136261;
-
-  for (let index = 0; index < payload.length; index += 1) {
-    hash ^= payload.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return (hash >>> 0).toString(16);
-}
-
-function canonicalizeDeckValidationRequest(request: DeckValidationRequest) {
-  return {
-    policy: request.policy,
-    deck: {
-      legendRegisteredCardId: request.deck.legendRegisteredCardId,
-      chosenChampionRegisteredCardId:
-        request.deck.chosenChampionRegisteredCardId,
-      mainDeckRegisteredCardIds: [...request.deck.mainDeckRegisteredCardIds],
-      runeDeckRegisteredCardIds: [...request.deck.runeDeckRegisteredCardIds],
-      battlefieldRegisteredCardIds: [
-        ...request.deck.battlefieldRegisteredCardIds,
-      ],
-      sideboardRegisteredCardIds: [...request.deck.sideboardRegisteredCardIds],
-    },
-  };
-}
-
 function validateNoDuplicateRegisteredIds(
   sections: Record<DeckValidationSection, readonly string[]>,
   reasons: DeckValidationReason[],
@@ -273,263 +277,6 @@ function validateMutablePartition(
         "Chosen Champion, Main Deck, and Sideboard must contain every registered mutable card exactly once.",
     });
   }
-}
-
-function validateCounts(
-  sections: Record<DeckValidationSection, readonly string[]>,
-  reasons: DeckValidationReason[],
-) {
-  if (sections.legend.length !== 1) {
-    reasons.push({
-      code: "deck.legendCount",
-      message: "Deck must contain exactly one Champion Legend.",
-      section: "legend",
-    });
-  }
-
-  if (sections.chosenChampion.length !== 1) {
-    reasons.push({
-      code: "deck.championCount",
-      message: "Deck must contain exactly one Chosen Champion Unit.",
-      section: "chosenChampion",
-    });
-  }
-
-  if (sections.mainDeck.length !== MAIN_DECK_COPY_COUNT) {
-    reasons.push({
-      code: "deck.mainDeckSize",
-      message:
-        "Main Deck must contain exactly 39 cards because the Chosen Champion is tracked separately.",
-      section: "mainDeck",
-    });
-  }
-
-  if (sections.mainDeck.length + sections.chosenChampion.length !== ACTIVE_CARD_COUNT) {
-    reasons.push({
-      code: "deck.activeDeckSize",
-      message: "Active deck must contain exactly 40 cards including the Chosen Champion.",
-      section: "mainDeck",
-    });
-  }
-
-  if (sections.runeDeck.length !== RUNE_DECK_COUNT) {
-    reasons.push({
-      code: "deck.runeCount",
-      message: "Rune deck must contain exactly 12 Rune cards.",
-      section: "runeDeck",
-    });
-  }
-
-  if (sections.battlefields.length !== BATTLEFIELD_COUNT) {
-    reasons.push({
-      code: "deck.battlefieldCount",
-      message: "Deck must contain exactly 3 registered Battlefields.",
-      section: "battlefields",
-    });
-  }
-
-  if (sections.sideboard.length > SIDEBOARD_CAPACITY) {
-    reasons.push({
-      code: "deck.sideboardSize",
-      message: "Sideboard can contain at most 10 cards.",
-      section: "sideboard",
-    });
-  }
-}
-
-function validateTypePlacement(
-  resolved: Record<DeckValidationSection, ResolvedCopy[]>,
-  reasons: DeckValidationReason[],
-) {
-  for (const copy of resolved.legend) {
-    if (copy.card.classification.type !== "Legend") {
-      addTypePlacementIssue(copy, "legend", reasons);
-    }
-  }
-
-  for (const copy of resolved.chosenChampion) {
-    if (
-      copy.card.classification.type !== "Unit" ||
-      copy.card.classification.supertype !== "Champion"
-    ) {
-      addTypePlacementIssue(copy, "chosenChampion", reasons);
-    }
-  }
-
-  for (const copy of resolved.runeDeck) {
-    if (copy.card.classification.type !== "Rune") {
-      addTypePlacementIssue(copy, "runeDeck", reasons);
-    }
-  }
-
-  for (const copy of resolved.battlefields) {
-    if (copy.card.classification.type !== "Battlefield") {
-      addTypePlacementIssue(copy, "battlefields", reasons);
-    }
-  }
-
-  for (const section of ["mainDeck", "sideboard"] as const) {
-    for (const copy of resolved[section]) {
-      if (!MAIN_DECK_TYPES.has(copy.card.classification.type)) {
-        addTypePlacementIssue(copy, section, reasons);
-      }
-    }
-  }
-}
-
-function validateChampionCompatibility(
-  resolved: Record<DeckValidationSection, ResolvedCopy[]>,
-  reasons: DeckValidationReason[],
-) {
-  const legend = resolved.legend[0];
-  const champion = resolved.chosenChampion[0];
-  if (!legend || !champion) return;
-
-  const legendTags = new Set(legend.card.tags);
-  const hasMatchingTag = champion.card.tags.some((tag) => legendTags.has(tag));
-
-  if (!hasMatchingTag) {
-    reasons.push({
-      code: "deck.championTag",
-      message: `Chosen Champion "${champion.card.name}" does not match the Champion Legend tag.`,
-      section: "chosenChampion",
-      registeredCardId: champion.registeredCardId,
-      canonicalName: champion.canonicalName,
-    });
-  }
-}
-
-function validateDomainIdentity(
-  resolved: Record<DeckValidationSection, ResolvedCopy[]>,
-  reasons: DeckValidationReason[],
-) {
-  const legend = resolved.legend[0];
-  const champion = resolved.chosenChampion[0];
-  if (!legend || !champion) return;
-
-  const legendDomain = new Set(legend.card.classification.domain);
-
-  for (const section of ["chosenChampion", "mainDeck", "sideboard"] as const) {
-    for (const copy of resolved[section]) {
-      validateCardDomains(copy, legendDomain, section, "Legend", reasons);
-    }
-  }
-
-  for (const copy of resolved.runeDeck) {
-    validateCardDomains(copy, legendDomain, "runeDeck", "Legend", reasons);
-  }
-}
-
-function validateSignatureCards(
-  resolved: Record<DeckValidationSection, ResolvedCopy[]>,
-  reasons: DeckValidationReason[],
-): number {
-  const legend = resolved.legend[0];
-  if (!legend) return 0;
-
-  const legendTags = new Set(legend.card.tags);
-  let signatureCount = 0;
-
-  for (const copy of [
-    ...resolved.chosenChampion,
-    ...resolved.mainDeck,
-    ...resolved.sideboard,
-  ]) {
-    const isSignature =
-      copy.card.classification.supertype === "Signature" ||
-      copy.card.metadata.signature === true;
-    if (!isSignature) continue;
-
-    signatureCount += 1;
-    const hasLegendTag = copy.card.tags.some((tag) => legendTags.has(tag));
-    if (!hasLegendTag) {
-      reasons.push({
-        code: "deck.signatureTag",
-        message: `Signature card "${copy.card.name}" does not match the Champion Legend tag.`,
-        section: "mainDeck",
-        registeredCardId: copy.registeredCardId,
-        canonicalName: copy.canonicalName,
-      });
-    }
-  }
-
-  if (signatureCount > 3) {
-    reasons.push({
-      code: "deck.signatureLimit",
-      message: `Deck has ${signatureCount} Signature cards. Maximum is 3.`,
-    });
-  }
-
-  return signatureCount;
-}
-
-function validateCopyLimits(
-  resolved: Record<DeckValidationSection, ResolvedCopy[]>,
-  reasons: DeckValidationReason[],
-) {
-  const copiesByCanonicalName = new Map<string, number>();
-  for (const copy of [
-    ...resolved.chosenChampion,
-    ...resolved.mainDeck,
-    ...resolved.sideboard,
-  ]) {
-    copiesByCanonicalName.set(
-      copy.canonicalName,
-      (copiesByCanonicalName.get(copy.canonicalName) ?? 0) + 1,
-    );
-  }
-
-  for (const [canonicalName, quantity] of copiesByCanonicalName) {
-    if (quantity > 3) {
-      reasons.push({
-        code: "deck.copyLimit",
-        message: `"${canonicalName}" has ${quantity} combined copies across Chosen Champion, Main Deck, and Sideboard. Maximum is 3.`,
-        canonicalName,
-      });
-    }
-  }
-}
-
-function validateCardDomains(
-  copy: ResolvedCopy,
-  allowedDomains: ReadonlySet<string>,
-  section: DeckValidationSection,
-  ownerLabel: string,
-  reasons: DeckValidationReason[],
-) {
-  for (const domain of copy.card.classification.domain) {
-    if (domain === "Colorless") continue;
-    if (!allowedDomains.has(domain)) {
-      reasons.push({
-        code:
-          section === "runeDeck"
-            ? "deck.runeDomainIdentity"
-            : "deck.domainIdentity",
-        message: `"${copy.card.name}" has domain "${domain}" outside the ${ownerLabel} domain identity.`,
-        section,
-        registeredCardId: copy.registeredCardId,
-        canonicalName: copy.canonicalName,
-      });
-    }
-  }
-}
-
-function addTypePlacementIssue(
-  copy: ResolvedCopy,
-  section: DeckValidationSection,
-  reasons: DeckValidationReason[],
-) {
-  reasons.push({
-    code: "deck.typePlacement",
-    message: `"${copy.card.name}" cannot be placed in ${section}.`,
-    section,
-    registeredCardId: copy.registeredCardId,
-    canonicalName: copy.canonicalName,
-  });
-}
-
-function canonicalGameplayName(card: Card): string {
-  return (card.metadata.clean_name ?? card.name).replace(/\s+/g, " ").trim();
 }
 
 function sameIdSet(left: readonly string[], right: readonly string[]) {

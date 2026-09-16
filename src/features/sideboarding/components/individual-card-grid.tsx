@@ -33,10 +33,7 @@ export function IndividualCardGrid({
   return (
     <div
       className="grid items-start justify-start gap-2 p-2"
-      style={{
-        gridTemplateColumns:
-          "repeat(8, minmax(0, var(--sideboarding-card-width)))",
-      }}
+      style={viewModel.cardGridStyle}
     >
       {leadingItem}
       {copies.map(({ card, copy }) => {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DeckId, MatchIntent, MatchProjection } from "@/shared/game";
-import { assertLegalRegisteredDeckConfiguration } from "@/server/deck/deck-validation-service";
+import { assertLegalRegisteredDeckConfiguration, loadRegisteredDeckReadiness } from "@/server/deck/deck-validation-service";
 import { loadDeckSnapshot } from "@/server/services/deck-catalog-service";
 import type { Db } from "mongodb";
 import type { DamageAssignment } from "./combat";
@@ -780,10 +780,12 @@ async function submitDeckReconfiguration(
       );
     }
 
+    const readinessReasons = await loadRegisteredDeckReadiness(db, registeredDeck);
     try {
       assertLegalRegisteredDeckConfiguration({
         registeredDeck,
         configuration,
+        readinessReasons,
       });
     } catch (error) {
       throw new MatchServiceError(

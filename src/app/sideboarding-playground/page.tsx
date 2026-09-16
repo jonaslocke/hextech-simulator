@@ -2,7 +2,7 @@ import { SideboardingPlayground } from "@/features/sideboarding/components/sideb
 import { createSideboardingPlaygroundFixture } from "@/features/sideboarding/playground-fixture";
 
 export default async function SideboardingPlaygroundPage() {
-  const { projection, session } = await createSideboardingPlaygroundFixture();
+  const { projection, session, deckNamesByRegisteredId } = await createSideboardingPlaygroundFixture();
 
-  return <SideboardingPlayground projection={projection} session={session} />;
+  return <SideboardingPlayground projection={projection} session={session} deckNamesByRegisteredId={deckNamesByRegisteredId} />;
 }

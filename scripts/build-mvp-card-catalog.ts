@@ -1,7 +1,8 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { cardSetFileSchema, type Card } from "../src/server/catalog";
+import { cardSetFileSchema, loadCardCatalog, type Card } from "../src/server/catalog";
 import { parseDeckList, resolveDeckCard } from "../src/server/deck";
+import { deriveCardCodeFromCard } from "../src/server/card-catalog/identity";
 
 const DECK_PATHS = [
   path.join("data", "decks", "lux.dec.txt"),
@@ -40,19 +41,22 @@ for (const card of sourceCards) {
     byName.set(card.name, card);
   }
 }
-const names: string[] = [];
+const maintainedCatalog = await loadCardCatalog();
+const canonicalByName = new Map(sourceCards.flatMap((card) =>
+  maintainedCatalog.byName.get(card.name)?.public_code === card.public_code
+    ? [[card.name, card] as const] : [],
+));
+const cardsByCode = new Map<string, Card>();
 for (const deckPath of DECK_PATHS) {
   const deck = parseDeckList(await readFile(deckPath, "utf8"));
   for (const entry of deck.entries) {
-    if (!names.includes(entry.name)) names.push(entry.name);
+    const card = resolveDeckCard({ byName, canonicalByName, cards: sourceCards }, entry);
+    if (!card) throw new Error(`MVP card is missing or ambiguous in the local catalog: ${entry.name}`);
+    cardsByCode.set(deriveCardCodeFromCard(card), card);
   }
 }
 
-const cards = names.map((name) => {
-  const card = resolveDeckCard({ byName }, name);
-  if (!card) throw new Error(`MVP card is missing from the local catalog: ${name}`);
-  return card;
-});
+const cards = [...cardsByCode.values()];
 cardSetFileSchema.parse(cards);
 const codes = cards.map((card) => card.public_code.split("/")[0]!);
 if (new Set(codes).size !== cards.length) {

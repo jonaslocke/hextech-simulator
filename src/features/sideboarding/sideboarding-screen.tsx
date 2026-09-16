@@ -38,7 +38,7 @@ export function SideboardingScreen({
   ) => Promise<DeckValidationResponse>;
 }) {
   const [editorMode, setEditorMode] =
-    useState<SideboardingEditorMode>("compact");
+    useState<SideboardingEditorMode>("allCards");
   const [selectedRegisteredCardId, setSelectedRegisteredCardId] = useState<
     string | null
   >(session.currentDeckConfiguration.chosenChampionRegisteredCardId);
@@ -59,8 +59,9 @@ export function SideboardingScreen({
         draft,
         selectedRegisteredCardId,
         session,
+        constraints: validation.response?.constraints,
       }),
-    [draft, selectedRegisteredCardId, session],
+    [draft, selectedRegisteredCardId, session, validation.response?.constraints],
   );
   const editingDisabled = isSubmitting || submitted;
 
