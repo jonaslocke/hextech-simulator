@@ -79,6 +79,34 @@ logs, plans, and investigation notes under `.agent-work/`.
 For dependent task handoffs, preserve only: Changed, Validated, Important
 semantic decisions, Remaining work, Relevant files, and Relevant authorities.
 
+## Adaptive specialist routing
+
+Moe, Curly, and Larry are optional specialist skills used inside the primary
+implementation context. They are not a mandatory pipeline and should not all be
+loaded by default.
+
+- **Moe (`moe`)** — use for new or changed gameplay/card semantics when deciding
+  whether existing reusable behaviors can be reused, composed, extended, or a
+  genuinely new capability is required.
+- **Curly (`curly`)** — use first for reported/manual defects or cross-layer
+  disagreements. Locate the first incorrect boundary and classify whether the
+  correction is code, authored data, publication/snapshot freshness, a product
+  decision, or no change.
+- **Larry (`larry`)** — use only after the semantic owner/defect is understood and
+  a shared change has meaningful combinatorial state/sequence risk. Load only the
+  relevant Larry reference file; do not preload his whole verification catalog.
+
+Route from evidence, not task labels: Curly may route a semantic/model defect to
+Moe; Moe or Curly may route a high-risk shared change to Larry. Routine
+parameter-only reuse or a localized low-risk correction should skip specialists
+that add no information.
+
+For substantial specialist work, keep at most one compact ephemeral task record
+under `.agent-work/<task>/` rather than separate specialist reports. Preserve only
+requested outcome, verified BASE/HEAD, reusable owner, protected behavior,
+first-incorrect-boundary/disposition when applicable, specialist conclusions,
+scope exclusions, and unresolved decisions.
+
 ## Workflow routing
 
 - Changes under `src/server/game/**`: read `src/server/game/AGENTS.md`; use
@@ -92,6 +120,19 @@ semantic decisions, Remaining work, Relevant files, and Relevant authorities.
   `refactor-to-feature-architecture`.
 
 Skills define procedures; durable docs define what is true.
+
+## Independent review
+
+For shared engine/reusable-behavior changes, cross-boundary gameplay fixes, or
+other changes where a regression would be expensive, prefer a fresh reviewer
+context after implementation when the execution environment supports it. The
+reviewer uses `technical-pr-review` and starts from the requested outcome,
+compact task record, BASE/HEAD, actual diff, relevant authorities, and validation
+evidence; do not preload the implementation investigation transcript.
+
+The implementation agent's self-review is useful diff hygiene but is not an
+independent review. If a fresh reviewer context is unavailable, state that
+independent review was not performed rather than treating self-review as one.
 
 ## Completion
 
