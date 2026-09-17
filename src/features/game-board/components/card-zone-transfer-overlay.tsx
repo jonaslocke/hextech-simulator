@@ -4,9 +4,14 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import cardBackImage from "../../../../assets/cardback.jpg";
 import { motion } from "motion/react";
 import type { Card, ZoneKind } from "../types";
+import { AttachmentCardGroup } from "./attachment-card-group";
+import { CardTile } from "./card-tile";
+import type { LocationTransferStartRect } from "../drag-and-drop/location-drag-actions";
 
 export type CardZonePlacement = {
+  attachments?: Card[];
   card: Card;
+  layoutIndex?: number;
   ownerPlayerId: string;
   zoneId: string;
   zoneKind: ZoneKind | "battlefield";
@@ -19,12 +24,7 @@ export type ZoneAnimationCount = {
   zoneKind: ZoneKind | "battlefield";
 };
 
-type RectSnapshot = {
-  height: number;
-  left: number;
-  top: number;
-  width: number;
-};
+export type RectSnapshot = LocationTransferStartRect;
 
 type CapturedPlacement = CardZonePlacement & {
   rect?: RectSnapshot;
@@ -36,36 +36,59 @@ export type CardZoneAnimationSnapshot = {
   stateVersion: number;
 };
 
+export type CardZoneSourceReservation = {
+  attachmentCount: number;
+  cardInstanceId: string;
+  slotIndex: number;
+  sourceExhausted: boolean;
+  zoneId: string;
+};
+
 type TransferAnimation = {
+  attachments: Card[];
   card: Card;
   flipToBack: boolean;
   from: RectSnapshot;
   fromRotation: number;
   id: string;
   index: number;
+  isBoardLocationTransfer: boolean;
   isVisibleDestination: boolean;
+  sourceReservation?: CardZoneSourceReservation;
   to: RectSnapshot;
   toRotation: number;
 };
 
 type Props = {
+  activeTransferStartRects?: ReadonlyMap<string, LocationTransferStartRect>;
   pendingSnapshot?: CardZoneAnimationSnapshot | null;
   placements: CardZonePlacement[];
   stateVersion: number;
   zoneCounts: ZoneAnimationCount[];
   onActiveCardIdsChange: (cardInstanceIds: Set<string>) => void;
+  onActiveSourceReservationsChange?: (
+    reservations: CardZoneSourceReservation[],
+  ) => void;
   onPendingSnapshotConsumed?: () => void;
+  onTransferStartRectsConsumed?: (cardInstanceIds: readonly string[]) => void;
 };
 
 const HIDDEN_DESTINATION_KINDS = new Set<ZoneKind>(["mainDeck", "runeDeck"]);
+const BOARD_LOCATION_KINDS = new Set<ZoneKind | "battlefield">([
+  "base",
+  "battlefield",
+]);
 
 export function CardZoneTransferOverlay({
+  activeTransferStartRects,
   pendingSnapshot,
   placements,
   stateVersion,
   zoneCounts,
   onActiveCardIdsChange,
+  onActiveSourceReservationsChange,
   onPendingSnapshotConsumed,
+  onTransferStartRectsConsumed,
 }: Props) {
   const latestInputRef = useRef({
     placements,
@@ -88,7 +111,9 @@ export function CardZoneTransferOverlay({
       placements
         .map(
           (placement) =>
-            `${placement.card.instanceId ?? ""}:${placement.zoneId}`,
+            `${placement.card.instanceId ?? ""}:${placement.zoneId}:${
+              placement.card.isExhausted ? "e" : "r"
+            }`,
         )
         .sort()
         .join("|"),
@@ -117,6 +142,7 @@ export function CardZoneTransferOverlay({
     const previous = shouldUsePendingSnapshot
       ? pendingSnapshot
       : fallbackPrevious;
+    const isAuthoritativeTransition = stateVersion > previous.stateVersion;
 
     previousRef.current = {
       counts: nextCounts,
@@ -133,6 +159,7 @@ export function CardZoneTransferOverlay({
     }
 
     const nextTransfers: TransferAnimation[] = [];
+    const consumedTransferStartIds: string[] = [];
 
     for (const [cardInstanceId, previousPlacement] of previous.placements) {
       if (!previousPlacement.rect) {
@@ -140,6 +167,18 @@ export function CardZoneTransferOverlay({
       }
 
       const nextPlacement = nextPlacements.get(cardInstanceId);
+      if (
+        isAttachmentCoveredByMovingHost({
+          cardInstanceId,
+          nextPlacement,
+          nextPlacements,
+          previousPlacement,
+          previousPlacements: previous.placements,
+        })
+      ) {
+        continue;
+      }
+
       const hiddenDestination = nextPlacement
         ? undefined
         : inferHiddenDestination({
@@ -163,10 +202,6 @@ export function CardZoneTransferOverlay({
         continue;
       }
 
-      if (isBaseToBattlefield(previousPlacement, nextPlacement)) {
-        continue;
-      }
-
       const destinationRect =
         nextPlacement?.rect ?? readZoneRect(destinationZoneId);
 
@@ -174,17 +209,48 @@ export function CardZoneTransferOverlay({
         continue;
       }
 
+      const transferStartRect = activeTransferStartRects?.get(cardInstanceId);
+      if (transferStartRect) {
+        consumedTransferStartIds.push(cardInstanceId);
+      }
+
+      const isBoardLocationTransfer = Boolean(
+        nextPlacement &&
+          BOARD_LOCATION_KINDS.has(previousPlacement.zoneKind) &&
+          BOARD_LOCATION_KINDS.has(nextPlacement.zoneKind),
+      );
+      const sourceReservation =
+        isAuthoritativeTransition &&
+        isBoardLocationTransfer &&
+        previousPlacement.layoutIndex !== undefined
+          ? {
+              attachmentCount: previousPlacement.attachments?.length ?? 0,
+              cardInstanceId,
+              slotIndex: previousPlacement.layoutIndex,
+              sourceExhausted: Boolean(previousPlacement.card.isExhausted),
+              zoneId: previousPlacement.zoneId,
+            }
+          : undefined;
+
       nextTransfers.push({
-        card: previousPlacement.card,
+        attachments:
+          nextPlacement?.attachments ?? previousPlacement.attachments ?? [],
+        card: nextPlacement?.card ?? previousPlacement.card,
         flipToBack: !nextPlacement,
-        from: previousPlacement.rect,
+        from: transferStartRect ?? previousPlacement.rect,
         fromRotation: previousPlacement.card.isExhausted ? 90 : 0,
         id: `${stateVersion}:${cardInstanceId}:${previousPlacement.zoneId}->${destinationZoneId}`,
         index: nextTransfers.length,
+        isBoardLocationTransfer,
         isVisibleDestination: Boolean(nextPlacement?.rect),
+        sourceReservation,
         to: destinationRect,
         toRotation: nextPlacement?.card.isExhausted ? 90 : 0,
       });
+    }
+
+    if (consumedTransferStartIds.length > 0) {
+      onTransferStartRectsConsumed?.(consumedTransferStartIds);
     }
 
     if (nextTransfers.length === 0) {
@@ -199,24 +265,42 @@ export function CardZoneTransferOverlay({
       onPendingSnapshotConsumed?.();
     }
   }, [
+    activeTransferStartRects,
     countSignature,
     onPendingSnapshotConsumed,
+    onTransferStartRectsConsumed,
     placementSignature,
     pendingSnapshot,
     stateVersion,
   ]);
 
   useLayoutEffect(() => {
-    onActiveCardIdsChange(
-      new Set(
-        transfers.flatMap((transfer) =>
-          transfer.isVisibleDestination && transfer.card.instanceId
-            ? [transfer.card.instanceId]
-            : [],
-        ),
-      ),
-    );
-  }, [onActiveCardIdsChange, transfers]);
+    const activeCardIds = new Set<string>();
+    const sourceReservations: CardZoneSourceReservation[] = [];
+
+    for (const transfer of transfers) {
+      if (transfer.isVisibleDestination) {
+        if (transfer.card.instanceId) {
+          activeCardIds.add(transfer.card.instanceId);
+        }
+        for (const attachment of transfer.attachments) {
+          if (attachment.instanceId) {
+            activeCardIds.add(attachment.instanceId);
+          }
+        }
+      }
+      if (transfer.sourceReservation) {
+        sourceReservations.push(transfer.sourceReservation);
+      }
+    }
+
+    onActiveCardIdsChange(activeCardIds);
+    onActiveSourceReservationsChange?.(sourceReservations);
+  }, [
+    onActiveCardIdsChange,
+    onActiveSourceReservationsChange,
+    transfers,
+  ]);
 
   if (transfers.length === 0) {
     return null;
@@ -265,21 +349,23 @@ function TransferCard({
   transfer: TransferAnimation;
 }) {
   const target = targetGeometry(transfer);
-  const delay = transfer.index * 0.045;
+  const delay = transfer.isBoardLocationTransfer ? 0 : transfer.index * 0.045;
+  const renderAttachmentGroup =
+    transfer.isVisibleDestination && transfer.attachments.length > 0;
 
   return (
     <motion.div
       animate={{
         opacity: transfer.isVisibleDestination ? 1 : 0,
-        rotate: transfer.toRotation,
+        rotate: renderAttachmentGroup ? 0 : transfer.toRotation,
         scale: target.scale,
         x: target.x,
         y: target.y,
       }}
-      className="fixed bg-slate-900 shadow-[0_18px_45px_rgba(0,0,0,0.65)] border border-yellow-300/50 rounded-md transform-gpu"
+      className="fixed transform-gpu"
       initial={{
         opacity: 1,
-        rotate: transfer.fromRotation,
+        rotate: renderAttachmentGroup ? 0 : transfer.fromRotation,
         scale: 1,
         x: 0,
         y: 0,
@@ -299,46 +385,111 @@ function TransferCard({
         ease: [0.16, 1, 0.3, 1],
       }}
     >
-      <motion.div
-        animate={{ rotateY: transfer.flipToBack ? 180 : 0 }}
-        className="relative w-full h-full transform-gpu"
-        initial={{ rotateY: 0 }}
+      {renderAttachmentGroup ? (
+        <TransferAttachmentGroup delay={delay} transfer={transfer} />
+      ) : (
+        <TransferCardFaces delay={delay} transfer={transfer} />
+      )}
+    </motion.div>
+  );
+}
+
+function TransferAttachmentGroup({
+  delay,
+  transfer,
+}: {
+  delay: number;
+  transfer: TransferAnimation;
+}) {
+  const groupId = transfer.card.instanceId ?? transfer.id;
+  const host = (
+    <motion.div
+      animate={{ rotate: transfer.toRotation }}
+      initial={{ rotate: transfer.fromRotation }}
+      style={{ transformOrigin: "center center" }}
+      transition={{
+        delay,
+        duration: 0.42,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+    >
+      <CardTile
+        enableHoverPreview={false}
+        enableZoneAnimation={false}
+        focusablePreview={false}
+        preserveOrientation
+        showMight
+        {...transfer.card}
+      />
+    </motion.div>
+  );
+
+  return (
+    <AttachmentCardGroup
+      attachments={transfer.attachments.map((attachment, index) => ({
+        id: attachment.instanceId ?? `${attachment.name}-${index}`,
+        card: (
+          <CardTile
+            enableHoverPreview={false}
+            enableZoneAnimation={false}
+            focusablePreview={false}
+            showMight
+            {...attachment}
+          />
+        ),
+      }))}
+      groupId={groupId}
+      host={host}
+    />
+  );
+}
+
+function TransferCardFaces({
+  delay,
+  transfer,
+}: {
+  delay: number;
+  transfer: TransferAnimation;
+}) {
+  return (
+    <motion.div
+      animate={{ rotateY: transfer.flipToBack ? 180 : 0 }}
+      className="relative bg-slate-900 shadow-[0_18px_45px_rgba(0,0,0,0.65)] border border-yellow-300/50 rounded-md w-full h-full transform-gpu"
+      initial={{ rotateY: 0 }}
+      style={{
+        transformStyle: "preserve-3d",
+        willChange: "transform",
+      }}
+      transition={{
+        delay: delay + 0.04,
+        duration: 0.34,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders existing card art. */}
+      <img
+        alt=""
+        className="block absolute inset-0 rounded-md w-full h-full object-cover"
+        draggable={false}
+        src={transfer.card.img}
+        style={{ backfaceVisibility: "hidden" }}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders the local card back asset. */}
+      <img
+        alt=""
+        className="block absolute inset-0 rounded-md w-full h-full object-cover"
+        draggable={false}
+        src={cardBackImage.src}
         style={{
-          transformStyle: "preserve-3d",
-          willChange: "transform",
+          backfaceVisibility: "hidden",
+          transform: "rotateY(180deg)",
         }}
-        transition={{
-          delay: delay + 0.04,
-          duration: 0.34,
-          ease: [0.16, 1, 0.3, 1],
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders existing card art. */}
-        <img
-          alt=""
-          className="block absolute inset-0 rounded-md w-full h-full object-cover"
-          draggable={false}
-          src={transfer.card.img}
-          style={{ backfaceVisibility: "hidden" }}
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders the local card back asset. */}
-        <img
-          alt=""
-          className="block absolute inset-0 rounded-md w-full h-full object-cover"
-          draggable={false}
-          src={cardBackImage.src}
-          style={{
-            backfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-          }}
-        />
-      </motion.div>
+      />
     </motion.div>
   );
 }
 
 function capturePlacements(placements: CardZonePlacement[]) {
-  const rects = readCardRects();
   const captured = new Map<string, CapturedPlacement>();
 
   for (const placement of placements) {
@@ -350,29 +501,43 @@ function capturePlacements(placements: CardZonePlacement[]) {
 
     captured.set(cardInstanceId, {
       ...placement,
-      rect: rects.get(cardInstanceId),
+      rect: readPlacementRect(placement),
     });
   }
 
   return captured;
 }
 
-function readCardRects() {
-  const rects = new Map<string, RectSnapshot>();
+function readPlacementRect(placement: CardZonePlacement) {
+  const cardInstanceId = placement.card.instanceId;
+  if (!cardInstanceId) {
+    return undefined;
+  }
 
-  document
-    .querySelectorAll<HTMLElement>("[data-card-instance-id]")
-    .forEach((element) => {
-      const cardInstanceId = element.dataset.cardInstanceId;
+  const matchingElements = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-card-instance-id]"),
+  ).filter(
+    (element) => element.dataset.cardInstanceId === cardInstanceId,
+  );
+  const element =
+    matchingElements.find(
+      (candidate) =>
+        candidate.closest<HTMLElement>("[data-zone-animation-id]")?.dataset
+          .zoneAnimationId === placement.zoneId,
+    ) ?? matchingElements[0];
 
-      if (!cardInstanceId || rects.has(cardInstanceId)) {
-        return;
-      }
+  if (!element) {
+    return undefined;
+  }
 
-      rects.set(cardInstanceId, toSnapshot(element.getBoundingClientRect()));
-    });
+  if ((placement.attachments?.length ?? 0) > 0) {
+    const group = element.closest<HTMLElement>("[data-attachment-group-id]");
+    if (group?.dataset.attachmentGroupId === cardInstanceId) {
+      return toSnapshot(group.getBoundingClientRect());
+    }
+  }
 
-  return rects;
+  return toSnapshot(element.getBoundingClientRect());
 }
 
 function readZoneRect(zoneId: string) {
@@ -413,13 +578,36 @@ function inferHiddenDestination({
   );
 }
 
-function isBaseToBattlefield(
-  previousPlacement: CapturedPlacement,
-  nextPlacement: CapturedPlacement | undefined,
-) {
+function isAttachmentCoveredByMovingHost({
+  cardInstanceId,
+  nextPlacement,
+  nextPlacements,
+  previousPlacement,
+  previousPlacements,
+}: {
+  cardInstanceId: string;
+  nextPlacement: CapturedPlacement | undefined;
+  nextPlacements: Map<string, CapturedPlacement>;
+  previousPlacement: CapturedPlacement;
+  previousPlacements: Map<string, CapturedPlacement>;
+}) {
+  const hostId =
+    nextPlacement?.card.attachedToCardInstanceId ??
+    previousPlacement.card.attachedToCardInstanceId;
+  if (!hostId || hostId === cardInstanceId) {
+    return false;
+  }
+
+  const previousHost = previousPlacements.get(hostId);
+  const nextHost = nextPlacements.get(hostId);
+  if (!previousHost || !nextHost || !nextPlacement) {
+    return false;
+  }
+
   return (
-    previousPlacement.zoneKind === "base" &&
-    nextPlacement?.zoneKind === "battlefield"
+    previousHost.zoneId !== nextHost.zoneId &&
+    previousPlacement.zoneId === previousHost.zoneId &&
+    nextPlacement.zoneId === nextHost.zoneId
   );
 }
 

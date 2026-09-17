@@ -38,7 +38,8 @@ import { DecisionInspectionToolbar } from "./components/decision-inspection-tool
 import { DecisionInspectionTrigger } from "./components/decision-inspection-trigger";
 import { DecisionZoneBrowser } from "./components/decision-zone-browser";
 import {
-  CardZoneAnimationSnapshot,
+  type CardZoneAnimationSnapshot,
+  type CardZoneSourceReservation,
   CardZoneTransferOverlay,
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
@@ -47,6 +48,7 @@ import {
   BugReportPanel,
   ReportBugButton,
 } from "./components/bug-report-panel";
+import { MovementDraftStage } from "./components/movement-draft-stage";
 import { PlayerBoard } from "./components/player-board";
 import { PublicRevealWindow } from "./components/public-reveal-window";
 import { DialogPortal } from "@/shared/components/dialog-portal";
@@ -77,6 +79,11 @@ import {
   type GameBoardUnitPlayChoice,
 } from "./interactions/use-game-board-actions";
 import { useBoardLocationDragState } from "./interactions/use-location-drag-state";
+import {
+  applyMovementDraftToAnimationData,
+  createMovementDraftView,
+} from "./interactions/movement-draft";
+import { applyTransferSourceReservations } from "./interactions/transfer-source-reservations";
 import {
   combineTargetRequirements,
   moveSelectionTitle,
@@ -197,6 +204,8 @@ export const GameBoard: FC<GameBoardProps> = ({
   const [activeTransferCardIds, setActiveTransferCardIds] = useState<
     Set<string>
   >(new Set());
+  const [activeTransferSourceReservations, setActiveTransferSourceReservations] =
+    useState<CardZoneSourceReservation[]>([]);
   const [pendingAnimationSnapshot, setPendingAnimationSnapshot] =
     useState<CardZoneAnimationSnapshot | null>(null);
   const [unitPlayChoice, setUnitPlayChoice] =
@@ -205,16 +214,20 @@ export const GameBoard: FC<GameBoardProps> = ({
     Set<string>
   >(new Set());
 
-  const board = createBoardModel({
+  const authoritativeBoard = createBoardModel({
     cardsByInstanceId,
     playerNames,
     projection,
     scores,
   });
-
-  const animationData = useMemo(() => createAnimationData(board), [board]);
+  const authoritativeAnimationData = useMemo(
+    () => createAnimationData(authoritativeBoard),
+    [authoritativeBoard],
+  );
+  const latestAnimationDataRef = useRef(authoritativeAnimationData);
 
   const capturePendingAnimationSnapshot = useCallback(() => {
+    const animationData = latestAnimationDataRef.current;
     setPendingAnimationSnapshot(
       captureCardZoneAnimationSnapshot({
         placements: animationData.placements,
@@ -222,7 +235,11 @@ export const GameBoard: FC<GameBoardProps> = ({
         zoneCounts: animationData.zoneCounts,
       }),
     );
-  }, [animationData, projection.stateVersion]);
+  }, [projection.stateVersion]);
+
+  const discardPendingAnimationSnapshot = useCallback(() => {
+    setPendingAnimationSnapshot(null);
+  }, []);
 
   const {
     chooseBoardTarget,
@@ -241,9 +258,46 @@ export const GameBoard: FC<GameBoardProps> = ({
   } = useBoardTargetSelection({
     actions: sourceProjection.actions,
     capturePendingAnimationSnapshot,
+    discardPendingAnimationSnapshot,
     highlightedCardInstanceIds,
     submitProjectedAction,
   });
+
+  const movementDraftDestination =
+    targetSelection?.purpose === "move" &&
+    targetSelectionAction?.presentation.boardLocation?.kind === "battlefield"
+      ? targetSelectionAction.presentation.boardLocation
+      : null;
+  const movementDraft = useMemo(
+    () =>
+      movementDraftDestination && targetSelection?.purpose === "move"
+        ? createMovementDraftView({
+            board: authoritativeBoard,
+            destinationBattlefieldId: movementDraftDestination.battlefieldId,
+            eligibleUnitIds: targetSelection.legalTargetIds,
+            selectedUnitIds: targetSelection.selectedTargetIds,
+          })
+        : null,
+    [authoritativeBoard, movementDraftDestination, targetSelection],
+  );
+  const animationData = useMemo(
+    () =>
+      applyMovementDraftToAnimationData(
+        authoritativeAnimationData,
+        movementDraft,
+      ),
+    [authoritativeAnimationData, movementDraft],
+  );
+  latestAnimationDataRef.current = animationData;
+
+  const { board, placeholderCardInstanceIds } = useMemo(
+    () =>
+      applyTransferSourceReservations(
+        authoritativeBoard,
+        activeTransferSourceReservations,
+      ),
+    [authoritativeBoard, activeTransferSourceReservations],
+  );
 
   const showdownPrompt = showdownPromptState(sourceProjection);
   const showdownBattlefieldName = showdownPrompt
@@ -346,6 +400,14 @@ export const GameBoard: FC<GameBoardProps> = ({
     },
     [],
   );
+  const handleActiveSourceReservationsChange = useCallback(
+    (reservations: CardZoneSourceReservation[]) => {
+      setActiveTransferSourceReservations((current) =>
+        sourceReservationsEqual(current, reservations) ? current : reservations,
+      );
+    },
+    [],
+  );
 
   const {
     beginGlobalAction,
@@ -382,7 +444,10 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const {
     activeLocationDrag,
+    activeLocationDragAttachmentIds,
     activeLocationDragOverlay,
+    activeTransferStartRects,
+    consumeTransferStartRects,
     getLocationDropStatus,
     handleLocationDragCancel,
     handleLocationDragDataChange,
@@ -393,30 +458,45 @@ export const GameBoard: FC<GameBoardProps> = ({
     actions: sourceProjection.actions,
     cardStates: projection.cardStates,
     cardsByInstanceId,
+    movementDraft,
     onAcceptedMoveDrop: submitLocationDragMoveAction,
     onAcceptedPlayDrop: submitLocationDragPlayAction,
+    onStageMovementDraftCard: chooseBoardTarget,
+    onUnstageMovementDraftCard: chooseBoardTarget,
   });
 
-  const movementDraftDestination =
-    targetSelection?.purpose === "move"
-      ? (targetSelectionAction?.presentation.boardLocation ?? null)
-      : null;
-
+  const isMovementDraftActive = Boolean(movementDraft);
   const canUseLocationDrag =
     !isInteractionSuspended &&
     !isSubmittingAction &&
-    !targetSelection &&
+    (!targetSelection || targetSelection.purpose === "move") &&
     !playerDecision &&
     !sourceProjection.pendingChoice &&
     !unitPlayChoice &&
     !isChainLockedOpen;
 
+  const hiddenBoardCardInstanceIds = useMemo(() => {
+    const hidden = new Set(activeTransferCardIds);
+    for (const cardInstanceId of movementDraft?.hiddenCardInstanceIds ?? []) {
+      hidden.add(cardInstanceId);
+    }
+    for (const cardInstanceId of activeLocationDragAttachmentIds) {
+      hidden.add(cardInstanceId);
+    }
+    for (const cardInstanceId of placeholderCardInstanceIds) {
+      hidden.add(cardInstanceId);
+    }
+    return hidden;
+  }, [
+    activeLocationDragAttachmentIds,
+    activeTransferCardIds,
+    movementDraft?.hiddenCardInstanceIds,
+    placeholderCardInstanceIds,
+  ]);
+
   const stagedMovementCardInstanceIds = useMemo(
-    () =>
-      targetSelection?.purpose === "move"
-        ? new Set(targetSelection.selectedTargetIds)
-        : new Set<string>(),
-    [targetSelection?.purpose, targetSelection?.selectedTargetIds],
+    () => movementDraft?.stagedCardInstanceIds ?? new Set<string>(),
+    [movementDraft],
   );
 
   const isMovementDraftDestination = useCallback(
@@ -508,7 +588,9 @@ export const GameBoard: FC<GameBoardProps> = ({
 
   const boardCardPrimaryAction = isInteractionSuspended
     ? undefined
-    : handleBoardCardPrimaryAction;
+    : isMovementDraftActive
+      ? (card: Card) => chooseBoardTarget(card.instanceId)
+      : handleBoardCardPrimaryAction;
   const boardCardPointerEnter = isInteractionSuspended
     ? undefined
     : handleTargetPointerEnter;
@@ -682,7 +764,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           {process.env.NODE_ENV === "development" && debugDrawAction && (
             <Button
               className="h-7 px-2 text-xs"
-              disabled={!debugDrawAction.enabled || isSubmittingAction || isInteractionSuspended}
+              disabled={!debugDrawAction.enabled || isSubmittingAction || isInteractionSuspended || isMovementDraftActive}
               onClick={() => void submitProjectedAction(debugDrawAction.id)}
               title={debugDrawAction.disabledReason ?? "Draw the top card of your main deck into your hand"}
               variant="secondary"
@@ -779,7 +861,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
             <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-              hiddenCardInstanceIds={activeTransferCardIds}
+              hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
               onBoardCardPrimaryAction={boardCardPrimaryAction}
               onBoardCardPointerEnter={boardCardPointerEnter}
               onBoardCardPointerLeave={boardCardPointerLeave}
@@ -797,7 +879,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   highlightedCardInstanceIds={
                     displayedHighlightedCardInstanceIds
                   }
-                  hiddenCardInstanceIds={activeTransferCardIds}
+                  hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
                   isHighlighted={
                     Boolean(hoveredChainRelationships?.battlefieldIds.includes(board.playerBattlefield.id)) ||
                     (hoveredBoardLocation?.kind === "battlefield" &&
@@ -826,7 +908,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                   highlightedCardInstanceIds={
                     displayedHighlightedCardInstanceIds
                   }
-                  hiddenCardInstanceIds={activeTransferCardIds}
+                  hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
                   isHighlighted={
                     Boolean(hoveredChainRelationships?.battlefieldIds.includes(board.opponentBattlefield.id)) ||
                     (hoveredBoardLocation?.kind === "battlefield" &&
@@ -854,7 +936,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             </LayoutGroup>
             <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
-              hiddenCardInstanceIds={activeTransferCardIds}
+              hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
               isBaseHighlighted={
                 Boolean(hoveredChainRelationships?.basePlayerIds.includes(board.player.playerId)) ||
                 hoveredBoardLocation?.kind === "base" ||
@@ -863,12 +945,12 @@ export const GameBoard: FC<GameBoardProps> = ({
               onOpenBanish={openPlayerBanishment}
               onOpenTrash={openPlayerTrash}
               onChampionContextAction={
-                isInteractionSuspended
+                isInteractionSuspended || isMovementDraftActive
                   ? undefined
                   : handleChampionCardAction
               }
               onChampionPrimaryAction={
-                isInteractionSuspended
+                isInteractionSuspended || isMovementDraftActive
                   ? undefined
                   : handleChampionCardAction
               }
@@ -876,12 +958,12 @@ export const GameBoard: FC<GameBoardProps> = ({
               onBoardCardPointerEnter={boardCardPointerEnter}
               onBoardCardPointerLeave={boardCardPointerLeave}
               onRuneContextAction={
-                isInteractionSuspended
+                isInteractionSuspended || isMovementDraftActive
                   ? undefined
                   : handleRuneContextAction
               }
               onRunePrimaryAction={
-                isInteractionSuspended
+                isInteractionSuspended || isMovementDraftActive
                   ? undefined
                   : handleRunePrimaryAction
               }
@@ -894,32 +976,44 @@ export const GameBoard: FC<GameBoardProps> = ({
             />
             <RunePoolBar runePool={viewerState?.runePool} />
           </div>
+          <MovementDraftStage
+            canDrag={canUseLocationDrag}
+            hiddenCardInstanceIds={activeTransferCardIds}
+            movementDraft={movementDraft}
+            onCardPrimaryAction={boardCardPrimaryAction}
+            onCardPointerEnter={boardCardPointerEnter}
+            onCardPointerLeave={boardCardPointerLeave}
+          />
         </LocationDragProvider>
         <ActionRail
-          concedeDisabled={isSubmittingAction}
-          disabled={isInteractionSuspended}
+          concedeDisabled={isSubmittingAction || isMovementDraftActive}
+          disabled={isInteractionSuspended || isMovementDraftActive}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
           onChainOpenChange={
-            isInteractionSuspended ? () => undefined : setIsChainOverlayOpen
+            isInteractionSuspended || isMovementDraftActive
+              ? () => undefined
+              : setIsChainOverlayOpen
           }
           onConcede={
-            !isInteractionSuspended && concedeAction ? onConcede : undefined
+            !isInteractionSuspended && !isMovementDraftActive && concedeAction
+              ? onConcede
+              : undefined
           }
           onPassTurn={
-            isInteractionSuspended
+            isInteractionSuspended || isMovementDraftActive
               ? undefined
               : passFocusAction
                 ? onPass
                 : onEndTurn
           }
           openZone={openZone}
-          passTurnDisabled={!canViewerEndTurn || isSubmittingAction}
+          passTurnDisabled={!canViewerEndTurn || isSubmittingAction || isMovementDraftActive}
           passTurnLabel={isSubmittingAction ? "Submitting…" : passTurnLabel}
           setOpenZone={setOpenZone}
         />
       </section>
-      {!isInteractionSuspended && globalActions.length > 0 && (
+      {!isInteractionSuspended && !isMovementDraftActive && globalActions.length > 0 && (
         <div className="top-12 left-1/2 z-50 fixed flex gap-2 -translate-x-1/2">
           {globalActions.map((action) => (
             <button
@@ -935,21 +1029,21 @@ export const GameBoard: FC<GameBoardProps> = ({
       )}
       <PublicRevealWindow key={sourceProjection.id} reveals={sourceProjection.publicReveals} />
       <ChainOverlay
-        canPassPriority={!isInteractionSuspended && canViewerPassChain}
+        canPassPriority={!isInteractionSuspended && !isMovementDraftActive && canViewerPassChain}
         chainCards={chainCards}
         highlightedChainIds={hoveredChainRelationships?.chainIds ?? []}
         chainPassLabel={isSubmittingAction ? "Submitting…" : chainPassLabel}
-        isCloseDisabled={isChainLockedOpen || isInteractionSuspended}
-        interactionSuspended={isInteractionSuspended}
+        isCloseDisabled={isChainLockedOpen || isInteractionSuspended || isMovementDraftActive}
+        interactionSuspended={isInteractionSuspended || isMovementDraftActive}
         isOpen={isChainOverlayOpen}
         isSubmittingAction={
-          isSubmittingAction || isInteractionSuspended
+          isSubmittingAction || isInteractionSuspended || isMovementDraftActive
         }
         onClose={() => {
-          if (!isInteractionSuspended) setIsChainOverlayOpen(false);
+          if (!isInteractionSuspended && !isMovementDraftActive) setIsChainOverlayOpen(false);
         }}
         onItemPointerEnter={
-          isInteractionSuspended
+          isInteractionSuspended || isMovementDraftActive
             ? undefined
             : (targetCardInstanceIds, relationships) => {
                 setHighlightedCardInstanceIds(new Set(targetCardInstanceIds));
@@ -957,21 +1051,21 @@ export const GameBoard: FC<GameBoardProps> = ({
               }
         }
         onItemPointerLeave={
-          isInteractionSuspended
+          isInteractionSuspended || isMovementDraftActive
             ? undefined
             : () => { setHighlightedCardInstanceIds(new Set()); setHoveredChainRelationships(null); }
         }
         onPassPriority={
-          isInteractionSuspended ? undefined : onPassPriority
+          isInteractionSuspended || isMovementDraftActive ? undefined : onPassPriority
         }
         priorityWindowKey={`${projection.stateVersion}:${passPriorityAction?.id ?? "none"}`}
       />
       <TemporaryZoneOverlay
-        enableCloseShortcut={!isInteractionSuspended}
-        interactionSuspended={isInteractionSuspended}
+        enableCloseShortcut={!isInteractionSuspended && !isMovementDraftActive}
+        interactionSuspended={isInteractionSuspended || isMovementDraftActive}
         logEntries={logEntries}
         onClose={() => {
-          if (!isInteractionSuspended) setOpenZone(null);
+          if (!isInteractionSuspended && !isMovementDraftActive) setOpenZone(null);
         }}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
@@ -985,14 +1079,16 @@ export const GameBoard: FC<GameBoardProps> = ({
         cards={board.player.zones.hand.cards}
         hiddenCardInstanceIds={activeTransferCardIds}
         onCardContextAction={
-          isInteractionSuspended
+          isInteractionSuspended || isMovementDraftActive
             ? undefined
             : handleCardContextFromHand
         }
         onPlayCard={
-          isInteractionSuspended ? undefined : handlePlayCardFromHand
+          isInteractionSuspended || isMovementDraftActive
+            ? undefined
+            : handlePlayCardFromHand
         }
-        interactionSuspended={isInteractionSuspended}
+        interactionSuspended={isInteractionSuspended || isMovementDraftActive}
         onTuck={closeCardActionMenu}
         playerId={board.player.playerId}
       />
@@ -1086,7 +1182,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               targetSelectionHasOptionalCost(targetSelection)
                 ? "Exhaust a ready friendly unit to draw 2. Decline to draw 1 instead."
                 : targetSelection.purpose === "move"
-                  ? "Click additional units to include them, then confirm the move."
+                  ? "Drag or click additional units to include them, then confirm the move."
                   : undefined
             }
           />
@@ -1180,7 +1276,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           title="Choose a Move Destination"
         />
       )}
-      {!isInteractionSuspended && unitPlayChoice && (
+      {!isInteractionSuspended && !isMovementDraftActive && unitPlayChoice && (
         <ReportCardChoiceDialog
           confirmLabel="Play card"
           description="Choose a destination or payment option for this card."
@@ -1205,14 +1301,17 @@ export const GameBoard: FC<GameBoardProps> = ({
         />
       )}
       <CardZoneTransferOverlay
+        activeTransferStartRects={activeTransferStartRects}
         onActiveCardIdsChange={handleActiveTransferCardIdsChange}
+        onActiveSourceReservationsChange={handleActiveSourceReservationsChange}
         onPendingSnapshotConsumed={() => setPendingAnimationSnapshot(null)}
+        onTransferStartRectsConsumed={consumeTransferStartRects}
         pendingSnapshot={pendingAnimationSnapshot}
         placements={animationData.placements}
         stateVersion={projection.stateVersion}
         zoneCounts={animationData.zoneCounts}
       />
-      {cardActionMenu && !isInteractionSuspended && (
+      {cardActionMenu && !isInteractionSuspended && !isMovementDraftActive && (
         <>
           <button
             aria-label="Close card action menu"
@@ -1287,4 +1386,25 @@ function targetSelectionHasOptionalCost(
 function optionalCostTitle(actionLabel: string | undefined) {
   const cardName = actionLabel?.replace(/^Play\s+/i, "").trim();
   return cardName ? `${cardName} - Optional Cost` : "Optional Cost";
+}
+
+function sourceReservationsEqual(
+  left: readonly CardZoneSourceReservation[],
+  right: readonly CardZoneSourceReservation[],
+) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((reservation, index) => {
+    const candidate = right[index];
+    return (
+      candidate !== undefined &&
+      reservation.attachmentCount === candidate.attachmentCount &&
+      reservation.cardInstanceId === candidate.cardInstanceId &&
+      reservation.slotIndex === candidate.slotIndex &&
+      reservation.sourceExhausted === candidate.sourceExhausted &&
+      reservation.zoneId === candidate.zoneId
+    );
+  });
 }

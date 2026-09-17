@@ -33,6 +33,22 @@ export type BoardLocationDropStatus =
   | "legal-over"
   | "invalid-over";
 
+export type MovementDraftDragContext = {
+  destination: BoardDropLocation;
+  eligibleCardInstanceIds: ReadonlySet<string>;
+  originByCardInstanceId: ReadonlyMap<string, BoardDropLocation>;
+  stagedCardInstanceIds: ReadonlySet<string>;
+};
+
+export type MovementDraftDropIntent = "stage" | "unstage";
+
+export type LocationTransferStartRect = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 const LOCATION_DRAG_CARD_ID_PREFIX = "location-drag-card";
 const LOCATION_DRAG_ACTION_KINDS = new Set<string>(["move", "play"]);
 const BOARD_DROP_ID_PREFIX = "board-drop";
@@ -188,6 +204,39 @@ export function legalDropLocationsForCard(input: {
     seen.add(key);
     return true;
   });
+}
+
+export function movementDraftLegalDropLocationsForCard(input: {
+  movementDraft: MovementDraftDragContext;
+  sourceCardInstanceId: string;
+}): BoardDropLocation[] {
+  const { movementDraft, sourceCardInstanceId } = input;
+
+  if (movementDraft.stagedCardInstanceIds.has(sourceCardInstanceId)) {
+    const origin = movementDraft.originByCardInstanceId.get(sourceCardInstanceId);
+    return origin ? [origin] : [];
+  }
+
+  return movementDraft.eligibleCardInstanceIds.has(sourceCardInstanceId)
+    ? [movementDraft.destination]
+    : [];
+}
+
+export function movementDraftDropIntent(input: {
+  destination: BoardDropLocation;
+  movementDraft: MovementDraftDragContext;
+  sourceCardInstanceId: string;
+}): MovementDraftDropIntent | null {
+  const legalLocations = movementDraftLegalDropLocationsForCard(input);
+  if (!isLegalBoardDropLocation(input.destination, legalLocations)) {
+    return null;
+  }
+
+  return input.movementDraft.stagedCardInstanceIds.has(
+    input.sourceCardInstanceId,
+  )
+    ? "unstage"
+    : "stage";
 }
 
 export function findLocationDragActionForDrop(input: {

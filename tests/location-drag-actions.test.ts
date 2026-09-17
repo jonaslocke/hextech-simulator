@@ -7,8 +7,11 @@ import {
   findLocationDragActionForDrop,
   legalDropLocationsForCard,
   locationDragCandidatesForCard,
+  movementDraftDropIntent,
+  movementDraftLegalDropLocationsForCard,
   sameBoardLocation,
   type BoardDropLocation,
+  type MovementDraftDragContext,
 } from "../src/features/game-board/drag-and-drop/location-drag-actions";
 
 function makeAction(input: {
@@ -169,4 +172,85 @@ test("serializes and parses board drop location ids", () => {
   );
 
   assert.equal(boardDropLocationFromId("other:base"), null);
+});
+
+test("movement draft only lets eligible unstaged units move to its destination", () => {
+  const destination: BoardDropLocation = {
+    kind: "battlefield",
+    battlefieldId: "target",
+  };
+  const context: MovementDraftDragContext = {
+    destination,
+    eligibleCardInstanceIds: new Set(["base-unit", "ganking-unit"]),
+    originByCardInstanceId: new Map([
+      ["base-unit", { kind: "base" }],
+      [
+        "ganking-unit",
+        { kind: "battlefield", battlefieldId: "origin" },
+      ],
+    ]),
+    stagedCardInstanceIds: new Set(["base-unit"]),
+  };
+
+  assert.deepEqual(
+    movementDraftLegalDropLocationsForCard({
+      movementDraft: context,
+      sourceCardInstanceId: "ganking-unit",
+    }),
+    [destination],
+  );
+  assert.equal(
+    movementDraftDropIntent({
+      destination,
+      movementDraft: context,
+      sourceCardInstanceId: "ganking-unit",
+    }),
+    "stage",
+  );
+  assert.deepEqual(
+    movementDraftLegalDropLocationsForCard({
+      movementDraft: context,
+      sourceCardInstanceId: "ineligible-unit",
+    }),
+    [],
+  );
+});
+
+test("movement draft only lets a staged unit return to its recorded origin", () => {
+  const context: MovementDraftDragContext = {
+    destination: { kind: "battlefield", battlefieldId: "target" },
+    eligibleCardInstanceIds: new Set(["base-unit", "ganking-unit"]),
+    originByCardInstanceId: new Map([
+      ["base-unit", { kind: "base" }],
+      [
+        "ganking-unit",
+        { kind: "battlefield", battlefieldId: "origin" },
+      ],
+    ]),
+    stagedCardInstanceIds: new Set(["base-unit", "ganking-unit"]),
+  };
+
+  assert.deepEqual(
+    movementDraftLegalDropLocationsForCard({
+      movementDraft: context,
+      sourceCardInstanceId: "base-unit",
+    }),
+    [{ kind: "base" }],
+  );
+  assert.equal(
+    movementDraftDropIntent({
+      destination: { kind: "base" },
+      movementDraft: context,
+      sourceCardInstanceId: "base-unit",
+    }),
+    "unstage",
+  );
+  assert.equal(
+    movementDraftDropIntent({
+      destination: { kind: "battlefield", battlefieldId: "other" },
+      movementDraft: context,
+      sourceCardInstanceId: "ganking-unit",
+    }),
+    null,
+  );
 });

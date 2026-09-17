@@ -82,14 +82,25 @@ export function simultaneousMoveAction(
   if (actionKind(selectedAction) !== "move") return null;
   const destination = actionExtra(selectedAction);
   if (!destination || destination === "base") return null;
-  return actions.find((candidate) =>
-    actionKind(candidate) === "moveMany" &&
-    actionExtra(candidate) === destination &&
-    candidate.targets.some((target) =>
-      target.kind === "card" &&
-      target.legalIds.includes(sourceCardInstanceId)
-    )
-  ) ?? null;
+  return actions.find((candidate) => {
+    if (
+      actionKind(candidate) !== "moveMany" ||
+      actionExtra(candidate) !== destination
+    ) {
+      return false;
+    }
+
+    const movementRequirement = candidate.targets.find(
+      (target) =>
+        target.kind === "card" &&
+        target.legalIds.includes(sourceCardInstanceId),
+    );
+
+    return (
+      movementRequirement !== undefined &&
+      new Set(movementRequirement.legalIds).size > 1
+    );
+  }) ?? null;
 }
 
 export type CombinedTargetRequirement = {

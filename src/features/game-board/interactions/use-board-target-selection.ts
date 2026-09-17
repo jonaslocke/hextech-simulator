@@ -1,6 +1,7 @@
 import type { GameProjection } from "@/shared/game";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type Dispatch,
@@ -38,6 +39,7 @@ type SubmitProjectedAction = (
 type UseBoardTargetSelectionArgs = {
   actions: GameProjection["actions"];
   capturePendingAnimationSnapshot?: () => void;
+  discardPendingAnimationSnapshot?: () => void;
   highlightedCardInstanceIds: Set<string>;
   submitProjectedAction: SubmitProjectedAction;
 };
@@ -57,6 +59,7 @@ export function createCardPaymentPreparation(action: GameProjection["actions"][n
 export function useBoardTargetSelection({
   actions,
   capturePendingAnimationSnapshot,
+  discardPendingAnimationSnapshot,
   highlightedCardInstanceIds,
   submitProjectedAction,
 }: UseBoardTargetSelectionArgs): {
@@ -95,6 +98,27 @@ export function useBoardTargetSelection({
   const targetSelection = storedSelection
     ? rebindStagedSelection(storedSelection, targetSelectionAction)
     : null;
+  const shouldDiscardReboundMoveDraft =
+    storedSelection?.purpose === "move" &&
+    (!targetSelectionAction ||
+      targetSelection?.purpose !== "move" ||
+      !sameIds(
+        storedSelection.selectedTargetIds,
+        targetSelection.selectedTargetIds,
+      ));
+
+  useEffect(() => {
+    if (!shouldDiscardReboundMoveDraft) {
+      return;
+    }
+
+    discardPendingAnimationSnapshot?.();
+    setHoveredTargetCardInstanceId(null);
+    setTargetSelection(null);
+  }, [
+    discardPendingAnimationSnapshot,
+    shouldDiscardReboundMoveDraft,
+  ]);
 
   const selectedDeflectSources =
     targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
@@ -205,7 +229,14 @@ export function useBoardTargetSelection({
         return false;
       }
 
-      if (!stagedTargetsAreCurrent(selection, targetSelectionAction)) return false;
+      if (!stagedTargetsAreCurrent(selection, targetSelectionAction)) {
+        if (selection.purpose === "move") {
+          discardPendingAnimationSnapshot?.();
+          setHoveredTargetCardInstanceId(null);
+          setTargetSelection(null);
+        }
+        return false;
+      }
 
       if (selection.purpose === "move" || selection.purpose === "play") {
         capturePendingAnimationSnapshot?.();
@@ -216,7 +247,14 @@ export function useBoardTargetSelection({
         selectedIds,
       );
 
-      if (!accepted) return false;
+      if (!accepted) {
+        if (selection.purpose === "move") {
+          discardPendingAnimationSnapshot?.();
+          setHoveredTargetCardInstanceId(null);
+          setTargetSelection(null);
+        }
+        return false;
+      }
 
       setPendingSubmittedTargetIds(selectedIds);
       setHoveredTargetCardInstanceId(null);
@@ -225,6 +263,7 @@ export function useBoardTargetSelection({
     },
     [
       capturePendingAnimationSnapshot,
+      discardPendingAnimationSnapshot,
       targetSelection,
       targetSelectionAction,
       submitProjectedAction,
@@ -262,6 +301,15 @@ export function useBoardTargetSelection({
         ...targetSelection,
         selectedTargetIds,
       };
+
+      if (
+        nextSelection.purpose === "move" &&
+        selectedTargetIds.length === 0
+      ) {
+        setHoveredTargetCardInstanceId(null);
+        setTargetSelection(null);
+        return;
+      }
 
       setTargetSelection(nextSelection);
 
@@ -417,5 +465,12 @@ function additionalPowerForTargets(
     action?.costPreview?.targetAdditionalPower
       .filter((source) => targetIds.includes(source.targetId))
       .reduce((total, source) => total + source.amount, 0) ?? 0
+  );
+}
+
+function sameIds(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((id, index) => id === right[index])
   );
 }
