@@ -104,7 +104,7 @@ test("the shared card layout and counters adapt to server constraints", () => {
     session,
   });
   assert.match(viewModel.cardGridStyle.gridTemplateColumns, /^repeat\(3,/);
-  assert.match(viewModel.countLabels.sideboard, /maximum 3/);
+  assert.equal(viewModel.countLabels.sideboard, "1/3");
   assert.match(viewModel.countLabels.active, /minimum 6/);
   assert.match(viewModel.cardWorkspaceStyle["--sideboarding-card-width"], /\/ 3/);
 });
@@ -141,7 +141,7 @@ test("server reasons render generically and keep submission unavailable", () => 
   assert.match(html, /An additional server requirement applies/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>[\s\S]*Submit no changes/);
   assert.match(html, /minimum 6/);
-  assert.match(html, /maximum 3/);
+  assert.match(html, /1\/3/);
 });
 
 test("playground draft serialization preserves exact names and each physical copy", () => {

@@ -141,7 +141,7 @@ function CardWorkspace({
       <div className="my-2 border-t border-white/15" />
 
       <CardWorkspaceSection
-        countLabel={viewModel.countLabels.sideboard}
+        countLabel={`${viewModel.countLabels.sideboard} cards`}
         title="Sideboard"
       >
         {mode === "grid" ? (

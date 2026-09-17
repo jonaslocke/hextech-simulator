@@ -1,12 +1,5 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { type Db } from "mongodb";
-import {
-  CANONICAL_CARDS_COLLECTION,
-  hashCardRulesText,
-  type CanonicalCardDocument,
-} from "../src/server/card-catalog";
-import { cardSetFileSchema, type Card } from "../src/server/catalog";
 import { getMongoClient, getMongoDatabaseName } from "../src/server/db";
 import {
   hashDeckSourceText,
@@ -14,8 +7,8 @@ import {
   type DeckDefinitionDocument,
   type DeckId,
 } from "../src/server/game/deck-definition";
-import { buildDeckSnapshotFromSource } from "../src/server/game/catalog";
 import { createDeckDefinitionRepository } from "../src/server/repositories/deck-definition-repository";
+import { buildValidatedDeckSnapshotFromSource } from "../src/server/services/deck-catalog-service";
 
 const CONFIRM_FLAG = "--confirm";
 
@@ -46,8 +39,6 @@ const SIDEBOARD_SEEDS = [
   filePath: string;
 }>;
 
-const MASTER_YI_CARD_CODES = ["OGS-004", "OGS-009"] as const;
-
 if (!process.argv.includes(CONFIRM_FLAG)) {
   throw new Error(
     `Refusing to synchronize sideboard validation decks without ${CONFIRM_FLAG}.`,
@@ -59,8 +50,6 @@ const client = await getMongoClient();
 try {
   const db = client.db(getMongoDatabaseName());
   const now = new Date().toISOString();
-
-  await repairMasterYiCanonicalNames(db, now);
 
   const result = await syncSideboardValidationDecks(db, now);
   console.log(
@@ -82,7 +71,10 @@ async function syncSideboardValidationDecks(db: Db, now: string) {
 
   for (const seed of SIDEBOARD_SEEDS) {
     const sourceText = await readFile(seed.filePath, "utf8");
-    await buildDeckSnapshotFromSource(db, sourceText);
+
+    // Persistence is downstream of the same complete Deck Validation authority
+    // used for normal playable decks. Do not repair publication data here.
+    await buildValidatedDeckSnapshotFromSource(db, sourceText);
 
     const existing = await repository.findById(seed.id);
     const sourceTextHash = hashDeckSourceText(sourceText);
@@ -110,56 +102,4 @@ async function syncSideboardValidationDecks(db: Db, now: string) {
   }
 
   return result;
-}
-
-async function repairMasterYiCanonicalNames(db: Db, now: string) {
-  const localCards = await loadLocalOgsCardsByCode();
-  const collection = db.collection<
-    CanonicalCardDocument & { _id: string }
-  >(CANONICAL_CARDS_COLLECTION);
-
-  for (const cardCode of MASTER_YI_CARD_CODES) {
-    const localCard = localCards.get(cardCode);
-    if (!localCard) {
-      throw new Error(`Local OGS card is unavailable: ${cardCode}.`);
-    }
-
-    const existing = await collection.findOne({ _id: cardCode });
-    if (!existing) {
-      throw new Error(`Persisted canonical card is unavailable: ${cardCode}.`);
-    }
-
-    if (existing.card.name === localCard.name) {
-      continue;
-    }
-
-    await collection.updateOne(
-      { _id: cardCode },
-      {
-        $set: {
-          card: localCard,
-          sourceTextHash: hashCardRulesText(localCard),
-          updatedAt: now,
-        },
-      },
-    );
-
-    console.log(
-      `Updated canonical card ${cardCode}: ${existing.card.name} -> ${localCard.name}`,
-    );
-  }
-}
-
-async function loadLocalOgsCardsByCode(): Promise<Map<string, Card>> {
-  const source = await readFile(
-    path.join(process.cwd(), "data", "sets", "ogs.json"),
-    "utf8",
-  );
-  const cards = cardSetFileSchema.parse(JSON.parse(source));
-  return new Map(
-    cards.flatMap((card) => {
-      const code = card.public_code.split("/")[0];
-      return code ? [[code, card] as const] : [];
-    }),
-  );
 }

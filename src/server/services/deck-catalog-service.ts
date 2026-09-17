@@ -29,6 +29,27 @@ export class DeckCatalogUnavailableError extends Error {
   }
 }
 
+/**
+ * Full simulator admission for decklist text.
+ *
+ * Construction validity alone is not enough: this boundary also requires the
+ * canonical publication/runtime readiness owned by Deck Validation before a
+ * snapshot can be admitted for persistence or play.
+ */
+export async function buildValidatedDeckSnapshotFromSource(
+  db: Db,
+  sourceText: string,
+): Promise<DeckSnapshot> {
+  const validation = await validateDeckText({ db, sourceText });
+  if (!validation.legal) {
+    throw new GameCatalogError(
+      validation.reasons.map((reason) => reason.message),
+    );
+  }
+
+  return buildDeckSnapshotFromSource(db, sourceText);
+}
+
 export async function loadDeckSnapshot(
   db: Db,
   deckId: DeckId,
@@ -42,11 +63,7 @@ export async function loadDeckSnapshot(
     ]);
   }
 
-  const validation = await validateDeckText({ db, sourceText: definition.sourceText });
-  if (!validation.legal) {
-    throw new GameCatalogError(validation.reasons.map((reason) => reason.message));
-  }
-  return buildDeckSnapshotFromSource(db, definition.sourceText);
+  return buildValidatedDeckSnapshotFromSource(db, definition.sourceText);
 }
 
 export async function getPlayableDeckOptions(
@@ -99,11 +116,7 @@ export async function syncDeckDefinitions(
   const repository = createDeckDefinitionRepository(db);
 
   for (const seed of seeds) {
-    const validation = await validateDeckText({ db, sourceText: seed.sourceText });
-    if (!validation.legal) {
-      throw new GameCatalogError(validation.reasons.map((reason) => reason.message));
-    }
-    await buildDeckSnapshotFromSource(db, seed.sourceText);
+    await buildValidatedDeckSnapshotFromSource(db, seed.sourceText);
   }
   const planned = await planDeckDefinitionSync(repository, seeds, now);
   for (const item of planned.writes) {

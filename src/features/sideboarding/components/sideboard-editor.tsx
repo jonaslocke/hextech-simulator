@@ -29,7 +29,7 @@ export function SideboardEditor({
         <div>
           <h2 className="font-semibold text-slate-100 text-sm">Sideboard</h2>
           <p className="text-slate-500 text-xs">
-            {viewModel.countLabels.sideboard}
+            {viewModel.countLabels.sideboard} cards
           </p>
         </div>
       </header>

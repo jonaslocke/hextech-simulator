@@ -32,7 +32,7 @@ export function buildSideboardingPresentation(input: {
       active: `${counts.active} · ${mainDeckBounds}`,
       mainDeck: `${counts.mainDeck} editable copies`,
       chosenChampion: `${counts.chosenChampion} / ${constraints.chosenChampion.exact}`,
-      sideboard: `${counts.sideboard} · maximum ${constraints.sideboard.maximum}`,
+      sideboard: `${counts.sideboard}/${constraints.sideboard.maximum}`,
     },
     mainDeckCountingLabel: constraints.mainDeck.includesChosenChampion
       ? "Includes Chosen Champion"
