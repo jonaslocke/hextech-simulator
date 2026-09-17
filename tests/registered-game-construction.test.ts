@@ -7,16 +7,24 @@ import {
 import type { MatchSeat } from "../src/server/game/state";
 import { gameFixture } from "./helpers/game-fixture";
 
-test("later games consume every accepted registered copy in a larger Main Deck", async () => {
+test("later games consume accepted one-for-one registered exchanges", async () => {
   const { decks } = await gameFixture();
   const configurations = Object.fromEntries(decks.map((deck) => {
     const configuration = createInitialDeckConfiguration(deck.instances);
-    const moved = configuration.sideboardRegisteredCardIds.splice(0, 2);
-    assert.equal(moved.length, 2);
-    configuration.mainDeckRegisteredCardIds.push(...moved);
+    const originalSideboardCount = configuration.sideboardRegisteredCardIds.length;
+    const incoming = configuration.sideboardRegisteredCardIds[0];
+    const outgoing = configuration.mainDeckRegisteredCardIds[0];
+    assert.ok(incoming);
+    assert.ok(outgoing);
+
+    configuration.mainDeckRegisteredCardIds[0] = incoming;
+    configuration.sideboardRegisteredCardIds[0] = outgoing;
+
     const result = assertLegalRegisteredDeckConfiguration({ registeredDeck: deck, configuration });
     assert.equal(result.legal, true);
-    assert.equal(result.summary.activeCardCount, 42);
+    assert.equal(result.summary.activeCardCount, 40);
+    assert.equal(result.summary.sideboardCount, originalSideboardCount);
+    assert.equal(result.constraints.sideboard.exact, originalSideboardCount);
     return [deck.playerId, configuration];
   }));
   const players = decks.map((deck, index): MatchSeat => ({

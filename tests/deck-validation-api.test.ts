@@ -22,21 +22,22 @@ import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import type { CardInstance } from "../src/server/game/state";
 import { POST } from "../src/app/api/decks/validate/route";
 
-test("construction gives equivalent text and registered boundaries, counts, and constraints", () => {
+test("construction enforces the tournament exact-40 Main Deck and shared Sideboard maximum", () => {
   for (const total of [39, 40, 41, 42]) {
     const fixture = deckFixture(total, 0);
     const text = validateDeckTextCandidate({ ...fixture, readinessReasons: [] });
     const registration = registeredFixture(fixture);
     const registered = validateRegisteredDeckCandidate(registration);
     assert.deepEqual(registered.reasons.map((reason) => reason.code), text.reasons.map((reason) => reason.code));
-    assert.equal(text.legal, total >= 40, JSON.stringify(text.reasons));
-    assert.equal(registered.legal, total >= 40, JSON.stringify(registered.reasons));
+    assert.equal(text.legal, total === 40, JSON.stringify(text.reasons));
+    assert.equal(registered.legal, total === 40, JSON.stringify(registered.reasons));
     assert.equal(text.summary.activeCardCount, total);
     assert.equal(text.summary.mainDeckCount, total - 1);
     assert.deepEqual(registered.summary, text.summary);
-    assert.equal(text.constraints.mainDeck.maximum, null);
-    assert.equal(text.constraints.mainDeck.minimum, 40);
+    assert.equal(text.constraints.mainDeck.exact, 40);
     assert.equal(text.constraints.mainDeck.includesChosenChampion, true);
+    assert.equal(text.constraints.sideboard.exact, null);
+    assert.equal(registered.constraints.sideboard.exact, 0);
   }
   for (const count of [0, 8, 9, 10, 11]) {
     const fixture = deckFixture(40, count);
@@ -46,10 +47,12 @@ test("construction gives equivalent text and registered boundaries, counts, and 
     assert.deepEqual(registered.reasons.map((reason) => reason.code), text.reasons.map((reason) => reason.code));
     assert.equal(text.summary.sideboardCount, count);
     assert.equal(text.constraints.sideboard.maximum, 10);
+    assert.equal(text.constraints.sideboard.exact, null);
+    assert.equal(registered.constraints.sideboard.exact, count);
   }
 });
 
-test("registered pool identity, fixed sections, and conserved larger configurations remain authoritative", () => {
+test("registered pool identity, fixed sections, exact Main Deck, and 1-for-1 exchanges remain authoritative", () => {
   const fixture = registeredFixture(deckFixture(40, 10));
   for (const [code, mutate] of [
     ["deck.unknownRegisteredCard", (request: RegisteredDeckValidationRequest) => { request.deck.mainDeckRegisteredCardIds[0] = "foreign:player:copy"; }],
@@ -62,14 +65,44 @@ test("registered pool identity, fixed sections, and conserved larger configurati
     const response = validateRegisteredDeckCandidate({ ...fixture, request });
     assert.equal(response.legal, false);
     assert.ok(response.reasons.some((reason) => reason.code === code), JSON.stringify(response.reasons));
-    assert.equal(response.constraints.mainDeck.maximum, null);
+    assert.equal(response.constraints.mainDeck.exact, 40);
+    assert.equal(response.constraints.sideboard.exact, 10);
   }
-  const larger = structuredClone(fixture.request);
-  larger.deck.mainDeckRegisteredCardIds.push(...larger.deck.sideboardRegisteredCardIds.splice(0, 2));
-  const response = validateRegisteredDeckCandidate({ ...fixture, request: larger });
-  assert.equal(response.legal, true, JSON.stringify(response.reasons));
-  assert.equal(response.summary.activeCardCount, 42);
-  assert.equal(response.summary.sideboardCount, 8);
+
+  const unpaired = structuredClone(fixture.request);
+  unpaired.deck.mainDeckRegisteredCardIds.push(...unpaired.deck.sideboardRegisteredCardIds.splice(0, 2));
+  const unpairedResponse = validateRegisteredDeckCandidate({ ...fixture, request: unpaired });
+  assert.equal(unpairedResponse.legal, false);
+  assert.ok(unpairedResponse.reasons.some((reason) => reason.code === "deck.mainDeckSize"));
+  assert.ok(unpairedResponse.reasons.some((reason) => reason.code === "deck.sideboardExchange"));
+  assert.equal(unpairedResponse.summary.activeCardCount, 42);
+  assert.equal(unpairedResponse.summary.sideboardCount, 8);
+
+  const exchanged = structuredClone(fixture.request);
+  const incoming = exchanged.deck.sideboardRegisteredCardIds[0]!;
+  const outgoing = exchanged.deck.mainDeckRegisteredCardIds[0]!;
+  exchanged.deck.mainDeckRegisteredCardIds[0] = incoming;
+  exchanged.deck.sideboardRegisteredCardIds[0] = outgoing;
+  const exchangedResponse = validateRegisteredDeckCandidate({ ...fixture, request: exchanged });
+  assert.equal(exchangedResponse.legal, true, JSON.stringify(exchangedResponse.reasons));
+  assert.equal(exchangedResponse.summary.activeCardCount, 40);
+  assert.equal(exchangedResponse.summary.sideboardCount, 10);
+});
+
+test("registered Sideboard cardinality follows the registered deck rather than the global maximum", () => {
+  const fixture = registeredFixture(deckFixture(40, 9));
+  const unchanged = validateRegisteredDeckCandidate(fixture);
+  assert.equal(unchanged.legal, true, JSON.stringify(unchanged.reasons));
+  assert.equal(unchanged.constraints.sideboard.maximum, 10);
+  assert.equal(unchanged.constraints.sideboard.exact, 9);
+
+  const unpaired = structuredClone(fixture.request);
+  unpaired.deck.mainDeckRegisteredCardIds.push(unpaired.deck.sideboardRegisteredCardIds.shift()!);
+  const response = validateRegisteredDeckCandidate({ ...fixture, request: unpaired });
+  assert.equal(response.legal, false);
+  assert.ok(response.reasons.some((reason) => reason.code === "deck.mainDeckSize"));
+  assert.ok(response.reasons.some((reason) => reason.code === "deck.sideboardExchange"));
+  assert.equal(response.constraints.sideboard.exact, 9);
 });
 
 test("independent reasons survive unresolved input and cover canonical copies, domains, Signature, and Battlefields", () => {
@@ -229,7 +262,9 @@ test("transport distinguishes explicit input modes, preserves source correlation
   const parseFailure = await validateDeckText({ ...fixture, db: {} as Db, sourceText: "Main Deck:\n1 Example" });
   assert.equal(parseFailure.legal, false);
   assert.equal(parseFailure.reasons[0].code, "deck.parse");
+  assert.equal(parseFailure.constraints.mainDeck.exact, 40);
   assert.equal(parseFailure.constraints.sideboard.maximum, 10);
+  assert.equal(parseFailure.constraints.sideboard.exact, null);
   assert.equal(parseFailure.reasons.length, 1, "Unparseable input has no independently established section counts");
 });
 

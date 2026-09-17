@@ -18,21 +18,17 @@ export function buildSideboardingPresentation(input: {
     gridTemplateColumns: `repeat(${columns}, var(--sideboarding-card-width))`,
     width: "max-content",
   } satisfies CSSProperties;
-  const mainDeckBounds = [
-    `minimum ${constraints.mainDeck.minimum}`,
-    ...(constraints.mainDeck.maximum === null
-      ? []
-      : [`maximum ${constraints.mainDeck.maximum}`]),
-  ].join(" · ");
+  const sideboardTarget =
+    constraints.sideboard.exact ?? constraints.sideboard.maximum;
 
   return {
     cardGridStyle,
     cardWorkspaceStyle,
     countLabels: {
-      active: `${counts.active} · ${mainDeckBounds}`,
+      active: `${counts.active}/${constraints.mainDeck.exact}`,
       mainDeck: `${counts.mainDeck} editable copies`,
-      chosenChampion: `${counts.chosenChampion} / ${constraints.chosenChampion.exact}`,
-      sideboard: `${counts.sideboard}/${constraints.sideboard.maximum}`,
+      chosenChampion: `${counts.chosenChampion}/${constraints.chosenChampion.exact}`,
+      sideboard: `${counts.sideboard}/${sideboardTarget}`,
     },
     mainDeckCountingLabel: constraints.mainDeck.includesChosenChampion
       ? "Includes Chosen Champion"

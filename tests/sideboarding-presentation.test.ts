@@ -37,10 +37,10 @@ function sessionFixture() {
     validationConstraints: {
       legend: { exact: 1 },
       chosenChampion: { exact: 1 },
-      mainDeck: { minimum: 6, maximum: null, includesChosenChampion: true },
+      mainDeck: { exact: 6, includesChosenChampion: true },
       runeDeck: { exact: 2 },
       battlefields: { exact: 1, unique: true },
-      sideboard: { maximum: 3 },
+      sideboard: { maximum: 3, exact: 1 },
     },
     context: {
       previousGameWinnerPlayerId: "player",
@@ -96,7 +96,7 @@ test("draft movement and Champion replacement preserve physical copies and allow
   );
 });
 
-test("the shared card layout and counters adapt to server constraints", () => {
+test("the shared card layout uses the global Sideboard maximum while counters use registered exact targets", () => {
   const session = sessionFixture();
   const viewModel = buildSideboardingViewModel({
     draft: session.currentDeckConfiguration,
@@ -104,8 +104,8 @@ test("the shared card layout and counters adapt to server constraints", () => {
     session,
   });
   assert.match(viewModel.cardGridStyle.gridTemplateColumns, /^repeat\(3,/);
-  assert.equal(viewModel.countLabels.sideboard, "1/3");
-  assert.match(viewModel.countLabels.active, /minimum 6/);
+  assert.equal(viewModel.countLabels.sideboard, "1/1");
+  assert.equal(viewModel.countLabels.active, "3/6");
   assert.match(viewModel.cardWorkspaceStyle["--sideboarding-card-width"], /\/ 3/);
 });
 
@@ -126,7 +126,11 @@ test("server reasons render generically and keep submission unavailable", () => 
       legal: false,
       fingerprint: "current",
       constraints: session.validationConstraints,
-      reasons: [{ code: "future.requirement", message: "An additional server requirement applies.", section: "sideboard" }],
+      reasons: [{
+        code: "deck.sideboardExchange",
+        message: "Sideboard cards must be exchanged 1-for-1.",
+        section: "sideboard",
+      }],
       summary: { activeCardCount: 3, mainDeckCount: 2, sideboardCount: 1, signatureCount: 0, legendCount: 1, chosenChampionCount: 1, runeDeckCount: 0, battlefieldCount: 0 },
     },
   };
@@ -138,10 +142,10 @@ test("server reasons render generically and keep submission unavailable", () => 
     validation,
     viewModel,
   }));
-  assert.match(html, /An additional server requirement applies/);
+  assert.match(html, /Sideboard cards must be exchanged 1-for-1/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>[\s\S]*Submit no changes/);
-  assert.match(html, /minimum 6/);
-  assert.match(html, /1\/3/);
+  assert.match(html, /3\/6/);
+  assert.match(html, /1\/1/);
 });
 
 test("playground draft serialization preserves exact names and each physical copy", () => {
@@ -171,9 +175,12 @@ test("playground draft serialization preserves exact names and each physical cop
   assert.match(largerText.sourceText, /Sideboard:\n\nRunes:/);
 });
 
-test("valid above-minimum counts do not introduce client-side warnings", () => {
+test("an exact-count legal response introduces no client-side legality of its own", () => {
   const session = sessionFixture();
-  const draft = { ...session.currentDeckConfiguration, mainDeckRegisteredCardIds: Array.from({ length: 8 }, (_, index) => `copy-${index}`) };
+  const draft = {
+    ...session.currentDeckConfiguration,
+    mainDeckRegisteredCardIds: Array.from({ length: 5 }, (_, index) => `copy-${index}`),
+  };
   const viewModel = buildSideboardingViewModel({ draft, selectedRegisteredCardId: null, session });
   const validation: SideboardingValidationState = {
     error: null,
@@ -186,13 +193,14 @@ test("valid above-minimum counts do not introduce client-side warnings", () => {
       fingerprint: "current",
       constraints: session.validationConstraints,
       reasons: [],
-      summary: { activeCardCount: 9, mainDeckCount: 8, sideboardCount: 1, signatureCount: 0, legendCount: 1, chosenChampionCount: 1, runeDeckCount: 0, battlefieldCount: 0 },
+      summary: { activeCardCount: 6, mainDeckCount: 5, sideboardCount: 1, signatureCount: 0, legendCount: 1, chosenChampionCount: 1, runeDeckCount: 0, battlefieldCount: 0 },
     },
   };
   const html = renderToStaticMarkup(React.createElement(SideboardingActions, {
     disabled: false, isSubmitting: false, onDispatch() {}, onSubmit() {}, validation, viewModel,
   }));
-  assert.match(html, /9 · minimum 6/);
+  assert.match(html, /6\/6/);
+  assert.match(html, /1\/1/);
   assert.doesNotMatch(html, /border-amber|disabled=""/);
   assert.match(html, /Deck is legal/);
 });

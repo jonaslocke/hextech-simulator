@@ -4,9 +4,13 @@
 
 Deck Validation in `src/server/deck` is the sole authority for deck validity,
 structured rejection reasons, and applicable constraints. Local core rules and
-local card data define construction semantics. The feature consumes existing
-canonical publication and runtime readiness checks; it does not publish cards,
-repair models, or maintain another support registry.
+local card data define the general construction semantics. For the current
+`riftbound-1v1-match` policy, Constructed Tournament Rules are explicit
+exceptions where this contract says so: Main Deck cardinality follows Tournament
+Rule 601.1.b, and between-games Sideboarding follows Tournament Rule 403.4.
+
+The feature consumes existing canonical publication and runtime readiness checks;
+it does not publish cards, repair models, or maintain another support registry.
 
 Decklist text and registered configurations use different input adapters and the
 same construction evaluator. Server consumers call this feature directly;
@@ -16,10 +20,11 @@ legality, hard-code capacity defaults, or call the server back through HTTP.
 ## Construction and exact identity
 
 - Exactly one Champion Legend and one Chosen Champion Unit.
-- At least 40 Main Deck cards, including the Chosen Champion once, with no
-  numeric maximum (local rule 103.2). Separately tracked editable Main Deck
-  copies exclude that Champion.
-- At most 10 Sideboard cards, counted by quantity.
+- Exactly 40 Main Deck cards, including the Chosen Champion once. This is the
+  Constructed Tournament exception to local core rule 103.2 for the
+  `riftbound-1v1-match` policy (Tournament Rule 601.1.b).
+- At most 10 Sideboard cards, counted by quantity. A Sideboard may therefore be
+  registered with any size from zero through ten.
 - One to three copies per Main Deck text entry, and at most three combined
   copies across Chosen Champion, Main Deck, and Sideboard.
 - Exactly twelve Rune cards and three unique Battlefields.
@@ -60,12 +65,17 @@ have machine-readable codes and presentation messages, with relevant section,
 source line/name, canonical identity, or registered-copy identity. Consumers
 render all reason messages generically, including future reason codes.
 
-Constraints are returned for invalid evaluations as well. They describe exact
-section cardinalities, Main Deck minimum and explicit `maximum: null`, inclusion
-of the Chosen Champion, and Sideboard maximum. Summary counts distinguish
-`activeCardCount` (including Chosen Champion) from `mainDeckCount` (editable
-copies). Fingerprints correlate results with the exact request; a previous valid
-response cannot authorize a changed draft.
+Constraints are returned for invalid evaluations as well. The Main Deck exposes
+an exact count of 40 and whether that count includes the Chosen Champion. The
+Sideboard exposes the global maximum of 10. Text validation has no exact
+Sideboard target, so `sideboard.exact` is `null`. Registered-match validation
+sets `sideboard.exact` to the Sideboard size originally registered for that
+player. A nine-card registered Sideboard therefore reports `maximum: 10` and
+`exact: 9`.
+
+Summary counts distinguish `activeCardCount` (including Chosen Champion) from
+`mainDeckCount` (editable copies). Fingerprints correlate results with the exact
+request; a previous valid response cannot authorize a changed draft.
 
 Malformed deck text produces parse diagnostics. Malformed envelopes produce a
 transport error. Infrastructure failures remain operational errors, never a
@@ -79,10 +89,10 @@ Validity consumes canonical approval, identity integrity, rules-text freshness,
 behavior-definition synchronization, supported bindings and parameters, and
 runtime compilation checks. Freshness compares canonical models and registered
 runtime cards against current local source rules, even when a stored card and
-its recorded hash are internally consistent. Sideboard-only dependencies are included. Snapshot
-construction and source-only construction checks are intermediate stages and
-must not be presented as complete simulator validity. A fixture's unique-card
-count is not a deck rule.
+its recorded hash are internally consistent. Sideboard-only dependencies are
+included. Snapshot construction and source-only construction checks are
+intermediate stages and must not be presented as complete simulator validity. A
+fixture's unique-card count is not a deck rule.
 
 Every permanent deck is discovered through the production registry and checked
 by the same generic pipeline. The registry defines today's selectable decks,
@@ -95,18 +105,42 @@ gameplay interaction.
 Registered IDs must belong to the loaded player registration. Each mutable copy
 appears exactly once, and the Legend, Rune Deck, and Battlefield pool remain
 fixed. Unknown/foreign IDs, duplicate assignments, missing copies, and changed
-fixed sections produce specific reasons. Conservation permits a larger Main
-Deck and smaller Sideboard; it does not require paired swaps.
+fixed sections produce specific reasons.
+
+Between games, Tournament Rule 403.4 is applied literally: Main Deck and
+Sideboard cards are exchanged 1-for-1. The final submitted Main Deck must still
+contain exactly 40 cards including the Chosen Champion, and the final submitted
+Sideboard must contain exactly the same number of cards as the Sideboard
+originally registered for the match. The Sideboard's registered size is not
+forced to ten. Examples:
+
+- A deck registered with 10 Sideboard cards must submit 10 after sideboarding.
+- A deck registered with 9 Sideboard cards must submit 9 after sideboarding.
+- A deck registered with no Sideboard must continue to submit none.
+
+The mutable registered pool is still conserved by physical-copy identity. The
+explicit `deck.sideboardExchange` reason exists even though exact-40 plus pool
+conservation also implies the same cardinality, because validation should tell
+the player which between-games rule was violated.
+
+Changing the Chosen Champion remains allowed when the resulting registered-copy
+allocation satisfies every construction rule and preserves the registered
+Sideboard cardinality.
 
 Match admission and authenticated final reconfiguration use the same authority
 as advisory feedback. A text request cannot replace final registered validation.
 The next game consumes the accepted actual registered-copy lists. Match services
 retain authentication, transaction, lifecycle, and persistence ownership.
 
-Sideboarding owns draft interaction and layout. Drafts may be invalid, individual
-copies remain editable, and reset preserves the existing interaction. Only a
+Sideboarding owns draft interaction and layout. Drafts may be temporarily
+invalid: moving a Sideboard card into the Main Deck may temporarily create
+41/9, for example, until a Main Deck card is moved back. The UI must not force
+atomic swaps or redesign the existing individual-copy interaction. Only a
 current valid response permits submission; pending/error/retry safeguards remain.
-The server projection can carry current validation-owned constraints for initial
-presentation, without pinning a historical ruleset. Both card grids derive their
-columns from the returned Sideboard maximum, and the central workspace scrolls
-to expose every copy, including invalid overflow drafts.
+
+The server projection carries current validation-owned constraints for initial
+presentation without pinning a historical ruleset. Both card grids derive their
+column count from the global Sideboard maximum, while the Sideboard counter uses
+the registered exact target. Thus a deck registered with nine Sideboard cards
+uses the same ten-column layout but displays a 9/9 legal target. The central
+workspace scrolls to expose every copy, including invalid intermediate drafts.

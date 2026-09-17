@@ -11,7 +11,10 @@ import { loadCardCatalog } from "@/server/catalog";
 import { deriveCardCodeFromCard } from "@/server/card-catalog/identity";
 import { parseDeckList, type DeckSectionName } from "@/server/deck";
 import { resolveDeckCard } from "@/server/deck/card-name";
-import { getDeckValidationConstraints, isEligibleChosenChampion } from "@/server/deck/construction";
+import {
+  getRegisteredDeckValidationConstraints,
+  isEligibleChosenChampion,
+} from "@/server/deck/construction";
 import type { Card } from "@/server/catalog";
 
 const PLAYGROUND_MATCH_ID = "sideboarding-playground";
@@ -121,7 +124,9 @@ export async function createSideboardingPlaygroundFixture(): Promise<Sideboardin
     eligibleChosenChampionRegisteredCardIds,
     registeredCardPool,
     cardsByCode,
-    validationConstraints: getDeckValidationConstraints(),
+    validationConstraints: getRegisteredDeckValidationConstraints(
+      originalRegisteredDeck.sideboardRegisteredCardIds.length,
+    ),
     context: {
       previousGameWinnerPlayerId: PLAYGROUND_PLAYER_ID,
       previousGameLoserPlayerId: PLAYGROUND_OPPONENT_ID,

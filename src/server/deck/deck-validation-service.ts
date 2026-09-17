@@ -15,11 +15,15 @@ import {
   inspectSnapshotRuntimeReadiness, loadCanonicalDeckReadiness,
 } from "@/server/game/catalog-readiness";
 import {
-  contextualizeReadinessReasons, evaluateDeckConstruction, type ConstructionEntry,
+  contextualizeReadinessReasons, evaluateDeckConstruction,
+  getRegisteredDeckValidationConstraints, type ConstructionEntry,
 } from "./construction";
 import { resolveDeckText } from "./validator";
 
-export { getDeckValidationConstraints, isEligibleChosenChampion } from "./construction";
+export {
+  getDeckValidationConstraints, getRegisteredDeckValidationConstraints,
+  isEligibleChosenChampion,
+} from "./construction";
 export { fingerprintDeckValidationRequest } from "@/shared/deck-validation";
 
 export function buildDeckValidationRequest(input: {
@@ -88,6 +92,12 @@ export function validateRegisteredDeckCandidate(input: {
   validateNoDuplicateRegisteredIds(sections, reasons);
   validateFixedRegisteredSections(input.registeredDeck.instances, sections, reasons);
   validateMutablePartition(input.registeredDeck.instances, sections, reasons);
+
+  const registeredSideboardCount = input.registeredDeck.instances.filter(
+    (copy) => copy.source === "sideboard",
+  ).length;
+  validateSideboardExchange(registeredSideboardCount, sections.sideboard.length, reasons);
+
   const cards = input.registeredDeck.snapshot.cards.map((definition) => definition.card);
   const construction = evaluateDeckConstruction(entries, {
     catalog: { cards, byName: new Map(cards.map((card) => [card.name, card])) },
@@ -98,7 +108,10 @@ export function validateRegisteredDeckCandidate(input: {
     ...(input.readinessReasons ?? []),
   ]));
   return deckValidationResponseSchema.parse({
-    ...construction, legal: reasons.length === 0, reasons,
+    ...construction,
+    constraints: getRegisteredDeckValidationConstraints(registeredSideboardCount),
+    legal: reasons.length === 0,
+    reasons,
     fingerprint: fingerprintDeckValidationRequest(request),
   });
 }
@@ -197,6 +210,7 @@ export function assertLegalRegisteredDeckConfiguration(input: {
   if (!response.legal) throw new Error(response.reasons.map((reason) => reason.message).join("; "));
   return response;
 }
+
 function validateNoDuplicateRegisteredIds(
   sections: Record<DeckValidationSection, readonly string[]>,
   reasons: DeckValidationReason[],
@@ -277,6 +291,21 @@ function validateMutablePartition(
         "Chosen Champion, Main Deck, and Sideboard must contain every registered mutable card exactly once.",
     });
   }
+}
+
+function validateSideboardExchange(
+  registeredSideboardCount: number,
+  submittedSideboardCount: number,
+  reasons: DeckValidationReason[],
+) {
+  if (submittedSideboardCount === registeredSideboardCount) return;
+  reasons.push({
+    code: "deck.sideboardExchange",
+    section: "sideboard",
+    message:
+      `Sideboard must contain exactly ${registeredSideboardCount} cards between games; ` +
+      "cards exchanged with the Main Deck are 1-for-1.",
+  });
 }
 
 function sameIdSet(left: readonly string[], right: readonly string[]) {

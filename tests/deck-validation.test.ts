@@ -4,8 +4,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { loadSourceCardCatalog, type CardCatalog } from "../src/server/catalog";
 import { validateDeckConstruction } from "../src/server/deck";
-import { buildDeckValidationRequest, validateRegisteredDeckCandidate } from "../src/server/deck/deck-validation-service";
-import type { DeckSnapshotDocument } from "../src/server/game/repositories";
 import { CORE_DECK_IDS, PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
 
 const deckDirectory = path.join(process.cwd(), "data", "decks");
@@ -75,35 +73,9 @@ test("counts Sideboard quantities against the common capacity", async () => {
   assert.equal(result.issues.some((issue) => issue.code === "deck.sideboardSize"), true);
 });
 
-test("registered construction accepts more than the minimum Main Deck size", async () => {
+test("rejects a Main Deck above the tournament exact-40 requirement", async () => {
   const source = (await loadDeck("annie.dec.txt")).replace("2 Flash", "3 Flash");
-  const construction = validateDeckConstruction(source, await permanentCatalog());
-  assert.equal(construction.ok, true, JSON.stringify(construction.issues));
-  if (!construction.ok) return;
-  const definitions = [...new Map(construction.snapshot.instances.map((instance) => [instance.card.public_code, {
-    cardCode: instance.card.public_code,
-    card: instance.card,
-    sourceTextHash: "test-source",
-    behaviorModel: { clauses: [], playTimings: [] },
-  }])).values()];
-  const registeredDeck: DeckSnapshotDocument = {
-    id: "validation:deck:player1", matchId: "validation", playerId: "player1",
-    createdAt: "2026-09-16T00:00:00.000Z", updatedAt: "2026-09-16T00:00:00.000Z",
-    snapshot: { sourceText: source, cards: definitions, entries: [], catalogDigest: "test" },
-    instances: construction.snapshot.instances.map((instance, index) => ({
-      instanceId: `instance-${index}`, registeredCardId: `validation:player1:${index}`,
-      ownerPlayerId: "player1", cardCode: instance.card.public_code, source: instance.source,
-    })),
-  };
-  const request = buildDeckValidationRequest({
-    registeredDeck,
-    configuration: {
-      chosenChampionRegisteredCardId: registeredDeck.instances.find((copy) => copy.source === "champion")!.registeredCardId!,
-      mainDeckRegisteredCardIds: registeredDeck.instances.filter((copy) => copy.source === "mainDeck").map((copy) => copy.registeredCardId!),
-      sideboardRegisteredCardIds: [],
-    },
-  });
-  const response = validateRegisteredDeckCandidate({ registeredDeck, request });
-  assert.equal(response.legal, true, JSON.stringify(response.reasons));
-  assert.equal(response.summary.activeCardCount, 41);
+  const result = validateDeckConstruction(source, await permanentCatalog());
+  assert.equal(result.ok, false);
+  assert.equal(result.issues.some((issue) => issue.code === "deck.mainDeckSize"), true);
 });

@@ -8,10 +8,10 @@ import type {
 const CONSTRAINTS: DeckValidationConstraints = {
   legend: { exact: 1 },
   chosenChampion: { exact: 1 },
-  mainDeck: { minimum: 40, maximum: null, includesChosenChampion: true },
+  mainDeck: { exact: 40, includesChosenChampion: true },
   runeDeck: { exact: 12 },
   battlefields: { exact: 3, unique: true },
-  sideboard: { maximum: 10 },
+  sideboard: { maximum: 10, exact: null },
 };
 const COPY_MAXIMUM = 3;
 const SIGNATURE_MAXIMUM = 3;
@@ -29,6 +29,19 @@ export type ConstructionEntry = {
 
 export function getDeckValidationConstraints(): DeckValidationConstraints {
   return structuredClone(CONSTRAINTS);
+}
+
+/**
+ * Adds the between-games contextual Sideboard cardinality without changing the
+ * global Constructed maximum. A deck registered with N Sideboard cards must
+ * still have N Sideboard cards in every submitted reconfiguration.
+ */
+export function getRegisteredDeckValidationConstraints(
+  registeredSideboardCount: number,
+): DeckValidationConstraints {
+  const constraints = getDeckValidationConstraints();
+  constraints.sideboard.exact = registeredSideboardCount;
+  return constraints;
 }
 
 /** One construction evaluator for source quantities and resolved registered copies. */
@@ -57,10 +70,10 @@ export function evaluateDeckConstruction(
       reasons.push({ code, section, message: `Deck must contain exactly ${exact} ${label}.` });
     }
   }
-  if (activeCardCount < CONSTRAINTS.mainDeck.minimum) {
+  if (activeCardCount !== CONSTRAINTS.mainDeck.exact) {
     reasons.push({
       code: "deck.mainDeckSize", section: "mainDeck",
-      message: `Main Deck must contain at least ${CONSTRAINTS.mainDeck.minimum} cards including the Chosen Champion.`,
+      message: `Main Deck must contain exactly ${CONSTRAINTS.mainDeck.exact} cards including the Chosen Champion.`,
     });
   }
   if (counts.sideboard > CONSTRAINTS.sideboard.maximum) {

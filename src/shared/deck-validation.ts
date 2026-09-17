@@ -44,13 +44,17 @@ export const deckValidationConstraintsSchema = z.object({
   legend: z.object({ exact: z.number().int().positive() }),
   chosenChampion: z.object({ exact: z.number().int().positive() }),
   mainDeck: z.object({
-    minimum: z.number().int().nonnegative(),
-    maximum: z.number().int().nonnegative().nullable(),
+    exact: z.number().int().positive(),
     includesChosenChampion: z.boolean(),
   }),
   runeDeck: z.object({ exact: z.number().int().nonnegative() }),
   battlefields: z.object({ exact: z.number().int().nonnegative(), unique: z.boolean() }),
-  sideboard: z.object({ maximum: z.number().int().positive() }),
+  sideboard: z.object({
+    maximum: z.number().int().positive(),
+    // Text construction has no required Sideboard size. Registered-match
+    // validation supplies the exact registered size for 1-for-1 sideboarding.
+    exact: z.number().int().nonnegative().nullable(),
+  }),
 });
 
 export const deckValidationResponseSchema = z.object({

@@ -5,7 +5,11 @@ import {
   type SideboardingCardView,
 } from "@/shared/game";
 import { BO3_MATCH_FEATURES } from "./bo3-match-config";
-import { canonicalGameplayName, getDeckValidationConstraints, isEligibleChosenChampion } from "../deck/construction";
+import {
+  canonicalGameplayName,
+  getRegisteredDeckValidationConstraints,
+  isEligibleChosenChampion,
+} from "../deck/construction";
 import { createInitialDeckConfiguration, registeredBattlefieldIds } from "./game-factory";
 import {
   deriveRemainingBattlefieldRegisteredIdsByPlayerId,
@@ -152,15 +156,19 @@ function buildSideboardingSession(input: {
   const betweenGames = input.match.betweenGames;
   if (!betweenGames) return null;
 
+  const originalRegisteredDeck = originalRegisteredDeckConfiguration(
+    input.viewerDeck.instances,
+  );
+
   return {
     matchId: input.match.id,
-    validationConstraints: getDeckValidationConstraints(),
+    validationConstraints: getRegisteredDeckValidationConstraints(
+      originalRegisteredDeck.sideboardRegisteredCardIds.length,
+    ),
     playerId: input.viewerSeat.playerId,
     gameNumber: betweenGames.nextGameNumber,
     expectedIntermissionVersion: input.match.stateVersion,
-    originalRegisteredDeck: originalRegisteredDeckConfiguration(
-      input.viewerDeck.instances,
-    ),
+    originalRegisteredDeck,
     currentDeckConfiguration: input.viewerSeat.currentDeckConfiguration,
     eligibleChosenChampionRegisteredCardIds:
       eligibleChosenChampionRegisteredCardIds(input.viewerDeck),
