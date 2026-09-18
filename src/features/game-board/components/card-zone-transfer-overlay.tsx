@@ -7,6 +7,10 @@ import type { Card, ZoneKind } from "../types";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { CardTile } from "./card-tile";
 import type { LocationTransferStartRect } from "../drag-and-drop/location-drag-actions";
+import {
+  boardLocationTransferNeedsDestinationRect,
+  exactPlacementCandidateIndex,
+} from "./card-zone-transfer-geometry";
 
 export type CardZonePlacement = {
   attachments?: Card[];
@@ -100,6 +104,8 @@ export function CardZoneTransferOverlay({
     stateVersion,
   });
   const [transfers, setTransfers] = useState<TransferAnimation[]>([]);
+  const [layoutRetryVersion, setLayoutRetryVersion] = useState(0);
+  const boardDestinationRetryRef = useRef<string | null>(null);
 
   latestInputRef.current = {
     placements,
@@ -143,7 +149,35 @@ export function CardZoneTransferOverlay({
       ? pendingSnapshot
       : fallbackPrevious;
     const isAuthoritativeTransition = stateVersion > previous.stateVersion;
+    const missingBoardDestination = Array.from(previous.placements.entries()).find(
+      ([cardInstanceId, previousPlacement]) => {
+        const nextPlacement = nextPlacements.get(cardInstanceId);
+        return Boolean(
+          nextPlacement &&
+            boardLocationTransferNeedsDestinationRect({
+              fromZoneId: previousPlacement.zoneId,
+              fromZoneKind: previousPlacement.zoneKind,
+              hasDestinationRect: Boolean(nextPlacement.rect),
+              toZoneId: nextPlacement.zoneId,
+              toZoneKind: nextPlacement.zoneKind,
+            }),
+        );
+      },
+    );
 
+    if (missingBoardDestination) {
+      const [cardInstanceId, previousPlacement] = missingBoardDestination;
+      const nextPlacement = nextPlacements.get(cardInstanceId)!;
+      const retryKey = `${stateVersion}:${cardInstanceId}:${previousPlacement.zoneId}->${nextPlacement.zoneId}`;
+
+      if (boardDestinationRetryRef.current !== retryKey) {
+        boardDestinationRetryRef.current = retryKey;
+        setLayoutRetryVersion((current) => current + 1);
+      }
+      return;
+    }
+
+    boardDestinationRetryRef.current = null;
     previousRef.current = {
       counts: nextCounts,
       placements: nextPlacements,
@@ -267,6 +301,7 @@ export function CardZoneTransferOverlay({
   }, [
     activeTransferStartRects,
     countSignature,
+    layoutRetryVersion,
     onPendingSnapshotConsumed,
     onTransferStartRectsConsumed,
     placementSignature,
@@ -519,12 +554,16 @@ function readPlacementRect(placement: CardZonePlacement) {
   ).filter(
     (element) => element.dataset.cardInstanceId === cardInstanceId,
   );
-  const element =
-    matchingElements.find(
-      (candidate) =>
-        candidate.closest<HTMLElement>("[data-zone-animation-id]")?.dataset
-          .zoneAnimationId === placement.zoneId,
-    ) ?? matchingElements[0];
+  const candidateZoneIds = matchingElements.map(
+    (candidate) =>
+      candidate.closest<HTMLElement>("[data-zone-animation-id]")?.dataset
+        .zoneAnimationId,
+  );
+  const exactIndex = exactPlacementCandidateIndex(
+    placement.zoneId,
+    candidateZoneIds,
+  );
+  const element = exactIndex >= 0 ? matchingElements[exactIndex] : undefined;
 
   if (!element) {
     return undefined;
