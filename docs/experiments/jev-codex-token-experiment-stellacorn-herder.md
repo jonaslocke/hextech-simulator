@@ -73,7 +73,7 @@ This is the **Jev-assisted** run.
 
 Before implementation discovery, Codex must run the project's per-card Jev triage for Stellacorn Herder and follow the route produced by the current Hextech routing policy.
 
-Use the project's current Jev command and current default configuration. The treatment must not manually override the route or alter routing thresholds for the experiment.
+Use the project's current Jev command with the experiment runtime environment defined in Section 5. For this experiment, the effective value of `HEXTECH_JEV_CARD_TRIAGE_MODE` must be `on`. The treatment must not manually override the route or alter routing thresholds for the experiment.
 
 If Jev returns `TARGETED_IMPLEMENTATION`, Codex should use the Jev artifact as the implementation discovery input and avoid running broader semantic discovery that the route is intended to bypass.
 
@@ -83,14 +83,117 @@ The Jev-assisted branch must not inspect the baseline branch's implementation or
 
 ---
 
-## 5. Experimental Controls
+## 5. Local `.env` Preparation
 
-The two runs must use the same conditions except for Jev assistance.
+Environment preparation is part of the frozen experiment protocol. Codex must not improvise different environment values between branches. **Both runs must end environment setup with the same effective `.env` configuration.** The experiment variable is whether Jev is invoked, not whether Jev-related environment variables exist.
+
+The committed `.env.example` remains the project template and must not be changed solely for this experiment. In particular, `.env.example` may continue to use `HEXTECH_JEV_CARD_TRIAGE_MODE=shadow`. The actual local `.env` used by the experiment must use `HEXTECH_JEV_CARD_TRIAGE_MODE=on`.
+
+### 5.1 Required effective local values
+
+Before implementation discovery begins on either branch, the local runtime environment must resolve to:
+
+```env
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB_NAME=hextech_simulator
+SOCKET_CORS_ORIGIN=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+HEXTECH_ENABLE_LOCAL_BUG_REPORT_ARTIFACTS=false
+
+TYPESAFE_API_KEY=<existing real local key>
+HEXTECH_JEV_CARD_TRIAGE_MODE=on
+
+PLAYER_TOKEN_SECRET=change-me-for-local-development
+```
+
+`TYPESAFE_API_KEY` is a secret. Codex must never invent, echo, log, commit, or copy its value into the result artifact. The requirement is only that the effective runtime environment exposes a non-empty real key when the Jev-assisted run needs it.
+
+### 5.2 Codex setup procedure — run on BOTH branches
+
+At the start of each experiment run, before card implementation/discovery, Codex must perform the following steps in this order:
+
+1. Confirm the current branch and start commit.
+2. Confirm `.env.example` exists.
+3. Confirm `.env` is excluded from Git tracking/commit scope. Use a non-destructive check such as:
+
+   ```bash
+   git check-ignore -q .env
+   ```
+
+   If `.env` is not ignored, do not commit it and record the condition as an environment/protocol issue in the result artifact.
+4. If `.env` does not exist, create it from the committed template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+5. Normalize the non-secret experiment values in `.env` to the exact values listed in Section 5.1. In particular, set:
+
+   ```env
+   HEXTECH_JEV_CARD_TRIAGE_MODE=on
+   ```
+
+   Do this on **both** the BASELINE and JEV_ASSISTED branches.
+6. Preserve an already configured non-empty `TYPESAFE_API_KEY` in `.env`. Do not replace it with a placeholder and do not print it. If `.env` has no key but the launching environment already provides `TYPESAFE_API_KEY`, Codex may rely on that inherited secret instead of writing it into `.env`.
+7. Verify that a TypeSafe key is available without printing the secret. A valid check is:
+
+   ```bash
+   node --env-file=.env -e "if (!process.env.TYPESAFE_API_KEY) process.exit(1)"
+   ```
+
+   If the key is unavailable, record the environment failure. The BASELINE implementation may continue because it must not invoke Jev; the JEV_ASSISTED run cannot execute its assigned treatment until a real key is available. Codex must not fabricate one.
+8. Verify the effective Jev mode without exposing secrets:
+
+   ```bash
+   node --env-file=.env -e "if (process.env.HEXTECH_JEV_CARD_TRIAGE_MODE !== 'on') process.exit(1); console.log(process.env.HEXTECH_JEV_CARD_TRIAGE_MODE)"
+   ```
+
+9. Confirm `.env` itself is not part of the starting Git diff:
+
+   ```bash
+   git status --short
+   ```
+
+10. After these checks, treat `.env` as frozen for the rest of the run. Codex must not change `.env`, `.env.example`, the Jev mode, the TypeSafe key location, or other experiment environment values while implementing Stellacorn Herder.
+
+### 5.3 Branch-specific environment behavior
+
+#### BASELINE — `experiment/stellacorn-herder-codex`
+
+The local `.env` still uses `HEXTECH_JEV_CARD_TRIAGE_MODE=on`, but **Codex must never invoke the Jev triage command or inspect any Stellacorn Jev artifact**. The presence of the Jev key and mode is intentionally inert on this branch and keeps the runtime environment identical to the treatment branch.
+
+Codex must remove any stale Stellacorn Jev triage artifact before baseline discovery begins. It must not generate a replacement.
+
+#### JEV_ASSISTED — `experiment/stellacorn-herder-jev`
+
+The local `.env` uses the same values, including `HEXTECH_JEV_CARD_TRIAGE_MODE=on`. After environment verification, Codex must run the current per-card Jev triage command for Stellacorn Herder **without passing a CLI mode override**. The command must therefore consume the frozen `on` value from the environment and return the real routing decision rather than shadow routing.
+
+Codex must record the exact triage command and generated Jev artifact path in the result artifact, but must never record the TypeSafe API key.
+
+### 5.4 Environment evidence in the result artifact
+
+Both branch result artifacts must record:
+
+- `.env` present at run start after setup: YES | NO
+- `.env` ignored by Git: YES | NO
+- effective `HEXTECH_JEV_CARD_TRIAGE_MODE`: expected `on`
+- `TYPESAFE_API_KEY` available: YES | NO — **presence only, never the value**
+- `.env` modified after setup: NO | YES
+- `.env.example` modified for experiment: NO | YES
+
+Any deviation must also appear under `Problems or Deviations`.
+
+---
+
+## 6. Experimental Controls
+
+The two runs must use the same conditions except for whether Jev triage is invoked and its result is supplied to Codex.
 
 Required controls:
 
 - same starting Git commit;
-- clean working tree before each run;
+- clean working tree before each run, excluding the ignored local `.env`;
 - separate branches as defined above;
 - fresh Codex session for each branch;
 - same Codex model;
@@ -98,7 +201,7 @@ Required controls:
 - exact same `/goal` prompt;
 - same repository instructions and skills;
 - same dependency state;
-- same environment variables except values inherently required by Jev on the treatment branch;
+- same effective `.env` and environment variables on both branches, including `TYPESAFE_API_KEY` availability and `HEXTECH_JEV_CARD_TRIAGE_MODE=on`;
 - same database/catalog starting state when database-backed operations are used;
 - same tests and correctness expectations;
 - no manual implementation hints supplied to only one branch;
@@ -110,7 +213,7 @@ Do not merge one experiment branch into the other.
 
 ---
 
-## 6. What Codex May Optimize
+## 7. What Codex May Optimize
 
 Codex should implement the card correctly using the workflow assigned to its branch.
 
@@ -122,7 +225,7 @@ The experiment is measuring the natural token consequence of the two discovery p
 
 ---
 
-## 7. Correctness Gate
+## 8. Correctness Gate
 
 Both branches are evaluated against the same gate.
 
@@ -141,7 +244,7 @@ The two branches do **not** need identical diffs. They need behaviorally correct
 
 ---
 
-## 8. Primary Measurement
+## 9. Primary Measurement
 
 The primary measurement is **Codex token consumption for the complete run**.
 
@@ -173,7 +276,7 @@ Do not include Jev tokens in this formula.
 
 ---
 
-## 9. Diagnostic Measurements
+## 10. Diagnostic Measurements
 
 The following may be recorded to help explain the result, but they are not success metrics:
 
@@ -190,7 +293,7 @@ Do not record or expose private chain-of-thought. The artifact should contain on
 
 ---
 
-## 10. Mandatory Result Artifact
+## 11. Mandatory Result Artifact
 
 Each Codex run must finish by generating one Markdown result artifact.
 
@@ -232,6 +335,12 @@ The artifact must use the structure below.
 - Fresh Codex session: YES | NO | UNKNOWN
 - Other branch inspected: NO | YES
 - Jev used: NO | YES
+- `.env` present after setup: YES | NO
+- `.env` ignored by Git: YES | NO
+- Effective `HEXTECH_JEV_CARD_TRIAGE_MODE`: expected `on`
+- `TYPESAFE_API_KEY` available: YES | NO (presence only; never record the secret)
+- `.env` modified after setup: NO | YES
+- `.env.example` modified for experiment: NO | YES
 - Deviations from experiment protocol: NONE | <details>
 
 ## Codex Token Usage
@@ -308,25 +417,28 @@ Document failures, retries, unavailable telemetry, environment problems, or prot
 
 ---
 
-## 11. Run Procedure
+## 12. Run Procedure
 
 Execute the following procedure independently on each branch.
 
 1. Confirm the branch name.
 2. Record the start commit.
-3. Confirm the expected clean starting state.
-4. Remove stale experiment artifacts that would contaminate the run.
-5. Start a fresh Codex session with the common `/goal` prompt.
-6. Follow the branch-specific workflow from this document.
-7. Implement Stellacorn Herder.
-8. Run the repository-required validation and relevant tests.
-9. Capture token telemetry exactly if exposed.
-10. Generate the branch-specific result artifact using the mandatory schema.
-11. Preserve the implementation and artifact for comparison; do not merge the branches into each other before analysis.
+3. Prepare and verify the local `.env` exactly as defined in Section 5, including effective `HEXTECH_JEV_CARD_TRIAGE_MODE=on` on both branches.
+4. Freeze `.env` for the remainder of the run.
+5. Confirm the expected clean starting Git state, excluding the ignored local `.env`.
+6. Remove stale experiment artifacts that would contaminate the run; on BASELINE this includes any Stellacorn Jev artifact.
+7. Start a fresh Codex session with the common `/goal` prompt.
+8. Follow the branch-specific workflow from this document.
+9. Implement Stellacorn Herder.
+10. Run the repository-required validation and relevant tests.
+11. Confirm `.env` and `.env.example` were not modified after setup.
+12. Capture token telemetry exactly if exposed.
+13. Generate the branch-specific result artifact using the mandatory schema, including environment evidence.
+14. Preserve the implementation and artifact for comparison; do not merge the branches into each other before analysis.
 
 ---
 
-## 12. Analysis Procedure
+## 13. Analysis Procedure
 
 After both runs, collect the two result artifacts and the final diffs.
 
@@ -342,7 +454,7 @@ Do not declare Jev successful merely because it used fewer tokens if its impleme
 
 ---
 
-## 13. Decision Rule
+## 14. Decision Rule
 
 The experiment supports the Jev approach for this card when:
 
