@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import {
   buildCanonicalCardDocument,
@@ -36,4 +37,18 @@ test("canonical publication compiles the self-movement draw contract", async () 
     confidence: "high",
     order: 1,
   }]);
+});
+
+test("Stellacorn Herder publication is confirmation-gated and source-bound", async () => {
+  const [packageSource, publisherSource] = await Promise.all([
+    readFile("package.json", "utf8"),
+    readFile("scripts/publish-stellacorn-herder-canonical-card.ts", "utf8"),
+  ]);
+
+  assert.match(packageSource, /catalog:publish-stellacorn-herder/);
+  assert.match(publisherSource, /--confirm/);
+  assert.match(publisherSource, /SFD-048\/221/);
+  assert.match(publisherSource, /syncBehaviorDefinitions/);
+  assert.match(publisherSource, /buildOrnnCanonicalPublication/);
+  assert.match(publisherSource, /publishCanonicalCard/);
 });
