@@ -144,7 +144,7 @@ export function decideCardTriageRoute(
       recommendedRoute.probabilities.TARGETED_IMPLEMENTATION ?? 0,
   };
 
-  const rulesTextIsMaterial = state.targetCard.text.plain.trim().length > 0;
+  const rulesTextIsMaterial = state.targetCard.rulesText.trim().length > 0;
   const selectedNonExecutable = selectedPrimitives.filter(
     (primitive) => primitive.runtimeCoverage !== "executable",
   );
@@ -339,7 +339,7 @@ function buildEscalationReasons(input: {
     );
   }
   if (
-    input.state.targetCard.text.plain.trim().length > 0 &&
+    input.state.targetCard.rulesText.trim().length > 0 &&
     input.state.behaviorCatalog.length > 0 &&
     input.signals.sourceStateSufficientForRouting < FAST_STATE_THRESHOLD
   ) {

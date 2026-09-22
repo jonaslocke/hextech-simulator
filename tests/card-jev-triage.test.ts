@@ -9,9 +9,10 @@ import {
   buildCompactCardTriageOutput,
   decideCardTriageRoute,
 } from "../scripts/card-jev-triage/routing";
-import type {
-  CardJevTriageState,
-  JevBehaviorCapability,
+import {
+  buildJevCardRequestState,
+  type CardJevTriageState,
+  type JevBehaviorCapability,
 } from "../scripts/card-jev-triage/state";
 
 const moveTrigger = capability({
@@ -46,6 +47,31 @@ test("card Jev triage asks routing questions and one independent question per pr
   );
 });
 
+test("primitive questions stay compact because the selection rule lives in shared state", () => {
+  const questions = buildCardTriageQuestions(state);
+  const question = questions[primitiveQuestionName("trigger.on_move")];
+
+  assert.equal(question?.type, "noul");
+  if (!question || question.type !== "noul") return;
+  assert.equal(question.instructions, "Required primitive: trigger.on_move?");
+  assert.equal(question.criteria, undefined);
+  assert.match(state.primitiveSelectionRule, /materially required/i);
+});
+
+test("Jev request state excludes repository-only metadata and keeps compact gameplay evidence", () => {
+  const requestState = buildJevCardRequestState(state);
+  const serialized = JSON.stringify(requestState);
+
+  assert.equal(requestState.card.rulesText, "When I move, draw 1.");
+  assert.equal(requestState.behaviorCatalog.length, 2);
+  assert.equal("catalogMetadata" in requestState, false);
+  assert.equal("targetIdentity" in requestState, false);
+  assert.equal(serialized.includes("sourceTextHash"), false);
+  assert.equal(serialized.includes("image_url"), false);
+  assert.equal(serialized.includes("fixedRules"), false);
+  assert.equal(serialized.includes("examples"), false);
+  assert.equal(serialized.includes("engineSupport"), false);
+});
 
 test("high-confidence executable composition routes directly to targeted implementation", () => {
   const result = buildResult(state, {
@@ -203,24 +229,20 @@ function buildState(
   return {
     objective: "test",
     constraints: [],
+    primitiveSelectionRule:
+      "For primitive::* questions, yes means materially required semantics.",
     targetCard: {
-      id: "test-stellacorn",
       name: "Stellacorn Herder",
-      riftbound_id: "sfd-048-221",
-      public_code: "SFD-048/221",
-      collector_number: 48,
-      attributes: { energy: 4, might: 3, power: null },
-      classification: {
-        type: "Unit",
-        supertype: null,
-        rarity: "Uncommon",
-        domain: ["Calm"],
-      },
-      text: { plain: "When I move, draw 1." },
-      set: { set_id: "SFD", label: "SFD" },
-      media: {},
+      publicCode: "SFD-048/221",
+      setCode: "SFD",
+      type: "Unit",
+      supertype: null,
+      domains: ["Calm"],
+      energy: 4,
+      might: 3,
+      power: null,
       tags: ["Mount Targon"],
-      metadata: {},
+      rulesText: "When I move, draw 1.",
     },
     targetIdentity: {
       cardCode: "SFD-048",
@@ -233,8 +255,7 @@ function buildState(
       canonicalSourceTextHash: null,
       runtimeSupportStatus: null,
       readinessReasons: [],
-      behaviorModel: null,
-      effectBehaviorModel: null,
+      existingBehaviorIds: [],
     },
     deterministicSuggestion: null,
     behaviorCatalog,
@@ -259,13 +280,8 @@ function capability(input: {
     name: input.id,
     description: input.id,
     parameters: [],
-    fixedRules: [],
     listensToEvents: input.listensToEvents ?? [],
     emitsEvents: input.emitsEvents ?? [],
-    timingRequirements: [],
-    targetingRequirements: [],
-    engineSupport: { status: "supported", note: "test" },
     runtimeCoverage: input.runtimeCoverage ?? "executable",
-    examples: [],
   };
 }

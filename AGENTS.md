@@ -133,6 +133,13 @@ SDK request/response types locally. Jev never searches the repository. It may
 identify candidate primitives; Codex still verifies those concrete owners before
 editing them.
 
+Keep the Jev request state semantically complete but compact: include gameplay-relevant
+card data, the deterministic suggestion, and a compact index of the full behavior
+vocabulary/runtime coverage. Do not serialize media/artist metadata, behavior examples,
+fixed-rule prose, parameter descriptions, or repeated per-primitive instructions into
+each request. Shared primitive-selection guidance belongs in state once; each primitive
+question should stay minimal.
+
 The compact stdout is the normal agent input. The complete state, questions,
 probabilities, and API usage are written under ignored
 `.agent-work/card-jev-triage/`; do not load that full artifact into the coding

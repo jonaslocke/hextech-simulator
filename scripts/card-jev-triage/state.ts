@@ -9,7 +9,10 @@ import {
 } from "../../src/server/card-catalog";
 import { deriveCardCodeFromCard } from "../../src/server/card-catalog/identity";
 import { hashCardRulesText } from "../../src/server/card-catalog/import-preview";
-import { loadSourceCardCatalog, type Card } from "../../src/server/catalog";
+import {
+  loadSourceCardCatalog,
+  type Card,
+} from "../../src/server/catalog";
 import { inspectCanonicalDeckReadiness } from "../../src/server/game/catalog-readiness";
 import {
   getRuntimeCoverageStatus,
@@ -29,30 +32,45 @@ export type CardImplementationEvidence = {
   canonicalSourceTextHash: string | null;
   runtimeSupportStatus: string | null;
   readinessReasons: string[];
-  behaviorModel: CanonicalCardDocument["behaviorModel"] | null;
-  effectBehaviorModel: CanonicalCardDocument["effectBehaviorModel"] | null;
+  existingBehaviorIds: string[];
 };
 
-export type JevBehaviorCapability = Omit<PrimitiveCatalogEntry, "examples"> & {
+export type JevTargetCard = {
+  name: string;
+  publicCode: string;
+  setCode: string;
+  type: Card["classification"]["type"];
+  supertype: Card["classification"]["supertype"];
+  domains: string[];
+  energy: number | null;
+  might: number | null;
+  power: number | null;
+  tags: string[];
+  rulesText: string;
+};
+
+export type JevBehaviorCapability = {
+  id: string;
+  family: PrimitiveCatalogEntry["family"];
+  name: string;
+  description: string;
+  parameters: Array<{
+    name: string;
+    type: PrimitiveCatalogEntry["parameters"][number]["type"];
+    required: boolean;
+  }>;
+  listensToEvents: string[];
+  emitsEvents: string[];
   runtimeCoverage: RuntimeCoverageStatus | null;
-  examples: PrimitiveCatalogEntry["examples"];
 };
 
 export type CompactBehaviorSuggestion = {
-  cardCode: string;
-  cardName: string;
-  publicCode: string;
-  setCode: string;
-  rulesText: string;
   primitiveIds: string[];
   supportStatus: CardBehaviorSuggestion["supportStatus"];
   unsupportedClauseCount: number;
   missingRequiredParameterCount: number;
   clauses: Array<{
     id: string;
-    sourceText: string;
-    normalizedText: string;
-    supportStatus: CardBehaviorSuggestion["supportStatus"];
     unsupportedReason: string | null;
     missingRequiredParameters: string[];
     assignments: Array<{
@@ -61,11 +79,6 @@ export type CompactBehaviorSuggestion = {
       parameters: Record<string, string | number | boolean | null>;
       confidence: "high" | "medium" | "low";
       supportStatus: string;
-      parameterValidation: {
-        complete: boolean;
-        missingRequired: string[];
-        issues: Array<{ parameterName: string; message: string }>;
-      };
     }>;
   }>;
 };
@@ -73,7 +86,8 @@ export type CompactBehaviorSuggestion = {
 export type CardJevTriageState = {
   objective: string;
   constraints: string[];
-  targetCard: Card;
+  primitiveSelectionRule: string;
+  targetCard: JevTargetCard;
   targetIdentity: {
     cardCode: string;
     publicCode: string;
@@ -89,15 +103,24 @@ export type CardJevTriageState = {
   };
 };
 
+export type JevCardRequestState = {
+  objective: string;
+  constraints: string[];
+  primitiveSelectionRule: string;
+  card: JevTargetCard;
+  implementation: {
+    status: CardImplementationStatus;
+    runtimeSupportStatus: string | null;
+    readinessReasons: string[];
+    existingBehaviorIds: string[];
+  };
+  deterministicSuggestion: CompactBehaviorSuggestion | null;
+  behaviorCatalog: JevBehaviorCapability[];
+};
+
 export type CardTriageTarget =
-  | {
-      publicCode: string;
-      cardName?: never;
-    }
-  | {
-      cardName: string;
-      publicCode?: never;
-    };
+  | { cardName: string; publicCode?: never }
+  | { publicCode: string; cardName?: never };
 
 export async function buildCardJevTriageState(input: {
   target: CardTriageTarget;
@@ -127,17 +150,17 @@ export async function buildCardJevTriageState(input: {
 
   return {
     objective:
-      "Choose the lowest-discovery-cost faithful implementation route for exactly this card. Prefer accepted reusable behavior semantics. Do not redefine an existing primitive merely to make the card fit it.",
+      "Choose the lowest-discovery-cost faithful route for implementing exactly this card using the current reusable behavior vocabulary.",
     constraints: [
-      "The target card is the only implementation task being classified.",
-      "Existing primitive meanings are protected contracts.",
-      "A composition of existing primitives is preferred when it faithfully expresses every material card-text clause.",
-      "A primitive with runtimeCoverage=executable is already available to the game runtime; other coverage values require implementation work before the card can rely on it.",
-      "The deterministic suggestion is evidence, not authority. Judge it against the target card and behavior catalog.",
-      "New shared capability is justified only when no existing primitive or faithful composition can express a material semantic distinction.",
-      "Do not infer repository implementation details that are not present in this state.",
+      "Protect existing primitive meanings.",
+      "Prefer faithful composition of existing primitives over extension or new capability.",
+      "runtimeCoverage=executable means the primitive is already executable; other values require implementation work.",
+      "The deterministic suggestion is evidence, not authority.",
+      "Judge only from the supplied state; do not assume repository details that are not present.",
     ],
-    targetCard: card,
+    primitiveSelectionRule:
+      "For primitive::* questions, answer yes only when that primitive's accepted semantics are materially required by the card. Similar wording alone is not enough.",
+    targetCard: toJevTargetCard(card),
     targetIdentity: {
       cardCode,
       publicCode: card.public_code,
@@ -154,6 +177,25 @@ export async function buildCardJevTriageState(input: {
   };
 }
 
+export function buildJevCardRequestState(
+  state: CardJevTriageState,
+): JevCardRequestState {
+  return {
+    objective: state.objective,
+    constraints: state.constraints,
+    primitiveSelectionRule: state.primitiveSelectionRule,
+    card: state.targetCard,
+    implementation: {
+      status: state.implementation.status,
+      runtimeSupportStatus: state.implementation.runtimeSupportStatus,
+      readinessReasons: state.implementation.readinessReasons,
+      existingBehaviorIds: state.implementation.existingBehaviorIds,
+    },
+    deterministicSuggestion: state.deterministicSuggestion,
+    behaviorCatalog: state.behaviorCatalog,
+  };
+}
+
 function resolveTargetCard(
   catalog: Awaited<ReturnType<typeof loadSourceCardCatalog>>,
   target: CardTriageTarget,
@@ -161,16 +203,11 @@ function resolveTargetCard(
   if (target.publicCode !== undefined) {
     const publicCode = target.publicCode;
     const card = catalog.byPublicCode.get(publicCode);
-
-    if (!card) {
-      throw new Error(`Unknown source card public code: ${publicCode}`);
-    }
-
+    if (!card) throw new Error(`Unknown source card public code: ${publicCode}`);
     return card;
   }
 
   const cardName = target.cardName;
-
   const exact = catalog.byName.get(cardName);
   if (exact) return exact;
 
@@ -178,17 +215,12 @@ function resolveTargetCard(
   const caseInsensitive = catalog.cards.filter(
     (card) => card.name.toLocaleLowerCase() === normalizedName,
   );
-
-  if (caseInsensitive.length === 1) {
-    return caseInsensitive[0]!;
-  }
-
+  if (caseInsensitive.length === 1) return caseInsensitive[0]!;
   if (caseInsensitive.length > 1) {
     throw new Error(
       `Card name ${JSON.stringify(cardName)} matches multiple printings; use --public-code.`,
     );
   }
-
   throw new Error(`Unknown source card: ${cardName}`);
 }
 
@@ -205,15 +237,14 @@ async function inspectImplementation(input: {
       canonicalSourceTextHash: null,
       runtimeSupportStatus: null,
       readinessReasons: ["Canonical database check skipped."],
-      behaviorModel: null,
-      effectBehaviorModel: null,
+      existingBehaviorIds: [],
     };
   }
 
   const document = await input.db
-    .collection<
-      CanonicalCardDocument & { _id: string }
-    >(CANONICAL_CARDS_COLLECTION)
+    .collection<CanonicalCardDocument & { _id: string }>(
+      CANONICAL_CARDS_COLLECTION,
+    )
     .findOne({ cardCode: input.cardCode });
 
   if (!document) {
@@ -222,11 +253,8 @@ async function inspectImplementation(input: {
       sourceTextHash: input.sourceTextHash,
       canonicalSourceTextHash: null,
       runtimeSupportStatus: null,
-      readinessReasons: [
-        "No approved canonical card is persisted for this card code.",
-      ],
-      behaviorModel: null,
-      effectBehaviorModel: null,
+      readinessReasons: ["No approved canonical card is persisted for this card code."],
+      existingBehaviorIds: [],
     };
   }
 
@@ -253,8 +281,23 @@ async function inspectImplementation(input: {
     canonicalSourceTextHash: document.sourceTextHash,
     runtimeSupportStatus: document.runtimeSupportStatus,
     readinessReasons,
-    behaviorModel: document.behaviorModel,
-    effectBehaviorModel: document.effectBehaviorModel,
+    existingBehaviorIds: collectCanonicalBehaviorIds(document),
+  };
+}
+
+function toJevTargetCard(card: Card): JevTargetCard {
+  return {
+    name: card.name,
+    publicCode: card.public_code,
+    setCode: card.set.set_id,
+    type: card.classification.type,
+    supertype: card.classification.supertype,
+    domains: [...card.classification.domain],
+    energy: card.attributes.energy,
+    might: card.attributes.might,
+    power: card.attributes.power,
+    tags: [...card.tags],
+    rulesText: card.text.plain,
   };
 }
 
@@ -262,20 +305,12 @@ function compactBehaviorSuggestion(
   suggestion: CardBehaviorSuggestion,
 ): CompactBehaviorSuggestion {
   return {
-    cardCode: suggestion.cardCode,
-    cardName: suggestion.cardName,
-    publicCode: suggestion.publicCode,
-    setCode: suggestion.setCode,
-    rulesText: suggestion.rulesText,
     primitiveIds: suggestion.primitiveIds,
     supportStatus: suggestion.supportStatus,
     unsupportedClauseCount: suggestion.unsupportedClauseCount,
     missingRequiredParameterCount: suggestion.missingRequiredParameterCount,
     clauses: suggestion.clauses.map((clause) => ({
       id: clause.id,
-      sourceText: clause.sourceText,
-      normalizedText: clause.normalizedText,
-      supportStatus: clause.supportStatus,
       unsupportedReason: clause.unsupportedReason,
       missingRequiredParameters: clause.missingRequiredParameters,
       assignments: clause.assignments.map((assignment) => ({
@@ -284,7 +319,6 @@ function compactBehaviorSuggestion(
         parameters: assignment.assignment.parameters,
         confidence: assignment.assignment.confidence,
         supportStatus: assignment.supportStatus,
-        parameterValidation: assignment.parameterValidation,
       })),
     })),
   };
@@ -298,14 +332,40 @@ function toJevBehaviorCapability(
     family: entry.family,
     name: entry.name,
     description: entry.description,
-    parameters: entry.parameters,
-    fixedRules: entry.fixedRules,
-    listensToEvents: entry.listensToEvents,
-    emitsEvents: entry.emitsEvents,
-    timingRequirements: entry.timingRequirements,
-    targetingRequirements: entry.targetingRequirements,
-    engineSupport: entry.engineSupport,
+    parameters: entry.parameters.map((parameter) => ({
+      name: parameter.name,
+      type: parameter.type,
+      required: parameter.required,
+    })),
+    listensToEvents: [...entry.listensToEvents],
+    emitsEvents: [...entry.emitsEvents],
     runtimeCoverage: getRuntimeCoverageStatus(entry.id),
-    examples: entry.examples.slice(0, 5),
   };
+}
+
+function collectCanonicalBehaviorIds(
+  document: CanonicalCardDocument,
+): string[] {
+  const ids = new Set<string>();
+
+  for (const model of [document.behaviorModel, document.effectBehaviorModel]) {
+    for (const binding of model.playTimings) ids.add(binding.behaviorId);
+    for (const clause of model.clauses) {
+      for (const bindings of [
+        clause.abilities,
+        clause.triggers,
+        clause.conditions,
+        clause.selectors,
+        clause.choices,
+        clause.costs,
+        clause.timings,
+        clause.effects,
+        clause.keywords,
+      ]) {
+        for (const binding of bindings) ids.add(binding.behaviorId);
+      }
+    }
+  }
+
+  return [...ids].sort();
 }

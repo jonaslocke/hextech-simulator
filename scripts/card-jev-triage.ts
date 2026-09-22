@@ -10,6 +10,7 @@ import {
 } from "./card-jev-triage/routing";
 import {
   buildCardJevTriageState,
+  buildJevCardRequestState,
   type CardTriageTarget,
 } from "./card-jev-triage/state";
 
@@ -91,8 +92,18 @@ try {
       );
     }
 
+    const jevState = toJevState(buildJevCardRequestState(state));
+    const requestStats = {
+      questionCount: Object.keys(questions).length,
+      serializedCharacters: JSON.stringify({ state: jevState, questions }).length,
+    };
+
+    console.error(
+      `[jev] ${requestStats.questionCount} questions, ${requestStats.serializedCharacters} serialized characters`,
+    );
+
     const jev = await new TypeSafeClient().systemOne({
-      state: toJevState(state),
+      state: jevState,
       questions,
     });
     const decision = decideCardTriageRoute(state, jev);
@@ -103,6 +114,7 @@ try {
       databaseWarning,
       state,
       questions,
+      requestStats,
       jev,
       decision,
     });
@@ -124,6 +136,13 @@ try {
       databaseWarning,
       state,
       questions,
+      requestStats: {
+        questionCount: Object.keys(questions).length,
+        serializedCharacters: JSON.stringify({
+          state: toJevState(buildJevCardRequestState(state)),
+          questions,
+        }).length,
+      },
       jev: null,
       error: errorMessage(error),
     });
