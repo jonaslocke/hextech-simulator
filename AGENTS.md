@@ -104,48 +104,70 @@ that add no information.
 ### Jev card-implementation triage
 
 For a task whose requested outcome is to implement **one new card**, Jev may
-perform a read-only pre-Moe triage using the target card plus the current behavior
-catalog. This is a routing optimization, not a rules or semantic authority.
+perform a read-only pre-Moe triage using the target card, compact source token
+definitions, and the current behavior catalog. This is a routing optimization,
+not a rules or semantic authority.
 
 - When `HEXTECH_JEV_CARD_TRIAGE_MODE=off`, preserve the pre-Jev workflow exactly:
   do not run the Jev triage command and do not consult prior Jev artifacts.
-- Otherwise, before loading Moe, run
+- The default calibration mode is `shadow`. Before loading Moe, run
   `npm run card:triage:jev -- --card "<exact source card name>"` (or
   `--public-code` when the printing is ambiguous).
 - `ALREADY_IMPLEMENTED` means the current source matches an executable canonical
   publication; do not reimplement it merely because it appears in the requested
   deck/corpus.
-- `TARGETED_IMPLEMENTATION` means Jev found high-confidence agreement that
-  existing **executable** primitives cover the card. Verify the reported owners
-  against repository evidence and proceed without loading full Moe discovery. If
-  that verification contradicts the triage, stop the shortcut and use Moe.
-- `MOE_DISCOVERY` routes through Moe normally.
-- `MOE_THEN_LARRY` routes through Moe first; use Larry only if the resulting
-  shared change actually has the state/sequence risk Larry owns.
-- `shadow` mode records Jev advice but keeps `MOE_DISCOVERY` as the effective
-  route, so it must not be treated as permission to skip existing discovery.
+- `TARGETED_IMPLEMENTATION` is an advisory fast-path classification produced by
+  deterministic Hextech policy over Jev's lower-level semantic probabilities and
+  runtime coverage. In `on` mode, verify the reported owners against repository
+  evidence and proceed without loading full Moe discovery. If that verification
+  contradicts the triage, stop the shortcut and use Moe.
+- `MOE_DISCOVERY` routes through Moe normally. Jev does not decide Larry routing;
+  Larry remains a downstream specialist only after Moe/Curly identifies a shared
+  change with meaningful state/sequence risk.
+- `shadow` mode always keeps `MOE_DISCOVERY` as the effective route while exposing
+  `jevAdvisoryRoute`; do not skip existing discovery while calibrating.
 
-The triage script constructs its state deterministically from local source-card
-and behavior-catalog owners and uses the official `@typesafe-ai/sdk`
+The triage script constructs its state deterministically from local source-card,
+source-token, and behavior-catalog owners and uses the official `@typesafe-ai/sdk`
 `TypeSafeClient`, `noul`, `choice`, and `score` APIs to ask Jev many independent
-questions in one System One call. Do not reimplement the Jev HTTP protocol or
-SDK request/response types locally. Jev never searches the repository. It may
-identify candidate primitives; Codex still verifies those concrete owners before
-editing them.
+questions in one System One call. Do not reimplement the Jev HTTP protocol or SDK
+request/response types locally. Jev never searches the repository.
 
-Keep the Jev request state semantically complete but compact: include gameplay-relevant
-card data, the deterministic suggestion, and a compact index of the full behavior
-vocabulary/runtime coverage. Do not serialize media/artist metadata, behavior examples,
-fixed-rule prose, parameter descriptions, or repeated per-primitive instructions into
-each request. Shared primitive-selection guidance belongs in state once; each primitive
-question should stay minimal.
+Jev provides evidence, not agent-workflow conclusions. Ask about semantic
+coverage, executable capability sufficiency, primitive parameterization,
+missing capability families, token-definition sufficiency, and primitive
+membership. Do not ask Jev whether Moe or Larry should run; Hextech derives that
+routing deterministically from the evidence. The final calibrated fast-path gate
+uses behavior-vocabulary sufficiency, material-clause coverage, primitive
+parameterization sufficiency, probability that there is no material gap,
+new-primitive risk, mechanical novelty, and a deterministic veto for any
+non-executable primitive with material probability. Other Jev answers remain
+telemetry and must not silently block the fast path.
 
-The compact stdout is the normal agent input. The complete state, questions,
-probabilities, and API usage are written under ignored
-`.agent-work/card-jev-triage/`; do not load that full artifact into the coding
-context unless debugging the triage itself. A TypeSafe/API failure is not semantic
-evidence; fall back to the existing Moe route or treat the Jev experiment run as
-invalid when Jev use is required by the task.
+Keep the Jev request state semantically complete but compact: include
+play-relevant card data, the deterministic suggestion, compact source token
+definitions, and a compact index of the full behavior vocabulary/runtime
+coverage. Treat the deterministic suggestion as evidence only; its parameters
+may be parser approximations. Do not serialize media/artist metadata, behavior
+examples, fixed-rule prose, parameter descriptions, or repeated per-primitive
+instructions into each request.
+
+Primitive-selection guidance belongs in shared state once. Normal printed card
+costs/statistics are not special behavior primitives. `cost.pay` is for
+rules-text-defined additional/alternate/optional payment semantics. Creating or
+playing a permanent ready is entry-state semantics and must not be confused with
+`action.ready_cards`, which changes an existing exhausted card to ready. A
+keyword may own the mechanics in its reminder text; avoid duplicating lower-level
+primitives unless the behavior model materially requires both.
+
+The compact stdout is the normal agent input and includes selected primitives,
+top primitive candidates, non-executable primitive risks, calibrated signals,
+and the advisory route. The complete state, questions, probabilities, and API
+usage are written under ignored `.agent-work/card-jev-triage/`; do not load that
+full artifact into the coding context unless debugging the triage itself. A
+TypeSafe/API failure is not semantic evidence; fall back to the existing Moe
+route or treat the Jev experiment run as invalid when Jev use is required by the
+task.
 
 For substantial specialist work, keep at most one compact ephemeral task record
 under `.agent-work/<task>/` rather than separate specialist reports. Preserve only

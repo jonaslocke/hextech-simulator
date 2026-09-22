@@ -1,9 +1,4 @@
-import {
-  choice,
-  noul,
-  score,
-  type Questions,
-} from "@typesafe-ai/sdk";
+import { choice, noul, score, type Questions } from "@typesafe-ai/sdk";
 import type { CardJevTriageState } from "./state";
 
 export const PRIMITIVE_QUESTION_PREFIX = "primitive::";
@@ -17,7 +12,7 @@ export function buildCardTriageQuestions(
 ): Questions {
   const questions: Questions = {
     implementationDisposition: choice(
-      "Best implementation disposition for this card?",
+      "Best semantic implementation disposition for this card?",
       {
         EXACT_REUSE:
           "Reuse an existing approved behavior shape without material semantic change.",
@@ -31,49 +26,47 @@ export function buildCardTriageQuestions(
           "The supplied state is insufficient for a faithful classification.",
       },
     ),
-    recommendedRoute: choice(
-      "Least expensive safe discovery route before implementation?",
-      {
-        TARGETED_IMPLEMENTATION:
-          "Existing executable capabilities are sufficient; verify identified owners and implement without broad semantic discovery.",
-        MOE_DISCOVERY:
-          "Full reusable-behavior discovery is needed before implementation.",
-        MOE_THEN_LARRY:
-          "Moe discovery is needed and the likely shared change has meaningful state/sequence risk afterward.",
-      },
-    ),
     existingBehaviorVocabularySufficient: noul(
-      "Can existing behavior vocabulary express every material card clause without redefining a primitive?",
+      "Can the supplied existing behavior vocabulary express every material rules-text clause without redefining primitive meaning?",
     ),
     existingExecutableCapabilitiesSufficient: noul(
-      "Are executable primitives sufficient for every material card clause?",
+      "Are primitives with runtimeCoverage=executable sufficient to implement every material rules-text clause faithfully?",
     ),
     compositionSufficient: noul(
-      "Is faithful composition of existing primitives sufficient?",
+      "Can this card be implemented faithfully by composing existing primitive meanings rather than extending or creating reusable semantics?",
     ),
     behaviorModelOnlySufficient: noul(
-      "Is this likely only behavior-model/publication work with no shared engine-code change?",
+      "Is implementation likely limited to card behavior-model/publication work, with no shared engine capability change required?",
     ),
     deterministicSuggestionComplete: noul(
-      "Does the deterministic suggestion cover all material card clauses accurately enough to guide implementation?",
+      "Does the deterministic suggestion identify every material semantic owner needed by the card?",
+    ),
+    deterministicSuggestionParametersReliable: noul(
+      "Are the deterministic suggestion's supplied parameters and cardinalities faithful to the card text, rather than parser approximations or misread printed characteristics?",
     ),
     allMaterialClausesCoveredByExistingPrimitives: noul(
-      "Do existing primitives collectively cover every material semantic distinction in the card?",
+      "Do existing primitives collectively cover every material semantic distinction present in the card rules text?",
+    ),
+    primitiveParameterizationSufficient: noul(
+      "Can the required existing primitives express the card's exact targets, counts, conditions, durations, destinations, and other parameters without changing their contracts?",
+    ),
+    referencedTokenDefinitionsSufficient: noul(
+      "If this card creates or references named tokens, does tokenCatalog contain every required named token with gameplay characteristics sufficient to represent the rules text? Answer yes when the card does not create or reference named tokens.",
     ),
     requiresExistingPrimitiveExtension: noul(
-      "Does faithful implementation require extending an existing primitive contract or parameters?",
+      "Does faithful implementation require extending an existing primitive contract, accepted parameter domain, or semantic meaning?",
     ),
     requiresNewPrimitive: noul(
       "Does faithful implementation require a genuinely new reusable primitive?",
     ),
     requiresNewEventOrTriggerInfrastructure: noul(
-      "Is new event or trigger infrastructure required?",
+      "Is new event or trigger infrastructure required beyond the supplied executable trigger/event capabilities?",
     ),
     requiresNewPersistentGameState: noul(
-      "Is new persistent game state or per-turn/effect memory required?",
+      "Is new persistent game state or per-turn/effect memory required beyond the supplied capabilities?",
     ),
     requiresNewSelectorOrChoiceContract: noul(
-      "Is a new selector, targeting, choice, or cardinality contract required?",
+      "Is a new selector, targeting, choice, or cardinality contract required beyond existing primitive parameterization?",
     ),
     requiresNewTimingOrChainContract: noul(
       "Is a new timing, Priority, Focus, Chain, delayed-resolution, or continuation contract required?",
@@ -81,30 +74,21 @@ export function buildCardTriageQuestions(
     requiresNewProjectionContract: noul(
       "Is a new viewer projection or client-visible gameplay contract required?",
     ),
-    sharedEngineChangeLikely: noul(
-      "Is shared game-engine code likely to change?",
-    ),
-    fullMoeDiscoveryNeeded: noul(
-      "Should full Moe reusable-behavior discovery run before implementation?",
-    ),
-    larryVerificationLikelyNeeded: noul(
-      "After the semantic owner is understood, is Larry-style state/sequence verification likely warranted?",
-    ),
     sourceStateSufficientForRouting: noul(
-      "Is the supplied state sufficient to route this card without repository-wide semantic discovery first?",
+      "Is the supplied card, token, behavior-vocabulary, runtime-coverage, and deterministic-suggestion state sufficient to decide whether broad reusable-behavior discovery can be skipped?",
     ),
     mechanicalNovelty: score(
-      "Mechanical novelty relative to supplied behavior vocabulary and runtime coverage?",
+      "Mechanical novelty relative to the supplied behavior vocabulary, token definitions, and runtime coverage?",
       [
         "0 — direct reuse of executable semantics.",
         "1 — straightforward composition of executable semantics.",
-        "2 — likely narrow extension or uncertain composition.",
+        "2 — likely narrow extension, incomplete source state, or uncertain composition.",
         "3 — material new reusable behavior or shared engine work likely.",
         "4 — multiple new semantic/runtime capabilities likely.",
       ],
     ),
     primaryGapFamily: choice(
-      "Primary missing semantic owner if executable capabilities are insufficient?",
+      "Primary missing semantic owner if existing executable capabilities are insufficient?",
       {
         NONE: "No missing reusable capability.",
         ABILITY: "Activated/reusable ability.",
@@ -115,11 +99,12 @@ export function buildCardTriageQuestions(
         TRIGGER: "Event/trigger contract.",
         CONDITION: "Condition/predicate.",
         CHOICE: "Player/system choice.",
-        COST: "Cost/payment contract.",
+        COST: "Special rules-text-defined cost/payment contract.",
         REPLACEMENT: "Replacement effect.",
         PREVENTION: "Prevention effect.",
         KEYWORD: "Keyword semantics.",
         STATE: "Persistent game/effect memory.",
+        TOKEN: "Named token definition or token-specific semantics.",
         PROJECTION: "Viewer/client projection.",
         MULTIPLE: "Multiple distinct owners are missing.",
         INSUFFICIENT_EVIDENCE: "State does not establish the primary gap.",

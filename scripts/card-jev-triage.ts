@@ -163,7 +163,7 @@ type ParsedArguments = {
 function parseArguments(argv: string[]): ParsedArguments {
   let cardName: string | null = null;
   let publicCode: string | null = null;
-  let mode = readMode(process.env.HEXTECH_JEV_CARD_TRIAGE_MODE ?? "on");
+  let mode = readMode(process.env.HEXTECH_JEV_CARD_TRIAGE_MODE ?? "shadow");
   let offline = false;
   let help = false;
 
@@ -258,7 +258,7 @@ function printHelp(): void {
 Options:
   --card <name>          Exact source-card name.
   --public-code <code>   Exact source printing code; use when a name is ambiguous.
-  --mode <mode>          on | shadow | off (default: HEXTECH_JEV_CARD_TRIAGE_MODE or on).
+  --mode <mode>          on | shadow | off (default: HEXTECH_JEV_CARD_TRIAGE_MODE or shadow).
   --offline              Skip canonical MongoDB implementation-readiness lookup.
   --help                 Show this help.
 

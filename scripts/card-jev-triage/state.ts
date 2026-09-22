@@ -49,6 +49,19 @@ export type JevTargetCard = {
   rulesText: string;
 };
 
+export type JevTokenDefinition = {
+  name: string;
+  publicCode: string;
+  setCode: string;
+  type: Card["classification"]["type"];
+  domains: string[];
+  energy: number | null;
+  might: number | null;
+  power: number | null;
+  tags: string[];
+  rulesText: string;
+};
+
 export type JevBehaviorCapability = {
   id: string;
   family: PrimitiveCatalogEntry["family"];
@@ -95,11 +108,13 @@ export type CardJevTriageState = {
   };
   implementation: CardImplementationEvidence;
   deterministicSuggestion: CompactBehaviorSuggestion | null;
+  tokenCatalog: JevTokenDefinition[];
   behaviorCatalog: JevBehaviorCapability[];
   catalogMetadata: {
     sourceCatalogVersionHash: string;
     sourceSetFiles: string[];
     behaviorPrimitiveCount: number;
+    tokenDefinitionCount: number;
   };
 };
 
@@ -115,6 +130,7 @@ export type JevCardRequestState = {
     existingBehaviorIds: string[];
   };
   deterministicSuggestion: CompactBehaviorSuggestion | null;
+  tokenCatalog: JevTokenDefinition[];
   behaviorCatalog: JevBehaviorCapability[];
 };
 
@@ -147,19 +163,28 @@ export async function buildCardJevTriageState(input: {
     sourceTextHash,
     primitiveCatalog,
   });
+  const tokenCatalog = sourceCatalog.cards
+    .filter((candidate) => candidate.classification.supertype === "Token")
+    .map(toJevTokenDefinition)
+    .sort((left, right) =>
+      `${left.name}\u0000${left.publicCode}`.localeCompare(
+        `${right.name}\u0000${right.publicCode}`,
+      ),
+    );
 
   return {
     objective:
-      "Choose the lowest-discovery-cost faithful route for implementing exactly this card using the current reusable behavior vocabulary.",
+      "Choose the lowest-discovery-cost faithful route for implementing exactly this card using the current reusable behavior vocabulary and known source token definitions.",
     constraints: [
       "Protect existing primitive meanings.",
       "Prefer faithful composition of existing primitives over extension or new capability.",
       "runtimeCoverage=executable means the primitive is already executable; other values require implementation work.",
-      "The deterministic suggestion is evidence, not authority.",
+      "The deterministic suggestion is evidence, not authority; validate both primitive identity and parameterization independently.",
+      "The tokenCatalog is the supplied source of known token definitions. Do not invent a named token that is absent from it.",
       "Judge only from the supplied state; do not assume repository details that are not present.",
     ],
     primitiveSelectionRule:
-      "For primitive::* questions, answer yes only when that primitive's accepted semantics are materially required by the card. Similar wording alone is not enough.",
+      "For primitive::* questions, answer yes only when that primitive's accepted semantics are materially required by the card. Similar wording alone is not enough. Printed Energy, Power, Might, domains, card type, supertype, and tags are card characteristics and do not by themselves require behavior primitives. Select cost.pay only for a rules-text-defined additional, alternate, optional, or special payment; never merely because the card has a normal printed play cost. Select action.ready_cards only when an existing exhausted card is changed to ready; text that creates or plays an object ready is entry-state semantics such as modifier.enter_ready, not action.ready_cards. A keyword may already own semantics stated in its reminder text, so do not duplicate lower-level primitives unless the behavior model materially requires both.",
     targetCard: toJevTargetCard(card),
     targetIdentity: {
       cardCode,
@@ -168,11 +193,13 @@ export async function buildCardJevTriageState(input: {
     },
     implementation,
     deterministicSuggestion,
+    tokenCatalog,
     behaviorCatalog: primitiveCatalog.map(toJevBehaviorCapability),
     catalogMetadata: {
       sourceCatalogVersionHash: sourceCatalog.versionHash,
       sourceSetFiles: sourceCatalog.setFiles,
       behaviorPrimitiveCount: primitiveCatalog.length,
+      tokenDefinitionCount: tokenCatalog.length,
     },
   };
 }
@@ -192,6 +219,7 @@ export function buildJevCardRequestState(
       existingBehaviorIds: state.implementation.existingBehaviorIds,
     },
     deterministicSuggestion: state.deterministicSuggestion,
+    tokenCatalog: state.tokenCatalog,
     behaviorCatalog: state.behaviorCatalog,
   };
 }
@@ -213,7 +241,7 @@ function resolveTargetCard(
 
   const normalizedName = cardName.toLocaleLowerCase();
   const caseInsensitive = catalog.cards.filter(
-    (card) => card.name.toLocaleLowerCase() === normalizedName,
+    (candidate) => candidate.name.toLocaleLowerCase() === normalizedName,
   );
   if (caseInsensitive.length === 1) return caseInsensitive[0]!;
   if (caseInsensitive.length > 1) {
@@ -292,6 +320,21 @@ function toJevTargetCard(card: Card): JevTargetCard {
     setCode: card.set.set_id,
     type: card.classification.type,
     supertype: card.classification.supertype,
+    domains: [...card.classification.domain],
+    energy: card.attributes.energy,
+    might: card.attributes.might,
+    power: card.attributes.power,
+    tags: [...card.tags],
+    rulesText: card.text.plain,
+  };
+}
+
+function toJevTokenDefinition(card: Card): JevTokenDefinition {
+  return {
+    name: card.name,
+    publicCode: card.public_code,
+    setCode: card.set.set_id,
+    type: card.classification.type,
     domains: [...card.classification.domain],
     energy: card.attributes.energy,
     might: card.attributes.might,

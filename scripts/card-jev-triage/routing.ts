@@ -17,12 +17,11 @@ export const cardTriageRoutes = [
   "ALREADY_IMPLEMENTED",
   "TARGETED_IMPLEMENTATION",
   "MOE_DISCOVERY",
-  "MOE_THEN_LARRY",
 ] as const;
 
 export type CardTriageRoute = (typeof cardTriageRoutes)[number];
 
-export type SelectedPrimitive = {
+export type PrimitiveCandidate = {
   id: string;
   probability: number;
   runtimeCoverage: CardJevTriageState["behaviorCatalog"][number]["runtimeCoverage"];
@@ -35,13 +34,24 @@ export type CardTriageDecision = {
     confidence: number;
     reuseOrComposeProbability: number;
   };
-  selectedPrimitives: SelectedPrimitive[];
+  primaryGap: {
+    choice: string;
+    confidence: number;
+    noneProbability: number;
+  };
+  selectedPrimitives: PrimitiveCandidate[];
+  topPrimitiveCandidates: PrimitiveCandidate[];
+  nonExecutablePrimitiveRisks: PrimitiveCandidate[];
   signals: {
     existingBehaviorVocabularySufficient: number;
     existingExecutableCapabilitiesSufficient: number;
     compositionSufficient: number;
     behaviorModelOnlySufficient: number;
+    deterministicSuggestionComplete: number;
+    deterministicSuggestionParametersReliable: number;
     allMaterialClausesCoveredByExistingPrimitives: number;
+    primitiveParameterizationSufficient: number;
+    referencedTokenDefinitionsSufficient: number;
     sourceStateSufficientForRouting: number;
     requiresExistingPrimitiveExtension: number;
     requiresNewPrimitive: number;
@@ -50,23 +60,25 @@ export type CardTriageDecision = {
     requiresNewSelectorOrChoiceContract: number;
     requiresNewTimingOrChainContract: number;
     requiresNewProjectionContract: number;
-    sharedEngineChangeLikely: number;
-    fullMoeDiscoveryNeeded: number;
-    larryVerificationLikelyNeeded: number;
     mechanicalNovelty: number;
-    recommendedTargetedRouteProbability: number;
   };
   reasons: string[];
 };
 
-const FAST_POSITIVE_THRESHOLD = 0.85;
-const FAST_STATE_THRESHOLD = 0.8;
-const FAST_MODEL_ONLY_THRESHOLD = 0.75;
-const FAST_RISK_CEILING = 0.2;
-const FAST_ROUTE_THRESHOLD = 0.7;
-const FAST_REUSE_OR_COMPOSE_THRESHOLD = 0.85;
+// Final shadow-calibration gate derived from the ten-card regression set after
+// refining the Jev questions/state. Keep the gate deliberately small and use
+// only signals that remained discriminative in the final pass. Other Jev
+// answers stay available as telemetry but do not block the fast path.
+const FAST_VOCABULARY_THRESHOLD = 0.7;
+const FAST_CLAUSE_COVERAGE_THRESHOLD = 0.5;
+const FAST_PARAMETERIZATION_THRESHOLD = 0.5;
+const FAST_NO_GAP_THRESHOLD = 0.6;
+const FAST_NEW_PRIMITIVE_CEILING = 0.25;
 const FAST_NOVELTY_CEILING = 1.25;
+
 const PRIMITIVE_SELECTION_THRESHOLD = 0.7;
+const NON_EXECUTABLE_RISK_THRESHOLD = 0.6;
+const TOP_PRIMITIVE_CANDIDATE_COUNT = 10;
 
 export function decideCardTriageRoute(
   state: CardJevTriageState,
@@ -77,13 +89,27 @@ export function decideCardTriageRoute(
   }
 
   const disposition = choiceAnswer(result, "implementationDisposition");
-  const recommendedRoute = choiceAnswer(result, "recommendedRoute");
+  const primaryGap = choiceAnswer(result, "primaryGapFamily");
   const mechanicalNovelty = scoreAnswer(result, "mechanicalNovelty");
   const reuseOrComposeProbability =
     (disposition.probabilities.EXACT_REUSE ?? 0) +
     (disposition.probabilities.COMPOSE_EXISTING ?? 0);
-  const selectedPrimitives = collectSelectedPrimitives(state, result);
-  const signals = {
+
+  const primitiveCandidates = collectPrimitiveCandidates(state, result);
+  const selectedPrimitives = primitiveCandidates.filter(
+    (primitive) => primitive.probability >= PRIMITIVE_SELECTION_THRESHOLD,
+  );
+  const topPrimitiveCandidates = primitiveCandidates.slice(
+    0,
+    TOP_PRIMITIVE_CANDIDATE_COUNT,
+  );
+  const nonExecutablePrimitiveRisks = primitiveCandidates.filter(
+    (primitive) =>
+      primitive.probability >= NON_EXECUTABLE_RISK_THRESHOLD &&
+      primitive.runtimeCoverage !== "executable",
+  );
+
+  const signals: CardTriageDecision["signals"] = {
     existingBehaviorVocabularySufficient: noulProbability(
       result,
       "existingBehaviorVocabularySufficient",
@@ -97,9 +123,25 @@ export function decideCardTriageRoute(
       result,
       "behaviorModelOnlySufficient",
     ),
+    deterministicSuggestionComplete: noulProbability(
+      result,
+      "deterministicSuggestionComplete",
+    ),
+    deterministicSuggestionParametersReliable: noulProbability(
+      result,
+      "deterministicSuggestionParametersReliable",
+    ),
     allMaterialClausesCoveredByExistingPrimitives: noulProbability(
       result,
       "allMaterialClausesCoveredByExistingPrimitives",
+    ),
+    primitiveParameterizationSufficient: noulProbability(
+      result,
+      "primitiveParameterizationSufficient",
+    ),
+    referencedTokenDefinitionsSufficient: noulProbability(
+      result,
+      "referencedTokenDefinitionsSufficient",
     ),
     sourceStateSufficientForRouting: noulProbability(
       result,
@@ -130,50 +172,22 @@ export function decideCardTriageRoute(
       result,
       "requiresNewProjectionContract",
     ),
-    sharedEngineChangeLikely: noulProbability(
-      result,
-      "sharedEngineChangeLikely",
-    ),
-    fullMoeDiscoveryNeeded: noulProbability(result, "fullMoeDiscoveryNeeded"),
-    larryVerificationLikelyNeeded: noulProbability(
-      result,
-      "larryVerificationLikelyNeeded",
-    ),
     mechanicalNovelty: mechanicalNovelty.score,
-    recommendedTargetedRouteProbability:
-      recommendedRoute.probabilities.TARGETED_IMPLEMENTATION ?? 0,
   };
 
-  const rulesTextIsMaterial = state.targetCard.rulesText.trim().length > 0;
-  const selectedNonExecutable = selectedPrimitives.filter(
-    (primitive) => primitive.runtimeCoverage !== "executable",
-  );
-  const riskSignals = [
-    signals.requiresExistingPrimitiveExtension,
-    signals.requiresNewPrimitive,
-    signals.requiresNewEventOrTriggerInfrastructure,
-    signals.requiresNewPersistentGameState,
-    signals.requiresNewSelectorOrChoiceContract,
-    signals.requiresNewTimingOrChainContract,
-    signals.requiresNewProjectionContract,
-    signals.sharedEngineChangeLikely,
-    signals.fullMoeDiscoveryNeeded,
-  ];
-  const maxRisk = Math.max(...riskSignals);
+  const noGapProbability = primaryGap.probabilities.NONE ?? 0;
 
   const fastPath =
-    reuseOrComposeProbability >= FAST_REUSE_OR_COMPOSE_THRESHOLD &&
-    signals.recommendedTargetedRouteProbability >= FAST_ROUTE_THRESHOLD &&
-    signals.existingBehaviorVocabularySufficient >= FAST_POSITIVE_THRESHOLD &&
-    signals.existingExecutableCapabilitiesSufficient >= FAST_POSITIVE_THRESHOLD &&
+    signals.existingBehaviorVocabularySufficient >=
+      FAST_VOCABULARY_THRESHOLD &&
     signals.allMaterialClausesCoveredByExistingPrimitives >=
-      FAST_POSITIVE_THRESHOLD &&
-    signals.sourceStateSufficientForRouting >= FAST_STATE_THRESHOLD &&
-    signals.behaviorModelOnlySufficient >= FAST_MODEL_ONLY_THRESHOLD &&
-    maxRisk <= FAST_RISK_CEILING &&
+      FAST_CLAUSE_COVERAGE_THRESHOLD &&
+    signals.primitiveParameterizationSufficient >=
+      FAST_PARAMETERIZATION_THRESHOLD &&
+    noGapProbability >= FAST_NO_GAP_THRESHOLD &&
+    signals.requiresNewPrimitive <= FAST_NEW_PRIMITIVE_CEILING &&
     signals.mechanicalNovelty <= FAST_NOVELTY_CEILING &&
-    selectedNonExecutable.length === 0 &&
-    (!rulesTextIsMaterial || selectedPrimitives.length > 0);
+    nonExecutablePrimitiveRisks.length === 0;
 
   if (fastPath) {
     return {
@@ -183,41 +197,44 @@ export function decideCardTriageRoute(
         confidence: disposition.confidence,
         reuseOrComposeProbability,
       },
+      primaryGap: {
+        choice: primaryGap.choice,
+        confidence: primaryGap.confidence,
+        noneProbability: primaryGap.probabilities.NONE ?? 0,
+      },
       selectedPrimitives,
+      topPrimitiveCandidates,
+      nonExecutablePrimitiveRisks,
       signals,
       reasons: [
-        "Jev signals agree that existing executable primitives cover the material card semantics.",
-        "No selected primitive requires new runtime coverage.",
-        "Novelty and shared-engine risk remain below the conservative fast-path thresholds.",
+        "Final calibrated semantic signals place the card in the targeted-implementation fast path.",
+        "No primitive with material probability lacks executable runtime coverage.",
+        "Vocabulary coverage, clause coverage, parameterization, gap confidence, new-primitive risk, and novelty satisfy the final gate.",
       ],
     };
   }
 
-  const moeThenLarryProbability =
-    recommendedRoute.probabilities.MOE_THEN_LARRY ?? 0;
-  const needsLarry =
-    moeThenLarryProbability >= 0.6 ||
-    (signals.sharedEngineChangeLikely >= 0.7 &&
-      signals.larryVerificationLikelyNeeded >= 0.65);
-
-  const reasons = buildEscalationReasons({
-    state,
-    reuseOrComposeProbability,
-    selectedNonExecutable,
-    signals,
-    maxRisk,
-  });
-
   return {
-    route: needsLarry ? "MOE_THEN_LARRY" : "MOE_DISCOVERY",
+    route: "MOE_DISCOVERY",
     disposition: {
       choice: disposition.choice,
       confidence: disposition.confidence,
       reuseOrComposeProbability,
     },
+    primaryGap: {
+      choice: primaryGap.choice,
+      confidence: primaryGap.confidence,
+      noneProbability: primaryGap.probabilities.NONE ?? 0,
+    },
     selectedPrimitives,
+    topPrimitiveCandidates,
+    nonExecutablePrimitiveRisks,
     signals,
-    reasons,
+    reasons: buildEscalationReasons({
+      nonExecutablePrimitiveRisks,
+      noGapProbability,
+      signals,
+    }),
   };
 }
 
@@ -239,19 +256,12 @@ export function buildCompactCardTriageOutput(input: {
     jevAdvisoryRoute:
       input.mode === "shadow" ? input.decision.route : undefined,
     disposition: input.decision.disposition,
+    primaryGap: input.decision.primaryGap,
     selectedPrimitives: input.decision.selectedPrimitives,
-    confidence: {
-      executableCapabilities:
-        input.decision.signals.existingExecutableCapabilitiesSufficient,
-      newPrimitive: input.decision.signals.requiresNewPrimitive,
-      primitiveExtension:
-        input.decision.signals.requiresExistingPrimitiveExtension,
-      sharedEngineChange: input.decision.signals.sharedEngineChangeLikely,
-      fullMoeDiscovery: input.decision.signals.fullMoeDiscoveryNeeded,
-      larryVerification:
-        input.decision.signals.larryVerificationLikelyNeeded,
-      mechanicalNovelty: input.decision.signals.mechanicalNovelty,
-    },
+    topPrimitiveCandidates: input.decision.topPrimitiveCandidates,
+    nonExecutablePrimitiveRisks:
+      input.decision.nonExecutablePrimitiveRisks,
+    signals: input.decision.signals,
     artifact: input.artifactPath,
   };
 }
@@ -264,13 +274,24 @@ function alreadyImplementedDecision(): CardTriageDecision {
       confidence: 1,
       reuseOrComposeProbability: 1,
     },
+    primaryGap: {
+      choice: "NONE",
+      confidence: 1,
+      noneProbability: 1,
+    },
     selectedPrimitives: [],
+    topPrimitiveCandidates: [],
+    nonExecutablePrimitiveRisks: [],
     signals: {
       existingBehaviorVocabularySufficient: 1,
       existingExecutableCapabilitiesSufficient: 1,
       compositionSufficient: 1,
       behaviorModelOnlySufficient: 1,
+      deterministicSuggestionComplete: 1,
+      deterministicSuggestionParametersReliable: 1,
       allMaterialClausesCoveredByExistingPrimitives: 1,
+      primitiveParameterizationSufficient: 1,
+      referencedTokenDefinitionsSufficient: 1,
       sourceStateSufficientForRouting: 1,
       requiresExistingPrimitiveExtension: 0,
       requiresNewPrimitive: 0,
@@ -279,20 +300,16 @@ function alreadyImplementedDecision(): CardTriageDecision {
       requiresNewSelectorOrChoiceContract: 0,
       requiresNewTimingOrChainContract: 0,
       requiresNewProjectionContract: 0,
-      sharedEngineChangeLikely: 0,
-      fullMoeDiscoveryNeeded: 0,
-      larryVerificationLikelyNeeded: 0,
       mechanicalNovelty: 0,
-      recommendedTargetedRouteProbability: 1,
     },
     reasons: ["Canonical source is current and runtime readiness is executable."],
   };
 }
 
-function collectSelectedPrimitives(
+function collectPrimitiveCandidates(
   state: CardJevTriageState,
   result: CardJevSystemOneResult,
-): SelectedPrimitive[] {
+): PrimitiveCandidate[] {
   return state.behaviorCatalog
     .map((primitive) => {
       const answer = result.answers[primitiveQuestionName(primitive.id)];
@@ -301,53 +318,70 @@ function collectSelectedPrimitives(
         id: primitive.id,
         probability: answer.noul,
         runtimeCoverage: primitive.runtimeCoverage,
-      } satisfies SelectedPrimitive;
+      } satisfies PrimitiveCandidate;
     })
     .filter(
-      (primitive): primitive is SelectedPrimitive =>
-        primitive !== null &&
-        primitive.probability >= PRIMITIVE_SELECTION_THRESHOLD,
+      (primitive): primitive is PrimitiveCandidate => primitive !== null,
     )
     .sort((left, right) => right.probability - left.probability);
 }
 
 function buildEscalationReasons(input: {
-  state: CardJevTriageState;
-  reuseOrComposeProbability: number;
-  selectedNonExecutable: SelectedPrimitive[];
+  nonExecutablePrimitiveRisks: PrimitiveCandidate[];
+  noGapProbability: number;
   signals: CardTriageDecision["signals"];
-  maxRisk: number;
 }): string[] {
   const reasons: string[] = [];
-  if (input.reuseOrComposeProbability < FAST_REUSE_OR_COMPOSE_THRESHOLD) {
-    reasons.push("Reuse/composition confidence does not meet the fast-path threshold.");
-  }
+
   if (
-    input.signals.existingExecutableCapabilitiesSufficient <
-    FAST_POSITIVE_THRESHOLD
+    input.signals.existingBehaviorVocabularySufficient <
+    FAST_VOCABULARY_THRESHOLD
   ) {
-    reasons.push("Existing executable-capability sufficiency is not high-confidence.");
-  }
-  if (input.maxRisk > FAST_RISK_CEILING) {
-    reasons.push("At least one new/shared-capability risk signal exceeds the fast-path ceiling.");
-  }
-  if (input.selectedNonExecutable.length > 0) {
     reasons.push(
-      `Selected primitives are not executable: ${input.selectedNonExecutable
-        .map((primitive) => primitive.id)
-        .join(", ")}.`,
+      "Existing behavior-vocabulary sufficiency is below the final fast-path floor.",
     );
   }
   if (
-    input.state.targetCard.rulesText.trim().length > 0 &&
-    input.state.behaviorCatalog.length > 0 &&
-    input.signals.sourceStateSufficientForRouting < FAST_STATE_THRESHOLD
+    input.signals.allMaterialClausesCoveredByExistingPrimitives <
+    FAST_CLAUSE_COVERAGE_THRESHOLD
   ) {
-    reasons.push("Jev does not consider the supplied state sufficient for direct routing.");
+    reasons.push(
+      "Existing primitives do not confidently cover all material card clauses.",
+    );
+  }
+  if (
+    input.signals.primitiveParameterizationSufficient <
+    FAST_PARAMETERIZATION_THRESHOLD
+  ) {
+    reasons.push(
+      "Primitive parameterization sufficiency is below the final fast-path floor.",
+    );
+  }
+  if (input.noGapProbability < FAST_NO_GAP_THRESHOLD) {
+    reasons.push(
+      "Jev does not assign enough probability to there being no material capability gap.",
+    );
+  }
+  if (input.signals.requiresNewPrimitive > FAST_NEW_PRIMITIVE_CEILING) {
+    reasons.push("New-primitive risk exceeds the final fast-path ceiling.");
+  }
+  if (input.signals.mechanicalNovelty > FAST_NOVELTY_CEILING) {
+    reasons.push("Mechanical novelty exceeds the final fast-path ceiling.");
+  }
+  if (input.nonExecutablePrimitiveRisks.length > 0) {
+    reasons.push(
+      `Material primitive candidates are not executable: ${input.nonExecutablePrimitiveRisks
+        .map(
+          (primitive) =>
+            `${primitive.id} (${primitive.probability.toFixed(2)})`,
+        )
+        .join(", ")}.`,
+    );
   }
   if (reasons.length === 0) {
-    reasons.push("The conservative targeted-implementation gate was not fully satisfied.");
+    reasons.push("The final targeted-implementation gate was not fully satisfied.");
   }
+
   return reasons;
 }
 
