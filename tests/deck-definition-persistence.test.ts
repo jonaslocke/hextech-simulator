@@ -51,7 +51,7 @@ test("plans idempotent deck-definition synchronization", async () => {
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
   assert.deepEqual(first.result, {
-    insertedCount: 5,
+    insertedCount: 6,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +61,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 5,
+    unchangedCount: 6,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,7 +75,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 4,
+    unchangedCount: 5,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
@@ -89,7 +89,7 @@ test("requires the complete fixed seed set", async () => {
         [seedSet()[0]!],
         NOW,
       ),
-    /exactly: lux, annie, master-yi, garen/,
+    /exactly: lux, annie, master-yi, stellacorn-herder, garen/,
   );
 });
 
@@ -115,6 +115,7 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
   assert.deepEqual(partial, [
     { id: "lux", label: "Lux" },
     { id: "master-yi", label: "Master Yi" },
+    { id: "stellacorn-herder", label: "Stellacorn Herder" },
     { id: "garen", label: "Garen" },
     { id: "ornn", label: "Ornn" },
   ]);
@@ -171,6 +172,11 @@ function seedSet(): DeckDefinitionSeed[] {
       id: "master-yi",
       label: "Master Yi",
       sourceText: validSourceText("Master Yi"),
+    },
+    {
+      id: "stellacorn-herder",
+      label: "Stellacorn Herder",
+      sourceText: validSourceText("Stellacorn Herder"),
     },
     { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
     { id: "ornn", label: "Ornn", sourceText: validSourceText("Ornn") },

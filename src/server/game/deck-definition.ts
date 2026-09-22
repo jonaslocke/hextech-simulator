@@ -10,6 +10,11 @@ export const PERMANENT_DECK_DEFINITIONS = [
   { id: "lux", label: "Lux", sourcePath: "data/decks/lux.dec.txt" },
   { id: "annie", label: "Annie", sourcePath: "data/decks/annie.dec.txt" },
   { id: "master-yi", label: "Master Yi", sourcePath: "data/decks/masteryi.dec.txt" },
+  {
+    id: "stellacorn-herder",
+    label: "Stellacorn Herder",
+    sourcePath: "data/decks/Stellacorn Herder.dec.txt",
+  },
   { id: "garen", label: "Garen", sourcePath: "data/decks/garen.dec.txt" },
   {
     id: "ornn",

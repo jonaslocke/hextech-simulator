@@ -178,6 +178,7 @@ export const deckIdSchema = z.enum([
   "lux",
   "annie",
   "master-yi",
+  "stellacorn-herder",
   "garen",
   "lux-s",
   "annie-s",
