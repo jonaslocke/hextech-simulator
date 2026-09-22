@@ -16,6 +16,7 @@
     "catalog:sync-behaviors": "node --env-file=.env --import tsx scripts/sync-card-catalog-behaviors.ts --confirm",
     "catalog:sync-decks": "node --env-file=.env --import tsx scripts/sync-deck-definitions.ts --confirm",
     "catalog:sync-sideboard-decks": "node --env-file=.env --import tsx scripts/sync-sideboard-validation-decks.ts --confirm",
+    "card:triage:jev": "node --env-file=.env --import tsx scripts/card-jev-triage.ts",
     "game:reset-runtime": "node --env-file=.env --import tsx scripts/reset-game-runtime.ts --confirm",
     "start": "tsx server.ts",
     "lint": "eslint .",
@@ -24,6 +25,7 @@
     "verify:pr": "node --import tsx scripts/verify-pr.ts"
   },
   "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0",
     "@dnd-kit/core": "^6.3.1",
     "@radix-ui/react-popover": "^1.1.17",
     "@radix-ui/react-select": "^2.3.1",

@@ -101,6 +101,45 @@ Moe; Moe or Curly may route a high-risk shared change to Larry. Routine
 parameter-only reuse or a localized low-risk correction should skip specialists
 that add no information.
 
+### Jev card-implementation triage
+
+For a task whose requested outcome is to implement **one new card**, Jev may
+perform a read-only pre-Moe triage using the target card plus the current behavior
+catalog. This is a routing optimization, not a rules or semantic authority.
+
+- When `HEXTECH_JEV_CARD_TRIAGE_MODE=off`, preserve the pre-Jev workflow exactly:
+  do not run the Jev triage command and do not consult prior Jev artifacts.
+- Otherwise, before loading Moe, run
+  `npm run card:triage:jev -- --card "<exact source card name>"` (or
+  `--public-code` when the printing is ambiguous).
+- `ALREADY_IMPLEMENTED` means the current source matches an executable canonical
+  publication; do not reimplement it merely because it appears in the requested
+  deck/corpus.
+- `TARGETED_IMPLEMENTATION` means Jev found high-confidence agreement that
+  existing **executable** primitives cover the card. Verify the reported owners
+  against repository evidence and proceed without loading full Moe discovery. If
+  that verification contradicts the triage, stop the shortcut and use Moe.
+- `MOE_DISCOVERY` routes through Moe normally.
+- `MOE_THEN_LARRY` routes through Moe first; use Larry only if the resulting
+  shared change actually has the state/sequence risk Larry owns.
+- `shadow` mode records Jev advice but keeps `MOE_DISCOVERY` as the effective
+  route, so it must not be treated as permission to skip existing discovery.
+
+The triage script constructs its state deterministically from local source-card
+and behavior-catalog owners and uses the official `@typesafe-ai/sdk`
+`TypeSafeClient`, `noul`, `choice`, and `score` APIs to ask Jev many independent
+questions in one System One call. Do not reimplement the Jev HTTP protocol or
+SDK request/response types locally. Jev never searches the repository. It may
+identify candidate primitives; Codex still verifies those concrete owners before
+editing them.
+
+The compact stdout is the normal agent input. The complete state, questions,
+probabilities, and API usage are written under ignored
+`.agent-work/card-jev-triage/`; do not load that full artifact into the coding
+context unless debugging the triage itself. A TypeSafe/API failure is not semantic
+evidence; fall back to the existing Moe route or treat the Jev experiment run as
+invalid when Jev use is required by the task.
+
 For substantial specialist work, keep at most one compact ephemeral task record
 under `.agent-work/<task>/` rather than separate specialist reports. Preserve only
 requested outcome, verified BASE/HEAD, reusable owner, protected behavior,
