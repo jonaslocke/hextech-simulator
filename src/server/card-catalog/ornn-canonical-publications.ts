@@ -45,6 +45,7 @@ const models: Record<string, Clause[]> = {
     [["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], ["action", "action.draw_cards", { player: "controller", count: 1 }]],
     [["ability", "ability.activated_effect", {}], ["cost", "cost.pay", { amount: 1, resource: "energy" }], ["cost", "cost.pay", { amount: 1, resource: "rune" }], ["cost", "cost.exhaust_source", {}], ["action", "action.kill_card", { target: "source" }], ["action", "action.draw_cards", { player: "controller", count: 1 }]],
   ],
+  "SFD-048": [[["trigger", "trigger.on_move", { subject: "source" }], ["action", "action.draw_cards", { player: "controller", count: 1 }]]],
   "SFD-051": [[friendlyUnit(), ["ability", "ability.equip", {}], ["cost", "cost.pay", { amount: 1, resource: "rune" }]]],
   "SFD-056": [
     [["keyword", "keyword.quick_draw", {}], ["trigger", "trigger.on_play", { actor: "controller", subject: "source" }], friendlyUnit("unit"), ["action", "action.attach_equipment", { target: "friendly_unit", selectionKey: "unit" }]],
