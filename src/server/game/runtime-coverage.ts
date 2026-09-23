@@ -39,6 +39,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.draw_cards": "executable",
   "action.draw_by_controlled_battlefield_count": "executable",
   "action.search_top_deck": "executable",
+  "action.each_player_choose_top_deck_card_and_play": "executable",
   "action.gain_xp": "executable",
   "action.reveal_opponent_hand": "executable",
   "action.grant_facedown_vision": "executable",

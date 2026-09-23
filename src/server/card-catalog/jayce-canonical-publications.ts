@@ -11,6 +11,9 @@ type Assignment = [
 type Clause = Assignment[];
 
 const models: Record<string, Clause[]> = {
+  "OGN-115": [[
+    ["action", "action.each_player_choose_top_deck_card_and_play", { count: 5 }],
+  ]],
   "VEN-149": [
     [
       ["ability", "ability.empower", {}],

@@ -913,6 +913,57 @@ export function createPrimitiveHandlers(
       }
     },
   });
+  handlers.set("action.each_player_choose_top_deck_card_and_play", {
+    choice(binding, context) {
+      const count = numberParam(binding, "count");
+      const selected = new Set(context.selectedIds);
+      for (const playerId of playersStartingWithNext(context.game, context.controllerPlayerId)) {
+        const looked = context.game.state.players[playerId]!.zones.mainDeck.slice(0, count);
+        if (looked.length > 0 && !looked.some((id) => selected.has(id))) {
+          return {
+            playerId,
+            choiceKey: `player:${playerId}`,
+            legalIds: looked,
+            visibleIds: looked,
+            minimum: 1,
+            maximum: 1,
+            prompt: "Choose a card to play, then recycle the rest.",
+            sourceZone: "mainDeck" as const,
+            presentation: "cardSelection" as const,
+          };
+        }
+      }
+      return null;
+    },
+    execute(binding, context) {
+      if (!context.effectResolutionId) {
+        throw new Error("Effect-driven card play must resolve in an effect frame.");
+      }
+      const resolutionId = context.effectResolutionId;
+      if ((context.game.state.effectPlayQueue ?? []).length > 0) {
+        throw new Error("Effect-driven card play queue is already active.");
+      }
+      const selected = new Set(context.selectedIds);
+      const staged = playersStartingWithNext(context.game, context.controllerPlayerId).flatMap((playerId) => {
+        const player = context.game.state.players[playerId]!;
+        const looked = player.zones.mainDeck.slice(0, numberParam(binding, "count"));
+        const chosen = looked.find((id) => selected.has(id));
+        if (!chosen) return [];
+        recycleCards(context.game, index, context.sourceCardInstanceId, looked.filter((id) => id !== chosen));
+        player.zones.mainDeck = player.zones.mainDeck.filter((id) => id !== chosen);
+        player.zones.hand.push(chosen);
+        advanceGameObjectIncarnation(context.game, chosen);
+        return [{
+          resolutionId,
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          playerId,
+          cardInstanceId: chosen,
+          ignoreBaseEnergy: true,
+        }];
+      });
+      context.game.state.effectPlayQueue = staged;
+    },
+  });
   handlers.set("trigger.stored_target_death", {
     matches(_binding, context) {
       const target = context.event?.subjectCardInstanceId;
@@ -1392,11 +1443,12 @@ export function effectiveEnergyCost(
   index?: RuntimeCardIndex,
   cardInstanceId?: string,
   onContribution?: (contribution: NumericContribution) => void,
+  baseEnergy?: number,
 ): number {
   return effectiveNumericValue({
     onContribution,
     attribute: "energyCost",
-    baseValue: definition.card.attributes.energy ?? 0,
+    baseValue: baseEnergy ?? definition.card.attributes.energy ?? 0,
     cardType: definition.card.classification.type,
     controllerPlayerId,
     game,
@@ -2474,6 +2526,14 @@ function effectOutcomeMatches(
   const expected = binding.parameters.onlyIfEffectValue;
   return context.effectOutcomes[effectKey] ===
     (typeof expected === "boolean" ? expected : true);
+}
+
+function playersStartingWithNext(game: GameDocument, playerId: string) {
+  const playerIds = [...game.state.setup.playerIds];
+  const index = playerIds.indexOf(playerId);
+  return index < 0
+    ? playerIds
+    : [...playerIds.slice(index + 1), ...playerIds.slice(0, index + 1)];
 }
 
 export function recycleCards(

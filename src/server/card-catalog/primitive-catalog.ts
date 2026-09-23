@@ -1184,6 +1184,15 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: partiallySupported("Entry-state changes are recurring in the corpus; target/source variants require additional validation.")
   }),
+  "action.each_player_choose_top_deck_card_and_play": primitiveSeed({
+    id: "action.each_player_choose_top_deck_card_and_play",
+    family: "action",
+    name: "Each player chooses and plays a top-deck card",
+    description: "Each player privately chooses one card from the top of their Main Deck, recycles the rest, then plays the chosen cards in next-player order while ignoring their base Energy costs.",
+    parameters: [required("count", "number", "Maximum number of Main Deck cards each player looks at.")],
+    emitsEvents: ["card.recycled", "card.played"],
+    engineSupport: supported("The effect frame retains private per-player choices and a server-authoritative staged-play queue reuses normal card declarations and Power payment."),
+  }),
   "trigger.stored_target_death": primitiveSeed({
     id: "trigger.stored_target_death",
     family: "trigger",

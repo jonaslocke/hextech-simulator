@@ -72,6 +72,7 @@ import {
 } from "./payment";
 import {
   beginEffectResolution,
+  resumeEffectResolution,
   submitEffectOption,
   submitEffectSelection,
   submitTokenPlacement,
@@ -99,6 +100,23 @@ export function gameplayActions(
   const actions: ProjectedAction[] = [
     action(game, "concede", "Concede Game", null),
   ];
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (stagedPlay) {
+    if (stagedPlay.playerId !== actorPlayerId) return actions;
+    addPlayableCardActions(actions, game, actorPlayerId, decks, index, "neutralOpen", {
+      stagedCardInstanceId: stagedPlay.cardInstanceId,
+      ignoreBaseEnergy: stagedPlay.ignoreBaseEnergy,
+    });
+    addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen", true);
+    // Rule 419.3.c: if an effect-driven play has no eligible card play, the
+    // instruction does nothing and the resolving effect continues. Resource
+    // preparation remains available whenever it can make the staged card
+    // playable, so this continuation is projected only once no play action is.
+    if (!actions.some((candidate) => candidate.id.split(":")[3] === "play")) {
+      actions.push(action(game, "skipEffectPlay", "Continue", null));
+    }
+    return actions;
+  }
   // Debug intents still pass through normal authorization, versioning, and logging.
   if (process.env.NODE_ENV === "development") {
     const disabledReason = game.state.pendingChoice
@@ -520,6 +538,9 @@ export function performGameplayAction(input: {
         input.decks,
       );
       break;
+    case "skipEffectPlay":
+      skipEffectPlay(game, input.actorPlayerId, index, input.decks);
+      break;
     case "submitChoice":
       if (game.state.pendingChoice?.type === "orderReplacements") {
         submitDeathReplacementOrder(
@@ -757,7 +778,14 @@ function playCard(
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
-  const { destinationId, optionalCostKeys, flow, repeat, preplayOptionSelections } = decodePlayExtra(playExtra);
+  const { destinationId, optionalCostKeys, flow, repeat, effectPlay, preplayOptionSelections } = decodePlayExtra(playExtra);
+  const stagedPlay = effectPlay ? game.state.effectPlayQueue?.[0] : null;
+  if (
+    effectPlay &&
+    (!stagedPlay || stagedPlay.playerId !== playerId || stagedPlay.cardInstanceId !== cardId)
+  ) {
+    throw new Error("Effect-driven card play is not available for this card.");
+  }
   const flowEnergyCost = flowEnergyCostFor(definition);
   if (
     flow
@@ -842,7 +870,9 @@ function playCard(
   if (dynamicTargets.some((target) => target.kind === "location")) {
     validateTargetRequirements(dynamicTargets, firstExecutionTargets);
   }
-  const energyCost = flow
+  const energyCost = effectPlay
+    ? effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, 0)
+    : flow
     ? flowEnergyCost!
     : effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
@@ -903,6 +933,7 @@ function playCard(
     );
     dispatchBehaviorEvent(game, playEvent, decks, { chainOrigin: "cardPlay" });
     cleanupBoard(game, index);
+    completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
     return;
   }
   if (isUnit) {
@@ -946,6 +977,7 @@ function playCard(
       );
       game.state.showdown.passedPlayerIds = [];
     }
+    completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
     return;
   }
   advanceGameObjectIncarnation(game, cardId);
@@ -985,6 +1017,50 @@ function playCard(
       passedPlayerIds: [],
     };
   }
+  completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
+}
+
+function completeEffectPlayIfReady(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  effectPlay: boolean,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  if (!effectPlay) return;
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay || stagedPlay.playerId !== playerId || stagedPlay.cardInstanceId !== cardId) {
+    throw new Error("Effect-driven card play queue is unavailable.");
+  }
+  game.state.effectPlayQueue!.shift();
+  if (game.state.effectPlayQueue!.length > 0) return;
+  resumeEffectResolution(game, stagedPlay.resolutionId, decks);
+  completeChainResolution(game, index, decks);
+}
+
+function skipEffectPlay(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay || stagedPlay.playerId !== playerId) {
+    throw new Error("Effect-driven card play queue is unavailable.");
+  }
+  const player = game.state.players[playerId]!;
+  const cardId = stagedPlay.cardInstanceId;
+  if (!player.zones.hand.includes(cardId)) {
+    throw new Error("The staged card is no longer available to play.");
+  }
+  // The temporary hand staging is an implementation detail. A card which
+  // cannot be played returns to its Main Deck; the other looked-at cards have
+  // already been recycled to the bottom by the resolving instruction.
+  player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  player.zones.mainDeck.unshift(cardId);
+  advanceGameObjectIncarnation(game, cardId);
+  completeEffectPlayIfReady(game, playerId, cardId, true, index, decks);
 }
 
 function spellResolutionClauseId(
@@ -1685,14 +1761,16 @@ function encodePlayExtra(
   optionalCostKeys: readonly string[],
   flow = false,
   repeat = false,
+  effectPlay = false,
   preplayOptionSelections: readonly Record<string, string[]>[] = [],
 ) {
-  if (optionalCostKeys.length === 0 && !flow && !repeat && preplayOptionSelections.length === 0) return destinationId;
+  if (optionalCostKeys.length === 0 && !flow && !repeat && !effectPlay && preplayOptionSelections.length === 0) return destinationId;
   return `play:${JSON.stringify({
     destinationId: destinationId ?? null,
     optionalCostKeys,
     flow,
     repeat,
+    effectPlay,
     preplayOptionSelections,
   })}`;
 }
@@ -1702,10 +1780,11 @@ function decodePlayExtra(extra: string): {
   optionalCostKeys: string[];
   flow: boolean;
   repeat: boolean;
+  effectPlay: boolean;
   preplayOptionSelections: Record<string, string[]>[];
 } {
   if (!extra.startsWith("play:")) {
-    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false, preplayOptionSelections: [] };
+    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false, effectPlay: false, preplayOptionSelections: [] };
   }
   try {
     const parsed: unknown = JSON.parse(extra.slice("play:".length));
@@ -1721,11 +1800,13 @@ function decodePlayExtra(extra: string): {
       .optionalCostKeys;
     const flow = (parsed as { flow?: unknown }).flow;
     const repeat = (parsed as { repeat?: unknown }).repeat;
+    const effectPlay = (parsed as { effectPlay?: unknown }).effectPlay;
     const preplayOptionSelections = (parsed as { preplayOptionSelections?: unknown }).preplayOptionSelections;
     if (
       (destinationId !== null && typeof destinationId !== "string") ||
       (flow !== undefined && typeof flow !== "boolean") ||
       (repeat !== undefined && typeof repeat !== "boolean") ||
+      (effectPlay !== undefined && typeof effectPlay !== "boolean") ||
       optionalCostKeys.some((key) => typeof key !== "string") ||
       new Set(optionalCostKeys).size !== optionalCostKeys.length ||
       (preplayOptionSelections !== undefined && (!Array.isArray(preplayOptionSelections) ||
@@ -1740,6 +1821,7 @@ function decodePlayExtra(extra: string): {
       optionalCostKeys: optionalCostKeys as string[],
       flow: flow === true,
       repeat: repeat === true,
+      effectPlay: effectPlay === true,
       preplayOptionSelections: (preplayOptionSelections ?? []) as Record<string, string[]>[],
     };
   } catch {
@@ -1856,6 +1938,10 @@ function addPlayableCardActions(
   decks: readonly DeckSnapshotDocument[],
   index: RuntimeCardIndex,
   timing: TurnTiming,
+  stagedPlay?: {
+    stagedCardInstanceId: string;
+    ignoreBaseEnergy: boolean;
+  },
 ) {
   const player = game.state.players[playerId]!;
   const handlers = createPrimitiveHandlers(index);
@@ -1872,6 +1958,7 @@ function addPlayableCardActions(
       .map((cardId) => ({ cardId, flow: true })),
   );
   for (const { cardId, flow } of playableCards) {
+    if (stagedPlay && cardId !== stagedPlay.stagedCardInstanceId) continue;
     const definition = definitionForInstance(cardId, index);
     if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
@@ -1881,8 +1968,9 @@ function addPlayableCardActions(
     const hasReaction =
       timings.includes("timing.reaction") ||
       hasBehavior(definition, "keyword.quick_draw");
-    if (timing === "showdownOpen" && !hasAction && !hasReaction) continue;
+    if (!stagedPlay && timing === "showdownOpen" && !hasAction && !hasReaction) continue;
     if (
+      !stagedPlay &&
       (timing === "neutralClosed" || timing === "showdownClosed") &&
       !hasReaction
     )
@@ -1893,7 +1981,9 @@ function addPlayableCardActions(
       optionalSourceCosts.map((payment) => payment.selectionKey),
     );
     const costContributions: NumericContribution[] = [];
-    const cost = flow
+    const cost = stagedPlay?.ignoreBaseEnergy
+      ? effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry), 0)
+      : flow
       ? flowEnergyCostFor(definition)!
       : effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
     const effectivePower = effectivePowerCost(
@@ -1987,6 +2077,7 @@ function addPlayableCardActions(
         const costsPayable = payment.canPay;
         const preparable = !costsPayable && hasLegalTargets && canPrepareCardPayment(
           game, playerId, decks, definition, additionalCosts, cardId, timing,
+          stagedPlay?.ignoreBaseEnergy ? 0 : undefined,
         );
         const enabled = (costsPayable || preparable) && hasLegalTargets;
         const disabledReason = !hasLegalTargets
@@ -2015,6 +2106,7 @@ function addPlayableCardActions(
               optionalCostKeys,
               flow,
               repeat,
+              Boolean(stagedPlay),
               preplayOptionSelections.some((selection) => Object.keys(selection).length > 0)
                 ? preplayOptionSelections
                 : [],
@@ -2048,10 +2140,11 @@ function canPrepareCardPayment(
   additionalCosts: readonly AdditionalCardCost[],
   cardId: string,
   timing: TurnTiming,
+  baseEnergyOverride?: number,
 ) {
   const index = createRuntimeCardIndex(decks, game);
   if (cardPaymentExceedsResourceCapacity(game, playerId, definition, index,
-    effectiveEnergyCost(game, playerId, definition, index, cardId), additionalCosts, cardId)) return false;
+    effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, baseEnergyOverride), additionalCosts, cardId)) return false;
   // Supported Add handlers change resource/board state, not runtime card
   // definitions or instances. Reuse their index throughout this local search.
   const handlers = createPrimitiveHandlers(index);
@@ -2065,7 +2158,7 @@ function canPrepareCardPayment(
     if (visited.has(key)) return false;
     visited.add(key);
     if (canPayCardCosts(state, playerId, definition,
-      effectiveEnergyCost(state, playerId, definition, index, cardId), index, 0, additionalCosts, cardId)) return true;
+      effectiveEnergyCost(state, playerId, definition, index, cardId, undefined, baseEnergyOverride), index, 0, additionalCosts, cardId)) return true;
     const abilities: ProjectedAction[] = [];
     addAbilityActions(abilities, state, playerId, index, handlers, timing);
     // Try combined Add first: it often supplies both missing resources in one
@@ -2119,6 +2212,7 @@ function addAbilityActions(
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   timing: TurnTiming,
+  onlyAddAbilities = false,
 ) {
   const player = game.state.players[playerId]!;
   const controlled = [
@@ -2147,6 +2241,7 @@ function addAbilityActions(
       ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
+        if (onlyAddAbilities && !isAddResourceAbility(ability.behaviorId)) continue;
         if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
         const targets = targetRequirementsForClause(

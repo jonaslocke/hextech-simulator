@@ -383,6 +383,19 @@ export const gameStateSchema = z.object({
       ).default({}),
     }),
   ),
+  // A resolving effect may instruct one or more players to play specific,
+  // privately looked-at cards. The cards are temporarily staged in their
+  // owners' hands solely to reuse the normal server-authoritative play
+  // declaration and payment path.
+  effectPlayQueue: z.array(
+    z.object({
+      resolutionId: z.string().min(1),
+      sourceCardInstanceId: z.string().min(1),
+      playerId: z.string().min(1),
+      cardInstanceId: z.string().min(1),
+      ignoreBaseEnergy: z.boolean(),
+    }),
+  ).default([]).optional(),
   pendingChoice: z
     .discriminatedUnion("type", [
       triggerOrderChoiceSchema,

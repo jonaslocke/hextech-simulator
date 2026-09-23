@@ -22,6 +22,9 @@ export type BehaviorExecutionContext = {
   // merely because they select the same source card.
   selectionOverrides: Record<string, string[]>;
   effectOutcomes: Record<string, boolean | number | string | string[]>;
+  // Effect frames may need to pause while a card is played as part of an
+  // instruction, rather than as an ordinary priority action.
+  effectResolutionId?: string;
 };
 
 export type BehaviorHandler = {
@@ -45,6 +48,7 @@ export type BehaviorHandler = {
     visibleIds?: string[];
     options?: Array<{ id: string; label: string }>;
     choiceKey?: string;
+    playerId?: string;
   } | null;
 };
 
@@ -370,6 +374,7 @@ export function createBehaviorContext(
   selectedIds: string[],
   effectOutcomes: Record<string, boolean | number | string | string[]> = {},
   selectionOverrides: Record<string, string[]> = {},
+  effectResolutionId?: string,
 ): BehaviorExecutionContext {
   return {
     game,
@@ -380,6 +385,7 @@ export function createBehaviorContext(
     selectedBySelector: {},
     selectionOverrides,
     effectOutcomes,
+    effectResolutionId,
   };
 }
 

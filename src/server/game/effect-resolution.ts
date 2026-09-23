@@ -257,6 +257,7 @@ export function resumeEffectResolution(
           : {}),
       },
       initialSelectionOverrides,
+      frame.id,
     );
     for (const selector of clause.selectors) {
       const selected =
@@ -286,7 +287,7 @@ export function resumeEffectResolution(
       if (requirement.kind === "option") {
         game.state.pendingChoice = {
           id: `choice:${frame.id}:${binding.order}`,
-          playerId: frame.controllerPlayerId,
+          playerId: requirement.playerId ?? frame.controllerPlayerId,
           type: "effectOption",
           resolutionId: frame.id,
           bindingKey: choiceBindingKey,
@@ -298,7 +299,7 @@ export function resumeEffectResolution(
       if (requirement.kind === "tokenPlacement") {
         game.state.pendingChoice = {
           id: `choice:${frame.id}:${binding.order}`,
-          playerId: frame.controllerPlayerId,
+          playerId: requirement.playerId ?? frame.controllerPlayerId,
           type: "tokenPlacement",
           resolutionId: frame.id,
           bindingKey: choiceBindingKey,
@@ -317,7 +318,7 @@ export function resumeEffectResolution(
       }
       game.state.pendingChoice = {
         id: `choice:${frame.id}:${binding.order}`,
-        playerId: frame.controllerPlayerId,
+        playerId: requirement.playerId ?? frame.controllerPlayerId,
         type: "effectSelection",
         resolutionId: frame.id,
         bindingKey: choiceBindingKey,
@@ -335,6 +336,9 @@ export function resumeEffectResolution(
     handler.execute(binding, context);
     frame.effectOutcomes = context.effectOutcomes;
     frame.nextEffectIndex += 1;
+    if ((game.state.effectPlayQueue ?? []).some((entry) => entry.resolutionId === frame.id)) {
+      return false;
+    }
   }
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);

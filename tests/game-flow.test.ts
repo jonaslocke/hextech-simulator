@@ -1823,6 +1823,91 @@ test("Repeat commits independent execution targets before priority and resolves 
   assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw-two"), true);
 });
 
+test("each player privately chooses, recycles, and plays a staged top-deck card in next-player order", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  source.behaviorModel.clauses = [
+    clause("each-player-top-deck", {
+      effects: [binding("action.each_player_choose_top_deck_card_and_play", 0, { count: 2 })],
+    }),
+  ];
+  for (const [playerId, selected, recycled] of [
+    ["p1", "p1:draw", "p1:unit"],
+    ["p2", "p2:draw", "p2:recycle"],
+  ] as const) {
+    if (playerId === "p2") {
+      decks[1]!.instances.push(
+        { instanceId: selected, ownerPlayerId: playerId, source: "mainDeck", cardCode: "UNIT" },
+        { instanceId: recycled, ownerPlayerId: playerId, source: "mainDeck", cardCode: "UNIT" },
+        { instanceId: "p2:rune", ownerPlayerId: playerId, source: "runeDeck", cardCode: "RUNE" },
+      );
+      game.state.cardStates[selected] = { exhausted: false, damage: 0, computedMight: 1 };
+      game.state.cardStates[recycled] = { exhausted: false, damage: 0, computedMight: 1 };
+      game.state.cardStates["p2:rune"] = { exhausted: false, damage: 0, computedMight: null };
+      game.state.players.p2!.zones.base.push("p2:rune");
+    }
+    game.state.players[playerId]!.zones.mainDeck = [selected, recycled];
+    game.state.players[playerId]!.power.Mind = playerId === "p1" ? 1 : 0;
+  }
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:spell",
+    clauseId: "each-player-top-deck",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.playerId, "p2");
+  const spectatorChoice = projectGame({ game, viewerPlayerId: "p1", decks }).pendingChoice;
+  assert.deepEqual(
+    spectatorChoice?.type === "effectSelection" ? spectatorChoice.visibleCards : [],
+    [],
+  );
+  let choose = gameplayActions(game, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p2",
+    actionId: choose.id,
+    selectedIds: ["p2:draw"],
+    decks,
+    now: "each-player-choose-p2",
+  });
+  assert.equal(next.state.pendingChoice?.playerId, "p1");
+  choose = gameplayActions(next, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: choose.id,
+    selectedIds: ["p1:draw"],
+    decks,
+    now: "each-player-choose-p1",
+  });
+  assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p2");
+  assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit"]);
+  assert.deepEqual(next.state.players.p2!.zones.mainDeck, ["p2:recycle"]);
+
+  const addPower = gameplayActions(next, "p2", decks).find((action) =>
+    action.sourceCardInstanceId === "p2:rune" && action.label === "Add Power [Mind]",
+  );
+  assert.ok(addPower, "a waived-Energy card can prepare its remaining Power cost");
+  let play = gameplayActions(next, "p2", decks).find((action) => action.sourceCardInstanceId === "p2:draw")!;
+  assert.equal(play.costPreview?.energy, 0);
+  assert.equal(play.costPreview?.effectivePower, 1);
+  next = performGameplayAction({ game: next, actorPlayerId: "p2", actionId: addPower.id, selectedIds: [], decks, now: "each-player-add-p2" });
+  play = gameplayActions(next, "p2", decks).find((action) => action.sourceCardInstanceId === "p2:draw")!;
+  next = performGameplayAction({ game: next, actorPlayerId: "p2", actionId: play.id, selectedIds: [], decks, now: "each-player-play-p2" });
+  assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p1");
+  play = gameplayActions(next, "p1", decks).find((action) => action.sourceCardInstanceId === "p1:draw")!;
+  assert.equal(play.costPreview?.energy, 0);
+  next = performGameplayAction({ game: next, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "each-player-play-p1" });
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:draw"));
+  assert.ok(next.state.players.p2!.zones.base.includes("p2:draw"));
+  assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.equal(next.state.players.p2!.power.Mind, 0);
+});
+
 test("committed modal Repeat declarations project only legal mode-target combinations", () => {
   const { game, decks } = fixture();
   const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
