@@ -281,6 +281,7 @@ export async function performMatchAction(
     stateVersion: number;
     actionId: string;
     selectedIds: string[];
+    targetSelections?: Record<string, string[]>;
     allocations?: DamageAssignment[];
     tokenPlacements?: TokenPlacement[];
     now?: string;
@@ -304,6 +305,7 @@ export async function performMatchAction(
         stateVersion: number;
         actionId: string;
         selectedIds: string[];
+        targetSelections?: Record<string, string[]>;
         allocations?: DamageAssignment[];
         tokenPlacements?: TokenPlacement[];
         now?: string;
@@ -318,6 +320,7 @@ export async function performMatchAction(
           payload: {
             actionId: input.actionId,
             selectedIds: input.selectedIds,
+            targetSelections: input.targetSelections ?? {},
             allocations: input.allocations ?? [],
             tokenPlacements: input.tokenPlacements ?? [],
           },
@@ -386,6 +389,7 @@ async function performGameAction(
   payload: {
     actionId: string;
     selectedIds: string[];
+    targetSelections?: Record<string, string[]>;
     allocations?: DamageAssignment[];
     tokenPlacements?: TokenPlacement[];
   },
@@ -430,6 +434,7 @@ async function performGameAction(
           actorPlayerId: seat.playerId,
           actionId,
           selectedIds: payload.selectedIds,
+          targetSelections: payload.targetSelections,
           allocations: payload.allocations,
           tokenPlacements: payload.tokenPlacements,
           decks,

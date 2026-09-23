@@ -778,9 +778,9 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   assert.equal(
     gameplayActions(autoPaid, "p1", decks).find(
       (action) => action.label === "Play Power Unit to Base",
-    )?.enabled,
-    false,
-    "the Gear-only resource cannot pay a Unit's Power cost",
+    ),
+    undefined,
+    "unpayable hand-card modes are not projected",
   );
 
   const addPower = gameplayActions(game, "p1", decks).find(
@@ -801,8 +801,8 @@ test("uses generic restricted Power for Gear cards and Gear Equip abilities", ()
   assert.equal(
     gameplayActions(afterAdd, "p1", decks).find(
       (action) => action.label === "Play Power Unit to Base",
-    )?.enabled,
-    false,
+    ),
+    undefined,
   );
   const playGear = gameplayActions(afterAdd, "p1", decks).find(
     (action) => action.label === "Play Test Gear",
@@ -1768,7 +1768,7 @@ test("Flow plays a spell from Trash at its alternate cost and banishes it after 
   assert.ok(next.state.players.p1!.zones.hand.includes("p1:draw"));
 });
 
-test("Repeat commits a second target before priority and resolves both executions", () => {
+test("Repeat commits independent execution targets before priority and resolves both executions", () => {
   const { game, decks } = fixture();
   const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
   spell.behaviorModel.clauses.push(
@@ -1800,28 +1800,163 @@ test("Repeat commits a second target before priority and resolves both execution
   );
   assert.ok(repeat?.enabled, JSON.stringify(gameplayActions(game, "p1", decks).filter((action) => action.sourceCardInstanceId === "p1:spell")));
   let next = performGameplayAction({
-    game, actorPlayerId: "p1", actionId: repeat.id, selectedIds: ["p2:mover"], decks, now: "repeat-play",
+    game,
+    actorPlayerId: "p1",
+    actionId: repeat.id,
+    selectedIds: [],
+    targetSelections: {
+      "repeat:0": ["p2:mover"],
+      "repeat:1": ["p2:mover"],
+    },
+    decks,
+    now: "repeat-play",
   });
-  assert.equal(next.state.pendingChoice?.type, "effectSelection");
-  assert.equal(next.state.chain, null);
+  assert.equal(next.state.pendingChoice, null);
+  assert.equal(next.state.chain?.items.at(-1)?.repeatTargetSelections?.length, 2);
   assert.equal(next.state.players.p1!.energy, 1);
   assert.equal(next.state.players.p1!.power.Mind, 1);
-
-  const chooseRepeatTarget = gameplayActions(next, "p1", decks).find(
-    (action) => action.choice?.kind === "effectSelection",
-  );
-  assert.ok(chooseRepeatTarget);
-  next = performGameplayAction({
-    game: next, actorPlayerId: "p1", actionId: chooseRepeatTarget.id,
-    selectedIds: ["p2:mover"], decks, now: "repeat-target",
-  });
-  assert.equal(next.state.chain?.items.at(-1)?.repeatTargetSelections?.length, 2);
   for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
     next = performGameplayAction({ game: next, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `repeat-pass-${playerId}` });
   }
   assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw"), true);
   assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw-two"), true);
+});
+
+test("committed modal Repeat declarations project only legal mode-target combinations", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.card.attributes.energy = 1;
+  spell.behaviorModel.clauses = [
+    clause("modal-repeat", {
+      keywords: [binding("keyword.repeat", 0, { energyCost: 1, powerCost: 1 })],
+      selectors: [
+        binding("selector.unit", 1, {
+          area: "base", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+          selectionKey: "target", onlyIfSelectionKey: "mode", onlyIfSelectionValue: "yes",
+        }),
+        binding("selector.gear", 2, {
+          minimumCount: 1, maximumCount: 1,
+          selectionKey: "target", onlyIfSelectionKey: "mode", onlyIfSelectionValue: "no",
+        }),
+      ],
+      effects: [
+        binding("action.optional", 3, {
+          effectKey: "damage", prompt: "Choose one", yesLabel: "Damage", noLabel: "Destroy",
+          selectionKey: "mode", commitAtPlay: true,
+        }),
+        binding("action.deal_damage", 4, {
+          amount: 4, target: "unit", selectionKey: "target",
+          onlyIfEffectKey: "damage", onlyIfEffectValue: true,
+        }),
+        binding("action.kill_card", 5, {
+          selectionKey: "target", onlyIfEffectKey: "damage", onlyIfEffectValue: false,
+        }),
+      ],
+    }),
+  ];
+  decks[0]!.snapshot.cards.push(
+    definition("MODAL_UNIT", "Modal unit", "Unit", 0, 5),
+    definition("MODAL_GEAR", "Modal gear", "Gear", 0, 0),
+  );
+  decks[1]!.instances.push(
+    { instanceId: "p2:modal-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "MODAL_UNIT" },
+    { instanceId: "p2:modal-gear", ownerPlayerId: "p2", source: "mainDeck", cardCode: "MODAL_GEAR" },
+  );
+  game.state.players.p2!.zones.base.push("p2:modal-unit", "p2:modal-gear");
+  game.state.cardStates["p2:modal-unit"] = { exhausted: false, damage: 0, computedMight: 5 };
+  game.state.cardStates["p2:modal-gear"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.players.p1!.energy = 2;
+  game.state.players.p1!.power.Mind = 2;
+
+  const modes = gameplayActions(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  );
+  const normal = modes.filter((action) => !action.label.startsWith("[Repeat]"));
+  const repeated = modes.filter((action) => action.label.startsWith("[Repeat]"));
+  assert.equal(normal.length, 2);
+  assert.equal(repeated.length, 4);
+  assert.ok(repeated.every((action) => action.presentation.playCost?.label.startsWith("[Repeat] Play")));
+  assert.ok(normal.some((action) => action.targets.some((target) =>
+    target.legalIds.includes("p2:modal-unit"),
+  )));
+  assert.ok(normal.some((action) => action.targets.some((target) =>
+    target.legalIds.includes("p2:modal-gear"),
+  )));
+  assert.deepEqual(
+    new Set(repeated.map((action) => action.targets.filter((target) => target.maximum > 0)
+      .map((target) => target.legalIds.includes("p2:modal-unit") ? "unit" : "gear").join("->"))),
+    new Set([
+      "unit->unit",
+      "unit->gear",
+      "gear->unit",
+      "gear->gear",
+    ]),
+  );
+
+  const withoutUnit = structuredClone(game);
+  withoutUnit.state.players.p1!.zones.base = withoutUnit.state.players.p1!.zones.base.filter(
+    (id) => id !== "p1:mover",
+  );
+  withoutUnit.state.players.p2!.zones.base = withoutUnit.state.players.p2!.zones.base.filter(
+    (id) => id !== "p2:modal-unit",
+  );
+  const noUnitModes = gameplayActions(withoutUnit, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  );
+  assert.equal(noUnitModes.filter((action) => !action.label.startsWith("[Repeat]")).length, 1);
+  assert.equal(noUnitModes.filter((action) => action.label.startsWith("[Repeat]")).length, 1);
+
+  const normalOnly = structuredClone(game);
+  normalOnly.state.players.p1!.energy = 1;
+  normalOnly.state.players.p1!.power = {};
+  normalOnly.state.players.p1!.zones.base = normalOnly.state.players.p1!.zones.base.filter(
+    (id) => id !== "p1:rune" && id !== "p1:rune-b",
+  );
+  assert.equal(
+    gameplayActions(normalOnly, "p1", decks).filter(
+      (action) => action.sourceCardInstanceId === "p1:spell" && action.label.startsWith("[Repeat]"),
+    ).length,
+    0,
+  );
+  const unaffordable = structuredClone(normalOnly);
+  unaffordable.state.players.p1!.energy = 0;
+  assert.equal(
+    gameplayActions(unaffordable, "p1", decks).filter(
+      (action) => action.sourceCardInstanceId === "p1:spell",
+    ).length,
+    0,
+  );
+
+  const repeat = repeated.find((action) => action.targets.filter((target) => target.maximum > 0)
+    .map((target) => target.legalIds.includes("p2:modal-unit") ? "unit" : "gear").join("->") === "unit->gear")!;
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: repeat.id,
+    selectedIds: [],
+    targetSelections: {
+      "repeat:0": ["p2:modal-unit"],
+      "repeat:1": ["p2:modal-gear"],
+    },
+    decks,
+    now: "modal-repeat-play",
+  });
+  assert.equal(next.state.pendingChoice, null);
+  assert.deepEqual(next.state.chain?.items.at(-1)?.preplayOptionSelections, [
+    { mode: ["yes"] },
+    { mode: ["no"] },
+  ]);
+  assert.deepEqual(next.state.chain?.items.at(-1)?.initialSelectionOverrides, {
+    mode: ["yes"],
+    target: ["p2:modal-unit"],
+  });
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
+    next = performGameplayAction({ game: next, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `modal-repeat-pass-${playerId}` });
+  }
+  assert.equal(next.state.cardStates["p2:modal-unit"]!.damage, 4);
+  assert.ok(next.state.players.p2!.zones.trash.includes("p2:modal-gear"));
 });
 
 test("modal recycle-or-draw effects use the server-authorized option and card-selection decisions", () => {

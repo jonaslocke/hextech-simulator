@@ -127,7 +127,12 @@ export function selectionRequirementsForClause(
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
     if (typeof binding.parameters.selectionKey === "string") {
-      selectorContext.selectedBySelector[binding.parameters.selectionKey] = selected;
+      selectorContext.selectedBySelector[binding.parameters.selectionKey] = [
+        ...new Set([
+          ...(selectorContext.selectedBySelector[binding.parameters.selectionKey] ?? []),
+          ...selected,
+        ]),
+      ];
     }
     return { binding, requirement };
   });
@@ -208,7 +213,12 @@ export function executeBehaviorClause(input: {
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
     if (typeof binding.parameters.selectionKey === "string") {
-      context.selectedBySelector[binding.parameters.selectionKey] = selected;
+      context.selectedBySelector[binding.parameters.selectionKey] = [
+        ...new Set([
+          ...(context.selectedBySelector[binding.parameters.selectionKey] ?? []),
+          ...selected,
+        ]),
+      ];
     }
   });
   const delayed = clause.timings.find((binding) => binding.behaviorId === "timing.delayed");

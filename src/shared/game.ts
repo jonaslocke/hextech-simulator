@@ -20,6 +20,9 @@ export const projectedTargetRequirementSchema = z
     kind: z.enum(["card", "battlefield", "location", "player", "chainItem"]),
     label: z.string().min(1).optional(),
     selectionKey: z.string().min(1).optional(),
+    // A play declaration can contain independent target selections for more
+    // than one execution. Each group remains a separate server-issued slot.
+    selectionGroup: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
     sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
     // A later location choice can be constrained by an earlier selected
@@ -62,6 +65,7 @@ export const projectedActionSchema = z.object({
       targetAdditionalPower: z.array(
         z.object({
           targetId: z.string().min(1),
+          selectionGroup: z.string().min(1).optional(),
           amount: z.number().int().positive(),
         }),
       ),
@@ -149,6 +153,7 @@ export const gameActionIntentSchema = z.object({
   payload: z.object({
     actionId: z.string().min(1),
     selectedIds: z.array(z.string().min(1)).default([]),
+    targetSelections: z.record(z.array(z.string().min(1))).default({}),
     allocations: z
       .array(
         z.object({

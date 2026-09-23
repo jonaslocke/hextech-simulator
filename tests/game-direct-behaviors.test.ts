@@ -155,10 +155,8 @@ test("projects combined Add and evaluates automatic showdown resources for targe
   );
   const cometAction = actions.find(
     (action) => action.sourceCardInstanceId === fallingComet,
-  )!;
-  assert.equal(cometAction.enabled, false);
-  assert.equal(cometAction.disabledReason, "Card costs cannot be paid.");
-  assert.deepEqual(cometAction.targets[0]?.legalIds, [enemy]);
+  );
+  assert.equal(cometAction, undefined);
 
   game.state.players.p1!.energy = 6;
   assert.equal(

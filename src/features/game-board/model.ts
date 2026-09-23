@@ -110,6 +110,11 @@ export type CombinedTargetRequirement = {
   requirements: ProjectedAction["targets"];
 };
 
+export type GroupedTargetRequirement = {
+  groupId: string;
+  requirement: CombinedTargetRequirement;
+};
+
 export function combineTargetRequirements(
   action: ProjectedAction,
   kind: ProjectedAction["targets"][number]["kind"],
@@ -133,6 +138,29 @@ export function combineTargetRequirements(
     ),
     requirements,
   };
+}
+
+export function groupedTargetRequirements(
+  action: ProjectedAction,
+  kind: ProjectedAction["targets"][number]["kind"],
+): GroupedTargetRequirement[] {
+  const byGroup = new Map<string, ProjectedAction["targets"]>();
+  for (const requirement of action.targets) {
+    if (requirement.kind !== kind || !requirement.selectionGroup) continue;
+    byGroup.set(requirement.selectionGroup, [
+      ...(byGroup.get(requirement.selectionGroup) ?? []),
+      requirement,
+    ]);
+  }
+  return [...byGroup.entries()].map(([groupId, requirements]) => ({
+    groupId,
+    requirement: {
+      legalIds: [...new Set(requirements.flatMap((requirement) => requirement.legalIds))],
+      maximum: requirements.reduce((total, requirement) => total + requirement.maximum, 0),
+      minimum: requirements.reduce((total, requirement) => total + requirement.minimum, 0),
+      requirements,
+    },
+  }));
 }
 
 export function targetSelectionIsLegal(

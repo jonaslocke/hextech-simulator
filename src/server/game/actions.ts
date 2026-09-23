@@ -476,6 +476,7 @@ export function performGameplayAction(input: {
   actorPlayerId: string;
   actionId: string;
   selectedIds: string[];
+  targetSelections?: Record<string, string[]>;
   allocations?: DamageAssignment[];
   tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
@@ -487,7 +488,7 @@ export function performGameplayAction(input: {
     throw new Error("Action is not legal for the current game state.");
   if (projected.poolPayment?.mode === "card" && projected.poolPayment.canPay === false)
     throw new Error("Add enough resources before confirming this action.");
-  validateActionTargets(projected, input.selectedIds);
+  validateActionTargets(projected, input.selectedIds, input.targetSelections ?? {});
   const game = structuredClone(input.game);
   // Public card reveals are an informational presentation, not a decision.
   // A later accepted game action replaces the transient presentation.
@@ -513,6 +514,7 @@ export function performGameplayAction(input: {
         source,
         extra,
         input.selectedIds,
+        input.targetSelections ?? {},
         index,
         handlers,
         input.decks,
@@ -719,6 +721,7 @@ export function performGameplayTransition(input: {
   actorPlayerId: string;
   actionId: string;
   selectedIds: string[];
+  targetSelections?: Record<string, string[]>;
   allocations?: DamageAssignment[];
   tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
@@ -747,13 +750,14 @@ function playCard(
   cardId: string,
   playExtra: string,
   selectedIds: string[],
+  targetSelections: Record<string, string[]>,
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   decks: readonly DeckSnapshotDocument[],
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
-  const { destinationId, optionalCostKeys, flow, repeat } = decodePlayExtra(playExtra);
+  const { destinationId, optionalCostKeys, flow, repeat, preplayOptionSelections } = decodePlayExtra(playExtra);
   const flowEnergyCost = flowEnergyCostFor(definition);
   if (
     flow
@@ -774,7 +778,7 @@ function playCard(
     .flatMap((payment) => payment.costs);
   const repeatCost = repeat ? repeatAdditionalCostFor(definition) : null;
   if (repeat && !repeatCost) throw new Error("Repeat is not available for this card.");
-  const selectionOverrides = Object.fromEntries(
+  const optionalSelectionOverrides = Object.fromEntries(
     optionalSourceCosts.map((payment) => [
       payment.selectionKey,
       optionalCostKeys.includes(payment.selectionKey) ? [cardId] : [],
@@ -782,8 +786,26 @@ function playCard(
   );
   // The source id permits canonical selector validation while the keyed
   // overrides retain which individual optional costs were actually chosen.
-  const allSelectedIds =
-    optionalCostKeys.length > 0 ? [...selectedIds, cardId] : selectedIds;
+  const executionTargetSelections = repeat
+    ? [
+        targetSelections["repeat:0"] ?? [],
+        targetSelections["repeat:1"] ?? [],
+      ]
+    : [targetSelections["play:0"] ?? selectedIds];
+  const firstExecutionTargets = executionTargetSelections[0] ?? [];
+  const selectionOverrides = selectionOverridesForPlayExecution({
+    game,
+    playerId,
+    cardId,
+    definition,
+    handlers,
+    targetIds: firstExecutionTargets,
+    optionalSelectionOverrides,
+    preplayOptionSelections: preplayOptionSelections[0] ?? {},
+  });
+  const allSelectedIds = optionalCostKeys.length > 0
+    ? [...firstExecutionTargets, cardId]
+    : firstExecutionTargets;
   const isUnit = definition.card.classification.type === "Unit";
   const isGear = definition.card.classification.type === "Gear";
   const showdownAtPlayStart = game.state.showdown;
@@ -818,7 +840,7 @@ function playCard(
       ),
     );
   if (dynamicTargets.some((target) => target.kind === "location")) {
-    validateTargetRequirements(dynamicTargets, selectedIds);
+    validateTargetRequirements(dynamicTargets, firstExecutionTargets);
   }
   const energyCost = flow
     ? flowEnergyCost!
@@ -834,7 +856,7 @@ function playCard(
   };
   const additionalAnyPower = targetDeflectCost(
     playerId,
-    selectedIds,
+    executionTargetSelections.flat(),
     index,
     ignoresDeflect(definition),
   );
@@ -852,7 +874,7 @@ function playCard(
     game,
     playerId,
     definition,
-    selectedIds,
+    executionTargetSelections.flat(),
     index,
   );
   if (game.state.turn) {
@@ -937,44 +959,18 @@ function playCard(
     initialSelectionOverrides: selectionOverrides,
     flowPlayed: flow,
     ...(repeat ? {
-      repeatTargetSelections: [allSelectedIds],
-      repeatTargetObjectVersions: [captureTargetObjectVersions(game, allSelectedIds)],
+      repeatTargetSelections: executionTargetSelections,
+      repeatTargetObjectVersions: executionTargetSelections.map((targets) =>
+        captureTargetObjectVersions(game, targets),
+      ),
       repeatResolutionIndex: 0,
+      preplayOptionSelections,
     } : {}),
     targetObjectVersions: captureTargetObjectVersions(game, allSelectedIds),
     behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
   };
-  if (repeat && dynamicTargets.length > 0) {
-    game.state.pendingChoice = {
-      id: `choice:${game.stateVersion + 1}:${item.id}:repeat-targets`,
-      playerId,
-      type: "effectSelection",
-      resolutionId: null,
-      bindingKey: "repeat-targets",
-      prompt: `Choose targets for the additional execution of ${item.label}`,
-      optionKind: dynamicTargets.some((target) => target.kind === "chainItem")
-        ? "chainItem"
-        : dynamicTargets.some((target) => target.kind === "battlefield")
-          ? "battlefield"
-          : dynamicTargets.some((target) => target.kind === "location")
-            ? "location"
-            : "card",
-      sourceZone: null,
-      presentation: "cardSelection",
-      legalCardIds: [...new Set(dynamicTargets.flatMap((target) => target.legalIds))],
-      minimum: dynamicTargets.reduce((sum, target) => sum + target.minimum, 0),
-      maximum: dynamicTargets.reduce((sum, target) => sum + target.maximum, 0),
-      chainItem: item,
-      targetRequirements: dynamicTargets,
-    };
-    return;
-  }
-  if (repeat) {
-    item.repeatTargetSelections!.push([]);
-    item.repeatTargetObjectVersions!.push({});
-  }
   if (game.state.chain) {
     game.state.chain.items.push(item);
     game.state.chain.priorityPlayerId = playerId;
@@ -1024,6 +1020,92 @@ function repeatAdditionalCostFor(definition: GameCardDefinition): AdditionalCard
     : null;
 }
 
+function selectionOverridesForPlayExecution(input: {
+  game: GameDocument;
+  playerId: string;
+  cardId: string;
+  definition: GameCardDefinition;
+  handlers: ReturnType<typeof createPrimitiveHandlers>;
+  targetIds: readonly string[];
+  optionalSelectionOverrides: Record<string, string[]>;
+  preplayOptionSelections: Record<string, string[]>;
+}) {
+  const base = {
+    ...input.optionalSelectionOverrides,
+    ...input.preplayOptionSelections,
+  };
+  const requirements = compileBehaviorModel(input.definition.behaviorModel, input.handlers)
+    .clauses
+    .filter((clause) => clauseCanRequirePlaySelections(input.definition, clause))
+    .flatMap((clause) => targetRequirementsForClause(
+      clause,
+      createBehaviorContext(
+        input.game,
+        input.playerId,
+        input.cardId,
+        null,
+        [...input.targetIds],
+        {},
+        base,
+      ),
+      input.handlers,
+    ));
+  return {
+    ...base,
+    ...Object.fromEntries(requirements.flatMap((requirement) =>
+      requirement.maximum > 0 &&
+      requirement.selectionPurpose !== "optionalCost" &&
+      typeof requirement.selectionKey === "string"
+        ? [[
+            requirement.selectionKey,
+            input.targetIds.filter((id) => requirement.legalIds.includes(id)),
+          ]]
+        : [],
+    )),
+  };
+}
+
+function selectionOverridesForChainExecution(
+  game: GameDocument,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  item: NonNullable<GameDocument["state"]["chain"]>["items"][number],
+  controllerPlayerId: string,
+  targetIds: readonly string[],
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const executionIndex = item.repeatResolutionIndex ?? 0;
+  const base = {
+    ...(item.initialSelectionOverrides ?? {}),
+    ...(item.preplayOptionSelections?.[executionIndex] ?? {}),
+  };
+  const requirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(
+      game,
+      controllerPlayerId,
+      item.sourceCardInstanceId!,
+      item.behaviorEvent,
+      [...targetIds],
+      {},
+      base,
+    ),
+    handlers,
+  );
+  return {
+    ...base,
+    ...Object.fromEntries(requirements.flatMap((requirement) =>
+      requirement.maximum > 0 &&
+      requirement.selectionPurpose !== "optionalCost" &&
+      typeof requirement.selectionKey === "string"
+        ? [[
+            requirement.selectionKey,
+            targetIds.filter((id) => requirement.legalIds.includes(id)),
+          ]]
+        : [],
+    )),
+  };
+}
+
 /** Finish the same persisted resolution after either Priority or a choice.
  * No Chain removal, Cleanup, or Focus transfer may occur while it is paused.
  */
@@ -1047,13 +1129,21 @@ function completeChainResolution(
     const clause = compileBehaviorModel(definition.behaviorModel, createPrimitiveHandlers(index))
       .clauses.find((candidate) => candidate.id === item.behaviorClauseId);
     if (!clause) throw new Error("Repeat behavior clause is unavailable.");
+    const lockedTargets = validLockedTargets(game, clause, item, item.controllerPlayerId, createPrimitiveHandlers(index));
     beginEffectResolution({
       game,
       controllerPlayerId: item.controllerPlayerId,
       sourceCardInstanceId: item.sourceCardInstanceId,
       clauseId: clause.id,
-      selectedIds: validLockedTargets(game, clause, item, item.controllerPlayerId, createPrimitiveHandlers(index)),
-      selectionOverrides: item.initialSelectionOverrides,
+      selectedIds: lockedTargets,
+      selectionOverrides: selectionOverridesForChainExecution(
+        game,
+        clause,
+        item,
+        item.controllerPlayerId,
+        lockedTargets,
+        createPrimitiveHandlers(index),
+      ),
       targetsLocked: true,
       event: item.behaviorEvent,
       decks,
@@ -1197,6 +1287,21 @@ function passPriority(
             (candidate) => candidate.id === item.behaviorClauseId,
           );
           if (clause) {
+            const lockedTargets = validLockedTargets(
+              game,
+              clause,
+              item,
+              controller,
+              handlers,
+            );
+            const executionOverrides = selectionOverridesForChainExecution(
+              game,
+              clause,
+              item,
+              controller,
+              lockedTargets,
+              handlers,
+            );
             if (
               clause.timings.some(
                 (timing) => timing.behaviorId === "timing.delayed",
@@ -1209,9 +1314,9 @@ function passPriority(
                   controller,
                   item.sourceCardInstanceId,
                   item.behaviorEvent,
-                  item.targetCardInstanceIds,
+                  lockedTargets,
                   {},
-                  item.initialSelectionOverrides ?? {},
+                  executionOverrides,
                 ),
                 handlers,
               });
@@ -1221,14 +1326,8 @@ function passPriority(
                 controllerPlayerId: controller,
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
-                selectedIds: validLockedTargets(
-                  game,
-                  clause,
-                  item,
-                  controller,
-                  handlers,
-                ),
-                selectionOverrides: item.initialSelectionOverrides,
+                selectedIds: lockedTargets,
+                selectionOverrides: executionOverrides,
                 targetsLocked: true,
                 event: item.behaviorEvent,
                 decks,
@@ -1586,13 +1685,15 @@ function encodePlayExtra(
   optionalCostKeys: readonly string[],
   flow = false,
   repeat = false,
+  preplayOptionSelections: readonly Record<string, string[]>[] = [],
 ) {
-  if (optionalCostKeys.length === 0 && !flow && !repeat) return destinationId;
+  if (optionalCostKeys.length === 0 && !flow && !repeat && preplayOptionSelections.length === 0) return destinationId;
   return `play:${JSON.stringify({
     destinationId: destinationId ?? null,
     optionalCostKeys,
     flow,
     repeat,
+    preplayOptionSelections,
   })}`;
 }
 
@@ -1601,9 +1702,10 @@ function decodePlayExtra(extra: string): {
   optionalCostKeys: string[];
   flow: boolean;
   repeat: boolean;
+  preplayOptionSelections: Record<string, string[]>[];
 } {
   if (!extra.startsWith("play:")) {
-    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false };
+    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false, preplayOptionSelections: [] };
   }
   try {
     const parsed: unknown = JSON.parse(extra.slice("play:".length));
@@ -1619,12 +1721,17 @@ function decodePlayExtra(extra: string): {
       .optionalCostKeys;
     const flow = (parsed as { flow?: unknown }).flow;
     const repeat = (parsed as { repeat?: unknown }).repeat;
+    const preplayOptionSelections = (parsed as { preplayOptionSelections?: unknown }).preplayOptionSelections;
     if (
       (destinationId !== null && typeof destinationId !== "string") ||
       (flow !== undefined && typeof flow !== "boolean") ||
       (repeat !== undefined && typeof repeat !== "boolean") ||
       optionalCostKeys.some((key) => typeof key !== "string") ||
-      new Set(optionalCostKeys).size !== optionalCostKeys.length
+      new Set(optionalCostKeys).size !== optionalCostKeys.length ||
+      (preplayOptionSelections !== undefined && (!Array.isArray(preplayOptionSelections) ||
+        preplayOptionSelections.some((selection) => !selection || typeof selection !== "object" ||
+          Object.entries(selection as Record<string, unknown>).some(([key, values]) =>
+            !key || !Array.isArray(values) || values.some((value) => typeof value !== "string")))))
     ) {
       throw new Error();
     }
@@ -1633,6 +1740,7 @@ function decodePlayExtra(extra: string): {
       optionalCostKeys: optionalCostKeys as string[],
       flow: flow === true,
       repeat: repeat === true,
+      preplayOptionSelections: (preplayOptionSelections ?? []) as Record<string, string[]>[],
     };
   } catch {
     throw new Error("Play mode is malformed.");
@@ -1674,6 +1782,73 @@ function displayPowerDomain(domain: string) {
   return `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`;
 }
 
+function committedPlayOptionModes(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+): Record<string, string[]>[] {
+  const bindings = compiled.clauses.flatMap((clause) => clause.effects).filter(
+    (binding) => binding.behaviorId === "action.optional" &&
+      binding.parameters.commitAtPlay === true &&
+      typeof binding.parameters.selectionKey === "string",
+  );
+  return bindings.reduce<Record<string, string[]>[]>(
+    (modes, binding) => [
+      ...modes.map((mode) => ({
+        ...mode,
+        [binding.parameters.selectionKey as string]: ["yes"],
+      })),
+      ...modes.map((mode) => ({
+        ...mode,
+        [binding.parameters.selectionKey as string]: ["no"],
+      })),
+    ],
+    [{}],
+  );
+}
+
+function declarationsForPlay(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  repeat: boolean,
+): Record<string, string[]>[][] {
+  const modes = committedPlayOptionModes(compiled);
+  return repeat
+    ? modes.flatMap((first) => modes.map((second) => [first, second]))
+    : modes.map((mode) => [mode]);
+}
+
+function targetSelectionsForPlayDeclaration(input: {
+  definition: GameCardDefinition;
+  compiled: ReturnType<typeof compileBehaviorModel>;
+  game: GameDocument;
+  playerId: string;
+  cardId: string;
+  handlers: ReturnType<typeof createPrimitiveHandlers>;
+  optionalSelectionOverrides: Record<string, string[]>;
+  optionSelections: readonly Record<string, string[]>[];
+  repeat: boolean;
+}) {
+  return input.optionSelections.flatMap((options, executionIndex) => {
+    const requirements = input.compiled.clauses
+      .filter((clause) => clauseCanRequirePlaySelections(input.definition, clause))
+      .flatMap((clause) => targetRequirementsForClause(
+        clause,
+        createBehaviorContext(
+          input.game,
+          input.playerId,
+          input.cardId,
+          null,
+          [],
+          {},
+          { ...input.optionalSelectionOverrides, ...options },
+        ),
+        input.handlers,
+      ));
+    return requirements.map((requirement) => ({
+      ...requirement,
+      ...(input.repeat ? { selectionGroup: `repeat:${executionIndex}` } : {}),
+    }));
+  });
+}
+
 function addPlayableCardActions(
   actions: ProjectedAction[],
   game: GameDocument,
@@ -1712,17 +1887,11 @@ function addPlayableCardActions(
       !hasReaction
     )
       continue;
-    const context = createBehaviorContext(game, playerId, cardId, null, []);
     const optionalSourceCosts = optionalSourcePlayCosts(definition);
     const repeatCost = repeatAdditionalCostFor(definition);
     const optionalSourceCostKeys = new Set(
       optionalSourceCosts.map((payment) => payment.selectionKey),
     );
-    const projectedTargets = compiled.clauses
-      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
-      .flatMap((clause) =>
-        targetRequirementsForClause(clause, context, handlers),
-      );
     const costContributions: NumericContribution[] = [];
     const cost = flow
       ? flowEnergyCostFor(definition)!
@@ -1735,42 +1904,6 @@ function addPlayableCardActions(
       cardId,
       (entry) => costContributions.push(entry),
     );
-    // Source-selected resource costs are committed by a play mode, not a
-    // target prompt. Other optional selectors (for example, exhaust a unit)
-    // stay as their existing player-decision flow.
-    const targets = projectedTargets.filter(
-      (target) =>
-        !(
-          target.selectionPurpose === "optionalCost" &&
-          target.selectionKey &&
-          optionalSourceCostKeys.has(target.selectionKey)
-        ),
-    );
-    const hasLegalTargets = canSatisfyTargetRequirements(targets);
-    const targetAdditionalPower = targets
-      .flatMap((requirement) => requirement.legalIds)
-      .filter((id, position, ids) => ids.indexOf(id) === position)
-      .map((targetId) => ({
-        targetId,
-        amount: targetDeflectCost(
-          playerId,
-          [targetId],
-          index,
-          ignoresDeflect(definition),
-        ),
-      }))
-      .filter((entry) => entry.amount > 0);
-    // This is projection only: payment remains server-owned. Publishing both
-    // printed and evaluated costs lets the client explain modifiers before a
-    // player commits a play, including for disabled actions.
-    const costPreview = {
-      energy: cost,
-      basePower: definition.card.attributes.power ?? 0,
-      effectivePower,
-      printedEnergy: definition.card.attributes.energy ?? 0,
-      printedPower: definition.card.attributes.power ?? 0,
-      targetAdditionalPower,
-    };
     const unitDestinations =
       definition.card.classification.type === "Unit"
         ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
@@ -1789,6 +1922,55 @@ function addPlayableCardActions(
     for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
       for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
         for (const repeat of repeatCost ? [false, true] : [false]) {
+        for (const preplayOptionSelections of declarationsForPlay(compiled, repeat)) {
+        const projectedTargets = targetSelectionsForPlayDeclaration({
+          definition,
+          compiled,
+          game,
+          playerId,
+          cardId,
+          handlers,
+          optionalSelectionOverrides: Object.fromEntries(optionalSourceCosts.map((payment) => [
+            payment.selectionKey,
+            optionalCostKeys.includes(payment.selectionKey) ? [cardId] : [],
+          ])),
+          optionSelections: preplayOptionSelections,
+          repeat,
+        });
+        // Source-selected resource costs are committed by a play mode, not a
+        // target prompt. Other optional selectors stay in their existing flow.
+        const targets = projectedTargets.filter(
+          (target) => !(
+            target.selectionPurpose === "optionalCost" &&
+            target.selectionKey &&
+            optionalSourceCostKeys.has(target.selectionKey)
+          ),
+        );
+        const hasLegalTargets = canSatisfyPlayDeclarationTargets(targets);
+        const targetAdditionalPower = targets.flatMap((requirement) =>
+          requirement.legalIds.map((targetId) => ({
+            targetId,
+            ...(requirement.selectionGroup
+              ? { selectionGroup: requirement.selectionGroup }
+              : {}),
+            amount: targetDeflectCost(
+              playerId,
+              [targetId],
+              index,
+              ignoresDeflect(definition),
+            ),
+          })),
+        ).filter((entry) => entry.amount > 0);
+        // This is projection only: payment remains server-owned. Publishing
+        // evaluated costs lets the client explain the currently legal mode.
+        const costPreview = {
+          energy: cost,
+          basePower: definition.card.attributes.power ?? 0,
+          effectivePower,
+          printedEnergy: definition.card.attributes.energy ?? 0,
+          printedPower: definition.card.attributes.power ?? 0,
+          targetAdditionalPower,
+        };
         const additionalCosts = optionalSourceCosts
           .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
           .flatMap((payment) => payment.costs)
@@ -1812,6 +1994,7 @@ function addPlayableCardActions(
           : costsPayable || preparable
             ? null
             : "Card costs cannot be paid.";
+        if (!enabled) continue;
         actions.push(
           action(
             game,
@@ -1827,7 +2010,15 @@ function addPlayableCardActions(
             cardId,
             enabled,
             disabledReason,
-            encodePlayExtra(destination.id, optionalCostKeys, flow, repeat),
+            encodePlayExtra(
+              destination.id,
+              optionalCostKeys,
+              flow,
+              repeat,
+              preplayOptionSelections.some((selection) => Object.keys(selection).length > 0)
+                ? preplayOptionSelections
+                : [],
+            ),
             targets,
             undefined,
             { ...costPreview, energy: payment.energy, effectivePower: payment.power, availableAnyPower },
@@ -1835,10 +2026,11 @@ function addPlayableCardActions(
           ),
         );
         actions[actions.length - 1]!.presentation.playCost = {
-          label: destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`,
+          label: `${repeat ? "[Repeat] " : ""}${destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`}`,
           showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
           modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
         };
+        }
         }
       }
     }
@@ -2204,6 +2396,19 @@ function executeActivatedAbility(
   game.state.chain.passedPlayerIds = [];
 }
 
+function canSatisfyPlayDeclarationTargets(
+  targets: readonly ProjectedAction["targets"][number][],
+) {
+  const grouped = new Map<string, ProjectedAction["targets"]>();
+  for (const target of targets) {
+    const group = target.selectionGroup ?? "default";
+    grouped.set(group, [...(grouped.get(group) ?? []), target]);
+  }
+  return [...grouped.values()].every((requirements) =>
+    canSatisfyTargetRequirements(requirements),
+  );
+}
+
 function payActivatedNonResourceCosts(
   game: GameDocument,
   clause: BehaviorClause,
@@ -2459,6 +2664,11 @@ function validLockedTargets(
     ?? item.targetCardInstanceIds;
   const targetVersions = item.repeatTargetObjectVersions?.[item.repeatResolutionIndex ?? 0]
     ?? item.targetObjectVersions;
+  const executionIndex = item.repeatResolutionIndex ?? 0;
+  const selectionOverrides = {
+    ...(item.initialSelectionOverrides ?? {}),
+    ...(item.preplayOptionSelections?.[executionIndex] ?? {}),
+  };
   const requirements = targetRequirementsForClause(
     clause,
     createBehaviorContext(
@@ -2468,7 +2678,7 @@ function validLockedTargets(
       item.behaviorEvent,
       selectedTargets,
       {},
-      item.initialSelectionOverrides ?? {},
+      selectionOverrides,
     ),
     handlers,
   );
@@ -2495,8 +2705,40 @@ function ignoresDeflect(definition: GameCardDefinition) {
   );
 }
 
-function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
-  validateTargetRequirements(action.targets, selectedIds);
+function validateActionTargets(
+  action: ProjectedAction,
+  selectedIds: string[],
+  targetSelections: Record<string, string[]>,
+) {
+  const grouped = action.targets.some((target) => target.selectionGroup);
+  if (!grouped) {
+    if (Object.keys(targetSelections).length) {
+      throw new Error("This action does not accept grouped target selections.");
+    }
+    validateTargetRequirements(action.targets, selectedIds);
+    return;
+  }
+  if (selectedIds.length) {
+    throw new Error("This action requires grouped target selections.");
+  }
+  const requirementsByGroup = new Map<string, ProjectedAction["targets"]>();
+  for (const target of action.targets) {
+    const group = target.selectionGroup;
+    if (!group) throw new Error("Grouped target declaration is malformed.");
+    requirementsByGroup.set(group, [
+      ...(requirementsByGroup.get(group) ?? []),
+      target,
+    ]);
+  }
+  if (
+    Object.keys(targetSelections).some((group) => !requirementsByGroup.has(group)) ||
+    [...requirementsByGroup.keys()].some((group) => !Object.hasOwn(targetSelections, group))
+  ) {
+    throw new Error("Target declaration does not match this action.");
+  }
+  for (const [group, requirements] of requirementsByGroup) {
+    validateTargetRequirements(requirements, targetSelections[group] ?? []);
+  }
 }
 
 function validateTargetRequirements(

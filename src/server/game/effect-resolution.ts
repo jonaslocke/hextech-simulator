@@ -256,6 +256,7 @@ export function resumeEffectResolution(
           ? { automaticTargets: true }
           : {}),
       },
+      initialSelectionOverrides,
     );
     for (const selector of clause.selectors) {
       const selected =
@@ -266,7 +267,12 @@ export function resumeEffectResolution(
         `${clause.id}:selectors:${selector.order}`
       ] = selected;
       if (typeof selector.parameters.selectionKey === "string") {
-        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+        context.selectedBySelector[selector.parameters.selectionKey] = [
+          ...new Set([
+            ...(context.selectedBySelector[selector.parameters.selectionKey] ?? []),
+            ...selected,
+          ]),
+        ];
       }
     }
     const handler = handlers.get(binding.behaviorId);

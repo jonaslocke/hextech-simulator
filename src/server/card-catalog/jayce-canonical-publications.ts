@@ -230,6 +230,45 @@ const models: Record<string, Clause[]> = {
       selectedMustShareLocation: true,
     }],
   ]],
+  "SFD-077": [[
+    ["keyword", "keyword.repeat", { energyCost: 4, powerCost: 1 }],
+    ["action", "action.optional", {
+      effectKey: "dealDamage",
+      prompt: "Choose one",
+      yesLabel: "Deal 4 to a unit in a base",
+      noLabel: "Kill a gear",
+      selectionKey: "mode",
+      commitAtPlay: true,
+    }],
+    ["selector", "selector.unit", {
+      area: "base",
+      locationRelation: "any",
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+      onlyIfSelectionKey: "mode",
+      onlyIfSelectionValue: "yes",
+    }],
+    ["selector", "selector.gear", {
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+      onlyIfSelectionKey: "mode",
+      onlyIfSelectionValue: "no",
+    }],
+    ["action", "action.deal_damage", {
+      amount: 4,
+      target: "unit",
+      selectionKey: "target",
+      onlyIfEffectKey: "dealDamage",
+      onlyIfEffectValue: true,
+    }],
+    ["action", "action.kill_card", {
+      selectionKey: "target",
+      onlyIfEffectKey: "dealDamage",
+      onlyIfEffectValue: false,
+    }],
+  ]],
   "UNL-088": [
     [
       ["trigger", "trigger.beginning_phase", {}],

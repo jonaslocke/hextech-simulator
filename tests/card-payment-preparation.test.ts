@@ -19,7 +19,7 @@ test("unaffordable resource capacity does not enumerate ready Rune combinations"
   const f = await preparationFixture(0, 7, 6);
   const before = structuredClone(f.game);
   const start = performance.now();
-  assert.equal(play(f).enabled, false);
+  assert.equal(play(f), undefined);
   const elapsed = performance.now() - start;
   assert.deepEqual(f.game, before);
   // A generous budget for slow CI; the regression took over eight seconds
@@ -31,11 +31,11 @@ test("large Rune pools reject Energy and domain shortages while retaining manual
   const f = await preparationFixture(13, 0, 12);
   const before = structuredClone(f.game);
   const start = performance.now();
-  assert.equal(play(f).enabled, false);
+  assert.equal(play(f), undefined);
   f.card.card.attributes.energy = 0;
   f.card.card.attributes.power = 1;
   f.card.card.classification.domain = ["Mind"];
-  assert.equal(play(f).enabled, false);
+  assert.equal(play(f), undefined);
   f.card.card.classification.domain = ["Calm"];
   const preparable = play(f);
   assert.equal(preparable.enabled, true);
@@ -58,7 +58,7 @@ test("unrelated card-type cost modifiers do not enumerate impossible Rune prepar
   ];
   const before = structuredClone(f.game);
   const start = performance.now();
-  assert.equal(play(f).enabled, false);
+  assert.equal(play(f), undefined);
   assert.deepEqual(f.game, before);
   const elapsed = performance.now() - start;
   assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
@@ -82,8 +82,7 @@ test("opponent cost modifiers invariant under Add prune impossible Rune preparat
   const start = performance.now();
   const action = play(f);
   const elapsed = performance.now() - start;
-  assert.equal(action.costPreview?.energy, 8);
-  assert.equal(action.enabled, false);
+  assert.equal(action, undefined);
   assert.deepEqual(f.game, before);
   assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
 });
@@ -134,7 +133,7 @@ test("capacity is only an upper bound and cannot enable incompatible resource al
     parameters: { resourceType: "power", amount: 1, domain: "sourceDomain", usage: "unrestricted" },
   };
   const before = structuredClone(f.game);
-  assert.equal(play(f).enabled, false, "the only source cannot exhaust twice");
+  assert.equal(play(f), undefined, "the only source cannot exhaust twice");
   assert.deepEqual(f.game, before);
 });
 
@@ -198,13 +197,11 @@ test("manual remainder composes with safe automatic Energy and Power without par
   assert.ok(after.state.players.p1!.zones.runeDeck.includes("p1:rune-1"));
 });
 
-test("truly unpayable cards remain disabled, including insufficient or incompatible manual resources", async () => {
+test("truly unpayable cards are omitted, including insufficient or incompatible manual resources", async () => {
   for (const [energy, power] of [[0, 2], [3, 0], [0, 1]]) {
     const f = await preparationFixture(energy, power);
     if (energy === 0 && power === 1) f.unrestricted.card.classification.domain = ["Mind"];
-    assert.equal(play(f).enabled, false);
-    assert.equal(createCardPaymentPreparation(play(f)), null);
-    assert.equal(play(f).disabledReason, "Card costs cannot be paid.");
+    assert.equal(play(f), undefined);
   }
 });
 
@@ -213,7 +210,7 @@ test("manual resource feasibility respects Energy and Power restrictions", async
     const f = await preparationFixture(kind === "energy" ? 1 : 0, kind === "power" ? 1 : 0);
     f.unrestricted.behaviorModel.clauses[0]!.abilities = [{ behaviorId: "ability.exhaust_for_resource", order: 0, confidence: "high",
       parameters: { resourceType: kind, amount: 1, usage: "card:Spell", domain: "rainbow" } }];
-    assert.equal(play(f).enabled, false, "Spell resources cannot prepare a Gear payment");
+    assert.equal(play(f), undefined, "Spell resources cannot prepare a Gear payment");
   }
 });
 

@@ -51,6 +51,7 @@ export type BoardPlayerProjection = {
       enabled: boolean;
       id: string;
       label: string;
+      targets: ProjectedAction["targets"];
       costPreview: ProjectedAction["costPreview"];
       playCost?: ProjectedAction["presentation"]["playCost"];
       poolPayment?: ProjectedAction["poolPayment"];
@@ -231,6 +232,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             enabled: action.enabled,
             id: action.id,
             label: action.label,
+            targets: action.targets,
             costPreview: action.costPreview,
             playCost: action.presentation.playCost,
             poolPayment: action.poolPayment,

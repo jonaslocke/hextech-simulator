@@ -17,7 +17,7 @@ import {
 import type { BoardPlayerProjection } from "../board-view-model";
 import { PlayableCardMenuLabel } from "../components/playable-card-menu-label";
 import type { CardActionMenuItem } from "../components/card-action-menu";
-import { combineTargetRequirements, simultaneousMoveAction } from "../model";
+import { combineTargetRequirements, groupedTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
 import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
 
@@ -33,6 +33,7 @@ type SubmitProjectedAction = (
   actionId: string | undefined,
   selectedIds?: string[],
   allocations?: Array<{ targetUnitId: string; amount: number }>,
+  targetSelections?: Record<string, string[]>,
 ) => Promise<boolean>;
 
 type OpenCardActionMenu = (
@@ -183,21 +184,29 @@ export function useGameBoardActions({
             ? "location"
             : "battlefield";
       const requirement = combineTargetRequirements(actionToSubmit, targetKind);
+      const targetGroups = groupedTargetRequirements(actionToSubmit, targetKind);
+      const initialTargetGroup = targetGroups[0];
       const followUpLocationRequirement =
         targetKind !== "location"
           ? combineTargetRequirements(actionToSubmit, "location") ?? undefined
           : undefined;
 
-      if (requirement && requirement.maximum > 0) {
+      if ((initialTargetGroup?.requirement ?? requirement)?.maximum > 0) {
+        const activeRequirement = initialTargetGroup?.requirement ?? requirement!;
         setTargetSelection({
           actionId: actionToSubmit.id,
           followUpLocationRequirement,
-          legalTargetIds: requirement.legalIds,
-          maxTargets: requirement.maximum,
-          minTargets: requirement.minimum,
+          legalTargetIds: activeRequirement.legalIds,
+          maxTargets: activeRequirement.maximum,
+          minTargets: activeRequirement.minimum,
           purpose: stagedMoveAction ? "move" : "play",
-          requirement,
+          requirement: activeRequirement,
           selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
+          ...(initialTargetGroup ? {
+            activeTargetGroupIndex: 0,
+            selectedTargetIdsByGroup: {},
+            targetGroups,
+          } : {}),
           targetKind,
           preparingPayment,
         });

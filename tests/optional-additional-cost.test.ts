@@ -85,8 +85,7 @@ test("an unavailable optional additional cost does not disable the normal mode",
   );
   const optional = modes.find((action) => action.label.includes("Calm Power"));
   assert.equal(normal?.enabled, true);
-  assert.equal(optional?.enabled, false);
-  assert.equal(optional?.disabledReason, "Card costs cannot be paid.");
+  assert.equal(optional, undefined);
 });
 
 function prepareClockworkPayment(

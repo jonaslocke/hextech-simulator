@@ -388,6 +388,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("selector.gear", {
     targets(binding, context) {
+      if (!selectorOptionMatches(binding, context)) return noSelectionRequirement(binding);
       const candidates = [
         ...Object.values(context.game.state.players).flatMap(
           (player) => player.zones.base,
@@ -840,6 +841,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.deal_damage", {
     execute(binding, context) {
+      if (!effectOutcomeMatches(binding, context)) return;
       const amount = effectiveNumericValue({
         attribute: "damage",
         baseValue: numberParam(binding, "amount"),
@@ -1172,6 +1174,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.kill_card", {
     execute(binding, context) {
+      if (!effectOutcomeMatches(binding, context)) return;
       const selected = selectionFor(binding, context);
       const targets = binding.parameters.target === "source"
         ? [context.sourceCardInstanceId]

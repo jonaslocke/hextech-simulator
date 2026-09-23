@@ -112,6 +112,7 @@ type GameBoardProps = {
   onPerformAction: (input: {
     actionId: string;
     selectedIds: string[];
+    targetSelections?: Record<string, string[]>;
     allocations?: Array<{ targetUnitId: string; amount: number }>;
     tokenPlacements?: Array<{ destinationId: string; count: number }>;
   }) => Promise<boolean>;
@@ -163,6 +164,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       actionId: string | undefined,
       selectedIds: string[] = [],
       allocations?: Array<{ targetUnitId: string; amount: number }>,
+      targetSelections?: Record<string, string[]>,
       tokenPlacements?: Array<{ destinationId: string; count: number }>,
     ): Promise<boolean> => {
       if (!actionId || interactionLockedRef.current) {
@@ -174,6 +176,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         selectedIds,
         allocations,
         tokenPlacements,
+        targetSelections,
       });
     },
     [onPerformAction],
@@ -793,6 +796,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             intent.actionId,
             intent.selectedIds ?? [],
             intent.allocations,
+            undefined,
             intent.tokenPlacements,
           );
           if (accepted && targetSelection?.actionId === intent.actionId) {
@@ -1165,6 +1169,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             title={
               targetSelectionAction?.poolPayment
                 ? targetSelectionAction.label
+                : targetSelection.targetGroups
+                  ? `Choose ${targetSelection.requirement.requirements.find((requirement) => requirement.label)?.label ?? "a target"}`
                 : targetSelection.purpose === "move"
                 ? moveSelectionTitle(
                     sourceProjection.actions.find(
@@ -1182,7 +1188,9 @@ export const GameBoard: FC<GameBoardProps> = ({
               targetSelectionHasOptionalCost(targetSelection)
                 ? "Exhaust a ready friendly unit to draw 2. Decline to draw 1 instead."
                 : targetSelection.purpose === "move"
-                  ? "Drag or click additional units to include them, then confirm the move."
+                ? "Drag or click additional units to include them, then confirm the move."
+                  : targetSelection.targetGroups
+                    ? `Execution ${(targetSelection.activeTargetGroupIndex ?? 0) + 1} of ${targetSelection.targetGroups.length}`
                   : undefined
             }
           />
