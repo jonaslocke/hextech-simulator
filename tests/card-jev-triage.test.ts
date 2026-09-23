@@ -11,6 +11,7 @@ import {
 } from "../scripts/card-jev-triage/routing";
 import {
   buildJevCardRequestState,
+  collectCanonicalBehaviorIds,
   type CardJevTriageState,
   type JevBehaviorCapability,
 } from "../scripts/card-jev-triage/state";
@@ -27,6 +28,20 @@ const drawCards = capability({
 });
 
 const state = buildState([moveTrigger, drawCards]);
+
+test("card Jev triage accepts legacy canonical cards without an Effect Text behavior model", () => {
+  const existing = collectCanonicalBehaviorIds({
+    behaviorModel: {
+      playTimings: [{ behaviorId: "timing.reaction" }],
+      clauses: [{
+        abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+        costs: [], timings: [], effects: [{ behaviorId: "action.draw_cards" }], keywords: [],
+      }],
+    },
+  } as never);
+
+  assert.deepEqual(existing, ["action.draw_cards", "timing.reaction"]);
+});
 
 test("card Jev triage asks semantic evidence questions and one independent question per primitive", () => {
   const questions = buildCardTriageQuestions(state);

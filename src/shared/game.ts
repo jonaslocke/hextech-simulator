@@ -185,6 +185,7 @@ export const deckIdSchema = z.enum([
   "master-yi-s",
   "garen-s",
   "ornn",
+  "jayce",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 

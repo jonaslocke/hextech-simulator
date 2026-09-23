@@ -18,6 +18,7 @@ import {
   effectivePowerCost,
   advanceGameObjectIncarnation,
   moveCardToTrash,
+  recycleCards,
   submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -752,7 +753,15 @@ function playCard(
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
-  const { destinationId, optionalCostKeys } = decodePlayExtra(playExtra);
+  const { destinationId, optionalCostKeys, flow, repeat } = decodePlayExtra(playExtra);
+  const flowEnergyCost = flowEnergyCostFor(definition);
+  if (
+    flow
+      ? !player.zones.trash.includes(cardId) || flowEnergyCost === null
+      : !player.zones.hand.includes(cardId) && player.zones.champion !== cardId
+  ) {
+    throw new Error("Card play origin is not legal.");
+  }
   const optionalSourceCosts = optionalSourcePlayCosts(definition);
   const optionalSourceCostKeys = new Set(
     optionalSourceCosts.map((payment) => payment.selectionKey),
@@ -763,6 +772,8 @@ function playCard(
   const optionalCosts = optionalSourceCosts
     .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
     .flatMap((payment) => payment.costs);
+  const repeatCost = repeat ? repeatAdditionalCostFor(definition) : null;
+  if (repeat && !repeatCost) throw new Error("Repeat is not available for this card.");
   const selectionOverrides = Object.fromEntries(
     optionalSourceCosts.map((payment) => [
       payment.selectionKey,
@@ -809,7 +820,9 @@ function playCard(
   if (dynamicTargets.some((target) => target.kind === "location")) {
     validateTargetRequirements(dynamicTargets, selectedIds);
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition, index, cardId);
+  const energyCost = flow
+    ? flowEnergyCost!
+    : effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -832,7 +845,7 @@ function playCard(
     energyCost,
     index,
     additionalAnyPower,
-    optionalCosts,
+    [...optionalCosts, ...(repeatCost ? [repeatCost] : [])],
     cardId,
   );
   payOptionalNonResourcePlayCosts(
@@ -848,6 +861,7 @@ function playCard(
   }
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  if (flow) player.zones.trash = player.zones.trash.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   if (isGear) {
     // Rules 143.1.a.1, 144.1, and 563.1.d: Gear enters ready at its
@@ -921,11 +935,46 @@ function playCard(
     sourceCardInstanceId: cardId,
     targetCardInstanceIds: allSelectedIds,
     initialSelectionOverrides: selectionOverrides,
+    flowPlayed: flow,
+    ...(repeat ? {
+      repeatTargetSelections: [allSelectedIds],
+      repeatTargetObjectVersions: [captureTargetObjectVersions(game, allSelectedIds)],
+      repeatResolutionIndex: 0,
+    } : {}),
     targetObjectVersions: captureTargetObjectVersions(game, allSelectedIds),
     behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
     behaviorEvent: playEvent,
   };
+  if (repeat && dynamicTargets.length > 0) {
+    game.state.pendingChoice = {
+      id: `choice:${game.stateVersion + 1}:${item.id}:repeat-targets`,
+      playerId,
+      type: "effectSelection",
+      resolutionId: null,
+      bindingKey: "repeat-targets",
+      prompt: `Choose targets for the additional execution of ${item.label}`,
+      optionKind: dynamicTargets.some((target) => target.kind === "chainItem")
+        ? "chainItem"
+        : dynamicTargets.some((target) => target.kind === "battlefield")
+          ? "battlefield"
+          : dynamicTargets.some((target) => target.kind === "location")
+            ? "location"
+            : "card",
+      sourceZone: null,
+      presentation: "cardSelection",
+      legalCardIds: [...new Set(dynamicTargets.flatMap((target) => target.legalIds))],
+      minimum: dynamicTargets.reduce((sum, target) => sum + target.minimum, 0),
+      maximum: dynamicTargets.reduce((sum, target) => sum + target.maximum, 0),
+      chainItem: item,
+      targetRequirements: dynamicTargets,
+    };
+    return;
+  }
+  if (repeat) {
+    item.repeatTargetSelections!.push([]);
+    item.repeatTargetObjectVersions!.push({});
+  }
   if (game.state.chain) {
     game.state.chain.items.push(item);
     game.state.chain.priorityPlayerId = playerId;
@@ -953,6 +1002,28 @@ function spellResolutionClauseId(
   return clauses.length === 1 ? clauses[0]!.id : null;
 }
 
+function flowEnergyCostFor(definition: GameCardDefinition): number | null {
+  const flow = definition.behaviorModel.clauses
+    .flatMap((clause) => clause.keywords)
+    .find((binding) => binding.behaviorId === "keyword.flow");
+  const energyCost = flow?.parameters.energyCost;
+  return typeof energyCost === "number" && energyCost >= 0
+    ? energyCost
+    : null;
+}
+
+function repeatAdditionalCostFor(definition: GameCardDefinition): AdditionalCardCost | null {
+  const repeat = definition.behaviorModel.clauses
+    .flatMap((clause) => clause.keywords)
+    .find((binding) => binding.behaviorId === "keyword.repeat");
+  const energy = repeat?.parameters.energyCost;
+  const power = repeat?.parameters.powerCost;
+  return typeof energy === "number" && energy >= 0 &&
+    typeof power === "number" && power >= 0
+    ? { energy, power }
+    : null;
+}
+
 /** Finish the same persisted resolution after either Priority or a choice.
  * No Chain removal, Cleanup, or Focus transfer may occur while it is paused.
  */
@@ -965,12 +1036,41 @@ function completeChainResolution(
   if (!chain?.resolvingItemId || game.state.effectResolutions.length || game.state.pendingChoice) return;
   const item = chain.items.find((candidate) => candidate.id === chain.resolvingItemId);
   if (!item) throw new Error("Resolving Chain item is unavailable.");
+  const repeatSelections = item.repeatTargetSelections;
+  const repeatIndex = item.repeatResolutionIndex ?? 0;
+  if (repeatSelections && repeatIndex + 1 < repeatSelections.length) {
+    item.repeatResolutionIndex = repeatIndex + 1;
+    if (!item.sourceCardInstanceId || !item.behaviorClauseId) {
+      throw new Error("Repeat chain item is unavailable.");
+    }
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const clause = compileBehaviorModel(definition.behaviorModel, createPrimitiveHandlers(index))
+      .clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+    if (!clause) throw new Error("Repeat behavior clause is unavailable.");
+    beginEffectResolution({
+      game,
+      controllerPlayerId: item.controllerPlayerId,
+      sourceCardInstanceId: item.sourceCardInstanceId,
+      clauseId: clause.id,
+      selectedIds: validLockedTargets(game, clause, item, item.controllerPlayerId, createPrimitiveHandlers(index)),
+      selectionOverrides: item.initialSelectionOverrides,
+      targetsLocked: true,
+      event: item.behaviorEvent,
+      decks,
+    });
+    if (!game.state.effectResolutions.length && !game.state.pendingChoice) {
+      completeChainResolution(game, index, decks);
+    }
+    return;
+  }
   chain.items = chain.items.filter((candidate) => candidate.id !== item.id);
   delete chain.resolvingItemId;
   if (item.kind === "spell" && item.sourceCardInstanceId) {
     const definition = definitionForInstance(item.sourceCardInstanceId, index);
     const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
-    game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+    game.state.players[owner]!.zones[item.flowPlayed ? "banishment" : "trash"].push(
+      item.sourceCardInstanceId,
+    );
     advanceGameObjectIncarnation(game, item.sourceCardInstanceId);
     dispatchBehaviorEvent(game, item.behaviorEvent?.type === "card.played"
       ? item.behaviorEvent
@@ -1484,20 +1584,26 @@ function optionalPlayCostModes(
 function encodePlayExtra(
   destinationId: string | undefined,
   optionalCostKeys: readonly string[],
+  flow = false,
+  repeat = false,
 ) {
-  if (optionalCostKeys.length === 0) return destinationId;
+  if (optionalCostKeys.length === 0 && !flow && !repeat) return destinationId;
   return `play:${JSON.stringify({
     destinationId: destinationId ?? null,
     optionalCostKeys,
+    flow,
+    repeat,
   })}`;
 }
 
 function decodePlayExtra(extra: string): {
   destinationId: string;
   optionalCostKeys: string[];
+  flow: boolean;
+  repeat: boolean;
 } {
   if (!extra.startsWith("play:")) {
-    return { destinationId: extra, optionalCostKeys: [] };
+    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false };
   }
   try {
     const parsed: unknown = JSON.parse(extra.slice("play:".length));
@@ -1511,8 +1617,12 @@ function decodePlayExtra(extra: string): {
     const destinationId = (parsed as { destinationId?: unknown }).destinationId;
     const optionalCostKeys = (parsed as { optionalCostKeys: unknown[] })
       .optionalCostKeys;
+    const flow = (parsed as { flow?: unknown }).flow;
+    const repeat = (parsed as { repeat?: unknown }).repeat;
     if (
       (destinationId !== null && typeof destinationId !== "string") ||
+      (flow !== undefined && typeof flow !== "boolean") ||
+      (repeat !== undefined && typeof repeat !== "boolean") ||
       optionalCostKeys.some((key) => typeof key !== "string") ||
       new Set(optionalCostKeys).size !== optionalCostKeys.length
     ) {
@@ -1521,6 +1631,8 @@ function decodePlayExtra(extra: string): {
     return {
       destinationId: destinationId ?? "",
       optionalCostKeys: optionalCostKeys as string[],
+      flow: flow === true,
+      repeat: repeat === true,
     };
   } catch {
     throw new Error("Play mode is malformed.");
@@ -1572,10 +1684,19 @@ function addPlayableCardActions(
 ) {
   const player = game.state.players[playerId]!;
   const handlers = createPrimitiveHandlers(index);
-  for (const cardId of [
+  const playableCards = [
     ...player.zones.hand,
     ...(player.zones.champion ? [player.zones.champion] : []),
-  ]) {
+  ].map((cardId) => ({ cardId, flow: false })).concat(
+    player.zones.trash
+      .filter((cardId) => {
+        const definition = definitionForInstance(cardId, index);
+        return definition.card.classification.type === "Spell" &&
+          flowEnergyCostFor(definition) !== null;
+      })
+      .map((cardId) => ({ cardId, flow: true })),
+  );
+  for (const { cardId, flow } of playableCards) {
     const definition = definitionForInstance(cardId, index);
     if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
@@ -1593,6 +1714,7 @@ function addPlayableCardActions(
       continue;
     const context = createBehaviorContext(game, playerId, cardId, null, []);
     const optionalSourceCosts = optionalSourcePlayCosts(definition);
+    const repeatCost = repeatAdditionalCostFor(definition);
     const optionalSourceCostKeys = new Set(
       optionalSourceCosts.map((payment) => payment.selectionKey),
     );
@@ -1602,7 +1724,9 @@ function addPlayableCardActions(
         targetRequirementsForClause(clause, context, handlers),
       );
     const costContributions: NumericContribution[] = [];
-    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
+    const cost = flow
+      ? flowEnergyCostFor(definition)!
+      : effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
     const effectivePower = effectivePowerCost(
       game,
       playerId,
@@ -1664,9 +1788,11 @@ function addPlayableCardActions(
         : null;
     for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
       for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
+        for (const repeat of repeatCost ? [false, true] : [false]) {
         const additionalCosts = optionalSourceCosts
           .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
-          .flatMap((payment) => payment.costs);
+          .flatMap((payment) => payment.costs)
+          .concat(repeat && repeatCost ? [repeatCost] : []);
         const { availableAnyPower, ...payment } = cardPaymentPreview(
           game,
           playerId,
@@ -1690,18 +1816,18 @@ function addPlayableCardActions(
           action(
             game,
             "play",
-            playActionLabel({
+            `${flow ? "[Flow] " : ""}${repeat ? "[Repeat] " : ""}${playActionLabel({
               definition,
               destinationName: destination.name,
               energyCost: cost,
               effectivePower,
               additionalCosts,
-              hasOptionalModes: optionalSourceCosts.length > 0,
-            }),
+              hasOptionalModes: optionalSourceCosts.length > 0 || repeat,
+            })}`,
             cardId,
             enabled,
             disabledReason,
-            encodePlayExtra(destination.id, optionalCostKeys),
+            encodePlayExtra(destination.id, optionalCostKeys, flow, repeat),
             targets,
             undefined,
             { ...costPreview, energy: payment.energy, effectivePower: payment.power, availableAnyPower },
@@ -1713,6 +1839,7 @@ function addPlayableCardActions(
           showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
           modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
         };
+        }
       }
     }
   }
@@ -1835,6 +1962,13 @@ function addAbilityActions(
           createBehaviorContext(game, playerId, sourceId, null, []),
           handlers,
         );
+        const conditionsMet = clause.conditions.every((condition) => {
+          const handler = handlers.get(condition.behaviorId);
+          return handler?.matches?.(
+            condition,
+            createBehaviorContext(game, playerId, sourceId, null, []),
+          ) ?? true;
+        });
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
@@ -1852,6 +1986,7 @@ function addAbilityActions(
           game.state.cardStates[sourceId]?.empowered === true;
         const enabled =
           sourceReady &&
+          conditionsMet &&
           !alreadyEmpowered &&
           costsPayable &&
           canSatisfyTargetRequirements(targets);
@@ -1880,7 +2015,9 @@ function addAbilityActions(
             enabled
               ? null
                 : sourceReady
-                ? alreadyEmpowered
+                ? !conditionsMet
+                  ? "Ability condition is not satisfied."
+                  : alreadyEmpowered
                   ? "Source is already Empowered."
                   : costsPayable
                   ? "No legal targets are available."
@@ -2036,6 +2173,7 @@ function executeActivatedAbility(
     }
     state.exhausted = true;
   }
+  payActivatedNonResourceCosts(game, clause, sourceId, selectedIds, index);
   if (costs.energy > 0 || costs.power > 0) {
     payAbilityCost(game, actorPlayerId, definition, costs, index, {
       poolOnly: binding.behaviorId === "ability.equip",
@@ -2064,6 +2202,42 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function payActivatedNonResourceCosts(
+  game: GameDocument,
+  clause: BehaviorClause,
+  sourceId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  for (const cost of clause.costs) {
+    if (cost.behaviorId === "cost.discard_selected_cards") {
+      const count = cost.parameters.count;
+      if (typeof count !== "number" || !Number.isInteger(count) || count < 1 || selectedIds.length < count) {
+        throw new Error("Activated discard cost cannot be paid.");
+      }
+      const owner = index.instances.get(sourceId)?.ownerPlayerId;
+      if (!owner) throw new Error("Activated discard source is unavailable.");
+      const player = game.state.players[owner]!;
+      const discarded = selectedIds.slice(0, count);
+      if (discarded.some((id) => !player.zones.hand.includes(id))) {
+        throw new Error("Activated discard cost must use cards from hand.");
+      }
+      player.zones.hand = player.zones.hand.filter((id) => !discarded.includes(id));
+      player.zones.trash.push(...discarded);
+      continue;
+    }
+    if (cost.behaviorId !== "cost.recycle_selected_cards") continue;
+    const count = cost.parameters.count;
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 1) {
+      throw new Error("Activated recycle cost is malformed.");
+    }
+    if (selectedIds.length < count) {
+      throw new Error("Activated recycle cost cannot be paid.");
+    }
+    recycleCards(game, index, sourceId, selectedIds.slice(0, count));
+  }
 }
 
 function activationCosts(clause: BehaviorClause) {
@@ -2281,6 +2455,10 @@ function validLockedTargets(
   controllerPlayerId: string,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
+  const selectedTargets = item.repeatTargetSelections?.[item.repeatResolutionIndex ?? 0]
+    ?? item.targetCardInstanceIds;
+  const targetVersions = item.repeatTargetObjectVersions?.[item.repeatResolutionIndex ?? 0]
+    ?? item.targetObjectVersions;
   const requirements = targetRequirementsForClause(
     clause,
     createBehaviorContext(
@@ -2288,7 +2466,7 @@ function validLockedTargets(
       controllerPlayerId,
       item.sourceCardInstanceId!,
       item.behaviorEvent,
-      item.targetCardInstanceIds,
+      selectedTargets,
       {},
       item.initialSelectionOverrides ?? {},
     ),
@@ -2300,12 +2478,12 @@ function validLockedTargets(
       .filter((requirement) => requirement.kind === "chainItem")
       .flatMap((requirement) => requirement.legalIds),
   );
-  return item.targetCardInstanceIds.filter(
+  return selectedTargets.filter(
     (id) =>
       currentlyLegal.has(id) &&
       (chainItemTargets.has(id) ||
         (game.state.cardStates[id]?.objectVersion ?? 0) ===
-          item.targetObjectVersions[id]),
+          targetVersions[id]),
   );
 }
 

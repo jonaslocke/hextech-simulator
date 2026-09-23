@@ -72,9 +72,11 @@ export function createPrimitiveHandlers(
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
     "keyword.quick_draw", "keyword.temporary",
+    "keyword.flow", "keyword.repeat", "keyword.lethal_damage",
     "type.additional",
     "modifier.ignore_deflect",
-    "keyword.ganking", "cost.exhaust_selected_unit",
+    "modifier.prevent_scoring_until_turn",
+    "keyword.ganking", "cost.exhaust_selected_unit", "cost.recycle_selected_cards", "cost.discard_selected_cards",
     "cost.pay", "cost.exhaust_source",
   ]) handlers.set(id, passive);
   handlers.set("ability.activated_effect", {
@@ -207,6 +209,7 @@ export function createPrimitiveHandlers(
 
   handlers.set("selector.unit", {
     targets(binding, context) {
+      if (!selectorOptionMatches(binding, context)) return noSelectionRequirement(binding);
       return selectorTargets(
         binding,
         context.game,
@@ -219,6 +222,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("selector.friendly_unit", {
     targets(binding, context) {
+      if (!selectorOptionMatches(binding, context)) return noSelectionRequirement(binding);
       return selectorTargets(
         binding,
         context.game,
@@ -231,6 +235,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("selector.enemy_unit", {
     targets(binding, context) {
+      if (!selectorOptionMatches(binding, context)) return noSelectionRequirement(binding);
       return selectorTargets(
         binding,
         context.game,
@@ -245,15 +250,25 @@ export function createPrimitiveHandlers(
   });
   handlers.set("selector.card", {
     targets(binding, context) {
-      const player = context.game.state.players[context.controllerPlayerId]!;
+      if (!selectorOptionMatches(binding, context)) return noSelectionRequirement(binding);
       const zone = stringParam(binding, "zone");
-      const zoneValue =
-        player.zones[zone as keyof typeof player.zones];
-      const ids = Array.isArray(zoneValue)
-        ? zoneValue
-        : zoneValue
-          ? [zoneValue]
-          : [];
+      const owner = binding.parameters.owner ?? binding.parameters.player;
+      const playerIds = owner === "opponent"
+        ? Object.keys(context.game.state.players).filter((id) => id !== context.controllerPlayerId)
+        : [context.controllerPlayerId];
+      const ids = zone === "board"
+        ? [
+            ...Object.values(context.game.state.players).flatMap((player) => player.zones.base),
+            ...context.game.state.battlefields.flatMap((battlefield) => battlefield.units),
+          ].filter((id) => playerIds.includes(index.instances.get(id)?.ownerPlayerId ?? ""))
+        : playerIds.flatMap((playerId) => {
+        const zoneValue = context.game.state.players[playerId]!.zones[zone as keyof typeof context.game.state.players[string]["zones"]];
+        return Array.isArray(zoneValue) ? zoneValue : zoneValue ? [zoneValue] : [];
+      });
+      const topCount = binding.parameters.topCount;
+      const visibleIds = typeof topCount === "number" && zone === "mainDeck"
+        ? ids.slice(0, Math.max(0, topCount))
+        : ids;
       const cardType = stringParam(binding, "cardType");
       return {
         kind: "card" as const,
@@ -262,7 +277,7 @@ export function createPrimitiveHandlers(
           zone === "hand" || zone === "trash" || zone === "mainDeck"
             ? zone
             : undefined,
-        legalIds: ids.filter(
+        legalIds: visibleIds.filter(
           (id) =>
             cardType === "any" ||
             cardHasType(definitionForInstance(id, index), cardType),
@@ -445,6 +460,21 @@ export function createPrimitiveHandlers(
               : cardHasType(definition, choosesControlledCardType);
           });
         })
+        .filter((item) => {
+          const selectionKey = binding.parameters.onlyTargetSelectedBy;
+          if (typeof selectionKey !== "string") return true;
+          const protectedIds = context.selectedBySelector[selectionKey] ?? [];
+          if (protectedIds.length === 0) return false;
+          const protectedSet = new Set(protectedIds);
+          const friendlyTargetIds = item.targetCardInstanceIds.filter((targetId) => {
+            const target = index.instances.get(targetId);
+            return target?.ownerPlayerId === context.controllerPlayerId &&
+              (cardHasType(definitionForInstance(targetId, index), "Unit") ||
+                cardHasType(definitionForInstance(targetId, index), "Gear"));
+          });
+          return friendlyTargetIds.length === protectedSet.size &&
+            friendlyTargetIds.every((targetId) => protectedSet.has(targetId));
+        })
         .map((item) => item.id);
       return {
         kind: "chainItem" as const,
@@ -460,6 +490,7 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.draw_cards", {
     execute(binding, context) {
+      if (!effectOutcomeMatches(binding, context)) return;
       const playerId = binding.parameters.player === "eachPlayer" ? null : context.controllerPlayerId;
       const count = numberParam(binding, "count");
       const ids = playerId ? [playerId] : [...context.game.state.setup.playerIds];
@@ -608,7 +639,10 @@ export function createPrimitiveHandlers(
           context.game.state.cardStates[id]!.exhausted = true;
         });
       }
-      if (moved.length === 0) {
+      const fallbackWhenFewerThan = typeof binding.parameters.fallbackWhenFewerThan === "number"
+        ? binding.parameters.fallbackWhenFewerThan
+        : 1;
+      if (moved.length < fallbackWhenFewerThan) {
         ensureMainDeck(context.game, context.controllerPlayerId, index);
         draw(
           context.game,
@@ -692,6 +726,34 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.ready_cards", {
     choice(binding, context) {
+      if (binding.parameters.selectExhaustedCards === true) {
+        const candidates = [
+          ...context.game.state.players[context.controllerPlayerId]!.zones.base,
+          ...context.game.state.battlefields.flatMap((battlefield) => [
+            ...battlefield.units,
+            ...(battlefield.attachedCardInstanceIds ?? []),
+          ]),
+        ];
+        const legalIds = [...new Set(candidates)].filter((id) =>
+          index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId &&
+          context.game.state.cardStates[id]?.exhausted === true &&
+          (binding.parameters.excludesSource !== true || id !== context.sourceCardInstanceId),
+        );
+        return {
+          kind: "card" as const,
+          legalIds,
+          minimum: typeof binding.parameters.minimumCount === "number"
+            ? binding.parameters.minimumCount
+            : 0,
+          maximum: typeof binding.parameters.maximumCount === "number"
+            ? binding.parameters.maximumCount
+            : 1,
+          prompt: typeof binding.parameters.prompt === "string"
+            ? binding.parameters.prompt
+            : "Choose exhausted cards to ready",
+          presentation: "cardSelection" as const,
+        };
+      }
       if (binding.parameters.target !== "runes") return null;
       const legalIds = context.game.state.players[
         context.controllerPlayerId
@@ -787,11 +849,19 @@ export function createPrimitiveHandlers(
         targetScope: "controller_effect",
       });
       const ids = damageTargets(binding, context, index);
+      validateDamageTargetLocations(binding, context.game, ids);
       let killed = false;
       for (const id of ids) {
         const state = context.game.state.cardStates[id];
         if (!state) throw new Error(`Damage target is unavailable: ${id}`);
-        state.damage += amount;
+        state.damage += damageIsLethalAgainstEnemyUnit(
+          context.game,
+          context.controllerPlayerId,
+          id,
+          index,
+        )
+          ? state.computedMight ?? definitionForInstance(id, index).card.attributes.might ?? amount
+          : amount;
         incrementObjectVersion(context.game, id);
       }
       cleanupLethalDamage(context.game, ids, index);
@@ -839,6 +909,89 @@ export function createPrimitiveHandlers(
         context.game.state.players[owner]!.zones.hand.push(id);
         resetStateAfterLeavingBoard(context.game, id, index);
       }
+    },
+  });
+  handlers.set("trigger.stored_target_death", {
+    matches(_binding, context) {
+      const target = context.event?.subjectCardInstanceId;
+      return Boolean(target && context.game.state.ongoingEffects.some(
+        (effect) => effect.behaviorId === "action.play_token_on_next_death" &&
+          effect.sourceCardInstanceId === context.sourceCardInstanceId &&
+          effect.targetCardInstanceIds.includes(target),
+      ));
+    },
+  });
+  handlers.set("condition.source_empowered", {
+    matches: (_binding, context) =>
+      context.game.state.cardStates[context.sourceCardInstanceId]?.empowered === true,
+  });
+  handlers.set("condition.first_non_token_gear_play_this_turn", {
+    matches: (_binding, context) => {
+      const event = context.event;
+      const turn = context.game.state.turn;
+      if (!event?.subjectCardInstanceId || event.type !== "card.played" ||
+        event.actorPlayerId !== context.controllerPlayerId || !turn) return false;
+      const playedGearIds = (turn.playedCardInstanceIds ?? []).filter((id) => {
+        const instance = index.instances.get(id);
+        return instance?.source !== "token" &&
+          definitionForInstance(id, index).card.classification.type === "Gear";
+      });
+      return playedGearIds.length === 1 && playedGearIds[0] === event.subjectCardInstanceId;
+    },
+  });
+  handlers.set("action.recycle_cards", {
+    choice(binding, context) {
+      if (!effectOutcomeMatches(binding, context)) return null;
+      const zone = binding.parameters.selectFromZone;
+      if (zone !== "trash" && zone !== "hand" && zone !== "mainDeck") return null;
+      const owner = binding.parameters.owner;
+      const playerIds = Object.keys(context.game.state.players).filter((playerId) =>
+        owner === "opponent"
+          ? playerId !== context.controllerPlayerId
+          : owner === "controller"
+            ? playerId === context.controllerPlayerId
+            : false,
+      );
+      const cardType = typeof binding.parameters.cardType === "string"
+        ? binding.parameters.cardType
+        : "any";
+      const excludedCardType = binding.parameters.excludesCardType;
+      const legalIds = playerIds.flatMap((playerId) =>
+        context.game.state.players[playerId]!.zones[zone].filter((id) =>
+          (cardType === "any" || cardHasType(definitionForInstance(id, index), cardType)) &&
+          (typeof excludedCardType !== "string" ||
+            !cardHasType(definitionForInstance(id, index), excludedCardType)) &&
+          (typeof binding.parameters.requiredDomain !== "string" ||
+            definitionForInstance(id, index).card.classification.domain.includes(
+              normalizedDomain(binding.parameters.requiredDomain),
+            )),
+        ),
+      );
+      return {
+        kind: "card" as const,
+        legalIds,
+        minimum: typeof binding.parameters.minimumCount === "number"
+          ? binding.parameters.minimumCount
+          : 0,
+        maximum: typeof binding.parameters.maximumCount === "number"
+          ? binding.parameters.maximumCount
+          : legalIds.length,
+        prompt: typeof binding.parameters.prompt === "string"
+          ? binding.parameters.prompt
+          : "Choose cards to recycle",
+        sourceZone: zone,
+        presentation: "cardSelection" as const,
+      };
+    },
+    execute(binding, context) {
+      if (!effectOutcomeMatches(binding, context)) return;
+      const selected = selectionFor(binding, context);
+      const count = typeof binding.parameters.count === "number"
+        ? binding.parameters.count
+        : undefined;
+      const cards = (selected.length > 0 ? selected : context.selectedIds)
+        .slice(0, count);
+      recycleCards(context.game, index, context.sourceCardInstanceId, cards);
     },
   });
   handlers.set("action.move_unit", {
@@ -916,6 +1069,13 @@ export function createPrimitiveHandlers(
       }
     }
   });
+  handlers.set("modifier.enter_exhausted", {
+    execute(_binding, context) {
+      const state = context.game.state.cardStates[context.sourceCardInstanceId];
+      if (!state) throw new Error("Entry exhaustion source is unavailable.");
+      state.exhausted = true;
+    },
+  });
   handlers.set("modifier.modify_numeric_value", {
     execute(binding, context) {
       if (isContinuousDuration(binding.parameters.duration)) {
@@ -980,7 +1140,10 @@ export function createPrimitiveHandlers(
         moveCardToTrash(context.game, context.sourceCardInstanceId, index);
       }
       const player = context.game.state.players[context.controllerPlayerId]!;
-      const amount = numberParam(binding, "amount");
+      const empoweredAmount = binding.parameters.empoweredAmount;
+      const amount = state.empowered === true && typeof empoweredAmount === "number"
+        ? empoweredAmount
+        : numberParam(binding, "amount");
       const usage = stringParam(binding, "usage");
       if (binding.parameters.resourceType === "power") {
         const domain = resourceDomainForBinding(binding, context, index);
@@ -1094,6 +1257,10 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.optional", {
     choice(binding, context) {
+      const committedKey = binding.parameters.selectionKey;
+      if (binding.parameters.commitAtPlay === true &&
+        typeof committedKey === "string" &&
+        Object.hasOwn(context.selectionOverrides, committedKey)) return null;
       const selectionKey = binding.parameters.onlyIfSelectedBy;
       if (
         typeof selectionKey === "string" &&
@@ -1119,14 +1286,69 @@ export function createPrimitiveHandlers(
         maximum: 1,
         prompt: stringParam(binding, "prompt"),
         options: [
-          { id: "yes", label: "Yes" },
-          { id: "no", label: "No" },
+          {
+            id: "yes",
+            label: typeof binding.parameters.yesLabel === "string"
+              ? binding.parameters.yesLabel
+              : "Yes",
+          },
+          {
+            id: "no",
+            label: typeof binding.parameters.noLabel === "string"
+              ? binding.parameters.noLabel
+              : "No",
+          },
         ],
       };
     },
     execute(binding, context) {
       const effectKey = stringParam(binding, "effectKey");
-      context.effectOutcomes[effectKey] = context.selectedIds.includes("yes");
+      const committedKey = binding.parameters.selectionKey;
+      const selected = binding.parameters.commitAtPlay === true &&
+        typeof committedKey === "string"
+        ? context.selectionOverrides[committedKey] ?? context.selectedIds
+        : context.selectedIds;
+      context.effectOutcomes[effectKey] = selected.includes("yes");
+    },
+  });
+  handlers.set("trigger.beginning_phase", {
+    matches(_binding, context) {
+      return context.event?.type === "turn.beginning" &&
+        context.event.actorPlayerId === context.controllerPlayerId;
+    },
+  });
+  handlers.set("condition.controller_hand_and_battlefield_unit_counts", {
+    matches(binding, context) {
+      const handCount = binding.parameters.handCount;
+      const battlefieldUnitCount = binding.parameters.battlefieldUnitCount;
+      if (typeof handCount !== "number" || typeof battlefieldUnitCount !== "number") return false;
+      return context.game.state.players[context.controllerPlayerId]!.zones.hand.length === handCount &&
+        context.game.state.battlefields.flatMap((battlefield) => battlefield.units)
+          .filter((id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId)
+          .length === battlefieldUnitCount;
+    },
+  });
+  handlers.set("action.win_game", {
+    execute(_binding, context) {
+      context.game.winnerPlayerId = context.controllerPlayerId;
+      context.game.completionReason = "victory";
+      context.game.status = "complete";
+    },
+  });
+  handlers.set("action.play_token_on_next_death", {
+    execute(binding, context) {
+      const tokenName = binding.parameters.tokenName;
+      if (typeof tokenName !== "string") throw new Error("Delayed death token is malformed.");
+      context.game.state.ongoingEffects.push({
+        id: `ongoing:${context.game.stateVersion}:${context.sourceCardInstanceId}:${context.game.state.ongoingEffects.length}`,
+        behaviorId: binding.behaviorId,
+        controllerPlayerId: context.controllerPlayerId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        targetCardInstanceIds: selectionFor(binding, context),
+        parameters: { tokenName },
+        duration: "thisTurn",
+        createdAtTurn: context.game.state.turn?.turnNumber ?? 0,
+      });
     },
   });
   handlers.set("ability.recycle_for_power", {
@@ -1634,6 +1856,15 @@ function findOrCreateTokenDefinition(
               order: 0,
             }],
           }]
+        : "deflect" in tokenIdentity && tokenIdentity.deflect
+        ? [{
+            id: "deflect",
+            sequence: 0,
+            sourceText: "Deflect",
+            normalizedText: "Deflect",
+            abilities: [], triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [],
+            keywords: [{ behaviorId: "keyword.deflect", parameters: {}, confidence: "high", order: 0 }],
+          }]
         : [],
     },
   };
@@ -1673,6 +1904,9 @@ function tokenIdentityFromName(tokenName: string) {
   }
   if (/gold gear/i.test(tokenName)) {
     return { name: "Gold Gear", might: null, imageUrl: null, type: "Gear" as const, temporary: false, goldGear: true };
+  }
+  if (/bird/i.test(tokenName)) {
+    return { name: "Bird", might: 1, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false, deflect: /deflect/i.test(tokenName) };
   }
   return { name: tokenName, might: null, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false };
 }
@@ -1925,6 +2159,14 @@ function queueDeathTriggeredEffects(
   if (!instance) return;
   const definition = definitionForInstance(sourceCardInstanceId, index);
   const handlers = createPrimitiveHandlers(index);
+  const delayedSources = game.state.ongoingEffects
+    .filter((effect) => effect.behaviorId === "action.play_token_on_next_death" &&
+      effect.targetCardInstanceIds.includes(sourceCardInstanceId))
+    .map((effect) => ({
+      sourceCardInstanceId: effect.sourceCardInstanceId,
+      label: definitionForInstance(effect.sourceCardInstanceId, index).card.name,
+      model: compileBehaviorModel(definitionForInstance(effect.sourceCardInstanceId, index).behaviorModel, handlers),
+    }));
   const items = collectTriggeredClauses({
     game,
     controllerPlayerId: instance.ownerPlayerId,
@@ -1932,7 +2174,7 @@ function queueDeathTriggeredEffects(
       sourceCardInstanceId,
       label: definition.card.name,
       model: compileBehaviorModel(definition.behaviorModel, handlers),
-    }],
+    }, ...delayedSources],
     event: {
       type: "card.died",
       actorPlayerId: null,
@@ -1941,6 +2183,12 @@ function queueDeathTriggeredEffects(
     },
     handlers,
   });
+  if (delayedSources.length) {
+    game.state.ongoingEffects = game.state.ongoingEffects.filter((effect) =>
+      !(effect.behaviorId === "action.play_token_on_next_death" &&
+        effect.targetCardInstanceIds.includes(sourceCardInstanceId)),
+    );
+  }
   if (items.length === 0) return;
   if (items.length > 1) {
     const choice = {
@@ -2149,6 +2397,132 @@ function removeFromAllLocations(game: GameDocument, id: string) {
     );
   }
   removeFromAttachmentLocations(game, id);
+}
+
+function validateDamageTargetLocations(
+  binding: BehaviorBinding,
+  game: GameDocument,
+  ids: readonly string[],
+) {
+  if (binding.parameters.atMostOnePerLocation !== true &&
+    binding.parameters.selectedMustShareLocation !== true) return;
+  const locations = ids.map((id) => boardLocationForUnit(game, id));
+  if (locations.some((location) => location === null)) {
+    throw new Error("Damage targets must be at a location.");
+  }
+  const keys = locations.map((location) => `${location!.kind}:${location!.id}`);
+  if (binding.parameters.atMostOnePerLocation === true && new Set(keys).size !== keys.length) {
+    throw new Error("Only one damage target may be chosen at each location.");
+  }
+  if (binding.parameters.selectedMustShareLocation === true && new Set(keys).size > 1) {
+    throw new Error("Damage targets must share one location.");
+  }
+}
+
+export function damageIsLethalAgainstEnemyUnit(
+  game: GameDocument,
+  controllerPlayerId: string,
+  targetId: string,
+  index: RuntimeCardIndex,
+) {
+  if (index.instances.get(targetId)?.ownerPlayerId === controllerPlayerId) return false;
+  const controlledBoardCards = [
+    ...game.state.players[controllerPlayerId]!.zones.base,
+    ...game.state.battlefields.flatMap((battlefield) => battlefield.units),
+  ];
+  return controlledBoardCards.some((id) =>
+    index.instances.get(id)?.ownerPlayerId === controllerPlayerId &&
+    definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
+      clause.keywords.some((keyword) => keyword.behaviorId === "keyword.lethal_damage"),
+    ),
+  );
+}
+
+function selectorOptionMatches(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const key = binding.parameters.onlyIfSelectionKey;
+  if (typeof key !== "string") return true;
+  const expected = binding.parameters.onlyIfSelectionValue;
+  return context.selectionOverrides[key]?.includes(
+    typeof expected === "string" ? expected : "yes",
+  ) ?? false;
+}
+
+function noSelectionRequirement(binding: BehaviorBinding) {
+  return {
+    kind: "card" as const,
+    ...(typeof binding.parameters.selectionKey === "string"
+      ? { selectionKey: binding.parameters.selectionKey }
+      : {}),
+    legalIds: [],
+    minimum: 0,
+    maximum: 0,
+  };
+}
+
+function effectOutcomeMatches(
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+) {
+  const effectKey = binding.parameters.onlyIfEffectKey;
+  if (typeof effectKey !== "string") return true;
+  const expected = binding.parameters.onlyIfEffectValue;
+  return context.effectOutcomes[effectKey] ===
+    (typeof expected === "boolean" ? expected : true);
+}
+
+export function recycleCards(
+  game: GameDocument,
+  index: RuntimeCardIndex,
+  sourceCardInstanceId: string,
+  cards: readonly string[],
+) {
+  const byOwnerAndDestination = new Map<string, string[]>();
+  for (const cardInstanceId of cards) {
+    const owner = index.instances.get(cardInstanceId)?.ownerPlayerId;
+    if (!owner) continue;
+    if (isTokenInstance(cardInstanceId, index)) {
+      ceaseToken(game, cardInstanceId);
+      continue;
+    }
+    const definition = definitionForInstance(cardInstanceId, index);
+    const destination = definition.card.classification.type === "Rune"
+      ? "runeDeck"
+      : "mainDeck";
+    removeFromAllLocations(game, cardInstanceId);
+    resetStateAfterLeavingBoard(game, cardInstanceId, index);
+    const key = `${owner}:${destination}`;
+    byOwnerAndDestination.set(key, [
+      ...(byOwnerAndDestination.get(key) ?? []),
+      cardInstanceId,
+    ]);
+  }
+  for (const [key, ids] of byOwnerAndDestination) {
+    const [owner, destination] = key.split(":") as [string, "mainDeck" | "runeDeck"];
+    const ordered = destination === "mainDeck" && ids.length > 1
+      ? deterministicRecycleOrder(game.id, sourceCardInstanceId, ids)
+      : ids;
+    game.state.players[owner]!.zones[destination].push(...ordered);
+  }
+  recomputeAllMight(game, index);
+}
+
+function deterministicRecycleOrder(
+  gameId: string,
+  sourceCardInstanceId: string,
+  ids: readonly string[],
+): string[] {
+  return ids
+    .map((id) => ({
+      id,
+      rank: createHash("sha256")
+        .update(`${gameId}:${sourceCardInstanceId}:${id}`)
+        .digest("hex"),
+    }))
+    .sort((left, right) => left.rank.localeCompare(right.rank))
+    .map(({ id }) => id);
 }
 function resetStateAfterLeavingBoard(
   game: GameDocument,

@@ -125,6 +125,15 @@ export const chainItemSchema = z.object({
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.
   initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+  // Flow replaces the normal post-resolution move to Trash with banishment.
+  flowPlayed: z.boolean().optional(),
+  // Repeat commits one target set for each execution while the card is played.
+  repeatTargetSelections: z.array(z.array(z.string())).optional(),
+  repeatTargetObjectVersions: z.array(z.record(z.number().int().nonnegative())).optional(),
+  repeatResolutionIndex: z.number().int().nonnegative().optional(),
+  // Choice modes marked commitAtPlay are retained alongside each execution.
+  // Each record is keyed by the canonical option binding's selection key.
+  preplayOptionSelections: z.array(z.record(z.array(z.string()))).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   activatedBehaviorId: z.string().nullable().default(null),
@@ -329,6 +338,7 @@ export const gameStateSchema = z.object({
         controllerPlayerId: z.string().min(1),
         sourceCardInstanceId: z.string().min(1),
         targetCardInstanceIds: z.array(z.string()),
+        parameters: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}).optional(),
         duration: z.string().min(1),
         createdAtTurn: z.number().int().nonnegative(),
       }),

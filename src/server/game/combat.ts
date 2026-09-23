@@ -5,6 +5,7 @@ import {
 } from "./board-rules";
 import { scoreBattlefield } from "./scoring";
 import {
+  damageIsLethalAgainstEnemyUnit,
   definitionForInstance,
   recomputeMight,
   type RuntimeCardIndex
@@ -240,11 +241,16 @@ function applyAssignment(
     throw new Error("Player is not a participant in this combat.");
   }
   combat.defenderAssignments = assignments;
-  for (const assignment of [
-    ...combat.attackerAssignments,
-    ...combat.defenderAssignments
-  ]) {
-    game.state.cardStates[assignment.targetUnitId]!.damage += assignment.amount;
+  for (const [controllerPlayerId, assignments] of [
+    [combat.attackerPlayerId, combat.attackerAssignments],
+    [combat.defenderPlayerId, combat.defenderAssignments],
+  ] as const) {
+    for (const assignment of assignments) {
+      const state = game.state.cardStates[assignment.targetUnitId]!;
+      state.damage += damageIsLethalAgainstEnemyUnit(game, controllerPlayerId, assignment.targetUnitId, index)
+        ? state.computedMight ?? assignment.amount
+        : assignment.amount;
+    }
   }
   resolveCombat(game, index, decks);
 }

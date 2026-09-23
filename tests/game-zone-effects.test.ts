@@ -34,6 +34,114 @@ test("returns selected trash cards and moves battlefield units generically", () 
   assert.equal(game.state.cardStates.unit!.exhausted, true);
 });
 
+test("channel-or-draw falls back when fewer than its required channel count move", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const rune = structuredClone(index.definitions.get("UNIT")!);
+  rune.cardCode = "RUNE";
+  rune.card = {
+    ...rune.card,
+    id: "RUNE",
+    name: "RUNE",
+    public_code: "RUNE/1",
+    classification: { ...rune.card.classification, type: "Rune" },
+  };
+  index.definitions.set("RUNE", rune);
+  index.instances.set("rune", {
+    instanceId: "rune", ownerPlayerId: "p1", source: "runeDeck", cardCode: "RUNE",
+  });
+  index.instances.set("draw", {
+    instanceId: "draw", ownerPlayerId: "p1", source: "mainDeck", cardCode: "SPELL",
+  });
+  game.state.cardStates.rune = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates.draw = { exhausted: false, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.runeDeck.push("rune");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+
+  createPrimitiveHandlers(index).get("action.channel_or_draw")!.execute!(
+    binding("action.channel_or_draw", {
+      channelCount: 2,
+      entryState: "exhausted",
+      fallbackDrawCount: 1,
+      fallbackWhenFewerThan: 2,
+    }),
+    createBehaviorContext(game, "p1", "spell", null, []),
+  );
+
+  assert.deepEqual(game.state.players.p1!.zones.base, ["rune"]);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("recycle moves selected runes to their owner's rune deck", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const rune = structuredClone(index.definitions.get("UNIT")!);
+  rune.cardCode = "RUNE";
+  rune.card = {
+    ...rune.card,
+    id: "RUNE",
+    name: "RUNE",
+    public_code: "RUNE/1",
+    classification: { ...rune.card.classification, type: "Rune" },
+  };
+  index.definitions.set("RUNE", rune);
+  index.instances.set("rune", {
+    instanceId: "rune", ownerPlayerId: "p1", source: "runeDeck", cardCode: "RUNE",
+  });
+  game.state.cardStates.rune = { exhausted: true, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.base.push("rune");
+
+  createPrimitiveHandlers(index).get("action.recycle_cards")!.execute!(
+    binding("action.recycle_cards", { target: "rune" }),
+    createBehaviorContext(game, "p1", "bf", null, ["rune"]),
+  );
+
+  assert.deepEqual(game.state.players.p1!.zones.base, []);
+  assert.deepEqual(game.state.players.p1!.zones.runeDeck, ["rune"]);
+  assert.equal(game.state.cardStates.rune?.exhausted, false);
+});
+
+test("entry exhaustion and empowered resource abilities use the source's current state", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const egg = structuredClone(index.definitions.get("UNIT")!);
+  egg.cardCode = "EGG";
+  egg.card = {
+    ...egg.card,
+    id: "EGG",
+    name: "Platewyrm Egg",
+    public_code: "EGG/1",
+    classification: { ...egg.card.classification, type: "Gear" },
+  };
+  index.definitions.set("EGG", egg);
+  index.instances.set("egg", {
+    instanceId: "egg", ownerPlayerId: "p1", source: "mainDeck", cardCode: "EGG",
+  });
+  game.state.cardStates.egg = { exhausted: false, empowered: true, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.base.push("egg");
+  const handlers = createPrimitiveHandlers(index);
+
+  handlers.get("modifier.enter_exhausted")!.execute!(
+    binding("modifier.enter_exhausted", { target: "source" }),
+    createBehaviorContext(game, "p1", "egg", null, []),
+  );
+  assert.equal(game.state.cardStates.egg!.exhausted, true);
+  game.state.cardStates.egg!.exhausted = false;
+
+  handlers.get("ability.exhaust_for_resource")!.execute!(
+    binding("ability.exhaust_for_resource", {
+      resourceType: "energy",
+      amountSource: "constant",
+      amount: 1,
+      empoweredAmount: 2,
+      usage: "unrestricted",
+    }),
+    createBehaviorContext(game, "p1", "egg", null, []),
+  );
+  assert.equal(game.state.players.p1!.energy, 2);
+  assert.equal(game.state.cardStates.egg!.exhausted, true);
+});
+
 test("applies controller Bonus Damage and records whether it killed", () => {
   const game = fixture();
   const index = cardIndex();

@@ -15,6 +15,7 @@ import {
   scoreBattlefield,
   type GameDocument,
 } from "../src/server/game";
+import type { GameCardDefinition } from "../src/server/game/schemas";
 import { cleanupBoard } from "../src/server/game/board-rules";
 import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
@@ -1717,6 +1718,273 @@ function withNodeEnvironment<T>(environment: string | undefined, run: () => T): 
     else variables.NODE_ENV = previous;
   }
 }
+
+test("Flow plays a spell from Trash at its alternate cost and banishes it after resolution", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.behaviorModel.clauses.push(
+    clause("flow", {
+      keywords: [binding("keyword.flow", 0, { energyCost: 2 })],
+      effects: [binding("action.draw_cards", 1, { player: "controller", count: 1 })],
+    }),
+  );
+  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter(
+    (id) => id !== "p1:spell",
+  );
+  game.state.players.p1!.zones.trash.push("p1:spell");
+  game.state.players.p1!.energy = 2;
+
+  const flow = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell" && action.label.startsWith("[Flow]"),
+  );
+  assert.ok(flow?.enabled);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: flow.id,
+    selectedIds: [],
+    decks,
+    now: "flow-play",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.flowPlayed, true);
+  assert.equal(next.state.players.p1!.zones.trash.includes("p1:spell"), false);
+  assert.equal(next.state.players.p1!.energy, 0);
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass);
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `flow-pass-${playerId}`,
+    });
+  }
+  assert.ok(next.state.players.p1!.zones.banishment.includes("p1:spell"));
+  assert.ok(next.state.players.p1!.zones.hand.includes("p1:draw"));
+});
+
+test("Repeat commits a second target before priority and resolves both executions", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.behaviorModel.clauses.push(
+    clause("repeat", {
+      keywords: [binding("keyword.repeat", 0, { energyCost: 1, powerCost: 1 })],
+      selectors: [binding("selector.card", 1, {
+        player: "opponent", zone: "board", cardType: "Unit", minimumCount: 1,
+        maximumCount: 1, selectionKey: "repeat-target",
+      })],
+      effects: [binding("action.draw_cards", 2, { player: "controller", count: 1 })],
+    }),
+  );
+  game.state.players.p1!.energy = 2;
+  game.state.players.p1!.power.Mind = 2;
+  decks[1]!.snapshot.cards.push(definition("OPP", "Opponent", "Unit", 0, 3));
+  decks[1]!.instances.push({
+    instanceId: "p2:mover", ownerPlayerId: "p2", source: "mainDeck", cardCode: "OPP",
+  });
+  game.state.battlefields[0]!.units.push("p2:mover");
+  game.state.cardStates["p2:mover"] = { exhausted: false, damage: 0, computedMight: 3 };
+  decks[0]!.instances.push({
+    instanceId: "p1:draw-two", ownerPlayerId: "p1", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.mainDeck.push("p1:draw-two");
+  game.state.cardStates["p1:draw-two"] = { exhausted: false, damage: 0, computedMight: 1 };
+
+  const repeat = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell" && action.label.startsWith("[Repeat]"),
+  );
+  assert.ok(repeat?.enabled, JSON.stringify(gameplayActions(game, "p1", decks).filter((action) => action.sourceCardInstanceId === "p1:spell")));
+  let next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: repeat.id, selectedIds: ["p2:mover"], decks, now: "repeat-play",
+  });
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.players.p1!.energy, 1);
+  assert.equal(next.state.players.p1!.power.Mind, 1);
+
+  const chooseRepeatTarget = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(chooseRepeatTarget);
+  next = performGameplayAction({
+    game: next, actorPlayerId: "p1", actionId: chooseRepeatTarget.id,
+    selectedIds: ["p2:mover"], decks, now: "repeat-target",
+  });
+  assert.equal(next.state.chain?.items.at(-1)?.repeatTargetSelections?.length, 2);
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
+    next = performGameplayAction({ game: next, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `repeat-pass-${playerId}` });
+  }
+  assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw"), true);
+  assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw-two"), true);
+});
+
+test("modal recycle-or-draw effects use the server-authorized option and card-selection decisions", () => {
+  const { game, decks } = fixture();
+  const disposal = definition("DISPOSAL", "Disposal Order", "Spell", 0, 0) as GameCardDefinition;
+  disposal.behaviorModel.clauses.push(
+    clause("dispose", {
+      timings: [binding("timing.reaction", 0, {})],
+      effects: [
+        binding("action.optional", 1, {
+          effectKey: "recycle",
+          prompt: "Choose an effect",
+          yesLabel: "Recycle up to 3 cards from opponents' trashes",
+          noLabel: "Draw 1",
+        }),
+        binding("action.recycle_cards", 2, {
+          target: "card",
+          selectFromZone: "trash",
+          owner: "opponent",
+          cardType: "any",
+          minimumCount: 0,
+          maximumCount: 3,
+          prompt: "Choose up to 3 cards to recycle",
+          onlyIfEffectKey: "recycle",
+          onlyIfEffectValue: true,
+        }),
+        binding("action.draw_cards", 3, {
+          player: "controller",
+          count: 1,
+          onlyIfEffectKey: "recycle",
+          onlyIfEffectValue: false,
+        }),
+      ],
+    }),
+  );
+  decks[0]!.snapshot.cards.push(disposal);
+  decks[0]!.instances.push({
+    instanceId: "p1:disposal",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "DISPOSAL",
+  });
+  decks[1]!.instances.push(
+    { instanceId: "p2:unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT" },
+    { instanceId: "p2:spell", ownerPlayerId: "p2", source: "mainDeck", cardCode: "SPELL" },
+  );
+  game.state.cardStates["p1:disposal"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p2:unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.cardStates["p2:spell"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.players.p2!.zones.trash.push("p2:unit", "p2:spell");
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:disposal",
+    clauseId: "dispose",
+    decks,
+  }), false);
+  assert.equal(game.state.pendingChoice?.type, "effectOption");
+  const chooseMode = gameplayActions(game, "p1", decks).find(
+    (action) => action.choice?.kind === "effectOption",
+  );
+  assert.ok(chooseMode);
+  let resolved = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: chooseMode.id,
+    selectedIds: ["yes"],
+    decks,
+    now: "choose-recycle",
+  });
+  assert.equal(resolved.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(resolved.state.pendingChoice?.legalCardIds.sort(), ["p2:spell", "p2:unit"]);
+  const chooseCards = gameplayActions(resolved, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(chooseCards);
+  resolved = performGameplayAction({
+    game: resolved,
+    actorPlayerId: "p1",
+    actionId: chooseCards.id,
+    selectedIds: ["p2:unit", "p2:spell"],
+    decks,
+    now: "choose-recycled-cards",
+  });
+
+  assert.deepEqual(resolved.state.players.p2!.zones.trash, []);
+  assert.deepEqual(resolved.state.players.p2!.zones.mainDeck.sort(), ["p2:spell", "p2:unit"]);
+  assert.equal(resolved.state.players.p1!.zones.hand.includes("p1:draw"), false);
+});
+
+test("activated recycle selections are paid before the ability enters the Chain", () => {
+  const { game, decks } = fixture();
+  const grabber = definition("GRABBER", "Garbage Grabber", "Unit", 0, 1) as GameCardDefinition;
+  grabber.behaviorModel.clauses.push(
+    clause("recycle-for-draw", {
+      abilities: [binding("ability.activated_effect", 0, {})],
+      selectors: [
+        binding("selector.card", 1, {
+          zone: "trash",
+          cardType: "any",
+          owner: "controller",
+          minimumCount: 3,
+          maximumCount: 3,
+          selectionKey: "recycledCards",
+        }),
+      ],
+      costs: [
+        binding("cost.recycle_selected_cards", 2, {
+          count: 3,
+          selectionKey: "recycledCards",
+        }),
+        binding("cost.pay", 3, { amount: 1, resource: "energy" }),
+        binding("cost.exhaust_source", 4, {}),
+      ],
+      effects: [binding("action.draw_cards", 5, { count: 1 })],
+    }),
+  );
+  decks[0]!.snapshot.cards.push(grabber);
+  decks[0]!.instances.push({
+    instanceId: "p1:grabber",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "GRABBER",
+  });
+  game.state.players.p1!.zones.base.push("p1:grabber");
+  game.state.players.p1!.zones.trash.push("p1:unit", "p1:spell", "p1:mover");
+  game.state.players.p1!.zones.hand = [];
+  game.state.players.p1!.energy = 1;
+  game.state.cardStates["p1:grabber"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+
+  const ability = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:grabber",
+  );
+  assert.ok(ability?.enabled);
+  assert.deepEqual(ability.targets[0]?.legalIds.sort(), [
+    "p1:mover",
+    "p1:spell",
+    "p1:unit",
+  ]);
+
+  const activated = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: ability.id,
+    selectedIds: ["p1:unit", "p1:spell", "p1:mover"],
+    decks,
+    now: "recycle-cost",
+  });
+
+  assert.deepEqual(activated.state.players.p1!.zones.trash, []);
+  assert.deepEqual(
+    activated.state.players.p1!.zones.mainDeck.slice(-3).sort(),
+    ["p1:mover", "p1:spell", "p1:unit"],
+  );
+  assert.equal(activated.state.players.p1!.energy, 0);
+  assert.equal(activated.state.cardStates["p1:grabber"]!.exhausted, true);
+  assert.equal(activated.state.chain?.items.at(-1)?.kind, "activatedAbility");
+});
 
 function fixture(): { game: GameDocument; decks: DeckSnapshotDocument[] } {
   const cards = [

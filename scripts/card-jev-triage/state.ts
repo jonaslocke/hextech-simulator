@@ -386,12 +386,13 @@ function toJevBehaviorCapability(
   };
 }
 
-function collectCanonicalBehaviorIds(
+export function collectCanonicalBehaviorIds(
   document: CanonicalCardDocument,
 ): string[] {
   const ids = new Set<string>();
 
   for (const model of [document.behaviorModel, document.effectBehaviorModel]) {
+    if (!model) continue;
     for (const binding of model.playTimings) ids.add(binding.behaviorId);
     for (const clause of model.clauses) {
       for (const bindings of [

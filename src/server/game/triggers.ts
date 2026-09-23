@@ -205,13 +205,20 @@ export function submitChainTargetSelection(
     throw new Error("Selected chain targets are not legal.");
   }
   const item = pending.chainItem;
-  item.targetCardInstanceIds = [...selectedIds];
-  item.targetObjectVersions = Object.fromEntries(
+  const targetVersions = Object.fromEntries(
     selectedIds.map((id) => [
       id,
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
   );
+  if (item.repeatTargetSelections) {
+    item.repeatTargetSelections.push([...selectedIds]);
+    item.repeatTargetObjectVersions ??= [];
+    item.repeatTargetObjectVersions.push(targetVersions);
+  } else {
+    item.targetCardInstanceIds = [...selectedIds];
+    item.targetObjectVersions = targetVersions;
+  }
   const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
   if (!queuedForOrdering) appendChainItem(game, item, item.chainOrigin);
