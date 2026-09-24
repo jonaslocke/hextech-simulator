@@ -55,7 +55,7 @@ function projection(stateVersion: number): GameProjection {
       { playerId: "player-1", displayName: "Viewer", isViewer: true, points: 0, energy: 0, conditionalEnergy: 0, power: {}, zones: [{ kind: "hand", visibility: "private", count: 1, cards: [card("card-1", "player-1")] }] },
       { playerId: "player-2", displayName: "Opponent", isViewer: false, points: 0, energy: 0, conditionalEnergy: 0, power: {}, zones: [] },
     ],
-    battlefields: [{ battlefieldId: "bf-1", selectedByPlayerId: "player-1", controllerPlayerId: "player-1", contestedByPlayerId: null, card: card("bf-card", "player-1"), units: [card("card-2", "player-2")], facedownCard: null }],
+    battlefields: [{ battlefieldId: "bf-1", selectedByPlayerId: "player-1", controllerPlayerId: "player-1", contestedByPlayerId: null, card: card("bf-card", "player-1"), units: [card("card-2", "player-2")], facedownCard: null, facedownCardPresent: false }],
     chain: null,
     actions: [],
     logEntries: [],

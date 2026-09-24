@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { loadSourceCardCatalog, type CardCatalog } from "../src/server/catalog";
-import { validateDeckConstruction } from "../src/server/deck";
+import { parseDeckList, validateDeckConstruction } from "../src/server/deck";
 import { CORE_DECK_IDS, PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
 
 const deckDirectory = path.join(process.cwd(), "data", "decks");
@@ -29,6 +29,23 @@ test("validates every permanent deck source through the shared pipeline", async 
     const result = validateDeckConstruction(source, catalog, { ownerId: definition.id });
     assert.equal(result.ok, true, `${definition.id}: ${JSON.stringify(result.issues, null, 2)}`);
   }
+});
+
+test("the Hidden manual deck is a legal Ornn derivative with one exact 3-copy substitution", async () => {
+  const original = await loadDeck("Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt");
+  const derived = await loadDeck("ornn-hidden-test.dec.txt");
+  assert.equal(derived, original.replace(/^3 Poro Snax$/m, "3 Consult the Past"));
+  const sourceList = parseDeckList(original);
+  const hiddenList = parseDeckList(derived);
+  assert.equal(sourceList.entries.find((entry) => entry.name === "Poro Snax")?.quantity, 3);
+  assert.equal(hiddenList.entries.find((entry) => entry.name === "Poro Snax"), undefined);
+  assert.equal(hiddenList.entries.find((entry) => entry.name === "Consult the Past")?.quantity, 3);
+  const sourceCount = sourceList.entries.filter((entry) => entry.section === "MainDeck").reduce((total, entry) => total + entry.quantity, 0);
+  const hiddenCount = hiddenList.entries.filter((entry) => entry.section === "MainDeck").reduce((total, entry) => total + entry.quantity, 0);
+  assert.equal(hiddenCount, sourceCount);
+  const validation = validateDeckConstruction(derived, await permanentCatalog(), { ownerId: "ornn-hidden-test" });
+  assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+  assert.equal(PERMANENT_DECK_DEFINITIONS.find((definition) => definition.id === "ornn-hidden-test")?.sourcePath, "data/decks/ornn-hidden-test.dec.txt");
 });
 
 test("accepts the official Rune Pool heading", async () => {
