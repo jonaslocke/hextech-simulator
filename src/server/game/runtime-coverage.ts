@@ -62,6 +62,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.detach_equipment": "executable",
   "action.optional": "executable",
   "modifier.modify_numeric_value": "executable",
+  "modifier.grant_keyword": "executable",
+  "modifier.grant_behavior": "executable",
   "modifier.play_unit_destination": "executable",
   "modifier.enter_ready": "executable",
   "modifier.ignore_deflect": "executable",

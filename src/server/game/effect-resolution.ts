@@ -12,6 +12,8 @@ import {
 } from "./primitive-handlers";
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
+import { behaviorModelWithGrantedClause } from "./runtime-behaviors";
+import type { BehaviorClause } from "./schemas";
 
 export type TokenPlacement = {
   destinationId: string;
@@ -23,6 +25,7 @@ export function beginEffectResolution(input: {
   controllerPlayerId: string;
   sourceCardInstanceId: string;
   clauseId: string;
+  grantedBehaviorClauseSnapshot?: BehaviorClause;
   delayedEffectId?: string;
   endingPlayerId?: string;
   event?: BehaviorEvent | null;
@@ -37,6 +40,7 @@ export function beginEffectResolution(input: {
     controllerPlayerId: input.controllerPlayerId,
     sourceCardInstanceId: input.sourceCardInstanceId,
     clauseId: input.clauseId,
+    ...(input.grantedBehaviorClauseSnapshot ? { grantedBehaviorClauseSnapshot: input.grantedBehaviorClauseSnapshot } : {}),
     nextEffectIndex: 0,
     delayedEffectId: input.delayedEffectId ?? null,
     endingPlayerId: input.endingPlayerId ?? null,
@@ -154,7 +158,7 @@ export function resumeEffectResolution(
   const initialSelectionOverrides = frame.initialSelectionOverrides ?? {};
   const definition = definitionForInstance(frame.sourceCardInstanceId, index);
   const clause = compileBehaviorModel(
-    definition.behaviorModel,
+    behaviorModelWithGrantedClause(definition.behaviorModel, frame.grantedBehaviorClauseSnapshot, frame.clauseId),
     handlers,
   ).clauses.find((candidate) => candidate.id === frame.clauseId);
   if (!clause)

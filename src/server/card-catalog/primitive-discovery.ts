@@ -375,6 +375,10 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "modifier.modify_numeric_value", "modifier", readNumericModifier(context.rulesText, readNonCostNumericAttribute(context.rulesText)), "high")
       : null
   ),
+  primitive("modifier.grant_keyword", "modifier", "Grant keyword", "Give a target a supported keyword characteristic.", ["keywordBehaviorId", "amount", "target", "duration", "displayDuration"], (context) => {
+    const grant = readKeywordGrant(context.normalizedText);
+    return grant ? assignment(context, "modifier.grant_keyword", "modifier", grant, "medium") : null;
+  }),
   primitive("modifier.modify_numeric_value", "modifier", "Modify numeric value", "Modify a numeric game or card value.", ["attribute", "operation", "operand", "amount", "target", "duration", "minimum"], (context) =>
     isEnergyCostModifier(context.rulesText)
       ? assignment(context, "modifier.modify_numeric_value", "modifier", readNumericModifier(context.rulesText, "energyCost"), "high")
@@ -808,11 +812,39 @@ function assignment(
   };
 }
 
+function readKeywordGrant(text: string): Record<string, string | number | boolean | null> | null {
+  const match = /\bgive(?:s)?\b([^.!?]{0,120}?)\[(Assault|Deflect|Shield|Tank|Ganking)(?:\s+(\d+))?\]/i.exec(text);
+  if (!match) return null;
+  const beforeKeyword = match[1] ?? "";
+  const keyword = match[2]!.toLowerCase().replace(/\s+/g, "_");
+  const durationText = text.slice(match.index, match.index + match[0].length + 32);
+  const thisTurn = /\bthis turn\b/i.test(`${beforeKeyword} ${durationText}`);
+  const target = /\bme\b/i.test(beforeKeyword)
+    ? "source"
+    : /\bunit\b/i.test(beforeKeyword)
+      ? "unit"
+      : "event_subject";
+  const isNumeric = ["assault", "deflect", "shield"].includes(keyword);
+  return {
+    keywordBehaviorId: `keyword.${keyword}`,
+    ...(isNumeric ? { amount: match[3] ? Number(match[3]) : 1 } : {}),
+    target,
+    duration: thisTurn ? "thisTurn" : "targetObject",
+    ...(thisTurn ? { displayDuration: "This turn" } : {}),
+  };
+}
+
+function withoutGrantedKeywordMentions(text: string): string {
+  const grant = /\bgive(?:s)?\b[^.!?]{0,120}?\[(?:Assault(?:\s+\d+)?|Deflect(?:\s+\d+)?|Shield(?:\s+\d+)?|Tank|Ganking)\](?:[^.!?]{0,28}?\[(?:Assault(?:\s+\d+)?|Deflect(?:\s+\d+)?|Shield(?:\s+\d+)?|Tank|Ganking)\])*/gi;
+  return text.replace(grant, " ");
+}
+
 function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[] {
-  const hiddenAssignments = isHiddenDeclaration(context.normalizedText)
+  const nativeText = withoutGrantedKeywordMentions(context.normalizedText);
+  const hiddenAssignments = isHiddenDeclaration(nativeText)
     ? [assignment(context, "keyword.hidden", "keyword", {}, "high")]
     : [];
-  const assaultMatch = context.normalizedText.match(/\[Assault(?:\s+(\d+))?\]/i);
+  const assaultMatch = nativeText.match(/\[Assault(?:\s+(\d+))?\]/i);
   const assaultAssignments = assaultMatch
     ? [
         assignment(
@@ -824,7 +856,7 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
         )
       ]
     : [];
-  const shieldMatch = context.normalizedText.match(/\[Shield(?:\s+(\d+))?\]/i);
+  const shieldMatch = nativeText.match(/\[Shield(?:\s+(\d+))?\]/i);
   const shieldAssignments = shieldMatch
     ? [
         assignment(
@@ -836,17 +868,17 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
         )
       ]
     : [];
-  const tankAssignments = /\[Tank\]/i.test(context.normalizedText)
+  const tankAssignments = /\[Tank\]/i.test(nativeText)
     ? [assignment(context, "keyword.tank", "keyword", {}, "high")]
     : [];
-  const visionAssignments = /\[Vision\]/i.test(context.normalizedText)
+  const visionAssignments = /\[Vision\]/i.test(nativeText)
     ? [assignment(context, "keyword.vision", "keyword", {}, "high")]
     : [];
-  const quickDrawAssignments = /\[Quick-Draw\]/i.test(context.normalizedText)
+  const quickDrawAssignments = /\[Quick-Draw\]/i.test(nativeText)
     ? [assignment(context, "keyword.quick_draw", "keyword", {}, "high")]
     : [];
   const deflectAssignments = /\[Deflect(?:\s+(\d+))?\]/i.exec(
-    context.normalizedText,
+    nativeText,
   );
   const deflect = deflectAssignments
     ? [
@@ -859,7 +891,7 @@ function detectKeywordAssignments(context: ClauseContext): PrimitiveAssignment[]
         ),
       ]
     : [];
-  const genericAssignments = [...context.normalizedText.matchAll(/\[([^\]]+)\]/g)]
+  const genericAssignments = [...nativeText.matchAll(/\[([^\]]+)\]/g)]
     .map((match) => match[1]!.trim())
     .filter(
       (keyword) =>

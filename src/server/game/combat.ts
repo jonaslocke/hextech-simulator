@@ -12,6 +12,7 @@ import {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { dispatchSimultaneousBehaviorEvents } from "./triggers";
+import { hasEffectiveKeyword } from "./effective-keywords";
 
 export type DamageAssignment = {
   targetUnitId: string;
@@ -180,7 +181,7 @@ export function combatChoiceTargets(
   return choice.targetUnitIds.map((unitId) => ({
     unitId,
     lethalAmount: lethalAmount(game, unitId),
-    hasTank: hasKeyword(unitId, "keyword.tank", index)
+    hasTank: hasEffectiveKeyword(game, unitId, "keyword.tank", index)
   }));
 }
 
@@ -335,7 +336,7 @@ function validateDamageAssignments(
     throw new Error("All available combat damage must be assigned.");
   }
   const tankIds = targetUnitIds.filter((id) =>
-    hasKeyword(id, "keyword.tank", index)
+    hasEffectiveKeyword(game, id, "keyword.tank", index)
   );
   const firstNonTank = assignments.findIndex(
     (entry) => !tankIds.includes(entry.targetUnitId)
@@ -376,18 +377,6 @@ function totalCombatMight(
 function lethalAmount(game: GameDocument, unitId: string) {
   const state = game.state.cardStates[unitId]!;
   return Math.max(1, (state.computedMight ?? 0) - state.damage);
-}
-
-function hasKeyword(
-  unitId: string,
-  behaviorId: string,
-  index: RuntimeCardIndex
-) {
-  return definitionForInstance(unitId, index).behaviorModel.clauses.some(
-    (clause) => clause.keywords.some(
-      (binding) => binding.behaviorId === behaviorId
-    )
-  );
 }
 
 function controlledUnits(

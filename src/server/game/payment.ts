@@ -3,6 +3,7 @@ import { candidateIsEligible, orderPaymentCandidates, type PaymentCandidate } fr
 export { resourceUsageAllowsPayment, type PaymentContext } from "./payment-restrictions";
 import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
+import { effectiveKeywordAmount } from "./effective-keywords";
 import { numericBindingMatchesCardType } from "./numeric-modifiers";
 import {
   advanceGameObjectIncarnation,
@@ -661,23 +662,14 @@ export function targetDeflectCost(
   playerId: string,
   selectedIds: readonly string[],
   index: RuntimeCardIndex,
+  game: GameDocument,
   ignoreDeflect = false,
 ) {
   if (ignoreDeflect) return 0;
   return selectedIds.reduce((total, id) => {
     const instance = index.instances.get(id);
     if (!instance || instance.ownerPlayerId === playerId) return total;
-    const amount = definitionForInstance(id, index).behaviorModel.clauses
-      .flatMap((clause) => clause.keywords)
-      .filter((binding) => binding.behaviorId === "keyword.deflect")
-      .reduce(
-        (sum, binding) =>
-          sum +
-          (typeof binding.parameters.amount === "number"
-            ? binding.parameters.amount
-            : 1),
-        0,
-      );
+    const amount = effectiveKeywordAmount(game, id, "keyword.deflect", index);
     return total + amount;
   }, 0);
 }

@@ -213,6 +213,28 @@ export const projectedCardViewSchema = z.object({
   mightModifiers: z.array(z.object({
     id: z.string(), amount: z.number(), sourceName: z.string(), label: z.string(), duration: z.string(),
   })).optional(),
+  keywordAnnotations: z.array(z.object({
+    keywordId: z.string().min(1),
+    displayName: z.string().min(1),
+    effectiveAmount: z.number().nullable(),
+    activationOrder: z.number().int().nonnegative(),
+  })).optional(),
+  runtimeEffects: z.array(z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("keyword"),
+      keywordId: z.string().min(1),
+      displayName: z.string().min(1),
+      contributionAmount: z.number().nullable(),
+      displayDuration: z.string().min(1).nullable(),
+      sourceName: z.string().min(1),
+    }),
+    z.object({
+      kind: z.literal("grantedBehavior"),
+      text: z.string().min(1),
+      displayDuration: z.string().min(1).nullable(),
+      sourceName: z.string().min(1),
+    }),
+  ])).optional(),
   damage: z.number().int().nonnegative(),
   exhausted: z.boolean(),
   empowered: z.boolean().optional(),

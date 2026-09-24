@@ -9,8 +9,10 @@ import { setupActions } from "./setup";
 import { gameplayActions } from "./actions";
 import type { ChainItem, GameDocument } from "./state";
 import { victoryRequirement } from "./victory";
-import { cardHasType, evaluateMight } from "./primitive-handlers";
+import { cardHasType, evaluateMight, type RuntimeCardIndex } from "./primitive-handlers";
 import { presentNumericContributions } from "./modifier-presentation";
+import { presentPublicSourceName } from "./modifier-presentation";
+import { evaluateEffectiveKeywords, nativeEffectiveKeywords, projectedKeywordAnnotations } from "./effective-keywords";
 
 export function projectGame(input: {
   game: GameDocument;
@@ -43,6 +45,7 @@ export function projectGame(input: {
       ),
     ],
   );
+  const runtimeIndex = { definitions, instances };
   const view = (id: string): ProjectedCardView => {
     const instance = instances.get(id)!;
     const definition = definitions.get(instance.cardCode)!;
@@ -63,8 +66,10 @@ export function projectGame(input: {
       power: card.attributes.power,
       computedMight: state.computedMight,
       ...(cardHasType(definition, "Unit") ? { mightModifiers: presentNumericContributions(
-        input.game, { definitions, instances }, evaluateMight(input.game, id, { definitions, instances }).contributions,
+        input.game, runtimeIndex, evaluateMight(input.game, id, runtimeIndex).contributions,
       ) } : {}),
+      keywordAnnotations: projectedKeywordAnnotations(input.game, id, runtimeIndex),
+      runtimeEffects: projectRuntimeEffects(input.game, id, runtimeIndex),
       damage: state.damage,
       exhausted: state.exhausted,
       empowered: state.empowered ?? false,
@@ -366,6 +371,45 @@ export function projectGame(input: {
       createdAt: event.createdAt,
     })),
   });
+}
+
+function projectRuntimeEffects(
+  game: GameDocument,
+  cardInstanceId: string,
+  index: RuntimeCardIndex,
+) {
+  const nativeIds = new Set(nativeEffectiveKeywords(cardInstanceId, index).flatMap((keyword) => keyword.contributions.map((entry) => entry.id)));
+  const grants = game.state.keywordGrants ?? [];
+  const grantById = new Map(grants.map((grant) => [grant.id, grant]));
+  const projected = evaluateEffectiveKeywords(game, cardInstanceId, index).flatMap((keyword) =>
+    keyword.contributions.flatMap((contribution) => {
+      const grant = grantById.get(contribution.id);
+      if (!grant && nativeIds.has(contribution.id)) return [];
+      return [{
+        sortOrder: grant?.applicationOrder ?? Number.MAX_SAFE_INTEGER,
+        value: {
+          kind: "keyword" as const,
+          keywordId: keyword.behaviorId,
+          displayName: keyword.behaviorId.replace(/^keyword\./, "").split("_").map((word) => word.slice(0, 1).toUpperCase() + word.slice(1)).join(" "),
+          contributionAmount: contribution.amount,
+          displayDuration: grant?.displayDuration ?? null,
+          sourceName: presentPublicSourceName(game, index, grant ? grant.sourceCardInstanceId : contribution.sourceCardInstanceId),
+        },
+      }];
+    }),
+  );
+  const behaviorEffects = (game.state.grantedBehaviorGrants ?? [])
+    .filter((grant) => grant.targetCardInstanceId === cardInstanceId && grant.targetGameObjectIncarnation === (game.state.cardStates[cardInstanceId]?.gameObjectIncarnation ?? 0))
+    .map((grant) => ({
+      sortOrder: grant.applicationOrder,
+      value: {
+        kind: "grantedBehavior" as const,
+        text: grant.displayText,
+        displayDuration: grant.displayDuration,
+        sourceName: presentPublicSourceName(game, index, grant.sourceCardInstanceId),
+      },
+    }));
+  return [...projected, ...behaviorEffects].sort((left, right) => left.sortOrder - right.sortOrder).map((entry) => entry.value);
 }
 
 function projectChainItem(
