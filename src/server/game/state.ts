@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   gameCardDefinitionSchema,
+  behaviorClauseSchema,
   type DeckSnapshot,
   type GameCardDefinition,
 } from "./schemas";
@@ -136,6 +137,7 @@ export const chainItemSchema = z.object({
   preplayOptionSelections: z.array(z.record(z.array(z.string()))).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
+  grantedBehaviorClauseSnapshot: behaviorClauseSchema.optional(),
   activatedBehaviorId: z.string().nullable().default(null),
   behaviorEvent: z
     .object({
@@ -330,6 +332,43 @@ export const gameStateSchema = z.object({
       createdAtTurn: z.number().int().nonnegative(),
     }),
   ),
+  keywordGrants: z.array(z.object({
+    id: z.string().min(1),
+    targetCardInstanceId: z.string().min(1),
+    targetGameObjectIncarnation: z.number().int().nonnegative(),
+    keywordBehaviorId: z.string().min(1),
+    amount: z.number().nullable(),
+    sourceCardInstanceId: z.string().nullable(),
+    sourceGameObjectIncarnation: z.number().int().nonnegative().nullable(),
+    sourceBehaviorClauseId: z.string().min(1).nullable(),
+    sourceBindingOrder: z.number().int().nonnegative(),
+    duration: z.string().min(1),
+    displayDuration: z.string().min(1).nullable(),
+    createdAtTurn: z.number().int().nonnegative(),
+    applicationOrder: z.number().int().nonnegative(),
+  })).optional(),
+  grantedBehaviorGrants: z.array(z.object({
+    id: z.string().min(1),
+    targetCardInstanceId: z.string().min(1),
+    targetGameObjectIncarnation: z.number().int().nonnegative(),
+    clauses: z.array(behaviorClauseSchema).min(1),
+    displayText: z.string().min(1),
+    sourceCardInstanceId: z.string().nullable(),
+    sourceGameObjectIncarnation: z.number().int().nonnegative().nullable(),
+    sourceBehaviorClauseId: z.string().min(1).nullable(),
+    sourceBindingOrder: z.number().int().nonnegative(),
+    duration: z.string().min(1),
+    displayDuration: z.string().min(1).nullable(),
+    createdAtTurn: z.number().int().nonnegative(),
+    applicationOrder: z.number().int().nonnegative(),
+  })).optional(),
+  runtimeKeywordActivations: z.array(z.object({
+    targetCardInstanceId: z.string().min(1),
+    targetGameObjectIncarnation: z.number().int().nonnegative(),
+    keywordBehaviorId: z.string().min(1),
+    activationOrder: z.number().int().nonnegative(),
+  })).optional(),
+  nextRuntimeEffectOrder: z.number().int().nonnegative().optional(),
   ongoingEffects: z
     .array(
       z.object({
@@ -360,6 +399,7 @@ export const gameStateSchema = z.object({
       controllerPlayerId: z.string().min(1),
       sourceCardInstanceId: z.string().min(1),
       clauseId: z.string().min(1),
+      grantedBehaviorClauseSnapshot: behaviorClauseSchema.optional(),
       nextEffectIndex: z.number().int().nonnegative(),
       delayedEffectId: z.string().min(1).nullable(),
       endingPlayerId: z.string().min(1).nullable(),
@@ -677,6 +717,10 @@ export function createInitialGame(input: {
       showdown: null,
       combat: null,
       modifiers: [],
+      keywordGrants: [],
+      grantedBehaviorGrants: [],
+      runtimeKeywordActivations: [],
+      nextRuntimeEffectOrder: 0,
       ongoingEffects: [],
       delayedEffects: [],
       effectResolutions: [],

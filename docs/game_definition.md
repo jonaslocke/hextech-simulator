@@ -683,6 +683,37 @@ reject behavior that is not explicitly executable.
 Card runtime must be data-driven from `data/sets/*.json`, but card text is not
 automatically executable just because the card exists in the catalog.
 
+### Runtime keyword and behavior grants
+
+The game engine owns effective keyword characteristics through one shared
+evaluator. Gameplay legality, Might contributions, and viewer projection read
+that same result. Native printed characteristics remain distinct from effects
+that grant a keyword.
+
+Resolved keyword grants are canonical runtime state. They retain the target card
+instance and game-object incarnation, source and behavior provenance, machine
+lifetime, explicit player-facing duration when present, and application order.
+An applied grant survives its resolving source leaving the Chain. It ends when
+its declared lifetime ends or the target becomes a new game object. Grants with
+no explicit duration use the target-object lifetime and do not invent a preview
+duration. Continuous grants are evaluated from their active source and
+conditions rather than copied onto each eligible target.
+
+Granted non-keyword rules text must reference an approved executable behavior
+fragment. Active fragments participate in normal trigger collection and
+resolution, and expire with their target incarnation or declared lifetime.
+Display text alone never creates gameplay behavior.
+
+The server projection resolves effective runtime keyword annotations and
+viewer-safe runtime effect provenance. It supplies final additive values,
+redundancy, activation order, effect text, explicit duration, and a public-safe
+source label so clients do not reconstruct gameplay state. This projection
+extends the existing Might provenance contract without replacing it.
+
+When shared keyword consumers move to the evaluator, their previously accepted
+behavior remains protected by unchanged PASS_TO_PASS expectations. Generalized
+runtime support must not trade away accepted gameplay to simplify the evaluator.
+
 Required card-runtime workflow:
 
 1. Load all set JSON files.

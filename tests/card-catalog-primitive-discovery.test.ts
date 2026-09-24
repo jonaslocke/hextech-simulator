@@ -416,6 +416,22 @@ test("models play, choose, and ready clauses as event listeners", () => {
   assert.equal(findAssignment(irelia, "action.ready_cards"), undefined);
 });
 
+test("distinguishes an effect that grants a keyword from a native keyword", () => {
+  const discovery = discoverCardPrimitives(createTestCard({
+    name: "Runtime Grant Fixture",
+    publicCode: "TST-032/032",
+    text: "When I attack, give me [Assault 2] this turn.",
+  }));
+  assert.deepEqual(findAssignment(discovery, "modifier.grant_keyword")?.parameters, {
+    keywordBehaviorId: "keyword.assault",
+    amount: 2,
+    target: "source",
+    duration: "thisTurn",
+    displayDuration: "This turn",
+  });
+  assert.equal(findAssignment(discovery, "keyword.assault"), undefined);
+});
+
 test("models a played spell Energy-cost threshold as a typed clause condition", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({

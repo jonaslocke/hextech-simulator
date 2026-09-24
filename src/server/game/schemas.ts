@@ -32,7 +32,8 @@ export const behaviorClauseSchema = z.object({
 
 export const behaviorModelSchema = z.object({
   playTimings: bindingListSchema,
-  clauses: z.array(behaviorClauseSchema)
+  clauses: z.array(behaviorClauseSchema),
+  fragments: z.record(z.array(behaviorClauseSchema)).optional(),
 }).strict();
 
 export const gameCardDefinitionSchema = z.object({

@@ -13,6 +13,8 @@ export * from "./game-factory";
 export * from "./bo3-match-config";
 export * from "./actions";
 export * from "./behavior-runtime";
+export * from "./effective-keywords";
+export * from "./runtime-behaviors";
 export * from "./primitive-handlers";
 export * from "./triggers";
 export * from "./victory";

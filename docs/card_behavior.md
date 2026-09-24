@@ -281,6 +281,25 @@ Product expectation:
 - Modifiers should explain why a value or rule changed.
 - Admin validation should classify modifier behavior separately from direct actions.
 
+Keyword characteristics and keyword grants are separate behavior contracts.
+Printed keywords describe what an object has; `modifier.grant_keyword`
+describes an effect that gives a supported keyword to a target. Additive numeric
+keywords combine through their keyword-specific rules, while redundant presence
+keywords remain present rather than becoming counts. Unsupported keyword
+composition remains explicitly unsupported.
+
+Applied keyword grants are tied to the target's current game-object incarnation.
+Their machine lifetime is separate from any explicitly printed duration shown to
+players. Resolved grants survive their source leaving the Chain, and continuous
+grants derive from active sources and conditions.
+
+`modifier.grant_behavior` references approved executable behavior fragments.
+The target's active granted trigger clauses participate in normal trigger
+discovery and resolution. The same grant supplies the player-facing rules text,
+provenance, and lifetime to viewer projection; display-only rules text is not a
+supported modifier. If a fragment cannot be represented by an executable
+reusable behavior, keep it unsupported rather than approximating it.
+
 ### 4. Replacement and Prevention Effects
 
 Replacement and prevention effects change what would happen before it happens.

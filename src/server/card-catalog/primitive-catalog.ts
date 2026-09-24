@@ -1185,6 +1185,49 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       "The catalog defines the modifier contract; ordered runtime evaluation remains future engine work."
     )
   }),
+  "modifier.grant_keyword": primitiveSeed({
+    id: "modifier.grant_keyword",
+    family: "modifier",
+    name: "Grant keyword",
+    description: "Gives a target game object a supported keyword characteristic for a defined lifetime.",
+    parameters: [
+      required("keywordBehaviorId", "string", "The keyword characteristic being granted.", ["keyword.assault", "keyword.deflect", "keyword.shield", "keyword.tank", "keyword.ganking"]),
+      optional("amount", "number", "The value for an additive numeric keyword."),
+      required("target", "target", "The target game object receiving the keyword."),
+      optional("selectionKey", "string", "Selector key supplying affected objects."),
+      optional("duration", "duration", "Machine lifetime for the applied grant.", ["thisTurn", "targetObject", "whileSourceAtBattlefield", "whileSourceOnBoard", "whileAttached"]),
+      optional("displayDuration", "string", "Player-facing duration when explicitly stated in the rules text."),
+    ],
+    fixedRules: [
+      "A keyword characteristic and an effect granting a keyword are distinct behavior contracts.",
+      "Additive numeric keywords combine according to their keyword-specific rules.",
+      "Presence keywords do not stack as numeric counts.",
+      "An applied grant is bound to the target's current game-object incarnation and survives its resolving source leaving the Chain.",
+      "Machine lifetime and explicitly stated player-facing duration are stored separately.",
+    ],
+    engineSupport: supported("Applied keyword grants are canonical runtime state and feed the shared effective-keyword evaluator."),
+  }),
+  "modifier.grant_behavior": primitiveSeed({
+    id: "modifier.grant_behavior",
+    family: "modifier",
+    name: "Grant behavior",
+    description: "Grants an approved executable trigger fragment to a target game object.",
+    parameters: [
+      required("behaviorFragmentId", "string", "The approved behavior fragment to grant."),
+      required("displayText", "string", "Player-facing rules text matching the executable fragment."),
+      required("target", "target", "The target game object receiving the behavior."),
+      optional("selectionKey", "string", "Selector key supplying the affected object."),
+      optional("duration", "duration", "Machine lifetime for the granted behavior.", ["thisTurn", "targetObject"]),
+      optional("displayDuration", "string", "Player-facing duration when explicitly stated in the rules text."),
+    ],
+    fixedRules: [
+      "Granted rules text must reference an approved executable behavior fragment.",
+      "A granted behavior is bound to the target's current game-object incarnation.",
+      "A resolved grant survives its source leaving the Chain or changing zones.",
+      "Expiration removes behavior execution and preview presentation together.",
+    ],
+    engineSupport: supported("Approved non-delayed triggered behavior fragments are discovered, executed through normal trigger collection, and projected with source and duration."),
+  }),
   "modifier.enter_ready": primitiveSeed({
     id: "modifier.enter_ready",
     family: "modifier",

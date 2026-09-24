@@ -26,6 +26,8 @@ import {
   removeFromAttachmentLocations,
 } from "./attachment-lifecycle";
 import { legalEffectMoveDestinationIds } from "./unit-destinations";
+import { additiveKeywordIds, effectiveKeywordAmount, evaluateEffectiveKeywords, hasEffectiveKeyword, reconcileRuntimeKeywordActivation } from "./effective-keywords";
+import { behaviorModelForRuntimeCard } from "./runtime-behaviors";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -1224,6 +1226,149 @@ export function createPrimitiveHandlers(
       cleanupLethalDamage(context.game, mightTargets, index);
     }
   });
+  handlers.set("modifier.grant_keyword", {
+    validate(binding) {
+      const keywordBehaviorId = binding.parameters.keywordBehaviorId;
+      if (typeof keywordBehaviorId !== "string" || !keywordBehaviorId.startsWith("keyword.")) {
+        throw new Error("Keyword grant requires a keyword behavior identity.");
+      }
+      if (keywordBehaviorId !== "keyword.assault" && keywordBehaviorId !== "keyword.deflect" &&
+          keywordBehaviorId !== "keyword.shield" && keywordBehaviorId !== "keyword.tank" &&
+          keywordBehaviorId !== "keyword.ganking") {
+        throw new Error(`Runtime keyword grant is not supported: ${keywordBehaviorId}`);
+      }
+      if (additiveKeywordIds.has(keywordBehaviorId) && binding.parameters.amount !== undefined &&
+          typeof binding.parameters.amount !== "number") {
+        throw new Error("Numeric keyword grants require a numeric amount.");
+      }
+      const keywordAmount = binding.parameters.amount;
+      if (additiveKeywordIds.has(keywordBehaviorId) && typeof keywordAmount === "number" &&
+          (!Number.isInteger(keywordAmount) || keywordAmount <= 0)) {
+        throw new Error("Numeric keyword grants require a positive integer amount.");
+      }
+      if (!additiveKeywordIds.has(keywordBehaviorId) && binding.parameters.amount !== undefined) {
+        throw new Error("Presence keywords cannot be granted with a numeric amount.");
+      }
+      if (binding.parameters.duration !== undefined && typeof binding.parameters.duration !== "string") {
+        throw new Error("Keyword grant duration must be a supported duration value.");
+      }
+      if (binding.parameters.duration !== undefined && !["thisTurn", "targetObject", "whileSourceAtBattlefield", "whileSourceOnBoard", "whileAttached"].includes(String(binding.parameters.duration))) {
+        throw new Error("Keyword grant duration must use a supported lifetime.");
+      }
+      if (typeof binding.parameters.target !== "string" || !["source", "event_subject", "unit", "friendly_unit", "enemy_unit", "controller_units", "controller_card"].includes(binding.parameters.target)) {
+        throw new Error("Keyword grants require a supported target reference.");
+      }
+    },
+    execute(binding, context) {
+      const target = stringParam(binding, "target");
+      const routedTargets = selectionFor(binding, context);
+      const targets = target === "source"
+        ? [context.sourceCardInstanceId]
+        : target === "event_subject" && context.event?.subjectCardInstanceId
+          ? [context.event.subjectCardInstanceId]
+          : routedTargets.length > 0
+            ? routedTargets
+            : context.selectedIds;
+      const keywordBehaviorId = stringParam(binding, "keywordBehaviorId");
+      const duration = typeof binding.parameters.duration === "string"
+        ? binding.parameters.duration
+        : "targetObject";
+      if (isContinuousDuration(duration)) return;
+      const createdAtTurn = context.game.state.turn?.turnNumber ?? 0;
+      const activationCandidates = new Set<string>();
+      for (const targetCardInstanceId of targets) {
+        const targetState = context.game.state.cardStates[targetCardInstanceId];
+        if (!targetState) continue;
+        const grant = {
+          id: `keyword-grant:${context.game.stateVersion}:${targetCardInstanceId}:${(context.game.state.keywordGrants ?? []).length}`,
+          targetCardInstanceId,
+          targetGameObjectIncarnation: targetState.gameObjectIncarnation ?? 0,
+          keywordBehaviorId,
+          amount: additiveKeywordIds.has(keywordBehaviorId)
+            ? typeof binding.parameters.amount === "number" ? binding.parameters.amount : 1
+            : null,
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          sourceGameObjectIncarnation: context.game.state.cardStates[context.sourceCardInstanceId]?.gameObjectIncarnation ?? 0,
+          sourceBehaviorClauseId: context.sourceBehaviorClauseId ?? null,
+          sourceBindingOrder: binding.order,
+          duration,
+          displayDuration: typeof binding.parameters.displayDuration === "string" ? binding.parameters.displayDuration : null,
+          createdAtTurn,
+          applicationOrder: context.game.state.nextRuntimeEffectOrder ?? 0,
+        };
+        (context.game.state.keywordGrants ??= []).push(grant);
+        context.game.state.nextRuntimeEffectOrder = (context.game.state.nextRuntimeEffectOrder ?? 0) + 1;
+        activationCandidates.add(targetCardInstanceId);
+      }
+      for (const targetCardInstanceId of activationCandidates) {
+        reconcileRuntimeKeywordActivation(context.game, targetCardInstanceId, keywordBehaviorId, index);
+        if (context.game.state.cardStates[targetCardInstanceId]?.combatRole) {
+          recomputeMight(context.game, targetCardInstanceId, index);
+          cleanupLethalDamage(context.game, [targetCardInstanceId], index);
+        }
+      }
+    },
+  });
+  handlers.set("modifier.grant_behavior", {
+    validate(binding) {
+      if (typeof binding.parameters.behaviorFragmentId !== "string" || !binding.parameters.behaviorFragmentId) {
+        throw new Error("Granted behavior requires an approved behavior fragment.");
+      }
+      if (typeof binding.parameters.displayText !== "string" || !binding.parameters.displayText.trim()) {
+        throw new Error("Granted behavior requires its player-facing rules text.");
+      }
+      if (binding.parameters.duration !== undefined && !["thisTurn", "targetObject"].includes(String(binding.parameters.duration))) {
+        throw new Error("Granted behavior duration must use a supported applied lifetime.");
+      }
+      if (binding.parameters.displayDuration !== undefined && typeof binding.parameters.displayDuration !== "string") {
+        throw new Error("Granted behavior display duration must be text when present.");
+      }
+      if (typeof binding.parameters.target !== "string" || !["source", "event_subject", "unit", "friendly_unit", "enemy_unit", "controller_units", "controller_card"].includes(binding.parameters.target)) {
+        throw new Error("Granted behavior requires a supported target reference.");
+      }
+    },
+    execute(binding, context) {
+      const fragmentId = stringParam(binding, "behaviorFragmentId");
+      const sourceDefinition = definitionForInstance(context.sourceCardInstanceId, index);
+      const fragment = sourceDefinition.behaviorModel.fragments?.[fragmentId];
+      if (!fragment?.length) throw new Error(`Granted behavior fragment is unavailable: ${fragmentId}`);
+      if (fragment.some((clause) => clause.triggers.length === 0 || clause.timings.some((timing) => timing.behaviorId === "timing.delayed"))) {
+        throw new Error("Granted behavior fragments currently require non-delayed triggered clauses.");
+      }
+      compileBehaviorModel({ playTimings: [], clauses: fragment }, handlers);
+      const target = stringParam(binding, "target");
+      const routedTargets = selectionFor(binding, context);
+      const targets = target === "source"
+        ? [context.sourceCardInstanceId]
+        : target === "event_subject" && context.event?.subjectCardInstanceId
+          ? [context.event.subjectCardInstanceId]
+          : routedTargets.length > 0
+            ? routedTargets
+            : context.selectedIds;
+      const duration = typeof binding.parameters.duration === "string" ? binding.parameters.duration : "targetObject";
+      const createdAtTurn = context.game.state.turn?.turnNumber ?? 0;
+      for (const targetCardInstanceId of targets) {
+        const targetState = context.game.state.cardStates[targetCardInstanceId];
+        if (!targetState) continue;
+        (context.game.state.grantedBehaviorGrants ??= []).push({
+          id: `behavior-grant:${context.game.stateVersion}:${targetCardInstanceId}:${(context.game.state.grantedBehaviorGrants ?? []).length}`,
+          targetCardInstanceId,
+          targetGameObjectIncarnation: targetState.gameObjectIncarnation ?? 0,
+          clauses: structuredClone(fragment),
+          displayText: stringParam(binding, "displayText"),
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          sourceGameObjectIncarnation: context.game.state.cardStates[context.sourceCardInstanceId]?.gameObjectIncarnation ?? 0,
+          sourceBehaviorClauseId: context.sourceBehaviorClauseId ?? null,
+          sourceBindingOrder: binding.order,
+          duration,
+          displayDuration: typeof binding.parameters.displayDuration === "string" ? binding.parameters.displayDuration : null,
+          createdAtTurn,
+          applicationOrder: context.game.state.nextRuntimeEffectOrder ?? 0,
+        });
+        context.game.state.nextRuntimeEffectOrder = (context.game.state.nextRuntimeEffectOrder ?? 0) + 1;
+      }
+    },
+  });
   handlers.set("ability.exhaust_for_resource", {
     execute(binding, context) {
       const state = context.game.state.cardStates[context.sourceCardInstanceId]!;
@@ -1499,13 +1644,24 @@ export function effectiveEnergyCost(
 }
 
 export function cleanupTurnModifiers(game: GameDocument, index: RuntimeCardIndex) {
-  const affected = game.state.modifiers.filter((item) => item.duration === "thisTurn" && item.targetCardInstanceId).map((item) => item.targetCardInstanceId!);
+  const expiredKeywordGrants = (game.state.keywordGrants ?? []).filter((grant) => grant.duration === "thisTurn");
+  const affectedKeywordTargets = new Set(expiredKeywordGrants.map((grant) => grant.targetCardInstanceId));
+  const affected = [
+    ...game.state.modifiers.filter((item) => item.duration === "thisTurn" && item.targetCardInstanceId).map((item) => item.targetCardInstanceId!),
+    ...expiredKeywordGrants.filter((grant) => additiveKeywordIds.has(grant.keywordBehaviorId)).map((grant) => grant.targetCardInstanceId),
+  ];
   game.state.modifiers = game.state.modifiers.filter((item) => item.duration !== "thisTurn");
+  game.state.keywordGrants = (game.state.keywordGrants ?? []).filter((grant) => grant.duration !== "thisTurn");
+  game.state.grantedBehaviorGrants = (game.state.grantedBehaviorGrants ?? []).filter((grant) => grant.duration !== "thisTurn");
   game.state.ongoingEffects = game.state.ongoingEffects.filter(
     (item) => item.duration !== "thisTurn",
   );
   affected.forEach((id) => recomputeMight(game, id, index));
   cleanupLethalDamage(game, [...new Set(affected)], index);
+  for (const targetCardInstanceId of affectedKeywordTargets) {
+    const otherKeywords = new Set(expiredKeywordGrants.filter((grant) => grant.targetCardInstanceId === targetCardInstanceId).map((grant) => grant.keywordBehaviorId));
+    for (const behaviorId of otherKeywords) reconcileRuntimeKeywordActivation(game, targetCardInstanceId, behaviorId, index);
+  }
 }
 
 export function recomputeAllMight(
@@ -2075,6 +2231,15 @@ export function advanceGameObjectIncarnation(game: GameDocument, id: string) {
   const state = game.state.cardStates[id];
   if (state) {
     state.gameObjectIncarnation = (state.gameObjectIncarnation ?? 0) + 1;
+    game.state.keywordGrants = (game.state.keywordGrants ?? []).filter((grant) =>
+      grant.targetCardInstanceId !== id || grant.targetGameObjectIncarnation === state.gameObjectIncarnation,
+    );
+    game.state.grantedBehaviorGrants = (game.state.grantedBehaviorGrants ?? []).filter((grant) =>
+      grant.targetCardInstanceId !== id || grant.targetGameObjectIncarnation === state.gameObjectIncarnation,
+    );
+    game.state.runtimeKeywordActivations = (game.state.runtimeKeywordActivations ?? []).filter((activation) =>
+      activation.targetCardInstanceId !== id || activation.targetGameObjectIncarnation === state.gameObjectIncarnation,
+    );
   }
 }
 export function recomputeMight(
@@ -2099,12 +2264,12 @@ export function evaluateMight(game: GameDocument, id: string, index: RuntimeCard
   });
   const combatRole = game.state.cardStates[id]?.combatRole;
   if (combatRole === "attacker") {
-    const entries = keywordContributions(id, "keyword.assault", index, game);
+    const entries = keywordContributions(game, id, "keyword.assault", index);
     value += entries.reduce((sum, entry) => sum + entry.amount, 0);
     contributions.push(...entries);
   }
   if (combatRole === "defender") {
-    const entries = keywordContributions(id, "keyword.shield", index, game);
+    const entries = keywordContributions(game, id, "keyword.shield", index);
     value += entries.reduce((sum, entry) => sum + entry.amount, 0);
     contributions.push(...entries);
   }
@@ -2142,25 +2307,23 @@ export function effectivePowerCost(
 }
 
 export function keywordAmount(
+  game: GameDocument,
   cardInstanceId: string,
   behaviorId: string,
   index: RuntimeCardIndex,
-  game?: GameDocument,
 ) {
-  return keywordContributions(cardInstanceId, behaviorId, index, game).reduce((sum, entry) => sum + entry.amount, 0);
+  return effectiveKeywordAmount(game, cardInstanceId, behaviorId, index);
 }
 
-function keywordContributions(cardInstanceId: string, behaviorId: string, index: RuntimeCardIndex, game?: GameDocument): NumericContribution[] {
-  const definition = definitionForInstance(cardInstanceId, index);
-  const sources = [{ id: cardInstanceId, clauses: definition.behaviorModel.clauses },
-    ...(game ? attachedCardIds(game, cardInstanceId).map((id) => ({ id, clauses: definitionForInstance(id, index).effectBehaviorModel?.clauses ?? [] })) : [])];
-  return sources.flatMap((source) => source.clauses.flatMap((clause) => clause.keywords
-    .filter((binding) => binding.behaviorId === behaviorId)
-    .map((binding) => ({ id: `${source.id}:${clause.id}:${binding.order}`, sourceCardInstanceId: source.id,
-      amount: typeof binding.parameters.amount === "number" ? binding.parameters.amount : 1,
-      duration: behaviorId === "keyword.assault" ? "whileAttacking" : "whileDefending",
-      label: behaviorId === "keyword.assault" ? "Assault" : "Shield",
-    }))));
+function keywordContributions(game: GameDocument, cardInstanceId: string, behaviorId: string, index: RuntimeCardIndex): NumericContribution[] {
+  const keyword = evaluateEffectiveKeywords(game, cardInstanceId, index).find((entry) => entry.behaviorId === behaviorId);
+  return (keyword?.contributions ?? []).map((entry) => ({
+    id: entry.id,
+    sourceCardInstanceId: entry.sourceCardInstanceId,
+    amount: entry.amount ?? 0,
+    duration: behaviorId === "keyword.assault" ? "whileAttacking" : "whileDefending",
+    label: behaviorId === "keyword.assault" ? "Assault" : "Shield",
+  }));
 }
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
   for (const id of ids) {
@@ -2237,13 +2400,9 @@ export function moveCardToTrash(
 export function isTemporaryCard(
   id: string,
   index: RuntimeCardIndex,
+  game: GameDocument,
 ) {
-  return definitionForInstance(id, index).behaviorModel.clauses.some(
-    (clause) =>
-      clause.keywords.some(
-        (keyword) => keyword.behaviorId === "keyword.temporary",
-      ),
-  );
+  return hasEffectiveKeyword(game, id, "keyword.temporary", index);
 }
 
 function queueDeathTriggeredEffects(
@@ -2254,6 +2413,7 @@ function queueDeathTriggeredEffects(
   const instance = index.instances.get(sourceCardInstanceId);
   if (!instance) return;
   const definition = definitionForInstance(sourceCardInstanceId, index);
+  const runtime = behaviorModelForRuntimeCard(game, sourceCardInstanceId, index);
   const handlers = createPrimitiveHandlers(index);
   const delayedSources = game.state.ongoingEffects
     .filter((effect) => effect.behaviorId === "action.play_token_on_next_death" &&
@@ -2269,7 +2429,8 @@ function queueDeathTriggeredEffects(
     sources: [{
       sourceCardInstanceId,
       label: definition.card.name,
-      model: compileBehaviorModel(definition.behaviorModel, handlers),
+      model: compileBehaviorModel(runtime.model, handlers),
+      grantedClauses: runtime.grantedClauses,
     }, ...delayedSources],
     event: {
       type: "card.died",
@@ -2458,6 +2619,9 @@ function ceaseToken(game: GameDocument, id: string) {
   removeFromAllLocations(game, id);
   detachCardsFromTopMostLeavingBoard(game, id);
   delete game.state.cardStates[id];
+  game.state.keywordGrants = (game.state.keywordGrants ?? []).filter((grant) => grant.targetCardInstanceId !== id);
+  game.state.grantedBehaviorGrants = (game.state.grantedBehaviorGrants ?? []).filter((grant) => grant.targetCardInstanceId !== id);
+  game.state.runtimeKeywordActivations = (game.state.runtimeKeywordActivations ?? []).filter((activation) => activation.targetCardInstanceId !== id);
   game.state.modifiers = game.state.modifiers.filter(
     (modifier) =>
       modifier.sourceCardInstanceId !== id &&

@@ -203,7 +203,7 @@ test("derives Deflect as an atomic any-domain Power cost", () => {
     keywords: [binding("keyword.deflect", { amount: 1 })],
   });
   game.state.players.p1!.power = { Fury: 1 };
-  const cost = targetDeflectCost("p1", ["unit"], index);
+  const cost = targetDeflectCost("p1", ["unit"], index, game);
 
   assert.equal(cost, 1);
   assert.ok(

@@ -1,5 +1,7 @@
 import type { ProjectedAction } from "../../shared/game";
 import type { NumericContribution } from "./numeric-modifiers";
+import { hasEffectiveKeyword, reconcileAllRuntimeKeywordActivations } from "./effective-keywords";
+import { behaviorModelForChainItem } from "./runtime-behaviors";
 import { presentNumericContributions } from "./modifier-presentation";
 import {
   compileBehaviorModel,
@@ -366,7 +368,7 @@ export function gameplayActions(
         action(game, "move", "Move to Base", cardId, true, null, "base"),
       );
       if (
-        hasBehavior(definitionForInstance(cardId, index), "keyword.ganking")
+        hasEffectiveKeyword(game, cardId, "keyword.ganking", index)
       ) {
         for (const destination of orderedBattlefields) {
           if (destination.battlefieldId === battlefield.battlefieldId) continue;
@@ -400,7 +402,7 @@ export function gameplayActions(
         (id) =>
           index.instances.get(id)?.ownerPlayerId === actorPlayerId &&
           !game.state.cardStates[id]?.exhausted &&
-          hasBehavior(definitionForInstance(id, index), "keyword.ganking"),
+          hasEffectiveKeyword(game, id, "keyword.ganking", index),
       );
     const movableUnits = [...readyBaseUnits, ...readyGankingUnits];
     if (movableUnits.length < 1) continue;
@@ -733,6 +735,7 @@ export function performGameplayAction(input: {
     default:
       throw new Error("Action kind is not implemented.");
   }
+  reconcileAllRuntimeKeywordActivations(game, index);
   game.stateVersion += 1;
   game.updatedAt = input.now;
   return game;
@@ -889,6 +892,7 @@ function playCard(
     playerId,
     executionTargetSelections.flat(),
     index,
+    game,
     ignoresDeflect(definition),
   );
   payCardCosts(
@@ -1313,7 +1317,7 @@ function passPriority(
           item.activatedBehaviorId
         ) {
           const clause = compileBehaviorModel(
-            definition.behaviorModel,
+            behaviorModelForChainItem(definition.behaviorModel, item),
             handlers,
           ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
           const binding = clause?.abilities.find(
@@ -1326,11 +1330,12 @@ function passPriority(
             );
           }
           if (binding.behaviorId === "ability.activated_effect") {
-            beginEffectResolution({
+          beginEffectResolution({
               game,
               controllerPlayerId: controller,
               sourceCardInstanceId: item.sourceCardInstanceId,
-              clauseId: clause.id,
+            clauseId: clause.id,
+            grantedBehaviorClauseSnapshot: item.grantedBehaviorClauseSnapshot,
               selectedIds: validLockedTargets(
                 game,
                 clause,
@@ -1358,7 +1363,7 @@ function passPriority(
           }
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(
-            definition.behaviorModel,
+            behaviorModelForChainItem(definition.behaviorModel, item),
             handlers,
           );
           const clause = compiled.clauses.find(
@@ -1404,6 +1409,7 @@ function passPriority(
                 controllerPlayerId: controller,
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
+                grantedBehaviorClauseSnapshot: item.grantedBehaviorClauseSnapshot,
                 selectedIds: lockedTargets,
                 selectionOverrides: executionOverrides,
                 targetsLocked: true,
@@ -1970,7 +1976,7 @@ function addPlayableCardActions(
     const hasAction = timings.includes("timing.action");
     const hasReaction =
       timings.includes("timing.reaction") ||
-      hasBehavior(definition, "keyword.quick_draw");
+      hasEffectiveKeyword(game, cardId, "keyword.quick_draw", index);
     if (!stagedPlay && timing === "showdownOpen" && !hasAction && !hasReaction) continue;
     if (
       !stagedPlay &&
@@ -2630,7 +2636,7 @@ function chainItemsNeedTargetSelection(
     }
     const definition = definitionForInstance(item.sourceCardInstanceId, index);
     const clause = compileBehaviorModel(
-      definition.behaviorModel,
+      behaviorModelForChainItem(definition.behaviorModel, item),
       handlers,
     ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
     if (!clause) return false;
@@ -2745,14 +2751,6 @@ function payOptionalNonResourcePlayCosts(
     if (selected) game.state.cardStates[selected]!.exhausted = true;
   }
 
-}
-
-function hasBehavior(definition: GameCardDefinition, behaviorId: string) {
-  return definition.behaviorModel.clauses.some((clause) =>
-    [...clause.keywords, ...clause.effects, ...clause.abilities].some(
-      (binding) => binding.behaviorId === behaviorId,
-    ),
-  );
 }
 
 function validLockedTargets(

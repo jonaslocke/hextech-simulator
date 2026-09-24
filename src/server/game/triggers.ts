@@ -14,6 +14,7 @@ import {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { ChainItem, GameDocument } from "./state";
 import { beginEffectResolution } from "./effect-resolution";
+import { behaviorModelForChainItem, behaviorModelForRuntimeCard } from "./runtime-behaviors";
 
 export function dispatchBehaviorEvent(
   game: GameDocument,
@@ -66,7 +67,7 @@ export function queueBeginningPhaseTriggers(
     ]),
   ].filter((id) =>
     index.instances.get(id)?.ownerPlayerId === turn.activePlayerId &&
-    isTemporaryCard(id, index),
+    isTemporaryCard(id, index, game),
   ).map((sourceCardInstanceId): ChainItem => ({
     id: `trigger:${game.stateVersion}:${sourceCardInstanceId}:temporary`,
     kind: "trigger",
@@ -101,14 +102,15 @@ function collectBehaviorEventItems(
   const handlers = createPrimitiveHandlers(index);
   const byController = new Map<string, ChainItem[]>();
   for (const controllerPlayerId of game.state.setup.playerIds) {
-    const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => ({
-      sourceCardInstanceId,
-      label: definitionForInstance(sourceCardInstanceId, index).card.name,
-      model: compileBehaviorModel(
-        definitionForInstance(sourceCardInstanceId, index).behaviorModel,
-        handlers
-      )
-    }));
+    const sources = activeSourceIds(game, controllerPlayerId, index).map((sourceCardInstanceId) => {
+      const runtime = behaviorModelForRuntimeCard(game, sourceCardInstanceId, index);
+      return {
+        sourceCardInstanceId,
+        label: definitionForInstance(sourceCardInstanceId, index).card.name,
+        model: compileBehaviorModel(runtime.model, handlers),
+        grantedClauses: runtime.grantedClauses,
+      };
+    });
     for (const event of events) {
       const items = collectTriggeredClauses({
         game,
@@ -245,7 +247,7 @@ function continueQueuedChainItems(
       index,
     );
     const clause = compileBehaviorModel(
-      definition.behaviorModel,
+      behaviorModelForChainItem(definition.behaviorModel, item),
       handlers,
     ).clauses.find((candidate) => candidate.id === item.behaviorClauseId);
     const requirements = clause

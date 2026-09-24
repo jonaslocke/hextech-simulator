@@ -13,6 +13,7 @@ export type BehaviorExecutionContext = {
   game: GameDocument;
   controllerPlayerId: string;
   sourceCardInstanceId: string;
+  sourceBehaviorClauseId?: string;
   event: BehaviorEvent | null;
   selectedIds: string[];
   selectedBySelector: Record<string, string[]>;
@@ -242,7 +243,7 @@ export function executeBehaviorClause(input: {
   for (const binding of clause.orderedEffects) {
     const handler = requireHandler(binding, handlers);
     if (!handler.execute) throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
-    handler.execute(binding, context);
+    handler.execute(binding, { ...context, sourceBehaviorClauseId: clause.id });
   }
   return { executed: true, delayed: false };
 }
@@ -255,14 +256,14 @@ export function executeBehaviorEffects(
   for (const binding of clause.orderedEffects) {
     const handler = requireHandler(binding, handlers);
     if (!handler.execute) throw new Error(`Behavior handler cannot execute: ${binding.behaviorId}`);
-    handler.execute(binding, context);
+    handler.execute(binding, { ...context, sourceBehaviorClauseId: clause.id });
   }
 }
 
 export function queueTriggeredClauses(input: {
   game: GameDocument;
   controllerPlayerId: string;
-  sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel }>;
+  sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel; grantedClauses?: Map<string, BehaviorClause> }>;
   event: BehaviorEvent;
   handlers: BehaviorHandlerRegistry;
   enqueueItems?: (items: ChainItem[]) => void;
@@ -305,7 +306,7 @@ export function queueTriggeredClauses(input: {
 export function collectTriggeredClauses(input: {
   game: GameDocument;
   controllerPlayerId: string;
-  sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel }>;
+  sources: Array<{ sourceCardInstanceId: string; label: string; model: CompiledBehaviorModel; grantedClauses?: Map<string, BehaviorClause> }>;
   event: BehaviorEvent;
   handlers: BehaviorHandlerRegistry;
 }): ChainItem[] {
@@ -323,6 +324,9 @@ export function collectTriggeredClauses(input: {
       targetCardInstanceIds: [],
       targetObjectVersions: {},
       behaviorClauseId: clause.id,
+      ...(source.grantedClauses?.has(clause.id)
+        ? { grantedBehaviorClauseSnapshot: source.grantedClauses.get(clause.id) }
+        : {}),
       activatedBehaviorId: null,
       behaviorEvent: input.event
     }];

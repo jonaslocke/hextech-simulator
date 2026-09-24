@@ -357,7 +357,7 @@ type ActiveContinuousBinding = {
   attachedEffectSourceId?: string;
 };
 
-function activeContinuousBindings(
+export function activeContinuousBindings(
   game: GameDocument,
   index: RuntimeCardIndex,
 ): ActiveContinuousBinding[] {
@@ -452,6 +452,9 @@ function continuousNumericBinding(
   clause: BehaviorClause,
   binding: BehaviorBinding,
 ): BehaviorBinding | null {
+  if (binding.behaviorId === "modifier.grant_keyword") {
+    return isContinuousDuration(binding.parameters.duration) ? binding : null;
+  }
   if (binding.behaviorId !== "modifier.modify_numeric_value") return null;
   if (isContinuousDuration(binding.parameters.duration)) return binding;
   if (!looksLikeStaticNumericModifier(clause.sourceText)) return null;
