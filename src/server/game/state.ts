@@ -209,6 +209,9 @@ const effectSelectionChoiceSchema = z.object({
         sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
         legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
         optionLabels: z.record(z.string().min(1)).optional(),
+        maximumPerLocation: z.number().int().positive().optional(),
+        mustShareLocation: z.boolean().optional(),
+        locationKeysById: z.record(z.string().min(1)).optional(),
         legalIds: z.array(z.string().min(1)),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
@@ -418,6 +421,7 @@ export const gameStateSchema = z.object({
         .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
       initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+      prepaidCostSelectionKeys: z.array(z.string()).optional(),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
       effectOutcomes: z.record(

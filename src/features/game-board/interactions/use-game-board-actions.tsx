@@ -20,7 +20,7 @@ import type { CardActionMenuItem } from "../components/card-action-menu";
 import { combineTargetRequirements, groupedTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
 import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
-import { availableBoardCardActions } from "./available-board-card-actions";
+import { availableBoardCardActions, availablePlayableCardModes } from "./available-board-card-actions";
 
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
@@ -317,27 +317,18 @@ export function useGameBoardActions({
         return;
       }
 
-      const modes = (viewerState.availablePaymentModes[card.instanceId] ?? []).filter((mode) => mode.enabled);
+      const modes = availablePlayableCardModes(viewerState.availablePaymentModes[card.instanceId] ?? []);
+      if (modes.length === 0) return;
 
       openCardActionMenu(
         event,
-        modes.length > 0
-          ? modes.map((mode) => ({
-              boardLocation: mode.boardLocation,
-              disabled: !mode.enabled,
-              id: mode.id,
-              label: mode.enabled
-                ? <PlayableCardMenuLabel mode={mode} />
-                : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
-              onSelect: () => beginPlayOrTargetSelection(card, mode.id),
-            }))
-          : [
-              {
-                disabled: true,
-                id: `${card.instanceId}:not-playable`,
-                label: "Not playable",
-              },
-            ],
+        modes.map((mode) => ({
+          boardLocation: mode.boardLocation,
+          disabled: false,
+          id: mode.id,
+          label: <PlayableCardMenuLabel mode={mode} />,
+          onSelect: () => beginPlayOrTargetSelection(card, mode.id),
+        })),
       );
     },
     [beginPlayOrTargetSelection, openCardActionMenu, targetSelection, viewerState],

@@ -4,6 +4,10 @@ import type {
   ProjectedCardView,
   ProjectedZone
 } from "@/shared/game";
+import {
+  targetSelectionCanAddToRequirements,
+  targetSelectionSatisfiesRequirements,
+} from "@/shared/game";
 export function chainOverlayOpen(
   isOpen: boolean,
   wasChainLockedOpen: boolean,
@@ -167,21 +171,12 @@ export function targetSelectionIsLegal(
   requirement: CombinedTargetRequirement,
   selectedIds: readonly string[],
 ): boolean {
-  return (
-    selectedIds.length >= requirement.minimum &&
-    selectedIds.length <= requirement.maximum &&
-    new Set(selectedIds).size === selectedIds.length &&
-    selectedIds.every((id) => requirement.legalIds.includes(id)) &&
-    requirement.requirements.every((individual) => {
-      const selectedCount = selectedIds.filter((id) =>
-        individual.legalIds.includes(id),
-      ).length;
-      return (
-        selectedCount >= individual.minimum &&
-        selectedCount <= individual.maximum
-      );
-    })
-  );
+  return requirement.requirements.length > 0
+    ? targetSelectionSatisfiesRequirements(requirement.requirements, selectedIds)
+    : selectedIds.length >= requirement.minimum &&
+        selectedIds.length <= requirement.maximum &&
+        new Set(selectedIds).size === selectedIds.length &&
+        selectedIds.every((id) => requirement.legalIds.includes(id));
 }
 
 export function targetSelectionCanAdd(
@@ -196,15 +191,9 @@ export function targetSelectionCanAdd(
     return false;
   }
 
-  const proposedIds = [...selectedIds, candidateId];
-  return (
-    proposedIds.length <= requirement.maximum &&
-    requirement.requirements.every(
-      (individual) =>
-        proposedIds.filter((id) => individual.legalIds.includes(id)).length <=
-        individual.maximum,
-    )
-  );
+  return requirement.requirements.length > 0
+    ? targetSelectionCanAddToRequirements(requirement.requirements, selectedIds, candidateId)
+    : selectedIds.length + 1 <= requirement.maximum;
 }
 
 export function moveSelectionTitle(

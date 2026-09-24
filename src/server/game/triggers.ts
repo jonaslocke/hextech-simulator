@@ -15,6 +15,7 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { ChainItem, GameDocument } from "./state";
 import { beginEffectResolution } from "./effect-resolution";
 import { behaviorModelForChainItem, behaviorModelForRuntimeCard } from "./runtime-behaviors";
+import { targetSelectionSatisfiesRequirements } from "../../shared/game";
 
 export function dispatchBehaviorEvent(
   game: GameDocument,
@@ -180,30 +181,7 @@ export function submitChainTargetSelection(
     throw new Error("Chain target selection is not available.");
   }
   const requirements = pending.targetRequirements ?? [];
-  const legal = new Set(requirements.flatMap((target) => target.legalIds));
-  const minimum = requirements.reduce(
-    (sum, target) => sum + target.minimum,
-    0,
-  );
-  const maximum = requirements.reduce(
-    (sum, target) => sum + target.maximum,
-    0,
-  );
-  if (
-    selectedIds.length < minimum ||
-    selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    requirements.some((target) => {
-      const selectedForTarget = selectedIds.filter((id) =>
-        target.legalIds.includes(id),
-      ).length;
-      return (
-        selectedForTarget < target.minimum ||
-        selectedForTarget > target.maximum
-      );
-    })
-  ) {
+  if (!targetSelectionSatisfiesRequirements(requirements, selectedIds)) {
     throw new Error("Selected chain targets are not legal.");
   }
   const item = pending.chainItem;

@@ -3,8 +3,9 @@ import { test } from "node:test";
 import { gameFixture } from "./helpers/game-fixture";
 import { projectGame } from "../src/server/game/projection";
 import { chainRelationships } from "../src/features/game-board/chain-relationships";
+import { targetSelectionCanAdd, targetSelectionIsLegal } from "../src/features/game-board/model";
 import { newPublicReveals } from "../src/features/game-board/interactions/public-reveal-events";
-import { availableBoardCardActions } from "../src/features/game-board/interactions/available-board-card-actions";
+import { availableBoardCardActions, availablePlayableCardModes } from "../src/features/game-board/interactions/available-board-card-actions";
 import { resolveDecisionInspectionRequest } from "../src/features/game-board/interactions/decision-inspection-request";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
 import { attachCardToTopMost, detachCard } from "../src/server/game/attachment-lifecycle";
@@ -39,6 +40,50 @@ test("board card menus omit unavailable projected actions", () => {
     availableBoardCardActions(actions, true).map((action) => action.id),
     ["resource"],
   );
+});
+
+test("playable card menus omit unavailable modes and empty placeholders", () => {
+  const modes = [
+    { id: "available", enabled: true },
+    { id: "unavailable", enabled: false },
+  ];
+  assert.deepEqual(availablePlayableCardModes(modes).map((mode) => mode.id), ["available"]);
+  assert.deepEqual(availablePlayableCardModes(modes.slice(1)), []);
+});
+
+test("target selection honors per-location cardinality constraints", () => {
+  const requirement = {
+    legalIds: ["unit-a", "unit-b", "unit-c"],
+    minimum: 0,
+    maximum: 2,
+    requirements: [{
+      kind: "card" as const,
+      legalIds: ["unit-a", "unit-b", "unit-c"],
+      minimum: 0,
+      maximum: 2,
+      maximumPerLocation: 1,
+      locationKeysById: {
+        "unit-a": "base:p2",
+        "unit-b": "base:p2",
+        "unit-c": "battlefield:arena",
+      },
+    }],
+  };
+
+  assert.equal(targetSelectionCanAdd(requirement, ["unit-a"], "unit-b"), false);
+  assert.equal(targetSelectionCanAdd(requirement, ["unit-a"], "unit-c"), true);
+  assert.equal(targetSelectionIsLegal(requirement, ["unit-a", "unit-c"]), true);
+  assert.equal(targetSelectionIsLegal(requirement, ["unit-a", "unit-b"]), false);
+
+  const sharedLocationRequirement = {
+    ...requirement,
+    requirements: [{
+      ...requirement.requirements[0]!,
+      mustShareLocation: true,
+    }],
+  };
+  assert.equal(targetSelectionCanAdd(sharedLocationRequirement, ["unit-a"], "unit-c"), false);
+  assert.equal(targetSelectionIsLegal(sharedLocationRequirement, ["unit-a", "unit-c"]), false);
 });
 
 test("Chain relationships distinguish object, location and Chain identities", async () => {

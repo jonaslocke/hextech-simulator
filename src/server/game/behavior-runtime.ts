@@ -1,4 +1,7 @@
-import type { ProjectedTargetRequirement } from "../../shared/game";
+import {
+  targetSelectionSatisfiesRequirements,
+  type ProjectedTargetRequirement,
+} from "../../shared/game";
 import type { BehaviorBinding, BehaviorClause, BehaviorModel } from "./schemas";
 import type { ChainItem, GameDocument } from "./state";
 
@@ -156,23 +159,54 @@ export function selectionRequirementsForClause(
   );
   return requirements
     .filter(({ requirement }) => requirement.maximum > 0)
-    .map(({ binding, requirement }) => ({
-      binding,
-      requirement:
-        requirement.kind === "battlefield" && automaticCardIds.size > 0
-          ? {
-              ...requirement,
-              legalIds: requirement.legalIds.filter((battlefieldId) =>
-                context.game.state.battlefields
-                  .find(
-                    (battlefield) =>
-                      battlefield.battlefieldId === battlefieldId,
-                  )
-                  ?.units.some((id) => automaticCardIds.has(id)),
-              ),
-            }
-          : requirement,
-    }));
+    .map(({ binding, requirement }) => {
+      let projected = requirement.kind === "battlefield" && automaticCardIds.size > 0
+        ? {
+            ...requirement,
+            legalIds: requirement.legalIds.filter((battlefieldId) =>
+              context.game.state.battlefields
+                .find((battlefield) => battlefield.battlefieldId === battlefieldId)
+                ?.units.some((id) => automaticCardIds.has(id)),
+            ),
+          }
+        : requirement;
+      const selectionKey = binding.parameters.selectionKey;
+      if (typeof selectionKey === "string" && projected.kind === "card") {
+        const matchingEffects = clause.orderedEffects.filter(
+          (effect) => effect.parameters.selectionKey === selectionKey,
+        );
+        const maximumPerLocation = matchingEffects.some(
+          (effect) => effect.parameters.atMostOnePerLocation === true,
+        ) ? 1 : undefined;
+        const mustShareLocation = matchingEffects.some(
+          (effect) => effect.parameters.selectedMustShareLocation === true,
+        ) || undefined;
+        if (maximumPerLocation !== undefined || mustShareLocation) {
+          const locationKeysById = Object.fromEntries(
+            projected.legalIds.flatMap((id) => {
+              const location = targetBoardLocationKey(context.game, id);
+              return location ? [[id, location]] : [];
+            }),
+          );
+          const locationCount = new Set(Object.values(locationKeysById)).size;
+          projected = {
+            ...projected,
+            ...(maximumPerLocation === undefined ? {} : { maximumPerLocation }),
+            ...(mustShareLocation ? { mustShareLocation: true } : {}),
+            locationKeysById,
+            ...(maximumPerLocation === undefined
+              ? {}
+              : {
+                  maximum: Math.max(
+                    projected.minimum,
+                    Math.min(projected.maximum, locationCount * maximumPerLocation),
+                  ),
+                }),
+          };
+        }
+      }
+      return { binding, requirement: projected };
+    });
 }
 
 export function clauseHasAutomaticAffectedGroup(
@@ -458,16 +492,18 @@ function bindingGroups(clause: BehaviorClause) {
   };
 }
 function validateSelections(requirements: ProjectedTargetRequirement[], selectedIds: string[]) {
-  if (requirements.length === 0) {
-    if (selectedIds.length) throw new Error("Behavior clause does not accept selected targets.");
-    return;
-  }
-  const legal = new Set(requirements.flatMap((requirement) => requirement.legalIds));
-  const minimum = requirements.reduce((sum, requirement) => sum + requirement.minimum, 0);
-  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
-  if (selectedIds.length < minimum || selectedIds.length > maximum || selectedIds.some((id) => !legal.has(id)) || new Set(selectedIds).size !== selectedIds.length) {
+  if (!targetSelectionSatisfiesRequirements(requirements, selectedIds)) {
     throw new Error("Behavior selections do not satisfy selector requirements.");
   }
+}
+
+function targetBoardLocationKey(game: GameDocument, unitId: string): string | null {
+  const battlefield = game.state.battlefields.find((candidate) => candidate.units.includes(unitId));
+  if (battlefield) return `battlefield:${battlefield.battlefieldId}`;
+  const basePlayerId = game.state.setup.playerIds.find((playerId) =>
+    game.state.players[playerId]?.zones.base.includes(unitId),
+  );
+  return basePlayerId ? `base:${basePlayerId}` : null;
 }
 function selectedForRequirement(requirement: ProjectedTargetRequirement, selectedIds: string[]) {
   return selectedIds.filter((id) => requirement.legalIds.includes(id)).slice(0, requirement.maximum);

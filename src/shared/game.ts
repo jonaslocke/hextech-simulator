@@ -29,6 +29,9 @@ export const projectedTargetRequirementSchema = z
     // object (for example, a unit's legal move destinations).
     legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
     optionLabels: z.record(z.string().min(1)).optional(),
+    maximumPerLocation: z.number().int().positive().optional(),
+    mustShareLocation: z.boolean().optional(),
+    locationKeysById: z.record(z.string().min(1)).optional(),
     legalIds: z.array(z.string().min(1)),
     minimum: z.number().int().nonnegative(),
     maximum: z.number().int().nonnegative(),
@@ -36,6 +39,73 @@ export const projectedTargetRequirementSchema = z
   .refine((value) => value.minimum <= value.maximum, {
     message: "Target minimum cannot exceed maximum.",
   });
+
+type TargetSelectionConstraint = {
+  legalIds: readonly string[];
+  minimum: number;
+  maximum: number;
+  maximumPerLocation?: number;
+  mustShareLocation?: boolean;
+  locationKeysById?: Readonly<Record<string, string>>;
+};
+
+export function targetSelectionSatisfiesRequirements(
+  requirements: readonly TargetSelectionConstraint[],
+  selectedIds: readonly string[],
+): boolean {
+  if (requirements.length === 0) return selectedIds.length === 0;
+  const legalIds = new Set(requirements.flatMap((requirement) => [...requirement.legalIds]));
+  const minimum = requirements.reduce((sum, requirement) => sum + requirement.minimum, 0);
+  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
+  return selectedIds.length >= minimum &&
+    selectedIds.length <= maximum &&
+    new Set(selectedIds).size === selectedIds.length &&
+    selectedIds.every((id) => legalIds.has(id)) &&
+    requirements.every((requirement) => {
+      const selected = selectedIds.filter((id) => requirement.legalIds.includes(id));
+      if (selected.length < requirement.minimum || selected.length > requirement.maximum) return false;
+      const locations = selected.map((id) => requirement.locationKeysById?.[id]);
+      if (requirement.maximumPerLocation !== undefined) {
+        if (locations.some((location) => location === undefined)) return false;
+        const countByLocation = new Map<string, number>();
+        for (const location of locations as string[]) {
+          const count = (countByLocation.get(location) ?? 0) + 1;
+          if (count > requirement.maximumPerLocation) return false;
+          countByLocation.set(location, count);
+        }
+      }
+      return !requirement.mustShareLocation ||
+        new Set(locations).size <= 1;
+    });
+}
+
+export function targetSelectionCanAddToRequirements(
+  requirements: readonly TargetSelectionConstraint[],
+  selectedIds: readonly string[],
+  candidateId: string,
+): boolean {
+  if (
+    selectedIds.includes(candidateId) ||
+    !requirements.some((requirement) => requirement.legalIds.includes(candidateId))
+  ) return false;
+  const proposed = [...selectedIds, candidateId];
+  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
+  return proposed.length <= maximum && requirements.every((requirement) => {
+    const selected = proposed.filter((id) => requirement.legalIds.includes(id));
+    if (selected.length > requirement.maximum) return false;
+    const locations = selected.map((id) => requirement.locationKeysById?.[id]);
+    if (requirement.maximumPerLocation !== undefined) {
+      if (locations.some((location) => location === undefined)) return false;
+      const countByLocation = new Map<string, number>();
+      for (const location of locations as string[]) {
+        const count = (countByLocation.get(location) ?? 0) + 1;
+        if (count > requirement.maximumPerLocation) return false;
+        countByLocation.set(location, count);
+      }
+    }
+    return !requirement.mustShareLocation || new Set(locations).size <= 1;
+  });
+}
 
 export const projectedActionSchema = z.object({
   id: z.string().min(1),

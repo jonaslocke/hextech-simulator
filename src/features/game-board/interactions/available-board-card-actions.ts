@@ -10,3 +10,7 @@ export function availableBoardCardActions(
     action.enabled && (!targetSelectionActive || action.label.startsWith("Add ")),
   );
 }
+
+export function availablePlayableCardModes<T extends { enabled: boolean }>(actions: readonly T[]): T[] {
+  return actions.filter((action) => action.enabled);
+}

@@ -14,6 +14,7 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { behaviorModelWithGrantedClause } from "./runtime-behaviors";
 import type { BehaviorClause } from "./schemas";
+import { targetSelectionSatisfiesRequirements } from "../../shared/game";
 
 export type TokenPlacement = {
   destinationId: string;
@@ -31,6 +32,7 @@ export function beginEffectResolution(input: {
   event?: BehaviorEvent | null;
   selectedIds?: string[];
   selectionOverrides?: Record<string, string[]>;
+  prepaidCostSelectionKeys?: string[];
   targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
@@ -47,6 +49,9 @@ export function beginEffectResolution(input: {
     event: input.event ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     initialSelectionOverrides: input.selectionOverrides ?? {},
+    ...(input.prepaidCostSelectionKeys?.length
+      ? { prepaidCostSelectionKeys: input.prepaidCostSelectionKeys }
+      : {}),
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
     effectOutcomes: {},
@@ -71,12 +76,15 @@ export function submitEffectSelection(
   if (!pending.resolutionId) {
     throw new Error("Effect resolution is unavailable.");
   }
-  if (
-    selectedIds.length < pending.minimum ||
-    selectedIds.length > pending.maximum ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    selectedIds.some((id) => !pending.legalCardIds.includes(id))
-  ) {
+  if (!targetSelectionSatisfiesRequirements(
+    pending.targetRequirements ?? [{
+      kind: pending.optionKind,
+      legalIds: pending.legalCardIds,
+      minimum: pending.minimum,
+      maximum: pending.maximum,
+    }],
+    selectedIds,
+  )) {
     throw new Error("Effect selection does not satisfy its requirements.");
   }
   const frame = game.state.effectResolutions.find(
@@ -180,8 +188,28 @@ export function resumeEffectResolution(
   )) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
-    if (frame.targetsLocked) {
-      const selectionKey = binding.parameters.selectionKey;
+    const selectionKey = binding.parameters.selectionKey;
+    if (
+      typeof selectionKey === "string" &&
+      frame.prepaidCostSelectionKeys?.includes(selectionKey)
+    ) {
+      const committedSelections =
+        frame.initialSelectionOverrides?.[selectionKey] ?? [];
+      if (
+        committedSelections.length < requirement.minimum ||
+        committedSelections.length > requirement.maximum ||
+        new Set(committedSelections).size !== committedSelections.length
+      ) {
+        finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+        return true;
+      }
+      // Activated costs may move their selected cards before effect
+      // resolution. Preserve that committed choice instead of checking the
+      // objects against their pre-cost location again.
+      frame.selectionsByBinding[bindingKey] = committedSelections;
+      continue;
+    }
+    if (frame.targetsLocked && requirement.sourceZone !== "mainDeck") {
       const lockedSelections =
         typeof selectionKey === "string" &&
         Object.hasOwn(initialSelectionOverrides, selectionKey)
@@ -201,6 +229,10 @@ export function resumeEffectResolution(
     if (requirement.legalIds.length < requirement.minimum) {
       finishResolutionFrame(game, frame.id, frame.delayedEffectId);
       return true;
+    }
+    if (requirement.minimum === 0 && requirement.legalIds.length === 0) {
+      frame.selectionsByBinding[bindingKey] = [];
+      continue;
     }
     game.state.pendingChoice = {
       id: `choice:${frame.id}:${binding.order}`,
