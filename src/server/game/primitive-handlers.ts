@@ -2160,7 +2160,7 @@ function findOrCreateTokenDefinition(
       media: tokenIdentity.imageUrl
         ? { image_url: tokenIdentity.imageUrl }
         : {},
-      tags: [],
+      tags: tokenIdentity.tags ?? [],
       metadata: {},
     },
     behaviorModel: {
@@ -2237,7 +2237,16 @@ function findOrCreateTokenDefinition(
   return definition;
 }
 
-function tokenIdentityFromName(tokenName: string) {
+function tokenIdentityFromName(tokenName: string): {
+  name: string;
+  might: number | null;
+  imageUrl: string | null;
+  type: "Unit" | "Gear";
+  temporary: boolean;
+  goldGear: boolean;
+  tags?: string[];
+  deflect?: boolean;
+} {
   if (/recruit/i.test(tokenName)) {
     return {
       name: "Recruit",
@@ -2261,18 +2270,27 @@ function tokenIdentityFromName(tokenName: string) {
     };
   }
   if (/sand soldier/i.test(tokenName)) {
-    return { name: "Sand Soldier", might: 2, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false };
+    return { name: "Sand Soldier", might: 2, imageUrl: null, type: "Unit", temporary: false, goldGear: false };
   }
   if (/mech/i.test(tokenName)) {
-    return { name: "Mech", might: 3, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false };
+    return { name: "Mech", might: 3, imageUrl: null, type: "Unit", temporary: false, goldGear: false };
   }
   if (/gold gear/i.test(tokenName)) {
-    return { name: "Gold Gear", might: null, imageUrl: null, type: "Gear" as const, temporary: false, goldGear: true };
+    return { name: "Gold Gear", might: null, imageUrl: null, type: "Gear", temporary: false, goldGear: true };
   }
   if (/bird/i.test(tokenName)) {
-    return { name: "Bird", might: 1, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false, deflect: /deflect/i.test(tokenName) };
+    return {
+      name: "Bird",
+      might: 1,
+      imageUrl: null,
+      type: "Unit",
+      temporary: false,
+      goldGear: false,
+      tags: ["Bird"],
+      deflect: /deflect/i.test(tokenName),
+    };
   }
-  return { name: tokenName, might: null, imageUrl: null, type: "Unit" as const, temporary: false, goldGear: false };
+  return { name: tokenName, might: null, imageUrl: null, type: "Unit", temporary: false, goldGear: false };
 }
 
 export function cardHasType(definition: GameCardDefinition, type: string) {

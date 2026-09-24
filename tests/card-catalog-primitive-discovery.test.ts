@@ -1098,6 +1098,14 @@ test("catalogs corpus-backed primitive text parameters as enums", () => {
   );
 });
 
+test("catalogs Bird unit tokens with Deflect as supported token parameters", () => {
+  assert.ok(
+    (tokenKinds as readonly string[]).includes(
+      "1 :rb_might: Bird unit with Deflect",
+    ),
+  );
+});
+
 test("catalogs target parameters as known target references", () => {
   const numericModifier = buildPrimitiveCatalog().find(
     (entry) => entry.id === "modifier.modify_numeric_value"

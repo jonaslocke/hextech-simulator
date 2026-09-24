@@ -261,6 +261,7 @@ export const tokenKinds = [
   "1 :rb_might: Recruit unit",
   "2 :rb_might: Sand Soldier unit",
   "3 :rb_might: Mech unit",
+  "1 :rb_might: Bird unit with Deflect",
   "Gold gear",
   "ready 3 :rb_might: Sprite unit"
 ] as const;

@@ -317,9 +317,9 @@ const models: Record<string, Clause[]> = {
       ["cost", "cost.discard_selected_cards", { count: 1, selectionKey: "discard" }],
       ["cost", "cost.exhaust_source", {}],
       ["action", "action.play_token", {
-        tokenName: "1 Might Bird unit with Deflect",
+        tokenName: "1 :rb_might: Bird unit with Deflect",
         count: 1,
-        placement: "base",
+        placement: "chooseBaseOrControlledBattlefield",
         entryState: "exhausted",
       }],
     ],
@@ -410,6 +410,10 @@ const models: Record<string, Clause[]> = {
     }],
   ]],
 };
+
+export function hasJayceCanonicalPublication(cardCode: string): boolean {
+  return Object.hasOwn(models, cardCode);
+}
 
 /** Approved executable models for cards required by the Jayce deck. */
 export function buildJayceCanonicalPublication(

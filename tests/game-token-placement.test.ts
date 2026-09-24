@@ -192,6 +192,46 @@ test("token projections retain generated keyword text", () => {
   assert.equal(sprite?.rulesText, "Temporary");
 });
 
+test("generated Bird units retain their tag and Deflect keyword", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("bird", {
+      effects: [
+        binding("action.play_token", 0, {
+          tokenName: "1 :rb_might: Bird unit with Deflect",
+          count: 1,
+          placement: "base",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+
+  assert.equal(
+    beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "source",
+      clauseId: "bird",
+      decks,
+    }),
+    true,
+  );
+
+  const bird = game.state.createdCardDefinitions?.find(
+    (definition) => definition.card.name === "Bird",
+  );
+  assert.ok(bird);
+  assert.deepEqual(bird.card.tags, ["Bird"]);
+  assert.ok(
+    bird.behaviorModel.clauses.some((clause) =>
+      clause.keywords.some((keyword) => keyword.behaviorId === "keyword.deflect"),
+    ),
+  );
+});
+
 test("fixed-location token creation plays token at source location", () => {
   const source = unit("SOURCE", "Faithful Manufactor", [
     clause("token-here", {
