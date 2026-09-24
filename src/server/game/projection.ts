@@ -335,6 +335,7 @@ export function projectGame(input: {
         canViewFacedownCard(battlefield.facedownCardInstanceId)
           ? view(battlefield.facedownCardInstanceId)
           : null,
+      facedownCardPresent: battlefield.facedownCardInstanceId !== null && battlefield.facedownCardInstanceId !== undefined,
     })),
     chain: input.game.state.chain
       ? {

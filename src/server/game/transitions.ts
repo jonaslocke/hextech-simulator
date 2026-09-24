@@ -17,6 +17,15 @@ export function acceptedActionEvent(
   actorPlayerId: string,
   action: ProjectedAction
 ): GameTransitionEvent {
+  const actionKind = action.id.split(":")[3];
+  if (actionKind === "hide") {
+    return {
+      type: "game.action.accepted",
+      actorPlayerId,
+      message: `${actorPlayerId} hid a card facedown.`,
+      payload: { actionKind: "hide" },
+    };
+  }
   return {
     type: "game.action.accepted",
     actorPlayerId,

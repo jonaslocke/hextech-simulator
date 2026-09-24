@@ -75,6 +75,7 @@ export function createPrimitiveHandlers(
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
     "keyword.quick_draw", "keyword.temporary",
     "keyword.flow", "keyword.repeat", "keyword.lethal_damage",
+    "keyword.hidden",
     "type.additional",
     "modifier.ignore_deflect",
     "modifier.prevent_scoring_until_turn",

@@ -63,7 +63,7 @@ export function buildPaymentPlan(
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
-    powerCost: effectivePowerCost(
+    powerCost: basePowerCost ?? effectivePowerCost(
       game,
       playerId,
       definition,
@@ -78,6 +78,40 @@ export function buildPaymentPlan(
     context: { kind: "card", cardType: definition.card.classification.type },
     additionalAnyPower,
   });
+}
+
+/** Rule 811.1.b: Hide costs one Power of any domain, payable through the
+ * ordinary Power payment sources but under Hide's own resource restrictions. */
+export function buildAnyPowerPaymentPlan(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  index: RuntimeCardIndex,
+): PaymentPlan | null {
+  const player = game.state.players[playerId]!;
+  const domains = new Set(
+    [...index.definitions.values()]
+      .flatMap((candidate) => candidate.card.classification.domain)
+      .concat(Object.keys(player.power))
+      .filter((domain) => domain !== "Colorless"),
+  );
+  return buildPaymentPlanForRequest(game, playerId, definition, index, {
+    energyCost: 0,
+    powerCost: 1,
+    allowedPowerDomains: [...domains],
+    context: { kind: "hide" },
+    additionalAnyPower: 0,
+  });
+}
+
+export function canPayAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
+  return buildAnyPowerPaymentPlan(game, playerId, definition, index) !== null;
+}
+
+export function payAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
+  const plan = buildAnyPowerPaymentPlan(game, playerId, definition, index);
+  if (!plan) throw new Error("Any-Power cost cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
 }
 
 export function buildAbilityPaymentPlan(

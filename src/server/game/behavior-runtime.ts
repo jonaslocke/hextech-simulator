@@ -22,6 +22,7 @@ export type BehaviorExecutionContext = {
   // canonical selector so independent optional costs cannot alias one another
   // merely because they select the same source card.
   selectionOverrides: Record<string, string[]>;
+  hiddenBattlefieldId: string | null;
   effectOutcomes: Record<string, boolean | number | string | string[]>;
   // Effect frames may need to pause while a card is played as part of an
   // instruction, rather than as an ordinary priority action.
@@ -126,7 +127,12 @@ export function selectionRequirementsForClause(
   const requirements = clause.selectors.map((binding) => {
     const handler = requireHandler(binding, handlers);
     if (!handler.targets) throw new Error(`Behavior handler cannot project targets: ${binding.behaviorId}`);
-    const requirement = handler.targets(binding, selectorContext);
+    const requirement = restrictHiddenPlayRequirement(
+      handler.targets(binding, selectorContext),
+      binding,
+      selectorContext,
+      clause.sourceText,
+    );
     const selected = selectedForBinding(binding, requirement, context);
     selectorContext.selectedBySelector[
       `${clause.id}:selectors:${binding.order}`
@@ -312,7 +318,11 @@ export function collectTriggeredClauses(input: {
 }): ChainItem[] {
   const items = input.sources.flatMap((source) => source.model.clauses.flatMap((clause) => {
     if (clause.triggers.length === 0) return [];
-    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, []);
+    const hiddenBattlefieldId = input.event.subjectCardInstanceId === source.sourceCardInstanceId &&
+      typeof input.event.values.hiddenBattlefieldId === "string"
+      ? input.event.values.hiddenBattlefieldId
+      : null;
+    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, [], {}, {}, hiddenBattlefieldId);
     if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
     return [{
@@ -322,6 +332,7 @@ export function collectTriggeredClauses(input: {
       controllerPlayerId: input.controllerPlayerId,
       sourceCardInstanceId: source.sourceCardInstanceId,
       targetCardInstanceIds: [],
+      ...(hiddenBattlefieldId ? { hiddenBattlefieldId } : {}),
       targetObjectVersions: {},
       behaviorClauseId: clause.id,
       ...(source.grantedClauses?.has(clause.id)
@@ -379,6 +390,7 @@ export function createBehaviorContext(
   effectOutcomes: Record<string, boolean | number | string | string[]> = {},
   selectionOverrides: Record<string, string[]> = {},
   effectResolutionId?: string,
+  hiddenBattlefieldId: string | null = null,
 ): BehaviorExecutionContext {
   return {
     game,
@@ -388,9 +400,43 @@ export function createBehaviorContext(
     selectedIds,
     selectedBySelector: {},
     selectionOverrides,
+    hiddenBattlefieldId: hiddenBattlefieldId ?? (
+      typeof event?.values.hiddenBattlefieldId === "string"
+        ? event.values.hiddenBattlefieldId
+        : null
+    ),
     effectOutcomes,
     effectResolutionId,
   };
+}
+
+function restrictHiddenPlayRequirement(
+  requirement: ProjectedTargetRequirement,
+  binding: BehaviorBinding,
+  context: BehaviorExecutionContext,
+  sourceText: string,
+): ProjectedTargetRequirement {
+  const battlefieldId = context.hiddenBattlefieldId;
+  if (
+    !battlefieldId ||
+    binding.parameters.selectionPurpose === "optionalCost" ||
+    requirement.sourceZone
+  ) return requirement;
+  if (requirement.kind === "battlefield") {
+    return { ...requirement, legalIds: requirement.legalIds.filter((id) => id === battlefieldId) };
+  }
+  if (requirement.kind !== "card") return requirement;
+  if (
+    binding.parameters.area === "base" ||
+    /\b(?:at|in|from)\s+(?:another|a different)\s+location\b|\b(?:at|in)\s+another battlefield\b/i.test(sourceText)
+  ) return requirement;
+  const battlefield = context.game.state.battlefields.find((candidate) => candidate.battlefieldId === battlefieldId);
+  if (!battlefield) return { ...requirement, legalIds: [] };
+  const atBattlefield = new Set([
+    ...battlefield.units,
+    ...(battlefield.attachedCardInstanceIds ?? []),
+  ]);
+  return { ...requirement, legalIds: requirement.legalIds.filter((id) => atBattlefield.has(id)) };
 }
 
 function matches(binding: BehaviorBinding, context: BehaviorExecutionContext, handlers: BehaviorHandlerRegistry): boolean {
