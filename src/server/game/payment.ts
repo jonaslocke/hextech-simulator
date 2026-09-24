@@ -85,29 +85,56 @@ export function buildAnyPowerPaymentPlan(
   playerId: string,
   definition: GameCardDefinition,
   index: RuntimeCardIndex,
+  options: { poolOnly?: boolean } = {},
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
-  const domains = new Set(
-    [...index.definitions.values()]
-      .flatMap((candidate) => candidate.card.classification.domain)
-      .concat(Object.keys(player.power))
-      .filter((domain) => domain !== "Colorless"),
-  );
+  const domains = anyPowerDomains(player, index);
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost: 0,
     powerCost: 1,
     allowedPowerDomains: [...domains],
     context: { kind: "hide" },
     additionalAnyPower: 0,
+    poolOnly: options.poolOnly,
   });
+}
+
+function anyPowerDomains(player: GameDocument["state"]["players"][string], index: RuntimeCardIndex) {
+  return new Set(
+    [...index.definitions.values()]
+      .flatMap((candidate) => candidate.card.classification.domain)
+      .concat(
+        Object.keys(player.power),
+        ...Object.values(player.restrictedResources?.power ?? {}).map((power) => Object.keys(power)),
+      )
+      .filter((domain) => domain !== "Colorless"),
+  );
 }
 
 export function canPayAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
   return buildAnyPowerPaymentPlan(game, playerId, definition, index) !== null;
 }
 
-export function payAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
-  const plan = buildAnyPowerPaymentPlan(game, playerId, definition, index);
+export function anyPowerPoolPaymentPreview(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
+  const player = game.state.players[playerId]!;
+  const powerDomains = [...anyPowerDomains(player, index)];
+  const context: PaymentContext = { kind: "hide" };
+  const eligiblePower = pooledCandidates(player, powerDomains).filter((candidate) =>
+    candidate.kind === "power" && candidateIsEligible(candidate, context, powerDomains));
+  return {
+    mode: "card" as const,
+    energy: 0,
+    power: 1,
+    powerDomains,
+    powerCosts: [{ amount: 1, domains: [] }],
+    availableEnergy: 0,
+    availablePower: eligiblePower.reduce((total, candidate) => total + candidate.amount, 0),
+    canPay: buildAnyPowerPaymentPlan(game, playerId, definition, index, { poolOnly: true }) !== null,
+  };
+}
+
+export function payAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex, options: { poolOnly?: boolean } = {}) {
+  const plan = buildAnyPowerPaymentPlan(game, playerId, definition, index, options);
   if (!plan) throw new Error("Any-Power cost cannot be paid.");
   applyPaymentPlan(game, playerId, plan, index);
 }
