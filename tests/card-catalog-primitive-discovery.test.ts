@@ -682,6 +682,27 @@ test("discovers Smoke and Mirrors location constraints only on its second target
   );
 });
 
+test("keeps a generic different-location target separate from a friendly-unit target", () => {
+  const discovery = discoverCardPrimitives(
+    createTestCard({
+      name: "Mixed Unit Targets",
+      publicCode: "TST-002/1",
+      text: "Choose a unit you control and another unit at a different location."
+    })
+  );
+
+  assert.equal(
+    findAssignment(discovery, "selector.friendly_unit")?.parameters.locationRelation,
+    "any",
+    "the first friendly-unit target is not constrained by the second target's location clause",
+  );
+  assert.equal(
+    findAssignment(discovery, "selector.unit")?.parameters.locationRelation,
+    "differentSourceLocation",
+    "the generic second target owns the explicit different-location clause",
+  );
+});
+
 test("discovers static source-location unit modifiers as automatic continuous effects", () => {
   const discovery = discoverCardPrimitives(
     createTestCard({

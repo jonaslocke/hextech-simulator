@@ -1278,7 +1278,6 @@ function readUnitLocationRelation(
     const constrainedTarget = readDifferentLocationTargetKind(rulesText);
     if (
       !targetKind ||
-      constrainedTarget === "unit" ||
       constrainedTarget === targetKind
     ) {
       return "differentSourceLocation";
