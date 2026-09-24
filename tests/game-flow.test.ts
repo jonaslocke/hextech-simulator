@@ -2023,17 +2023,40 @@ test("effect-driven spells enter the Chain in next-player play order", () => {
 
 test("a public reveal-until instruction plays the first matching card with both base costs ignored", () => {
   const { game, decks } = fixture();
+  const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  unit.card.attributes.energy = 2;
+  unit.card.attributes.power = 1;
   const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "BF")!;
-  source.behaviorModel.clauses = [clause("reveal-until-unit", {
-    effects: [binding("action.reveal_until_card_type_and_play", 0, {
-      cardType: "Unit",
-      ignoreBaseCosts: true,
-    })],
-  })];
+  source.behaviorModel.clauses = [
+    clause("reveal-until-unit", {
+      effects: [binding("action.reveal_until_card_type_and_play", 0, {
+        cardType: "Unit",
+        ignoreBaseCosts: true,
+      })],
+    }),
+    clause("cost-increase", {
+      sequence: 1,
+      effects: [binding("modifier.modify_numeric_value", 0, {
+        attribute: "energyCost",
+        operation: "increase",
+        amount: 1,
+        target: "controller_card",
+        duration: "whileSourceAtBattlefield",
+      }), binding("modifier.modify_numeric_value", 1, {
+        attribute: "powerCost",
+        operation: "increase",
+        amount: 1,
+        target: "controller_card",
+        duration: "whileSourceAtBattlefield",
+      })],
+    }),
+  ];
   decks[0]!.instances.push({
     instanceId: "p1:revealed-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "UNIT",
   });
   game.state.cardStates["p1:revealed-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p1!.energy = 1;
+  game.state.players.p1!.power.Mind = 1;
   game.state.players.p1!.zones.mainDeck = ["p1:spell", "p1:revealed-unit", "p1:unit"];
   game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== "p1:spell");
 
@@ -2051,12 +2074,14 @@ test("a public reveal-until instruction plays the first matching card with both 
   const play = gameplayActions(game, "p1", decks).find((action) =>
     action.sourceCardInstanceId === "p1:revealed-unit",
   )!;
-  assert.equal(play.costPreview?.energy, 0);
-  assert.equal(play.costPreview?.effectivePower, 0);
+  assert.equal(play.costPreview?.energy, 1, "the Energy increase applies after the waived printed Energy cost");
+  assert.equal(play.costPreview?.effectivePower, 1, "the Power increase applies after the waived printed Power cost");
   const next = performGameplayAction({
     game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "reveal-until-play",
   });
   assert.ok(next.state.players.p1!.zones.base.includes("p1:revealed-unit"));
+  assert.equal(next.state.players.p1!.energy, 0);
+  assert.equal(next.state.players.p1!.power.Mind, 0);
   assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit", "p1:spell"]);
   assert.equal(next.state.effectPlayQueue?.length, 0);
   assert.equal(next.state.effectResolutions.length, 0);
