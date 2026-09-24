@@ -114,7 +114,14 @@ export function effectiveNumericValue(input: NumericValueInput): number {
           : null,
       operation: stringParameter(binding, "operation"),
     });
-    input.onContribution?.({ id: `${attachedEffectSourceId ?? sourceId}:${binding.order}:${input.attribute}`, sourceCardInstanceId: attachedEffectSourceId ?? sourceId, amount: value - before, duration: String(binding.parameters.duration ?? "continuous") });
+    input.onContribution?.({
+      id: `${attachedEffectSourceId ?? sourceId}:${binding.order}:${input.attribute}`,
+      sourceCardInstanceId: attachedEffectSourceId ?? sourceId,
+      amount: value - before,
+      duration: numericModifierConditions(binding).includes("sourceAttachedThisTurn")
+        ? "thisTurn"
+        : String(binding.parameters.duration ?? "continuous"),
+    });
   }
 
   for (const modifier of input.game.state.modifiers) {

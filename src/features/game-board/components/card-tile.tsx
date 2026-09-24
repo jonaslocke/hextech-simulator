@@ -448,7 +448,7 @@ function KeywordAnnotationStack({
   return (
     <div
       aria-label={`Runtime keywords: ${visibleLabels.join(", ")}${overflow > 0 ? ` and ${overflow} more` : ""}`}
-      className="top-2 left-[-7px] z-20 absolute grid gap-1.5 max-w-[calc(100vw-1rem)] pointer-events-none"
+      className="top-2 left-[-6px] z-20 absolute grid gap-1 pointer-events-none"
       role="list"
     >
       <AnimatePresence initial={false}>
@@ -463,7 +463,7 @@ function KeywordAnnotationStack({
             <motion.span
               animate={{ opacity: 1, scale: 1 }}
               aria-label={label}
-              className="inline-flex w-max max-w-full items-center gap-1.5 rounded-r-full rounded-l-md border border-white/65 px-2 py-1 font-semibold text-[9px] leading-none shadow-md shadow-black/55 whitespace-nowrap"
+              className="inline-flex w-max max-w-full items-center gap-1 rounded-full border border-white/50 px-1.5 py-0.5 font-semibold text-[8px] leading-none shadow-sm shadow-black/45 whitespace-nowrap"
               exit={{ opacity: 0, scale: 0.96 }}
               initial={{ opacity: 0, scale: 0.96 }}
               key={annotation.keywordId}
@@ -478,9 +478,9 @@ function KeywordAnnotationStack({
             >
               {iconPath ? (
                 // eslint-disable-next-line @next/next/no-img-element -- The keyword asset map owns local image URLs.
-                <img alt="" aria-hidden="true" className="size-3.5 shrink-0 object-contain" draggable={false} src={iconPath} />
+                <img alt="" aria-hidden="true" className="size-3 shrink-0 object-contain" draggable={false} src={iconPath} />
               ) : (
-                <Sparkles aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={2.25} />
+                <Sparkles aria-hidden="true" className="size-3 shrink-0" strokeWidth={2.25} />
               )}
               <span>{label}</span>
             </motion.span>
@@ -490,7 +490,7 @@ function KeywordAnnotationStack({
           <motion.span
             animate={{ opacity: 1, scale: 1 }}
             aria-label={`${overflow} more runtime keyword${overflow === 1 ? "" : "s"}`}
-            className="inline-flex w-max items-center rounded-r-full rounded-l-md border border-white/65 px-2 py-1 font-semibold text-[9px] leading-none shadow-md shadow-black/55 whitespace-nowrap"
+            className="inline-flex w-max items-center rounded-full border border-white/50 px-1.5 py-0.5 font-semibold text-[8px] leading-none shadow-sm shadow-black/45 whitespace-nowrap"
             exit={{ opacity: 0, scale: 0.96 }}
             initial={{ opacity: 0, scale: 0.96 }}
             key="keyword-overflow"

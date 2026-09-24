@@ -20,6 +20,7 @@ import {
   effectivePowerCost,
   advanceGameObjectIncarnation,
   moveCardToTrash,
+  recomputeAllMight,
   submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -1251,6 +1252,9 @@ function completeEndTurn(
     phase: "awaken",
     playedCardInstanceIds: [],
   };
+  // Turn-scoped conditions can change without a modifier being removed
+  // (for example, an attached effect conditioned on being attached this turn).
+  recomputeAllMight(game, index);
   applyStartOfTurn(game, decks, index);
 }
 
