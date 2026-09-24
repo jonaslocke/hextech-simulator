@@ -93,6 +93,8 @@ export type BattlefieldData = {
   playerAttachments: Card[];
   opponentAttachments: Card[];
   facedownCard: Card | null;
+  facedownCardPresent: boolean;
+  facedownCardOnPlayerSide: boolean;
   img: HTMLImageElement["src"];
 };
 

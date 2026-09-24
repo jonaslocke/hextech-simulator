@@ -1,6 +1,7 @@
 "use client";
 
 import { CardRulesText } from "@/features/card-presentation";
+import cardBackImage from "../../../../assets/cardback.jpg";
 import { cn } from "@/shared/utils/cn";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Info } from "lucide-react";
@@ -262,6 +263,8 @@ export const BattlefieldBoard: FC<Props> = ({
     playerAttachments,
     playerUnits,
     facedownCard,
+    facedownCardPresent,
+    facedownCardOnPlayerSide,
     img,
   },
   dropStatus = "idle",
@@ -432,7 +435,11 @@ export const BattlefieldBoard: FC<Props> = ({
 
         <BattlefieldUnitRow
           attachments={opponentAttachments}
-          cards={[...opponentUnits, ...(facedownCard ? [facedownCard] : [])]}
+          cards={[
+            ...opponentUnits,
+            ...(!facedownCardOnPlayerSide && facedownCard ? [facedownCard] : []),
+          ]}
+          facedownCardBack={!facedownCardOnPlayerSide && facedownCardPresent && !facedownCard}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -444,7 +451,8 @@ export const BattlefieldBoard: FC<Props> = ({
 
         <BattlefieldUnitRow
           attachments={playerAttachments}
-          cards={playerUnits}
+          cards={[...playerUnits, ...(facedownCardOnPlayerSide && facedownCard ? [facedownCard] : [])]}
+          facedownCardBack={facedownCardOnPlayerSide && facedownCardPresent && !facedownCard}
           dragSourceLocation={
             enablePlayerUnitLocationDrag
               ? { kind: "battlefield", battlefieldId: id }
@@ -475,6 +483,7 @@ export const BattlefieldBoard: FC<Props> = ({
 function BattlefieldUnitRow({
   attachments = [],
   cards,
+  facedownCardBack = false,
   className,
   dragSourceLocation,
   hiddenCardInstanceIds,
@@ -488,6 +497,7 @@ function BattlefieldUnitRow({
 }: {
   attachments?: Card[];
   cards: Card[];
+  facedownCardBack?: boolean;
   className?: string;
   dragSourceLocation?: BoardDragSourceLocation;
   hiddenCardInstanceIds?: Set<string>;
@@ -510,6 +520,14 @@ function BattlefieldUnitRow({
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
+      {facedownCardBack && (
+        <CardTile
+          name="Facedown card"
+          img={cardBackImage.src}
+          type="Facedown"
+          size="sm"
+        />
+      )}
       {attachmentGroups.map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
