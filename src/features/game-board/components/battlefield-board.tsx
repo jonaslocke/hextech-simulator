@@ -49,7 +49,7 @@ const BATTLEFIELD_ROW_LAYOUT_TRANSITION = {
 
 const battlefieldRoot = cva(
   [
-    "isolate relative grid grid-rows-[minmax(0,1fr)_34px] rounded-lg min-w-0 overflow-visible",
+    "isolate relative grid grid-rows-[minmax(0,1fr)_34px] rounded-lg min-w-0 overflow-hidden",
     "border bg-slate-950/10 transition-[border-color,background-color,box-shadow,--tw-ring-color] duration-300 ease-out",
     "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025),0_14px_32px_rgba(0,0,0,0.18)]",
     "supports-backdrop-filter:bg-slate-950/6 supports-backdrop-filter:backdrop-blur-[1px]",
@@ -180,7 +180,10 @@ const battlefieldDescriptionBar = cva([
 ]);
 
 const battlefieldUnitRow = cva(
-  ["flex flex-wrap gap-2 pl-2 min-h-0 overflow-visible"],
+  [
+    "flex flex-wrap gap-2 pl-2 min-h-0 overflow-auto",
+    "[scrollbar-color:rgba(103,232,249,0.25)_transparent]",
+  ],
   {
     variants: {
       side: {
@@ -354,21 +357,29 @@ export const BattlefieldBoard: FC<Props> = ({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0 overflow-hidden rounded-lg pointer-events-none"
-      >
-        <div
-          className="-z-30 absolute inset-0 bg-no-repeat bg-center brightness-[0.72] saturate-[1.22] contrast-[1.08]"
-          style={{
-            backgroundImage: `url(${img})`,
-            backgroundPosition: BATTLEFIELD_ART_BACKGROUND_POSITION,
-            backgroundSize: BATTLEFIELD_ART_BACKGROUND_SIZE,
-          }}
-        />
-        <div className="-z-20 absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_54%),linear-gradient(180deg,rgba(2,6,23,0.10),rgba(2,6,23,0.32))]" />
-        <div className="-z-10 absolute inset-0 bg-slate-950/12 shadow-[inset_0_0_64px_rgba(0,0,0,0.34)]" />
-        <div className={battlefieldRadialOverlay({ visualState })} />
-        <div className={battlefieldInsetOverlay({ visualState })} />
-      </div>
+        className="-z-30 absolute inset-0 bg-no-repeat bg-center brightness-[0.72] saturate-[1.22] contrast-[1.08]"
+        style={{
+          backgroundImage: `url(${img})`,
+          backgroundPosition: BATTLEFIELD_ART_BACKGROUND_POSITION,
+          backgroundSize: BATTLEFIELD_ART_BACKGROUND_SIZE,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="-z-20 absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_54%),linear-gradient(180deg,rgba(2,6,23,0.10),rgba(2,6,23,0.32))]"
+      />
+      <div
+        aria-hidden="true"
+        className="-z-10 absolute inset-0 bg-slate-950/12 shadow-[inset_0_0_64px_rgba(0,0,0,0.34)]"
+      />
+      <div
+        aria-hidden="true"
+        className={battlefieldRadialOverlay({ visualState })}
+      />
+      <div
+        aria-hidden="true"
+        className={battlefieldInsetOverlay({ visualState })}
+      />
 
       <div className="relative grid grid-rows-2 p-2 min-h-0">
         <div className={battlefieldNamePill({ emphasized: isEmphasized })}>
