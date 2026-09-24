@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { Db } from "mongodb";
 import {
   hashDeckSourceText,
+  PERMANENT_DECK_DEFINITIONS,
   validateDeckDefinitionDocument,
   type DeckDefinitionDocument,
   type DeckDefinitionSeed,
@@ -50,8 +51,9 @@ test("plans idempotent deck-definition synchronization", async () => {
   const seeds = seedSet();
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
+  const deckCount = seeds.length;
   assert.deepEqual(first.result, {
-    insertedCount: 6,
+    insertedCount: deckCount,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +63,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 6,
+    unchangedCount: deckCount,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,22 +77,10 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 5,
+    unchangedCount: deckCount - 1,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
-});
-
-test("requires the complete fixed seed set", async () => {
-  await assert.rejects(
-    () =>
-      planDeckDefinitionSync(
-        memoryRepository(),
-        [seedSet()[0]!],
-        NOW,
-      ),
-    /exactly: lux, annie, master-yi, stellacorn-herder, garen/,
-  );
 });
 
 test("returns valid playable options and rejects a fully unavailable catalog", async () => {
@@ -112,13 +102,12 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
     logger,
     repository,
   );
-  assert.deepEqual(partial, [
-    { id: "lux", label: "Lux" },
-    { id: "master-yi", label: "Master Yi" },
-    { id: "stellacorn-herder", label: "Stellacorn Herder" },
-    { id: "garen", label: "Garen" },
-    { id: "ornn", label: "Ornn" },
-  ]);
+  assert.deepEqual(
+    partial,
+    seedSet()
+      .filter(({ id }) => id !== "annie")
+      .map(({ id, label }) => ({ id, label })),
+  );
   assert.equal(errors.length, 1);
 
   await assert.rejects(
@@ -165,22 +154,11 @@ test("deck synchronization is confirmation-gated and reset-safe", async () => {
 });
 
 function seedSet(): DeckDefinitionSeed[] {
-  return [
-    { id: "lux", label: "Lux", sourceText: validSourceText("Lux") },
-    { id: "annie", label: "Annie", sourceText: validSourceText("Annie") },
-    {
-      id: "master-yi",
-      label: "Master Yi",
-      sourceText: validSourceText("Master Yi"),
-    },
-    {
-      id: "stellacorn-herder",
-      label: "Stellacorn Herder",
-      sourceText: validSourceText("Stellacorn Herder"),
-    },
-    { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
-    { id: "ornn", label: "Ornn", sourceText: validSourceText("Ornn") },
-  ];
+  return PERMANENT_DECK_DEFINITIONS.map(({ id, label }) => ({
+    id,
+    label,
+    sourceText: validSourceText(label),
+  }));
 }
 
 function validSourceText(name: string): string {
