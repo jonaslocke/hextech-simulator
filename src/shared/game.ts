@@ -129,6 +129,7 @@ export const projectedActionSchema = z.object({
     }).optional(),
     playCost: z.object({
       label: z.string(),
+      declarationLabel: z.string().optional(),
       showCost: z.boolean(),
       modifierSources: z.array(z.string()),
     }).optional(),

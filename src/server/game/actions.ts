@@ -2141,8 +2141,47 @@ function playActionLabel(input: {
   return `${base} (${costs.join(" + ")})`;
 }
 
+function committedPlayDeclarationLabel(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  selections: readonly Record<string, string[]>[],
+) {
+  return selections.flatMap((selection) => compiled.clauses.flatMap((clause) =>
+    clause.effects.flatMap((binding) => {
+      const key = binding.parameters.selectionKey;
+      if (binding.behaviorId !== "action.optional" ||
+        binding.parameters.commitAtPlay !== true ||
+        typeof key !== "string") return [];
+      const selected = selection[key]?.[0];
+      const label = selected === "yes"
+        ? binding.parameters.yesLabel
+        : selected === "no"
+          ? binding.parameters.noLabel
+          : null;
+      return typeof label === "string" && label.length > 0 ? [label] : [];
+    }),
+  )).join(" → ");
+}
+
 function displayPowerDomain(domain: string) {
   return `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`;
+}
+
+function readyGearAbilityLabel(
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+) {
+  if (!clause.effects.some((binding) => binding.behaviorId === "action.ready_cards")) {
+    return null;
+  }
+  const selector = clause.selectors.find(
+    (binding) => binding.behaviorId === "selector.gear",
+  );
+  if (!selector) return null;
+  const minimum = selector.parameters.minimumCount;
+  const maximum = selector.parameters.maximumCount;
+  if (typeof maximum !== "number" || maximum < 1) return null;
+  if (minimum === 1 && maximum === 1) return "Ready a Gear";
+  if (minimum === maximum) return `Ready ${maximum} Gears`;
+  return `Ready up to ${maximum} Gears`;
 }
 
 function committedPlayOptionModes(
@@ -2417,8 +2456,13 @@ function addPlayableCardActions(
             payment,
           ),
         );
+        const declarationLabel = committedPlayDeclarationLabel(
+          compiled,
+          preplayOptionSelections,
+        );
         actions[actions.length - 1]!.presentation.playCost = {
           label: `${repeat ? "[Repeat] " : ""}${destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`}`,
+          ...(declarationLabel ? { declarationLabel } : {}),
           showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
           modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
         };
@@ -2592,7 +2636,7 @@ function addAbilityActions(
                 ? "Equip"
               : ability.behaviorId === "ability.empower"
                 ? "Empower"
-                : `${definition.card.name} ability`;
+                : readyGearAbilityLabel(clause) ?? `${definition.card.name} ability`;
         actions.push(
           action(
             game,

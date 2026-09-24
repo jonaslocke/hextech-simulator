@@ -20,6 +20,7 @@ import type { CardActionMenuItem } from "../components/card-action-menu";
 import { combineTargetRequirements, groupedTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
 import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
+import { availableBoardCardActions } from "./available-board-card-actions";
 
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
@@ -371,8 +372,9 @@ export function useGameBoardActions({
       if (!card.instanceId || !event) {
         return;
       }
-      const cardActions = sourceActions(card.instanceId).filter(
-        (action) => !targetSelection || action.label.startsWith("Add "),
+      const cardActions = availableBoardCardActions(
+        sourceActions(card.instanceId),
+        Boolean(targetSelection),
       );
       if (cardActions.length === 0) return;
       const powerDomain = cardActions

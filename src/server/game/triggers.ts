@@ -516,7 +516,6 @@ function activeSourceIds(
   const player = game.state.players[controllerPlayerId]!;
   return [...new Set([
     ...(player.zones.legend ? [player.zones.legend] : []),
-    ...(player.zones.champion ? [player.zones.champion] : []),
     ...player.zones.base,
     ...game.state.battlefields
       .filter((battlefield) =>

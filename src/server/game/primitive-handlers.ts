@@ -279,6 +279,9 @@ export function createPrimitiveHandlers(
       return {
         kind: "card" as const,
         label: `${cardType === "any" ? "card" : cardType.toLowerCase()} from ${zone}`,
+        ...(typeof binding.parameters.selectionKey === "string"
+          ? { selectionKey: binding.parameters.selectionKey }
+          : {}),
         sourceZone:
           zone === "hand" || zone === "trash" || zone === "mainDeck"
             ? zone
@@ -1147,7 +1150,15 @@ export function createPrimitiveHandlers(
   });
   handlers.set("action.recycle_cards", {
     choice(binding, context) {
-      if (!effectOutcomeMatches(binding, context)) return null;
+      const committedModeKey = binding.parameters.onlyIfSelectionKey;
+      if (typeof committedModeKey === "string") {
+        if (!selectorOptionMatches(binding, context)) return null;
+      } else if (!effectOutcomeMatches(binding, context)) {
+        return null;
+      }
+      const committedCardsKey = binding.parameters.selectionKey;
+      if (typeof committedCardsKey === "string" &&
+        Object.hasOwn(context.selectionOverrides, committedCardsKey)) return null;
       const zone = binding.parameters.selectFromZone;
       if (zone !== "trash" && zone !== "hand" && zone !== "mainDeck") return null;
       const owner = binding.parameters.owner;

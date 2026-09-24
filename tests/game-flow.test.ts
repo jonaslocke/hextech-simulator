@@ -9,6 +9,7 @@ import {
   createBehaviorContext,
   effectiveEnergyCost,
   applyHoldScoring,
+  dispatchBehaviorEvent,
   gameplayActions,
   performGameplayAction,
   projectGame,
@@ -59,6 +60,77 @@ test("generates and validates generic turn, resource, movement, and priority act
   assert.equal(game.state.battlefields[0]!.controllerPlayerId, "p1");
   assert.equal(game.state.battlefields[0]!.contestedByPlayerId, null);
   assert.equal(game.state.players.p1!.points, 1);
+});
+
+test("triggered abilities of permanents are inactive in the chosen-champion zone", () => {
+  const { game, decks } = fixture();
+  const source = definition("ZONE_SOURCE", "Zone Source", "Unit", 0, 1) as GameCardDefinition;
+  source.behaviorModel.clauses.push(clause("on-play", {
+    triggers: [binding("trigger.on_play", 0, { actor: "controller", subject: "spell" })],
+  }));
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({
+    instanceId: "p1:zone-source",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "ZONE_SOURCE",
+  });
+  game.state.players.p1!.zones.champion = "p1:zone-source";
+  game.state.cardStates["p1:zone-source"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: 1,
+  };
+
+  const event = {
+    type: "card.played" as const,
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "p1:spell",
+    values: {},
+  };
+  dispatchBehaviorEvent(game, event, decks);
+  assert.equal(game.state.chain, null);
+
+  game.state.players.p1!.zones.champion = null;
+  game.state.players.p1!.zones.base.push("p1:zone-source");
+  dispatchBehaviorEvent(game, event, decks);
+  const boardTriggerChain = game.state.chain as NonNullable<GameDocument["state"]["chain"]> | null;
+  assert.equal(boardTriggerChain?.items.length, 1);
+  assert.equal(boardTriggerChain?.items[0]?.sourceCardInstanceId, "p1:zone-source");
+});
+
+test("activated action labels describe a selected gear action", () => {
+  const { game, decks } = fixture();
+  const source = definition("ACTION_SOURCE", "Action Source", "Gear", 0, 0) as GameCardDefinition;
+  source.behaviorModel.clauses.push(clause("ready-gear", {
+    abilities: [binding("ability.activated_effect", 0, {})],
+    selectors: [binding("selector.gear", 1, {
+      controller: "controller",
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "gear",
+    })],
+    effects: [binding("action.ready_cards", 2, {
+      player: "controller",
+      target: "card",
+      selectionKey: "gear",
+      count: 1,
+    })],
+  }));
+  decks[0]!.snapshot.cards.push(source, definition("TARGET_GEAR", "Target Gear", "Gear", 0, 0));
+  decks[0]!.instances.push(
+    { instanceId: "p1:action-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: "ACTION_SOURCE" },
+    { instanceId: "p1:target-gear", ownerPlayerId: "p1", source: "mainDeck", cardCode: "TARGET_GEAR" },
+  );
+  game.state.players.p1!.zones.base.push("p1:action-source", "p1:target-gear");
+  game.state.cardStates["p1:action-source"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:target-gear"] = { exhausted: true, damage: 0, computedMight: null };
+
+  const actions = gameplayActions(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === "p1:action-source",
+  );
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0]?.label, "Ready a Gear");
 });
 
 test.skip("plays a spell through priority resolution and advances the turn", () => {
@@ -2465,8 +2537,8 @@ test("committed modal Repeat declarations project only legal mode-target combina
 
 test("modal recycle-or-draw effects use the server-authorized option and card-selection decisions", () => {
   const { game, decks } = fixture();
-  const disposal = definition("DISPOSAL", "Disposal Order", "Spell", 0, 0) as GameCardDefinition;
-  disposal.behaviorModel.clauses.push(
+  const modalSpell = definition("MODAL_RECYCLER", "Modal recycler spell", "Spell", 0, 0) as GameCardDefinition;
+  modalSpell.behaviorModel.clauses.push(
     clause("dispose", {
       timings: [binding("timing.reaction", 0, {})],
       effects: [
@@ -2496,18 +2568,18 @@ test("modal recycle-or-draw effects use the server-authorized option and card-se
       ],
     }),
   );
-  decks[0]!.snapshot.cards.push(disposal);
+  decks[0]!.snapshot.cards.push(modalSpell);
   decks[0]!.instances.push({
-    instanceId: "p1:disposal",
+    instanceId: "p1:modal-recycler",
     ownerPlayerId: "p1",
     source: "mainDeck",
-    cardCode: "DISPOSAL",
+    cardCode: "MODAL_RECYCLER",
   });
   decks[1]!.instances.push(
     { instanceId: "p2:unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT" },
     { instanceId: "p2:spell", ownerPlayerId: "p2", source: "mainDeck", cardCode: "SPELL" },
   );
-  game.state.cardStates["p1:disposal"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:modal-recycler"] = { exhausted: false, damage: 0, computedMight: null };
   game.state.cardStates["p2:unit"] = { exhausted: false, damage: 0, computedMight: 1 };
   game.state.cardStates["p2:spell"] = { exhausted: false, damage: 0, computedMight: null };
   game.state.players.p2!.zones.trash.push("p2:unit", "p2:spell");
@@ -2515,7 +2587,7 @@ test("modal recycle-or-draw effects use the server-authorized option and card-se
   assert.equal(beginEffectResolution({
     game,
     controllerPlayerId: "p1",
-    sourceCardInstanceId: "p1:disposal",
+    sourceCardInstanceId: "p1:modal-recycler",
     clauseId: "dispose",
     decks,
   }), false);
@@ -2550,6 +2622,109 @@ test("modal recycle-or-draw effects use the server-authorized option and card-se
   assert.deepEqual(resolved.state.players.p2!.zones.trash, []);
   assert.deepEqual(resolved.state.players.p2!.zones.mainDeck.sort(), ["p2:spell", "p2:unit"]);
   assert.equal(resolved.state.players.p1!.zones.hand.includes("p1:draw"), false);
+});
+
+test("committed modal play declarations capture their mode and public targets before the Chain", () => {
+  const { game, decks } = fixture();
+  const modalSpell = definition("MODAL_SPELL", "Modal Spell", "Spell", 0, 0) as GameCardDefinition;
+  modalSpell.behaviorModel.clauses.push(clause("modal", {
+    timings: [binding("timing.action", 0, {})],
+    selectors: [binding("selector.card", 1, {
+      zone: "trash",
+      owner: "opponent",
+      cardType: "any",
+      minimumCount: 0,
+      maximumCount: 3,
+      selectionKey: "recycledCards",
+      onlyIfSelectionKey: "mode",
+      onlyIfSelectionValue: "yes",
+    })],
+    effects: [
+      binding("action.optional", 1, {
+        effectKey: "recycle",
+        prompt: "Choose an effect",
+        yesLabel: "Recycle up to 3 cards from opponents' trashes",
+        noLabel: "Draw 1",
+        selectionKey: "mode",
+        commitAtPlay: true,
+      }),
+      binding("action.recycle_cards", 2, {
+        target: "card",
+        selectFromZone: "trash",
+        owner: "opponent",
+        cardType: "any",
+        minimumCount: 0,
+        maximumCount: 3,
+        selectionKey: "recycledCards",
+        onlyIfEffectKey: "recycle",
+        onlyIfEffectValue: true,
+        onlyIfSelectionKey: "mode",
+        onlyIfSelectionValue: "yes",
+      }),
+      binding("action.draw_cards", 3, {
+        player: "controller",
+        count: 1,
+        onlyIfEffectKey: "recycle",
+        onlyIfEffectValue: false,
+      }),
+    ],
+  }));
+  decks[0]!.snapshot.cards.push(modalSpell);
+  decks[0]!.instances.push({
+    instanceId: "p1:modal-spell",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "MODAL_SPELL",
+  });
+  game.state.players.p1!.zones.hand.push("p1:modal-spell");
+  game.state.players.p2!.zones.trash.push("p2:unit", "p2:spell");
+  decks[1]!.instances.push(
+    { instanceId: "p2:unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT" },
+    { instanceId: "p2:spell", ownerPlayerId: "p2", source: "mainDeck", cardCode: "SPELL" },
+  );
+  game.state.cardStates["p1:modal-spell"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p2:unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.cardStates["p2:spell"] = { exhausted: false, damage: 0, computedMight: null };
+
+  const modes = gameplayActions(game, "p1", decks).filter(
+    (action) => action.sourceCardInstanceId === "p1:modal-spell",
+  );
+  assert.equal(modes.length, 2);
+  const recycleMode = modes.find((action) => action.targets.length > 0)!;
+  const drawMode = modes.find((action) => action.targets.length === 0)!;
+  assert.deepEqual(recycleMode.targets[0]?.legalIds, ["p2:unit", "p2:spell"]);
+  assert.equal(recycleMode.presentation.playCost?.declarationLabel, "Recycle up to 3 cards from opponents' trashes");
+  assert.equal(drawMode.presentation.playCost?.declarationLabel, "Draw 1");
+
+  const played = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: recycleMode.id,
+    selectedIds: ["p2:unit"],
+    decks,
+    now: "declare-modal-play",
+  });
+  assert.equal(played.state.pendingChoice, null);
+  assert.deepEqual(played.state.chain?.items[0]?.initialSelectionOverrides, {
+    mode: ["yes"],
+    recycledCards: ["p2:unit"],
+  });
+
+  const resolving = structuredClone(played);
+  const completed = beginEffectResolution({
+    game: resolving,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:modal-spell",
+    clauseId: "modal",
+    selectedIds: ["p2:unit"],
+    selectionOverrides: played.state.chain!.items[0]!.initialSelectionOverrides,
+    decks,
+  });
+  assert.equal(completed, true);
+  assert.equal(resolving.state.pendingChoice, null);
+  assert.equal(resolving.state.players.p2!.zones.trash.includes("p2:unit"), false);
+  assert.equal(resolving.state.players.p2!.zones.mainDeck.includes("p2:unit"), true);
+  assert.equal(drawMode.targets.length, 0);
 });
 
 test("activated recycle selections are paid before the ability enters the Chain", () => {

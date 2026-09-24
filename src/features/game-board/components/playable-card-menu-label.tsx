@@ -8,10 +8,11 @@ export function PlayableCardMenuLabel({ mode }: { mode: BoardPlayerProjection["a
   const preview = mode.costPreview;
   const presentation = mode.playCost;
   const label = presentation?.label ?? mode.label;
-  const declaration = mode.targets
+  const declaration = [presentation?.declarationLabel, ...mode.targets
     .filter((target) => target.maximum > 0)
     .map((target) => target.label)
-    .filter((label): label is string => Boolean(label));
+    .filter((label): label is string => Boolean(label))]
+    .filter((entry): entry is string => Boolean(entry));
   if (!preview || !presentation?.showCost) return <>
     <span>{label}</span>
     {declaration.length > 0 && <span className="block text-slate-400 text-[11px]">{declaration.join(" → ")}</span>}

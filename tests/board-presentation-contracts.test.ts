@@ -4,6 +4,7 @@ import { gameFixture } from "./helpers/game-fixture";
 import { projectGame } from "../src/server/game/projection";
 import { chainRelationships } from "../src/features/game-board/chain-relationships";
 import { newPublicReveals } from "../src/features/game-board/interactions/public-reveal-events";
+import { availableBoardCardActions } from "../src/features/game-board/interactions/available-board-card-actions";
 import { resolveDecisionInspectionRequest } from "../src/features/game-board/interactions/decision-inspection-request";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
 import { attachCardToTopMost, detachCard } from "../src/server/game/attachment-lifecycle";
@@ -21,6 +22,23 @@ test("location selection supports board inspection without changing the selectio
   const targetSelection = { actionId: "move", targetKind: "location" as const, purpose: "choice" as const, legalTargetIds: ["base"], selectedTargetIds: [], minTargets: 1, maxTargets: 1, requirement: { requirements: [], legalIds: ["base"], minimum: 1, maximum: 1 } };
   assert.equal(resolveDecisionInspectionRequest({ playerDecision: null, targetSelection })?.policy, "publicGameState");
   assert.deepEqual(targetSelection.selectedTargetIds, []);
+});
+
+test("board card menus omit unavailable projected actions", () => {
+  const actions = [
+    { id: "ready", enabled: true, label: "Ready a Gear" },
+    { id: "unavailable", enabled: false, label: "Ready two Gears" },
+    { id: "resource", enabled: true, label: "Add Energy" },
+  ] as unknown as Parameters<typeof availableBoardCardActions>[0];
+
+  assert.deepEqual(
+    availableBoardCardActions(actions, false).map((action) => action.id),
+    ["ready", "resource"],
+  );
+  assert.deepEqual(
+    availableBoardCardActions(actions, true).map((action) => action.id),
+    ["resource"],
+  );
 });
 
 test("Chain relationships distinguish object, location and Chain identities", async () => {
