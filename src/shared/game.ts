@@ -177,6 +177,7 @@ export const gameIntentRequestSchema = z.object({
 export const deckIdSchema = z.enum([
   "lux",
   "annie",
+  "annie-cleave",
   "master-yi",
   "stellacorn-herder",
   "garen",

@@ -7,6 +7,7 @@ import { deriveCardCodeFromCard } from "../src/server/card-catalog/identity";
 const DECK_PATHS = [
   path.join("data", "decks", "lux.dec.txt"),
   path.join("data", "decks", "annie.dec.txt"),
+  path.join("data", "decks", "annie-cleave.dec.txt"),
   path.join("data", "decks", "masteryi.dec.txt"),
   path.join(
     "data",

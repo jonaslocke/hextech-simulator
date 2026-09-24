@@ -1733,6 +1733,49 @@
     "ligamagic_id": "370"
   },
   {
+    "id": "7beb6a8e-7c1d-433f-ba5f-325a31e3f528",
+    "name": "Cleave",
+    "riftbound_id": "ogn-004-298",
+    "public_code": "OGN-004/298",
+    "collector_number": 4,
+    "attributes": {
+      "energy": 1,
+      "might": null,
+      "power": null
+    },
+    "classification": {
+      "type": "Spell",
+      "supertype": null,
+      "rarity": "Common",
+      "domain": [
+        "Fury"
+      ]
+    },
+    "text": {
+      "rich": "<p>[Action] <em>(Play on your turn or in showdowns.)</em><br />Give a unit [Assault 3] this turn. <em>(+3 :rb_might: while it's an attacker.)</em></p>",
+      "plain": "[Action] (Play on your turn or in showdowns.)Give a unit [Assault 3] this turn. (+3 :rb_might: while it's an attacker.)"
+    },
+    "set": {
+      "set_id": "OGN",
+      "label": "Origins"
+    },
+    "media": {
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/95d476a1e88ff547fb846149619177bc7e3cea9f-744x1039.png",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Spell: Cleave. [Action] (Play on your turn or in showdowns.)\nGive a unit [Assault 3] this turn. (+3 [S] while it's an attacker.)"
+    },
+    "tags": [],
+    "metadata": {
+      "clean_name": "Cleave",
+      "alternate_art": false,
+      "overnumbered": false,
+      "signature": false
+    },
+    "tcgplayer_id": "652774",
+    "orientation": "portrait",
+    "ligamagic_id": "4"
+  },
+  {
     "id": "cfa62e26-900a-4562-a408-7959a695893a",
     "name": "Wuju Bladesman - Starter",
     "riftbound_id": "ogs-019-024",

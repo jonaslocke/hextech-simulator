@@ -9,6 +9,11 @@ export const DECK_DEFINITIONS_COLLECTION = "deckDefinitions";
 export const PERMANENT_DECK_DEFINITIONS = [
   { id: "lux", label: "Lux", sourcePath: "data/decks/lux.dec.txt" },
   { id: "annie", label: "Annie", sourcePath: "data/decks/annie.dec.txt" },
+  {
+    id: "annie-cleave",
+    label: "Annie Cleave",
+    sourcePath: "data/decks/annie-cleave.dec.txt",
+  },
   { id: "master-yi", label: "Master Yi", sourcePath: "data/decks/masteryi.dec.txt" },
   {
     id: "stellacorn-herder",
