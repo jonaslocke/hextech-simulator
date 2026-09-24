@@ -23,8 +23,10 @@ test("normalized eligibility covers production aliases, card/ability scopes and 
   assert.equal(resourceUsageAllowsPayment("spellsOnly", { kind: "ability", sourceCardType: "Spell" }), false);
   assert.equal(compareRestrictions(normalizeResourceRestriction("spellsOnly"), normalizeResourceRestriction("card:Spell")), "equivalent");
   assert.equal(compareRestrictions(broad, normalizeResourceRestriction("gearAndGearAbilitiesOnly")), "equivalent");
-  assert.equal(compareRestrictions({ kind: ["card", "ability"] }, {}), "equivalent");
-  assert.equal(compareRestrictions({ type: ["Gear"] }, broad), "equivalent");
+  assert.equal(compareRestrictions({ kind: ["card", "ability"] }, {}), "narrower");
+  assert.equal(resourceUsageAllowsPayment("card:Spell", { kind: "hide" }), false);
+  assert.equal(resourceUsageAllowsPayment("hide:Hide", { kind: "hide" }), true);
+  assert.equal(compareRestrictions({ type: ["Gear"] }, broad), "broader");
   assert.equal(compareRestrictions({ kind: [] }, { type: [] }), "equivalent");
 });
 
