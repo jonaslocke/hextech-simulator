@@ -2,7 +2,7 @@ import { DomainIcon, EnergyResource } from "@/features/card-presentation";
 
 export function ResourceCost({ energy, powerCosts }: { energy: number; powerCosts: Array<{ amount: number; domains: string[] }> }) {
   return <span className="inline-flex flex-wrap items-center gap-1">
-    <EnergyResource compact value={energy} />
+    {energy > 0 && <EnergyResource compact value={energy} />}
     {powerCosts.filter((cost) => cost.amount > 0).flatMap((cost, costIndex) =>
       Array.from({ length: cost.amount }, (_, powerIndex) => (
         <span className="inline-flex items-center gap-0.5" key={`${costIndex}-${powerIndex}`}>

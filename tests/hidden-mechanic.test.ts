@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { adaptProjectionToBoard } from "../src/features/game-board/board-view-model";
 import { cardSchema } from "../src/server/catalog";
 import {
   acceptedActionEvent,
@@ -13,16 +14,16 @@ import {
 } from "../src/server/game";
 import { gameFixture } from "./helpers/game-fixture";
 
-async function hiddenGearFixture() {
+async function hiddenCardFixture(cardCode = "OGN-077") {
   const { game, decks, id } = await gameFixture();
   const sourceCards = cardSchema.array().parse(
     JSON.parse(await readFile("data/sets/ogn.json", "utf8")),
   );
-  const card = sourceCards.find((candidate) => candidate.public_code === "OGN-077/298");
-  assert.ok(card, "Zhonya's Hourglass must remain available from canonical set data");
+  const card = sourceCards.find((candidate) => candidate.public_code.startsWith(`${cardCode}/`));
+  assert.ok(card, `${cardCode} must remain available from canonical set data`);
   const definition: GameCardDefinition = {
-    cardCode: "OGN-077",
-    sourceTextHash: "test:ogn-077",
+    cardCode,
+    sourceTextHash: `test:${cardCode.toLowerCase()}`,
     card,
     behaviorModel: {
       playTimings: [],
@@ -38,8 +39,8 @@ async function hiddenGearFixture() {
     },
   };
   decks[0]!.snapshot.cards.push(definition);
-  const cardId = "p1:hidden:OGN-077:1";
-  decks[0]!.instances.push({ instanceId: cardId, ownerPlayerId: "p1", source: "mainDeck", cardCode: "OGN-077" });
+  const cardId = `p1:hidden:${cardCode}:1`;
+  decks[0]!.instances.push({ instanceId: cardId, ownerPlayerId: "p1", source: "mainDeck", cardCode });
   game.state.cardStates[cardId] = { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 };
   const battlefield = {
     battlefieldId: "field",
@@ -59,6 +60,32 @@ async function hiddenGearFixture() {
   return { game, decks, cardId, battlefield, index };
 }
 
+const hiddenGearFixture = () => hiddenCardFixture("OGN-077");
+
+test("Hide projects the rainbow Power cost as structured resource data", async () => {
+  const { game, decks, cardId } = await hiddenGearFixture();
+  const ownerProjection = projectGame({ game, decks, viewerPlayerId: "p1" });
+  const hide = ownerProjection.actions.find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));
+  assert.ok(hide);
+  assert.deepEqual(hide.presentation.resourceCost, {
+    energy: 0,
+    powerCosts: [{ amount: 1, domains: [] }],
+  });
+  assert.doesNotMatch(hide.label, /1 Any Power/);
+  const board = adaptProjectionToBoard(ownerProjection);
+  assert.deepEqual(board.projection.players.p1!.availablePaymentModes[cardId]?.[0]?.resourceCost, hide.presentation.resourceCost);
+});
+
+test("Hidden's rainbow cost accepts unrestricted off-domain Power in the Rune Pool", async () => {
+  const { game, decks, cardId } = await hiddenGearFixture();
+  game.state.players.p1!.power = { Fury: 1 };
+  const hide = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));
+  assert.ok(hide?.enabled, "the Calm Gear can be hidden using unrestricted Fury Power");
+  const current = performGameplayAction({ game, actorPlayerId: "p1", actionId: hide.id, selectedIds: [], decks, now: "hidden-off-domain-payment" });
+  assert.equal(current.state.players.p1!.power.Fury, 0);
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, cardId);
+});
+
 test("Hide pays any-domain Power, keeps the card private, and does not open the Chain", async () => {
   const { game, decks, cardId } = await hiddenGearFixture();
   const hide = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));
@@ -75,8 +102,15 @@ test("Hide pays any-domain Power, keeps the card private, and does not open the 
   const ownerProjection = projectGame({ game: current, decks, viewerPlayerId: "p1" });
   const opponentProjection = projectGame({ game: current, decks, viewerPlayerId: "p2" });
   assert.equal(ownerProjection.battlefields[0]!.facedownCard?.instanceId, cardId);
+  const ownerBoard = adaptProjectionToBoard(ownerProjection);
+  assert.equal(ownerBoard.projection.battlefields[0]!.facedownSlot, cardId);
+  assert.equal(ownerBoard.projection.battlefields[0]!.units.includes(cardId), false);
   assert.equal(opponentProjection.battlefields[0]!.facedownCard, null);
   assert.equal(opponentProjection.battlefields[0]!.facedownCardPresent, true);
+  const opponentBoard = adaptProjectionToBoard(opponentProjection);
+  assert.equal(opponentBoard.projection.battlefields[0]!.facedownSlot, null);
+  assert.equal(opponentBoard.projection.battlefields[0]!.facedownSlotPresent, true);
+  assert.equal(opponentBoard.cardsByInstanceId[cardId], undefined);
   assert.doesNotMatch(JSON.stringify(opponentProjection), /OGN-077|Zhonya|p1:hidden/);
   assert.equal(opponentProjection.actions.some((action) => action.sourceCardInstanceId === cardId), false);
 });
@@ -93,10 +127,13 @@ test("Hidden Gear waits until the next turn, then resolves through Chain and Cle
   };
   const play = gameplayActions(current, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Play "));
   assert.ok(play?.enabled);
+  assert.equal(play.label, "Play from Hidden");
   current = performGameplayAction({ game: current, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "hidden-gear-play" });
   assert.ok(current.state.chain, "playing from Hidden opens the Chain");
   assert.equal(current.state.chain.items.at(-1)?.hiddenBattlefieldId, battlefield.battlefieldId);
-  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, cardId);
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, null, "the Facedown Zone clears as soon as play is accepted");
+  assert.equal(current.state.cardStates[cardId]!.hiddenAtTurnNumber, null);
+  assert.equal(current.state.cardStates[cardId]!.gameObjectIncarnation, 1);
 
   for (const playerId of ["p1", "p2"]) {
     const pass = gameplayActions(current, playerId, decks).find((action) => action.label === "Pass priority");
@@ -104,9 +141,49 @@ test("Hidden Gear waits until the next turn, then resolves through Chain and Cle
     current = performGameplayAction({ game: current, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `hidden-gear-pass-${playerId}` });
   }
   cleanupBoard(current, index);
+  assert.equal(current.state.cardStates[cardId]!.gameObjectIncarnation, 2);
   assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, null);
   assert.deepEqual(current.state.battlefields[0]!.attachedCardInstanceIds, []);
   assert.ok(current.state.players.p1!.zones.base.includes(cardId), "unattached Gear is recalled to its owner's Base during Cleanup");
+});
+
+test("playing Hidden moves the card to the Chain once, rejects reuse, and resolves to Trash", async () => {
+  const { game, decks, cardId, battlefield } = await hiddenCardFixture("OGN-083");
+  const hide = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "))!;
+  let current = performGameplayAction({ game, actorPlayerId: "p1", actionId: hide.id, selectedIds: [], decks, now: "hidden-spell-hide" });
+  current.state.turn!.turnNumber += 1;
+  current.state.showdown = {
+    kind: "nonCombat", battlefieldId: battlefield.battlefieldId,
+    relevantPlayerIds: ["p1", "p2"], focusPlayerId: "p1", passedPlayerIds: [],
+  };
+  const play = gameplayActions(current, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label === "Play from Hidden");
+  assert.ok(play?.enabled, "Hidden play becomes available at the later legal timing");
+  current = performGameplayAction({ game: current, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "hidden-spell-play" });
+
+  assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, null);
+  assert.equal(current.state.chain?.items.length, 1);
+  assert.equal(current.state.chain?.items[0]?.sourceCardInstanceId, cardId);
+  assert.equal(current.state.chain?.items[0]?.hiddenBattlefieldId, battlefield.battlefieldId);
+  assert.equal(current.state.cardStates[cardId]!.hiddenAtTurnNumber, null);
+  assert.equal(current.state.cardStates[cardId]!.gameObjectIncarnation, 1);
+  const ownerProjection = projectGame({ game: current, decks, viewerPlayerId: "p1" });
+  assert.equal(ownerProjection.battlefields[0]!.facedownCard, null);
+  assert.equal(ownerProjection.battlefields[0]!.facedownCardPresent, false);
+  assert.equal(ownerProjection.chain?.items[0]?.sourceCardInstanceId, cardId);
+  assert.equal(gameplayActions(current, "p1", decks).some((action) => action.sourceCardInstanceId === cardId && ["hide", "playHidden"].includes(action.id.split(":")[3]!)), false);
+  assert.throws(
+    () => performGameplayAction({ game: current, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "hidden-spell-stale-reuse" }),
+    /Action is not legal for the current game state/,
+  );
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(current, playerId, decks).find((action) => action.label === "Pass priority");
+    assert.ok(pass, `${playerId} must receive priority before the Hidden spell resolves`);
+    current = performGameplayAction({ game: current, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `hidden-spell-pass-${playerId}` });
+  }
+  assert.equal(current.state.chain, null);
+  assert.ok(current.state.players.p1!.zones.trash.includes(cardId), "a resolved Hidden Spell follows ordinary play and goes to Trash");
+  assert.equal(current.state.cardStates[cardId]!.gameObjectIncarnation, 2);
 });
 
 test("an occupied Facedown Zone is not offered as a Hide destination", async () => {
