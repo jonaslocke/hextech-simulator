@@ -65,6 +65,7 @@ import {
   canPayAnyPowerCost,
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
+  anyPowerPoolPaymentPreview,
   canPayCardCosts,
   cardPaymentPreview,
   cardPaymentExceedsResourceCapacity,
@@ -1251,6 +1252,7 @@ function addHiddenCardActions(
           energy: 0,
           powerCosts: [{ amount: 1, domains: [] }],
         };
+        hideAction.poolPayment = anyPowerPoolPaymentPreview(game, playerId, definition, index);
         actions.push(hideAction);
       }
     }
@@ -1335,7 +1337,7 @@ function hideCard(game: GameDocument, playerId: string, cardId: string, battlefi
     throw new Error("Hide is not legal for this card or battlefield.");
   }
   const definition = definitionForInstance(cardId, index);
-  payAnyPowerCost(game, playerId, definition, index);
+  payAnyPowerCost(game, playerId, definition, index, { poolOnly: true });
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   battlefield.facedownCardInstanceId = cardId;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { adaptProjectionToBoard } from "../src/features/game-board/board-view-model";
+import { createCardPaymentPreparation } from "../src/features/game-board/interactions/use-board-target-selection";
 import { cardSchema } from "../src/server/catalog";
 import {
   acceptedActionEvent,
@@ -84,6 +85,70 @@ test("Hidden's rainbow cost accepts unrestricted off-domain Power in the Rune Po
   const current = performGameplayAction({ game, actorPlayerId: "p1", actionId: hide.id, selectedIds: [], decks, now: "hidden-off-domain-payment" });
   assert.equal(current.state.players.p1!.power.Fury, 0);
   assert.equal(current.state.battlefields[0]!.facedownCardInstanceId, cardId);
+});
+
+test("Hide asks the player to add Power and spends only the selected pooled resource", async () => {
+  const { game, decks, cardId } = await hiddenGearFixture();
+  game.state.players.p1!.power = {};
+
+  const sourceId = "p1:hidden-payment-source";
+  const unusedSourceId = "p1:hidden-unused-payment-source";
+  const source = structuredClone(decks[0]!.snapshot.cards.find((definition) => definition.cardCode === "OGN-077")!);
+  source.cardCode = "Hidden payment source";
+  source.card.id = source.cardCode;
+  source.card.name = source.cardCode;
+  source.card.public_code = "TEST-HIDDEN-POWER/1";
+  source.card.classification.type = "Rune";
+  source.card.classification.domain = ["Mind"];
+  source.behaviorModel = {
+    playTimings: [],
+    clauses: [{
+      id: "add-power", sequence: 0, sourceText: "", normalizedText: "",
+      abilities: [{ behaviorId: "ability.exhaust_for_resource", order: 0, confidence: "high", parameters: { resourceType: "power", amount: 1, domain: "Mind", usage: "unrestricted" } }],
+      triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: [],
+    }],
+  };
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({ instanceId: sourceId, ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode });
+  game.state.cardStates[sourceId] = { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 };
+  const unusedSource = structuredClone(source);
+  unusedSource.cardCode = "Unused Hidden payment source";
+  unusedSource.card.id = unusedSource.cardCode;
+  unusedSource.card.name = unusedSource.cardCode;
+  unusedSource.card.public_code = "TEST-HIDDEN-POWER-UNUSED/1";
+  decks[0]!.snapshot.cards.push(unusedSource);
+  decks[0]!.instances.push({ instanceId: unusedSourceId, ownerPlayerId: "p1", source: "mainDeck", cardCode: unusedSource.cardCode });
+  game.state.cardStates[unusedSourceId] = { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 };
+  game.state.players.p1!.zones.base.push(sourceId, unusedSourceId);
+
+  const hideBeforeAddingPower = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));
+  assert.ok(hideBeforeAddingPower?.enabled, "a legal Add Power source makes Hide preparable");
+  assert.equal(hideBeforeAddingPower.poolPayment?.mode, "card");
+  assert.equal(hideBeforeAddingPower.poolPayment?.canPay, false);
+  assert.equal(hideBeforeAddingPower.poolPayment?.power, 1);
+  assert.deepEqual(hideBeforeAddingPower.poolPayment?.powerCosts, [{ amount: 1, domains: [] }]);
+  assert.equal(createCardPaymentPreparation(hideBeforeAddingPower)?.targetKind, "payment");
+  assert.equal(game.state.cardStates[sourceId]!.exhausted, false, "projecting Hide does not auto-use the resource source");
+  assert.throws(
+    () => performGameplayAction({ game, actorPlayerId: "p1", actionId: hideBeforeAddingPower.id, selectedIds: [], decks, now: "hidden-unfunded" }),
+    /Add enough resources/,
+    "the server rejects Hide until the player prepares its Rune Pool payment",
+  );
+
+  const addPower = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === sourceId && action.label.startsWith("Add Power"));
+  assert.ok(addPower?.enabled);
+  const afterAdd = performGameplayAction({ game, actorPlayerId: "p1", actionId: addPower.id, selectedIds: [], decks, now: "hidden-add-power" });
+  assert.equal(afterAdd.state.players.p1!.power.Mind, 1);
+  assert.equal(afterAdd.state.cardStates[sourceId]!.exhausted, true, "only the explicit Add action exhausts the selected source");
+
+  const hideAfterAddingPower = gameplayActions(afterAdd, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));
+  assert.ok(hideAfterAddingPower?.enabled);
+  assert.equal(hideAfterAddingPower.poolPayment?.canPay, true);
+  const afterHide = performGameplayAction({ game: afterAdd, actorPlayerId: "p1", actionId: hideAfterAddingPower.id, selectedIds: [], decks, now: "hidden-confirm-hide" });
+  assert.equal(afterHide.state.players.p1!.power.Mind, 0);
+  assert.equal(afterHide.state.cardStates[sourceId]!.exhausted, true);
+  assert.equal(afterHide.state.cardStates[unusedSourceId]!.exhausted, false, "Hide does not auto-exhaust another resource source");
+  assert.equal(afterHide.state.battlefields[0]!.facedownCardInstanceId, cardId);
 });
 
 test("Hide pays any-domain Power, keeps the card private, and does not open the Chain", async () => {
