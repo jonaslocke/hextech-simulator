@@ -127,7 +127,6 @@ export function selectionRequirementsForClause(
       handler.targets(binding, selectorContext),
       binding,
       selectorContext,
-      clause.sourceText,
     );
     const selected = selectedForBinding(binding, requirement, context);
     selectorContext.selectedBySelector[
@@ -398,22 +397,19 @@ function restrictHiddenPlayRequirement(
   requirement: ProjectedTargetRequirement,
   binding: BehaviorBinding,
   context: BehaviorExecutionContext,
-  sourceText: string,
 ): ProjectedTargetRequirement {
   const battlefieldId = context.hiddenBattlefieldId;
   if (
     !battlefieldId ||
     binding.parameters.selectionPurpose === "optionalCost" ||
-    requirement.sourceZone
+    requirement.sourceZone ||
+    binding.parameters.locationRelation === "differentSourceLocation"
   ) return requirement;
   if (requirement.kind === "battlefield") {
     return { ...requirement, legalIds: requirement.legalIds.filter((id) => id === battlefieldId) };
   }
   if (requirement.kind !== "card") return requirement;
-  if (
-    binding.parameters.area === "base" ||
-    /\b(?:at|in|from)\s+(?:another|a different)\s+location\b|\b(?:at|in)\s+another battlefield\b/i.test(sourceText)
-  ) return requirement;
+  if (binding.parameters.area === "base") return requirement;
   const battlefield = context.game.state.battlefields.find((candidate) => candidate.battlefieldId === battlefieldId);
   if (!battlefield) return { ...requirement, legalIds: [] };
   const atBattlefield = new Set([

@@ -216,6 +216,7 @@ export function createPrimitiveHandlers(
         () => true,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     }
   });
@@ -228,6 +229,7 @@ export function createPrimitiveHandlers(
         (id) => index.instances.get(id)?.ownerPlayerId === context.controllerPlayerId,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     }
   });
@@ -242,6 +244,7 @@ export function createPrimitiveHandlers(
           context.controllerPlayerId,
         context.sourceCardInstanceId,
         context.selectedIds,
+        context.hiddenBattlefieldId,
       );
     },
   });
@@ -1368,6 +1371,7 @@ function selectorTargets(
   predicate: (id: string) => boolean,
   sourceCardInstanceId: string,
   lockedSelectedIds: readonly string[] = [],
+  hiddenBattlefieldId: string | null = null,
 ) {
   const baseUnits = game.state.setup.playerIds.flatMap(
     (playerId) => game.state.players[playerId]?.zones.base ?? []
@@ -1431,6 +1435,7 @@ function selectorTargets(
         id,
         sourceCardInstanceId,
         binding.parameters.locationRelation,
+        hiddenBattlefieldId,
       ),
     )
     .filter(
@@ -2365,18 +2370,24 @@ function unitLocationRelationMatches(
   targetId: string,
   sourceId: string,
   relation: unknown,
+  hiddenBattlefieldId: string | null = null,
 ) {
-  if (relation !== "sourceLocation" && relation !== "sharedLocation") {
+  if (
+    relation !== "sourceLocation" &&
+    relation !== "sharedLocation" &&
+    relation !== "differentSourceLocation"
+  ) {
     return true;
   }
-  const sourceLocation = boardLocationForUnit(game, sourceId);
+  const sourceLocation = hiddenBattlefieldId
+    ? { kind: "battlefield" as const, id: hiddenBattlefieldId }
+    : boardLocationForUnit(game, sourceId);
   const targetLocation = boardLocationForUnit(game, targetId);
-  return (
-    sourceLocation !== null &&
-    targetLocation !== null &&
+  if (sourceLocation === null || targetLocation === null) return false;
+  const sameLocation =
     sourceLocation.kind === targetLocation.kind &&
-    sourceLocation.id === targetLocation.id
-  );
+    sourceLocation.id === targetLocation.id;
+  return relation === "differentSourceLocation" ? !sameLocation : sameLocation;
 }
 
 function boardLocationForUnit(game: GameDocument, unitId: string) {

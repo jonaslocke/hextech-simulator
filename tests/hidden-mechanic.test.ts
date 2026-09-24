@@ -127,12 +127,20 @@ test("Hidden adds Hide without replacing ordinary hand play", async () => {
   assert.ok(normalPlay?.enabled, "normal hand play uses its ordinary cost and timing alongside Hide");
 });
 
-test("a Hidden play target is restricted to its associated Battlefield and no-target plays are omitted", async () => {
+test("Hidden target restrictions apply to each target separately in a multi-target clause", async () => {
   const { game, decks, cardId, battlefield } = await hiddenGearFixture();
   const definition = decks[0]!.snapshot.cards.find((candidate) => candidate.cardCode === "OGN-077")!;
+  definition.behaviorModel.clauses[0]!.sourceText = "Choose a friendly unit here and another friendly unit at a different location.";
   definition.behaviorModel.clauses[0]!.selectors.push({
     behaviorId: "selector.friendly_unit", order: 1, confidence: "high",
     parameters: { area: "board", selectionKey: "target", minimumCount: 1, maximumCount: 1 },
+  });
+  definition.behaviorModel.clauses[0]!.selectors.push({
+    behaviorId: "selector.friendly_unit", order: 2, confidence: "high",
+    parameters: {
+      area: "board", controller: "controller", locationRelation: "differentSourceLocation",
+      selectionKey: "targetElsewhere", minimumCount: 1, maximumCount: 1,
+    },
   });
   const unitDefinition = decks[0]!.snapshot.cards.find((candidate) => candidate.card.classification.type === "Unit");
   assert.ok(unitDefinition, "fixture needs a canonical Unit target");
@@ -148,13 +156,11 @@ test("a Hidden play target is restricted to its associated Battlefield and no-ta
   current.state.turn!.turnNumber += 1;
   current.state.showdown = { kind: "nonCombat", battlefieldId: battlefield.battlefieldId, relevantPlayerIds: ["p1", "p2"], focusPlayerId: "p1", passedPlayerIds: [] };
   const play = gameplayActions(current, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Play "));
-  assert.deepEqual(play?.targets[0]?.legalIds, [unitIds[0]], "off-Battlefield friendly units are excluded");
+  assert.deepEqual(play?.targets[0]?.legalIds, [unitIds[0]], "the first target stays at the associated Battlefield");
+  assert.deepEqual(play?.targets[1]?.legalIds, [unitIds[1]], "only the second target may use its explicit different-location exception");
 
   current.state.battlefields[0]!.units = [];
   assert.equal(gameplayActions(current, "p1", decks).some((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Play ")), false, "a required target cannot be satisfied at the associated Battlefield");
-  definition.behaviorModel.clauses[0]!.sourceText = "Choose a unit at a different location.";
-  const explicitException = gameplayActions(current, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Play "));
-  assert.deepEqual(explicitException?.targets[0]?.legalIds, [unitIds[1]], "explicit different-location targeting is preserved");
 });
 
 test("losing Battlefield control sends its facedown card to its owner's Trash during Cleanup", async () => {
