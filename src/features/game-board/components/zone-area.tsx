@@ -98,6 +98,7 @@ const zoneAreaContent = cva(
         compact: "gap-1.5 px-2 py-2",
         default: "gap-2 px-3 py-2.5",
         roomy: "gap-3 px-4 py-3",
+        dense: "gap-2 py-2.5",
       },
       centered: {
         true: "justify-center",
@@ -119,7 +120,7 @@ interface Props extends PropsWithChildren {
   animationZoneId?: string;
   className?: string;
   contentClassName?: string;
-  density?: "compact" | "default" | "roomy";
+  density?: "compact" | "default" | "roomy" | "dense";
   dropStatus?: BoardLocationDropStatus;
   isCentered?: boolean;
   isDestinationHighlighted?: boolean;

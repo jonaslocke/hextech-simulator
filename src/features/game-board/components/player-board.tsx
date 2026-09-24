@@ -156,6 +156,7 @@ const BaseLine = ({
         isDestinationHighlighted={isBaseHighlighted}
         isHightlighted={isBaseHighlighted || isHightlighted}
         ref={baseUnitsDroppable.setNodeRef}
+        density="dense"
       >
         <BasePermanentList
           cards={baseUnits}
@@ -531,7 +532,11 @@ function CardList({ cards, ...props }: CardListProps) {
   return (
     <CardListLayout cards={cards} {...props}>
       {cards.map((card, index) => (
-        <CardListCard key={card.instanceId ?? `${card.name}-${index}`} card={card} {...props} />
+        <CardListCard
+          key={card.instanceId ?? `${card.name}-${index}`}
+          card={card}
+          {...props}
+        />
       ))}
     </CardListLayout>
   );
@@ -553,7 +558,13 @@ function BasePermanentList({ cards, ...props }: CardListProps) {
             host={<CardListCard card={host} {...props} />}
             attachments={attachments.map((card, attachmentIndex) => ({
               id: card.instanceId ?? `${card.name}-${attachmentIndex}`,
-              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} />,
+              card: (
+                <CardListCard
+                  card={card}
+                  {...props}
+                  dragSourceLocation={undefined}
+                />
+              ),
             }))}
           />
         );
@@ -578,19 +589,48 @@ function CardListCard({
   const tile = (
     <CardTile
       enableHoverPreview={!onClick}
-      isHighlighted={card.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
-      isTransferHidden={card.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
-      onContextAction={onCardContextAction ? (event) => onCardContextAction(card, event) : undefined}
-      onPrimaryAction={onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
-      onHighlightPointerEnter={onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
-      onHighlightPointerLeave={onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
+      isHighlighted={
+        card.instanceId
+          ? highlightedCardInstanceIds?.has(card.instanceId)
+          : false
+      }
+      isTransferHidden={
+        card.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false
+      }
+      onContextAction={
+        onCardContextAction
+          ? (event) => onCardContextAction(card, event)
+          : undefined
+      }
+      onPrimaryAction={
+        onCardPrimaryAction
+          ? (event) => onCardPrimaryAction(card, event)
+          : undefined
+      }
+      onHighlightPointerEnter={
+        onCardPointerEnter ? () => onCardPointerEnter(card) : undefined
+      }
+      onHighlightPointerLeave={
+        onCardPointerLeave ? () => onCardPointerLeave(card) : undefined
+      }
       showMight={showMight}
-      isStagedForMovement={card.instanceId ? stagedMovementCardInstanceIds?.has(card.instanceId) : false}
+      isStagedForMovement={
+        card.instanceId
+          ? stagedMovementCardInstanceIds?.has(card.instanceId)
+          : false
+      }
       {...card}
     />
   );
-  return !dragSourceLocation || !card.instanceId || !card.type?.split(" / ").includes("Unit") ? <div>{tile}</div> : (
-    <DraggableLocationCard cardInstanceId={card.instanceId} sourceLocation={dragSourceLocation}>
+  return !dragSourceLocation ||
+    !card.instanceId ||
+    !card.type?.split(" / ").includes("Unit") ? (
+    <div>{tile}</div>
+  ) : (
+    <DraggableLocationCard
+      cardInstanceId={card.instanceId}
+      sourceLocation={dragSourceLocation}
+    >
       {tile}
     </DraggableLocationCard>
   );
@@ -602,7 +642,9 @@ function CardListLayout({
   count,
   onClick,
   layout = "row",
-}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout"> & { children: ReactNode }) {
+}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout"> & {
+  children: ReactNode;
+}) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
 
@@ -677,7 +719,7 @@ function CardListLayout({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
+          "flex flex-wrap items-start gap-2 px-3 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
           hasWrappedRows ? "content-start" : "content-center",
         )}
         ref={wrapContainerRef}
