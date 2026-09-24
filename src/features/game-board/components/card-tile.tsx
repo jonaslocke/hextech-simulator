@@ -498,8 +498,8 @@ function KeywordAnnotationStack({
             >
               <KeywordIcon
                 aria-hidden="true"
-                className="size-[9px] shrink-0"
-                strokeWidth={2.5}
+                className="size-[10px] shrink-0"
+                strokeWidth={2}
               />
 
               <span>{label}</span>
