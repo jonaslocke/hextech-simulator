@@ -186,6 +186,7 @@ export const deckIdSchema = z.enum([
   "master-yi-s",
   "garen-s",
   "ornn",
+  "ornn-hidden-test",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
 
@@ -285,6 +286,7 @@ export const projectedBattlefieldSchema = z.object({
   units: z.array(projectedCardViewSchema),
   attachedCards: z.array(projectedCardViewSchema).optional(),
   facedownCard: projectedCardViewSchema.nullable().default(null),
+  facedownCardPresent: z.boolean().default(false),
 });
 
 export const projectedChainItemSchema = z.object({

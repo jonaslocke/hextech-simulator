@@ -1,5 +1,6 @@
 import {
   cleanupLethalDamage,
+  advanceGameObjectIncarnation,
   recomputeAllMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
@@ -45,6 +46,16 @@ export function cleanupBoard(
     ) {
       battlefield.contestedByPlayerId = null;
     }
+  }
+  for (const battlefield of game.state.battlefields) {
+    const hiddenCardId = battlefield.facedownCardInstanceId;
+    if (!hiddenCardId) continue;
+    const ownerPlayerId = index.instances.get(hiddenCardId)?.ownerPlayerId;
+    if (!ownerPlayerId || battlefield.controllerPlayerId === ownerPlayerId) continue;
+    battlefield.facedownCardInstanceId = null;
+    game.state.cardStates[hiddenCardId]!.hiddenAtTurnNumber = null;
+    game.state.players[ownerPlayerId]!.zones.trash.push(hiddenCardId);
+    advanceGameObjectIncarnation(game, hiddenCardId);
   }
 }
 

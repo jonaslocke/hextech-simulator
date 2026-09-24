@@ -74,6 +74,7 @@ export const GAME__RUNTIME_COVERAGE = {
   "keyword.tank": "executable",
   "keyword.deflect": "executable",
   "keyword.ganking": "executable",
+  "keyword.hidden": "executable",
   "cost.exhaust_selected_unit": "executable",
   "cost.pay": "executable",
   "cost.exhaust_source": "executable",

@@ -73,7 +73,7 @@ export function createPrimitiveHandlers(
   for (const id of [
     "timing.action", "timing.reaction", "timing.delayed", "keyword.assault",
     "keyword.tank", "keyword.shield", "keyword.vision", "keyword.deflect",
-    "keyword.quick_draw", "keyword.temporary",
+    "keyword.quick_draw", "keyword.temporary", "keyword.hidden",
     "type.additional",
     "modifier.ignore_deflect",
     "keyword.ganking", "cost.exhaust_selected_unit",

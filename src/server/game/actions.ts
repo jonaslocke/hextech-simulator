@@ -62,11 +62,13 @@ import {
   type GameTransition,
 } from "./transitions";
 import {
+  canPayAnyPowerCost,
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
   canPayCardCosts,
   cardPaymentPreview,
   cardPaymentExceedsResourceCapacity,
+  payAnyPowerCost,
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
@@ -285,6 +287,7 @@ export function gameplayActions(
         index,
         currentTiming(game),
       );
+      addHiddenCardActions(actions, game, actorPlayerId, index, currentTiming(game));
       addAbilityActions(
         actions,
         game,
@@ -308,6 +311,7 @@ export function gameplayActions(
     index,
     "neutralOpen",
   );
+  addHiddenCardActions(actions, game, actorPlayerId, index, "neutralOpen");
   addAbilityActions(
     actions,
     game,
@@ -519,6 +523,12 @@ export function performGameplayAction(input: {
         handlers,
         input.decks,
       );
+      break;
+    case "hide":
+      hideCard(game, input.actorPlayerId, source, extra, index);
+      break;
+    case "playHidden":
+      playHiddenCard(game, input.actorPlayerId, source, extra, input.selectedIds, index, handlers);
       break;
     case "submitChoice":
       if (game.state.pendingChoice?.type === "orderReplacements") {
@@ -792,24 +802,10 @@ function playCard(
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
-  const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
-  const dynamicTargets = compiled.clauses
-    .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
-    .flatMap((clause) =>
-      targetRequirementsForClause(
-        clause,
-        createBehaviorContext(
-          game,
-          playerId,
-          cardId,
-          null,
-          allSelectedIds,
-          {},
-          selectionOverrides,
-        ),
-        handlers,
-      ),
-    );
+  const dynamicTargets = playTargetRequirements({
+    game, definition, playerId, cardId, selectedIds: allSelectedIds,
+    handlers, selectionOverrides,
+  });
   if (dynamicTargets.some((target) => target.kind === "location")) {
     validateTargetRequirements(dynamicTargets, selectedIds);
   }
@@ -958,6 +954,243 @@ function spellResolutionClauseId(
   return clauses.length === 1 ? clauses[0]!.id : null;
 }
 
+function playTargetRequirements(input: {
+  game: GameDocument;
+  definition: GameCardDefinition;
+  playerId: string;
+  cardId: string;
+  selectedIds: string[];
+  handlers: ReturnType<typeof createPrimitiveHandlers>;
+  selectionOverrides?: Record<string, string[]>;
+  hiddenBattlefieldId?: string | null;
+}) {
+  const compiled = compileBehaviorModel(input.definition.behaviorModel, input.handlers);
+  return compiled.clauses
+    .filter((clause) => clauseCanRequirePlaySelections(input.definition, clause))
+    .flatMap((clause) => targetRequirementsForClause(
+      clause,
+      createBehaviorContext(
+        input.game, input.playerId, input.cardId, null, input.selectedIds,
+        {}, input.selectionOverrides ?? {}, input.hiddenBattlefieldId ?? null,
+      ),
+      input.handlers,
+    ));
+}
+
+function addHiddenCardActions(
+  actions: ProjectedAction[],
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+  timing: TurnTiming,
+) {
+  const player = game.state.players[playerId]!;
+  const turn = game.state.turn;
+  if (!turn) return;
+  const handlers = createPrimitiveHandlers(index);
+
+  if (timing === "neutralOpen" && !game.state.showdown && turn.activePlayerId === playerId) {
+    const availableBattlefields = game.state.battlefields.filter(
+      (battlefield) => battlefield.controllerPlayerId === playerId && !battlefield.facedownCardInstanceId,
+    );
+    for (const cardId of [...player.zones.hand, ...(player.zones.champion ? [player.zones.champion] : [])]) {
+      if (!hasEffectiveKeyword(game, cardId, "keyword.hidden", index)) continue;
+      const definition = definitionForInstance(cardId, index);
+      const canPay = canPayAnyPowerCost(game, playerId, definition, index);
+      for (const battlefield of availableBattlefields) {
+        const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
+        actions.push(action(
+          game,
+          "hide",
+          `Hide ${definition.card.name} at ${battlefieldName} (1 Any Power)`,
+          cardId,
+          canPay,
+          canPay ? null : "1 Any Power is required to hide this card.",
+          battlefield.battlefieldId,
+        ));
+      }
+    }
+  }
+
+  for (const battlefield of game.state.battlefields) {
+    const cardId = battlefield.facedownCardInstanceId;
+    if (!cardId || battlefield.controllerPlayerId !== playerId) continue;
+    const hiddenAt = game.state.cardStates[cardId]?.hiddenAtTurnNumber;
+    if (hiddenAt == null || turn.turnNumber <= hiddenAt || !hasEffectiveKeyword(game, cardId, "keyword.hidden", index)) continue;
+    const definition = definitionForInstance(cardId, index);
+    const optionalSourceCosts = optionalSourcePlayCosts(definition);
+    const optionalKeys = new Set(optionalSourceCosts.map((payment) => payment.selectionKey));
+    const projectedTargets = playTargetRequirements({
+      game, definition, playerId, cardId, selectedIds: [], handlers,
+      hiddenBattlefieldId: battlefield.battlefieldId,
+    });
+    const targets = projectedTargets.filter((target) =>
+      !(target.selectionPurpose === "optionalCost" && target.selectionKey && optionalKeys.has(target.selectionKey)),
+    );
+    if (!canSatisfyTargetRequirements(targets)) continue;
+    const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
+    for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
+      const additionalCosts = optionalSourceCosts
+        .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
+        .flatMap((payment) => payment.costs);
+      const costsPayable = canPayCardCosts(game, playerId, definition, 0, index, 0, additionalCosts, cardId, 0);
+      if (!costsPayable) continue;
+      actions.push(action(
+        game,
+        "playHidden",
+        hiddenPlayActionLabel({ definition, battlefieldName, additionalCosts }),
+        cardId,
+        true,
+        null,
+        encodeHiddenPlayExtra(battlefield.battlefieldId, optionalCostKeys),
+        targets,
+      ));
+    }
+  }
+}
+
+function hiddenPlayActionLabel(input: {
+  definition: GameCardDefinition;
+  battlefieldName: string;
+  additionalCosts: readonly AdditionalCardCost[];
+}) {
+  const extras = input.additionalCosts.flatMap((cost) => [
+    ...(cost.energy > 0 ? [`${cost.energy} Energy`] : []),
+    ...(cost.power > 0 ? [`${cost.power}${cost.powerDomain ? ` ${displayPowerDomain(cost.powerDomain)}` : ""} Power`] : []),
+  ]);
+  return `Play ${input.definition.card.name} from Hidden at ${input.battlefieldName} (${extras.length ? `Base cost ignored + ${extras.join(" + ")}` : "Base cost ignored"})`;
+}
+
+function encodeHiddenPlayExtra(battlefieldId: string, optionalCostKeys: readonly string[]) {
+  return `hidden:${JSON.stringify({ battlefieldId, optionalCostKeys })}`;
+}
+
+function decodeHiddenPlayExtra(extra: string) {
+  if (!extra.startsWith("hidden:")) throw new Error("Hidden play mode is malformed.");
+  try {
+    const parsed: unknown = JSON.parse(extra.slice("hidden:".length));
+    if (!parsed || typeof parsed !== "object") throw new Error();
+    const battlefieldId = (parsed as { battlefieldId?: unknown }).battlefieldId;
+    const optionalCostKeys = (parsed as { optionalCostKeys?: unknown }).optionalCostKeys;
+    if (typeof battlefieldId !== "string" || !Array.isArray(optionalCostKeys) || optionalCostKeys.some((key) => typeof key !== "string") || new Set(optionalCostKeys).size !== optionalCostKeys.length) throw new Error();
+    return { battlefieldId, optionalCostKeys: optionalCostKeys as string[] };
+  } catch {
+    throw new Error("Hidden play mode is malformed.");
+  }
+}
+
+function hideCard(game: GameDocument, playerId: string, cardId: string, battlefieldId: string, index: RuntimeCardIndex) {
+  const player = game.state.players[playerId]!;
+  const turn = game.state.turn;
+  const battlefield = game.state.battlefields.find((candidate) => candidate.battlefieldId === battlefieldId);
+  if (!turn || turn.activePlayerId !== playerId || game.state.chain || game.state.showdown ||
+      !hasEffectiveKeyword(game, cardId, "keyword.hidden", index) ||
+      !(player.zones.hand.includes(cardId) || player.zones.champion === cardId) ||
+      !battlefield || battlefield.controllerPlayerId !== playerId || battlefield.facedownCardInstanceId) {
+    throw new Error("Hide is not legal for this card or battlefield.");
+  }
+  const definition = definitionForInstance(cardId, index);
+  payAnyPowerCost(game, playerId, definition, index);
+  player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  if (player.zones.champion === cardId) player.zones.champion = null;
+  battlefield.facedownCardInstanceId = cardId;
+  game.state.cardStates[cardId]!.hiddenAtTurnNumber = turn.turnNumber;
+}
+
+function playHiddenCard(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  extra: string,
+  selectedIds: string[],
+  index: RuntimeCardIndex,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const { battlefieldId, optionalCostKeys } = decodeHiddenPlayExtra(extra);
+  const turn = game.state.turn;
+  const battlefield = game.state.battlefields.find((candidate) => candidate.battlefieldId === battlefieldId);
+  const hiddenAt = game.state.cardStates[cardId]?.hiddenAtTurnNumber;
+  const definition = definitionForInstance(cardId, index);
+  if (!turn || hiddenAt == null || turn.turnNumber <= hiddenAt || !battlefield ||
+      battlefield.facedownCardInstanceId !== cardId || battlefield.controllerPlayerId !== playerId ||
+      !hasEffectiveKeyword(game, cardId, "keyword.hidden", index)) throw new Error("Hidden card is not playable.");
+  const optionalSourceCosts = optionalSourcePlayCosts(definition);
+  if (optionalCostKeys.some((key) => !optionalSourceCosts.some((payment) => payment.selectionKey === key))) throw new Error("Optional play cost is not available for this card.");
+  const optionalCosts = optionalSourceCosts.filter((payment) => optionalCostKeys.includes(payment.selectionKey)).flatMap((payment) => payment.costs);
+  const selectionOverrides = Object.fromEntries(optionalSourceCosts.map((payment) => [payment.selectionKey, optionalCostKeys.includes(payment.selectionKey) ? [cardId] : []]));
+  const allSelectedIds = optionalCostKeys.length > 0 ? [...selectedIds, cardId] : selectedIds;
+  const targets = playTargetRequirements({ game, definition, playerId, cardId, selectedIds: allSelectedIds, handlers, selectionOverrides, hiddenBattlefieldId: battlefieldId });
+  validateTargetRequirements(targets, selectedIds);
+  const additionalAnyPower = targetDeflectCost(playerId, selectedIds, index, game, ignoresDeflect(definition));
+  payCardCosts(game, playerId, definition, 0, index, additionalAnyPower, optionalCosts, cardId, 0);
+  payOptionalNonResourcePlayCosts(game, playerId, definition, selectedIds, index);
+  if (game.state.turn) {
+    game.state.turn.playedCardInstanceIds ??= [];
+    game.state.turn.playedCardInstanceIds.push(cardId);
+  }
+  if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
+  // The card remains in its Facedown Zone while its Chain item is pending.
+  // This keeps the location occupied until resolution (and leaves a countered
+  // play attached to the same server-owned origin).
+  const item = {
+    id: `hidden:${game.stateVersion + 1}:${cardId}`,
+    kind: definition.card.classification.type === "Spell" ? "spell" as const : "permanent" as const,
+    label: definition.card.name,
+    controllerPlayerId: playerId,
+    sourceCardInstanceId: cardId,
+    targetCardInstanceIds: allSelectedIds,
+    initialSelectionOverrides: selectionOverrides,
+    hiddenBattlefieldId: battlefieldId,
+    targetObjectVersions: captureTargetObjectVersions(game, allSelectedIds),
+    behaviorClauseId: definition.card.classification.type === "Spell" ? spellResolutionClauseId(definition, handlers) : null,
+    activatedBehaviorId: null,
+    behaviorEvent: {
+      type: "card.played",
+      actorPlayerId: playerId,
+      subjectCardInstanceId: cardId,
+      values: { "eventSubject.printedEnergyCost": definition.card.attributes.energy ?? 0, "eventSubject.effectiveEnergyCost": 0, hiddenBattlefieldId: battlefieldId },
+    },
+  };
+  if (game.state.chain) {
+    game.state.chain.items.push(item);
+    game.state.chain.priorityPlayerId = playerId;
+    game.state.chain.passedPlayerIds = [];
+  } else {
+    game.state.chain = { items: [item], relevantPlayerIds: game.state.showdown?.relevantPlayerIds ?? [...game.state.setup.playerIds], priorityPlayerId: playerId, passedPlayerIds: [] };
+  }
+}
+
+function resolveHiddenPermanent(
+  game: GameDocument,
+  item: ChainItem,
+  definition: GameCardDefinition,
+  index: RuntimeCardIndex,
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const battlefield = game.state.battlefields.find((candidate) => candidate.battlefieldId === item.hiddenBattlefieldId);
+  const cardId = item.sourceCardInstanceId;
+  if (!battlefield || !cardId) return;
+  clearHiddenCardLocation(game, cardId, battlefield.battlefieldId);
+  game.state.cardStates[cardId]!.hiddenAtTurnNumber = null;
+  if (definition.card.classification.type === "Gear") {
+    (battlefield.attachedCardInstanceIds ??= []).push(cardId);
+    game.state.cardStates[cardId]!.exhausted = false;
+  } else {
+    battlefield.units.push(cardId);
+    game.state.cardStates[cardId]!.exhausted = true;
+  }
+  executeImmediateClauses(game, definition, item.controllerPlayerId, cardId, item.targetCardInstanceIds, handlers, item.targetObjectVersions, item.initialSelectionOverrides ?? {}, item.hiddenBattlefieldId ?? null);
+  dispatchBehaviorEvent(game, item.behaviorEvent ?? { type: "card.played", actorPlayerId: item.controllerPlayerId, subjectCardInstanceId: cardId, values: { hiddenBattlefieldId: item.hiddenBattlefieldId ?? null } }, decks);
+}
+
+function clearHiddenCardLocation(game: GameDocument, cardId: string, battlefieldId: string | undefined) {
+  const battlefield = game.state.battlefields.find((candidate) => candidate.battlefieldId === battlefieldId);
+  if (battlefield?.facedownCardInstanceId === cardId) battlefield.facedownCardInstanceId = null;
+  const state = game.state.cardStates[cardId];
+  if (state) state.hiddenAtTurnNumber = null;
+}
+
 /** Finish the same persisted resolution after either Priority or a choice.
  * No Chain removal, Cleanup, or Focus transfer may occur while it is paused.
  */
@@ -975,6 +1208,7 @@ function completeChainResolution(
   if (item.kind === "spell" && item.sourceCardInstanceId) {
     const definition = definitionForInstance(item.sourceCardInstanceId, index);
     const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
+    if (item.hiddenBattlefieldId) clearHiddenCardLocation(game, item.sourceCardInstanceId, item.hiddenBattlefieldId);
     game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
     advanceGameObjectIncarnation(game, item.sourceCardInstanceId);
     dispatchBehaviorEvent(game, item.behaviorEvent?.type === "card.played"
@@ -1094,6 +1328,8 @@ function passPriority(
               ),
             );
           }
+        } else if (item.kind === "permanent" && item.hiddenBattlefieldId) {
+          resolveHiddenPermanent(game, item, definition, index, handlers, decks);
         } else if (item.behaviorClauseId) {
           const compiled = compileBehaviorModel(
             behaviorModelForChainItem(definition.behaviorModel, item),
@@ -1294,7 +1530,9 @@ function action(
   ];
   if (extra !== undefined) parts.push(encodeURIComponent(extra));
   const boardDestination =
-    kind === "play" && extra ? decodePlayExtra(extra).destinationId : extra;
+    kind === "play" && extra ? decodePlayExtra(extra).destinationId
+      : kind === "playHidden" && extra ? decodeHiddenPlayExtra(extra).battlefieldId
+        : extra;
   const surface =
     kind === "submitChoice"
       ? "choice-dialog"
@@ -1324,7 +1562,7 @@ function action(
           ? "Choose the order for triggered abilities."
           : null,
       boardLocation:
-        (kind === "play" || kind === "move" || kind === "moveMany") &&
+        (kind === "play" || kind === "playHidden" || kind === "hide" || kind === "move" || kind === "moveMany") &&
         boardDestination
           ? boardDestination === "base"
             ? { kind: "base" as const }
@@ -2111,6 +2349,7 @@ function executeImmediateClauses(
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   targetObjectVersions?: Record<string, number>,
   selectionOverrides: Record<string, string[]> = {},
+  hiddenBattlefieldId: string | null = null,
 ) {
   const compiled = compileBehaviorModel(definition.behaviorModel, handlers);
   const effectOutcomes: Record<string, boolean | number | string | string[]> =
@@ -2136,6 +2375,7 @@ function executeImmediateClauses(
         clauseSelections,
         effectOutcomes,
         selectionOverrides,
+        hiddenBattlefieldId,
       ),
       handlers,
       allowUnavailableSelections: targetObjectVersions !== undefined,
@@ -2294,6 +2534,7 @@ function validLockedTargets(
       item.targetCardInstanceIds,
       {},
       item.initialSelectionOverrides ?? {},
+      item.hiddenBattlefieldId ?? null,
     ),
     handlers,
   );

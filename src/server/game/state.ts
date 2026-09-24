@@ -93,6 +93,7 @@ export const turnStateSchema = z.object({
 
 export const cardStateSchema = z.object({
   exhausted: z.boolean(),
+  hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
   empowered: z.boolean().default(false).optional(),
   damage: z.number().int().nonnegative(),
   computedMight: z.number().nullable(),
@@ -114,6 +115,7 @@ export const chainItemSchema = z.object({
   label: z.string(),
   controllerPlayerId: z.string(),
   sourceCardInstanceId: z.string().nullable(),
+  hiddenBattlefieldId: z.string().min(1).nullable().optional(),
   targetCardInstanceIds: z.array(z.string()),
   // Needed while a triggered item waits for targets before it can establish
   // the Chain that its originating card play already opened.

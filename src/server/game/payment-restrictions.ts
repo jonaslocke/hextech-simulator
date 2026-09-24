@@ -6,6 +6,7 @@ export type ResourceRestriction = Readonly<Record<string, readonly string[]>>;
 export type PaymentContext = (
   | { kind: "card"; cardType: string }
   | { kind: "ability"; sourceCardType: string }
+  | { kind: "hide" }
 ) & { characteristics?: Readonly<Record<string, string>> };
 
 const impossible: ResourceRestriction = { kind: [] };
@@ -15,7 +16,7 @@ export function normalizeResourceRestriction(usage: string): ResourceRestriction
   if (usage === "unrestricted") return {};
   if (usage === "spellsOnly") return { kind: ["card"], type: ["Spell"] };
   if (usage === "gearAndGearAbilitiesOnly") return { kind: ["card", "ability"], type: ["Gear"] };
-  const match = /^(card|ability|cardOrAbility):([A-Za-z]+(?:\|[A-Za-z]+)*)$/.exec(usage);
+  const match = /^(card|ability|cardOrAbility|hide):([A-Za-z]+(?:\|[A-Za-z]+)*)$/.exec(usage);
   if (!match) return impossible;
   return {
     kind: match[1] === "cardOrAbility" ? ["card", "ability"] : [match[1]!],
@@ -27,7 +28,7 @@ export function restrictionAllowsPayment(restriction: ResourceRestriction, conte
   const dimensions: Readonly<Record<string, string>> = {
     ...context.characteristics,
     kind: context.kind,
-    type: context.kind === "card" ? context.cardType : context.sourceCardType,
+    type: context.kind === "card" ? context.cardType : context.kind === "ability" ? context.sourceCardType : "Hide",
   };
   return Object.entries(restriction).every(([key, allowed]) =>
     dimensions[key] !== undefined && allowed.includes(dimensions[key]!),
@@ -44,10 +45,10 @@ function isSubset(left: ResourceRestriction, right: ResourceRestriction) {
 function semanticDimensions(restriction: ResourceRestriction): ResourceRestriction {
   if (!restriction.kind) return restriction;
   const { kind, ...dimensions } = restriction;
-  // PaymentContext has exactly these two kinds. Accepting both places no
+  // PaymentContext's kinds. Accepting every kind places no
   // constraint on this dimension; it is equivalent to omitting it.
-  const acceptedKinds = ["card", "ability"].filter((value) => kind.includes(value));
-  return acceptedKinds.length === 2 ? dimensions : { ...dimensions, kind: acceptedKinds };
+  const acceptedKinds = ["card", "ability", "hide"].filter((value) => kind.includes(value));
+  return acceptedKinds.length === 3 ? dimensions : { ...dimensions, kind: acceptedKinds };
 }
 
 export function compareRestrictions(left: ResourceRestriction, right: ResourceRestriction) {
