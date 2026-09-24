@@ -264,7 +264,6 @@ export const BattlefieldBoard: FC<Props> = ({
     playerUnits,
     facedownCard,
     facedownCardPresent,
-    facedownCardOnPlayerSide,
     img,
   },
   dropStatus = "idle",
@@ -424,7 +423,7 @@ export const BattlefieldBoard: FC<Props> = ({
         )}
 
         {hasMightToShow && (
-          <div className={battlefieldMightBadge()}>
+          <div className={cn(battlefieldMightBadge(), facedownCardPresent && "right-20")}>
             <div className="px-1 py-0.5 leading-none">{opponentTotalMight}</div>
             <div className="px-1 font-extrabold text-[8px] text-slate-950/70 leading-none">
               VS
@@ -435,11 +434,7 @@ export const BattlefieldBoard: FC<Props> = ({
 
         <BattlefieldUnitRow
           attachments={opponentAttachments}
-          cards={[
-            ...opponentUnits,
-            ...(!facedownCardOnPlayerSide && facedownCard ? [facedownCard] : []),
-          ]}
-          facedownCardBack={!facedownCardOnPlayerSide && facedownCardPresent && !facedownCard}
+          cards={opponentUnits}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           onCardPointerEnter={onCardPointerEnter}
@@ -451,8 +446,7 @@ export const BattlefieldBoard: FC<Props> = ({
 
         <BattlefieldUnitRow
           attachments={playerAttachments}
-          cards={[...playerUnits, ...(facedownCardOnPlayerSide && facedownCard ? [facedownCard] : [])]}
-          facedownCardBack={facedownCardOnPlayerSide && facedownCardPresent && !facedownCard}
+          cards={playerUnits}
           dragSourceLocation={
             enablePlayerUnitLocationDrag
               ? { kind: "battlefield", battlefieldId: id }
@@ -466,6 +460,15 @@ export const BattlefieldBoard: FC<Props> = ({
           side="player"
           stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
           zoneAnimationId={`battlefield:${id}:player`}
+        />
+        <BattlefieldFacedownZone
+          card={facedownCard}
+          isPresent={facedownCardPresent}
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          onCardPointerEnter={onCardPointerEnter}
+          onCardPointerLeave={onCardPointerLeave}
+          onCardPrimaryAction={onCardPrimaryAction}
         />
       </div>
 
@@ -483,7 +486,6 @@ export const BattlefieldBoard: FC<Props> = ({
 function BattlefieldUnitRow({
   attachments = [],
   cards,
-  facedownCardBack = false,
   className,
   dragSourceLocation,
   hiddenCardInstanceIds,
@@ -497,7 +499,6 @@ function BattlefieldUnitRow({
 }: {
   attachments?: Card[];
   cards: Card[];
-  facedownCardBack?: boolean;
   className?: string;
   dragSourceLocation?: BoardDragSourceLocation;
   hiddenCardInstanceIds?: Set<string>;
@@ -520,14 +521,6 @@ function BattlefieldUnitRow({
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
-      {facedownCardBack && (
-        <CardTile
-          name="Facedown card"
-          img={cardBackImage.src}
-          type="Facedown"
-          size="sm"
-        />
-      )}
       {attachmentGroups.map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
@@ -620,5 +613,48 @@ function BattlefieldUnitRow({
         );
       })}
     </motion.div>
+  );
+}
+
+export function BattlefieldFacedownZone({
+  card,
+  hiddenCardInstanceIds,
+  highlightedCardInstanceIds,
+  isPresent,
+  onCardPointerEnter,
+  onCardPointerLeave,
+  onCardPrimaryAction,
+}: {
+  card: Card | null;
+  hiddenCardInstanceIds?: Set<string>;
+  highlightedCardInstanceIds?: Set<string>;
+  isPresent: boolean;
+  onCardPointerEnter?: (card: Card) => void;
+  onCardPointerLeave?: (card: Card) => void;
+  onCardPrimaryAction?: (card: Card, event?: MouseEvent<HTMLDivElement>) => void;
+}) {
+  if (!isPresent) return null;
+
+  return (
+    <div
+      aria-label="Facedown Zone"
+      role="group"
+      className="top-1/2 right-2 z-30 absolute flex -translate-y-1/2 flex-col items-center gap-1 bg-slate-950/90 shadow-xl p-1.5 border border-fuchsia-200/40 rounded-md ring-1 ring-fuchsia-300/20"
+      data-testid="facedown-zone"
+    >
+      <span className="font-semibold text-[9px] text-fuchsia-100 uppercase tracking-wide">Facedown</span>
+      <CardTile
+        {...(card ?? {})}
+        size="sm"
+        name={card?.name ?? "Facedown card"}
+        img={card?.img ?? cardBackImage.src}
+        type={card?.type ?? "Facedown"}
+        isHighlighted={card?.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
+        isTransferHidden={card?.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
+        onPrimaryAction={card && onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
+        onHighlightPointerEnter={card && onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
+        onHighlightPointerLeave={card && onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
+      />
+    </div>
   );
 }

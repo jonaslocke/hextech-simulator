@@ -1238,15 +1238,20 @@ function addHiddenCardActions(
       const canPay = canPayAnyPowerCost(game, playerId, definition, index);
       for (const battlefield of availableBattlefields) {
         const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
-        actions.push(action(
+        const hideAction = action(
           game,
           "hide",
-          `Hide ${definition.card.name} at ${battlefieldName} (1 Any Power)`,
+          `Hide at ${battlefieldName}`,
           cardId,
           canPay,
-          canPay ? null : "1 Any Power is required to hide this card.",
+          canPay ? null : "A Power rune is required to hide this card.",
           battlefield.battlefieldId,
-        ));
+        );
+        hideAction.presentation.resourceCost = {
+          energy: 0,
+          powerCosts: [{ amount: 1, domains: [] }],
+        };
+        actions.push(hideAction);
       }
     }
   }
@@ -1267,37 +1272,38 @@ function addHiddenCardActions(
       !(target.selectionPurpose === "optionalCost" && target.selectionKey && optionalKeys.has(target.selectionKey)),
     );
     if (!canSatisfyTargetRequirements(targets)) continue;
-    const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
     for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
       const additionalCosts = optionalSourceCosts
         .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
         .flatMap((payment) => payment.costs);
       const costsPayable = canPayCardCosts(game, playerId, definition, 0, index, 0, additionalCosts, cardId, 0);
       if (!costsPayable) continue;
-      actions.push(action(
+      const hiddenPlayAction = action(
         game,
         "playHidden",
-        hiddenPlayActionLabel({ definition, battlefieldName, additionalCosts }),
+        "Play from Hidden",
         cardId,
         true,
         null,
         encodeHiddenPlayExtra(battlefield.battlefieldId, optionalCostKeys),
         targets,
-      ));
+      );
+      const resourceCost = additionalResourceCost(additionalCosts);
+      if (resourceCost) hiddenPlayAction.presentation.resourceCost = resourceCost;
+      actions.push(hiddenPlayAction);
     }
   }
 }
 
-function hiddenPlayActionLabel(input: {
-  definition: GameCardDefinition;
-  battlefieldName: string;
-  additionalCosts: readonly AdditionalCardCost[];
-}) {
-  const extras = input.additionalCosts.flatMap((cost) => [
-    ...(cost.energy > 0 ? [`${cost.energy} Energy`] : []),
-    ...(cost.power > 0 ? [`${cost.power}${cost.powerDomain ? ` ${displayPowerDomain(cost.powerDomain)}` : ""} Power`] : []),
-  ]);
-  return `Play ${input.definition.card.name} from Hidden at ${input.battlefieldName} (${extras.length ? `Base cost ignored + ${extras.join(" + ")}` : "Base cost ignored"})`;
+function additionalResourceCost(costs: readonly AdditionalCardCost[]) {
+  const energy = costs.reduce((total, cost) => total + cost.energy, 0);
+  const powerCosts = costs
+    .filter((cost) => cost.power > 0)
+    .map((cost) => ({
+      amount: cost.power,
+      domains: cost.powerDomain ? [cost.powerDomain] : [],
+    }));
+  return energy > 0 || powerCosts.length > 0 ? { energy, powerCosts } : null;
 }
 
 function encodeHiddenPlayExtra(battlefieldId: string, optionalCostKeys: readonly string[]) {
@@ -1368,9 +1374,11 @@ function playHiddenCard(
     game.state.turn.playedCardInstanceIds.push(cardId);
   }
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
-  // The card remains in its Facedown Zone while its Chain item is pending.
-  // This keeps the location occupied until resolution (and leaves a countered
-  // play attached to the same server-owned origin).
+  // Playing moves the physical card from the Facedown Zone to the Chain. Keep
+  // only the origin metadata on the Chain item for Hidden-specific behavior.
+  battlefield.facedownCardInstanceId = null;
+  game.state.cardStates[cardId]!.hiddenAtTurnNumber = null;
+  advanceGameObjectIncarnation(game, cardId);
   const item = {
     id: `hidden:${game.stateVersion + 1}:${cardId}`,
     kind: definition.card.classification.type === "Spell" ? "spell" as const : "permanent" as const,
@@ -1419,6 +1427,9 @@ function resolveHiddenPermanent(
     battlefield.units.push(cardId);
     game.state.cardStates[cardId]!.exhausted = true;
   }
+  // The Chain is a Non-Board Zone, so resolving onto the Battlefield creates
+  // another game-object incarnation, as in ordinary zone transitions.
+  advanceGameObjectIncarnation(game, cardId);
   executeImmediateClauses(game, definition, item.controllerPlayerId, cardId, item.targetCardInstanceIds, handlers, item.targetObjectVersions, item.initialSelectionOverrides ?? {}, item.hiddenBattlefieldId ?? null);
   dispatchBehaviorEvent(game, item.behaviorEvent ?? { type: "card.played", actorPlayerId: item.controllerPlayerId, subjectCardInstanceId: cardId, values: { hiddenBattlefieldId: item.hiddenBattlefieldId ?? null } }, decks);
 }

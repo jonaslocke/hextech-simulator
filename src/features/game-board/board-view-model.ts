@@ -53,6 +53,7 @@ export type BoardPlayerProjection = {
       label: string;
       targets: ProjectedAction["targets"];
       costPreview: ProjectedAction["costPreview"];
+      resourceCost?: ProjectedAction["presentation"]["resourceCost"];
       playCost?: ProjectedAction["presentation"]["playCost"];
       poolPayment?: ProjectedAction["poolPayment"];
     }>
@@ -235,6 +236,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             label: action.label,
             targets: action.targets,
             costPreview: action.costPreview,
+            resourceCost: action.presentation.resourceCost,
             playCost: action.presentation.playCost,
             poolPayment: action.poolPayment,
           })),

@@ -15,7 +15,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { BoardPlayerProjection } from "../board-view-model";
-import { PlayableCardMenuLabel } from "../components/playable-card-menu-label";
+import { PlayableCardMenuLabel, ResourceCostMenuLabel } from "../components/playable-card-menu-label";
 import type { CardActionMenuItem } from "../components/card-action-menu";
 import { combineTargetRequirements, groupedTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
@@ -385,7 +385,9 @@ export function useGameBoardActions({
           accessibleLabel: resourceActionAccessibleLabel(action, powerDomain),
           disabled: !action.enabled,
           id: action.id,
-          label: resourceActionMenuLabel(action, powerDomain),
+          label: action.presentation.resourceCost
+            ? <ResourceCostMenuLabel label={action.label} cost={action.presentation.resourceCost} />
+            : resourceActionMenuLabel(action, powerDomain),
           onSelect: () => action.label.startsWith("Add ")
             ? submitRuneAction(action.id)
             : beginPlayOrTargetSelection(card, action.id),
