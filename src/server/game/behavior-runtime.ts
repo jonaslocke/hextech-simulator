@@ -321,7 +321,7 @@ export function collectTriggeredClauses(input: {
       typeof input.event.values.hiddenBattlefieldId === "string"
       ? input.event.values.hiddenBattlefieldId
       : null;
-    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, [], {}, {}, hiddenBattlefieldId);
+    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, [], {}, {}, undefined, hiddenBattlefieldId);
     if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
     return [{

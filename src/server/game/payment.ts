@@ -63,7 +63,7 @@ export function buildPaymentPlan(
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
-    powerCost: basePowerCost ?? effectivePowerCost(
+    powerCost: effectivePowerCost(
       game,
       playerId,
       definition,
