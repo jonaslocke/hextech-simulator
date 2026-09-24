@@ -168,6 +168,7 @@ export type BoardProjection = {
     units: string[];
     attachedCardInstanceIds: string[];
     facedownSlot: string | null;
+    facedownSlotPresent: boolean;
   }>;
   cardStates: Record<
     string,
@@ -367,6 +368,7 @@ export function adaptProjectionToBoard(projection: GameProjection): {
           (card) => card.instanceId,
         ),
         facedownSlot: battlefield.facedownCard?.instanceId ?? null,
+        facedownSlotPresent: battlefield.facedownCardPresent,
       })),
       cardStates,
     },

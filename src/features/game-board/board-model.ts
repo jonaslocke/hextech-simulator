@@ -265,6 +265,8 @@ function buildBattlefieldData({
       .filter(({ ownerPlayerId }) => ownerPlayerId === opponentPlayerId)
       .map(({ card }) => card),
     facedownCard,
+    facedownCardPresent: battlefield?.facedownSlotPresent ?? false,
+    facedownCardOnPlayerSide: battlefield?.controllerPlayerId === viewerPlayerId,
   };
 }
 
