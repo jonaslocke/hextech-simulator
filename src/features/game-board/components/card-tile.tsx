@@ -3,13 +3,20 @@
 import { FC, MouseEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Sparkles } from "lucide-react";
+import {
+  CircleDollarSign,
+  MoveUpRight,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Swords,
+  type LucideIcon,
+} from "lucide-react";
 import {
   CardRulesText,
   DomainIcon,
   EnergyResource,
   formatDomain,
-  getKeywordImagePath,
   MightResource,
 } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
@@ -69,6 +76,14 @@ const CARD_ORIENTATION_TRANSITION = {
   mass: 0.7,
   restDelta: 0.001,
   restSpeed: 0.001,
+};
+
+const RUNTIME_KEYWORD_ICONS: Record<string, LucideIcon> = {
+  "keyword.assault": Swords,
+  "keyword.deflect": CircleDollarSign,
+  "keyword.ganking": MoveUpRight,
+  "keyword.shield": Shield,
+  "keyword.tank": ShieldCheck,
 };
 
 type CardTileProps = Card & {
@@ -456,10 +471,7 @@ function KeywordAnnotationStack({
     >
       <AnimatePresence initial={false}>
         {visibleAnnotations.map((annotation) => {
-          const keywordName = annotation.keywordId
-            .replace(/^keyword\./, "")
-            .replaceAll("_", "-");
-          const iconPath = getKeywordImagePath(keywordName, "md");
+          const KeywordIcon = RUNTIME_KEYWORD_ICONS[annotation.keywordId] ?? Sparkles;
           const label = formatKeywordAnnotation(annotation);
 
           return (
@@ -484,22 +496,11 @@ function KeywordAnnotationStack({
               }}
               transition={{ duration: 0.14, ease: "easeOut" }}
             >
-              {iconPath ? (
-                // eslint-disable-next-line @next/next/no-img-element -- The keyword asset map owns local image URLs.
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  className="size-3 object-contain shrink-0"
-                  draggable={false}
-                  src={iconPath}
-                />
-              ) : (
-                <Sparkles
-                  aria-hidden="true"
-                  className="size-[9px] shrink-0"
-                  strokeWidth={2.5}
-                />
-              )}
+              <KeywordIcon
+                aria-hidden="true"
+                className="size-[9px] shrink-0"
+                strokeWidth={2.5}
+              />
 
               <span>{label}</span>
             </motion.span>
