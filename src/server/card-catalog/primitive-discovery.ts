@@ -214,13 +214,13 @@ const primitiveDetectors: PrimitiveDetector[] = [
     /\b(a|each|target|chosen) unit\b|\bunits\b/.test(context.rulesText) &&
     !/\b(?:friendly|enemy) units?\b/.test(context.rulesText) &&
     !/\bunit from your trash\b/.test(context.rulesText)
-      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), excludesSource: context.rulesText.includes("another"), maximumMight: readMaximumMight(context.rulesText), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "medium")
+      ? assignment(context, "selector.unit", "selector", { scope: readUnitScope(context.rulesText), ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText, "unit"), excludesSource: context.rulesText.includes("another"), maximumMight: readMaximumMight(context.rulesText), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "medium")
       : null
   ),
   primitive("selector.friendly_unit", "selector", "Select friendly unit", "Behavior requires or affects friendly units.", ["minimumCount", "maximumCount"], (context) =>
     (/\bfriendly units?\b/.test(context.rulesText) ||
       /\bunits? you control\b/.test(context.normalizedText))
-      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText), controller: "controller", excludesSource: context.rulesText.includes("another") || context.rulesText.includes("other friendly"), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "high")
+      ? assignment(context, "selector.friendly_unit", "selector", { ...readUnitCountBounds(context.rulesText), area: readUnitTargetArea(context.rulesText), locationRelation: readUnitLocationRelation(context.rulesText, "friendly"), controller: "controller", excludesSource: context.rulesText.includes("another") || context.rulesText.includes("other friendly"), ...(isStaticGroupNumericModifier(context.rulesText) ? { automatic: true } : {}) }, "high")
       : null
   ),
   primitive("selector.enemy_unit", "selector", "Select enemy unit", "Behavior requires or affects enemy units.", ["minimumCount", "maximumCount"], (context) =>
@@ -228,7 +228,7 @@ const primitiveDetectors: PrimitiveDetector[] = [
       ? assignment(context, "selector.enemy_unit", "selector", {
           ...readUnitCountBounds(context.rulesText),
           area: readUnitTargetArea(context.rulesText),
-          locationRelation: readUnitLocationRelation(context.rulesText),
+          locationRelation: readUnitLocationRelation(context.rulesText, "enemy"),
           controller: "opponent",
           excludesSource: context.rulesText.includes("another"),
           ...(context.rulesText.includes("all enemy units")
@@ -1270,14 +1270,20 @@ function readUnitTargetArea(rulesText: string): string {
   return "board";
 }
 
-function readUnitLocationRelation(rulesText: string): string {
-  if (
-    rulesText.includes("another location") ||
-    rulesText.includes("different location") ||
-    rulesText.includes("another battlefield") ||
-    rulesText.includes("different battlefield")
-  ) {
-    return "differentSourceLocation";
+function readUnitLocationRelation(
+  rulesText: string,
+  targetKind?: "unit" | "friendly" | "enemy",
+): string {
+  if (hasDifferentLocationConstraint(rulesText)) {
+    const constrainedTarget = readDifferentLocationTargetKind(rulesText);
+    if (
+      !targetKind ||
+      constrainedTarget === "unit" ||
+      constrainedTarget === targetKind
+    ) {
+      return "differentSourceLocation";
+    }
+    return "any";
   }
 
   if (rulesText.includes("same location") || rulesText.includes("same battlefield")) {
@@ -1293,6 +1299,39 @@ function readUnitLocationRelation(rulesText: string): string {
   }
 
   return "any";
+}
+
+function hasDifferentLocationConstraint(rulesText: string): boolean {
+  return /\b(?:at|in|from)\s+(?:another|a different)\s+(?:location|battlefield)\b/.test(rulesText);
+}
+
+function readDifferentLocationTargetKind(
+  rulesText: string,
+): "unit" | "friendly" | "enemy" {
+  const constraint = /\b(?:at|in|from)\s+(?:another|a different)\s+(?:location|battlefield)\b/.exec(rulesText);
+  if (!constraint || constraint.index === undefined) return "unit";
+
+  const prefix = rulesText.slice(0, constraint.index);
+  const clauseStart = Math.max(prefix.lastIndexOf("."), prefix.lastIndexOf(";")) + 1;
+  const targetText = prefix.slice(clauseStart);
+  const unitReferences = [
+    ...targetText.matchAll(/\b(?:friendly\s+|enemy\s+)?units?(?:\s+(?:you control|your opponent controls|opponent controls))?\b/g),
+  ];
+  const lastReference = unitReferences.at(-1)?.[0].toLowerCase();
+
+  if (
+    lastReference?.includes("friendly") ||
+    lastReference?.includes("you control")
+  ) {
+    return "friendly";
+  }
+  if (
+    lastReference?.includes("enemy") ||
+    lastReference?.includes("opponent controls")
+  ) {
+    return "enemy";
+  }
+  return "unit";
 }
 
 function unitNearArea(rulesText: string, areaPattern: string): boolean {

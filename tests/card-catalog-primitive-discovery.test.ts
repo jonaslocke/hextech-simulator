@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import {
   analyzeCardBehaviorSuggestions,
@@ -30,6 +31,7 @@ import {
 } from "../src/server/card-catalog";
 import { runeResourceTypes } from "../src/shared/game";
 import type { Card } from "../src/server/catalog";
+import { cardSchema } from "../src/server/catalog";
 
 test("derives stable card identity from public code variants", () => {
   assert.equal(deriveCardCode("OGN-027/298"), "OGN-027");
@@ -656,6 +658,27 @@ test("discovers Base, source-location, different-location, and shared-location U
   assert.deepEqual(
     pickLocation(findAssignment(anotherLocation, "selector.enemy_unit")?.parameters),
     { area: "board", locationRelation: "differentSourceLocation" }
+  );
+});
+
+test("discovers Smoke and Mirrors location constraints only on its second target", async () => {
+  const cards = cardSchema.array().parse(
+    JSON.parse(await readFile("data/sets/unl.json", "utf8")),
+  );
+  const smokeAndMirrors = cards.find((card) => card.name === "Smoke and Mirrors");
+  assert.ok(smokeAndMirrors, "the canonical Smoke and Mirrors card must exist");
+
+  const discovery = discoverCardPrimitives(smokeAndMirrors);
+
+  assert.equal(
+    findAssignment(discovery, "selector.unit")?.parameters.locationRelation,
+    "any",
+    "the first unit is restricted by Hidden to the associated Battlefield, not to a different location",
+  );
+  assert.equal(
+    findAssignment(discovery, "selector.friendly_unit")?.parameters.locationRelation,
+    "differentSourceLocation",
+    "the second unit's explicit different-location clause remains per-target",
   );
 });
 
