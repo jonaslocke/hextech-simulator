@@ -12,7 +12,7 @@ MainDeck:
 3 Sai Scout
 3 Sneaky Deckhand
 3 Traveling Merchant
-3 Maddened Marauder
+3 Cleave
 3 Firestorm
 3 Incinerate
 2 Pouty Poro

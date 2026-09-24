@@ -5,5 +5,20 @@ export default async function OnlineMatchPage({
 }: {
   params: Promise<{ matchId: string }>;
 }) {
-  return <OnlineMatchGameLoader matchId={(await params).matchId} />;
+  return (
+    <>
+      <div
+        className="flex justify-center py-4 font-mono font-semibold text-[9px] truncate uppercase tracking-wide"
+        style={{
+          backgroundColor: "var(--riftbound-keyword-background)",
+          color: "var(--riftbound-keyword-foreground)",
+          
+        }}
+      >
+        Assault 3
+      </div>
+
+      <OnlineMatchGameLoader matchId={(await params).matchId} />
+    </>
+  );
 }

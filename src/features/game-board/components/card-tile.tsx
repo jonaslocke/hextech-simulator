@@ -142,13 +142,12 @@ export const CardTile: FC<CardTileProps> = ({
     orientation === "auto" ? autoOrientation : orientation;
   const dimensions = getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
-  const isGear = Boolean(type?.split(" / ").includes("Gear") && !type?.split(" / ").includes("Unit"));
+  const isGear = Boolean(
+    type?.split(" / ").includes("Gear") && !type?.split(" / ").includes("Unit"),
+  );
   const { isLocationDragActive } = useLocationDragState();
-  const {
-    isReportMode,
-    selectedCardInstanceIds,
-    toggleCardInstanceId,
-  } = useReportCardSelection();
+  const { isReportMode, selectedCardInstanceIds, toggleCardInstanceId } =
+    useReportCardSelection();
   const canShowHoverPreview =
     enableHoverPreview && !isLocationDragActive && !isReportMode;
 
@@ -283,10 +282,7 @@ export const CardTile: FC<CardTileProps> = ({
       }}
       onFocus={schedulePreview}
       onKeyDown={(event) => {
-        if (
-          isReportMode &&
-          (event.key === "Enter" || event.key === " ")
-        ) {
+        if (isReportMode && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           routeReportCardInteraction({
             instanceId,
@@ -376,23 +372,30 @@ export const CardTile: FC<CardTileProps> = ({
             width: dimensions.width,
           }}
         />
-        {showMight && might !== undefined && !(isGear && attachedToCardInstanceId) && (
-          <span
-            className={cn(
-              "absolute flex justify-center items-center bg-white shadow border border-slate-900/70 rounded-full font-bold text-slate-950",
-              sizeConfig.mightBadgeClassName,
-              isGear && "top-auto",
-              isGear && (size === "xl" ? "-bottom-2" : size === "lg" ? "-bottom-1.5" : "-bottom-1"),
-            )}
-          >
-            {might}
-          </span>
-        )}
+        {showMight &&
+          might !== undefined &&
+          !(isGear && attachedToCardInstanceId) && (
+            <span
+              className={cn(
+                "absolute flex justify-center items-center bg-white shadow border border-slate-900/70 rounded-full font-bold text-slate-950",
+                sizeConfig.mightBadgeClassName,
+                isGear && "top-auto",
+                isGear &&
+                  (size === "xl"
+                    ? "-bottom-2"
+                    : size === "lg"
+                      ? "-bottom-1.5"
+                      : "-bottom-1"),
+              )}
+            >
+              {might}
+            </span>
+          )}
         {damage !== undefined && damage > 0 && (
           <span
             aria-label={`${damage} damage`}
             className={cn(
-              "top-1/2 absolute z-30 flex justify-center items-center bg-red-500 shadow border border-red-100 rounded-full font-black text-white -translate-y-1/2 pointer-events-none",
+              "top-1/2 z-30 absolute flex justify-center items-center bg-red-500 shadow border border-red-100 rounded-full font-black text-white -translate-y-1/2 pointer-events-none",
               sizeConfig.damageBadgeClassName,
               keywordAnnotations?.length && "left-auto",
               keywordAnnotations?.length && size === "sm" && "-right-4",
@@ -448,7 +451,7 @@ function KeywordAnnotationStack({
   return (
     <div
       aria-label={`Runtime keywords: ${visibleLabels.join(", ")}${overflow > 0 ? ` and ${overflow} more` : ""}`}
-      className="top-2 left-[-6px] z-20 absolute grid gap-1 pointer-events-none"
+      className="top-2 left-[-6px] z-20 absolute gap-1 grid pointer-events-none"
       role="list"
     >
       <AnimatePresence initial={false}>
@@ -463,7 +466,12 @@ function KeywordAnnotationStack({
             <motion.span
               animate={{ opacity: 1, scale: 1 }}
               aria-label={label}
-              className="inline-flex w-max max-w-full items-center gap-1 rounded-full border border-white/50 px-1.5 py-0.5 font-semibold text-[8px] leading-none shadow-sm shadow-black/45 whitespace-nowrap"
+              className={cn(
+                "inline-flex items-center w-max max-w-full h-[15px]",
+                "gap-[3px] rounded-[3px] border border-white/50 px-1",
+                "font-mono text-[8px] font-semibold uppercase leading-none tracking-[-0.01em]",
+                "whitespace-nowrap shadow-sm shadow-black/45",
+              )}
               exit={{ opacity: 0, scale: 0.96 }}
               initial={{ opacity: 0, scale: 0.96 }}
               key={annotation.keywordId}
@@ -478,10 +486,21 @@ function KeywordAnnotationStack({
             >
               {iconPath ? (
                 // eslint-disable-next-line @next/next/no-img-element -- The keyword asset map owns local image URLs.
-                <img alt="" aria-hidden="true" className="size-3 shrink-0 object-contain" draggable={false} src={iconPath} />
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="size-3 object-contain shrink-0"
+                  draggable={false}
+                  src={iconPath}
+                />
               ) : (
-                <Sparkles aria-hidden="true" className="size-3 shrink-0" strokeWidth={2.25} />
+                <Sparkles
+                  aria-hidden="true"
+                  className="size-[9px] shrink-0"
+                  strokeWidth={2.5}
+                />
               )}
+
               <span>{label}</span>
             </motion.span>
           );
@@ -490,7 +509,7 @@ function KeywordAnnotationStack({
           <motion.span
             animate={{ opacity: 1, scale: 1 }}
             aria-label={`${overflow} more runtime keyword${overflow === 1 ? "" : "s"}`}
-            className="inline-flex w-max items-center rounded-full border border-white/50 px-1.5 py-0.5 font-semibold text-[8px] leading-none shadow-sm shadow-black/45 whitespace-nowrap"
+            className="inline-flex items-center shadow-black/45 shadow-sm px-1.5 py-0.5 border border-white/50 rounded-full w-max font-semibold text-[8px] leading-none whitespace-nowrap"
             exit={{ opacity: 0, scale: 0.96 }}
             initial={{ opacity: 0, scale: 0.96 }}
             key="keyword-overflow"
@@ -727,10 +746,11 @@ function CardSummary({
           )}
         </div>
       )}
-      {((mightModifiers?.length ?? 0) > 0 || (runtimeEffects?.length ?? 0) > 0) && (
+      {((mightModifiers?.length ?? 0) > 0 ||
+        (runtimeEffects?.length ?? 0) > 0) && (
         <section aria-label="Runtime changes" className="text-slate-200">
           <div className="font-semibold text-xs">Runtime changes</div>
-          <ul className="mt-1 space-y-2">
+          <ul className="space-y-2 mt-1">
             {mightModifiers?.map((entry) => (
               <RuntimeEffectRow
                 duration={formatMightModifierDuration(entry.duration)}
@@ -777,14 +797,16 @@ function RuntimeEffectRow({
 }) {
   return (
     <li className="min-w-0">
-      <div className="font-semibold text-[12px] text-slate-100 leading-snug break-words">
+      <div className="font-semibold text-[12px] text-slate-100 break-words leading-snug">
         {effect}
       </div>
-      <div className="mt-0.5 text-[10px] leading-snug break-words">
+      <div className="mt-0.5 text-[10px] break-words leading-snug">
         {duration && (
           <>
             <span className="font-medium text-slate-300">{duration}</span>
-            <span aria-hidden="true" className="px-1 text-slate-500">·</span>
+            <span aria-hidden="true" className="px-1 text-slate-500">
+              ·
+            </span>
           </>
         )}
         <span className="font-normal text-slate-500">{source}</span>
@@ -802,14 +824,18 @@ function formatRuntimeEffect(
 }
 
 function formatMightModifierDuration(duration: string) {
-  return ({
-    thisTurn: "This turn",
-    whileAttached: "While attached",
-    whileAttacking: "While attacking",
-    whileDefending: "While defending",
-    whileSourceOnBoard: "While source is on board",
-    whileSourceAtBattlefield: "While source is at a battlefield",
-  } as Record<string, string>)[duration] ?? duration;
+  return (
+    (
+      {
+        thisTurn: "This turn",
+        whileAttached: "While attached",
+        whileAttacking: "While attacking",
+        whileDefending: "While defending",
+        whileSourceOnBoard: "While source is on board",
+        whileSourceAtBattlefield: "While source is at a battlefield",
+      } as Record<string, string>
+    )[duration] ?? duration
+  );
 }
 
 function SummaryStatChip({
