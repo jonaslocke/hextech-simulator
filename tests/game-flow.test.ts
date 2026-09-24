@@ -2021,6 +2021,47 @@ test("effect-driven spells enter the Chain in next-player play order", () => {
   assert.equal(next.state.effectPlayQueue?.length, 0);
 });
 
+test("a public reveal-until instruction plays the first matching card with both base costs ignored", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "BF")!;
+  source.behaviorModel.clauses = [clause("reveal-until-unit", {
+    effects: [binding("action.reveal_until_card_type_and_play", 0, {
+      cardType: "Unit",
+      ignoreBaseCosts: true,
+    })],
+  })];
+  decks[0]!.instances.push({
+    instanceId: "p1:revealed-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.cardStates["p1:revealed-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p1!.zones.mainDeck = ["p1:spell", "p1:revealed-unit", "p1:unit"];
+  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== "p1:spell");
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:bf",
+    clauseId: "reveal-until-unit",
+    decks,
+  }), false);
+  assert.deepEqual(
+    game.state.publicReveals?.[0]?.cardInstanceIds,
+    ["p1:spell", "p1:revealed-unit"],
+  );
+  const play = gameplayActions(game, "p1", decks).find((action) =>
+    action.sourceCardInstanceId === "p1:revealed-unit",
+  )!;
+  assert.equal(play.costPreview?.energy, 0);
+  assert.equal(play.costPreview?.effectivePower, 0);
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "reveal-until-play",
+  });
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:revealed-unit"));
+  assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit", "p1:spell"]);
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+});
+
 test("committed modal Repeat declarations project only legal mode-target combinations", () => {
   const { game, decks } = fixture();
   const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;

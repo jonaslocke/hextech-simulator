@@ -568,6 +568,45 @@ export function createPrimitiveHandlers(
       }
     },
   });
+  handlers.set("action.reveal_until_card_type_and_play", {
+    execute(binding, context) {
+      const player = context.game.state.players[context.controllerPlayerId]!;
+      const cardType = stringParam(binding, "cardType");
+      const matchingIndex = player.zones.mainDeck.findIndex((id) =>
+        cardHasType(definitionForInstance(id, index), cardType),
+      );
+      const looked = matchingIndex < 0
+        ? [...player.zones.mainDeck]
+        : player.zones.mainDeck.slice(0, matchingIndex + 1);
+      if (looked.length === 0) return;
+      addPublicReveal(
+        context,
+        looked,
+        `${definitionForInstance(context.sourceCardInstanceId, index).card.name} revealed`,
+        index,
+      );
+      player.zones.mainDeck = player.zones.mainDeck.filter((id) => !looked.includes(id));
+      const selectedCardId = matchingIndex < 0 ? null : looked.at(-1)!;
+      const recycled = looked.filter((id) => id !== selectedCardId);
+      player.zones.mainDeck.push(
+        ...deterministicallyRecycle(
+          recycled,
+          `${context.game.id}:${context.game.stateVersion}:${context.sourceCardInstanceId}`,
+        ),
+      );
+      if (!selectedCardId || !context.effectResolutionId) return;
+      player.zones.hand.push(selectedCardId);
+      advanceGameObjectIncarnation(context.game, selectedCardId);
+      (context.game.state.effectPlayQueue ??= []).push({
+        resolutionId: context.effectResolutionId,
+        sourceCardInstanceId: context.sourceCardInstanceId,
+        playerId: context.controllerPlayerId,
+        cardInstanceId: selectedCardId,
+        ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
+        ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
+      });
+    },
+  });
   handlers.set("action.gain_xp", {
     execute(binding, context) {
       const player = context.game.state.players[context.controllerPlayerId]!;
@@ -959,6 +998,7 @@ export function createPrimitiveHandlers(
           playerId,
           cardInstanceId: chosen,
           ignoreBaseEnergy: true,
+          ignoreBasePower: false,
         }];
       });
       context.game.state.effectPlayQueue = staged;
@@ -2086,11 +2126,12 @@ export function effectivePowerCost(
   index?: RuntimeCardIndex,
   cardInstanceId?: string,
   onContribution?: (contribution: NumericContribution) => void,
+  basePower?: number,
 ): number {
   return effectiveNumericValue({
     onContribution,
     attribute: "powerCost",
-    baseValue: definition.card.attributes.power ?? 0,
+    baseValue: basePower ?? definition.card.attributes.power ?? 0,
     cardType: definition.card.classification.type,
     controllerPlayerId,
     game,

@@ -58,6 +58,7 @@ export function buildPaymentPlan(
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
   cardInstanceId?: string,
+  basePowerOverride?: number,
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
@@ -67,6 +68,8 @@ export function buildPaymentPlan(
       definition,
       index,
       cardInstanceId,
+      undefined,
+      basePowerOverride,
     ),
     allowedPowerDomains: definition.card.classification.domain.filter(
       (domain) => domain !== "Colorless",
@@ -312,9 +315,10 @@ export function canPayCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
+  basePowerOverride?: number,
 ) {
   return cardPaymentPlans(game, playerId, definition, energyCost, index,
-    additionalAnyPower, additionalCosts, cardInstanceId) !== null;
+    additionalAnyPower, additionalCosts, cardInstanceId, basePowerOverride) !== null;
 }
 
 /** A necessary capacity check, never a payment plan or a proof of legality.
@@ -329,6 +333,7 @@ export function cardPaymentExceedsResourceCapacity(
   energyCost: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId: string,
+  basePowerOverride?: number,
 ) {
   const context: PaymentContext = { kind: "card", cardType: definition.card.classification.type };
   const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
@@ -368,7 +373,7 @@ export function cardPaymentExceedsResourceCapacity(
         })))));
   const minimumEnergy = (mutableCost("energyCost") ? 0 : energyCost) + additionalCosts.reduce((sum, cost) => sum + cost.energy, 0);
   const powerCosts = [
-    { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId, undefined, basePowerOverride), domains },
     ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
   ].filter((cost) => cost.amount > 0);
   const capacity = pooledCandidates(game.state.players[playerId]!, []);
@@ -419,16 +424,17 @@ export function cardPaymentPreview(
   index: RuntimeCardIndex,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId: string,
+  basePowerOverride?: number,
 ) {
   const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
   const powerCosts = [
-    { amount: effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    { amount: effectivePowerCost(game, playerId, definition, index, cardInstanceId, undefined, basePowerOverride), domains },
     ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
   ].filter((cost) => cost.amount > 0);
   const powerDomains = [...new Set(powerCosts.flatMap((cost) => cost.domains))];
   const eligible = pooledCandidates(game.state.players[playerId]!, powerDomains).filter((candidate) =>
     candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }, powerDomains));
-  const canPay = canPayCardCosts(game, playerId, definition, energyCost, index, 0, additionalCosts, cardInstanceId);
+  const canPay = canPayCardCosts(game, playerId, definition, energyCost, index, 0, additionalCosts, cardInstanceId, basePowerOverride);
   let availableAnyPower = 0;
   let upper = pooledCandidates(game.state.players[playerId]!, []).filter((candidate) => candidate.kind === "power" &&
     candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }))
@@ -437,7 +443,7 @@ export function cardPaymentPreview(
   // before advertising how much additional target Power can safely be paid.
   if (canPay) while (availableAnyPower < upper) {
     const amount = Math.ceil((availableAnyPower + upper) / 2);
-    if (canPayCardCosts(game, playerId, definition, energyCost, index, amount, additionalCosts, cardInstanceId)) availableAnyPower = amount;
+    if (canPayCardCosts(game, playerId, definition, energyCost, index, amount, additionalCosts, cardInstanceId, basePowerOverride)) availableAnyPower = amount;
     else upper = amount - 1;
   }
   return {
@@ -462,12 +468,13 @@ function cardPaymentPlans(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
+  basePowerOverride?: number,
 ): PaymentPlan[] | null {
   const preview = structuredClone(game);
   const plans: PaymentPlan[] = [];
   try {
     const base = buildPaymentPlan(preview, playerId, definition, energyCost, index,
-      additionalAnyPower, cardInstanceId);
+      additionalAnyPower, cardInstanceId, basePowerOverride);
     if (!base) return null;
     plans.push(base);
     applyPaymentPlan(preview, playerId, base, index);
@@ -498,9 +505,10 @@ export function payCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
+  basePowerOverride?: number,
 ) {
   const plans = cardPaymentPlans(game, playerId, definition, energyCost, index,
-    additionalAnyPower, additionalCosts, cardInstanceId);
+    additionalAnyPower, additionalCosts, cardInstanceId, basePowerOverride);
   if (!plans) {
     throw new Error("Card costs cannot be paid.");
   }

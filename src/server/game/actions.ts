@@ -106,6 +106,7 @@ export function gameplayActions(
     addPlayableCardActions(actions, game, actorPlayerId, decks, index, "neutralOpen", {
       stagedCardInstanceId: stagedPlay.cardInstanceId,
       ignoreBaseEnergy: stagedPlay.ignoreBaseEnergy,
+      ignoreBasePower: stagedPlay.ignoreBasePower,
     });
     addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen", true);
     // Rule 419.3.c: if an effect-driven play has no eligible card play, the
@@ -871,7 +872,7 @@ function playCard(
     validateTargetRequirements(dynamicTargets, firstExecutionTargets);
   }
   const energyCost = effectPlay
-    ? effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, 0)
+    ? effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, stagedPlay?.ignoreBaseEnergy ? 0 : undefined)
     : flow
     ? flowEnergyCost!
     : effectiveEnergyCost(game, playerId, definition, index, cardId);
@@ -899,6 +900,7 @@ function playCard(
     additionalAnyPower,
     [...optionalCosts, ...(repeatCost ? [repeatCost] : [])],
     cardId,
+    stagedPlay?.ignoreBasePower ? 0 : undefined,
   );
   payOptionalNonResourcePlayCosts(
     game,
@@ -1941,6 +1943,7 @@ function addPlayableCardActions(
   stagedPlay?: {
     stagedCardInstanceId: string;
     ignoreBaseEnergy: boolean;
+    ignoreBasePower: boolean;
   },
 ) {
   const player = game.state.players[playerId]!;
@@ -1993,6 +1996,7 @@ function addPlayableCardActions(
       index,
       cardId,
       (entry) => costContributions.push(entry),
+      stagedPlay?.ignoreBasePower ? 0 : undefined,
     );
     const unitDestinations =
       definition.card.classification.type === "Unit"
@@ -2073,11 +2077,13 @@ function addPlayableCardActions(
           index,
           additionalCosts,
           cardId,
+          stagedPlay?.ignoreBasePower ? 0 : undefined,
         );
         const costsPayable = payment.canPay;
         const preparable = !costsPayable && hasLegalTargets && canPrepareCardPayment(
           game, playerId, decks, definition, additionalCosts, cardId, timing,
           stagedPlay?.ignoreBaseEnergy ? 0 : undefined,
+          stagedPlay?.ignoreBasePower ? 0 : undefined,
         );
         const enabled = (costsPayable || preparable) && hasLegalTargets;
         const disabledReason = !hasLegalTargets
@@ -2141,10 +2147,11 @@ function canPrepareCardPayment(
   cardId: string,
   timing: TurnTiming,
   baseEnergyOverride?: number,
+  basePowerOverride?: number,
 ) {
   const index = createRuntimeCardIndex(decks, game);
   if (cardPaymentExceedsResourceCapacity(game, playerId, definition, index,
-    effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, baseEnergyOverride), additionalCosts, cardId)) return false;
+    effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, baseEnergyOverride), additionalCosts, cardId, basePowerOverride)) return false;
   // Supported Add handlers change resource/board state, not runtime card
   // definitions or instances. Reuse their index throughout this local search.
   const handlers = createPrimitiveHandlers(index);
@@ -2158,7 +2165,7 @@ function canPrepareCardPayment(
     if (visited.has(key)) return false;
     visited.add(key);
     if (canPayCardCosts(state, playerId, definition,
-      effectiveEnergyCost(state, playerId, definition, index, cardId, undefined, baseEnergyOverride), index, 0, additionalCosts, cardId)) return true;
+      effectiveEnergyCost(state, playerId, definition, index, cardId, undefined, baseEnergyOverride), index, 0, additionalCosts, cardId, basePowerOverride)) return true;
     const abilities: ProjectedAction[] = [];
     addAbilityActions(abilities, state, playerId, index, handlers, timing);
     // Try combined Add first: it often supplies both missing resources in one

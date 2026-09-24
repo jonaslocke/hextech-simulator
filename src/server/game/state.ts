@@ -394,6 +394,7 @@ export const gameStateSchema = z.object({
       playerId: z.string().min(1),
       cardInstanceId: z.string().min(1),
       ignoreBaseEnergy: z.boolean(),
+      ignoreBasePower: z.boolean().default(false),
     }),
   ).default([]).optional(),
   pendingChoice: z

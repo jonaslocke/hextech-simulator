@@ -967,6 +967,18 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     emitsEvents: ["card.drawn", "card.recycled"],
     engineSupport: supported("The private looked-card set, optional public reveal acknowledgement, and selection are retained in the canonical effect frame."),
   }),
+  "action.reveal_until_card_type_and_play": primitiveSeed({
+    id: "action.reveal_until_card_type_and_play",
+    family: "action",
+    name: "Reveal until a card type, then play it",
+    description: "Publicly reveals cards from the controller's Main Deck through the first matching card, plays that card with the declared base costs ignored, and recycles the other revealed cards.",
+    parameters: [
+      required("cardType", "string", "The first revealed card type to play.", ["Unit", "Spell", "Gear"]),
+      optional("ignoreBaseCosts", "boolean", "Whether the played card's base Energy and Power costs are set to zero."),
+    ],
+    emitsEvents: ["card.revealed", "card.recycled", "card.played"],
+    engineSupport: supported("The resolving effect owns the public reveal and stages the identified card through the server-authoritative effect-play declaration queue."),
+  }),
   "action.gain_xp": primitiveSeed({
     id: "action.gain_xp",
     family: "action",
