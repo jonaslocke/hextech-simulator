@@ -5,7 +5,7 @@ import {
   deckValidationRequestSchema, deckValidationResponseSchema, fingerprintDeckValidationRequest,
   type RegisteredDeckValidationRequest,
 } from "../src/shared/deck-validation";
-import { cardSchema, loadSourceCardCatalog, type CardCatalog } from "../src/server/catalog";
+import { cardSchema, loadCardCatalog, type CardCatalog } from "../src/server/catalog";
 import { deriveCardCodeFromCard } from "../src/server/card-catalog/identity";
 import {
   buildBehaviorDefinitionDocument, buildCanonicalCardDocument, buildCurrentBehaviorCatalog,
@@ -213,7 +213,7 @@ test("canonical models must match current local source rules even when their sto
 });
 
 test("registered readiness checks both current publication and registered runtime source freshness", async () => {
-  const source = (await loadSourceCardCatalog()).byName.get("Gust")!;
+  const source = (await loadCardCatalog()).byName.get("Gust")!;
   const current = buildCanonicalCardDocument({
     cardCode: deriveCardCodeFromCard(source), card: source, sourceTextHash: hashCardRulesText(source),
     modelingStatus: "approved", adminNotes: "Readiness fixture", clauses: [],

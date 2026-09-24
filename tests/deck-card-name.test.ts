@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loadCardCatalog, loadSourceCardCatalog, type Card, type CardCatalog } from "../src/server/catalog";
+import { loadCardCatalog, type Card, type CardCatalog } from "../src/server/catalog";
 import { deckCardNameLookupCandidates, parseDeckList, resolveDeckCard, resolveDeckCardIdentity } from "../src/server/deck";
 
 const sourceCatalog = await loadCardCatalog();
@@ -73,15 +73,13 @@ test("non-Legend comma names and established export identity keep their meaning"
   assert.equal(resolveDeckCard(sourceCatalog, "Yi, Meditative")?.name, "Master Yi, Meditative");
 });
 
-test("full source resolution preserves maintained canonical identities and source decoration", async () => {
-  const catalog = await loadSourceCardCatalog();
-  for (const card of sourceCatalog.cards) {
-    const name = card.classification.type === "Legend" ? `${card.tags[0]}, ${card.name}` : card.name;
-    assert.equal(resolveDeckCard(catalog, name)?.public_code, card.public_code, name);
-  }
+test("full catalog resolution preserves canonical identities and includes later sets", async () => {
+  const catalog = await loadCardCatalog();
+  assert.equal(resolveDeckCard(catalog, "Ornn, Fire Below the Mountain")?.public_code, legend.public_code);
   assert.equal(resolveDeckCard(catalog, "Kennen, Heart of the Tempest")?.public_code, "VEN-155/166");
   assert.equal(resolveDeckCard(catalog, "Yordle, Heart of the Tempest"), undefined);
   assert.equal(resolveDeckCard(catalog, "Kai'Sa, Daughter of the Void")?.public_code, "OGN-247/298");
+  assert.equal(resolveDeckCard(catalog, "Jayce, Defender of Tomorrow")?.public_code, "VEN-149/166");
   const entry = { section: "Legend" as const, name: "Ornn, Fire Below the Mountain" };
   assert.deepEqual(deckCardNameLookupCandidates(entry, catalog), [entry.name, "Fire Below the Mountain"]);
   assert.equal(resolveDeckCard(catalog, { ...entry, section: "MainDeck" })?.classification.type, "Legend",

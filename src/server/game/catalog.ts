@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Db } from "mongodb";
 import { CANONICAL_CARDS_COLLECTION, loadBehaviorDefinitions, type CanonicalCardDocument } from "../card-catalog";
 import { deriveCardCodeFromCard } from "../card-catalog/identity";
-import { loadSourceCardCatalog, type CardCatalog } from "../catalog";
+import { loadCardCatalog, type CardCatalog } from "../catalog";
 import { resolveDeckCardIdentity } from "../deck/card-name";
 import { parseDeckList } from "../deck/parser";
 import { inspectCanonicalDeckReadiness, type RuntimeBehaviorDefinition } from "./catalog-readiness";
@@ -17,7 +17,7 @@ export class GameCatalogError extends Error {
 }
 
 export async function buildDeckSnapshotFromSource(db: Db, sourceText: string): Promise<DeckSnapshot> {
-  const catalog = await loadSourceCardCatalog();
+  const catalog = await loadCardCatalog();
   const entries = resolveEntries(sourceText, catalog);
   const codes = [...new Set(entries.map(({ cardCode }) => cardCode))];
   const [storedCards, behaviorDefinitions] = await Promise.all([

@@ -56,8 +56,7 @@ infer private state or decide legality.
 
 ## Operational notes
 
-Use the scripts declared in `package.json`. Catalog synchronization and runtime
-reset scripts mutate persistent MongoDB state; run them only when the task
-explicitly authorizes that operation. Generated MVP catalog outputs are produced
-by `scripts/build-mvp-card-catalog.ts` and checked with
-`npm run catalog:check-mvp`.
+Use the scripts declared in `package.json`. Catalog publication/synchronization
+and runtime reset scripts mutate persistent MongoDB state; run them only when
+the task explicitly authorizes that operation. The shared card catalog reads
+the complete local corpus from `data/sets/*.json`.

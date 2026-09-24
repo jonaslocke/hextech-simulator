@@ -5,11 +5,11 @@ import {
   buildCurrentBehaviorCatalog,
 } from "../src/server/card-catalog";
 import { buildJayceCanonicalPublication } from "../src/server/card-catalog/jayce-canonical-publications";
-import { loadSourceCardCatalog } from "../src/server/catalog";
+import { loadCardCatalog } from "../src/server/catalog";
 
 test("Jayce deck reusable publications compile their current supported cards", async () => {
   const [catalog, behaviors] = await Promise.all([
-    loadSourceCardCatalog(),
+    loadCardCatalog(),
     buildCurrentBehaviorCatalog(),
   ]);
 

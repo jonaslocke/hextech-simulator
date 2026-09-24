@@ -11,7 +11,7 @@ import {
   type CanonicalCardPublicationInput,
 } from "../src/server/card-catalog";
 import {
-  loadSourceCardCatalog,
+  loadCardCatalog,
   type Card,
 } from "../src/server/catalog";
 import { parseDeckList, validateDeckConstruction } from "../src/server/deck";
@@ -399,7 +399,7 @@ const EXPECTED_GAREN_MODELS: Record<string, ModelExpectation> = {
 test("Garen M1 deck has exact publishable executable behavior models", async () => {
   const deckPath = path.join(process.cwd(), "data", "decks", "garen.dec.txt");
   const [catalog, deckText, behaviorCatalog] = await Promise.all([
-    loadSourceCardCatalog(),
+    loadCardCatalog(),
     readFile(deckPath, "utf8"),
     buildCurrentBehaviorCatalog(),
   ]);

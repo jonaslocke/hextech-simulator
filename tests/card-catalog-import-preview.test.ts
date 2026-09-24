@@ -25,7 +25,7 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
 
   const preview = await previewCardCatalogImport({
     behaviorCatalog: buildPrimitiveCatalog(),
-    sourceLabel: "mvp.json",
+    sourceLabel: "uploaded-cards.json",
     rawJson: JSON.stringify([stupefy, megaMech]),
     existingCardLookup: async (cardCodes) => {
       lookupCalls.push(cardCodes);
@@ -34,7 +34,7 @@ test("previews admin-uploaded JSON without persisting suggestions", async () => 
   });
 
   assert.deepEqual(lookupCalls, [["OGN-095", "OGN-088"]]);
-  assert.equal(preview.sourceLabel, "mvp.json");
+  assert.equal(preview.sourceLabel, "uploaded-cards.json");
   assert.equal(preview.summary.uploadedCardCount, 2);
   assert.equal(preview.summary.suggestedCardCount, 2);
   assert.equal(preview.summary.vanillaCardCount, 1);
