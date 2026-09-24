@@ -61,6 +61,8 @@ export const GAME__RUNTIME_COVERAGE = {
   "action.fight": "executable",
   "action.kill_unit": "executable",
   "action.kill_card": "executable",
+  "action.banish_card": "executable",
+  "action.play_banished_card": "executable",
   "action.counter_chain_item": "executable",
   "action.return_to_hand": "executable",
   "action.recycle_cards": "executable",

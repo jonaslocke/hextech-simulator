@@ -1032,8 +1032,26 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Banish card",
     description: "Moves a card to banishment.",
-    parameters: [required("target", "target", "The card to banish.")],
-    emitsEvents: ["card.banished"]
+    parameters: [
+      required("target", "target", "The card to banish."),
+      optional("selectionKey", "string", "Selector key supplying the card or permanent to banish."),
+      optional("captureLocationAs", "string", "Effect outcome key that records the selected objects' locations before banishment."),
+    ],
+    emitsEvents: ["card.banished"],
+    engineSupport: supported("Banishment is a direct owner-zone transfer, separate from Kill and Discard; optional location capture supports a later linked effect-play."),
+  }),
+  "action.play_banished_card": primitiveSeed({
+    id: "action.play_banished_card",
+    family: "action",
+    name: "Play a banished card at its captured location",
+    description: "Plays selected Units that were banished earlier in the same effect at the locations captured before banishment.",
+    parameters: [
+      required("selectionKey", "string", "Selector key supplying the previously banished Units."),
+      required("capturedLocationsKey", "string", "Effect outcome key containing locations captured by the linked banish action."),
+      optional("ignoreBaseCosts", "boolean", "Whether the played card's base Energy and Power costs are set to zero."),
+    ],
+    emitsEvents: ["card.played"],
+    engineSupport: supported("The banished card's owner uses the normal server-authoritative effect-play queue with its pre-banish location as the granted Unit destination; an ineligible play returns to Banishment."),
   }),
   "action.return_to_hand": primitiveSeed({
     id: "action.return_to_hand",

@@ -51,7 +51,7 @@ test("plans idempotent deck-definition synchronization", async () => {
 
   const first = await planDeckDefinitionSync(repository, seeds, NOW);
   assert.deepEqual(first.result, {
-    insertedCount: 7,
+    insertedCount: 8,
     updatedCount: 0,
     unchangedCount: 0,
   });
@@ -61,7 +61,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(second.result, {
     insertedCount: 0,
     updatedCount: 0,
-    unchangedCount: 7,
+    unchangedCount: 8,
   });
   assert.deepEqual(second.writes, []);
 
@@ -75,7 +75,7 @@ test("plans idempotent deck-definition synchronization", async () => {
   assert.deepEqual(changed.result, {
     insertedCount: 0,
     updatedCount: 1,
-    unchangedCount: 6,
+    unchangedCount: 7,
   });
   assert.equal(changed.writes[0]?.createdAt, NOW);
   assert.equal(changed.writes[0]?.updatedAt, LATER);
@@ -89,7 +89,7 @@ test("requires the complete fixed seed set", async () => {
         [seedSet()[0]!],
         NOW,
       ),
-    /exactly: lux, annie, master-yi, stellacorn-herder, garen/,
+    /exactly: lux, annie, master-yi, stellacorn-herder, garen, ornn, jayce, ornn-hidden-test/,
   );
 });
 
@@ -119,6 +119,7 @@ test("returns valid playable options and rejects a fully unavailable catalog", a
     { id: "garen", label: "Garen" },
     { id: "ornn", label: "Ornn" },
     { id: "jayce", label: "Jayce" },
+    { id: "ornn-hidden-test", label: "Ornn - Hidden Test" },
   ]);
   assert.equal(errors.length, 1);
 
@@ -182,6 +183,7 @@ function seedSet(): DeckDefinitionSeed[] {
     { id: "garen", label: "Garen", sourceText: validSourceText("Garen") },
     { id: "ornn", label: "Ornn", sourceText: validSourceText("Ornn") },
     { id: "jayce", label: "Jayce", sourceText: validSourceText("Jayce") },
+    { id: "ornn-hidden-test", label: "Ornn - Hidden Test", sourceText: validSourceText("Ornn") },
   ];
 }
 

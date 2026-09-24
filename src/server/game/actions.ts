@@ -112,6 +112,8 @@ export function gameplayActions(
       stagedCardInstanceId: stagedPlay.cardInstanceId,
       ignoreBaseEnergy: stagedPlay.ignoreBaseEnergy,
       ignoreBasePower: stagedPlay.ignoreBasePower,
+      forcedDestinationId: stagedPlay.forcedDestinationId,
+      destinationBasePlayerId: stagedPlay.destinationBasePlayerId,
     });
     addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen", true);
     // Rule 419.3.c: if an effect-driven play has no eligible card play, the
@@ -860,7 +862,10 @@ function playCard(
       : null;
   if (
     isUnit &&
-    !isLegalUnitDestination(game, playerId, definition, destinationId)
+    (stagedPlay?.forcedDestinationId
+      ? destinationId !== stagedPlay.forcedDestinationId ||
+        (destinationId !== "base" && !destinationBattlefield)
+      : !isLegalUnitDestination(game, playerId, definition, destinationId))
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
@@ -941,7 +946,12 @@ function playCard(
   }
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
-    else player.zones.base.push(cardId);
+    else {
+      const destinationBasePlayerId = stagedPlay?.destinationBasePlayerId ?? playerId;
+      const destinationBase = game.state.players[destinationBasePlayerId]?.zones.base;
+      if (!destinationBase) throw new Error("Unit play Base destination is unavailable.");
+      destinationBase.push(cardId);
+    }
     advanceGameObjectIncarnation(game, cardId);
     if (
       destinationBattlefield &&
@@ -1057,11 +1067,14 @@ function skipEffectPlay(
   if (!player.zones.hand.includes(cardId)) {
     throw new Error("The staged card is no longer available to play.");
   }
-  // The temporary hand staging is an implementation detail. A card which
-  // cannot be played returns to its Main Deck; the other looked-at cards have
-  // already been recycled to the bottom by the resolving instruction.
+  // Temporary hand staging is an implementation detail. A card which cannot
+  // be played returns to the zone from which this effect staged it.
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
-  player.zones.mainDeck.unshift(cardId);
+  if (stagedPlay.returnZone === "banishment") {
+    if (!player.zones.banishment.includes(cardId)) player.zones.banishment.push(cardId);
+  } else {
+    player.zones.mainDeck.unshift(cardId);
+  }
   advanceGameObjectIncarnation(game, cardId);
   completeEffectPlayIfReady(game, playerId, cardId, true, index, decks);
 }
@@ -2210,6 +2223,8 @@ function addPlayableCardActions(
     stagedCardInstanceId: string;
     ignoreBaseEnergy: boolean;
     ignoreBasePower: boolean;
+    forcedDestinationId: string | null;
+    destinationBasePlayerId: string | null;
   },
 ) {
   const player = game.state.players[playerId]!;
@@ -2266,18 +2281,30 @@ function addPlayableCardActions(
     );
     const unitDestinations =
       definition.card.classification.type === "Unit"
-        ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
-            id,
-            name:
-              id === "base"
+        ? stagedPlay?.forcedDestinationId
+          ? [{
+              id: stagedPlay.forcedDestinationId,
+              name: stagedPlay.forcedDestinationId === "base"
                 ? "Base"
                 : definitionForInstance(
                     game.state.battlefields.find(
-                      (battlefield) => battlefield.battlefieldId === id,
+                      (battlefield) => battlefield.battlefieldId === stagedPlay.forcedDestinationId,
                     )!.cardInstanceId,
                     index,
                   ).card.name,
-          }))
+            }]
+          : legalUnitDestinationIds(game, playerId, definition).map((id) => ({
+              id,
+              name:
+                id === "base"
+                  ? "Base"
+                  : definitionForInstance(
+                      game.state.battlefields.find(
+                        (battlefield) => battlefield.battlefieldId === id,
+                      )!.cardInstanceId,
+                      index,
+                    ).card.name,
+            }))
         : null;
     for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
       for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {

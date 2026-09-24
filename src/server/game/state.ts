@@ -425,10 +425,9 @@ export const gameStateSchema = z.object({
       ).default({}),
     }),
   ),
-  // A resolving effect may instruct one or more players to play specific,
-  // privately looked-at cards. The cards are temporarily staged in their
-  // owners' hands solely to reuse the normal server-authoritative play
-  // declaration and payment path.
+  // A resolving effect may instruct a player to play identified cards. Cards
+  // are temporarily staged in their owners' hands solely to reuse the normal
+  // server-authoritative play declaration and payment path.
   effectPlayQueue: z.array(
     z.object({
       resolutionId: z.string().min(1),
@@ -437,6 +436,9 @@ export const gameStateSchema = z.object({
       cardInstanceId: z.string().min(1),
       ignoreBaseEnergy: z.boolean(),
       ignoreBasePower: z.boolean().default(false),
+      returnZone: z.enum(["mainDeck", "banishment"]).default("mainDeck"),
+      forcedDestinationId: z.string().min(1).nullable().default(null),
+      destinationBasePlayerId: z.string().min(1).nullable().default(null),
     }),
   ).default([]).optional(),
   pendingChoice: z

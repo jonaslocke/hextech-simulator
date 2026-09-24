@@ -11,6 +11,25 @@ type Assignment = [
 type Clause = Assignment[];
 
 const models: Record<string, Clause[]> = {
+  "VEN-066": [[
+    ["selector", "selector.unit", {
+      area: "board",
+      locationRelation: "any",
+      minimumCount: 1,
+      maximumCount: 1,
+      selectionKey: "target",
+    }],
+    ["action", "action.banish_card", {
+      target: "unit",
+      selectionKey: "target",
+      captureLocationAs: "capturedLocations",
+    }],
+    ["action", "action.play_banished_card", {
+      selectionKey: "target",
+      capturedLocationsKey: "capturedLocations",
+      ignoreBaseCosts: true,
+    }],
+  ]],
   "OGN-160": [[
     ["trigger", "trigger.end_of_turn", { player: "controller" }],
     ["action", "action.reveal_until_card_type_and_play", { cardType: "Unit", ignoreBaseCosts: true }],

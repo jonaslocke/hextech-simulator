@@ -610,6 +610,9 @@ export function createPrimitiveHandlers(
         cardInstanceId: selectedCardId,
         ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
         ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
+        returnZone: "mainDeck",
+        forcedDestinationId: null,
+        destinationBasePlayerId: null,
       });
     },
   });
@@ -947,6 +950,107 @@ export function createPrimitiveHandlers(
       context.selectedIds.forEach((id) => moveUnitToTrash(context.game, id, index));
     }
   });
+  handlers.set("action.banish_card", {
+    execute(binding, context) {
+      const selectionKey = binding.parameters.selectionKey;
+      const selected = typeof selectionKey === "string"
+        ? context.selectedBySelector[selectionKey] ?? []
+        : context.selectedIds;
+      const capturedLocations = selected.map((id) => JSON.stringify({
+        cardInstanceId: id,
+        location: boardLocationForUnit(context.game, id),
+      }));
+      if (typeof binding.parameters.captureLocationAs === "string") {
+        context.effectOutcomes[binding.parameters.captureLocationAs] = capturedLocations;
+      }
+      for (const id of selected) {
+        const ownerPlayerId = index.instances.get(id)?.ownerPlayerId;
+        if (!ownerPlayerId) continue;
+        // Rule 427.2 moves directly to Banishment; this is not a Kill or Discard.
+        removeFromAllLocations(context.game, id);
+        const banishment = context.game.state.players[ownerPlayerId]!.zones.banishment;
+        if (!banishment.includes(id)) banishment.push(id);
+        resetStateAfterLeavingBoard(context.game, id, index);
+        if (isTokenInstance(id, index)) {
+          ceaseToken(context.game, id);
+          continue;
+        }
+        (context.game.state.queuedBehaviorEvents ??= []).push({
+          type: "card.banished",
+          actorPlayerId: context.controllerPlayerId,
+          subjectCardInstanceId: id,
+          values: {},
+        });
+      }
+    },
+  });
+  handlers.set("action.play_banished_card", {
+    execute(binding, context) {
+      if (!context.effectResolutionId) {
+        throw new Error("Effect-driven card play must resolve in an effect frame.");
+      }
+      if ((context.game.state.effectPlayQueue ?? []).length > 0) {
+        throw new Error("Effect-driven card play queue is already active.");
+      }
+      const selectionKey = stringParam(binding, "selectionKey");
+      const selected = context.selectedBySelector[selectionKey] ?? [];
+      const capturedValue = context.effectOutcomes[stringParam(binding, "capturedLocationsKey")];
+      const capturedLocations = new Map(
+        (Array.isArray(capturedValue) ? capturedValue : []).flatMap((entry) => {
+          if (typeof entry !== "string") return [];
+          try {
+            const parsed = JSON.parse(entry) as {
+              cardInstanceId?: unknown;
+              location?: unknown;
+            };
+            const location = parsed.location as { kind?: unknown; id?: unknown } | null;
+            if (
+              typeof parsed.cardInstanceId !== "string" ||
+              !location ||
+              (location.kind !== "base" && location.kind !== "battlefield") ||
+              typeof location.id !== "string"
+            ) return [];
+            return [[parsed.cardInstanceId, { kind: location.kind, id: location.id } as const]];
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const staged = selected.flatMap((id) => {
+        const instance = index.instances.get(id);
+        const definition = instance && index.definitions.get(instance.cardCode);
+        const location = capturedLocations.get(id);
+        const player = instance && context.game.state.players[instance.ownerPlayerId];
+        if (
+          !instance ||
+          !player ||
+          !definition ||
+          definition.card.classification.type !== "Unit" ||
+          !location ||
+          !player.zones.banishment.includes(id) ||
+          (location.kind === "battlefield" && !context.game.state.battlefields.some(
+            (battlefield) => battlefield.battlefieldId === location.id,
+          )) ||
+          (location.kind === "base" && !context.game.state.players[location.id])
+        ) return [];
+        player.zones.banishment = player.zones.banishment.filter((candidate) => candidate !== id);
+        player.zones.hand.push(id);
+        advanceGameObjectIncarnation(context.game, id);
+        return [{
+          resolutionId: context.effectResolutionId!,
+          sourceCardInstanceId: context.sourceCardInstanceId,
+          playerId: instance.ownerPlayerId,
+          cardInstanceId: id,
+          ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
+          ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
+          returnZone: "banishment" as const,
+          forcedDestinationId: location.kind === "base" ? "base" : location.id,
+          destinationBasePlayerId: location.kind === "base" ? location.id : null,
+        }];
+      });
+      context.game.state.effectPlayQueue = staged;
+    },
+  });
   handlers.set("action.return_to_hand", {
     execute(_binding, context) {
       for (const id of context.selectedIds) {
@@ -1005,6 +1109,9 @@ export function createPrimitiveHandlers(
           cardInstanceId: chosen,
           ignoreBaseEnergy: true,
           ignoreBasePower: false,
+          returnZone: "mainDeck" as const,
+          forcedDestinationId: null,
+          destinationBasePlayerId: null,
         }];
       });
       context.game.state.effectPlayQueue = staged;

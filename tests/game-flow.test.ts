@@ -2087,6 +2087,246 @@ test("a public reveal-until instruction plays the first matching card with both 
   assert.equal(next.state.effectResolutions.length, 0);
 });
 
+test("banishment effect-play uses the target owner and captured location", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  source.behaviorModel.clauses = [
+    clause("banish-and-return-play", {
+      selectors: [binding("selector.unit", 0, {
+        area: "board",
+        locationRelation: "any",
+        minimumCount: 1,
+        maximumCount: 1,
+        selectionKey: "target",
+      })],
+      effects: [
+        binding("action.banish_card", 1, {
+          target: "unit",
+          selectionKey: "target",
+          captureLocationAs: "capturedLocations",
+        }),
+        binding("action.play_banished_card", 2, {
+          selectionKey: "target",
+          capturedLocationsKey: "capturedLocations",
+          ignoreBaseCosts: true,
+        }),
+      ],
+    }),
+  ];
+  const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  unit.card.attributes.energy = 2;
+  unit.card.attributes.power = 1;
+  decks[1]!.instances.push({
+    instanceId: "p2:target",
+    ownerPlayerId: "p2",
+    source: "mainDeck",
+    cardCode: "UNIT",
+  });
+  game.state.cardStates["p2:target"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p1!.zones.base = game.state.players.p1!.zones.base.filter((id) => id !== "p1:mover");
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  game.state.battlefields[0]!.units = ["p2:target"];
+  game.state.players.p2!.energy = 2;
+  game.state.players.p2!.power = { Mind: 1 };
+
+  const declaration = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:spell",
+  )!;
+  assert.deepEqual(declaration.targets.map((target) => target.legalIds), [["p2:target"]]);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: declaration.id,
+    selectedIds: ["p2:target"],
+    decks,
+    now: "banishment-declaration",
+  });
+  assert.deepEqual(next.state.chain?.items[0]?.targetCardInstanceIds, ["p2:target"]);
+  assert.deepEqual(next.state.battlefields[0]!.units, ["p2:target"]);
+  for (const playerId of ["p1", "p2"] as const) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    )!;
+    next = performGameplayAction({
+      game: next, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks,
+      now: `banishment-priority-${playerId}`,
+    });
+  }
+  assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p2");
+  assert.equal(next.state.effectPlayQueue?.[0]?.forcedDestinationId, "p1:bf");
+  assert.equal(next.state.players.p2!.zones.banishment.includes("p2:target"), false);
+  assert.equal(next.state.players.p2!.zones.hand.includes("p2:target"), true);
+
+  const play = gameplayActions(next, "p2", decks).find(
+    (action) => action.sourceCardInstanceId === "p2:target",
+  )!;
+  assert.equal(play.costPreview?.energy, 0);
+  assert.equal(play.costPreview?.effectivePower, 0);
+  assert.match(play.label, /Arena/);
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p2",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "banishment-play",
+  });
+  assert.deepEqual(next.state.battlefields[0]!.units, ["p2:target"]);
+  assert.equal(next.state.players.p2!.zones.base.includes("p2:target"), false);
+  assert.equal(next.state.players.p2!.zones.banishment.includes("p2:target"), false);
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+  assert.equal(next.state.players.p2!.energy, 2);
+  assert.deepEqual(next.state.players.p2!.power, { Mind: 1 });
+});
+
+test("an ineligible banishment effect-play stays banished and continues resolution", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "BF")!;
+  source.behaviorModel.clauses = [
+    clause("banish-and-play", {
+      selectors: [binding("selector.unit", 0, {
+        area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+        selectionKey: "target",
+      })],
+      effects: [
+        binding("action.banish_card", 1, {
+          target: "unit", selectionKey: "target", captureLocationAs: "locations",
+        }),
+        binding("action.play_banished_card", 2, {
+          selectionKey: "target", capturedLocationsKey: "locations", ignoreBaseCosts: true,
+        }),
+        binding("action.gain_xp", 3, { amount: 1 }),
+      ],
+    }),
+  ];
+  const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  unit.behaviorModel.clauses = [clause("needs-play-target", {
+    selectors: [binding("selector.enemy_unit", 0, {
+      area: "battlefield", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+    })],
+  })];
+  decks[1]!.instances.push({
+    instanceId: "p2:target", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.cardStates["p2:target"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.battlefields[0]!.controllerPlayerId = "p1";
+  game.state.battlefields[0]!.units = ["p2:target"];
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:bf",
+    clauseId: "banish-and-play",
+    selectedIds: ["p2:target"],
+    decks,
+  }), false);
+  assert.equal(gameplayActions(game, "p1", decks).some(
+    (action) => action.sourceCardInstanceId === "p2:target",
+  ), false);
+  const p2Actions = gameplayActions(game, "p2", decks);
+  assert.equal(p2Actions.some((action) => action.id.split(":")[3] === "play"), false);
+  const continueAction = p2Actions.find((action) => action.label === "Continue")!;
+  const next = performGameplayAction({
+    game,
+    actorPlayerId: "p2",
+    actionId: continueAction.id,
+    selectedIds: [],
+    decks,
+    now: "banishment-continue",
+  });
+  assert.deepEqual(next.state.players.p2!.zones.banishment, ["p2:target"]);
+  assert.equal(next.state.players.p2!.zones.hand.includes("p2:target"), false);
+  assert.equal(next.state.players.p1!.xp, 1);
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+});
+
+test("banishment effect-play preserves the identity of a Base destination", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "BF")!;
+  source.behaviorModel.clauses = [
+    clause("banish-and-return-play", {
+      selectors: [binding("selector.unit", 0, {
+        area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+        selectionKey: "target",
+      })],
+      effects: [
+        binding("action.banish_card", 1, {
+          target: "unit", selectionKey: "target", captureLocationAs: "locations",
+        }),
+        binding("action.play_banished_card", 2, {
+          selectionKey: "target", capturedLocationsKey: "locations", ignoreBaseCosts: true,
+        }),
+      ],
+    }),
+  ];
+  decks[1]!.instances.push({
+    instanceId: "p2:target", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.cardStates["p2:target"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.players.p1!.zones.base.push("p2:target");
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:bf",
+    clauseId: "banish-and-return-play",
+    selectedIds: ["p2:target"],
+    decks,
+  }), false);
+  assert.equal(game.state.effectPlayQueue?.[0]?.forcedDestinationId, "base");
+  assert.equal(game.state.effectPlayQueue?.[0]?.destinationBasePlayerId, "p1");
+  const play = gameplayActions(game, "p2", decks).find(
+    (action) => action.sourceCardInstanceId === "p2:target",
+  )!;
+  const next = performGameplayAction({
+    game, actorPlayerId: "p2", actionId: play.id, selectedIds: [], decks, now: "base-return-play",
+  });
+  assert.ok(next.state.players.p1!.zones.base.includes("p2:target"));
+  assert.equal(next.state.players.p2!.zones.base.includes("p2:target"), false);
+});
+
+test("a banished Unit token ceases to exist before a linked effect-play", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "BF")!;
+  source.behaviorModel.clauses = [
+    clause("banish-and-return-play", {
+      selectors: [binding("selector.unit", 0, {
+        area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+        selectionKey: "target",
+      })],
+      effects: [
+        binding("action.banish_card", 1, {
+          target: "unit", selectionKey: "target", captureLocationAs: "locations",
+        }),
+        binding("action.play_banished_card", 2, {
+          selectionKey: "target", capturedLocationsKey: "locations", ignoreBaseCosts: true,
+        }),
+      ],
+    }),
+  ];
+  decks[1]!.instances.push({
+    instanceId: "p2:token", ownerPlayerId: "p2", source: "token", cardCode: "UNIT",
+  });
+  game.state.cardStates["p2:token"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.battlefields[0]!.units = ["p2:token"];
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "p1:bf",
+    clauseId: "banish-and-return-play",
+    selectedIds: ["p2:token"],
+    decks,
+  }), true);
+  assert.equal(game.state.cardStates["p2:token"], undefined);
+  assert.equal(decks[1]!.instances.some((instance) => instance.instanceId === "p2:token"), true);
+  assert.equal(game.state.players.p2!.zones.banishment.includes("p2:token"), false);
+  assert.equal(game.state.players.p2!.zones.hand.includes("p2:token"), false);
+  assert.equal(game.state.effectPlayQueue?.length, 0);
+});
+
 test("committed modal Repeat declarations project only legal mode-target combinations", () => {
   const { game, decks } = fixture();
   const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
