@@ -2,12 +2,14 @@
 
 import { FC, MouseEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { Sparkles } from "lucide-react";
 import {
   CardRulesText,
   DomainIcon,
   EnergyResource,
   formatDomain,
+  getKeywordImagePath,
   MightResource,
 } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
@@ -102,6 +104,7 @@ export const CardTile: FC<CardTileProps> = ({
   isTransferHidden = false,
   isExhausted,
   img,
+  keywordAnnotations,
   might,
   mightModifiers,
   name,
@@ -116,6 +119,7 @@ export const CardTile: FC<CardTileProps> = ({
   preserveOrientation = false,
   publicCode,
   rulesText,
+  runtimeEffects,
   setLabel,
   showMight = true,
   size = "md",
@@ -255,7 +259,7 @@ export const CardTile: FC<CardTileProps> = ({
           ? "z-[2147483647]"
           : isStagedForMovement
             ? "z-30"
-            : isHighlighted
+            : isHighlighted || (keywordAnnotations?.length ?? 0) > 0
               ? "z-20"
               : "z-10",
       )}
@@ -386,9 +390,15 @@ export const CardTile: FC<CardTileProps> = ({
         )}
         {damage !== undefined && damage > 0 && (
           <span
+            aria-label={`${damage} damage`}
             className={cn(
-              "top-1/2 absolute flex justify-center items-center bg-red-500 shadow border border-red-100 rounded-full font-black text-white -translate-y-1/2",
+              "top-1/2 absolute z-30 flex justify-center items-center bg-red-500 shadow border border-red-100 rounded-full font-black text-white -translate-y-1/2 pointer-events-none",
               sizeConfig.damageBadgeClassName,
+              keywordAnnotations?.length && "left-auto",
+              keywordAnnotations?.length && size === "sm" && "-right-4",
+              keywordAnnotations?.length && size === "md" && "-right-3",
+              keywordAnnotations?.length && size === "lg" && "-right-3",
+              keywordAnnotations?.length && size === "xl" && "-right-4",
             )}
           >
             {damage}
@@ -399,6 +409,7 @@ export const CardTile: FC<CardTileProps> = ({
             Moving
           </span>
         )}
+        <KeywordAnnotationStack annotations={keywordAnnotations} />
       </motion.div>
       <CardHoverPreviewPortal
         domains={domains}
@@ -414,6 +425,7 @@ export const CardTile: FC<CardTileProps> = ({
         publicCode={publicCode}
         resolvedOrientation={resolvedOrientation}
         rulesText={rulesText}
+        runtimeEffects={runtimeEffects}
         setLabel={setLabel}
         supertype={supertype}
         type={type}
@@ -421,6 +433,90 @@ export const CardTile: FC<CardTileProps> = ({
     </div>
   );
 };
+
+function KeywordAnnotationStack({
+  annotations,
+}: {
+  annotations?: Card["keywordAnnotations"];
+}) {
+  if (!annotations?.length) return null;
+
+  const visibleAnnotations = annotations.slice(0, 3);
+  const overflow = annotations.length - visibleAnnotations.length;
+  const visibleLabels = visibleAnnotations.map(formatKeywordAnnotation);
+
+  return (
+    <div
+      aria-label={`Runtime keywords: ${visibleLabels.join(", ")}${overflow > 0 ? ` and ${overflow} more` : ""}`}
+      className="top-2 left-[-7px] z-20 absolute grid gap-1.5 max-w-[calc(100vw-1rem)] pointer-events-none"
+      role="list"
+    >
+      <AnimatePresence initial={false}>
+        {visibleAnnotations.map((annotation) => {
+          const keywordName = annotation.keywordId
+            .replace(/^keyword\./, "")
+            .replaceAll("_", "-");
+          const iconPath = getKeywordImagePath(keywordName, "md");
+          const label = formatKeywordAnnotation(annotation);
+
+          return (
+            <motion.span
+              animate={{ opacity: 1, scale: 1 }}
+              aria-label={label}
+              className="inline-flex w-max max-w-full items-center gap-1.5 rounded-r-full rounded-l-md border border-white/65 px-2 py-1 font-semibold text-[9px] leading-none shadow-md shadow-black/55 whitespace-nowrap"
+              exit={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0, scale: 0.96 }}
+              key={annotation.keywordId}
+              layout="position"
+              role="listitem"
+              style={{
+                backgroundColor: "var(--riftbound-keyword-background)",
+                color: "var(--riftbound-keyword-foreground)",
+                transformOrigin: "left center",
+              }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+            >
+              {iconPath ? (
+                // eslint-disable-next-line @next/next/no-img-element -- The keyword asset map owns local image URLs.
+                <img alt="" aria-hidden="true" className="size-3.5 shrink-0 object-contain" draggable={false} src={iconPath} />
+              ) : (
+                <Sparkles aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={2.25} />
+              )}
+              <span>{label}</span>
+            </motion.span>
+          );
+        })}
+        {overflow > 0 && (
+          <motion.span
+            animate={{ opacity: 1, scale: 1 }}
+            aria-label={`${overflow} more runtime keyword${overflow === 1 ? "" : "s"}`}
+            className="inline-flex w-max items-center rounded-r-full rounded-l-md border border-white/65 px-2 py-1 font-semibold text-[9px] leading-none shadow-md shadow-black/55 whitespace-nowrap"
+            exit={{ opacity: 0, scale: 0.96 }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            key="keyword-overflow"
+            role="listitem"
+            style={{
+              backgroundColor: "var(--riftbound-keyword-background)",
+              color: "var(--riftbound-keyword-foreground)",
+              transformOrigin: "left center",
+            }}
+            transition={{ duration: 0.14, ease: "easeOut" }}
+          >
+            +{overflow}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function formatKeywordAnnotation(
+  annotation: NonNullable<Card["keywordAnnotations"]>[number],
+) {
+  return annotation.effectiveAmount === null
+    ? annotation.displayName
+    : `${annotation.displayName} ${annotation.effectiveAmount}`;
+}
 
 function CardHoverPreviewPortal({
   domains,
@@ -436,6 +532,7 @@ function CardHoverPreviewPortal({
   publicCode,
   resolvedOrientation,
   rulesText,
+  runtimeEffects,
   setLabel,
   supertype,
   type,
@@ -453,6 +550,7 @@ function CardHoverPreviewPortal({
   publicCode?: string;
   resolvedOrientation: ResolvedCardTileOrientation;
   rulesText?: string;
+  runtimeEffects?: Card["runtimeEffects"];
   setLabel?: string;
   supertype?: Card["supertype"];
   type?: Card["type"];
@@ -502,6 +600,7 @@ function CardHoverPreviewPortal({
         power={power}
         publicCode={publicCode}
         rulesText={rulesText}
+        runtimeEffects={runtimeEffects}
         setLabel={setLabel}
         supertype={supertype}
         type={type}
@@ -552,6 +651,7 @@ function CardSummary({
   power,
   publicCode,
   rulesText,
+  runtimeEffects,
   setLabel,
   supertype,
   type,
@@ -566,6 +666,7 @@ function CardSummary({
   power?: number;
   publicCode?: string;
   rulesText?: string;
+  runtimeEffects?: Card["runtimeEffects"];
   setLabel?: string;
   supertype?: Card["supertype"];
   type?: Card["type"];
@@ -626,13 +727,29 @@ function CardSummary({
           )}
         </div>
       )}
-      {mightModifiers && mightModifiers.length > 0 && <section aria-label="Might modifiers" className="text-xs text-slate-200">
-        <div className="font-semibold">Might changes</div>
-        <ul className="mt-1 space-y-1">{mightModifiers.map((entry) => <li key={entry.id}>
-          <strong>{entry.amount > 0 ? "+" : ""}{entry.amount}</strong> {entry.sourceName} · {entry.label}
-          <span className="text-slate-400"> · {({ thisTurn: "this turn", whileAttached: "while attached", whileAttacking: "while attacking", whileDefending: "while defending", whileSourceOnBoard: "while source is on board", whileSourceAtBattlefield: "while source is at battlefield" } as Record<string, string>)[entry.duration] ?? entry.duration}</span>
-        </li>)}</ul>
-      </section>}
+      {((mightModifiers?.length ?? 0) > 0 || (runtimeEffects?.length ?? 0) > 0) && (
+        <section aria-label="Runtime changes" className="text-slate-200">
+          <div className="font-semibold text-xs">Runtime changes</div>
+          <ul className="mt-1 space-y-2">
+            {mightModifiers?.map((entry) => (
+              <RuntimeEffectRow
+                duration={formatMightModifierDuration(entry.duration)}
+                effect={`${entry.amount > 0 ? "+" : ""}${entry.amount} Might${entry.label && entry.label !== "Might" ? ` (${entry.label})` : ""}`}
+                key={`might:${entry.id}`}
+                source={entry.sourceName}
+              />
+            ))}
+            {runtimeEffects?.map((entry, index) => (
+              <RuntimeEffectRow
+                duration={entry.displayDuration}
+                effect={formatRuntimeEffect(entry)}
+                key={`${entry.kind}:${index}`}
+                source={entry.sourceName}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="gap-1.5 grid bg-slate-950/45 shadow-inner p-2 border border-white/10 rounded-md text-slate-100 text-sm">
         {rulesText?.trim() ? (
           <CardRulesText text={rulesText} />
@@ -647,6 +764,52 @@ function CardSummary({
       )}
     </div>
   );
+}
+
+function RuntimeEffectRow({
+  duration,
+  effect,
+  source,
+}: {
+  duration: string | null;
+  effect: string;
+  source: string;
+}) {
+  return (
+    <li className="min-w-0">
+      <div className="font-semibold text-[12px] text-slate-100 leading-snug break-words">
+        {effect}
+      </div>
+      <div className="mt-0.5 text-[10px] leading-snug break-words">
+        {duration && (
+          <>
+            <span className="font-medium text-slate-300">{duration}</span>
+            <span aria-hidden="true" className="px-1 text-slate-500">·</span>
+          </>
+        )}
+        <span className="font-normal text-slate-500">{source}</span>
+      </div>
+    </li>
+  );
+}
+
+function formatRuntimeEffect(
+  effect: NonNullable<Card["runtimeEffects"]>[number],
+) {
+  if (effect.kind === "grantedBehavior") return effect.text;
+  if (effect.contributionAmount === null) return effect.displayName;
+  return `${effect.displayName} ${effect.contributionAmount > 0 ? "+" : ""}${effect.contributionAmount}`;
+}
+
+function formatMightModifierDuration(duration: string) {
+  return ({
+    thisTurn: "This turn",
+    whileAttached: "While attached",
+    whileAttacking: "While attacking",
+    whileDefending: "While defending",
+    whileSourceOnBoard: "While source is on board",
+    whileSourceAtBattlefield: "While source is at a battlefield",
+  } as Record<string, string>)[duration] ?? duration;
 }
 
 function SummaryStatChip({

@@ -176,6 +176,8 @@ export type BoardProjection = {
       damage: number;
       computedMight?: number;
       mightModifiers?: ProjectedCardView["mightModifiers"];
+      keywordAnnotations?: ProjectedCardView["keywordAnnotations"];
+      runtimeEffects?: ProjectedCardView["runtimeEffects"];
       attachedToCardInstanceId?: string | null;
     }
   >;
@@ -197,6 +199,8 @@ export function adaptProjectionToBoard(projection: GameProjection): {
         empowered: card.empowered,
         damage: card.damage,
         mightModifiers: card.mightModifiers,
+        keywordAnnotations: card.keywordAnnotations,
+        runtimeEffects: card.runtimeEffects,
         ...(card.computedMight === null
           ? {}
           : { computedMight: card.computedMight }),

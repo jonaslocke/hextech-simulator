@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { gameFixture } from "./helpers/game-fixture";
 import { projectGame } from "../src/server/game/projection";
 import { chainRelationships } from "../src/features/game-board/chain-relationships";
+import { adaptProjectionToBoard } from "../src/features/game-board/board-view-model";
 import { newPublicReveals } from "../src/features/game-board/interactions/public-reveal-events";
 import { resolveDecisionInspectionRequest } from "../src/features/game-board/interactions/decision-inspection-request";
 import { createRuntimeCardIndex, definitionForInstance, recomputeMight } from "../src/server/game/primitive-handlers";
@@ -51,6 +52,32 @@ test("projected Might lists separate attachment instances and removes detached c
   detachCard(game, gear);
   recomputeMight(game, unit, index);
   assert.equal(read().mightModifiers!.length, 0);
+});
+
+test("runtime keyword and effect metadata reach the board card model", async () => {
+  const { game, decks, place } = await gameFixture();
+  const unit = place("OGN-044", "base");
+  const projection = projectGame({ game, decks, viewerPlayerId: "p1" });
+  const projectedCard = projection.players.flatMap((player) => player.zones.flatMap((zone) => zone.cards))
+    .find((card) => card.instanceId === unit)!;
+  projectedCard.keywordAnnotations = [{
+    keywordId: "keyword.assault",
+    displayName: "Assault",
+    effectiveAmount: 4,
+    activationOrder: 2,
+  }];
+  projectedCard.runtimeEffects = [{
+    kind: "keyword",
+    keywordId: "keyword.assault",
+    displayName: "Assault",
+    contributionAmount: 3,
+    displayDuration: "This turn",
+    sourceName: "Blood Rush",
+  }];
+
+  const adapted = adaptProjectionToBoard(projection);
+  assert.deepEqual(adapted.projection.cardStates[unit]?.keywordAnnotations, projectedCard.keywordAnnotations);
+  assert.deepEqual(adapted.projection.cardStates[unit]?.runtimeEffects, projectedCard.runtimeEffects);
 });
 
 test("play projection shows final costs only for altered or alternative modes and excludes unavailable modes", async () => {

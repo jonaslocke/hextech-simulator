@@ -3,3 +3,4 @@ export { DomainIcon } from "./components/domain-icon";
 export { EnergyResource } from "./components/energy-resource";
 export { MightResource } from "./components/might-resource";
 export { formatDomain } from "./lib/format-domain";
+export { getKeywordImagePath } from "./lib/keyword-assets";

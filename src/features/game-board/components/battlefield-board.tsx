@@ -181,7 +181,7 @@ const battlefieldDescriptionBar = cva([
 
 const battlefieldUnitRow = cva(
   [
-    "flex flex-wrap gap-2 min-h-0 overflow-auto",
+    "flex flex-wrap gap-2 pl-2 min-h-0 overflow-auto",
     "[scrollbar-color:rgba(103,232,249,0.25)_transparent]",
   ],
   {

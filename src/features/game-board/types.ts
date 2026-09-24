@@ -58,6 +58,8 @@ export type Card = {
   attachedToCardInstanceId?: string | null;
   damage?: number;
   mightModifiers?: ProjectedCardView["mightModifiers"];
+  keywordAnnotations?: ProjectedCardView["keywordAnnotations"];
+  runtimeEffects?: ProjectedCardView["runtimeEffects"];
   comesToPlayReady?: boolean;
 };
 

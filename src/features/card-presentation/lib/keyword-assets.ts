@@ -67,8 +67,8 @@ const keywordAssets: Partial<Record<
 };
 
 export function getKeywordImagePath(
-  keyword: CardKeyword,
+  keyword: string,
   size: KeywordSize = "md",
 ) {
-  return keywordAssets[keyword]?.[size].src;
+  return keywordAssets[keyword as CardKeyword]?.[size]?.src;
 }

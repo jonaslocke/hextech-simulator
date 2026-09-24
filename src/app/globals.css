@@ -77,6 +77,10 @@
 
   --player-accent-border: #60a5fa;
   --opponent-accent-border: #fb7185;
+
+  /* Runtime Riftbound keyword presentation */
+  --riftbound-keyword-background: #1ea289;
+  --riftbound-keyword-foreground: #ffffff;
 }
 
 @theme inline {
