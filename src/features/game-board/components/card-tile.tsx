@@ -466,7 +466,7 @@ function KeywordAnnotationStack({
   return (
     <div
       aria-label={`Runtime keywords: ${visibleLabels.join(", ")}${overflow > 0 ? ` and ${overflow} more` : ""}`}
-      className="top-2 left-[-6px] z-20 absolute gap-1 grid pointer-events-none"
+      className="top-2 left-0 z-20 absolute gap-1 grid pointer-events-none"
       role="list"
     >
       <AnimatePresence initial={false}>
