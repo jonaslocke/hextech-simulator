@@ -373,7 +373,7 @@ test("keeps large rune rows inside a horizontally scrollable zone", async () => 
   );
 });
 
-test("routes owned Trash primary interaction through playable-card handling only", async () => {
+test("routes owned Trash pointer activation through the projected play menu", async () => {
   const overlay = await readFile(
     path.join(
       process.cwd(),
@@ -392,18 +392,18 @@ test("routes owned Trash primary interaction through playable-card handling only
 
   assert.match(
     overlay,
-    /openZone === "playerTrash"[\s\S]*?onCardContextAction=\{onCardContextAction\}[\s\S]*?onPlayCard=\{onPlayCard\}/,
+    /openZone === "playerTrash"[\s\S]*?onCardContextAction=\{onCardContextAction\}[\s\S]*?onCardPrimaryAction=\{onCardPrimaryAction\}/,
   );
   assert.match(
     overlay,
-    /onPrimaryAction=\{onPlayCard \? \(\) => onPlayCard\(card\) : undefined\}/,
+    /onPrimaryAction=\{\s*onCardPrimaryAction\s*\?\s*\(event\) => onCardPrimaryAction\(card, event\)/,
   );
   const opponentTrash = overlay.match(/openZone === "opponentTrash" \? \([\s\S]*?\) : \(/)?.[0];
   assert.ok(opponentTrash);
-  assert.doesNotMatch(opponentTrash, /onCardContextAction|onPlayCard/);
+  assert.doesNotMatch(opponentTrash, /onCardContextAction|onCardPrimaryAction/);
   assert.match(
     board,
-    /<TemporaryZoneOverlay[\s\S]*?onPlayCard=\{\s*isInteractionSuspended \|\| isMovementDraftActive\s*\? undefined\s*: handlePlayCardFromHand\s*\}/,
+    /<TemporaryZoneOverlay[\s\S]*?onCardPrimaryAction=\{\s*isInteractionSuspended \|\| isMovementDraftActive\s*\? undefined\s*: \(card, event\) =>\s*event\s*\? handleCardContextFromHand\(card, event\)\s*: handlePlayCardFromHand\(card\)/,
   );
 });
 
