@@ -432,7 +432,8 @@ test("play menu renders projected Flow and Repeat markers with keyword assets", 
   );
 
   assert.ok(label.includes("const markers = /\\[(Flow|Repeat)\\]/g;"));
-  assert.match(label, /getKeywordImagePath\(part\.toLowerCase\(\)/);
+  assert.ok(label.includes('part === "Flow" ? "flow" : "repeat"'));
+  assert.match(label, /getKeywordImagePath\([\s\S]*?"md"/);
   assert.match(keywordAssets, /flow: \{ md: flow64, lg: flow128 \}/);
 });
 
