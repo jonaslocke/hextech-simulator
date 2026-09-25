@@ -407,6 +407,35 @@ test("routes owned Trash pointer activation through the projected play menu", as
   );
 });
 
+test("play menu renders projected Flow and Repeat markers with keyword assets", async () => {
+  const label = await readFile(
+    path.join(
+      process.cwd(),
+      "src",
+      "features",
+      "game-board",
+      "components",
+      "playable-card-menu-label.tsx",
+    ),
+    "utf8",
+  );
+  const keywordAssets = await readFile(
+    path.join(
+      process.cwd(),
+      "src",
+      "features",
+      "card-presentation",
+      "lib",
+      "keyword-assets.ts",
+    ),
+    "utf8",
+  );
+
+  assert.ok(label.includes("const markers = /\\[(Flow|Repeat)\\]/g;"));
+  assert.match(label, /getKeywordImagePath\(part\.toLowerCase\(\)/);
+  assert.match(keywordAssets, /flow: \{ md: flow64, lg: flow128 \}/);
+});
+
 async function collect(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files: string[] = [];

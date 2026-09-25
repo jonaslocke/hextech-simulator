@@ -31,15 +31,30 @@ export function PlayableCardMenuLabel({ mode }: { mode: BoardPlayerProjection["a
 }
 
 function renderPlayLabel(label: string) {
-  const marker = "[Repeat]";
-  const markerIndex = label.indexOf(marker);
-  if (markerIndex < 0) return label;
-  const asset = getKeywordImagePath("repeat", "md");
-  return <span className="inline-flex items-center gap-1">
-    {label.slice(0, markerIndex)}
-    {asset ? <img alt="Repeat" className="h-4 w-auto object-contain" src={asset} /> : marker}
-    {label.slice(markerIndex + marker.length)}
-  </span>;
+  const markers = /\[(Flow|Repeat)\]/g;
+  if (!markers.test(label)) return label;
+
+  markers.lastIndex = 0;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label.split(markers).map((part, index) => {
+        if (part !== "Flow" && part !== "Repeat") return part;
+
+        const asset = getKeywordImagePath(
+          part === "Flow" ? "flow" : "repeat",
+          "md",
+        );
+        return asset ? (
+          <img
+            alt={part}
+            className="h-4 w-auto object-contain"
+            key={`${part}-${index}`}
+            src={asset}
+          />
+        ) : `[${part}]`;
+      })}
+    </span>
+  );
 }
 
 export function ResourceCostMenuLabel({
