@@ -611,6 +611,12 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+        completeChainResolution(game, index, input.decks);
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "effectOption") {
         submitEffectOption(
           game,

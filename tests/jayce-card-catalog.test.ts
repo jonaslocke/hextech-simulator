@@ -77,6 +77,12 @@ test("Jayce deck reusable publications compile their current supported cards", a
         [["action.each_player_choose_top_deck_card_and_play"]],
       );
     }
+    if (code === "VEN-075/166") {
+      const resource = document.behaviorModel.clauses.flatMap((clause) => clause.abilities)
+        .find((binding) => binding.behaviorId === "ability.exhaust_for_resource");
+      assert.equal(resource?.parameters.amount, 1);
+      assert.equal(resource?.parameters.empoweredAmount, 2);
+    }
     if (code === "OGN-099/298") {
       const ability = document.behaviorModel.clauses[0]!;
       assert.ok(ability.selectors.some((binding) =>
@@ -322,6 +328,64 @@ test("canonical Flow publication is playable from Trash with modified alternate 
   }
   assert.equal(next.state.players.p1!.zones.banishment.includes("p1:canonical-flow-spell"), true);
   assert.equal(next.state.players.p1!.zones.hand.length, handSizeBefore + 1);
+});
+
+test("canonical empowered resource publication reaches shared projection and payment", async () => {
+  const [catalog, behaviors, fixture] = await Promise.all([
+    loadCardCatalog(),
+    buildCurrentBehaviorCatalog(),
+    gameFixture(),
+  ]);
+  const card = catalog.byPublicCode.get("VEN-075/166");
+  assert.ok(card, "Missing source card VEN-075/166");
+  const resource = buildCanonicalCardDocument(
+    buildJayceCanonicalPublication(card), behaviors, "created", "updated",
+  );
+  const { game, decks } = fixture;
+  decks[0]!.snapshot.cards.push(resource);
+  decks[0]!.instances.push({
+    instanceId: "p1:canonical-empowered-source", ownerPlayerId: "p1",
+    source: "mainDeck", cardCode: resource.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("p1:canonical-empowered-source");
+  game.state.cardStates["p1:canonical-empowered-source"] = {
+    exhausted: false, empowered: true, damage: 0, computedMight: null,
+  };
+
+  const paymentSpell = structuredClone(decks[0]!.snapshot.cards.find(
+    (candidate) => candidate.card.classification.type === "Spell",
+  )!);
+  paymentSpell.cardCode = "GENERIC_PAYMENT_SPELL";
+  paymentSpell.card.public_code = "GENERIC_PAYMENT_SPELL";
+  paymentSpell.card.name = "Payment Spell";
+  paymentSpell.card.attributes.energy = 2;
+  paymentSpell.card.attributes.power = 0;
+  paymentSpell.behaviorModel = { playTimings: [], clauses: [] };
+  decks[0]!.snapshot.cards.push(paymentSpell);
+  decks[0]!.instances.push({
+    instanceId: "p1:generic-payment-spell", ownerPlayerId: "p1",
+    source: "mainDeck", cardCode: paymentSpell.cardCode,
+  });
+  game.state.players.p1!.zones.hand.push("p1:generic-payment-spell");
+  game.state.cardStates["p1:generic-payment-spell"] = {
+    exhausted: false, damage: 0, computedMight: null,
+  };
+
+  const actions = gameplayActions(game, "p1", decks);
+  assert.equal(actions.find((action) =>
+    action.sourceCardInstanceId === "p1:canonical-empowered-source" && action.label.startsWith("Add "),
+  )?.label, "Add 2 Energy");
+  const play = actions.find((action) =>
+    action.sourceCardInstanceId === "p1:generic-payment-spell",
+  );
+  assert.equal(play?.enabled, true);
+  assert.equal(play?.poolPayment?.canPay, true);
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: play!.id,
+    selectedIds: [], decks, now: "canonical-empowered-payment",
+  });
+  assert.equal(next.state.cardStates["p1:canonical-empowered-source"]?.exhausted, true);
+  assert.equal(next.state.players.p1!.energy, 0);
 });
 
 test("canonical top-deck selection waits for resolution and skips an empty choice", async () => {

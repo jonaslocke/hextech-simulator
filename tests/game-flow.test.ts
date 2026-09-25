@@ -1604,6 +1604,72 @@ test("requires pooled Deflect power for a resolving spell target choice", () => 
   assert.equal(next.state.pendingChoice, null);
 });
 
+test("resolution-time Deflect payment applies to triggered and activated effects", () => {
+  for (const kind of ["trigger", "activatedAbility"] as const) {
+    const { game, decks } = fixture();
+    const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+    source.behaviorModel.clauses = [clause("resolving-target", {
+      selectors: [binding("selector.unit", 0, {
+        area: "board", scope: "any", minimumCount: 1, maximumCount: 1,
+      })],
+    })];
+    const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+    unit.behaviorModel.clauses = [clause("deflect", {
+      keywords: [binding("keyword.deflect", 0, { amount: 1 })],
+    })];
+    decks[1]!.instances.push({
+      instanceId: `p2:${kind}-warded-unit`, ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+    });
+    const targetId = `p2:${kind}-warded-unit`;
+    game.state.battlefields[0]!.units.push(targetId);
+    game.state.cardStates[targetId] = { exhausted: true, damage: 0, computedMight: 1 };
+
+    const itemId = `resolving-${kind}`;
+    game.state.chain = {
+      items: [{
+        id: itemId,
+        kind,
+        label: "Resolving effect",
+        controllerPlayerId: "p1",
+        sourceCardInstanceId: "p1:spell",
+        targetCardInstanceIds: [],
+        targetObjectVersions: {},
+        behaviorClauseId: "resolving-target",
+        activatedBehaviorId: kind === "activatedAbility" ? "ability.activated_effect" : null,
+        behaviorEvent: null,
+      }],
+      relevantPlayerIds: ["p1", "p2"],
+      priorityPlayerId: "p1",
+      passedPlayerIds: [],
+      openedBy: "cardPlay",
+      resolvingItemId: itemId,
+    };
+    assert.equal(beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "p1:spell",
+      clauseId: "resolving-target",
+      decks,
+    }), false);
+    const submit = () => gameplayActions(game, "p1", decks).find((action) =>
+      action.id.includes(":submitChoice:"),
+    )!;
+    assert.throws(() => performGameplayAction({
+      game, actorPlayerId: "p1", actionId: submit().id,
+      selectedIds: [targetId], decks, now: `resolving-deflect-unpaid-${kind}`,
+    }), /cost cannot be paid/i);
+
+    game.state.players.p1!.power.Mind = 1;
+    const next = performGameplayAction({
+      game, actorPlayerId: "p1", actionId: submit().id,
+      selectedIds: [targetId], decks, now: `resolving-deflect-paid-${kind}`,
+    });
+    assert.equal(next.state.players.p1!.power.Mind, 0);
+    assert.equal(next.state.pendingChoice, null);
+    assert.equal(next.state.effectResolutions.length, 0);
+  }
+});
+
 test("counters a qualifying chain spell through the generic chain-target primitive", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
@@ -2541,6 +2607,79 @@ test("effect-driven play resumes a resolving end-of-turn trigger exactly once", 
   assert.equal(next.state.turn?.activePlayerId, "p2");
   assert.equal(next.state.turn?.phase, "action");
   assert.ok(next.state.players.p1!.zones.base.includes("p1:effect-play-unit"));
+});
+
+test("effect-driven permanent play pauses its parent for the normal on-play trigger Chain", () => {
+  const { game, decks } = fixture();
+  const source = definition("PLAY_SOURCE", "Effect Source", "Unit", 0, 1) as GameCardDefinition;
+  source.behaviorModel.clauses = [clause("end-effect-play", {
+    triggers: [binding("trigger.end_of_turn", 0, { player: "controller" })],
+    effects: [binding("action.reveal_until_card_type_and_play", 1, {
+      cardType: "Unit", ignoreBaseCosts: true,
+    })],
+  })];
+  const target = definition("PLAY_TARGET", "Effect Target", "Unit", 0, 1) as GameCardDefinition;
+  target.behaviorModel.clauses = [clause("on-play-target", {
+    triggers: [binding("trigger.on_play", 0, { actor: "controller", subject: "source" })],
+    selectors: [binding("selector.enemy_unit", 1, {
+      area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+      selectionKey: "target",
+    })],
+    effects: [binding("action.deal_damage", 2, {
+      amount: 1, selectionKey: "target",
+    })],
+  })];
+  decks[0]!.snapshot.cards.push(source, target);
+  decks[0]!.instances.push(
+    { instanceId: "p1:effect-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: "PLAY_SOURCE" },
+    { instanceId: "p1:effect-target", ownerPlayerId: "p1", source: "mainDeck", cardCode: "PLAY_TARGET" },
+  );
+  decks[1]!.instances.push({
+    instanceId: "p2:trigger-target", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.base.push("p1:effect-source");
+  game.state.players.p1!.zones.mainDeck = ["p1:effect-target"];
+  game.state.battlefields[0]!.units.push("p2:trigger-target");
+  game.state.cardStates["p1:effect-source"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.cardStates["p1:effect-target"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.cardStates["p2:trigger-target"] = { exhausted: true, damage: 0, computedMight: 1 };
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: gameplayActions(game, "p1", decks).find((action) => action.id.split(":")[3] === "endTurn")!.id,
+    selectedIds: [], decks, now: "effect-play-onplay-end-turn",
+  });
+  for (const playerId of ["p1", "p2"] as const) {
+    const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
+    next = performGameplayAction({
+      game: next, actorPlayerId: playerId, actionId: pass.id,
+      selectedIds: [], decks, now: `effect-play-onplay-pass-${playerId}`,
+    });
+  }
+  const play = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:effect-target",
+  )!;
+  next = performGameplayAction({
+    game: next, actorPlayerId: "p1", actionId: play.id,
+    selectedIds: [], decks, now: "effect-play-onplay-play",
+  });
+
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.ok(next.state.pendingChoice?.type === "effectSelection" && next.state.pendingChoice.chainItem);
+  const targetChoice = gameplayActions(next, "p1", decks).find((action) =>
+    action.id.includes(":submitChoice:"),
+  )!;
+  next = performGameplayAction({
+    game: next, actorPlayerId: "p1", actionId: targetChoice.id,
+    selectedIds: ["p2:trigger-target"], decks, now: "effect-play-onplay-target",
+  });
+  assert.equal(next.state.chain?.items.filter((item) => item.sourceCardInstanceId === "p1:effect-source").length, 0);
+  assert.equal(next.state.chain?.items.length, 1);
+  assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:effect-target");
+  assert.deepEqual(next.state.chain?.items[0]?.targetCardInstanceIds, ["p2:trigger-target"]);
 });
 
 test("banishment effect-play uses the target owner and captured location", () => {
