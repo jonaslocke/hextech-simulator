@@ -53,15 +53,28 @@ test("playable card menus omit unavailable modes and empty placeholders", () => 
 });
 
 test("viewer-owned Trash cards expose only server-projected alternate play modes", async () => {
-  const { game, decks, place } = await gameFixture();
-  const cardId = place("OGN-044", "hand");
-  const definition = definitionForInstance(cardId, createRuntimeCardIndex(decks, game));
-  definition.card.classification.type = "Spell";
-  definition.behaviorModel.clauses[0]!.keywords.push({
-    behaviorId: "keyword.flow", order: 50, confidence: "high",
-    parameters: { energyCost: 2 },
-  });
-  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== cardId);
+  const { game, decks } = await gameFixture();
+  const source = structuredClone(decks[0]!.snapshot.cards[0]!);
+  source.cardCode = "GENERIC_FLOW_SPELL";
+  source.card.id = source.cardCode;
+  source.card.name = "Flow Spell";
+  source.card.public_code = "GENERIC_FLOW_SPELL";
+  source.card.classification.type = "Spell";
+  source.card.attributes.energy = 2;
+  source.card.attributes.power = 0;
+  source.behaviorModel = {
+    playTimings: [],
+    clauses: [{
+      id: "flow", sequence: 0, sourceText: "", normalizedText: "",
+      abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+      costs: [], timings: [], effects: [],
+      keywords: [{ behaviorId: "keyword.flow", order: 0, confidence: "high", parameters: { energyCost: 2 } }],
+    }],
+  };
+  const cardId = "p1:generic-flow-spell";
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({ instanceId: cardId, ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode });
+  game.state.cardStates[cardId] = { exhausted: false, damage: 0, computedMight: null };
   game.state.players.p1!.zones.trash.push(cardId);
   game.state.players.p1!.energy = 2;
 
