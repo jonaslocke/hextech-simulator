@@ -5,7 +5,7 @@ import cardBackImage from "../../../../assets/cardback.jpg";
 import { motion } from "motion/react";
 import type { Card, ZoneKind } from "../types";
 import { AttachmentCardGroup } from "./attachment-card-group";
-import { CardTile } from "./card-tile";
+import { CardTile, type CardTileSize } from "./card-tile";
 import type { LocationTransferStartRect } from "../drag-and-drop/location-drag-actions";
 import {
   boardLocationTransferNeedsDestinationRect,
@@ -31,7 +31,9 @@ export type ZoneAnimationCount = {
 export type RectSnapshot = LocationTransferStartRect;
 
 type CapturedPlacement = CardZonePlacement & {
+  presentationSize?: CardTileSize;
   rect?: RectSnapshot;
+  showMight?: boolean;
 };
 
 export type CardZoneAnimationSnapshot = {
@@ -58,7 +60,9 @@ type TransferAnimation = {
   index: number;
   isBoardLocationTransfer: boolean;
   isVisibleDestination: boolean;
+  presentationSize: CardTileSize;
   sourceReservation?: CardZoneSourceReservation;
+  showMight: boolean;
   to: RectSnapshot;
   toRotation: number;
 };
@@ -277,7 +281,9 @@ export function CardZoneTransferOverlay({
         index: nextTransfers.length,
         isBoardLocationTransfer,
         isVisibleDestination: Boolean(nextPlacement?.rect),
+        presentationSize: previousPlacement.presentationSize ?? "md",
         sourceReservation,
+        showMight: previousPlacement.showMight ?? false,
         to: destinationRect,
         toRotation: nextPlacement?.card.isExhausted ? 90 : 0,
       });
@@ -486,10 +492,16 @@ function TransferCardFaces({
   delay: number;
   transfer: TransferAnimation;
 }) {
+  const presentationDimensions =
+    transfer.fromRotation === 90
+      ? { height: transfer.from.width, width: transfer.from.height }
+      : { height: transfer.from.height, width: transfer.from.width };
+
   return (
     <motion.div
       animate={{ rotateY: transfer.flipToBack ? 180 : 0 }}
-      className="relative bg-slate-900 shadow-[0_18px_45px_rgba(0,0,0,0.65)] border border-yellow-300/50 rounded-md w-full h-full transform-gpu"
+      aria-hidden="true"
+      className="relative w-full h-full transform-gpu"
       initial={{ rotateY: 0 }}
       style={{
         transformStyle: "preserve-3d",
@@ -501,14 +513,23 @@ function TransferCardFaces({
         ease: [0.16, 1, 0.3, 1],
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders existing card art. */}
-      <img
-        alt=""
-        className="block absolute inset-0 rounded-md w-full h-full object-cover"
-        draggable={false}
-        src={transfer.card.img}
+      <div
+        className="absolute inset-0"
         style={{ backfaceVisibility: "hidden" }}
-      />
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <CardTile
+            enableHoverPreview={false}
+            enableZoneAnimation={false}
+            focusablePreview={false}
+            presentationDimensions={presentationDimensions}
+            preserveOrientation
+            showMight={transfer.showMight}
+            size={transfer.presentationSize}
+            {...transfer.card}
+          />
+        </div>
+      </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders the local card back asset. */}
       <img
         alt=""
@@ -534,16 +555,20 @@ function capturePlacements(placements: CardZonePlacement[]) {
       continue;
     }
 
+    const element = findPlacementElement(placement);
+
     captured.set(cardInstanceId, {
       ...placement,
-      rect: readPlacementRect(placement),
+      presentationSize: readCardTileSize(element),
+      rect: readPlacementRect(placement, element),
+      showMight: readCardTileShowMight(element),
     });
   }
 
   return captured;
 }
 
-function readPlacementRect(placement: CardZonePlacement) {
+function findPlacementElement(placement: CardZonePlacement) {
   const cardInstanceId = placement.card.instanceId;
   if (!cardInstanceId) {
     return undefined;
@@ -565,13 +590,31 @@ function readPlacementRect(placement: CardZonePlacement) {
   );
   const element = exactIndex >= 0 ? matchingElements[exactIndex] : undefined;
 
-  if (!element) {
-    return undefined;
-  }
+  return element;
+}
+
+function readCardTileSize(element?: HTMLElement): CardTileSize | undefined {
+  const size = element?.dataset.cardTileSize;
+  return size === "sm" || size === "md" || size === "lg" || size === "xl"
+    ? size
+    : undefined;
+}
+
+function readCardTileShowMight(element?: HTMLElement) {
+  const value = element?.dataset.cardShowMight;
+  return value === "true" ? true : value === "false" ? false : undefined;
+}
+
+function readPlacementRect(
+  placement: CardZonePlacement,
+  element?: HTMLElement,
+) {
+  if (!element) return undefined;
+  const cardInstanceId = placement.card.instanceId;
 
   if ((placement.attachments?.length ?? 0) > 0) {
     const group = element.closest<HTMLElement>("[data-attachment-group-id]");
-    if (group?.dataset.attachmentGroupId === cardInstanceId) {
+    if (group && group.dataset.attachmentGroupId === cardInstanceId) {
       return toSnapshot(group.getBoundingClientRect());
     }
   }
