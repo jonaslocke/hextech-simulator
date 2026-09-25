@@ -2,6 +2,7 @@
 
 import { Hand } from "lucide-react";
 import type { CSSProperties, FC } from "react";
+import type { GameProjection } from "@/shared/game";
 import { cn } from "@/shared/utils/cn";
 import type { GameScore } from "../types";
 import { ScoreTrack } from "./score-track";
@@ -20,6 +21,7 @@ export type MatchHudContext = {
 
 type ScoreHeaderProps = GameScore & {
   matchContext?: MatchHudContext;
+  turn: GameProjection["turn"];
   victoryScore: number;
 };
 
@@ -93,13 +95,13 @@ function HandCountBadge({
   );
 }
 
-function PlayerHudPlate({
+export function PlayerHudPlate({
   handCount,
   matchScore,
   name,
   seat,
 }: {
-  handCount: number;
+  handCount?: number;
   matchScore?: number;
   name: string;
   seat: Seat;
@@ -114,7 +116,10 @@ function PlayerHudPlate({
     borderRightColor: isOpponent ? "var(--seat-accent)" : undefined,
   } as CSSProperties;
 
-  const handBadge = <HandCountBadge handCount={handCount} name={name} />;
+  const handBadge =
+    handCount === undefined ? null : (
+      <HandCountBadge handCount={handCount} name={name} />
+    );
 
   const scoreBadge =
     matchScore === undefined ? null : (
@@ -161,7 +166,7 @@ function PlayerHudPlate({
 
       <span
         className={cn(
-          "z-10 relative min-w-0 max-w-36 truncate",
+          "z-10 relative min-w-0 max-w-[min(32vw,24rem)] truncate",
           isOpponent ? "text-right" : "text-left",
         )}
         title={name}
@@ -197,29 +202,33 @@ export const ScoreHeader: FC<ScoreHeaderProps> = ({
   matchContext,
   opponent,
   player,
+  turn,
   victoryScore,
 }) => {
-  const playerMatchScore = matchContext
-    ? (matchContext.scoreByPlayerId[player.playerId] ?? 0)
-    : undefined;
-
   const opponentMatchScore = matchContext
     ? (matchContext.scoreByPlayerId[opponent.playerId] ?? 0)
+    : undefined;
+  const activePlayerName = turn
+    ? turn.activePlayerId === player.playerId
+      ? player.name
+      : opponent.name
     : undefined;
 
   return (
     <header
       className={cn(
-        "items-start gap-2 grid px-2 pt-2 pb-1",
+        "relative items-start gap-2 grid px-3 py-2 min-h-16 border-b border-white/10",
+        "bg-slate-950/35 supports-backdrop-filter:bg-slate-950/20 supports-backdrop-filter:backdrop-blur-md",
         "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]",
       )}
+      aria-label={`Match score for ${player.name} and ${opponent.name}`}
     >
       <div className="justify-self-start min-w-0">
         <PlayerHudPlate
-          handCount={player.zones.hand.count}
-          matchScore={playerMatchScore}
-          name={player.name}
-          seat="player"
+          handCount={opponent.zones.hand.count}
+          matchScore={opponentMatchScore}
+          name={opponent.name}
+          seat="opponent"
         />
       </div>
 
@@ -237,13 +246,19 @@ export const ScoreHeader: FC<ScoreHeaderProps> = ({
         ) : null}
       </div>
 
-      <div className="justify-self-end min-w-0">
-        <PlayerHudPlate
-          handCount={opponent.zones.hand.count}
-          matchScore={opponentMatchScore}
-          name={opponent.name}
-          seat="opponent"
-        />
+      <div className="justify-self-end min-w-0 max-w-full">
+        {turn ? (
+          <p
+            aria-label={`Turn ${turn.turnNumber}, ${turn.phase} phase, ${activePlayerName} to act`}
+            className="rounded-md border border-white/10 bg-slate-950/30 px-2.5 py-1.5 text-right text-xs text-slate-200/90 shadow-sm"
+            title={`${activePlayerName} to act`}
+          >
+            <span className="font-mono font-semibold tabular-nums">Turn {turn.turnNumber}</span>
+            <span className="mx-1.5 text-slate-500" aria-hidden="true">·</span>
+            <span className="capitalize">{turn.phase}</span>
+            <span className="ml-1.5 max-w-[20vw] truncate text-slate-400">{activePlayerName}</span>
+          </p>
+        ) : null}
       </div>
     </header>
   );
