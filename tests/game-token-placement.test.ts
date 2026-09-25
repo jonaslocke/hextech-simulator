@@ -233,6 +233,38 @@ test("token media from a catalog definition reaches the projected battlefield ca
   assert.equal(projected?.imageUrl, "https://assets.example.test/catalogued-token.png");
 });
 
+test("non-Unit token creation preserves the absence of Might", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("gear-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Gold Gear",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "gear-token",
+    decks,
+  }), true);
+  const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenId);
+  assert.equal(game.state.cardStates[tokenId]?.computedMight, null);
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .players.find((player) => player.playerId === "p1")
+    ?.zones.find((zone) => zone.kind === "base")?.cards.find((card) => card.instanceId === tokenId);
+  assert.equal(projected?.type, "Gear");
+  assert.equal(projected?.computedMight, null);
+});
+
 test("generated Bird units retain their tag and Deflect keyword", () => {
   const source = unit("SOURCE", "Token Creator", [
     clause("bird", {

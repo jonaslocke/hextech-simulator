@@ -439,6 +439,9 @@ export const gameStateSchema = z.object({
       playerId: z.string().min(1),
       cardInstanceId: z.string().min(1),
       mayDecline: z.boolean().default(false),
+      resumeResolutionAfterPlay: z.boolean().default(true),
+      awaitParentResolution: z.boolean().default(false),
+      deferTriggeredItems: z.boolean().default(false),
       ignoreBaseEnergy: z.boolean(),
       ignoreBasePower: z.boolean().default(false),
       returnZone: z.enum(["mainDeck", "banishment"]).default("mainDeck"),
@@ -446,6 +449,7 @@ export const gameStateSchema = z.object({
       destinationBasePlayerId: z.string().min(1).nullable().default(null),
     }),
   ).default([]).optional(),
+  deferredChainItems: z.array(chainItemSchema).optional(),
   pendingChoice: z
     .discriminatedUnion("type", [
       triggerOrderChoiceSchema,

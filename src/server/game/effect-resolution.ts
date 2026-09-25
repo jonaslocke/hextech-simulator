@@ -92,6 +92,30 @@ export function submitEffectSelection(
     (candidate) => candidate.id === pending.resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const definition = definitionForInstance(frame.sourceCardInstanceId, index);
+  const clause = compileBehaviorModel(
+    behaviorModelWithGrantedClause(definition.behaviorModel, frame.grantedBehaviorClauseSnapshot, frame.clauseId),
+    handlers,
+  ).clauses.find((candidate) => candidate.id === frame.clauseId);
+  const effectBindingOrder = Number(pending.bindingKey.split(":effects:")[1]?.split(":")[0]);
+  const selectedEffect = clause?.orderedEffects.find((binding) => binding.order === effectBindingOrder);
+  if (selectedEffect && pending.bindingKey.includes(":player:")) {
+    handlers.get(selectedEffect.behaviorId)?.selectionSubmitted?.(
+      selectedEffect,
+      createBehaviorContext(
+        game,
+        frame.controllerPlayerId,
+        frame.sourceCardInstanceId,
+        frame.event,
+        selectedIds,
+        frame.effectOutcomes,
+        frame.initialSelectionOverrides ?? {},
+        frame.id,
+      ),
+    );
+  }
   const deflectTargets = (pending.targetRequirements ?? [])
     .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
     .flatMap((requirement) =>
@@ -101,23 +125,22 @@ export function submitEffectSelection(
     (item) => item.id === game.state.chain?.resolvingItemId,
   );
   if (deflectTargets.length > 0 && resolvingItem?.sourceCardInstanceId) {
-    const index = createRuntimeCardIndex(decks, game);
-    const definition = definitionForInstance(resolvingItem.sourceCardInstanceId, index);
+    const resolvingDefinition = definitionForInstance(resolvingItem.sourceCardInstanceId, index);
     const cost = targetDeflectCost(
       playerId,
       deflectTargets,
       index,
       game,
-      ignoresDeflect(definition),
+      ignoresDeflect(resolvingDefinition),
     );
     payAnyPowerAdditionalCost(
       game,
       playerId,
-      definition,
+      resolvingDefinition,
       cost,
       resolvingItem.kind === "spell"
-        ? { kind: "card", cardType: definition.card.classification.type }
-        : { kind: "ability", sourceCardType: definition.card.classification.type },
+        ? { kind: "card", cardType: resolvingDefinition.card.classification.type }
+        : { kind: "ability", sourceCardType: resolvingDefinition.card.classification.type },
       index,
     );
   }
@@ -402,7 +425,9 @@ export function resumeEffectResolution(
     handler.execute(binding, context);
     frame.effectOutcomes = context.effectOutcomes;
     frame.nextEffectIndex += 1;
-    if ((game.state.effectPlayQueue ?? []).some((entry) => entry.resolutionId === frame.id)) {
+    if ((game.state.effectPlayQueue ?? []).some((entry) =>
+      entry.resolutionId === frame.id && entry.resumeResolutionAfterPlay !== false && !entry.awaitParentResolution,
+    )) {
       return false;
     }
   }

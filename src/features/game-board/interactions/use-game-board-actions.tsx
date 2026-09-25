@@ -597,6 +597,21 @@ function resourceActionMenuLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ): ReactNode {
+  const output = action.presentation.resourceOutput;
+  if (output) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        {output.energy > 0 && <EnergyResource compact value={output.energy} />}
+        {output.energy > 0 && output.power > 0 && <span>and</span>}
+        {output.power > 0 && <>
+          <span>{output.power > 1 ? output.power : ""}</span>
+          <DomainIcon decorative domain={output.powerDomains[0] ?? powerDomain ?? "Rainbow"} />
+          <span>Power</span>
+        </>}
+      </span>
+    );
+  }
   let content: ReactNode = action.label;
   if (action.label === "Add Energy") {
     content = (
@@ -637,6 +652,14 @@ function resourceActionAccessibleLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ) {
+  const output = action.presentation.resourceOutput;
+  if (output) {
+    const parts = [
+      ...(output.energy > 0 ? [`${output.energy} Energy`] : []),
+      ...(output.power > 0 ? [`${output.power} ${formatDomain(output.powerDomains[0] ?? powerDomain ?? "Rainbow")} Power`] : []),
+    ];
+    return parts.length ? `Add ${parts.join(" and ")}` : action.label;
+  }
   const domain = powerDomain ? formatDomain(powerDomain) : "Power";
   if (action.label === "Add Energy") return "Add 1 Energy";
   if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;

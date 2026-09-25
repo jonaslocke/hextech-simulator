@@ -147,6 +147,13 @@ export function queueChainItemsForTargets(
   const queuedItems = options.chainOrigin
     ? items.map((item) => ({ ...item, chainOrigin: options.chainOrigin }))
     : items;
+  if (game.state.effectPlayQueue?.some((entry) => entry.deferTriggeredItems)) {
+    game.state.deferredChainItems = [
+      ...(game.state.deferredChainItems ?? []),
+      ...queuedItems,
+    ];
+    return;
+  }
   if (!options.preserveOrder && queuedItems.length > 1) {
     const controllerPlayerId = queuedItems[0]?.controllerPlayerId;
     if (controllerPlayerId) {

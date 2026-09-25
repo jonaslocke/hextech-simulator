@@ -613,6 +613,9 @@ export function createPrimitiveHandlers(
         playerId: context.controllerPlayerId,
         cardInstanceId: selectedCardId,
         mayDecline: false,
+        resumeResolutionAfterPlay: true,
+        awaitParentResolution: false,
+        deferTriggeredItems: false,
         ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
         ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
         returnZone: "mainDeck",
@@ -941,8 +944,18 @@ export function createPrimitiveHandlers(
       const secondState = second ? context.game.state.cardStates[second] : null;
       const firstMight = firstState?.computedMight ?? 0;
       const secondMight = secondState?.computedMight ?? 0;
-      if (firstState && secondMight > 0) firstState.damage += secondMight;
-      if (secondState && firstMight > 0) secondState.damage += firstMight;
+      const firstController = first ? index.instances.get(first)?.ownerPlayerId : undefined;
+      const secondController = second ? index.instances.get(second)?.ownerPlayerId : undefined;
+      if (firstState && first && secondMight > 0) {
+        firstState.damage += secondController && damageIsLethalAgainstEnemyUnit(context.game, secondController, first, index)
+          ? firstMight
+          : secondMight;
+      }
+      if (secondState && second && firstMight > 0) {
+        secondState.damage += firstController && damageIsLethalAgainstEnemyUnit(context.game, firstController, second, index)
+          ? secondMight
+          : firstMight;
+      }
       cleanupLethalDamage(
         context.game,
         [first, second].filter((id): id is string => Boolean(id)),
@@ -1047,6 +1060,9 @@ export function createPrimitiveHandlers(
           playerId: instance.ownerPlayerId,
           cardInstanceId: id,
           mayDecline: false,
+          resumeResolutionAfterPlay: true,
+          awaitParentResolution: false,
+          deferTriggeredItems: false,
           ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
           ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
           returnZone: "banishment" as const,
@@ -1071,10 +1087,14 @@ export function createPrimitiveHandlers(
   handlers.set("action.each_player_choose_top_deck_card_and_play", {
     choice(binding, context) {
       const count = numberParam(binding, "count");
-      const selected = new Set(context.selectedIds);
-      for (const playerId of playersStartingWithNext(context.game, context.controllerPlayerId)) {
+      const selectedPlayers = new Set(context.selectedIds.flatMap((id) => {
+        const owner = index.instances.get(id)?.ownerPlayerId;
+        return owner ? [owner] : [];
+      }));
+      for (const playerId of playersStartingWithController(context.game, context.controllerPlayerId)) {
+        if (selectedPlayers.has(playerId)) continue;
         const looked = context.game.state.players[playerId]!.zones.mainDeck.slice(0, count);
-        if (looked.length > 0 && !looked.some((id) => selected.has(id))) {
+        if (looked.length > 0) {
           return {
             playerId,
             choiceKey: `player:${playerId}`,
@@ -1090,6 +1110,18 @@ export function createPrimitiveHandlers(
       }
       return null;
     },
+    selectionSubmitted(binding, context) {
+      const selected = context.selectedIds[0];
+      const owner = selected ? index.instances.get(selected)?.ownerPlayerId : null;
+      if (!selected || !owner) throw new Error("The selected top-deck card is unavailable.");
+      const player = context.game.state.players[owner]!;
+      const looked = player.zones.mainDeck.slice(0, numberParam(binding, "count"));
+      if (!looked.includes(selected)) throw new Error("The selected card is no longer among the revealed cards.");
+      player.zones.mainDeck = player.zones.mainDeck.filter((id) => !looked.includes(id));
+      player.zones.banishment.push(selected);
+      advanceGameObjectIncarnation(context.game, selected);
+      recycleCards(context.game, index, context.sourceCardInstanceId, looked.filter((id) => id !== selected));
+    },
     execute(binding, context) {
       if (!context.effectResolutionId) {
         throw new Error("Effect-driven card play must resolve in an effect frame.");
@@ -1098,25 +1130,28 @@ export function createPrimitiveHandlers(
       if ((context.game.state.effectPlayQueue ?? []).length > 0) {
         throw new Error("Effect-driven card play queue is already active.");
       }
-      const selected = new Set(context.selectedIds);
       const staged = playersStartingWithNext(context.game, context.controllerPlayerId).flatMap((playerId) => {
-        const player = context.game.state.players[playerId]!;
-        const looked = player.zones.mainDeck.slice(0, numberParam(binding, "count"));
-        const chosen = looked.find((id) => selected.has(id));
+        const chosen = context.selectedIds.find((id) => index.instances.get(id)?.ownerPlayerId === playerId);
         if (!chosen) return [];
-        recycleCards(context.game, index, context.sourceCardInstanceId, looked.filter((id) => id !== chosen));
-        player.zones.mainDeck = player.zones.mainDeck.filter((id) => id !== chosen);
-        player.zones.hand.push(chosen);
-        advanceGameObjectIncarnation(context.game, chosen);
+        const player = context.game.state.players[playerId]!;
+        const awaitParentResolution = Boolean(context.game.state.chain?.resolvingItemId);
+        if (!awaitParentResolution) {
+          player.zones.banishment = player.zones.banishment.filter((id) => id !== chosen);
+          player.zones.hand.push(chosen);
+          advanceGameObjectIncarnation(context.game, chosen);
+        }
         return [{
           resolutionId,
           sourceCardInstanceId: context.sourceCardInstanceId,
           playerId,
           cardInstanceId: chosen,
-          mayDecline: true,
+          mayDecline: false,
+          resumeResolutionAfterPlay: !awaitParentResolution,
+          awaitParentResolution,
+          deferTriggeredItems: awaitParentResolution,
           ignoreBaseEnergy: true,
           ignoreBasePower: false,
-          returnZone: "mainDeck" as const,
+          returnZone: "banishment" as const,
           forcedDestinationId: null,
           destinationBasePlayerId: null,
         }];
@@ -2391,6 +2426,10 @@ export function recomputeMight(
   id: string,
   index: RuntimeCardIndex,
 ) {
+  if (definitionForInstance(id, index).card.classification.type !== "Unit") {
+    game.state.cardStates[id]!.computedMight = null;
+    return;
+  }
   game.state.cardStates[id]!.computedMight = evaluateMight(game, id, index).value;
 }
 
@@ -2563,6 +2602,7 @@ function queueDeathTriggeredEffects(
     .filter((effect) => effect.behaviorId === "action.play_token_on_next_death" &&
       effect.targetCardInstanceIds.includes(sourceCardInstanceId))
     .map((effect) => ({
+      controllerPlayerId: effect.controllerPlayerId,
       sourceCardInstanceId: effect.sourceCardInstanceId,
       label: definitionForInstance(effect.sourceCardInstanceId, index).card.name,
       model: compileBehaviorModel(definitionForInstance(effect.sourceCardInstanceId, index).behaviorModel, handlers),
@@ -2575,7 +2615,7 @@ function queueDeathTriggeredEffects(
       label: definition.card.name,
       model: compileBehaviorModel(runtime.model, handlers),
       grantedClauses: runtime.grantedClauses,
-    }, ...delayedSources],
+    }],
     event: {
       type: "card.died",
       actorPlayerId: null,
@@ -2584,6 +2624,27 @@ function queueDeathTriggeredEffects(
     },
     handlers,
   });
+  const delayedGroups = new Map<string, typeof delayedSources>();
+  for (const source of delayedSources) {
+    delayedGroups.set(source.controllerPlayerId, [
+      ...(delayedGroups.get(source.controllerPlayerId) ?? []),
+      source,
+    ]);
+  }
+  for (const [controllerPlayerId, sources] of delayedGroups) {
+    items.push(...collectTriggeredClauses({
+      game,
+      controllerPlayerId,
+      sources,
+      event: {
+        type: "card.died",
+        actorPlayerId: null,
+        subjectCardInstanceId: sourceCardInstanceId,
+        values: {},
+      },
+      handlers,
+    }));
+  }
   if (delayedSources.length) {
     game.state.ongoingEffects = game.state.ongoingEffects.filter((effect) =>
       !(effect.behaviorId === "action.play_token_on_next_death" &&
@@ -2883,6 +2944,14 @@ function playersStartingWithNext(game: GameDocument, playerId: string) {
   return index < 0
     ? playerIds
     : [...playerIds.slice(index + 1), ...playerIds.slice(0, index + 1)];
+}
+
+function playersStartingWithController(game: GameDocument, playerId: string) {
+  const playerIds = [...game.state.setup.playerIds];
+  const index = playerIds.indexOf(playerId);
+  return index < 0
+    ? playerIds
+    : [...playerIds.slice(index), ...playerIds.slice(0, index)];
 }
 
 export function recycleCards(

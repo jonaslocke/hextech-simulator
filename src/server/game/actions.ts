@@ -1065,10 +1065,33 @@ function completeEffectPlayIfReady(
     throw new Error("Effect-driven card play queue is unavailable.");
   }
   game.state.effectPlayQueue!.shift();
-  if (game.state.effectPlayQueue!.length > 0) return;
-  resumeEffectResolution(game, stagedPlay.resolutionId, decks);
+  if (game.state.effectPlayQueue!.length > 0) {
+    activateEffectPlayQueueHead(game);
+    return;
+  }
+  const deferredItems = game.state.deferredChainItems ?? [];
+  game.state.deferredChainItems = [];
+  if (deferredItems.length) queueChainItemsForTargets(game, deferredItems, decks);
+  if (stagedPlay.resumeResolutionAfterPlay !== false) {
+    resumeEffectResolution(game, stagedPlay.resolutionId, decks);
+  }
   completeChainResolution(game, index, decks);
   finishTurnProgressionIfReady(game, index, decks);
+}
+
+function activateEffectPlayQueueHead(game: GameDocument) {
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay?.awaitParentResolution) return;
+  const player = game.state.players[stagedPlay.playerId];
+  if (!player) throw new Error("Effect-driven play owner is unavailable.");
+  player.zones.banishment = player.zones.banishment.filter(
+    (id) => id !== stagedPlay.cardInstanceId,
+  );
+  if (!player.zones.hand.includes(stagedPlay.cardInstanceId)) {
+    player.zones.hand.push(stagedPlay.cardInstanceId);
+  }
+  advanceGameObjectIncarnation(game, stagedPlay.cardInstanceId);
+  stagedPlay.awaitParentResolution = false;
 }
 
 function skipEffectPlay(
@@ -1558,6 +1581,7 @@ function completeChainResolution(
       game.state.showdown.passedPlayerIds = [];
     }
   }
+  activateEffectPlayQueueHead(game);
 }
 
 function passPriority(
@@ -1855,6 +1879,7 @@ function action(
   choice?: ProjectedAction["choice"],
   costPreview?: ProjectedAction["costPreview"],
   poolPayment?: ProjectedAction["poolPayment"],
+  resourceOutput?: NonNullable<ProjectedAction["presentation"]["resourceOutput"]>,
 ): ProjectedAction {
   const parts = [
     "game",
@@ -1885,6 +1910,7 @@ function action(
     poolPayment,
     choice,
     presentation: {
+      resourceOutput,
       surface,
       style:
         kind === "concede"
@@ -2650,6 +2676,13 @@ function addAbilityActions(
               game.state.cardStates[sourceId]?.empowered === true,
             )
           : null;
+        const resourceOutput = ability.behaviorId === "ability.exhaust_for_resource"
+          ? ability.parameters.resourceType === "power"
+            ? { energy: 0, power: resourceAmount ?? 0, powerDomains: [String(ability.parameters.domain ?? powerDomain)] }
+            : { energy: resourceAmount ?? 0, power: 0, powerDomains: [] as string[] }
+          : ability.behaviorId === "ability.recycle_for_power"
+            ? { energy: 0, power: 1, powerDomains: [powerDomain] }
+            : undefined;
         const amountPrefix = resourceAmount && resourceAmount !== 1
           ? `${resourceAmount} `
           : "";
@@ -2699,6 +2732,7 @@ function addAbilityActions(
             ability.behaviorId === "ability.equip"
               ? abilityPoolPaymentPreview(game, playerId, definition, abilityCosts, index)
               : undefined,
+            resourceOutput,
           ),
         );
       }
@@ -2752,6 +2786,11 @@ function addAbilityActions(
               behaviorId: powerActivation.ability.behaviorId,
             },
           ]),
+          [],
+          undefined,
+          undefined,
+          undefined,
+          { energy: combinedEnergyAmount ?? 0, power: 1, powerDomains: [powerDomain] },
         ),
       );
     }

@@ -114,6 +114,11 @@ test("combined resource actions project and produce the empowered Energy amount"
     (action) => action.sourceCardInstanceId === unrestrictedSourceId && action.label === "Add 2 Energy and Power",
   );
   assert.ok(combined);
+  assert.deepEqual(combined.presentation.resourceOutput, {
+    energy: 2,
+    power: 1,
+    powerDomains: ["Calm"],
+  });
   const next = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: combined.id, selectedIds: [], now: "combined-empowered-resource" });
   assert.equal(next.state.players.p1!.energy, 2);
   assert.ok(next.state.players.p1!.zones.runeDeck.includes(unrestrictedSourceId));

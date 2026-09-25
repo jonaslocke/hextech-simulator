@@ -22,6 +22,7 @@ import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  moveUnitToTrash,
   recomputeMight,
 } from "../src/server/game/primitive-handlers";
 
@@ -97,6 +98,49 @@ test("triggered abilities of permanents are inactive in the chosen-champion zone
   const boardTriggerChain = game.state.chain as NonNullable<GameDocument["state"]["chain"]> | null;
   assert.equal(boardTriggerChain?.items.length, 1);
   assert.equal(boardTriggerChain?.items[0]?.sourceCardInstanceId, "p1:zone-source");
+});
+
+test("stored death triggers retain their effect controller after the source leaves play", () => {
+  const { game, decks } = fixture();
+  const delayedSource = definition("DELAYED_SOURCE", "Delayed Source", "Gear", 0, 0) as GameCardDefinition;
+  delayedSource.behaviorModel.clauses = [clause("stored-death", {
+    triggers: [binding("trigger.stored_target_death", 0, {})],
+    effects: [binding("action.play_token", 1, {
+      tokenName: "Recruit",
+      count: 1,
+      placement: "base",
+    })],
+  })];
+  const target = definition("TARGET_UNIT", "Target Unit", "Unit", 0, 1) as GameCardDefinition;
+  decks[1]!.snapshot.cards.push(delayedSource);
+  decks[0]!.snapshot.cards.push(target);
+  decks[1]!.instances.push({ instanceId: "p2:source", ownerPlayerId: "p2", source: "mainDeck", cardCode: "DELAYED_SOURCE" });
+  decks[0]!.instances.push({ instanceId: "p1:target", ownerPlayerId: "p1", source: "mainDeck", cardCode: "TARGET_UNIT" });
+  game.state.players.p2!.zones.trash.push("p2:source");
+  game.state.players.p1!.zones.base.push("p1:target");
+  game.state.cardStates["p2:source"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p1:target"] = { exhausted: false, damage: 0, computedMight: 1 };
+  game.state.ongoingEffects.push({
+    id: "ongoing:stored-death",
+    behaviorId: "action.play_token_on_next_death",
+    controllerPlayerId: "p2",
+    sourceCardInstanceId: "p2:source",
+    targetCardInstanceIds: ["p1:target"],
+    parameters: { tokenName: "Recruit" },
+    duration: "thisTurn",
+    createdAtTurn: 1,
+  });
+
+  moveUnitToTrash(game, "p1:target", createRuntimeCardIndex(decks, game));
+  assert.equal(game.state.chain?.items[0]?.controllerPlayerId, "p2");
+  assert.equal(game.state.ongoingEffects.some((effect) => effect.id === "ongoing:stored-death"), false);
+  let next = game;
+  for (const playerId of [next.state.chain!.priorityPlayerId, next.state.chain!.priorityPlayerId === "p1" ? "p2" : "p1"] as const) {
+    const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
+    next = performGameplayAction({ game: next, actorPlayerId: playerId, actionId: pass.id, selectedIds: [], decks, now: `stored-death-${playerId}` });
+  }
+  assert.ok(next.state.createdCardInstances?.some((instance) => instance.ownerPlayerId === "p2"));
+  assert.equal(next.state.players.p2!.zones.base.some((id) => next.state.createdCardInstances?.some((instance) => instance.instanceId === id)), true);
 });
 
 test("activated action labels describe a selected gear action", () => {
@@ -2272,7 +2316,7 @@ test("Repeat commits independent execution targets before priority and resolves 
   assert.equal(next.state.players.p1!.zones.hand.includes("p1:draw-two"), true);
 });
 
-test("each player privately chooses, recycles, and plays a staged top-deck card in next-player order", () => {
+test("each player selects then banishes in turn order and finalizes plays in next-player order", () => {
   const { game, decks } = fixture();
   const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
   source.behaviorModel.clauses = [
@@ -2299,6 +2343,26 @@ test("each player privately chooses, recycles, and plays a staged top-deck card 
     game.state.players[playerId]!.power.Mind = playerId === "p1" ? 1 : 0;
   }
 
+  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== "p1:spell");
+  game.state.chain = {
+    items: [{
+      id: "chain:parent-effect",
+      kind: "spell",
+      label: source.card.name,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "p1:spell",
+      targetCardInstanceIds: [],
+      targetObjectVersions: {},
+      behaviorClauseId: "each-player-top-deck",
+      activatedBehaviorId: null,
+      behaviorEvent: null,
+    }],
+    relevantPlayerIds: ["p1", "p2"],
+    priorityPlayerId: "p1",
+    passedPlayerIds: [],
+    resolvingItemId: "chain:parent-effect",
+  };
+
   assert.equal(beginEffectResolution({
     game,
     controllerPlayerId: "p1",
@@ -2306,38 +2370,44 @@ test("each player privately chooses, recycles, and plays a staged top-deck card 
     clauseId: "each-player-top-deck",
     decks,
   }), false);
-  assert.equal(game.state.pendingChoice?.playerId, "p2");
-  const spectatorChoice = projectGame({ game, viewerPlayerId: "p1", decks }).pendingChoice;
+  assert.equal(game.state.pendingChoice?.playerId, "p1");
+  const spectatorChoice = projectGame({ game, viewerPlayerId: "p2", decks }).pendingChoice;
   assert.deepEqual(
     spectatorChoice?.type === "effectSelection" ? spectatorChoice.visibleCards : [],
     [],
   );
-  let choose = gameplayActions(game, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  let choose = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
   let next = performGameplayAction({
     game,
-    actorPlayerId: "p2",
-    actionId: choose.id,
-    selectedIds: ["p2:draw"],
-    decks,
-    now: "each-player-choose-p2",
-  });
-  assert.equal(next.state.pendingChoice?.playerId, "p1");
-  choose = gameplayActions(next, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
-  next = performGameplayAction({
-    game: next,
     actorPlayerId: "p1",
     actionId: choose.id,
     selectedIds: ["p1:draw"],
     decks,
     now: "each-player-choose-p1",
   });
+  assert.equal(next.state.pendingChoice?.playerId, "p2");
+  assert.ok(next.state.players.p1!.zones.banishment.includes("p1:draw"));
+  assert.equal(projectGame({ game: next, viewerPlayerId: "p2", decks }).players.find((p) => p.playerId === "p1")?.zones.find((zone) => zone.kind === "banishment")?.cards.some((card) => card.instanceId === "p1:draw"), true);
+  choose = gameplayActions(next, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p2",
+    actionId: choose.id,
+    selectedIds: ["p2:draw"],
+    decks,
+    now: "each-player-choose-p2",
+  });
+  assert.equal(next.state.effectResolutions.length, 0, "the parent resolution finishes before the staged play decision");
+  assert.ok(next.state.players.p1!.zones.trash.includes("p1:spell"));
+  assert.equal(next.state.chain, null);
+  assert.ok(next.state.players.p1!.zones.banishment.includes("p1:draw"));
   assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p2");
   assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit"]);
   assert.deepEqual(next.state.players.p2!.zones.mainDeck, ["p2:recycle"]);
   assert.deepEqual(projectGame({ game: next, viewerPlayerId: "p2", decks }).effectPlayDecision, {
     playerId: "p2",
     stagedCardInstanceId: "p2:draw",
-    canDecline: true,
+    canDecline: false,
   });
   assert.deepEqual(projectGame({ game: next, viewerPlayerId: "p1", decks }).effectPlayDecision, {
     playerId: "p2",
@@ -2355,10 +2425,13 @@ test("each player privately chooses, recycles, and plays a staged top-deck card 
   next = performGameplayAction({ game: next, actorPlayerId: "p2", actionId: addPower.id, selectedIds: [], decks, now: "each-player-add-p2" });
   play = gameplayActions(next, "p2", decks).find((action) => action.sourceCardInstanceId === "p2:draw")!;
   next = performGameplayAction({ game: next, actorPlayerId: "p2", actionId: play.id, selectedIds: [], decks, now: "each-player-play-p2" });
+  assert.ok(next.state.players.p2!.zones.base.includes("p2:draw"));
+  assert.equal(next.state.players.p2!.power.Mind, 0, "Power is paid during finalization");
   assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p1");
   play = gameplayActions(next, "p1", decks).find((action) => action.sourceCardInstanceId === "p1:draw")!;
   assert.equal(play.costPreview?.energy, 0);
   next = performGameplayAction({ game: next, actorPlayerId: "p1", actionId: play.id, selectedIds: [], decks, now: "each-player-play-p1" });
+  assert.equal(next.state.chain, null);
   assert.equal(next.state.effectPlayQueue?.length, 0);
   assert.equal(next.state.effectResolutions.length, 0);
   assert.ok(next.state.players.p1!.zones.base.includes("p1:draw"));
@@ -2367,7 +2440,7 @@ test("each player privately chooses, recycles, and plays a staged top-deck card 
   assert.equal(next.state.players.p2!.power.Mind, 0);
 });
 
-test("an unavailable effect-driven play returns to the deck and continues the resolution", () => {
+test("an unavailable effect-driven play remains banished and continues the resolution", () => {
   const { game, decks } = fixture();
   const cards = decks[0]!.snapshot.cards as GameCardDefinition[];
   const source = cards.find((card) => card.cardCode === "SPELL")!;
@@ -2403,22 +2476,23 @@ test("an unavailable effect-driven play returns to the deck and continues the re
     clauseId: "each-player-top-deck",
     decks,
   }), false);
-  let choice = gameplayActions(game, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  let choice = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
   let next = performGameplayAction({
-    game, actorPlayerId: "p2", actionId: choice.id, selectedIds: ["p2:blocked"], decks, now: "blocked-choose-p2",
+    game, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["p1:draw"], decks, now: "blocked-choose-p1",
   });
-  choice = gameplayActions(next, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  choice = gameplayActions(next, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
   next = performGameplayAction({
-    game: next, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["p1:draw"], decks, now: "blocked-choose-p1",
+    game: next, actorPlayerId: "p2", actionId: choice.id, selectedIds: ["p2:blocked"], decks, now: "blocked-choose-p2",
   });
   const p2Actions = gameplayActions(next, "p2", decks);
   assert.equal(p2Actions.some((action) => action.sourceCardInstanceId === "p2:blocked"), false);
-  const continueAction = p2Actions.find((action) => action.label === "Don't play");
+  const continueAction = p2Actions.find((action) => action.label === "Continue");
   assert.ok(continueAction);
   next = performGameplayAction({
     game: next, actorPlayerId: "p2", actionId: continueAction.id, selectedIds: [], decks, now: "blocked-continue",
   });
-  assert.deepEqual(next.state.players.p2!.zones.mainDeck, ["p2:blocked", "p2:recycle"]);
+  assert.ok(next.state.players.p2!.zones.banishment.includes("p2:blocked"));
+  assert.deepEqual(next.state.players.p2!.zones.mainDeck, ["p2:recycle"]);
   assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p1");
   const play = gameplayActions(next, "p1", decks).find((action) => action.sourceCardInstanceId === "p1:draw")!;
   next = performGameplayAction({
@@ -2448,6 +2522,18 @@ test("effect-driven spells enter the Chain in next-player play order", () => {
   game.state.cardStates["p2:staged-spell"] = { exhausted: false, damage: 0, computedMight: null };
   game.state.players.p1!.zones.mainDeck = ["p1:staged-spell"];
   game.state.players.p2!.zones.mainDeck = ["p2:staged-spell"];
+  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== "p1:spell");
+  game.state.chain = {
+    items: [{
+      id: "chain:parent-effect", kind: "spell", label: source.card.name,
+      controllerPlayerId: "p1", sourceCardInstanceId: "p1:spell",
+      targetCardInstanceIds: [], targetObjectVersions: {},
+      behaviorClauseId: "each-player-top-deck", activatedBehaviorId: null,
+      behaviorEvent: null,
+    }],
+    relevantPlayerIds: ["p1", "p2"], priorityPlayerId: "p1",
+    passedPlayerIds: [], resolvingItemId: "chain:parent-effect",
+  };
 
   assert.equal(beginEffectResolution({
     game,
@@ -2456,14 +2542,16 @@ test("effect-driven spells enter the Chain in next-player play order", () => {
     clauseId: "each-player-top-deck",
     decks,
   }), false);
-  let choice = gameplayActions(game, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  let choice = gameplayActions(game, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
   let next = performGameplayAction({
-    game, actorPlayerId: "p2", actionId: choice.id, selectedIds: ["p2:staged-spell"], decks, now: "staged-spell-choose-p2",
+    game, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["p1:staged-spell"], decks, now: "staged-spell-choose-p1",
   });
-  choice = gameplayActions(next, "p1", decks).find((action) => action.choice?.kind === "effectSelection")!;
+  choice = gameplayActions(next, "p2", decks).find((action) => action.choice?.kind === "effectSelection")!;
   next = performGameplayAction({
-    game: next, actorPlayerId: "p1", actionId: choice.id, selectedIds: ["p1:staged-spell"], decks, now: "staged-spell-choose-p1",
+    game: next, actorPlayerId: "p2", actionId: choice.id, selectedIds: ["p2:staged-spell"], decks, now: "staged-spell-choose-p2",
   });
+  assert.equal(next.state.players.p1!.zones.trash.includes("p1:spell"), true);
+  assert.equal(next.state.chain, null);
   for (const playerId of ["p2", "p1"] as const) {
     const play = gameplayActions(next, playerId, decks).find((action) =>
       action.sourceCardInstanceId === `${playerId}:staged-spell`,

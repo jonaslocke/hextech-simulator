@@ -37,6 +37,7 @@ export type BehaviorHandler = {
   matches?(binding: BehaviorBinding, context: BehaviorExecutionContext): boolean;
   targets?(binding: BehaviorBinding, context: BehaviorExecutionContext): ProjectedTargetRequirement;
   execute?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
+  selectionSubmitted?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
   choice?(
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,

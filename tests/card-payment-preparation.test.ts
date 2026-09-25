@@ -41,6 +41,11 @@ test("empowered resource amount is shared by action projection and automatic Ene
     (action) => action.sourceCardInstanceId === unrestrictedSourceId,
   )!;
   assert.equal(projectedResource.label, "Add 2 Energy");
+  assert.deepEqual(projectedResource.presentation.resourceOutput, {
+    energy: 2,
+    power: 0,
+    powerDomains: [],
+  });
   const projectedPlay = play(f);
   assert.equal(projectedPlay.enabled, true);
   assert.equal(projectedPlay.poolPayment?.canPay, true);

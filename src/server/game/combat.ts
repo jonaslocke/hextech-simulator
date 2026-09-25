@@ -164,6 +164,7 @@ export function submitCombatDamage(
   }
   validateDamageAssignments(
     game,
+    playerId,
     assignments,
     choice.totalDamage,
     choice.targetUnitIds,
@@ -181,7 +182,7 @@ export function combatChoiceTargets(
   if (!choice || choice.type !== "assignCombatDamage") return [];
   return choice.targetUnitIds.map((unitId) => ({
     unitId,
-    lethalAmount: lethalAmount(game, unitId),
+    lethalAmount: lethalAmount(game, choice.playerId, unitId, index),
     hasTank: hasEffectiveKeyword(game, unitId, "keyword.tank", index)
   }));
 }
@@ -323,6 +324,7 @@ function resolveCombat(
 
 function validateDamageAssignments(
   game: GameDocument,
+  controllerPlayerId: string,
   assignments: DamageAssignment[],
   totalDamage: number,
   targetUnitIds: string[],
@@ -353,7 +355,7 @@ function validateDamageAssignments(
       .some((entry) => tankIds.includes(entry.targetUnitId));
     const incompleteTank = tankIds.some((id) =>
       (assignments.find((entry) => entry.targetUnitId === id)?.amount ?? 0)
-        < lethalAmount(game, id)
+        < lethalAmount(game, controllerPlayerId, id, index)
     );
     if (tankAfterNonTank || incompleteTank) {
       throw new Error("Tank units must be assigned lethal damage first.");
@@ -361,7 +363,7 @@ function validateDamageAssignments(
   }
   for (let indexPosition = 0; indexPosition < assignments.length - 1; indexPosition += 1) {
     const entry = assignments[indexPosition]!;
-    if (entry.amount < lethalAmount(game, entry.targetUnitId)) {
+    if (entry.amount < lethalAmount(game, controllerPlayerId, entry.targetUnitId, index)) {
       throw new Error("A unit must be assigned lethal damage before assigning another unit.");
     }
   }
@@ -380,7 +382,8 @@ function totalCombatMight(
   }, 0);
 }
 
-function lethalAmount(game: GameDocument, unitId: string) {
+function lethalAmount(game: GameDocument, controllerPlayerId: string, unitId: string, index: RuntimeCardIndex) {
+  if (damageIsLethalAgainstEnemyUnit(game, controllerPlayerId, unitId, index)) return 1;
   const state = game.state.cardStates[unitId]!;
   return Math.max(1, (state.computedMight ?? 0) - state.damage);
 }

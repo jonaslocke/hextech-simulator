@@ -190,6 +190,11 @@ export const projectedActionSchema = z.object({
     .nullable()
     .optional(),
   presentation: z.object({
+    resourceOutput: z.object({
+      energy: z.number().int().nonnegative(),
+      power: z.number().int().nonnegative(),
+      powerDomains: z.array(z.string().min(1)),
+    }).optional(),
     resourceCost: z.object({
       energy: z.number().int().nonnegative(),
       powerCosts: z.array(z.object({

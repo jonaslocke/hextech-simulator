@@ -359,6 +359,35 @@ test("combat suggestions use projected effective Might and marked damage through
   assert.ok(overridden.state.battlefields[0]!.units.includes("large"));
 });
 
+test("lethal-damage modifiers lower projected and validated combat thresholds", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 2,
+    attackerLethalDamage: true,
+    defenders: [
+      { id: "tank", might: 8, tank: true },
+      { id: "other", might: 7 },
+    ],
+  });
+  const game = passShowdown(moveAttacker(initial, decks), decks);
+  const action = gameplayActions(game, "p1", decks).find((candidate) => candidate.choice?.kind === "combatDamage")!;
+  assert.equal(action.choice?.kind, "combatDamage");
+  if (action.choice?.kind !== "combatDamage") return;
+  assert.deepEqual(action.choice.targets.map(({ unitId, lethalAmount, hasTank }) => ({ unitId, lethalAmount, hasTank })), [
+    { unitId: "tank", lethalAmount: 1, hasTank: true },
+    { unitId: "other", lethalAmount: 1, hasTank: false },
+  ]);
+  assert.throws(() => performGameplayAction({
+    game, decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [],
+    allocations: [{ targetUnitId: "other", amount: 1 }, { targetUnitId: "tank", amount: 1 }], now: "lethal-invalid-order",
+  }), /Tank units must be assigned lethal damage first/);
+  const next = performGameplayAction({
+    game, decks, actorPlayerId: "p1", actionId: action.id, selectedIds: [],
+    allocations: [{ targetUnitId: "tank", amount: 1 }, { targetUnitId: "other", amount: 1 }], now: "lethal-valid-order",
+  });
+  assert.ok(next.state.players.p2!.zones.trash.includes("tank"));
+  assert.ok(next.state.players.p2!.zones.trash.includes("other"));
+});
+
 test("combat auto-assignment and manual overrides remain subject to server Tank and allocation validation", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 5,
@@ -430,6 +459,7 @@ function passShowdown(
 function combatFixture(input: {
   attackerMight: number;
   attackerAssault?: number;
+  attackerLethalDamage?: boolean;
   defenders: Array<{
     id: string;
     might: number;
@@ -444,7 +474,9 @@ function combatFixture(input: {
       "Unit",
       input.attackerMight,
       false,
-      input.attackerAssault
+      input.attackerAssault,
+      undefined,
+      input.attackerLethalDamage,
     ),
     ...input.defenders.map((unit) =>
       definition(
@@ -594,7 +626,8 @@ function definition(
   might: number,
   tank = false,
   assault?: number,
-  shield?: number
+  shield?: number,
+  lethalDamage?: boolean,
 ) {
   const keywords: BehaviorBinding[] = [];
   if (tank) {
@@ -619,6 +652,14 @@ function definition(
       parameters: { amount: shield },
       confidence: "high",
       order: keywords.length
+    });
+  }
+  if (lethalDamage) {
+    keywords.push({
+      behaviorId: "keyword.lethal_damage",
+      parameters: {},
+      confidence: "high",
+      order: keywords.length,
     });
   }
   return {

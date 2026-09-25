@@ -1081,6 +1081,7 @@ export const GameBoard: FC<GameBoardProps> = ({
         onClose={() => {
           if (!isInteractionSuspended && !isMovementDraftActive) setOpenZone(null);
         }}
+        onCardContextAction={isInteractionSuspended || isMovementDraftActive ? undefined : handleCardContextFromHand}
         openZone={openZone}
         opponentBanishment={board.opponent.zones.banishment}
         opponentTrash={board.opponent.zones.trash}

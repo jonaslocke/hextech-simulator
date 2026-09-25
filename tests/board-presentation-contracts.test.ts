@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { gameFixture } from "./helpers/game-fixture";
 import { projectGame } from "../src/server/game/projection";
+import { adaptProjectionToBoard } from "../src/features/game-board/board-view-model";
 import { chainRelationships } from "../src/features/game-board/chain-relationships";
 import { targetSelectionCanAdd, targetSelectionIsLegal } from "../src/features/game-board/model";
 import { newPublicReveals } from "../src/features/game-board/interactions/public-reveal-events";
@@ -49,6 +50,27 @@ test("playable card menus omit unavailable modes and empty placeholders", () => 
   ];
   assert.deepEqual(availablePlayableCardModes(modes).map((mode) => mode.id), ["available"]);
   assert.deepEqual(availablePlayableCardModes(modes.slice(1)), []);
+});
+
+test("viewer-owned Trash cards expose only server-projected alternate play modes", async () => {
+  const { game, decks, place } = await gameFixture();
+  const cardId = place("OGN-044", "hand");
+  const definition = definitionForInstance(cardId, createRuntimeCardIndex(decks, game));
+  definition.card.classification.type = "Spell";
+  definition.behaviorModel.clauses[0]!.keywords.push({
+    behaviorId: "keyword.flow", order: 50, confidence: "high",
+    parameters: { energyCost: 2 },
+  });
+  game.state.players.p1!.zones.hand = game.state.players.p1!.zones.hand.filter((id) => id !== cardId);
+  game.state.players.p1!.zones.trash.push(cardId);
+  game.state.players.p1!.energy = 2;
+
+  const projection = projectGame({ game, decks, viewerPlayerId: "p1" });
+  const board = adaptProjectionToBoard(projection);
+  const modes = availablePlayableCardModes(board.projection.players.p1!.availablePaymentModes[cardId] ?? []);
+  assert.equal(modes.length, 1);
+  assert.equal(modes[0]!.enabled, true);
+  assert.equal(projection.actions.some((action) => action.sourceCardInstanceId === cardId && action.enabled), true);
 });
 
 test("target selection honors per-location cardinality constraints", () => {
