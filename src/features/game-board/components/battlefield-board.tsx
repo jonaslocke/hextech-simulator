@@ -28,19 +28,6 @@ import { groupCardsByAttachment } from "./attachment-layout";
 const BATTLEFIELD_ART_BACKGROUND_SIZE = "178% auto";
 const BATTLEFIELD_ART_BACKGROUND_POSITION = "center 43%";
 
-const BATTLEFIELD_WIDTH_BY_SHOWDOWN_STATE = {
-  neutral: "50%",
-  open: "60%",
-  deferred: "40%",
-} as const;
-
-const BATTLEFIELD_SIZE_TRANSITION = {
-  type: "spring",
-  stiffness: 260,
-  damping: 30,
-  mass: 0.75,
-} as const;
-
 const BATTLEFIELD_ROW_LAYOUT_TRANSITION = {
   type: "spring",
   stiffness: 300,
@@ -123,46 +110,6 @@ const battlefieldInsetOverlay = cva(
   },
 );
 
-const battlefieldNamePill = cva(
-  [
-    "inline-flex top-1.5 left-2 z-[99] absolute items-center",
-    "bg-slate-950/38 supports-backdrop-filter:bg-slate-950/28",
-    "shadow-black/30 shadow-lg supports-backdrop-filter:backdrop-blur-md",
-    "border border-white/12 rounded-full max-w-[calc(100%-1rem)] overflow-hidden",
-    "text-[10px] text-slate-100 uppercase",
-  ],
-  {
-    variants: {
-      emphasized: {
-        true: "border-cyan-100/24 shadow-cyan-950/20",
-        false: "",
-      },
-    },
-    defaultVariants: {
-      emphasized: false,
-    },
-  },
-);
-
-const battlefieldStatusBadge = cva(
-  [
-    "top-1.5 right-2 z-[98] absolute",
-    "bg-slate-950/70 px-2 py-0.5 border rounded-full",
-    "font-mono text-[9px]",
-  ],
-  {
-    variants: {
-      state: {
-        controlled: "border-amber-200/25 text-amber-100",
-        contested: "border-rose-200/30 text-rose-100",
-      },
-    },
-    defaultVariants: {
-      state: "controlled",
-    },
-  },
-);
-
 const battlefieldMightBadge = cva([
   "top-1/2 right-2 z-20 absolute flex flex-col items-center",
   "bg-amber-300/88 supports-backdrop-filter:bg-amber-300/78",
@@ -172,18 +119,17 @@ const battlefieldMightBadge = cva([
 ]);
 
 const battlefieldDescriptionBar = cva([
-  "bottom-0 absolute inset-x-0 flex justify-center items-center",
+  "bottom-0 absolute inset-x-0 flex items-center",
   "bg-slate-950/26 supports-backdrop-filter:bg-slate-950/16 hover:bg-slate-950/48",
   "shadow-[0_-10px_22px_rgba(0,0,0,0.16)] supports-backdrop-filter:backdrop-blur-sm",
-  "px-3 border-white/8 border-t h-full hover:min-h-14",
-  "text-[10px] text-slate-100/88 hover:text-white hover:text-sm text-center",
-  "transition-[background-color,min-height,font-size,color] duration-300 ease-out",
+  "gap-3 px-3 border-white/8 border-t h-full",
+  "text-[10px] text-slate-100/88 text-left",
+  "transition-colors duration-300 ease-out",
 ]);
 
 const battlefieldUnitRow = cva(
   [
-    "flex flex-wrap gap-2 pl-2 min-h-0 overflow-auto",
-    "[scrollbar-color:rgba(103,232,249,0.25)_transparent]",
+    "flex flex-wrap gap-1 pl-2 min-h-0 overflow-auto",
   ],
   {
     variants: {
@@ -214,6 +160,8 @@ type Props = {
   onCardPointerEnter?: (card: Card) => void;
   onCardPointerLeave?: (card: Card) => void;
   owner: "player" | "opponent";
+  playerId?: string;
+  opponentPlayerId?: string;
   showdownState?: "neutral" | "open" | "deferred";
   enablePlayerUnitLocationDrag?: boolean;
   dropStatus?: BoardLocationDropStatus;
@@ -275,6 +223,8 @@ export const BattlefieldBoard: FC<Props> = ({
   onCardPointerLeave,
   onCardPrimaryAction,
   owner,
+  playerId,
+  opponentPlayerId,
   showdownState = "neutral",
   enablePlayerUnitLocationDrag = false,
   stagedMovementCardInstanceIds,
@@ -343,9 +293,6 @@ export const BattlefieldBoard: FC<Props> = ({
   return (
     <motion.div
       aria-selected={isHighlighted}
-      animate={{
-        width: BATTLEFIELD_WIDTH_BY_SHOWDOWN_STATE[showdownState],
-      }}
       data-battlefield-visual-state={visualState}
       data-drop-status={dropStatus}
       data-highlighted={isEmphasized ? "true" : undefined}
@@ -354,8 +301,7 @@ export const BattlefieldBoard: FC<Props> = ({
       initial={false}
       layout="position"
       ref={setBattlefieldRootRef}
-      transition={BATTLEFIELD_SIZE_TRANSITION}
-      className={battlefieldRoot({ visualState })}
+      className={cn(battlefieldRoot({ visualState }), "flex-1")}
     >
       <div
         aria-hidden="true"
@@ -384,35 +330,8 @@ export const BattlefieldBoard: FC<Props> = ({
       />
 
       <div className="relative grid grid-rows-2 p-2 min-h-0">
-        <div className={battlefieldNamePill({ emphasized: isEmphasized })}>
-          <span className="px-2 py-0.5 font-mono font-semibold truncate tracking-wide">
-            {name}
-          </span>
-          <button
-            type="button"
-            aria-expanded={isBattlefieldCardOpen}
-            aria-label={`Show ${name} battlefield card`}
-            className="flex justify-center items-center hover:bg-white/10 border-white/12 border-l focus-visible:outline focus-visible:outline-yellow-300 size-5 text-white/70 hover:text-white transition"
-            onClick={() => setIsBattlefieldCardOpen((isOpen) => !isOpen)}
-          >
-            <Info aria-hidden="true" className="size-3" />
-          </button>
-        </div>
-
-        {(controllerPlayerId || contestedByPlayerId) && (
-          <div
-            className={battlefieldStatusBadge({
-              state: contestedByPlayerId ? "contested" : "controlled",
-            })}
-          >
-            {contestedByPlayerId
-              ? `Contested by ${contestedByPlayerId}`
-              : `Controlled by ${controllerPlayerId}`}
-          </div>
-        )}
-
         {isBattlefieldCardOpen && (
-          <div className="top-9 left-2 z-[120] absolute bg-slate-950/72 supports-backdrop-filter:bg-slate-950/56 shadow-2xl shadow-black/70 supports-backdrop-filter:backdrop-blur-md p-1 border border-white/12 rounded-lg ring-1 ring-cyan-300/10">
+          <div className="bottom-9 left-2 z-[120] absolute bg-slate-950/72 supports-backdrop-filter:bg-slate-950/56 shadow-2xl shadow-black/70 supports-backdrop-filter:backdrop-blur-md p-1 border border-white/12 rounded-lg ring-1 ring-cyan-300/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- Battlefield art comes from the catalog. */}
             <img
               alt={name}
@@ -472,8 +391,29 @@ export const BattlefieldBoard: FC<Props> = ({
         />
       </div>
 
-      <div className="relative h-8.5 overflow-visible">
+      <div className="relative h-[34px] overflow-visible">
         <div className={battlefieldDescriptionBar()}>
+          <div className="flex flex-col justify-center shrink-0 w-[40%] min-w-0 leading-tight">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="font-semibold truncate">{name}</span>
+              <button
+                type="button"
+                aria-expanded={isBattlefieldCardOpen}
+                aria-label={`Show ${name} battlefield card`}
+                className="flex justify-center items-center hover:bg-white/10 border-white/12 border-l focus-visible:outline focus-visible:outline-yellow-300 size-5 shrink-0 text-white/70 hover:text-white transition"
+                onClick={() => setIsBattlefieldCardOpen((isOpen) => !isOpen)}
+              >
+                <Info aria-hidden="true" className="size-3" />
+              </button>
+            </div>
+            <span className="truncate text-[9px] text-white/70">
+              {contestedByPlayerId
+                ? `Contested by ${contestedByPlayerId === playerId ? "You" : contestedByPlayerId === opponentPlayerId ? "Opponent" : "a player"}`
+                : controllerPlayerId
+                  ? `Controlled by ${controllerPlayerId === playerId ? "You" : controllerPlayerId === opponentPlayerId ? "Opponent" : "a player"}`
+                  : "Uncontrolled"}
+            </span>
+          </div>
           <div className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] line-clamp-2 leading-snug">
             <CardRulesText text={description} />
           </div>
@@ -518,6 +458,7 @@ function BattlefieldUnitRow({
     <motion.div
       className={cn(battlefieldUnitRow({ side }), className)}
       data-zone-animation-id={zoneAnimationId}
+      data-board-scroll
       layout
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
@@ -525,6 +466,7 @@ function BattlefieldUnitRow({
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
           <CardTile
+            size="lg"
             enableHoverPreview
             isHighlighted={
               unit.instanceId
@@ -575,10 +517,12 @@ function BattlefieldUnitRow({
           <AttachmentCardGroup
             groupId={key}
             key={key}
+            size="lg"
             host={hostTile}
             attachments={attachedCards.map((attachment, attachmentIndex) => ({
               id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
               card: <CardTile
+                  size="lg"
                   enableHoverPreview
                   isHighlighted={
                     attachment.instanceId
@@ -639,22 +583,26 @@ export function BattlefieldFacedownZone({
     <div
       aria-label="Facedown Zone"
       role="group"
-      className="top-1/2 right-2 z-30 absolute flex -translate-y-1/2 flex-col items-center gap-1 bg-slate-950/90 shadow-xl p-1.5 border border-fuchsia-200/40 rounded-md ring-1 ring-fuchsia-300/20"
+      className="bottom-0 left-1/2 z-30 absolute -translate-x-1/2 overflow-visible"
       data-testid="facedown-zone"
     >
-      <span className="font-semibold text-[9px] text-fuchsia-100 uppercase tracking-wide">Facedown</span>
-      <CardTile
-        {...(card ?? {})}
-        size="sm"
-        name={card?.name ?? "Facedown card"}
-        img={card?.img ?? cardBackImage.src}
-        type={card?.type ?? "Facedown"}
-        isHighlighted={card?.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
-        isTransferHidden={card?.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
-        onPrimaryAction={card && onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
-        onHighlightPointerEnter={card && onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
-        onHighlightPointerLeave={card && onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
-      />
+      <div className={cn("group relative h-9 w-[86px] overflow-visible", card && "hover:-translate-y-[88px] focus-within:-translate-y-[88px] transition-transform duration-200 motion-reduce:transition-none")}>
+        <div className="h-9 w-[86px] overflow-hidden rounded-md border border-fuchsia-200/40 bg-slate-950/90 shadow-xl ring-1 ring-fuchsia-300/20">
+          <CardTile
+            {...(card ?? {})}
+            size="md"
+            name={card?.name ?? "Hidden card"}
+            img={card?.img ?? cardBackImage.src}
+            type={card?.type ?? "Hidden"}
+            isHighlighted={card?.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
+            isTransferHidden={card?.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
+            onPrimaryAction={card && onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
+            onHighlightPointerEnter={card && onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
+            onHighlightPointerLeave={card && onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
+          />
+        </div>
+        <span className="top-1 left-1 z-40 absolute rounded bg-slate-950/80 px-1 font-bold text-[9px] text-fuchsia-100 tracking-wide">HIDDEN</span>
+      </div>
     </div>
   );
 }

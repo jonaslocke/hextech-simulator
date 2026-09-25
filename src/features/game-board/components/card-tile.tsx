@@ -168,11 +168,7 @@ export const CardTile: FC<CardTileProps> = ({
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
-    height: isRotatedExhausted
-      ? resolvedOrientation === "landscape"
-        ? dimensions.width
-        : dimensions.height
-      : dimensions.height,
+    height: isRotatedExhausted ? dimensions.width : dimensions.height,
     zIndex: previewPosition ? 2147483647 : undefined,
   };
 
