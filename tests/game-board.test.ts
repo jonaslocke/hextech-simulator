@@ -373,6 +373,40 @@ test("keeps large rune rows inside a horizontally scrollable zone", async () => 
   );
 });
 
+test("routes owned Trash primary interaction through playable-card handling only", async () => {
+  const overlay = await readFile(
+    path.join(
+      process.cwd(),
+      "src",
+      "features",
+      "game-board",
+      "components",
+      "temporary-zone-overlay.tsx",
+    ),
+    "utf8",
+  );
+  const board = await readFile(
+    path.join(process.cwd(), "src", "features", "game-board", "game-board.tsx"),
+    "utf8",
+  );
+
+  assert.match(
+    overlay,
+    /openZone === "playerTrash"[\s\S]*?onCardContextAction=\{onCardContextAction\}[\s\S]*?onPlayCard=\{onPlayCard\}/,
+  );
+  assert.match(
+    overlay,
+    /onPrimaryAction=\{onPlayCard \? \(\) => onPlayCard\(card\) : undefined\}/,
+  );
+  const opponentTrash = overlay.match(/openZone === "opponentTrash" \? \([\s\S]*?\) : \(/)?.[0];
+  assert.ok(opponentTrash);
+  assert.doesNotMatch(opponentTrash, /onCardContextAction|onPlayCard/);
+  assert.match(
+    board,
+    /<TemporaryZoneOverlay[\s\S]*?onPlayCard=\{\s*isInteractionSuspended \|\| isMovementDraftActive\s*\? undefined\s*: handlePlayCardFromHand\s*\}/,
+  );
+});
+
 async function collect(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files: string[] = [];

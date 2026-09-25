@@ -18,6 +18,7 @@ export function TemporaryZoneOverlay({
   logEntries,
   onClose,
   onCardContextAction,
+  onPlayCard,
   openZone,
   opponentBanishment,
   opponentTrash,
@@ -30,6 +31,7 @@ export function TemporaryZoneOverlay({
   logEntries: GameLogEntry[];
   onClose: () => void;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onPlayCard?: (card: Card) => void;
   openZone: TemporaryZoneOverlayZone;
   opponentBanishment: ZoneData;
   opponentTrash: ZoneData;
@@ -72,7 +74,12 @@ export function TemporaryZoneOverlay({
       ) : openZone === "log" ? (
         <LogList entries={logEntries} />
       ) : openZone === "playerTrash" ? (
-        <ZoneCards emptyLabel="No cards in trash" cards={playerTrash.cards} onCardContextAction={onCardContextAction} />
+        <ZoneCards
+          emptyLabel="No cards in trash"
+          cards={playerTrash.cards}
+          onCardContextAction={onCardContextAction}
+          onPlayCard={onPlayCard}
+        />
       ) : openZone === "opponentTrash" ? (
         <ZoneCards emptyLabel="No cards in trash" cards={opponentTrash.cards} />
       ) : (
@@ -86,10 +93,12 @@ export function ZoneCards({
   cards,
   emptyLabel,
   onCardContextAction,
+  onPlayCard,
 }: {
   cards: Card[];
   emptyLabel: string;
   onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onPlayCard?: (card: Card) => void;
 }) {
   if (cards.length === 0) {
     return <EmptyState label={emptyLabel} />;
@@ -105,6 +114,7 @@ export function ZoneCards({
           onContextAction={onCardContextAction ? (event) => onCardContextAction(card, event) : undefined}
           showMight={false}
           {...card}
+          onPrimaryAction={onPlayCard ? () => onPlayCard(card) : undefined}
         />
       ))}
     </div>
