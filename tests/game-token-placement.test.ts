@@ -9,6 +9,7 @@ import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  definitionForInstance,
   moveUnitToTrash,
 } from "../src/server/game/primitive-handlers";
 import { gameplayActions, performGameplayAction, projectGame } from "../src/server/game";
@@ -263,6 +264,81 @@ test("non-Unit token creation preserves the absence of Might", () => {
     ?.zones.find((zone) => zone.kind === "base")?.cards.find((card) => card.instanceId === tokenId);
   assert.equal(projected?.type, "Gear");
   assert.equal(projected?.computedMight, null);
+});
+
+test("runtime-created fallback tokens stay visible to an index held across effect resolution", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("generated-gear", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Gold Gear",
+        count: 1,
+        placement: "base",
+        entryState: "exhausted",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  const transitionIndex = createRuntimeCardIndex(decks, game);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "generated-gear",
+    decks,
+  }), true);
+
+  const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenId);
+  assert.equal(definitionForInstance(tokenId, transitionIndex).card.name, "Gold Gear");
+  assert.equal(game.state.cardStates[tokenId]?.exhausted, true);
+  assert.doesNotThrow(() => moveUnitToTrash(game, tokenId, transitionIndex));
+});
+
+test("token wording resolves to a matching authoritative Token definition", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("gear-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Gold Gear",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const authoritativeToken = unit("CORPUS_GEAR_TOKEN", "Gold");
+  authoritativeToken.card.classification.type = "Gear";
+  authoritativeToken.card.classification.supertype = "Token";
+  authoritativeToken.card.attributes.might = null;
+  authoritativeToken.card.media.image_url = "https://assets.example.test/corpus-gear.png";
+  const { game, decks } = fixture([source, authoritativeToken]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "gear-token",
+    decks,
+  }), true);
+
+  const token = game.state.createdCardInstances?.[0];
+  assert.equal(token?.cardCode, "CORPUS_GEAR_TOKEN");
+  assert.equal(
+    (game.state.createdCardDefinitions ?? []).some((definition) => definition.cardCode === "TOKEN-gold-gear"),
+    false,
+  );
+  assert.equal(
+    projectGame({ game, decks, viewerPlayerId: "p1" }).players
+      .find((player) => player.playerId === "p1")?.zones
+      .find((zone) => zone.kind === "base")?.cards
+      .find((card) => card.instanceId === token?.instanceId)?.imageUrl,
+    "https://assets.example.test/corpus-gear.png",
+  );
 });
 
 test("generated Bird units retain their tag and Deflect keyword", () => {

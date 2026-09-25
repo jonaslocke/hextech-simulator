@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   createBehaviorContext,
   buildPaymentPlan,
+  cleanupLethalDamage,
   createPrimitiveHandlers,
   legalUnitDestinationIds,
   recomputeMight,
@@ -190,6 +191,108 @@ test("applies controller Bonus Damage and records whether it killed", () => {
 
   assert.ok(game.state.players.p2!.zones.trash.includes("unit"));
   assert.equal(context.effectOutcomes.lastDamageKilled, true);
+});
+
+test("Lethal preserves positive damage and kills a zero-Might enemy unit", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: false, damage: 0, computedMight: null };
+
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  const context = createBehaviorContext(game, "p1", "lethal-source", null, ["zero-might-unit"]);
+  createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(
+    binding("action.deal_damage", { amount: 1, target: "unit" }),
+    context,
+  );
+
+  assert.equal(game.state.cardStates["zero-might-unit"]!.damage, 1);
+  assert.ok(game.state.players.p2!.zones.trash.includes("zero-might-unit"));
+});
+
+test("fight preserves its actual damage value while applying the Lethal threshold", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: true, damage: 0, computedMight: 2 };
+
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  const context = createBehaviorContext(game, "p1", "lethal-source", null, []);
+  context.selectedBySelector.first = ["lethal-source"];
+  context.selectedBySelector.second = ["zero-might-unit"];
+  createPrimitiveHandlers(index).get("action.fight")!.execute!(
+    binding("action.fight", { firstUnitSelectionKey: "first", secondUnitSelectionKey: "second" }),
+    context,
+  );
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("zero-might-unit"));
+});
+
+test("zero-Might units need positive damage and ordinary damage remains unchanged", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  cleanupLethalDamage(game, ["zero-might-unit"], index);
+  assert.ok(game.state.battlefields[0]!.units.includes("zero-might-unit"));
+
+  const context = createBehaviorContext(game, "p1", "spell", null, ["unit"]);
+  createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(
+    binding("action.deal_damage", { amount: 1, target: "unit" }),
+    context,
+  );
+  assert.equal(game.state.cardStates.unit!.damage, 1);
+  assert.ok(game.state.battlefields[0]!.units.includes("unit"));
 });
 
 test("derives Deflect as an atomic any-domain Power cost", () => {

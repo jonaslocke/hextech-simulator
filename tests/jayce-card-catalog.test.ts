@@ -77,6 +77,62 @@ test("Jayce deck reusable publications compile their current supported cards", a
         [["action.each_player_choose_top_deck_card_and_play"]],
       );
     }
+    if (code === "VEN-066/166") {
+      assert.ok(document.behaviorModel.clauses.some((clause) =>
+        clause.keywords.some((binding) => binding.behaviorId === "keyword.hidden"),
+      ));
+      const { game, decks } = await gameFixture();
+      decks[0]!.snapshot.cards.push({
+        cardCode: document.cardCode,
+        sourceTextHash: document.sourceTextHash,
+        card: document.card,
+        behaviorModel: document.behaviorModel,
+        effectText: document.effectText ?? null,
+        effectBehaviorModel: document.effectBehaviorModel,
+      });
+      const hiddenCardId = "p1:canonical-hidden-spell";
+      decks[0]!.instances.push({
+        instanceId: hiddenCardId,
+        ownerPlayerId: "p1",
+        source: "mainDeck",
+        cardCode: document.cardCode,
+      });
+      game.state.players.p1!.zones.hand.push(hiddenCardId);
+      game.state.cardStates[hiddenCardId] = {
+        exhausted: false,
+        damage: 0,
+        computedMight: null,
+      };
+      const target = decks[0]!.instances.find((instance) =>
+        instance.source === "mainDeck" &&
+        decks[0]!.snapshot.cards.some((candidate) =>
+          candidate.cardCode === instance.cardCode && candidate.card.classification.type === "Unit",
+        ),
+      );
+      assert.ok(target, "integration fixture needs a Unit target");
+      game.state.players.p1!.zones.mainDeck = game.state.players.p1!.zones.mainDeck.filter(
+        (instanceId) => instanceId !== target.instanceId,
+      );
+      const battlefieldInstance = decks[0]!.instances.find((instance) => instance.source === "battlefield");
+      assert.ok(battlefieldInstance, "integration fixture needs a Battlefield");
+      game.state.battlefields = [{
+        battlefieldId: "canonical-hidden-field",
+        cardInstanceId: battlefieldInstance.instanceId,
+        selectedByPlayerId: "p1",
+        controllerPlayerId: "p1",
+        contestedByPlayerId: null,
+        units: [target.instanceId],
+        facedownCardInstanceId: null,
+      }];
+      game.state.players.p1!.energy = 20;
+      game.state.players.p1!.power = { Fury: 5 };
+
+      const actions = gameplayActions(game, "p1", decks).filter(
+        (action) => action.sourceCardInstanceId === hiddenCardId,
+      );
+      assert.ok(actions.some((action) => action.enabled && action.id.split(":")[3] === "hide"));
+      assert.ok(actions.some((action) => action.enabled && action.id.split(":")[3] === "play"));
+    }
     if (code === "VEN-075/166") {
       const resource = document.behaviorModel.clauses.flatMap((clause) => clause.abilities)
         .find((binding) => binding.behaviorId === "ability.exhaust_for_resource");

@@ -388,6 +388,18 @@ test("lethal-damage modifiers lower projected and validated combat thresholds", 
   assert.ok(next.state.players.p2!.zones.trash.includes("other"));
 });
 
+test("combat Lethal damage kills a zero-Might defender without replacing the assigned amount", () => {
+  const { game: initial, decks } = combatFixture({
+    attackerMight: 1,
+    attackerLethalDamage: true,
+    defenders: [{ id: "zero", might: 0 }],
+  });
+
+  const next = passShowdown(moveAttacker(initial, decks), decks);
+
+  assert.ok(next.state.players.p2!.zones.trash.includes("zero"));
+});
+
 test("combat auto-assignment and manual overrides remain subject to server Tank and allocation validation", () => {
   const { game: initial, decks } = combatFixture({
     attackerMight: 5,
