@@ -90,6 +90,11 @@ test("play projection shows final costs only for altered or alternative modes an
   const modes = read();
   assert.equal(modes.length, 2);
   assert.deepEqual(modes.map((mode) => mode.presentation.playCost?.showCost), [false, true]);
+  assert.deepEqual(
+    modes.map((mode) => mode.presentation.playCost?.paymentMode),
+    ["standard", "additional-cost"],
+  );
+  assert.ok(modes.every((mode) => mode.presentation.playCost?.destinationLabel === "Base"));
   assert.ok(modes.every((mode) => mode.label === "Play Clockwork Keeper to Base"));
   assert.equal(modes[1]!.costPreview!.energy, 2);
   assert.deepEqual(modes[1]!.poolPayment!.powerCosts, [{ amount: 1, domains: ["Calm"] }]);

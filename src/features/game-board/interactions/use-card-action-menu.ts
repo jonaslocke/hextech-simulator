@@ -1,16 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 import type {
   BoardLocation,
   CardActionMenuItem,
   CardActionMenuState,
 } from "../components/card-action-menu";
 
-const MENU_WIDTH = 180;
-const MENU_MIN_HEIGHT = 44;
-const MENU_ITEM_HEIGHT = 36;
-const MENU_VERTICAL_PADDING = 12;
 const VIEWPORT_GUTTER = 8;
 
 export function useCardActionMenu() {
@@ -33,26 +29,15 @@ export function useCardActionMenu() {
 
       setHoveredBoardLocation(null);
 
-      const menuHeight = Math.max(
-        MENU_MIN_HEIGHT,
-        items.length * MENU_ITEM_HEIGHT + MENU_VERTICAL_PADDING,
-      );
-
       setCardActionMenu({
         items,
         left: Math.min(
           event.clientX,
-          Math.max(
-            VIEWPORT_GUTTER,
-            window.innerWidth - MENU_WIDTH - VIEWPORT_GUTTER,
-          ),
+          Math.max(VIEWPORT_GUTTER, window.innerWidth - VIEWPORT_GUTTER),
         ),
         top: Math.min(
           event.clientY,
-          Math.max(
-            VIEWPORT_GUTTER,
-            window.innerHeight - menuHeight - VIEWPORT_GUTTER,
-          ),
+          Math.max(VIEWPORT_GUTTER, window.innerHeight - VIEWPORT_GUTTER),
         ),
       });
     },
@@ -66,26 +51,6 @@ export function useCardActionMenu() {
   const clearCardActionMenuHighlight = useCallback(() => {
     setHoveredBoardLocation(null);
   }, []);
-
-  useEffect(() => {
-    if (!cardActionMenu) {
-      return;
-    }
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeCardActionMenu();
-      }
-    };
-
-    window.addEventListener("pointerdown", closeCardActionMenu);
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      window.removeEventListener("pointerdown", closeCardActionMenu);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [cardActionMenu, closeCardActionMenu]);
 
   return {
     cardActionMenu,
