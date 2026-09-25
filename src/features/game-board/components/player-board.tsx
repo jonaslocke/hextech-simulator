@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/shared/components/button";
 import { cn } from "@/shared/utils/cn";
 import { ArchiveX, Trash2 } from "lucide-react";
 import {
@@ -11,6 +10,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import cardBackImage from "../../../../assets/cardback.jpg";
 import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
@@ -20,7 +20,7 @@ import type {
 } from "../drag-and-drop/location-drag-actions";
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import { Card, PlayerData, ZoneData } from "../types";
-import { CardTile } from "./card-tile";
+import { CARD_TILE_SIZE_CONFIG, CardTile, type CardTileSize } from "./card-tile";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { groupCardsByAttachment } from "./attachment-layout";
 import { ZoneArea } from "./zone-area";
@@ -98,8 +98,8 @@ const BaseLine = ({
   isLocationDropEnabled = false,
   stagedMovementCardInstanceIds,
 }: BaseLineProps) => {
-  const baseUnits = player.zones.base.cards.filter(
-    (card) => card.type !== "Rune",
+  const baseUnits = orderBasePermanents(
+    player.zones.base.cards.filter((card) => card.type !== "Rune"),
   );
   const hasChampionZone =
     player.zones.champion.cards.length > 0 || player.zones.champion.count > 0;
@@ -114,9 +114,9 @@ const BaseLine = ({
       className={cn(
         "gap-2 grid min-h-0",
         hasChampionZone &&
-          "grid-cols-[var(--board-zone-width)_var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
+          "grid-cols-[var(--board-champion-width)_var(--board-legend-width)_minmax(0,1fr)_var(--board-pile-width)]",
         !hasChampionZone &&
-          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
+          "grid-cols-[var(--board-legend-width)_minmax(0,1fr)_var(--board-pile-width)]",
       )}
     >
       {hasChampionZone && (
@@ -133,6 +133,7 @@ const BaseLine = ({
             hiddenCardInstanceIds={hiddenCardInstanceIds}
             onCardContextAction={onChampionContextAction}
             onCardPrimaryAction={onChampionPrimaryAction}
+            size="lg"
             zone={player.zones.champion}
           />
         </ZoneArea>
@@ -147,6 +148,7 @@ const BaseLine = ({
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           onCardPrimaryAction={onBoardCardPrimaryAction}
           onCardContextAction={onBoardCardPrimaryAction}
+          size="xl"
           zone={player.zones.legend}
         />
       </ZoneArea>
@@ -163,6 +165,7 @@ const BaseLine = ({
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
           layout="wrap"
+          size="lg"
           onCardPrimaryAction={onBoardCardPrimaryAction}
           onCardPointerEnter={onBoardCardPointerEnter}
           onCardPointerLeave={onBoardCardPointerLeave}
@@ -175,7 +178,7 @@ const BaseLine = ({
         isCentered
         isHightlighted={isHightlighted}
       >
-        <HiddenZone count={player.zones.mainDeck.count} label="Main deck" />
+        <HiddenZone count={player.zones.mainDeck.count} label="Main deck" size="md" />
       </ZoneArea>
     </div>
   );
@@ -204,7 +207,6 @@ const RunesLine = ({
   const baseRunes = player.zones.base.cards.filter(
     (card) => card.type === "Rune",
   );
-  const hasBanishment = player.zones.banishment.count > 0;
   const runeCounts = countRuneReadiness(baseRunes);
 
   const baseRunesDroppable = useBoardLocationDroppable({
@@ -214,15 +216,7 @@ const RunesLine = ({
   });
 
   return (
-    <div
-      className={cn(
-        "gap-2 grid min-h-0",
-        hasBanishment &&
-          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)_64px]",
-        !hasBanishment &&
-          "grid-cols-[var(--board-zone-width)_minmax(0,1fr)_var(--board-zone-width)]",
-      )}
-    >
+    <div className="gap-2 grid grid-cols-[var(--board-pile-width)_minmax(0,1fr)_var(--board-pile-width)] min-h-0">
       <ZoneArea
         animationZoneId={`${player.playerId}:runeDeck`}
         isCentered
@@ -238,14 +232,12 @@ const RunesLine = ({
         ref={baseRunesDroppable.setNodeRef}
         totalCardsCount={runeCounts}
       >
-        <CardList
+        <RuneFan
           cards={baseRunes}
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
-          layout="scroll"
           onCardContextAction={onRuneContextAction}
           onCardPrimaryAction={onRunePrimaryAction}
-          showMight={false}
         />
       </ZoneArea>
       <ZoneArea
@@ -253,34 +245,15 @@ const RunesLine = ({
         isCentered
         isHightlighted={isHightlighted}
       >
-        <TrashZone
+        <TrashBanishZone
           highlightedCardInstanceIds={highlightedCardInstanceIds}
           hiddenCardInstanceIds={hiddenCardInstanceIds}
-          onClick={onOpenTrash}
-          zone={player.zones.trash}
+          onOpenTrash={onOpenTrash}
+          onOpenBanish={onOpenBanish}
+          trash={player.zones.trash}
+          banishment={player.zones.banishment}
         />
       </ZoneArea>
-      {hasBanishment && (
-        <ZoneArea
-          animationZoneId={`${player.playerId}:banishment`}
-          isCentered
-          isHightlighted={isHightlighted}
-        >
-          <Button
-            aria-label={`${player.name} banished cards`}
-            className="relative p-2"
-            onClick={onOpenBanish}
-            title={`${player.zones.banishment.count} banished`}
-            type="button"
-            variant="ghost"
-          >
-            <ArchiveX className="size-5" />
-            <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
-              {player.zones.banishment.count}
-            </span>
-          </Button>
-        </ZoneArea>
-      )}
     </div>
   );
 };
@@ -400,6 +373,7 @@ function ZoneCards({
   onClick,
   showCount = false,
   showMight = false,
+  size = "md",
   zone,
 }: {
   dragSourceLocation?: BoardDragSourceLocation;
@@ -415,6 +389,7 @@ function ZoneCards({
   onClick?: () => void;
   showCount?: boolean;
   showMight?: boolean;
+  size?: CardTileSize;
   zone: ZoneData;
 }) {
   if (zone.cards.length > 0) {
@@ -431,80 +406,210 @@ function ZoneCards({
         onCardPointerLeave={onCardPointerLeave}
         onClick={onClick}
         showMight={showMight}
+        size={size}
       />
     );
   }
 
   if (zone.count > 0) {
-    return <HiddenZone count={zone.count} label={zone.kind} />;
+    return <HiddenZone count={zone.count} label={zone.kind} size={size} />;
   }
 
   return null;
 }
 
-function TrashZone({
+function TrashBanishZone({
   highlightedCardInstanceIds,
   hiddenCardInstanceIds,
-  onClick,
-  zone,
+  onOpenTrash,
+  onOpenBanish,
+  trash,
+  banishment,
 }: {
   highlightedCardInstanceIds?: Set<string>;
   hiddenCardInstanceIds?: Set<string>;
-  onClick?: () => void;
-  zone: ZoneData;
+  onOpenTrash?: () => void;
+  onOpenBanish?: () => void;
+  trash: ZoneData;
+  banishment: ZoneData;
 }) {
-  const latestCard = zone.cards.at(-1);
-
-  if (zone.cards.length > 0) {
-    return (
-      <div className="flex justify-center items-center gap-2 max-w-full">
-        {latestCard && (
-          <button
-            aria-label={`Open trash, ${zone.count} cards`}
-            className="relative shrink-0"
-            onClick={onClick}
-            title={`${zone.count} cards in trash`}
-            type="button"
-          >
-            <CardTile
-              enableHoverPreview
-              isHighlighted={
-                latestCard.instanceId
-                  ? highlightedCardInstanceIds?.has(latestCard.instanceId)
-                  : false
-              }
-              isTransferHidden={
-                latestCard.instanceId
-                  ? hiddenCardInstanceIds?.has(latestCard.instanceId)
-                  : false
-              }
-              showMight={false}
-              {...latestCard}
-            />
-            <span className="top-1 right-1 z-20 absolute bg-yellow-300 px-1.5 py-0.5 rounded font-bold text-black text-xs">
-              {zone.count}
-            </span>
-          </button>
-        )}
-      </div>
-    );
-  }
-
+  const isSplit = banishment.count > 0;
   return (
-    <div className="flex items-center gap-2">
-      <button
-        aria-label="Open trash"
-        className="relative flex justify-center items-center p-2 text-slate-100"
-        onClick={onClick}
-        title={`${zone.count} cards in trash`}
-        type="button"
-      >
-        <Trash2 className="size-5" />
-        <span className="-top-1 -right-1 absolute flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-[10px] text-black">
-          {zone.count}
-        </span>
-      </button>
+    <div className="w-[86px] h-[120px] overflow-hidden">
+      <PilePreview
+        icon={<Trash2 className="size-4" />}
+        count={trash.count}
+        card={trash.cards.at(-1)}
+        label="Trash"
+        onClick={onOpenTrash}
+        highlightedCardInstanceIds={highlightedCardInstanceIds}
+        hiddenCardInstanceIds={hiddenCardInstanceIds}
+        height={isSplit ? 60 : 120}
+      />
+      {isSplit && (
+        <PilePreview
+          icon={<ArchiveX className="size-4" />}
+          count={banishment.count}
+          card={banishment.cards.at(-1)}
+          label="Banishment"
+          onClick={onOpenBanish}
+          highlightedCardInstanceIds={highlightedCardInstanceIds}
+          hiddenCardInstanceIds={hiddenCardInstanceIds}
+          height={60}
+          separated
+        />
+      )}
     </div>
+  );
+}
+
+function orderBasePermanents(cards: Card[]) {
+  const group = (card: Card) => {
+    const types = card.type?.split(" / ") ?? [];
+    if (types.includes("Unit")) return 1;
+    if (types.includes("Gear") && !types.includes("Unit")) return 0;
+    if (types.includes("Equipment")) return 2;
+    return 1;
+  };
+  return cards
+    .map((card, arrivalIndex) => ({ card, arrivalIndex, group: group(card) }))
+    .sort((left, right) => left.group - right.group || left.arrivalIndex - right.arrivalIndex)
+    .map(({ card }) => card);
+}
+
+function RuneFan({
+  cards,
+  highlightedCardInstanceIds,
+  hiddenCardInstanceIds,
+  onCardContextAction,
+  onCardPrimaryAction,
+}: {
+  cards: Card[];
+  highlightedCardInstanceIds?: Set<string>;
+  hiddenCardInstanceIds?: Set<string>;
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onCardPrimaryAction?: (card: Card) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState({ size: "lg" as CardTileSize, step: 32 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const update = () => {
+      const availableWidth = container.clientWidth;
+      const sizeForWidth = (size: CardTileSize) => {
+        const dimensions = cards.map((card) => {
+          const tile = CARD_TILE_SIZE_CONFIG[size];
+          return card.isExhausted ? tile.height : tile.width;
+        });
+        const widestCard = Math.max(0, ...dimensions);
+        const maximumStep = cards.length > 1
+          ? Math.floor((availableWidth - widestCard) / (cards.length - 1))
+          : 32;
+        return { step: Math.min(32, maximumStep), widestCard };
+      };
+
+      const large = sizeForWidth("lg");
+      if (large.step >= 24 || cards.length <= 1) {
+        setLayout({ size: "lg", step: Math.max(24, large.step) });
+        return;
+      }
+      const medium = sizeForWidth("md");
+      setLayout({ size: "md", step: Math.max(24, medium.step) });
+    };
+
+    update();
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [cards]);
+
+  const dimensions = CARD_TILE_SIZE_CONFIG[layout.size];
+  const width = cards.length === 0
+    ? 0
+    : (cards.length - 1) * layout.step + Math.max(...cards.map((card) =>
+        card.isExhausted ? dimensions.height : dimensions.width,
+      ));
+  return (
+    <div className="relative w-full h-full min-h-0 overflow-visible" ref={containerRef} data-rune-fan>
+      <div className="relative h-full" style={{ width: Math.min(width, containerRef.current?.clientWidth ?? width) }}>
+        {cards.map((card, index) => {
+          const footprintWidth = card.isExhausted ? dimensions.height : dimensions.width;
+          const footprintHeight = card.isExhausted ? dimensions.width : dimensions.height;
+          const style = {
+            left: index * layout.step,
+            width: footprintWidth,
+            height: footprintHeight,
+            zIndex: index + 1,
+          } satisfies CSSProperties;
+          return (
+            <div className="top-1/2 absolute -translate-y-1/2" key={card.instanceId ?? `${card.name}-${index}`} style={style}>
+              <CardTile
+                isHighlighted={card.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
+                isTransferHidden={card.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
+                onContextAction={onCardContextAction ? (event) => onCardContextAction(card, event) : undefined}
+                onPrimaryAction={onCardPrimaryAction ? () => onCardPrimaryAction(card) : undefined}
+                size={layout.size}
+                showMight={false}
+                {...card}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PilePreview({
+  card,
+  count,
+  height,
+  hiddenCardInstanceIds,
+  highlightedCardInstanceIds,
+  icon,
+  label,
+  onClick,
+  separated = false,
+}: {
+  card?: Card;
+  count: number;
+  height: number;
+  hiddenCardInstanceIds?: Set<string>;
+  highlightedCardInstanceIds?: Set<string>;
+  icon: ReactNode;
+  label: string;
+  onClick?: () => void;
+  separated?: boolean;
+}) {
+  return (
+    <button
+      aria-label={`Open ${label.toLowerCase()}, ${count} cards`}
+      className={cn("relative block w-[86px] overflow-hidden bg-slate-950/75 text-slate-100", separated && "border-white/40 border-t")}
+      onClick={onClick}
+      style={{ height }}
+      title={`${count} cards in ${label.toLowerCase()}`}
+      type="button"
+    >
+      {card ? (
+        <div className="top-0 left-0 absolute pointer-events-none">
+          <CardTile
+            enableHoverPreview={height === 120}
+            isHighlighted={card.instanceId ? highlightedCardInstanceIds?.has(card.instanceId) : false}
+            isTransferHidden={card.instanceId ? hiddenCardInstanceIds?.has(card.instanceId) : false}
+            size="md"
+            showMight={false}
+            {...card}
+          />
+        </div>
+      ) : null}
+      <span className="bottom-1 left-1 z-20 absolute flex items-center gap-1 bg-slate-950/80 px-1 rounded text-[10px] text-white">
+        {icon}
+        <span className="flex justify-center items-center bg-yellow-300 rounded-full min-w-4 h-4 font-bold text-black">{count}</span>
+      </span>
+    </button>
   );
 }
 
@@ -523,6 +628,7 @@ type CardListProps = {
   onCardPointerLeave?: (card: Card) => void;
   onClick?: () => void;
   layout?: "row" | "scroll" | "wrap";
+  size?: CardTileSize;
   showMight?: boolean;
   stagedMovementCardInstanceIds?: Set<string>;
 };
@@ -539,26 +645,85 @@ function CardList({ cards, ...props }: CardListProps) {
 
 // Attachment relationships affect only Base permanents, never generic zones.
 function BasePermanentList({ cards, ...props }: CardListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const attachmentGroups = groupCardsByAttachment(cards);
+  const attachmentGroupsRef = useRef(attachmentGroups);
+  attachmentGroupsRef.current = attachmentGroups;
+  const cardSignature = cards
+    .map((card) => `${card.instanceId ?? card.name}:${Number(Boolean(card.isExhausted))}:${card.attachedToCardInstanceId ?? ""}`)
+    .join("|");
+  const [density, setDensity] = useState({ size: "lg" as CardTileSize, gap: 8 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateDensity = () => {
+      const availableWidth = container.clientWidth;
+      const groups = attachmentGroupsRef.current;
+      const resolveSize = (size: CardTileSize) => {
+        const cardDimensions = CARD_TILE_SIZE_CONFIG[size];
+        const groupsWidth = groups.reduce((total, group) => {
+          const hostWidth = group.host.isExhausted
+            ? cardDimensions.height
+            : cardDimensions.width;
+          const stripWidth = Math.max(24, cardDimensions.width * 0.2);
+          return total + hostWidth + group.attachments.length * stripWidth;
+        }, 0);
+        const gaps = Math.max(0, groups.length - 1);
+        return { groupsWidth, gaps };
+      };
+      const xl = resolveSize("xl");
+      const lg = resolveSize("lg");
+      const md = resolveSize("md");
+      const fits = (candidate: { groupsWidth: number; gaps: number }) =>
+        candidate.groupsWidth + candidate.gaps * 4 <= availableWidth;
+      const size = fits(xl) ? "xl" : fits(lg) ? "lg" : "md";
+      const measured = size === "xl" ? xl : size === "lg" ? lg : md;
+      const gap = measured.gaps === 0
+        ? 8
+        : Math.max(4, Math.min(8, (availableWidth - measured.groupsWidth) / measured.gaps));
+      setDensity((current) =>
+        current.size === size && Math.abs(current.gap - gap) < 0.5
+          ? current
+          : { size, gap },
+      );
+    };
+
+    updateDensity();
+    const resizeObserver = new ResizeObserver(updateDensity);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [cardSignature]);
+
   return (
-    <CardListLayout cards={cards} {...props}>
-      {groupCardsByAttachment(cards).map(({ host, attachments }, index) => {
+    <div className="w-full h-full min-w-0 min-h-0" ref={containerRef}>
+    <CardListLayout
+      cards={cards}
+      {...props}
+      size={density.size}
+      style={{ columnGap: density.gap, rowGap: 6 }}
+    >
+      {attachmentGroups.map(({ host, attachments }, index) => {
         const key = host.instanceId ?? `${host.name}-${index}`;
         if (attachments.length === 0) {
-          return <CardListCard key={key} card={host} {...props} />;
+          return <CardListCard key={key} card={host} {...props} size={density.size} />;
         }
         return (
           <AttachmentCardGroup
             key={key}
             groupId={key}
-            host={<CardListCard card={host} {...props} />}
+            size={props.size ?? "md"}
+            host={<CardListCard card={host} {...props} size={density.size} />}
             attachments={attachments.map((card, attachmentIndex) => ({
               id: card.instanceId ?? `${card.name}-${attachmentIndex}`,
-              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} />,
+              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} size={density.size} />,
             }))}
           />
         );
       })}
     </CardListLayout>
+    </div>
   );
 }
 
@@ -572,6 +737,7 @@ function CardListCard({
   onCardPointerEnter,
   onCardPointerLeave,
   onClick,
+  size = "md",
   showMight = false,
   stagedMovementCardInstanceIds,
 }: Omit<CardListProps, "cards"> & { card: Card }) {
@@ -584,6 +750,7 @@ function CardListCard({
       onPrimaryAction={onCardPrimaryAction ? (event) => onCardPrimaryAction(card, event) : undefined}
       onHighlightPointerEnter={onCardPointerEnter ? () => onCardPointerEnter(card) : undefined}
       onHighlightPointerLeave={onCardPointerLeave ? () => onCardPointerLeave(card) : undefined}
+      size={size}
       showMight={showMight}
       isStagedForMovement={card.instanceId ? stagedMovementCardInstanceIds?.has(card.instanceId) : false}
       {...card}
@@ -602,7 +769,8 @@ function CardListLayout({
   count,
   onClick,
   layout = "row",
-}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout"> & { children: ReactNode }) {
+  style,
+}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout" | "size"> & { children: ReactNode; style?: CSSProperties }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
 
@@ -677,9 +845,11 @@ function CardListLayout({
     return (
       <div
         className={cn(
-          "flex flex-wrap items-start gap-2 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
+          "flex flex-wrap items-start gap-1 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
           hasWrappedRows ? "content-start" : "content-center",
         )}
+        style={style}
+        data-board-scroll
         ref={wrapContainerRef}
       >
         {content}
@@ -711,10 +881,10 @@ function CardListLayout({
   );
 }
 
-function HiddenZone({ count, label }: { count: number; label: string }) {
+function HiddenZone({ count, label, size = "md" }: { count: number; label: string; size?: CardTileSize }) {
   return (
     <div className="relative">
-      <CardTile img={cardBackImage.src} name={label} />
+      <CardTile size={size} img={cardBackImage.src} name={label} />
       <span className="-top-2 left-1/2 z-30 absolute bg-[#111827] shadow-black/50 shadow-md px-1.5 py-0.5 rounded font-bold text-xs -translate-x-1/2">
         {count}
       </span>

@@ -621,7 +621,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       ? () =>
           decisionInspection.inspectZone(board.player.playerId, "banishment")
       : undefined
-    : () => setOpenZone("banish");
+    : () => setOpenZone("playerBanish");
   const openOpponentBanishment = isReportMode
     ? undefined
     : decisionInspection.isInspecting
@@ -629,7 +629,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       ? () =>
           decisionInspection.inspectZone(board.opponent.playerId, "banishment")
       : undefined
-    : () => setOpenZone("banish");
+    : () => setOpenZone("opponentBanish");
 
   const beginBugReport = useCallback(() => {
     const game = cloneViewerSafeProjection(sourceProjection);
@@ -749,7 +749,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       {...reportCardSelection}
     >
     <main
-      className="relative grid h-dvh grid-rows-[auto_minmax(0,1fr)_7rem] overflow-hidden text-slate-100 game-board"
+      className="relative grid h-dvh min-h-[1300px] grid-rows-[auto_minmax(0,1fr)_7rem] overflow-x-hidden overflow-y-auto text-slate-100 game-board"
       onClickCapture={handleBoardClickCapture}
     >
       <div className="relative">
@@ -845,8 +845,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             isInteractionSuspended ? () => undefined : handleLocationDragOver
           }
         >
-          <div className="flex-1 gap-2 grid grid-rows-[minmax(120px,0.9fr)_minmax(180px,1.4fr)_minmax(120px,0.9fr)] p-2 pb-0 min-w-0 min-h-0 overflow-hidden">
-            <div className="gap-1 grid grid-rows-2 min-h-0">
+          <div className="flex-1 gap-2 grid grid-rows-[minmax(368px,1fr)_minmax(350px,1.05fr)_minmax(368px,1fr)] p-2 pb-0 min-w-0 min-h-0 overflow-hidden">
+            <div className="gap-2 grid grid-rows-[minmax(164px,auto)_minmax(196px,auto)] min-h-0">
               <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
@@ -883,6 +883,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerEnter={boardCardPointerEnter}
                   onCardPointerLeave={boardCardPointerLeave}
                   owner="player"
+                  playerId={board.player.playerId}
+                  opponentPlayerId={board.opponent.playerId}
                   showdownState={board.playerBattlefieldShowdownState}
                   enablePlayerUnitLocationDrag={canUseLocationDrag}
                   stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
@@ -914,6 +916,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                   onCardPointerEnter={boardCardPointerEnter}
                   onCardPointerLeave={boardCardPointerLeave}
                   owner="opponent"
+                  playerId={board.player.playerId}
+                  opponentPlayerId={board.opponent.playerId}
                   showdownState={board.opponentBattlefieldShowdownState}
                   dropStatus={getLocationDropStatus({
                     kind: "battlefield",
@@ -923,7 +927,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                 />
               </div>
             </LayoutGroup>
-            <div className="gap-1 grid grid-rows-2 min-h-0">
+            <div className="gap-2 grid grid-rows-[minmax(196px,auto)_minmax(164px,auto)] min-h-0">
               <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}

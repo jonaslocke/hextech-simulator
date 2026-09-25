@@ -190,8 +190,50 @@ button {
 
 .game-board {
   --card-sm-height: clamp(76px, 6.67vh, 96px);
-  --card-md-height: clamp(88px, 8.34vh, 120px);
-  --card-lg-height: clamp(108px, 10vh, 144px);
-  --card-xl-height: clamp(132px, 12.23vh, 176px);
-  --board-zone-width: clamp(104px, 9.03vh, 130px);
+  --card-md-height: 120px;
+  --card-lg-height: 144px;
+  --card-xl-height: 176px;
+  --board-legend-width: 126px;
+  --board-champion-width: 103px;
+  --board-pile-width: 86px;
+  --board-scrollbar-size: 6px;
+  --board-scrollbar-gap: 4px;
+}
+
+.game-board [data-board-scroll] {
+  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+.game-board [data-board-scroll]::-webkit-scrollbar {
+  width: var(--board-scrollbar-size);
+  height: var(--board-scrollbar-size);
+}
+
+.game-board [data-board-scroll]::-webkit-scrollbar-thumb {
+  border: var(--board-scrollbar-gap) solid transparent;
+  border-radius: 999px;
+  background: rgb(148 163 184 / 0.4);
+  background-clip: padding-box;
+}
+
+@keyframes battlefield-showdown-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.game-board [data-showdown-state]:not([data-showdown-state="neutral"]) {
+  animation: battlefield-showdown-pulse 1500ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-board [data-showdown-state]:not([data-showdown-state="neutral"]) {
+    animation: none;
+  }
 }

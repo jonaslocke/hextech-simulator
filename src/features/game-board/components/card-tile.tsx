@@ -101,6 +101,7 @@ type CardTileProps = Card & {
   onPrimaryAction?: (event?: MouseEvent<HTMLDivElement>) => void;
   ownerLabel?: string;
   ownerSeat?: "player" | "opponent";
+  presentationDimensions?: { height: number; width: number };
   showMight?: boolean;
   size?: CardTileSize;
 };
@@ -130,6 +131,7 @@ export const CardTile: FC<CardTileProps> = ({
   orientation = "auto",
   ownerLabel,
   ownerSeat,
+  presentationDimensions,
   power,
   preserveOrientation = false,
   publicCode,
@@ -155,7 +157,8 @@ export const CardTile: FC<CardTileProps> = ({
   const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
   const resolvedOrientation =
     orientation === "auto" ? autoOrientation : orientation;
-  const dimensions = getCardTileDimensions(size, resolvedOrientation);
+  const dimensions =
+    presentationDimensions ?? getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
   const isGear = Boolean(
     type?.split(" / ").includes("Gear") && !type?.split(" / ").includes("Unit"),
@@ -168,11 +171,7 @@ export const CardTile: FC<CardTileProps> = ({
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
-    height: isRotatedExhausted
-      ? resolvedOrientation === "landscape"
-        ? dimensions.width
-        : dimensions.height
-      : dimensions.height,
+    height: isRotatedExhausted ? dimensions.width : dimensions.height,
     zIndex: previewPosition ? 2147483647 : undefined,
   };
 
@@ -263,6 +262,8 @@ export const CardTile: FC<CardTileProps> = ({
         enableZoneAnimation && instanceId ? instanceId : undefined
       }
       data-card-orientation={resolvedOrientation}
+      data-card-tile-size={size}
+      data-card-show-might={showMight ? "true" : "false"}
       className={cn(
         "relative flex justify-center items-center overflow-visible shrink-0",
         selectedCardInstanceIds?.has(instanceId ?? "") &&

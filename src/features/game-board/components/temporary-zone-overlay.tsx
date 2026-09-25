@@ -1,11 +1,11 @@
 "use client";
 
 import type { Card, GameLogEntry, TemporaryZone, ZoneData } from "../types";
+import { useEffect, useState } from "react";
 import {
   FloatingOverlayPanel,
   type FloatingOverlayPlacement,
 } from "./floating-overlay-panel";
-import { BoardSlot } from "./board-slot";
 import { CardTile } from "./card-tile";
 import { EmptyState } from "./empty-state";
 
@@ -50,22 +50,12 @@ export function TemporaryZoneOverlay({
       onClose={onClose}
       placement={placement}
       title={title}
+      className="flex h-[min(640px,calc(100dvh-16px))] w-[min(568px,calc(100vw-16px))] flex-col"
     >
-      {openZone === "banish" ? (
-        <div className="gap-2 grid">
-          <BoardSlot title="Player 1 Banish">
-            <ZoneCards
-              emptyLabel="No banished cards"
-              cards={playerBanishment.cards}
-            />
-          </BoardSlot>
-          <BoardSlot title="Player 2 Banish">
-            <ZoneCards
-              emptyLabel="No banished cards"
-              cards={opponentBanishment.cards}
-            />
-          </BoardSlot>
-        </div>
+      {openZone === "playerBanish" ? (
+        <ZoneCards emptyLabel="No banished cards" cards={playerBanishment.cards} />
+      ) : openZone === "opponentBanish" ? (
+        <ZoneCards emptyLabel="No banished cards" cards={opponentBanishment.cards} />
       ) : openZone === "log" ? (
         <LogList entries={logEntries} />
       ) : openZone === "playerTrash" ? (
@@ -86,17 +76,26 @@ export function ZoneCards({
   cards: Card[];
   emptyLabel: string;
 }) {
+  const [size, setSize] = useState<"lg" | "xl">("xl");
+  useEffect(() => {
+    const updateSize = () => setSize(window.innerHeight <= 700 ? "lg" : "xl");
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
   if (cards.length === 0) {
     return <EmptyState label={emptyLabel} />;
   }
 
   return (
-    <div className="flex gap-2 overflow-auto">
+    <div className="grid flex-1 min-h-0 max-h-full grid-cols-4 content-start justify-start gap-3 overflow-x-hidden overflow-y-auto pr-2" data-board-scroll>
       {cards.map((card, index) => (
         <CardTile
           enableZoneAnimation={false}
           enableHoverPreview
           key={card.instanceId ?? `${card.name}-${index}`}
+          size={size}
           showMight={false}
           {...card}
         />
@@ -129,8 +128,10 @@ function LogList({ entries }: { entries: GameLogEntry[] }) {
 
 function getTemporaryZoneTitle(openZone: TemporaryZoneOverlayZone) {
   switch (openZone) {
-    case "banish":
-      return "Banished Cards";
+    case "playerBanish":
+      return "Your Banishment";
+    case "opponentBanish":
+      return "Opponent Banishment";
     case "playerTrash":
       return "Player Trash";
     case "opponentTrash":
@@ -143,7 +144,8 @@ function getTemporaryZoneTitle(openZone: TemporaryZoneOverlayZone) {
 
 function getTemporaryZoneEmptyMessage(openZone: TemporaryZoneOverlayZone) {
   switch (openZone) {
-    case "banish":
+    case "playerBanish":
+    case "opponentBanish":
       return "";
     default:
       return "No accepted server events are present in the current preview state.";

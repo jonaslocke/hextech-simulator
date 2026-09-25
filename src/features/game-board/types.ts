@@ -2,7 +2,8 @@ import type { ProjectedCardView } from "@/shared/game";
 
 export type TemporaryZone =
   | "chain"
-  | "banish"
+  | "opponentBanish"
+  | "playerBanish"
   | "log"
   | "opponentTrash"
   | "playerTrash"
