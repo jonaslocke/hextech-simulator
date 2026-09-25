@@ -69,5 +69,7 @@ function resolvePlayerDecisionInspectionRequest(
         source: "playerDecision",
         title: decision.title,
       };
+    case "effectPlay":
+      return null;
   }
 }

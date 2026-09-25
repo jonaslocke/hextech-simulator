@@ -1481,6 +1481,129 @@ test("projects Deflect before payment and requires its Power in the Rune Pool", 
   assert.equal(next.state.chain?.items[0]?.sourceCardInstanceId, "p1:spell");
 });
 
+test("requires pooled Deflect power when a triggered ability commits its target", () => {
+  const { game, decks } = fixture();
+  const source = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  source.behaviorModel.clauses = [clause("targeted-trigger", {
+    triggers: [binding("trigger.end_of_turn", 0, { player: "controller" })],
+    selectors: [binding("selector.unit", 0, {
+      area: "board", scope: "any", minimumCount: 1, maximumCount: 1,
+    })],
+  })];
+  source.behaviorModel.clauses[0]!.keywords = [binding("keyword.deflect", 0, { amount: 1 })];
+  decks[1]!.instances.push({
+    instanceId: "p2:warded-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.battlefields[0]!.units.push("p2:warded-unit");
+  game.state.cardStates["p2:warded-unit"] = { exhausted: true, damage: 0, computedMight: 1 };
+  dispatchBehaviorEvent(game, {
+    type: "turn.ended", actorPlayerId: "p1", subjectCardInstanceId: null, values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice?.type, "effectSelection");
+  const submit = () => gameplayActions(game, "p1", decks).find((action) => action.id.includes(":submitChoice:"))!;
+  assert.throws(() => performGameplayAction({
+    game, actorPlayerId: "p1", actionId: submit().id,
+    selectedIds: ["p2:warded-unit"], decks, now: "triggered-deflect-unpaid",
+  }), /cost cannot be paid/i);
+
+  game.state.players.p1!.power.Mind = 1;
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: submit().id,
+    selectedIds: ["p2:warded-unit"], decks, now: "triggered-deflect-paid",
+  });
+  assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.deepEqual(next.state.chain?.items[0]?.targetCardInstanceIds, ["p2:warded-unit"]);
+});
+
+test("charges Deflect when an activated ability selects an enemy target", () => {
+  const { game, decks } = fixture();
+  const source = definition("TARGETED_ACTION", "Targeted Action", "Gear", 0, 0) as GameCardDefinition;
+  source.behaviorModel.clauses = [clause("targeted-ability", {
+    abilities: [binding("ability.activated_effect", 0, {})],
+    selectors: [binding("selector.enemy_unit", 1, {
+      area: "board", locationRelation: "any", minimumCount: 1, maximumCount: 1,
+    })],
+  })];
+  const target = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  target.behaviorModel.clauses = [clause("deflect", {
+    keywords: [binding("keyword.deflect", 0, { amount: 1 })],
+  })];
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({
+    instanceId: "p1:targeted-action", ownerPlayerId: "p1", source: "mainDeck", cardCode: "TARGETED_ACTION",
+  });
+  decks[1]!.instances.push({
+    instanceId: "p2:activated-warded-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.players.p1!.zones.base.push("p1:targeted-action");
+  game.state.battlefields[0]!.units.push("p2:activated-warded-unit");
+  game.state.cardStates["p1:targeted-action"] = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates["p2:activated-warded-unit"] = { exhausted: true, damage: 0, computedMight: 1 };
+
+  const activation = () => gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:targeted-action",
+  )!;
+  assert.throws(() => performGameplayAction({
+    game, actorPlayerId: "p1", actionId: activation().id,
+    selectedIds: ["p2:activated-warded-unit"], decks, now: "activated-deflect-unpaid",
+  }), /Ability costs cannot be paid/i);
+
+  game.state.players.p1!.power.Mind = 1;
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: activation().id,
+    selectedIds: ["p2:activated-warded-unit"], decks, now: "activated-deflect-paid",
+  });
+  assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.deepEqual(next.state.chain?.items[0]?.targetCardInstanceIds, ["p2:activated-warded-unit"]);
+});
+
+test("requires pooled Deflect power for a resolving spell target choice", () => {
+  const { game, decks } = fixture();
+  const spell = decks[0]!.snapshot.cards.find((card) => card.cardCode === "SPELL")!;
+  spell.behaviorModel.clauses = [clause("resolution-target", {
+    selectors: [binding("selector.unit", 0, {
+      area: "board", scope: "any", minimumCount: 1, maximumCount: 1,
+    })],
+  })];
+  const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  unit.behaviorModel.clauses = [clause("deflect", {
+    keywords: [binding("keyword.deflect", 0, { amount: 1 })],
+  })];
+  decks[1]!.instances.push({
+    instanceId: "p2:resolving-warded-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: "UNIT",
+  });
+  game.state.battlefields[0]!.units.push("p2:resolving-warded-unit");
+  game.state.cardStates["p2:resolving-warded-unit"] = { exhausted: true, damage: 0, computedMight: 1 };
+
+  assert.equal(beginEffectResolution({
+    game, controllerPlayerId: "p1", sourceCardInstanceId: "p1:spell",
+    clauseId: "resolution-target", decks,
+  }), false);
+  game.state.chain = {
+    items: [{
+      id: "resolving-spell", kind: "spell", label: "Spell", controllerPlayerId: "p1",
+      sourceCardInstanceId: "p1:spell", targetCardInstanceIds: [], targetObjectVersions: {},
+      behaviorClauseId: "resolution-target", activatedBehaviorId: null, behaviorEvent: null,
+    }],
+    relevantPlayerIds: ["p1", "p2"], priorityPlayerId: "p1", passedPlayerIds: [],
+    openedBy: "cardPlay", resolvingItemId: "resolving-spell",
+  };
+  const submit = () => gameplayActions(game, "p1", decks).find((action) => action.id.includes(":submitChoice:"))!;
+  assert.throws(() => performGameplayAction({
+    game, actorPlayerId: "p1", actionId: submit().id,
+    selectedIds: ["p2:resolving-warded-unit"], decks, now: "resolution-deflect-unpaid",
+  }), /cost cannot be paid/i);
+
+  game.state.players.p1!.power.Mind = 1;
+  const next = performGameplayAction({
+    game, actorPlayerId: "p1", actionId: submit().id,
+    selectedIds: ["p2:resolving-warded-unit"], decks, now: "resolution-deflect-paid",
+  });
+  assert.equal(next.state.players.p1!.power.Mind, 0);
+  assert.equal(next.state.pendingChoice, null);
+});
+
 test("counters a qualifying chain spell through the generic chain-target primitive", () => {
   const { game: initial, decks } = fixture();
   let game = initial;
@@ -2145,6 +2268,16 @@ test("each player privately chooses, recycles, and plays a staged top-deck card 
   assert.equal(next.state.effectPlayQueue?.[0]?.playerId, "p2");
   assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit"]);
   assert.deepEqual(next.state.players.p2!.zones.mainDeck, ["p2:recycle"]);
+  assert.deepEqual(projectGame({ game: next, viewerPlayerId: "p2", decks }).effectPlayDecision, {
+    playerId: "p2",
+    stagedCardInstanceId: "p2:draw",
+    canDecline: true,
+  });
+  assert.deepEqual(projectGame({ game: next, viewerPlayerId: "p1", decks }).effectPlayDecision, {
+    playerId: "p2",
+    stagedCardInstanceId: null,
+    canDecline: false,
+  });
 
   const addPower = gameplayActions(next, "p2", decks).find((action) =>
     action.sourceCardInstanceId === "p2:rune" && action.label === "Add Power [Mind]",
@@ -2214,7 +2347,7 @@ test("an unavailable effect-driven play returns to the deck and continues the re
   });
   const p2Actions = gameplayActions(next, "p2", decks);
   assert.equal(p2Actions.some((action) => action.sourceCardInstanceId === "p2:blocked"), false);
-  const continueAction = p2Actions.find((action) => action.label === "Continue");
+  const continueAction = p2Actions.find((action) => action.label === "Don't play");
   assert.ok(continueAction);
   next = performGameplayAction({
     game: next, actorPlayerId: "p2", actionId: continueAction.id, selectedIds: [], decks, now: "blocked-continue",
@@ -2345,6 +2478,69 @@ test("a public reveal-until instruction plays the first matching card with both 
   assert.deepEqual(next.state.players.p1!.zones.mainDeck, ["p1:unit", "p1:spell"]);
   assert.equal(next.state.effectPlayQueue?.length, 0);
   assert.equal(next.state.effectResolutions.length, 0);
+});
+
+test("effect-driven play resumes a resolving end-of-turn trigger exactly once", () => {
+  const { game, decks } = fixture();
+  const unit = decks[0]!.snapshot.cards.find((card) => card.cardCode === "UNIT")!;
+  unit.behaviorModel.clauses = [
+    clause("end-of-turn-effect-play", {
+      triggers: [binding("trigger.end_of_turn", 0, { player: "controller" })],
+      effects: [binding("action.reveal_until_card_type_and_play", 1, {
+        cardType: "Unit",
+        ignoreBaseCosts: true,
+      })],
+    }),
+  ];
+  decks[0]!.instances.push(
+    { instanceId: "p1:effect-play-unit", ownerPlayerId: "p1", source: "mainDeck", cardCode: "UNIT" },
+  );
+  game.state.players.p1!.zones.mainDeck = ["p1:effect-play-unit"];
+  game.state.cardStates["p1:effect-play-unit"] = { exhausted: false, damage: 0, computedMight: 1 };
+
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: gameplayActions(game, "p1", decks).find((action) => action.id.split(":")[3] === "endTurn")!.id,
+    selectedIds: [],
+    decks,
+    now: "effect-play-end-turn",
+  });
+  assert.equal(next.state.chain?.items.length, 1);
+  for (const playerId of ["p1", "p2"] as const) {
+    const pass = gameplayActions(next, playerId, decks).find((action) => action.label === "Pass priority")!;
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `effect-play-end-trigger-pass-${playerId}`,
+    });
+  }
+
+  assert.equal(next.state.effectPlayQueue?.[0]?.cardInstanceId, "p1:effect-play-unit");
+  const stagedPlay = projectGame({ game: next, viewerPlayerId: "p1", decks }).effectPlayDecision;
+  assert.equal(stagedPlay?.stagedCardInstanceId, "p1:effect-play-unit");
+  assert.equal(stagedPlay?.canDecline, false, "a publicly revealed required play cannot be declined");
+  const play = gameplayActions(next, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:effect-play-unit" && action.id.split(":")[3] === "play",
+  )!;
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: play.id,
+    selectedIds: [],
+    decks,
+    now: "effect-play-end-trigger-play",
+  });
+
+  assert.equal(next.state.effectPlayQueue?.length, 0);
+  assert.equal(next.state.effectResolutions.length, 0);
+  assert.equal(next.state.chain, null);
+  assert.equal(next.state.turn?.activePlayerId, "p2");
+  assert.equal(next.state.turn?.phase, "action");
+  assert.ok(next.state.players.p1!.zones.base.includes("p1:effect-play-unit"));
 });
 
 test("banishment effect-play uses the target owner and captured location", () => {

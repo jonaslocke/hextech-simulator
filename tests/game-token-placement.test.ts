@@ -192,6 +192,47 @@ test("token projections retain generated keyword text", () => {
   assert.equal(sprite?.rulesText, "Temporary");
 });
 
+test("token media from a catalog definition reaches the projected battlefield card", () => {
+  const source = unit("SOURCE", "Source", [
+    clause("play-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Catalogued Unit",
+        count: 1,
+        placement: "sourceLocation",
+      })],
+    }),
+  ]);
+  const token = unit("CATALOGUED_TOKEN", "Catalogued Unit");
+  token.card.classification.supertype = "Token";
+  token.card.media.image_url = "https://assets.example.test/catalogued-token.png";
+  const { game, decks } = fixture([source, token, battlefield("BF", "Training Yard")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["source"],
+  });
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-token",
+    decks,
+  }), true);
+  const createdId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(createdId);
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .battlefields.flatMap((item) => item.units)
+    .find((item) => item.instanceId === createdId);
+  assert.equal(projected?.imageUrl, "https://assets.example.test/catalogued-token.png");
+});
+
 test("generated Bird units retain their tag and Deflect keyword", () => {
   const source = unit("SOURCE", "Token Creator", [
     clause("bird", {
@@ -270,6 +311,13 @@ test("fixed-location token creation plays token at source location", () => {
   assert.equal(game.state.battlefields[0]!.units.length, 2);
   assert.equal(
     game.state.createdCardDefinitions?.[0]?.card.media.image_url,
+    "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
+  );
+  const projectedToken = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .battlefields.flatMap((item) => item.units)
+    .find((item) => item.instanceId === game.state.createdCardInstances?.[0]?.instanceId);
+  assert.equal(
+    projectedToken?.imageUrl,
     "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
   );
 });

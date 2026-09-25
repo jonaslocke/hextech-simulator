@@ -434,6 +434,11 @@ export const gameProjectionSchema = z.object({
       passedPlayerIds: z.array(z.string().min(1)),
     })
     .nullable(),
+  effectPlayDecision: z.object({
+    playerId: z.string().min(1),
+    stagedCardInstanceId: z.string().min(1).nullable(),
+    canDecline: z.boolean(),
+  }).nullable().optional(),
   showdown: z
     .object({
       kind: z.enum(["nonCombat", "combat"]),

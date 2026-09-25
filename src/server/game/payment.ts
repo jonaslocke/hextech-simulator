@@ -5,6 +5,7 @@ import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import { effectiveKeywordAmount } from "./effective-keywords";
 import { numericBindingMatchesCardType } from "./numeric-modifiers";
+import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 import {
   advanceGameObjectIncarnation,
   definitionForInstance,
@@ -50,6 +51,28 @@ type PaymentRequest = {
   additionalAnyPower: number;
   poolOnly?: boolean;
 };
+
+export function payAnyPowerAdditionalCost(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  amount: number,
+  context: PaymentContext,
+  index: RuntimeCardIndex,
+): void {
+  if (amount <= 0) return;
+  const player = game.state.players[playerId]!;
+  const plan = buildPaymentPlanForRequest(game, playerId, definition, index, {
+    energyCost: 0,
+    powerCost: 0,
+    allowedPowerDomains: [...anyPowerDomains(player, index)],
+    context,
+    additionalAnyPower: amount,
+    poolOnly: true,
+  });
+  if (!plan) throw new Error("Additional Any-Power cost cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
+}
 
 export function buildPaymentPlan(
   game: GameDocument,
@@ -147,7 +170,7 @@ export function buildAbilityPaymentPlan(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; additionalAnyPower?: number } = {},
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, sourceDefinition, index, {
     energyCost: costs.energy,
@@ -159,7 +182,7 @@ export function buildAbilityPaymentPlan(
       kind: "ability",
       sourceCardType: sourceDefinition.card.classification.type,
     },
-    additionalAnyPower: 0,
+    additionalAnyPower: options.additionalAnyPower ?? 0,
     poolOnly: options.poolOnly,
   });
 }
@@ -276,7 +299,9 @@ function buildPaymentPlanForRequest(
   for (const id of sourceIds) {
     if (game.state.cardStates[id]?.exhausted) continue;
     for (const kind of ["energy", "power"] as const) {
-      const ability = kind === "energy" ? exhaustForEnergyAbility(id, request.context, index) : exhaustForPowerAbility(id, request.context, index);
+      const ability = kind === "energy"
+        ? exhaustForEnergyAbility(id, request.context, index, game)
+        : exhaustForPowerAbility(id, request.context, index, game);
       if (!ability) continue;
       generated.push({ ...ability, kind, sourceId: id, acquisition: "exhaust",
         restriction: normalizeResourceRestriction(ability.usage), order: generated.length });
@@ -454,8 +479,12 @@ export function cardPaymentExceedsResourceCapacity(
         add("power", 1, "unrestricted", source.card.classification.domain[0] ?? "Rainbow");
       }
       if (ability.behaviorId !== "ability.exhaust_for_resource" || game.state.cardStates[id]?.exhausted) continue;
-      const { amount, usage, resourceType, domain, poolResource } = ability.parameters;
-      if (typeof amount !== "number" || amount <= 0 || typeof usage !== "string") continue;
+      const { usage, resourceType, domain, poolResource } = ability.parameters;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
+      if (amount === null || typeof usage !== "string") continue;
       if (resourceType !== "power") add("energy", amount, usage);
       else {
         const producedDomain = domain === "sourceDomain"
@@ -583,7 +612,7 @@ export function payAbilityCost(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; additionalAnyPower?: number } = {},
 ) {
   const plan = buildAbilityPaymentPlan(
     game,
@@ -743,6 +772,14 @@ export function targetDeflectCost(
   }, 0);
 }
 
+export function ignoresDeflect(definition: GameCardDefinition) {
+  return definition.behaviorModel.clauses.some((clause) =>
+    clause.effects.some(
+      (binding) => binding.behaviorId === "modifier.ignore_deflect",
+    ),
+  );
+}
+
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {
   return definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
     clause.abilities.some((ability) => ability.behaviorId === behaviorId),
@@ -753,6 +790,7 @@ function exhaustForEnergyAbility(
   id: string,
   paymentContext: PaymentContext,
   index: RuntimeCardIndex,
+  game: GameDocument,
 ): { amount: number; usage: string } | null {
   for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
     for (const ability of clause.abilities) {
@@ -762,11 +800,13 @@ function exhaustForEnergyAbility(
       ) {
         continue;
       }
-      const amount = ability.parameters.amount;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
       const usage = ability.parameters.usage;
       if (
-        typeof amount !== "number" ||
-        amount <= 0 ||
+        amount === null ||
         typeof usage !== "string" ||
         !resourceUsageAllowsPayment(usage, paymentContext)
       ) {
@@ -782,6 +822,7 @@ function exhaustForPowerAbility(
   id: string,
   paymentContext: PaymentContext,
   index: RuntimeCardIndex,
+  game: GameDocument,
 ): Omit<PowerSourceUse, "id"> | null {
   const definition = definitionForInstance(id, index);
   for (const clause of definition.behaviorModel.clauses) {
@@ -792,7 +833,10 @@ function exhaustForPowerAbility(
       ) {
         continue;
       }
-      const amount = ability.parameters.amount;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
       const usage = ability.parameters.usage;
       const requestedDomain = ability.parameters.domain;
       const domain =
@@ -804,8 +848,7 @@ function exhaustForPowerAbility(
             ? normalizedDomain(requestedDomain)
             : null;
       if (
-        typeof amount !== "number" ||
-        amount <= 0 ||
+        amount === null ||
         typeof usage !== "string" ||
         !domain ||
         !resourceUsageAllowsPayment(usage, paymentContext)

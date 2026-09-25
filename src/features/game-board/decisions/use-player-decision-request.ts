@@ -401,6 +401,75 @@ export function buildPlayerDecisionRequest({
     }
   }
 
+  const effectPlay = sourceProjection.effectPlayDecision;
+  if (
+    effectPlay?.stagedCardInstanceId &&
+    activeTargetSelection &&
+    sourceProjection.actions.some(
+      (action) =>
+        action.id === activeTargetSelection.actionId &&
+        action.sourceCardInstanceId === effectPlay.stagedCardInstanceId &&
+        action.id.split(":")[3] === "play",
+    )
+  ) {
+    return null;
+  }
+
+  if (effectPlay) {
+    if (effectPlay.playerId !== viewerPlayerId) {
+      const playerName = playerNames[effectPlay.playerId] ?? effectPlay.playerId;
+      return {
+        inspection: "none",
+        kind: "pendingDecision",
+        message: `Waiting for ${playerName} to play a card from an effect.`,
+        title: "Effect-driven play",
+      };
+    }
+
+    const cardInstanceId = effectPlay.stagedCardInstanceId;
+    if (!cardInstanceId) return null;
+    const card = cardsByInstanceId[cardInstanceId];
+    const playOptions = sourceProjection.actions
+      .filter(
+        (action) =>
+          action.enabled &&
+          action.sourceCardInstanceId === cardInstanceId &&
+          action.id.split(":")[3] === "play",
+      )
+      .map((action) => ({
+        actionId: action.id,
+        id: action.id,
+        kind: "play" as const,
+        label: action.label,
+      }));
+    const continuation = sourceProjection.actions.find(
+      (action) => action.id.split(":")[3] === "skipEffectPlay",
+    );
+    const options = [
+      ...playOptions,
+      ...(continuation
+        ? [{
+            actionId: continuation.id,
+            id: continuation.id,
+            kind: effectPlay.canDecline ? "decline" as const : "continue" as const,
+            label: continuation.label,
+          }]
+        : []),
+    ];
+    if (options.length === 0 || !card) return null;
+
+    return {
+      kind: "effectPlay",
+      decisionKey: `effect-play:${effectPlay.playerId}:${cardInstanceId}`,
+      stagedCard: {
+        id: cardInstanceId,
+        label: card.name,
+        ...(card.media.image_url ? { imageUrl: card.media.image_url } : {}),
+      },
+      options,
+    };
+  }
+
   return null;
 }
 

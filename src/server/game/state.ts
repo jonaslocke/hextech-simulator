@@ -438,6 +438,7 @@ export const gameStateSchema = z.object({
       sourceCardInstanceId: z.string().min(1),
       playerId: z.string().min(1),
       cardInstanceId: z.string().min(1),
+      mayDecline: z.boolean().default(false),
       ignoreBaseEnergy: z.boolean(),
       ignoreBasePower: z.boolean().default(false),
       returnZone: z.enum(["mainDeck", "banishment"]).default("mainDeck"),

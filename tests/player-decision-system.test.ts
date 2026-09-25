@@ -397,6 +397,85 @@ test("maps pending non-board effect selections to the dialog", () => {
   );
 });
 
+test("maps a staged effect play to an explicit decision using only projected play actions", () => {
+  const projection = projectionWith({ actions: [], pendingChoice: null });
+  Object.assign(projection, {
+    effectPlayDecision: {
+      playerId: "player-1",
+      stagedCardInstanceId: "staged-unit",
+      canDecline: true,
+    },
+  });
+  projection.actions.push(
+    {
+      ...cardTargetAction({ id: "play-base", label: "target", legalIds: [] }),
+      id: "game:1:action:play:base:staged-unit",
+      label: "Play Test Unit to Base",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+    },
+    {
+      ...cardTargetAction({ id: "disabled-play", label: "target", legalIds: [] }),
+      id: "game:1:action:play:unavailable:staged-unit",
+      enabled: false,
+      label: "Unavailable mode",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+    },
+    {
+      ...cardTargetAction({ id: "skip-play", label: "target", legalIds: [] }),
+      id: "game:1:action:skipEffectPlay:staged-unit",
+      label: "Don't play",
+      sourceCardInstanceId: null,
+      targets: [],
+    },
+  );
+  const cardView = card("staged-unit", "Unit");
+  cardView.name = "Test Unit";
+  projection.players[0]!.zones.find((zone) => zone.kind === "hand")!.cards = [cardView];
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {
+      "staged-unit": {
+        attributes: { energy: 2, might: 3, power: 1 },
+        classification: { domain: [], supertype: null, type: "Unit" },
+        media: { image_url: "/test-unit.png" },
+        metadata: {},
+        name: "Test Unit",
+        ownerPlayerId: "player-1",
+        public_code: "TEST-001",
+        set: { label: "Test" },
+        text: { plain: "" },
+      },
+    },
+    sourceProjection: projection,
+  });
+
+  assert.deepEqual(decision, {
+    kind: "effectPlay",
+    decisionKey: "effect-play:player-1:staged-unit",
+    stagedCard: {
+      id: "staged-unit",
+      label: "Test Unit",
+      imageUrl: "/test-unit.png",
+    },
+    options: [
+      {
+        actionId: "game:1:action:play:base:staged-unit",
+        id: "game:1:action:play:base:staged-unit",
+        label: "Play Test Unit to Base",
+        kind: "play",
+      },
+      {
+        actionId: "game:1:action:skipEffectPlay:staged-unit",
+        id: "game:1:action:skipEffectPlay:staged-unit",
+        label: "Don't play",
+        kind: "decline",
+      },
+    ],
+  });
+});
+
 function projectionWith(
   overrides: Pick<GameProjection, "actions" | "pendingChoice">,
 ): GameProjection {

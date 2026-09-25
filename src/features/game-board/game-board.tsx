@@ -786,6 +786,16 @@ export const GameBoard: FC<GameBoardProps> = ({
         onCancel={() => {
           if (!isInteractionSuspended) setTargetSelection(null);
         }}
+        onBeginEffectPlay={(actionId) => {
+          const action = sourceProjection.actions.find(
+            (candidate) => candidate.id === actionId,
+          );
+          const cardInstanceId = action?.sourceCardInstanceId;
+          const stagedCard = cardInstanceId
+            ? buildCard(cardInstanceId, cardsByInstanceId, projection.cardStates)[0]
+            : undefined;
+          if (stagedCard) beginPlayOrTargetSelection(stagedCard, actionId);
+        }}
         onInspect={
           !isInteractionSuspended && decisionInspection.canInspect
             ? decisionInspection.inspectBoard

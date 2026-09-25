@@ -76,8 +76,10 @@ import {
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
+  ignoresDeflect,
   type AdditionalCardCost,
 } from "./payment";
+import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 import {
   beginEffectResolution,
   resumeEffectResolution,
@@ -119,12 +121,19 @@ export function gameplayActions(
       destinationBasePlayerId: stagedPlay.destinationBasePlayerId,
     });
     addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen", true);
-    // Rule 419.3.c: if an effect-driven play has no eligible card play, the
-    // instruction does nothing and the resolving effect continues. Resource
-    // preparation remains available whenever it can make the staged card
-    // playable, so this continuation is projected only once no play action is.
-    if (!actions.some((candidate) => candidate.id.split(":")[3] === "play")) {
-      actions.push(action(game, "skipEffectPlay", "Continue", null));
+    const hasPlayableMode = actions.some(
+      (candidate) => candidate.id.split(":")[3] === "play",
+    );
+    // Rule 128.6 lets a player decline an effect-driven play from a private
+    // zone. If the staged card has no legal play, the instruction is
+    // impossible and the parent effect simply continues.
+    if (stagedPlay.mayDecline || !hasPlayableMode) {
+      actions.push(action(
+        game,
+        "skipEffectPlay",
+        stagedPlay.mayDecline ? "Don't play" : "Continue",
+        null,
+      ));
     }
     return actions;
   }
@@ -1053,6 +1062,7 @@ function completeEffectPlayIfReady(
   if (game.state.effectPlayQueue!.length > 0) return;
   resumeEffectResolution(game, stagedPlay.resolutionId, decks);
   completeChainResolution(game, index, decks);
+  finishTurnProgressionIfReady(game, index, decks);
 }
 
 function skipEffectPlay(
@@ -1813,7 +1823,13 @@ function finishTurnProgressionIfReady(
   decks: readonly DeckSnapshotDocument[],
 ) {
   const turn = game.state.turn;
-  if (!turn || game.state.chain || game.state.pendingChoice) return;
+  if (
+    !turn ||
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.effectResolutions.length > 0 ||
+    (game.state.effectPlayQueue?.length ?? 0) > 0
+  ) return;
   if (turn.phase === "end") {
     continueEndTurn(game, turn.activePlayerId, index, decks);
   } else if (isStartOfTurnPhase(turn.phase)) {
@@ -2622,6 +2638,15 @@ function addAbilityActions(
         const alreadyEmpowered =
           ability.behaviorId === "ability.empower" &&
           game.state.cardStates[sourceId]?.empowered === true;
+        const resourceAmount = ability.behaviorId === "ability.exhaust_for_resource"
+          ? effectiveExhaustForResourceAmount(
+              ability,
+              game.state.cardStates[sourceId]?.empowered === true,
+            )
+          : null;
+        const amountPrefix = resourceAmount && resourceAmount !== 1
+          ? `${resourceAmount} `
+          : "";
         const enabled =
           sourceReady &&
           conditionsMet &&
@@ -2633,11 +2658,11 @@ function addAbilityActions(
             ? `Add Power [${powerDomain}]`
             : ability.behaviorId === "ability.exhaust_for_resource"
               ? ability.parameters.resourceType === "power"
-                ? `Add Power [${String(ability.parameters.domain ?? powerDomain)}]`
+                ? `Add ${amountPrefix}Power [${String(ability.parameters.domain ?? powerDomain)}]`
                 : ability.parameters.usage === "spellsOnly" ||
                     ability.parameters.usage === "card:Spell"
-                ? "Add spell Energy"
-                : "Add Energy"
+                ? `Add ${amountPrefix}spell Energy`
+                : `Add ${amountPrefix}Energy`
               : ability.behaviorId === "ability.equip"
                 ? "Equip"
               : ability.behaviorId === "ability.empower"
@@ -2677,6 +2702,12 @@ function addAbilityActions(
         ability.behaviorId === "ability.exhaust_for_resource" &&
         ability.parameters.resourceType === "energy",
     );
+    const combinedEnergyAmount = energyActivation
+      ? effectiveExhaustForResourceAmount(
+          energyActivation.ability,
+          game.state.cardStates[sourceId]?.empowered === true,
+        )
+      : null;
     const powerActivation = activations.find(
       ({ ability }) => ability.behaviorId === "ability.recycle_for_power",
     );
@@ -2701,7 +2732,7 @@ function addAbilityActions(
         action(
           game,
           "activateMany",
-          "Add Energy and Power",
+          `Add ${combinedEnergyAmount && combinedEnergyAmount !== 1 ? `${combinedEnergyAmount} ` : ""}Energy and Power`,
           sourceId,
           enabled,
           enabled ? null : "Source is exhausted.",
@@ -2802,6 +2833,21 @@ function executeActivatedAbility(
     return;
   }
   const costs = activationCosts(clause);
+  const targetRequirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(game, actorPlayerId, sourceId, null, []),
+    handlers,
+  );
+  const deflectTargets = targetRequirements
+    .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+    .flatMap((requirement) => selectedIds.filter((id) => requirement.legalIds.includes(id)));
+  const additionalAnyPower = targetDeflectCost(
+    actorPlayerId,
+    deflectTargets,
+    index,
+    game,
+    ignoresDeflect(definition),
+  );
   const costSelectionOverrides = activatedCostSelectionOverrides(
     game,
     actorPlayerId,
@@ -2823,6 +2869,12 @@ function executeActivatedAbility(
   if (costs.energy > 0 || costs.power > 0) {
     payAbilityCost(game, actorPlayerId, definition, costs, index, {
       poolOnly: binding.behaviorId === "ability.equip",
+      additionalAnyPower,
+    });
+  } else if (additionalAnyPower > 0) {
+    payAbilityCost(game, actorPlayerId, definition, costs, index, {
+      poolOnly: binding.behaviorId === "ability.equip",
+      additionalAnyPower,
     });
   }
   const item = {
@@ -3197,14 +3249,6 @@ function validLockedTargets(
       (chainItemTargets.has(id) ||
         (game.state.cardStates[id]?.objectVersion ?? 0) ===
           targetVersions[id]),
-  );
-}
-
-function ignoresDeflect(definition: GameCardDefinition) {
-  return definition.behaviorModel.clauses.some((clause) =>
-    clause.effects.some(
-      (binding) => binding.behaviorId === "modifier.ignore_deflect",
-    ),
   );
 }
 

@@ -16,6 +16,7 @@ import type { ChainItem, GameDocument } from "./state";
 import { beginEffectResolution } from "./effect-resolution";
 import { behaviorModelForChainItem, behaviorModelForRuntimeCard } from "./runtime-behaviors";
 import { targetSelectionSatisfiesRequirements } from "../../shared/game";
+import { ignoresDeflect, payAnyPowerAdditionalCost, targetDeflectCost } from "./payment";
 
 export function dispatchBehaviorEvent(
   game: GameDocument,
@@ -185,6 +186,32 @@ export function submitChainTargetSelection(
     throw new Error("Selected chain targets are not legal.");
   }
   const item = pending.chainItem;
+  if (item.sourceCardInstanceId) {
+    const index = createRuntimeCardIndex(decks, game);
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const deflectTargets = requirements
+      .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+      .flatMap((requirement) =>
+        selectedIds.filter((id) => requirement.legalIds.includes(id)),
+      );
+    const cost = targetDeflectCost(
+      playerId,
+      deflectTargets,
+      index,
+      game,
+      ignoresDeflect(definition),
+    );
+    payAnyPowerAdditionalCost(
+      game,
+      playerId,
+      definition,
+      cost,
+      item.kind === "spell"
+        ? { kind: "card", cardType: definition.card.classification.type }
+        : { kind: "ability", sourceCardType: definition.card.classification.type },
+      index,
+    );
+  }
   const targetVersions = Object.fromEntries(
     selectedIds.map((id) => [
       id,

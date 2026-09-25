@@ -15,6 +15,7 @@ import type { GameDocument } from "./state";
 import { behaviorModelWithGrantedClause } from "./runtime-behaviors";
 import type { BehaviorClause } from "./schemas";
 import { targetSelectionSatisfiesRequirements } from "../../shared/game";
+import { ignoresDeflect, payAnyPowerAdditionalCost, targetDeflectCost } from "./payment";
 
 export type TokenPlacement = {
   destinationId: string;
@@ -91,6 +92,35 @@ export function submitEffectSelection(
     (candidate) => candidate.id === pending.resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
+  const deflectTargets = (pending.targetRequirements ?? [])
+    .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+    .flatMap((requirement) =>
+      selectedIds.filter((id) => requirement.legalIds.includes(id)),
+    );
+  const resolvingItem = game.state.chain?.items.find(
+    (item) => item.id === game.state.chain?.resolvingItemId,
+  );
+  if (deflectTargets.length > 0 && resolvingItem?.sourceCardInstanceId) {
+    const index = createRuntimeCardIndex(decks, game);
+    const definition = definitionForInstance(resolvingItem.sourceCardInstanceId, index);
+    const cost = targetDeflectCost(
+      playerId,
+      deflectTargets,
+      index,
+      game,
+      ignoresDeflect(definition),
+    );
+    payAnyPowerAdditionalCost(
+      game,
+      playerId,
+      definition,
+      cost,
+      resolvingItem.kind === "spell"
+        ? { kind: "card", cardType: definition.card.classification.type }
+        : { kind: "ability", sourceCardType: definition.card.classification.type },
+      index,
+    );
+  }
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
   game.state.pendingChoice = null;
   return resumeEffectResolution(game, frame.id, decks);

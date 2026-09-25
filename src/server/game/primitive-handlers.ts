@@ -28,6 +28,7 @@ import {
 import { legalEffectMoveDestinationIds } from "./unit-destinations";
 import { additiveKeywordIds, effectiveKeywordAmount, evaluateEffectiveKeywords, hasEffectiveKeyword, reconcileRuntimeKeywordActivation } from "./effective-keywords";
 import { behaviorModelForRuntimeCard } from "./runtime-behaviors";
+import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
@@ -611,6 +612,7 @@ export function createPrimitiveHandlers(
         sourceCardInstanceId: context.sourceCardInstanceId,
         playerId: context.controllerPlayerId,
         cardInstanceId: selectedCardId,
+        mayDecline: false,
         ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
         ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
         returnZone: "mainDeck",
@@ -1044,6 +1046,7 @@ export function createPrimitiveHandlers(
           sourceCardInstanceId: context.sourceCardInstanceId,
           playerId: instance.ownerPlayerId,
           cardInstanceId: id,
+          mayDecline: false,
           ignoreBaseEnergy: binding.parameters.ignoreBaseCosts === true,
           ignoreBasePower: binding.parameters.ignoreBaseCosts === true,
           returnZone: "banishment" as const,
@@ -1110,6 +1113,7 @@ export function createPrimitiveHandlers(
           sourceCardInstanceId: context.sourceCardInstanceId,
           playerId,
           cardInstanceId: chosen,
+          mayDecline: true,
           ignoreBaseEnergy: true,
           ignoreBasePower: false,
           returnZone: "mainDeck" as const,
@@ -1500,10 +1504,8 @@ export function createPrimitiveHandlers(
         moveCardToTrash(context.game, context.sourceCardInstanceId, index);
       }
       const player = context.game.state.players[context.controllerPlayerId]!;
-      const empoweredAmount = binding.parameters.empoweredAmount;
-      const amount = state.empowered === true && typeof empoweredAmount === "number"
-        ? empoweredAmount
-        : numberParam(binding, "amount");
+      const amount = effectiveExhaustForResourceAmount(binding, state.empowered === true)
+        ?? numberParam(binding, "amount");
       const usage = stringParam(binding, "usage");
       if (binding.parameters.resourceType === "power") {
         const domain = resourceDomainForBinding(binding, context, index);

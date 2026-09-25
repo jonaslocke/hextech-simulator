@@ -139,6 +139,16 @@ export function projectGame(input: {
       zones,
     };
   });
+  const projectedActions = (input.game.status === "setup_pending"
+    ? setupActions(input.game, input.viewerPlayerId)
+    : gameplayActions(input.game, input.viewerPlayerId, input.decks)
+  ).filter((action) => !action.id.includes(":action:play:") || action.enabled).map((action) => {
+    if (action.presentation.playCost) return { ...action, label: action.presentation.playCost.label };
+    if (!action.id.includes(":setup:lockBattlefield:")) return action;
+    const cardId = action.id.split(":").slice(4).join(":");
+    return { ...action, label: `Choose ${view(cardId).name}` };
+  });
+  const stagedEffectPlay = input.game.state.effectPlayQueue?.[0] ?? null;
   return gameProjectionSchema.parse({
     id: input.game.id,
     matchId: input.game.matchId,
@@ -187,6 +197,18 @@ export function projectGame(input: {
     },
     turn: input.game.state.turn
       ? { ...input.game.state.turn, passedPlayerIds: [] }
+      : null,
+    effectPlayDecision: stagedEffectPlay
+      ? {
+          playerId: stagedEffectPlay.playerId,
+          stagedCardInstanceId:
+            stagedEffectPlay.playerId === input.viewerPlayerId
+              ? stagedEffectPlay.cardInstanceId
+              : null,
+          canDecline:
+            stagedEffectPlay.playerId === input.viewerPlayerId &&
+            stagedEffectPlay.mayDecline,
+        }
       : null,
     showdown: input.game.state.showdown
       ? {
@@ -354,15 +376,7 @@ export function projectGame(input: {
         : reveal.message,
       cards: reveal.cardInstanceIds.map(view),
     })),
-    actions: (input.game.status === "setup_pending"
-      ? setupActions(input.game, input.viewerPlayerId)
-      : gameplayActions(input.game, input.viewerPlayerId, input.decks)
-    ).filter((action) => !action.id.includes(":action:play:") || action.enabled).map((action) => {
-      if (action.presentation.playCost) return { ...action, label: action.presentation.playCost.label };
-      if (!action.id.includes(":setup:lockBattlefield:")) return action;
-      const cardId = action.id.split(":").slice(4).join(":");
-      return { ...action, label: `Choose ${view(cardId).name}` };
-    }),
+    actions: projectedActions,
     logEntries: (input.events ?? []).map((event) => ({
       id: event.id,
       message: event.type === "cards.revealed" && typeof event.payload?.handOwnerPlayerId === "string" &&

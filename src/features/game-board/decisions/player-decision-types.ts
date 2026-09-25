@@ -101,10 +101,23 @@ export type TokenPlacementDecisionRequest = DecisionInspectionCapability & {
   confirmLabel?: string;
 };
 
+export type EffectPlayDecisionRequest = DecisionInspectionCapability & {
+  kind: "effectPlay";
+  decisionKey: string;
+  stagedCard: PlayerDecisionCard;
+  options: Array<{
+    actionId: string;
+    id: string;
+    kind: "play" | "decline" | "continue";
+    label: string;
+  }>;
+};
+
 export type PlayerDecisionRequest =
   | CardSelectionDecisionRequest
   | OptionDecisionRequest
   | OrderedDecisionRequest
   | CombatDamageDecisionRequest
   | TokenPlacementDecisionRequest
+  | EffectPlayDecisionRequest
   | PendingDecisionRequest;

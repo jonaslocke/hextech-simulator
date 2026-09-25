@@ -27,6 +27,32 @@ test("unaffordable resource capacity does not enumerate ready Rune combinations"
   assert.ok(elapsed < 1000, `action projection took ${elapsed.toFixed(0)} ms`);
 });
 
+test("empowered resource amount is shared by action projection and automatic Energy payment", async () => {
+  const f = await preparationFixture(0, 0, 0);
+  f.card.card.attributes.energy = 2;
+  f.card.card.attributes.power = 0;
+  f.unrestricted.behaviorModel.clauses[0]!.abilities = [{
+    behaviorId: "ability.exhaust_for_resource", order: 0, confidence: "high",
+    parameters: { resourceType: "energy", amount: 1, empoweredAmount: 2, usage: "unrestricted" },
+  }];
+  f.game.state.cardStates[unrestrictedSourceId]!.empowered = true;
+
+  const projectedResource = gameplayActions(f.game, "p1", f.decks).find(
+    (action) => action.sourceCardInstanceId === unrestrictedSourceId,
+  )!;
+  assert.equal(projectedResource.label, "Add 2 Energy");
+  const projectedPlay = play(f);
+  assert.equal(projectedPlay.enabled, true);
+  assert.equal(projectedPlay.poolPayment?.canPay, true);
+  const next = performGameplayAction({
+    game: f.game, decks: f.decks, actorPlayerId: "p1", actionId: projectedPlay.id,
+    selectedIds: [], now: "empowered-resource-payment",
+  });
+  assert.equal(next.state.cardStates[unrestrictedSourceId]!.exhausted, true);
+  assert.equal(next.state.players.p1!.energy, 0);
+  assert.ok(next.state.players.p1!.zones.base.includes(paymentCardId));
+});
+
 test("large Rune pools reject Energy and domain shortages while retaining manual preparation", async () => {
   const f = await preparationFixture(13, 0, 12);
   const before = structuredClone(f.game);
