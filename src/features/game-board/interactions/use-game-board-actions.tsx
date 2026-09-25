@@ -16,7 +16,8 @@ import {
 } from "react";
 import type { BoardPlayerProjection } from "../board-view-model";
 import { PlayableCardMenuLabel, ResourceCostMenuLabel } from "../components/playable-card-menu-label";
-import type { CardActionMenuItem } from "../components/card-action-menu";
+import type { CardActionMenuGroup, CardActionMenuItem } from "../components/card-action-menu";
+import { groupPlayPaymentModes } from "../play-from-hand-menu";
 import { combineTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
 import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
@@ -309,18 +310,48 @@ export function useGameBoardActions({
 
       const modes = (viewerState.availablePaymentModes[card.instanceId] ?? []).filter((mode) => mode.enabled);
 
+      const menuItems = modes.map((mode) => ({
+        boardLocation: mode.boardLocation,
+        disabled: !mode.enabled,
+        id: mode.id,
+        label: mode.enabled
+          ? <PlayableCardMenuLabel mode={mode} />
+          : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
+        onSelect: () => beginPlayOrTargetSelection(card, mode.id),
+      }));
+      const paymentModeGroups = groupPlayPaymentModes(modes);
+
+      if (paymentModeGroups) {
+        const groups: CardActionMenuGroup[] = paymentModeGroups.map((group) => ({
+          id: group.id,
+          items: group.modes.map((mode) => ({
+            boardLocation: mode.boardLocation,
+            id: mode.id,
+            label: (
+              <PlayableCardMenuLabel
+                label={mode.playCost?.destinationLabel ?? mode.playCost?.label ?? mode.label}
+                mode={mode}
+              />
+            ),
+            onSelect: () => beginPlayOrTargetSelection(card, mode.id),
+          })),
+          label: group.label,
+        }));
+
+        openCardActionMenu(event, [
+          {
+            groups,
+            id: `${card.instanceId}:play`,
+            label: `Play ${card.name}`,
+          },
+        ]);
+        return;
+      }
+
       openCardActionMenu(
         event,
-        modes.length > 0
-          ? modes.map((mode) => ({
-              boardLocation: mode.boardLocation,
-              disabled: !mode.enabled,
-              id: mode.id,
-              label: mode.enabled
-                ? <PlayableCardMenuLabel mode={mode} />
-                : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
-              onSelect: () => beginPlayOrTargetSelection(card, mode.id),
-            }))
+        menuItems.length > 0
+          ? menuItems
           : [
               {
                 disabled: true,

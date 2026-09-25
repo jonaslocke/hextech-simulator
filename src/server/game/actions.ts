@@ -1972,6 +1972,8 @@ function addPlayableCardActions(
         );
         actions[actions.length - 1]!.presentation.playCost = {
           label: destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`,
+          destinationLabel: destination.name || "Play",
+          paymentMode: optionalCostKeys.length > 0 ? "additional-cost" : "standard",
           showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
           modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
         };

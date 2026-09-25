@@ -1,13 +1,19 @@
 import { ResourceCost } from "./resource-cost";
 import type { BoardPlayerProjection } from "../board-view-model";
 
-export function PlayableCardMenuLabel({ mode }: { mode: BoardPlayerProjection["availablePaymentModes"][string][number] }) {
+export function PlayableCardMenuLabel({
+  label: labelOverride,
+  mode,
+}: {
+  label?: string;
+  mode: BoardPlayerProjection["availablePaymentModes"][string][number];
+}) {
   if (mode.resourceCost) {
     return <ResourceCostMenuLabel label={mode.label} cost={mode.resourceCost} />;
   }
   const preview = mode.costPreview;
   const presentation = mode.playCost;
-  const label = presentation?.label ?? mode.label;
+  const label = labelOverride ?? presentation?.label ?? mode.label;
   if (!preview || !presentation?.showCost) return <>{label}</>;
   return <span className="flex flex-col gap-0.5">
     <span>{label}</span>

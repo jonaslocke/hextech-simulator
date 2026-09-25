@@ -1312,22 +1312,14 @@ export const GameBoard: FC<GameBoardProps> = ({
         zoneCounts={animationData.zoneCounts}
       />
       {cardActionMenu && !isInteractionSuspended && !isMovementDraftActive && (
-        <>
-          <button
-            aria-label="Close card action menu"
-            className="z-[2147483646] fixed inset-0 bg-transparent cursor-default"
-            onPointerDown={closeCardActionMenu}
-            type="button"
-          />
-          <CardActionMenu
-            items={cardActionMenu.items}
-            left={cardActionMenu.left}
-            onClose={closeCardActionMenu}
-            onItemHighlight={setCardActionMenuHighlight}
-            onItemHighlightEnd={clearCardActionMenuHighlight}
-            top={cardActionMenu.top}
-          />
-        </>
+        <CardActionMenu
+          items={cardActionMenu.items}
+          left={cardActionMenu.left}
+          onClose={closeCardActionMenu}
+          onItemHighlight={setCardActionMenuHighlight}
+          onItemHighlightEnd={clearCardActionMenuHighlight}
+          top={cardActionMenu.top}
+        />
       )}
     </main>
     <DialogPortal>
