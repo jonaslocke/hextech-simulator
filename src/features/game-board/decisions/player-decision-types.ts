@@ -110,6 +110,7 @@ export type EffectPlayDecisionRequest = DecisionInspectionCapability & {
     id: string;
     kind: "play" | "decline" | "continue";
     label: string;
+    description?: string;
   }>;
 };
 

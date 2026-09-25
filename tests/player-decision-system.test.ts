@@ -413,6 +413,48 @@ test("maps a staged effect play to an explicit decision using only projected pla
       label: "Play Test Unit to Base",
       sourceCardInstanceId: "staged-unit",
       targets: [],
+      presentation: {
+        ...cardTargetAction({ id: "play-base-presentation", label: "target", legalIds: [] }).presentation,
+        playCost: {
+          label: "Play Test Unit to Base",
+          showCost: false,
+          modifierSources: [],
+        },
+      },
+    },
+    {
+      ...cardTargetAction({ id: "play-base-optional", label: "target", legalIds: [] }),
+      id: "game:1:action:play:base:staged-unit:optional",
+      label: "Play Test Unit to Base",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+      costPreview: {
+        energy: 2,
+        basePower: 0,
+        effectivePower: 1,
+        printedEnergy: 2,
+        printedPower: 0,
+        availableAnyPower: 0,
+        targetAdditionalPower: [],
+      },
+      poolPayment: {
+        energy: 2,
+        power: 1,
+        powerDomains: ["Calm"],
+        availableEnergy: 2,
+        availablePower: 1,
+        canPay: true,
+        powerCosts: [{ amount: 1, domains: ["Calm"] }],
+      },
+      presentation: {
+        ...cardTargetAction({ id: "play-base-optional-presentation", label: "target", legalIds: [] }).presentation,
+        playCost: {
+          label: "Play Test Unit to Base",
+          declarationLabel: "Pay the optional cost",
+          showCost: true,
+          modifierSources: [],
+        },
+      },
     },
     {
       ...cardTargetAction({ id: "disabled-play", label: "target", legalIds: [] }),
@@ -464,6 +506,13 @@ test("maps a staged effect play to an explicit decision using only projected pla
         actionId: "game:1:action:play:base:staged-unit",
         id: "game:1:action:play:base:staged-unit",
         label: "Play Test Unit to Base",
+        kind: "play",
+      },
+      {
+        actionId: "game:1:action:play:base:staged-unit:optional",
+        id: "game:1:action:play:base:staged-unit:optional",
+        label: "Play Test Unit to Base",
+        description: "Pay the optional cost · Cost: 2 Energy + 1 Calm Power",
         kind: "play",
       },
       {

@@ -436,12 +436,16 @@ export function buildPlayerDecisionRequest({
           action.sourceCardInstanceId === cardInstanceId &&
           action.id.split(":")[3] === "play",
       )
-      .map((action) => ({
-        actionId: action.id,
-        id: action.id,
-        kind: "play" as const,
-        label: action.label,
-      }));
+      .map((action) => {
+        const description = effectPlayOptionDescription(action);
+        return {
+          actionId: action.id,
+          id: action.id,
+          kind: "play" as const,
+          label: action.label,
+          ...(description ? { description } : {}),
+        };
+      });
     const continuation = sourceProjection.actions.find(
       (action) => action.id.split(":")[3] === "skipEffectPlay",
     );
@@ -471,6 +475,39 @@ export function buildPlayerDecisionRequest({
   }
 
   return null;
+}
+
+function effectPlayOptionDescription(
+  action: GameProjection["actions"][number],
+) {
+  const presentation = action.presentation.playCost;
+  const details: string[] = [];
+  if (presentation?.declarationLabel) {
+    details.push(presentation.declarationLabel);
+  }
+  if (presentation?.showCost && action.costPreview) {
+    const costs: string[] = [];
+    if (action.costPreview.energy > 0) {
+      costs.push(`${action.costPreview.energy} Energy`);
+    }
+    const powerCosts = action.poolPayment?.powerCosts ?? (
+      action.costPreview.effectivePower > 0
+        ? [{
+            amount: action.costPreview.effectivePower,
+            domains: action.poolPayment?.powerDomains ?? [],
+          }]
+        : []
+    );
+    for (const powerCost of powerCosts) {
+      if (powerCost.amount === 0) continue;
+      const domains = powerCost.domains
+        .map((domain) => `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`)
+        .join("/");
+      costs.push(`${powerCost.amount}${domains ? ` ${domains}` : ""} Power`);
+    }
+    if (costs.length > 0) details.push(`Cost: ${costs.join(" + ")}`);
+  }
+  return details.length > 0 ? details.join(" · ") : undefined;
 }
 
 function mapActiveCardDecision({

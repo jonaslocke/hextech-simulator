@@ -912,14 +912,7 @@ export function createPrimitiveHandlers(
       for (const id of ids) {
         const state = context.game.state.cardStates[id];
         if (!state) throw new Error(`Damage target is unavailable: ${id}`);
-        state.damage += damageIsLethalAgainstEnemyUnit(
-          context.game,
-          context.controllerPlayerId,
-          id,
-          index,
-        )
-          ? state.computedMight ?? definitionForInstance(id, index).card.attributes.might ?? amount
-          : amount;
+        markDamage(context.game, id, context.controllerPlayerId, amount);
         incrementObjectVersion(context.game, id);
       }
       cleanupLethalDamage(context.game, ids, index);
@@ -947,14 +940,12 @@ export function createPrimitiveHandlers(
       const firstController = first ? index.instances.get(first)?.ownerPlayerId : undefined;
       const secondController = second ? index.instances.get(second)?.ownerPlayerId : undefined;
       if (firstState && first && secondMight > 0) {
-        firstState.damage += secondController && damageIsLethalAgainstEnemyUnit(context.game, secondController, first, index)
-          ? firstMight
-          : secondMight;
+        if (!secondController) throw new Error(`Unit controller is unavailable: ${second}`);
+        markDamage(context.game, first, secondController, secondMight);
       }
       if (secondState && second && firstMight > 0) {
-        secondState.damage += firstController && damageIsLethalAgainstEnemyUnit(context.game, firstController, second, index)
-          ? secondMight
-          : firstMight;
+        if (!firstController) throw new Error(`Unit controller is unavailable: ${first}`);
+        markDamage(context.game, second, firstController, firstMight);
       }
       cleanupLethalDamage(
         context.game,
@@ -2123,6 +2114,7 @@ function playToken(
   game.state.cardStates[instanceId] = {
     exhausted: input.entryState === "exhausted",
     damage: 0,
+    damageByPlayerId: {},
     computedMight: definition.card.attributes.might,
     gameObjectIncarnation: 0,
     objectVersion: 0,
@@ -2509,6 +2501,14 @@ function keywordContributions(game: GameDocument, cardInstanceId: string, behavi
   }));
 }
 export function cleanupLethalDamage(game: GameDocument, ids: string[], index: RuntimeCardIndex) {
+  const lethalByMarkedDamage = new Map(ids.map((id) => {
+    const state = game.state.cardStates[id];
+    const lethal = Object.entries(state?.damageByPlayerId ?? {}).some(
+      ([playerId, amount]) =>
+        amount > 0 && damageIsLethalAgainstEnemyUnit(game, playerId, id, index),
+    );
+    return [id, lethal] as const;
+  }));
   for (const id of ids) {
     const state = game.state.cardStates[id];
     const might =
@@ -2518,12 +2518,34 @@ export function cleanupLethalDamage(game: GameDocument, ids: string[], index: Ru
     const unchangedSuppressedDeath =
       state?.lethalSuppressedDamage === state?.damage &&
       state?.lethalSuppressedMight === might;
-    if (state && !unchangedSuppressedDeath && state.damage > 0 && state.damage >= might) {
+    const controllerMarkedLethalDamage = lethalByMarkedDamage.get(id) ?? false;
+    if (
+      state &&
+      !unchangedSuppressedDeath &&
+      state.damage > 0 &&
+      (state.damage >= might || controllerMarkedLethalDamage)
+    ) {
       moveUnitToTrash(game, id, index);
       if (game.state.pendingChoice) return true;
     }
   }
   return false;
+}
+
+export function markDamage(
+  game: GameDocument,
+  targetId: string,
+  controllerPlayerId: string,
+  amount: number,
+) {
+  const state = game.state.cardStates[targetId];
+  if (!state) throw new Error(`Damage target is unavailable: ${targetId}`);
+  state.damage += amount;
+  if (amount > 0) {
+    const damageByPlayerId = (state.damageByPlayerId ??= {});
+    damageByPlayerId[controllerPlayerId] =
+      (damageByPlayerId[controllerPlayerId] ?? 0) + amount;
+  }
 }
 export function moveUnitToTrash(game: GameDocument, id: string, index: RuntimeCardIndex) {
   if (resolveDeathReplacement(game, id, index)) {
@@ -3016,6 +3038,7 @@ function resetStateAfterLeavingBoard(
   incrementObjectVersion(game, id);
   if (createsNewGameObject) advanceGameObjectIncarnation(game, id);
   state.damage = 0;
+  state.damageByPlayerId = {};
   state.exhausted = false;
   state.empowered = false;
   state.combatRole = null;

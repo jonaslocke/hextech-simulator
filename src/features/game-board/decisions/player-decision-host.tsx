@@ -146,6 +146,7 @@ export function PlayerDecisionHost({
             options: decision.options.map((option) => ({
               id: option.id,
               label: option.label,
+              description: option.description,
             })),
             revealedCards: [decision.stagedCard],
             title: "Play a card from this effect?",

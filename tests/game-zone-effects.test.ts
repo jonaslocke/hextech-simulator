@@ -193,7 +193,7 @@ test("applies controller Bonus Damage and records whether it killed", () => {
   assert.equal(context.effectOutcomes.lastDamageKilled, true);
 });
 
-test("Lethal preserves positive damage and kills a zero-Might enemy unit", () => {
+test("Lethal resolves positive damage against a zero-Might enemy unit", () => {
   const game = fixture();
   const index = cardIndex();
   const source = structuredClone(index.definitions.get("UNIT")!);
@@ -227,7 +227,6 @@ test("Lethal preserves positive damage and kills a zero-Might enemy unit", () =>
     context,
   );
 
-  assert.equal(game.state.cardStates["zero-might-unit"]!.damage, 1);
   assert.ok(game.state.players.p2!.zones.trash.includes("zero-might-unit"));
 });
 
@@ -292,7 +291,49 @@ test("zero-Might units need positive damage and ordinary damage remains unchange
     context,
   );
   assert.equal(game.state.cardStates.unit!.damage, 1);
+  assert.deepEqual(game.state.cardStates.unit!.damageByPlayerId, { p1: 1 });
   assert.ok(game.state.battlefields[0]!.units.includes("unit"));
+});
+
+test("cleanup applies a controller's lethal modifier to positive damage already marked by them", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: false, damage: 0, computedMight: null };
+
+  for (const id of ["marked-by-controller", "marked-by-opponent"]) {
+    const unit = structuredClone(index.definitions.get("UNIT")!);
+    unit.cardCode = id;
+    unit.card.attributes.might = 3;
+    index.definitions.set(id, unit);
+    index.instances.set(id, {
+      instanceId: id, ownerPlayerId: "p2", source: "mainDeck", cardCode: id,
+    });
+    game.state.battlefields[0]!.units.push(id);
+    game.state.cardStates[id] = {
+      exhausted: true,
+      damage: 1,
+      damageByPlayerId: { [id === "marked-by-controller" ? "p1" : "p2"]: 1 },
+      computedMight: 3,
+    };
+  }
+
+  cleanupLethalDamage(game, ["marked-by-controller", "marked-by-opponent"], index);
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("marked-by-controller"));
+  assert.ok(game.state.battlefields[0]!.units.includes("marked-by-opponent"));
 });
 
 test("derives Deflect as an atomic any-domain Power cost", () => {

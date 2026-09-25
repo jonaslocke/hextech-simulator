@@ -730,6 +730,7 @@ function applyPaymentPlan(
     const state = game.state.cardStates[id];
     if (state) {
       state.damage = 0;
+      state.damageByPlayerId = {};
       state.exhausted = false;
     }
   }

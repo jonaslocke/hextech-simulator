@@ -96,6 +96,7 @@ export const cardStateSchema = z.object({
   hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
   empowered: z.boolean().default(false).optional(),
   damage: z.number().int().nonnegative(),
+  damageByPlayerId: z.record(z.number().int().nonnegative()).optional(),
   computedMight: z.number().nullable(),
   // Changes only when a zone transition creates a new game object. Unlike
   // objectVersion, ordinary state changes such as taking damage do not affect
@@ -678,6 +679,7 @@ export function createInitialGame(input: {
         {
           exhausted: false,
           damage: 0,
+          damageByPlayerId: {},
           computedMight: cardByCode(deck, instance.cardCode).card.attributes
             .might,
           gameObjectIncarnation: 0,

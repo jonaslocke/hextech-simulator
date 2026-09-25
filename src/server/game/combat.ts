@@ -7,6 +7,7 @@ import { scoreBattlefield } from "./scoring";
 import {
   damageIsLethalAgainstEnemyUnit,
   definitionForInstance,
+  markDamage,
   recomputeMight,
   type RuntimeCardIndex
 } from "./primitive-handlers";
@@ -248,10 +249,7 @@ function applyAssignment(
     [combat.defenderPlayerId, combat.defenderAssignments],
   ] as const) {
     for (const assignment of assignments) {
-      const state = game.state.cardStates[assignment.targetUnitId]!;
-      state.damage += damageIsLethalAgainstEnemyUnit(game, controllerPlayerId, assignment.targetUnitId, index)
-        ? state.computedMight ?? assignment.amount
-        : assignment.amount;
+      markDamage(game, assignment.targetUnitId, controllerPlayerId, assignment.amount);
     }
   }
   resolveCombat(game, index, decks);
