@@ -13,6 +13,7 @@ export function ActionButton({
   active,
   children,
   className,
+  collapsed = true,
   disabled = false,
   isShortcutActive = true,
   label,
@@ -26,6 +27,7 @@ export function ActionButton({
   active: boolean;
   children: ReactNode;
   className?: string;
+  collapsed?: boolean;
   disabled?: boolean;
   isShortcutActive?: boolean;
   label: string;
@@ -119,7 +121,8 @@ export function ActionButton({
       })}
       aria-pressed={active}
       className={cn(
-        "group relative flex justify-center items-center p-0 rounded-md size-10 overflow-hidden transition",
+        "group relative flex items-center rounded-md h-10 overflow-hidden transition",
+        collapsed ? "justify-center p-0 w-10" : "justify-start gap-3 px-3 w-full",
         "disabled:cursor-not-allowed disabled:opacity-45",
         "focus-visible:ring-2 focus-visible:ring-ring/50",
         active
@@ -139,9 +142,14 @@ export function ActionButton({
       type="button"
       variant="ghost"
     >
-      <span className="z-10 relative flex justify-center items-center">
+      <span className="z-10 relative flex justify-center items-center shrink-0">
         {children}
       </span>
+      {!collapsed && (
+        <span className="z-10 relative truncate text-left text-sm font-medium">
+          {label}
+        </span>
+      )}
 
       {showShortcutBadge && resolvedShortcut && resolvedShortcutLabel && (
         <span

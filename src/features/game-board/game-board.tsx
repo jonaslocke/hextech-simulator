@@ -8,7 +8,6 @@ import {
   type StructuredBugReport,
 } from "@/shared/bug-report";
 import type { GameProjection } from "@/shared/game";
-import { Button } from "@/shared/components/button";
 import { copyText } from "@/shared/utils/copy-text";
 import { LayoutGroup } from "motion/react";
 import {
@@ -44,17 +43,17 @@ import {
   captureCardZoneAnimationSnapshot,
 } from "./components/card-zone-transfer-overlay";
 import { ChainOverlay } from "./components/chain-overlay";
-import {
-  BugReportPanel,
-  ReportBugButton,
-} from "./components/bug-report-panel";
+import { BugReportPanel } from "./components/bug-report-panel";
 import { MovementDraftStage } from "./components/movement-draft-stage";
 import { PlayerBoard } from "./components/player-board";
 import { PublicRevealWindow } from "./components/public-reveal-window";
-import { DialogPortal } from "@/shared/components/dialog-portal";
 import { PlayerHandFan } from "./components/player-hand-fan";
 import { RunePoolBar } from "./components/rune-pool-bar";
-import { ScoreHeader, type MatchHudContext } from "./components/score-header";
+import {
+  PlayerHudPlate,
+  ScoreHeader,
+  type MatchHudContext,
+} from "./components/score-header";
 import { ShowdownPrompt } from "./components/showdown-prompt";
 import { TargetSelectionPrompt } from "./components/target-selection-prompt";
 import { TemporaryZoneOverlay } from "./components/temporary-zone-overlay";
@@ -750,7 +749,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       {...reportCardSelection}
     >
     <main
-      className="relative flex flex-col h-screen overflow-hidden text-slate-100 game-board"
+      className="relative grid h-dvh grid-rows-[auto_minmax(0,1fr)_7rem] overflow-hidden text-slate-100 game-board"
       onClickCapture={handleBoardClickCapture}
     >
       <div className="relative">
@@ -758,21 +757,9 @@ export const GameBoard: FC<GameBoardProps> = ({
           matchContext={matchContext}
           opponent={board.opponent}
           player={board.player}
+          turn={projection.turn}
           victoryScore={projection.victoryScore}
         />
-        <div className="top-14 right-32 z-[2147483646] absolute flex gap-2">
-          {process.env.NODE_ENV === "development" && debugDrawAction && (
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={!debugDrawAction.enabled || isSubmittingAction || isInteractionSuspended || isMovementDraftActive}
-              onClick={() => void submitProjectedAction(debugDrawAction.id)}
-              title={debugDrawAction.disabledReason ?? "Draw the top card of your main deck into your hand"}
-              variant="secondary"
-            >
-              {debugDrawAction.label}
-            </Button>
-          )}
-        </div>
       </div>
       <PlayerDecisionHost
         cardsByInstanceId={cardsByInstanceId}
@@ -839,7 +826,7 @@ export const GameBoard: FC<GameBoardProps> = ({
             priorityPlayerId={showdownPrompt.priorityPlayerId}
           />
         )}
-      <section className="flex flex-1 min-h-0 overflow-hidden">
+      <section className="flex min-h-0 overflow-hidden">
         <LocationDragProvider
           activeDragData={activeLocationDrag}
           dragOverlay={activeLocationDragOverlay}
@@ -858,8 +845,9 @@ export const GameBoard: FC<GameBoardProps> = ({
             isInteractionSuspended ? () => undefined : handleLocationDragOver
           }
         >
-          <div className="flex-1 gap-2 grid grid-rows-[minmax(96px,0.8fr)_minmax(0,1.2fr)_minmax(180px,2fr)_minmax(0,1.2fr)_minmax(96px,0.8fr)_48px] p-2 min-h-0 overflow-hidden">
-            <PlayerBoard
+          <div className="flex-1 gap-2 grid grid-rows-[minmax(120px,0.9fr)_minmax(180px,1.4fr)_minmax(120px,0.9fr)] p-2 pb-0 min-w-0 min-h-0 overflow-hidden">
+            <div className="gap-1 grid grid-rows-2 min-h-0">
+              <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
               onBoardCardPrimaryAction={boardCardPrimaryAction}
@@ -871,7 +859,8 @@ export const GameBoard: FC<GameBoardProps> = ({
               isActivePlayer={isOpponentActive}
               isBaseHighlighted={hoveredChainRelationships?.basePlayerIds.includes(board.opponent.playerId)}
               isMirrored
-            />
+              />
+            </div>
             <LayoutGroup id="battlefield-showdown-layout">
               <div className="flex gap-2 min-h-0">
                 <BattlefieldBoard
@@ -934,7 +923,8 @@ export const GameBoard: FC<GameBoardProps> = ({
                 />
               </div>
             </LayoutGroup>
-            <PlayerBoard
+            <div className="gap-1 grid grid-rows-2 min-h-0">
+              <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
               isBaseHighlighted={
@@ -973,8 +963,8 @@ export const GameBoard: FC<GameBoardProps> = ({
               stagedMovementCardInstanceIds={stagedMovementCardInstanceIds}
               baseDropStatus={getLocationDropStatus({ kind: "base" })}
               isLocationDropEnabled={isLocationDropEnabled}
-            />
-            <RunePoolBar runePool={viewerState?.runePool} />
+              />
+            </div>
           </div>
           <MovementDraftStage
             canDrag={canUseLocationDrag}
@@ -990,6 +980,7 @@ export const GameBoard: FC<GameBoardProps> = ({
           disabled={isInteractionSuspended || isMovementDraftActive}
           isChainOpen={isChainOverlayOpen}
           isChainLockedOpen={isChainLockedOpen}
+          isReporting={Boolean(bugReportDraft)}
           onChainOpenChange={
             isInteractionSuspended || isMovementDraftActive
               ? () => undefined
@@ -1000,6 +991,24 @@ export const GameBoard: FC<GameBoardProps> = ({
               ? onConcede
               : undefined
           }
+          debugAction={
+            process.env.NODE_ENV === "development" && debugDrawAction
+              ? {
+                  disabled:
+                    !debugDrawAction.enabled ||
+                    isSubmittingAction ||
+                    isInteractionSuspended ||
+                    isMovementDraftActive,
+                  disabledReason: debugDrawAction.disabledReason,
+                  label: debugDrawAction.label,
+                }
+              : undefined
+          }
+          onDebugAction={
+            process.env.NODE_ENV === "development" && debugDrawAction
+              ? () => void submitProjectedAction(debugDrawAction.id)
+              : undefined
+          }
           onPassTurn={
             isInteractionSuspended || isMovementDraftActive
               ? undefined
@@ -1007,10 +1016,45 @@ export const GameBoard: FC<GameBoardProps> = ({
                 ? onPass
                 : onEndTurn
           }
+          onReportBug={beginBugReport}
           openZone={openZone}
           passTurnDisabled={!canViewerEndTurn || isSubmittingAction || isMovementDraftActive}
           passTurnLabel={isSubmittingAction ? "Submitting…" : passTurnLabel}
           setOpenZone={setOpenZone}
+        />
+      </section>
+      <section
+        aria-label="Player context"
+        className="relative z-20 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-t border-white/10 bg-slate-950/45 px-4 py-2 supports-backdrop-filter:bg-slate-950/25 supports-backdrop-filter:backdrop-blur-md"
+      >
+        <div className="z-10 relative min-w-0 max-w-full">
+          <PlayerHudPlate
+            matchScore={
+              matchContext?.scoreByPlayerId[board.player.playerId] ?? undefined
+            }
+            name={board.player.name}
+            seat="player"
+          />
+        </div>
+        <div className="z-10 relative justify-self-end min-w-0 max-w-full">
+          <RunePoolBar runePool={viewerState?.runePool} />
+        </div>
+        <PlayerHandFan
+          cards={board.player.zones.hand.cards}
+          hiddenCardInstanceIds={activeTransferCardIds}
+          onCardContextAction={
+            isInteractionSuspended || isMovementDraftActive
+              ? undefined
+              : handleCardContextFromHand
+          }
+          onPlayCard={
+            isInteractionSuspended || isMovementDraftActive
+              ? undefined
+              : handlePlayCardFromHand
+          }
+          interactionSuspended={isInteractionSuspended || isMovementDraftActive}
+          onTuck={closeCardActionMenu}
+          playerId={board.player.playerId}
         />
       </section>
       {!isInteractionSuspended && !isMovementDraftActive && globalActions.length > 0 && (
@@ -1075,23 +1119,6 @@ export const GameBoard: FC<GameBoardProps> = ({
         playerTrash={board.player.zones.trash}
       />
 
-      <PlayerHandFan
-        cards={board.player.zones.hand.cards}
-        hiddenCardInstanceIds={activeTransferCardIds}
-        onCardContextAction={
-          isInteractionSuspended || isMovementDraftActive
-            ? undefined
-            : handleCardContextFromHand
-        }
-        onPlayCard={
-          isInteractionSuspended || isMovementDraftActive
-            ? undefined
-            : handlePlayCardFromHand
-        }
-        interactionSuspended={isInteractionSuspended || isMovementDraftActive}
-        onTuck={closeCardActionMenu}
-        playerId={board.player.playerId}
-      />
       {!isInteractionSuspended &&
         (targetSelection?.targetKind === "card" || targetSelection?.targetKind === "payment") &&
         !targetSelectionUsesCardPrompt && (
@@ -1322,11 +1349,6 @@ export const GameBoard: FC<GameBoardProps> = ({
         />
       )}
     </main>
-    <DialogPortal>
-      <div className="fixed top-14 right-3 z-[2147483647]">
-        <ReportBugButton isReporting={Boolean(bugReportDraft)} onBegin={beginBugReport} />
-      </div>
-    </DialogPortal>
     <BugReportPanel
       artifactPath={bugReportArtifactPath}
       draft={
