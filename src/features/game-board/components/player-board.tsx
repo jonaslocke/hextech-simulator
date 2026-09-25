@@ -645,27 +645,85 @@ function CardList({ cards, ...props }: CardListProps) {
 
 // Attachment relationships affect only Base permanents, never generic zones.
 function BasePermanentList({ cards, ...props }: CardListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const attachmentGroups = groupCardsByAttachment(cards);
+  const attachmentGroupsRef = useRef(attachmentGroups);
+  attachmentGroupsRef.current = attachmentGroups;
+  const cardSignature = cards
+    .map((card) => `${card.instanceId ?? card.name}:${Number(Boolean(card.isExhausted))}:${card.attachedToCardInstanceId ?? ""}`)
+    .join("|");
+  const [density, setDensity] = useState({ size: "lg" as CardTileSize, gap: 8 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateDensity = () => {
+      const availableWidth = container.clientWidth;
+      const groups = attachmentGroupsRef.current;
+      const resolveSize = (size: CardTileSize) => {
+        const cardDimensions = CARD_TILE_SIZE_CONFIG[size];
+        const groupsWidth = groups.reduce((total, group) => {
+          const hostWidth = group.host.isExhausted
+            ? cardDimensions.height
+            : cardDimensions.width;
+          const stripWidth = Math.max(24, cardDimensions.width * 0.2);
+          return total + hostWidth + group.attachments.length * stripWidth;
+        }, 0);
+        const gaps = Math.max(0, groups.length - 1);
+        return { groupsWidth, gaps };
+      };
+      const xl = resolveSize("xl");
+      const lg = resolveSize("lg");
+      const md = resolveSize("md");
+      const fits = (candidate: { groupsWidth: number; gaps: number }) =>
+        candidate.groupsWidth + candidate.gaps * 4 <= availableWidth;
+      const size = fits(xl) ? "xl" : fits(lg) ? "lg" : "md";
+      const measured = size === "xl" ? xl : size === "lg" ? lg : md;
+      const gap = measured.gaps === 0
+        ? 8
+        : Math.max(4, Math.min(8, (availableWidth - measured.groupsWidth) / measured.gaps));
+      setDensity((current) =>
+        current.size === size && Math.abs(current.gap - gap) < 0.5
+          ? current
+          : { size, gap },
+      );
+    };
+
+    updateDensity();
+    const resizeObserver = new ResizeObserver(updateDensity);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [cardSignature]);
+
   return (
-    <CardListLayout cards={cards} {...props}>
-      {groupCardsByAttachment(cards).map(({ host, attachments }, index) => {
+    <div className="w-full h-full min-w-0 min-h-0" ref={containerRef}>
+    <CardListLayout
+      cards={cards}
+      {...props}
+      size={density.size}
+      style={{ columnGap: density.gap, rowGap: 6 }}
+    >
+      {attachmentGroups.map(({ host, attachments }, index) => {
         const key = host.instanceId ?? `${host.name}-${index}`;
         if (attachments.length === 0) {
-          return <CardListCard key={key} card={host} {...props} />;
+          return <CardListCard key={key} card={host} {...props} size={density.size} />;
         }
         return (
           <AttachmentCardGroup
             key={key}
             groupId={key}
             size={props.size ?? "md"}
-            host={<CardListCard card={host} {...props} />}
+            host={<CardListCard card={host} {...props} size={density.size} />}
             attachments={attachments.map((card, attachmentIndex) => ({
               id: card.instanceId ?? `${card.name}-${attachmentIndex}`,
-              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} />,
+              card: <CardListCard card={card} {...props} dragSourceLocation={undefined} size={density.size} />,
             }))}
           />
         );
       })}
     </CardListLayout>
+    </div>
   );
 }
 
@@ -711,7 +769,8 @@ function CardListLayout({
   count,
   onClick,
   layout = "row",
-}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout"> & { children: ReactNode }) {
+  style,
+}: Pick<CardListProps, "cards" | "count" | "onClick" | "layout" | "size"> & { children: ReactNode; style?: CSSProperties }) {
   const wrapContainerRef = useRef<HTMLDivElement>(null);
   const [hasWrappedRows, setHasWrappedRows] = useState(false);
 
@@ -789,6 +848,7 @@ function CardListLayout({
           "flex flex-wrap items-start gap-1 py-2 pr-1 w-full h-full max-h-full overflow-x-hidden overflow-y-auto",
           hasWrappedRows ? "content-start" : "content-center",
         )}
+        style={style}
         data-board-scroll
         ref={wrapContainerRef}
       >

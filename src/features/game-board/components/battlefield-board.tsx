@@ -21,7 +21,7 @@ import type {
 } from "../drag-and-drop/location-drag-actions";
 import { useBoardLocationDroppable } from "../drag-and-drop/use-board-location-droppable";
 import type { BattlefieldData, Card } from "../types";
-import { CardTile } from "./card-tile";
+import { CARD_TILE_SIZE_CONFIG, CardTile, type CardTileSize } from "./card-tile";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { groupCardsByAttachment } from "./attachment-layout";
 
@@ -129,7 +129,7 @@ const battlefieldDescriptionBar = cva([
 
 const battlefieldUnitRow = cva(
   [
-    "flex flex-wrap gap-1 pl-2 min-h-0 overflow-auto",
+    "flex flex-wrap pl-2 min-h-0 overflow-auto",
   ],
   {
     variants: {
@@ -262,8 +262,6 @@ export const BattlefieldBoard: FC<Props> = ({
     (acc, cur) => acc + (cur.might ?? 0),
     0,
   );
-  const hasMightToShow = playerTotalMight + opponentTotalMight > 0;
-
   useEffect(() => {
     if (!isBattlefieldCardOpen) {
       return;
@@ -341,13 +339,14 @@ export const BattlefieldBoard: FC<Props> = ({
           </div>
         )}
 
-        {hasMightToShow && (
-          <div className={cn(battlefieldMightBadge(), facedownCardPresent && "right-20")}>
-            <div className="px-1 py-0.5 leading-none">{opponentTotalMight}</div>
-            <div className="px-1 font-extrabold text-[8px] text-slate-950/70 leading-none">
-              VS
-            </div>
-            <div className="px-1 py-0.5 leading-none">{playerTotalMight}</div>
+        {opponentTotalMight > 0 && (
+          <div className={cn(battlefieldMightBadge(), facedownCardPresent && "right-20")} style={{ top: "25%" }}>
+            {opponentTotalMight}
+          </div>
+        )}
+        {playerTotalMight > 0 && (
+          <div className={cn(battlefieldMightBadge(), facedownCardPresent && "right-20")} style={{ top: "75%" }}>
+            {playerTotalMight}
           </div>
         )}
 
@@ -454,19 +453,71 @@ function BattlefieldUnitRow({
   stagedMovementCardInstanceIds?: Set<string>;
 }) {
   const attachmentGroups = groupCardsByAttachment([...cards, ...attachments]);
+  const attachmentGroupsRef = useRef(attachmentGroups);
+  attachmentGroupsRef.current = attachmentGroups;
+  const rowRef = useRef<HTMLDivElement>(null);
+  const cardSignature = [...cards, ...attachments]
+    .map((card) => `${card.instanceId ?? card.name}:${Number(Boolean(card.isExhausted))}:${card.attachedToCardInstanceId ?? ""}`)
+    .join("|");
+  const [density, setDensity] = useState({ size: "lg" as CardTileSize, gap: 8 });
+
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+
+    const updateDensity = () => {
+      const availableWidth = row.clientWidth;
+      const groups = attachmentGroupsRef.current;
+      const resolveSize = (size: CardTileSize) => {
+        const cardDimensions = CARD_TILE_SIZE_CONFIG[size];
+        const groupsWidth = groups.reduce((total, group) => {
+          const hostWidth = group.host.isExhausted
+            ? cardDimensions.height
+            : cardDimensions.width;
+          const stripWidth = Math.max(24, cardDimensions.width * 0.2);
+          return total + hostWidth + group.attachments.length * stripWidth;
+        }, 0);
+        const gaps = Math.max(0, groups.length - 1);
+        return { groupsWidth, gaps };
+      };
+      const xl = resolveSize("xl");
+      const lg = resolveSize("lg");
+      const md = resolveSize("md");
+      const fits = (candidate: { groupsWidth: number; gaps: number }) =>
+        candidate.groupsWidth + candidate.gaps * 4 <= availableWidth;
+      const size = fits(xl) ? "xl" : fits(lg) ? "lg" : "md";
+      const measured = size === "xl" ? xl : size === "lg" ? lg : md;
+      const gap = measured.gaps === 0
+        ? 8
+        : Math.max(4, Math.min(8, (availableWidth - measured.groupsWidth) / measured.gaps));
+      setDensity((current) =>
+        current.size === size && Math.abs(current.gap - gap) < 0.5
+          ? current
+          : { size, gap },
+      );
+    };
+
+    updateDensity();
+    const resizeObserver = new ResizeObserver(updateDensity);
+    resizeObserver.observe(row);
+    return () => resizeObserver.disconnect();
+  }, [cardSignature]);
+
   return (
     <motion.div
       className={cn(battlefieldUnitRow({ side }), className)}
       data-zone-animation-id={zoneAnimationId}
       data-board-scroll
       layout
+      ref={rowRef}
+      style={{ columnGap: density.gap, rowGap: 6 }}
       transition={BATTLEFIELD_ROW_LAYOUT_TRANSITION}
     >
       {attachmentGroups.map(({ host: unit, attachments: attachedCards }, index) => {
         const key = unit.instanceId ?? `${unit.name}-${index}`;
         const tile = (
           <CardTile
-            size="lg"
+            size={density.size}
             enableHoverPreview
             isHighlighted={
               unit.instanceId
@@ -517,12 +568,12 @@ function BattlefieldUnitRow({
           <AttachmentCardGroup
             groupId={key}
             key={key}
-            size="lg"
+            size={density.size}
             host={hostTile}
             attachments={attachedCards.map((attachment, attachmentIndex) => ({
               id: attachment.instanceId ?? `${attachment.name}-${attachmentIndex}`,
               card: <CardTile
-                  size="lg"
+                  size={density.size}
                   enableHoverPreview
                   isHighlighted={
                     attachment.instanceId
