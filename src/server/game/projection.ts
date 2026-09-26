@@ -61,6 +61,7 @@ export function projectGame(input: {
       type: displayCardTypes(definition).join(" / "),
       supertype: card.classification.supertype,
       domains: card.classification.domain,
+      tags: card.tags,
       energy: card.attributes.energy,
       might: card.attributes.might,
       power: card.attributes.power,

@@ -47,9 +47,9 @@ export function PlayerHandFan({
 }: PlayerHandFanProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [handWidth, setHandWidth] = useState(DEFAULT_HAND_WIDTH);
-  const [viewportHeight, setViewportHeight] = useState(() =>
-    typeof window === "undefined" ? 1440 : window.innerHeight,
-  );
+  // Keep the server and first client render identical, then measure the real
+  // viewport in the existing resize effect.
+  const [viewportHeight, setViewportHeight] = useState(900);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selectionFreezeUntilRef = useRef(0);
@@ -118,6 +118,7 @@ export function PlayerHandFan({
       total: cards.length,
     });
   }, [cards.length, handWidth, viewportHeight]);
+  const handCardHeight = responsiveCardHeight(HAND_CARD_SIZE, viewportHeight);
 
   const cardTransition = {
     type: "spring" as const,
@@ -438,6 +439,10 @@ export function PlayerHandFan({
                           : false
                       }
                       showMight={false}
+                      cardDimensions={{
+                        height: handCardHeight,
+                        width: Math.round(handCardHeight * 130 / 181),
+                      }}
                       {...card}
                       size={HAND_CARD_SIZE}
                     />

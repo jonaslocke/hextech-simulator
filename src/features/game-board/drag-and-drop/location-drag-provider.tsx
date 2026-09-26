@@ -95,6 +95,7 @@ export function LocationDragProvider({
       <DndContext
         autoScroll={false}
         collisionDetection={locationDragCollisionDetection}
+        id="game-board-location-drag"
         onDragCancel={(event) => {
           onDragCancel?.(event);
           onActiveDragDataChange?.(null);

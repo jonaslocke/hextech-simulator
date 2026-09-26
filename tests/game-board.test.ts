@@ -350,7 +350,7 @@ test("game board contains no initial-deck or behavior identities", async () => {
   assert.deepEqual(forbidden.filter((value) => source.includes(value)), []);
 });
 
-test("keeps large rune rows inside a horizontally scrollable zone", async () => {
+test("renders Rune rows as a contained single-row fan", async () => {
   const playerBoard = await readFile(
     path.join(
       process.cwd(),
@@ -365,11 +365,11 @@ test("keeps large rune rows inside a horizontally scrollable zone", async () => 
 
   assert.match(
     playerBoard,
-    /cards=\{baseRunes\}[\s\S]*?layout="scroll"/,
+    /cards=\{baseRunes\}[\s\S]*?layout="fan"/,
   );
   assert.match(
     playerBoard,
-    /layout === "scroll"[\s\S]*?overflow-x-auto overflow-y-hidden/,
+    /function RuneFan[\s\S]*?resolveRuneFan[\s\S]*?overflow-hidden/,
   );
 });
 

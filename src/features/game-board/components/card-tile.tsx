@@ -21,16 +21,17 @@ import {
 } from "@/features/card-presentation";
 import { cn } from "@/shared/utils/cn";
 import { Card } from "../types";
+import { BOARD_CARD_DIMENSIONS, type BoardCardSize } from "../board-geometry";
 import { useLocationDragState } from "../drag-and-drop/location-drag-provider";
 import { routeReportCardInteraction } from "../bug-report";
 import { useReportCardSelection } from "../report-card-selection-context";
 
-const CARD_ASPECT_RATIO = 130 / 181;
 const LANDSCAPE_CARD_ASPECT_RATIO = 181 / 130;
 const LANDSCAPE_IMAGE_RATIO_THRESHOLD = 1.05;
 
-export type CardTileSize = "sm" | "md" | "lg" | "xl";
+export type CardTileSize = "sm" | BoardCardSize;
 export type CardTileOrientation = "auto" | "portrait" | "landscape";
+export type CardTileDimensions = { width: number; height: number };
 
 type ResolvedCardTileOrientation = Exclude<CardTileOrientation, "auto">;
 
@@ -44,26 +45,26 @@ export const CARD_TILE_SIZE_CONFIG: Record<
   }
 > = {
   sm: {
-    width: Math.round(96 * CARD_ASPECT_RATIO),
+    width: 69,
     height: 96,
     mightBadgeClassName: "-right-1 -top-1 h-4 min-w-4 px-1 text-[10px]",
     damageBadgeClassName: "-left-1.5 h-5 min-w-5 px-1 text-[10px]",
   },
   md: {
-    width: Math.round(120 * CARD_ASPECT_RATIO),
-    height: 120,
+    width: BOARD_CARD_DIMENSIONS.md.width,
+    height: BOARD_CARD_DIMENSIONS.md.height,
     mightBadgeClassName: "-right-1 -top-1 h-5 min-w-5 px-1 text-xs",
     damageBadgeClassName: "-left-2 h-6 min-w-6 px-1 text-xs",
   },
   lg: {
-    width: Math.round(144 * CARD_ASPECT_RATIO),
-    height: 144,
+    width: BOARD_CARD_DIMENSIONS.lg.width,
+    height: BOARD_CARD_DIMENSIONS.lg.height,
     mightBadgeClassName: "-right-1.5 -top-1.5 h-6 min-w-6 px-1.5 text-sm",
     damageBadgeClassName: "-left-2 h-7 min-w-7 px-1.5 text-sm",
   },
   xl: {
-    width: Math.round(176 * CARD_ASPECT_RATIO),
-    height: 176,
+    width: BOARD_CARD_DIMENSIONS.xl.width,
+    height: BOARD_CARD_DIMENSIONS.xl.height,
     mightBadgeClassName: "-right-2 -top-2 h-7 min-w-7 px-1.5 text-sm",
     damageBadgeClassName: "-left-2.5 h-8 min-w-8 px-1.5 text-sm",
   },
@@ -87,6 +88,7 @@ const RUNTIME_KEYWORD_ICONS: Record<string, LucideIcon> = {
 };
 
 type CardTileProps = Card & {
+  cardDimensions?: { width: number; height: number };
   enableHoverPreview?: boolean;
   enableZoneAnimation?: boolean;
   focusablePreview?: boolean;
@@ -107,6 +109,7 @@ type CardTileProps = Card & {
 
 export const CardTile: FC<CardTileProps> = ({
   attachedToCardInstanceId,
+  cardDimensions,
   domains = [],
   enableHoverPreview = false,
   enableZoneAnimation = true,
@@ -155,7 +158,7 @@ export const CardTile: FC<CardTileProps> = ({
   const sizeConfig = CARD_TILE_SIZE_CONFIG[size];
   const resolvedOrientation =
     orientation === "auto" ? autoOrientation : orientation;
-  const dimensions = getCardTileDimensions(size, resolvedOrientation);
+  const dimensions = cardDimensions ?? getCardTileDimensions(size, resolvedOrientation);
   const isRotatedExhausted = Boolean(isExhausted && !preserveOrientation);
   const isGear = Boolean(
     type?.split(" / ").includes("Gear") && !type?.split(" / ").includes("Unit"),
@@ -168,11 +171,7 @@ export const CardTile: FC<CardTileProps> = ({
 
   const footprintStyle = {
     width: isRotatedExhausted ? dimensions.height : dimensions.width,
-    height: isRotatedExhausted
-      ? resolvedOrientation === "landscape"
-        ? dimensions.width
-        : dimensions.height
-      : dimensions.height,
+    height: isRotatedExhausted ? dimensions.width : dimensions.height,
     zIndex: previewPosition ? 2147483647 : undefined,
   };
 
@@ -263,6 +262,7 @@ export const CardTile: FC<CardTileProps> = ({
         enableZoneAnimation && instanceId ? instanceId : undefined
       }
       data-card-orientation={resolvedOrientation}
+      data-card-size={size}
       className={cn(
         "relative flex justify-center items-center overflow-visible shrink-0",
         selectedCardInstanceIds?.has(instanceId ?? "") &&
@@ -335,19 +335,14 @@ export const CardTile: FC<CardTileProps> = ({
     >
       <motion.div
         data-card-face
-        animate={{
-          rotate: isExhausted && !preserveOrientation ? 90 : 0,
-          scale: isExhausted && !preserveOrientation ? 0.98 : 1,
-          y: isExhausted && !preserveOrientation ? -2 : 0,
-        }}
-        className="relative transform-gpu shrink-0"
+        animate={{ rotate: isExhausted && !preserveOrientation ? 90 : 0 }}
+        className="relative shrink-0"
         initial={false}
         ref={bodyRef}
         style={{
           height: dimensions.height,
           transformOrigin: motionOrigin,
           width: dimensions.width,
-          willChange: "transform",
         }}
         transition={CARD_ORIENTATION_TRANSITION}
       >
@@ -634,17 +629,17 @@ export function getCardTileDimensions(
   size: CardTileSize,
   orientation: ResolvedCardTileOrientation,
 ) {
-  const height = `var(--card-${size}-height, ${CARD_TILE_SIZE_CONFIG[size].height}px)`;
+  const height = CARD_TILE_SIZE_CONFIG[size].height;
   if (orientation === "landscape") {
     return {
-      height,
-      width: `calc(${height} * ${LANDSCAPE_CARD_ASPECT_RATIO})`,
+      height: Math.round(height * 130 / 181),
+      width: Math.round(height * LANDSCAPE_CARD_ASPECT_RATIO),
     };
   }
 
   return {
     height,
-    width: `calc(${height} * ${CARD_ASPECT_RATIO})`,
+    width: CARD_TILE_SIZE_CONFIG[size].width,
   };
 }
 

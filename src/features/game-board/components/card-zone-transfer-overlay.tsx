@@ -5,7 +5,7 @@ import cardBackImage from "../../../../assets/cardback.jpg";
 import { motion } from "motion/react";
 import type { Card, ZoneKind } from "../types";
 import { AttachmentCardGroup } from "./attachment-card-group";
-import { CardTile } from "./card-tile";
+import { CardTile, getCardTileDimensions, type CardTileDimensions, type CardTileSize } from "./card-tile";
 import type { LocationTransferStartRect } from "../drag-and-drop/location-drag-actions";
 import {
   boardLocationTransferNeedsDestinationRect,
@@ -31,7 +31,12 @@ export type ZoneAnimationCount = {
 export type RectSnapshot = LocationTransferStartRect;
 
 type CapturedPlacement = CardZonePlacement & {
-  rect?: RectSnapshot;
+  rect?: SizedRectSnapshot;
+};
+
+type SizedRectSnapshot = RectSnapshot & {
+  cardDimensions?: CardTileDimensions;
+  cardSize?: CardTileSize;
 };
 
 export type CardZoneAnimationSnapshot = {
@@ -52,14 +57,16 @@ type TransferAnimation = {
   attachments: Card[];
   card: Card;
   flipToBack: boolean;
-  from: RectSnapshot;
+  from: SizedRectSnapshot;
   fromRotation: number;
   id: string;
   index: number;
   isBoardLocationTransfer: boolean;
   isVisibleDestination: boolean;
+  presentationDimensions?: CardTileDimensions;
+  presentationSize: CardTileSize;
   sourceReservation?: CardZoneSourceReservation;
-  to: RectSnapshot;
+  to: SizedRectSnapshot;
   toRotation: number;
 };
 
@@ -265,6 +272,11 @@ export function CardZoneTransferOverlay({
               zoneId: previousPlacement.zoneId,
             }
           : undefined;
+      const presentationSize = previousPlacement.rect?.cardSize ?? nextPlacement?.rect?.cardSize;
+      const presentationDimensions = previousPlacement.rect?.cardDimensions ?? nextPlacement?.rect?.cardDimensions;
+      if (!presentationSize) {
+        continue;
+      }
 
       nextTransfers.push({
         attachments:
@@ -277,6 +289,8 @@ export function CardZoneTransferOverlay({
         index: nextTransfers.length,
         isBoardLocationTransfer,
         isVisibleDestination: Boolean(nextPlacement?.rect),
+        presentationDimensions,
+        presentationSize,
         sourceReservation,
         to: destinationRect,
         toRotation: nextPlacement?.card.isExhausted ? 90 : 0,
@@ -387,13 +401,15 @@ function TransferCard({
   const delay = transfer.isBoardLocationTransfer ? 0 : transfer.index * 0.045;
   const renderAttachmentGroup =
     transfer.isVisibleDestination && transfer.attachments.length > 0;
+  const cardDimensions = transfer.presentationDimensions ?? getCardTileDimensions(transfer.presentationSize, "portrait");
+  const width = renderAttachmentGroup ? transfer.from.width : cardDimensions.width;
+  const height = renderAttachmentGroup ? transfer.from.height : cardDimensions.height;
 
   return (
     <motion.div
       animate={{
-        opacity: transfer.isVisibleDestination ? 1 : 0,
+        opacity: transfer.isVisibleDestination ? [1, 1, 0] : 0,
         rotate: renderAttachmentGroup ? 0 : transfer.toRotation,
-        scale: target.scale,
         x: target.x,
         y: target.y,
       }}
@@ -401,23 +417,25 @@ function TransferCard({
       initial={{
         opacity: 1,
         rotate: renderAttachmentGroup ? 0 : transfer.fromRotation,
-        scale: 1,
         x: 0,
         y: 0,
       }}
       onAnimationComplete={onComplete}
       style={{
-        height: transfer.from.height,
-        left: transfer.from.left,
-        top: transfer.from.top,
+        height,
+        left: transfer.from.left + transfer.from.width / 2 - width / 2,
+        top: transfer.from.top + transfer.from.height / 2 - height / 2,
         transformOrigin: "center center",
-        width: transfer.from.width,
+        width,
         willChange: "transform, opacity",
       }}
       transition={{
         delay,
         duration: transfer.isVisibleDestination ? 0.42 : 0.48,
         ease: [0.16, 1, 0.3, 1],
+        opacity: transfer.isVisibleDestination
+          ? { duration: 0.42, ease: "linear", times: [0, 0.88, 1] }
+          : undefined,
       }}
     >
       {renderAttachmentGroup ? (
@@ -454,6 +472,8 @@ function TransferAttachmentGroup({
         focusablePreview={false}
         preserveOrientation
         showMight
+        cardDimensions={transfer.presentationDimensions}
+        size={transfer.presentationSize}
         {...transfer.card}
       />
     </motion.div>
@@ -469,11 +489,16 @@ function TransferAttachmentGroup({
             enableZoneAnimation={false}
             focusablePreview={false}
             showMight
+            cardDimensions={transfer.presentationDimensions}
+            size={transfer.presentationSize}
             {...attachment}
           />
         ),
       }))}
       groupId={groupId}
+      dimensions={transfer.presentationDimensions}
+      hostExhausted={Boolean(transfer.card.isExhausted)}
+      size={transfer.presentationSize}
       host={host}
     />
   );
@@ -501,14 +526,18 @@ function TransferCardFaces({
         ease: [0.16, 1, 0.3, 1],
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders existing card art. */}
-      <img
-        alt=""
-        className="block absolute inset-0 rounded-md w-full h-full object-cover"
-        draggable={false}
-        src={transfer.card.img}
-        style={{ backfaceVisibility: "hidden" }}
-      />
+      <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
+        <CardTile
+          enableHoverPreview={false}
+          enableZoneAnimation={false}
+          focusablePreview={false}
+          preserveOrientation
+          showMight
+          cardDimensions={transfer.presentationDimensions}
+          size={transfer.presentationSize}
+          {...transfer.card}
+        />
+      </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- Transfer overlay renders the local card back asset. */}
       <img
         alt=""
@@ -543,7 +572,7 @@ function capturePlacements(placements: CardZonePlacement[]) {
   return captured;
 }
 
-function readPlacementRect(placement: CardZonePlacement) {
+function readPlacementRect(placement: CardZonePlacement): SizedRectSnapshot | undefined {
   const cardInstanceId = placement.card.instanceId;
   if (!cardInstanceId) {
     return undefined;
@@ -572,11 +601,32 @@ function readPlacementRect(placement: CardZonePlacement) {
   if ((placement.attachments?.length ?? 0) > 0) {
     const group = element.closest<HTMLElement>("[data-attachment-group-id]");
     if (group?.dataset.attachmentGroupId === cardInstanceId) {
-      return toSnapshot(group.getBoundingClientRect());
+      return {
+        ...toSnapshot(group.getBoundingClientRect()),
+        cardDimensions: cardTileDimensions(element),
+        cardSize: cardTileSize(group.dataset.cardSize),
+      };
     }
   }
 
-  return toSnapshot(element.getBoundingClientRect());
+  return {
+    ...toSnapshot(element.getBoundingClientRect()),
+    cardDimensions: cardTileDimensions(element),
+    cardSize: cardTileSize(element.dataset.cardSize),
+  };
+}
+
+function cardTileDimensions(element: HTMLElement): CardTileDimensions | undefined {
+  const face = element.querySelector<HTMLElement>("[data-card-face]");
+  const width = Number.parseFloat(face?.style.width ?? "");
+  const height = Number.parseFloat(face?.style.height ?? "");
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { width, height }
+    : undefined;
+}
+
+function cardTileSize(value: string | undefined): CardTileSize | undefined {
+  return value === "sm" || value === "md" || value === "lg" || value === "xl" ? value : undefined;
 }
 
 function readZoneRect(zoneId: string) {
@@ -658,25 +708,12 @@ function targetGeometry(transfer: TransferAnimation) {
 
   if (transfer.isVisibleDestination) {
     return {
-      scale: Math.min(
-        transfer.to.width / transfer.from.width,
-        transfer.to.height / transfer.from.height,
-      ),
       x: toCenterX - fromCenterX,
       y: toCenterY - fromCenterY,
     };
   }
 
-  const scale = Math.min(
-    0.72,
-    Math.max(
-      0.38,
-      Math.min(transfer.to.width, transfer.to.height) / transfer.from.width,
-    ),
-  );
-
   return {
-    scale,
     x: toCenterX - fromCenterX,
     y: toCenterY - fromCenterY,
   };
