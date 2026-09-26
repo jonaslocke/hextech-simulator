@@ -151,6 +151,62 @@ test("Hide asks the player to add Power and spends only the selected pooled reso
   assert.equal(afterHide.state.battlefields[0]!.facedownCardInstanceId, cardId);
 });
 
+test("Hide remains preparable when Power requires an explicit ready-Rune recycle", async () => {
+  const { game, decks, cardId } = await hiddenGearFixture();
+  game.state.players.p1!.power = {};
+
+  const sourceId = "p1:hidden-recycle-source";
+  const source = structuredClone(decks[0]!.snapshot.cards.find((definition) => definition.cardCode === "OGN-077")!);
+  source.cardCode = "Hidden recycle source";
+  source.card.id = source.cardCode;
+  source.card.name = source.cardCode;
+  source.card.public_code = "TEST-HIDDEN-RECYCLE/1";
+  source.card.classification.type = "Rune";
+  source.card.classification.supertype = "Basic";
+  source.card.classification.domain = ["Mind"];
+  source.behaviorModel = {
+    playTimings: [],
+    clauses: [{
+      id: "add-power", sequence: 0, sourceText: "", normalizedText: "",
+      abilities: [{ behaviorId: "ability.recycle_for_power", order: 0, confidence: "high", parameters: { amount: 1, domain: "sourceDomain", usage: "unrestricted" } }],
+      triggers: [], conditions: [], selectors: [], choices: [], costs: [], timings: [], effects: [], keywords: [],
+    }],
+  };
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({ instanceId: sourceId, ownerPlayerId: "p1", source: "runeDeck", cardCode: source.cardCode });
+  game.state.cardStates[sourceId] = { exhausted: false, damage: 0, computedMight: null, objectVersion: 0 };
+  game.state.players.p1!.zones.base.push(sourceId);
+
+  const hideBeforeAddingPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "),
+  );
+  assert.ok(hideBeforeAddingPower?.enabled, "a legal explicit Recycle for Power action makes Hide preparable");
+  assert.equal(hideBeforeAddingPower.poolPayment?.canPay, false, "the Power is not in the Rune Pool yet");
+  assert.equal(createCardPaymentPreparation(hideBeforeAddingPower)?.targetKind, "payment");
+  assert.equal(game.state.players.p1!.zones.base.includes(sourceId), true, "projection does not auto-recycle the ready Rune");
+  assert.throws(
+    () => performGameplayAction({ game, actorPlayerId: "p1", actionId: hideBeforeAddingPower.id, selectedIds: [], decks, now: "hidden-unfunded-recycle" }),
+    /Add enough resources/,
+    "Hide still requires explicit Power preparation",
+  );
+
+  const addPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === sourceId && action.label.startsWith("Add Power"),
+  );
+  assert.ok(addPower?.enabled);
+  const afterAdd = performGameplayAction({ game, actorPlayerId: "p1", actionId: addPower.id, selectedIds: [], decks, now: "hidden-recycle-add-power" });
+  assert.equal(afterAdd.state.players.p1!.power.Mind, 1);
+  assert.equal(afterAdd.state.players.p1!.zones.base.includes(sourceId), false, "the Rune is recycled only by the explicit Add action");
+
+  const hideAfterAddingPower = gameplayActions(afterAdd, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "),
+  );
+  assert.ok(hideAfterAddingPower?.enabled);
+  const afterHide = performGameplayAction({ game: afterAdd, actorPlayerId: "p1", actionId: hideAfterAddingPower.id, selectedIds: [], decks, now: "hidden-confirm-recycle-hide" });
+  assert.equal(afterHide.state.players.p1!.power.Mind, 0);
+  assert.equal(afterHide.state.battlefields[0]!.facedownCardInstanceId, cardId);
+});
+
 test("Hide pays any-domain Power, keeps the card private, and does not open the Chain", async () => {
   const { game, decks, cardId } = await hiddenGearFixture();
   const hide = gameplayActions(game, "p1", decks).find((action) => action.sourceCardInstanceId === cardId && action.label.startsWith("Hide "));

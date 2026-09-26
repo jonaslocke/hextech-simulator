@@ -50,6 +50,7 @@ type PaymentRequest = {
   context: PaymentContext;
   additionalAnyPower: number;
   poolOnly?: boolean;
+  allowReadyRuneRecycling?: boolean;
 };
 
 export function payAnyPowerAdditionalCost(
@@ -110,7 +111,7 @@ export function buildAnyPowerPaymentPlan(
   playerId: string,
   definition: GameCardDefinition,
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; allowReadyRuneRecycling?: boolean } = {},
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   const domains = anyPowerDomains(player, index);
@@ -121,6 +122,7 @@ export function buildAnyPowerPaymentPlan(
     context: { kind: "hide" },
     additionalAnyPower: 0,
     poolOnly: options.poolOnly,
+    allowReadyRuneRecycling: options.allowReadyRuneRecycling,
   });
 }
 
@@ -136,8 +138,10 @@ function anyPowerDomains(player: GameDocument["state"]["players"][string], index
   );
 }
 
-export function canPayAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
-  return buildAnyPowerPaymentPlan(game, playerId, definition, index) !== null;
+/** A Hide action may be prepared by explicitly recycling a ready Rune first.
+ * This is projection eligibility only; actual Hide payment remains pool-only. */
+export function canPrepareAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
+  return buildAnyPowerPaymentPlan(game, playerId, definition, index, { allowReadyRuneRecycling: true }) !== null;
 }
 
 export function anyPowerPoolPaymentPreview(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
@@ -328,7 +332,12 @@ function buildPaymentPlanForRequest(
         runeState: game.state.cardStates[id]?.exhausted ? "exhausted" : result.energySourceIds.includes(id) ? "exhausted-by-plan" : "ready" });
     }
     let remainingPower = request.powerCost;
-    for (const source of orderPaymentCandidates(candidates.filter((candidate) => candidateIsEligible(candidate, request.context, request.allowedPowerDomains)))) {
+    for (const source of orderPaymentCandidates(candidates.filter((candidate) => candidateIsEligible(
+      candidate,
+      request.context,
+      request.allowedPowerDomains,
+      { allowReadyRuneRecycling: request.allowReadyRuneRecycling },
+    )))) {
       if (remainingPower === 0) break;
       const spend = Math.min(source.amount, remainingPower);
       if (source.acquisition === "pool") recordPoolSpend(result, source, spend);

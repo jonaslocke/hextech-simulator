@@ -13,9 +13,15 @@ export type PaymentCandidate = {
   pool?: "ordinary" | "conditional" | "restricted";
 };
 
-export function candidateIsEligible(candidate: PaymentCandidate, context: PaymentContext, domains?: readonly string[]) {
+export function candidateIsEligible(
+  candidate: PaymentCandidate,
+  context: PaymentContext,
+  domains?: readonly string[],
+  options: { allowReadyRuneRecycling?: boolean } = {},
+) {
   return candidate.amount > 0 && restrictionAllowsPayment(candidate.restriction, context) &&
-    (candidate.acquisition !== "recycle" || candidate.runeState === "exhausted" || candidate.runeState === "exhausted-by-plan") &&
+    (candidate.acquisition !== "recycle" || options.allowReadyRuneRecycling ||
+      candidate.runeState === "exhausted" || candidate.runeState === "exhausted-by-plan") &&
     (candidate.kind !== "power" || domains === undefined || candidate.domain === "Rainbow" || domains.includes(candidate.domain!));
 }
 

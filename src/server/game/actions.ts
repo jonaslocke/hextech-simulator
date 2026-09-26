@@ -65,7 +65,7 @@ import {
   type GameTransition,
 } from "./transitions";
 import {
-  canPayAnyPowerCost,
+  canPrepareAnyPowerCost,
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
   anyPowerPoolPaymentPreview,
@@ -1292,7 +1292,7 @@ function addHiddenCardActions(
     for (const cardId of [...player.zones.hand, ...(player.zones.champion ? [player.zones.champion] : [])]) {
       if (!hasEffectiveKeyword(game, cardId, "keyword.hidden", index)) continue;
       const definition = definitionForInstance(cardId, index);
-      const canPay = canPayAnyPowerCost(game, playerId, definition, index);
+      const canPrepare = canPrepareAnyPowerCost(game, playerId, definition, index);
       for (const battlefield of availableBattlefields) {
         const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
         const hideAction = action(
@@ -1300,8 +1300,8 @@ function addHiddenCardActions(
           "hide",
           `Hide at ${battlefieldName}`,
           cardId,
-          canPay,
-          canPay ? null : "A Power rune is required to hide this card.",
+          canPrepare,
+          canPrepare ? null : "A Power rune is required to hide this card.",
           battlefield.battlefieldId,
         );
         hideAction.presentation.resourceCost = {
