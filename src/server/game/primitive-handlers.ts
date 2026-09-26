@@ -10,6 +10,7 @@ import {
 import type { DeckSnapshotDocument } from "./repositories";
 import type { BehaviorBinding, GameCardDefinition } from "./schemas";
 import type { CardInstance, GameDocument } from "./state";
+import type { Card } from "../catalog";
 import { createHash } from "node:crypto";
 import {
   effectiveNumericValue,
@@ -33,6 +34,7 @@ import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 export type RuntimeCardIndex = {
   definitions: Map<string, GameCardDefinition>;
   instances: Map<string, CardInstance>;
+  tokenCards?: Card[];
 };
 
 export function createRuntimeCardIndex(
@@ -56,6 +58,9 @@ export function createRuntimeCardIndex(
         (item) => [item.instanceId, item] as const,
       )),
     ]),
+    tokenCards: [...new Map(decks.flatMap((deck) =>
+      (deck.snapshot.tokenCards ?? []).map((card) => [card.public_code, card] as const),
+    )).values()],
   };
 }
 
@@ -2165,22 +2170,45 @@ function findOrCreateTokenDefinition(
   tokenName: string,
   index: RuntimeCardIndex,
 ): GameCardDefinition {
-  const tokenIdentity = tokenIdentityFromName(tokenName);
+  const parsedIdentity = tokenIdentityFromName(tokenName);
   const existing = [...index.definitions.values()].find(
     (definition) =>
       definition.card.classification.supertype === "Token" &&
-      (definition.card.name === tokenIdentity.name ||
-        definition.card.name.startsWith(`${tokenIdentity.name} (`)),
+      tokenNameMatchesCardName(tokenName, definition.card.name),
   );
   if (existing) return existing;
+
+  const sourceToken = (index.tokenCards ?? []).find(
+    (card) => {
+      if (
+        card.classification.supertype !== "Token" ||
+        (card.classification.type !== "Unit" && card.classification.type !== "Gear")
+      ) return false;
+      return tokenNameMatchesCardName(tokenName, card.name);
+    },
+  );
+  const tokenIdentity = sourceToken
+    ? {
+        ...parsedIdentity,
+        name: sourceToken.name,
+        might: sourceToken.attributes.might,
+        type: sourceToken.classification.type as "Unit" | "Gear",
+        imageUrl: sourceToken.media.image_url ?? null,
+        tags: sourceToken.tags,
+        temporary:
+          parsedIdentity.temporary || /\[Temporary(?:\s+\d+)?\]/i.test(sourceToken.text.plain),
+        deflect:
+          parsedIdentity.deflect || /\[Deflect(?:\s+\d+)?\]/i.test(sourceToken.text.plain),
+      }
+    : parsedIdentity;
   const normalized = tokenIdentity.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const cardCode = `TOKEN-${normalized}`;
+  const cardCode = sourceToken?.public_code ?? `TOKEN-${normalized}`;
   const existingGenerated = index.definitions.get(cardCode);
   if (existingGenerated) return existingGenerated;
   const definition: GameCardDefinition = {
     cardCode,
     sourceTextHash: `generated:${normalized}`,
-    card: {
+    card: sourceToken ?? {
       id: cardCode,
       name: tokenIdentity.name,
       public_code: cardCode,
@@ -2275,6 +2303,13 @@ function findOrCreateTokenDefinition(
   (game.state.createdCardDefinitions ??= []).push(definition);
   index.definitions.set(cardCode, definition);
   return definition;
+}
+
+function tokenNameMatchesCardName(tokenName: string, cardName: string): boolean {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const requestedName = normalize(tokenName);
+  const catalogName = normalize(cardName);
+  return requestedName === catalogName || ` ${requestedName} `.includes(` ${catalogName} `);
 }
 
 function tokenIdentityFromName(tokenName: string): {

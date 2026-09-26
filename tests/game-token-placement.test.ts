@@ -234,6 +234,52 @@ test("token media from a catalog definition reaches the projected battlefield ca
   assert.equal(projected?.imageUrl, "https://assets.example.test/catalogued-token.png");
 });
 
+test("source token metadata supplies media and printed keywords to generated tokens", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("play-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "1 :rb_might: Scout unit token with Deflect",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const sourceToken = unit("TST-T01", "Scout", []).card;
+  sourceToken.public_code = "TST-T01";
+  sourceToken.classification.supertype = "Token";
+  sourceToken.tags = ["Scout"];
+  sourceToken.text.plain = "[Deflect]";
+  sourceToken.media.image_url = "https://assets.example.test/scout-token.png";
+  const { game, decks } = fixture([source]);
+  decks[0]!.snapshot.tokenCards = [sourceToken];
+  decks[1]!.snapshot.tokenCards = [sourceToken];
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-token",
+    decks,
+  }), true);
+
+  const tokenInstanceId = game.state.createdCardInstances?.[0]?.instanceId;
+  const definition = game.state.createdCardDefinitions?.[0];
+  assert.ok(tokenInstanceId);
+  assert.equal(definition?.cardCode, "TST-T01");
+  assert.deepEqual(definition?.card.tags, ["Scout"]);
+  assert.ok(definition?.behaviorModel.clauses.some((clause) =>
+    clause.keywords.some((keyword) => keyword.behaviorId === "keyword.deflect"),
+  ));
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .players.find((player) => player.playerId === "p1")
+    ?.zones.find((zone) => zone.kind === "base")?.cards
+    .find((card) => card.instanceId === tokenInstanceId);
+  assert.equal(projected?.imageUrl, "https://assets.example.test/scout-token.png");
+});
+
 test("non-Unit token creation preserves the absence of Might", () => {
   const source = unit("SOURCE", "Token Creator", [
     clause("gear-token", {

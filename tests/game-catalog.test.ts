@@ -66,6 +66,34 @@ test("snapshot resolution does not impose a fixture-specific unique-card minimum
   assert.equal(snapshot.cards.length, 1);
 });
 
+test("deck snapshots carry source-corpus Token printings separately from deck cards", async () => {
+  const fixture = await buildFixture();
+  const sourceToken = structuredClone(fixture.localCatalog.cards.find(
+    (card) => card.classification.type === "Unit" && card.classification.supertype === null,
+  )!);
+  sourceToken.id = "synthetic-token";
+  sourceToken.name = "Scout";
+  sourceToken.public_code = "TST-T01";
+  sourceToken.classification.type = "Unit";
+  sourceToken.classification.supertype = "Token";
+  sourceToken.media.image_url = "https://assets.example.test/scout-token.png";
+  const sourceCatalog = {
+    cards: [...fixture.localCatalog.cards, sourceToken],
+    byName: fixture.localCatalog.byName,
+    canonicalByName: fixture.localCatalog.canonicalByName,
+  };
+
+  const snapshot = buildDeckSnapshot(
+    fixture.sourceText,
+    fixture.documents,
+    fixture.definitions,
+    sourceCatalog,
+  );
+
+  assert.ok(snapshot.tokenCards?.some((card) => card.public_code === "TST-T01"));
+  assert.equal(snapshot.cards.some((definition) => definition.cardCode === "TST-T01"), false);
+});
+
 async function buildFixture() {
   const sourceText = await readFile("data/decks/lux.dec.txt", "utf8");
   const localCatalog = await loadCardCatalog();
@@ -98,5 +126,5 @@ async function buildFixture() {
   const definitions = behaviorCatalog.map((entry) =>
     buildBehaviorDefinitionDocument(entry, "2026-01-01T00:00:00.000Z")
   );
-  return { sourceText, documents, definitions };
+  return { sourceText, documents, definitions, localCatalog };
 }
