@@ -437,13 +437,12 @@ export function buildPlayerDecisionRequest({
           action.id.split(":")[3] === "play",
       )
       .map((action) => {
-        const description = effectPlayOptionDescription(action);
         return {
           actionId: action.id,
           id: action.id,
           kind: "play" as const,
           label: action.label,
-          ...(description ? { description } : {}),
+          ...effectPlayOptionPresentation(action),
         };
       });
     const continuation = sourceProjection.actions.find(
@@ -477,19 +476,15 @@ export function buildPlayerDecisionRequest({
   return null;
 }
 
-function effectPlayOptionDescription(
+function effectPlayOptionPresentation(
   action: GameProjection["actions"][number],
 ) {
   const presentation = action.presentation.playCost;
-  const details: string[] = [];
+  const details: { description?: string; resourceCost?: { energy: number; powerCosts: Array<{ amount: number; domains: string[] }> } } = {};
   if (presentation?.declarationLabel) {
-    details.push(presentation.declarationLabel);
+    details.description = presentation.declarationLabel;
   }
   if (presentation?.showCost && action.costPreview) {
-    const costs: string[] = [];
-    if (action.costPreview.energy > 0) {
-      costs.push(`${action.costPreview.energy} Energy`);
-    }
     const powerCosts = action.poolPayment?.powerCosts ?? (
       action.costPreview.effectivePower > 0
         ? [{
@@ -498,16 +493,14 @@ function effectPlayOptionDescription(
           }]
         : []
     );
-    for (const powerCost of powerCosts) {
-      if (powerCost.amount === 0) continue;
-      const domains = powerCost.domains
-        .map((domain) => `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`)
-        .join("/");
-      costs.push(`${powerCost.amount}${domains ? ` ${domains}` : ""} Power`);
+    if (action.costPreview.energy > 0 || powerCosts.some((cost) => cost.amount > 0)) {
+      details.resourceCost = {
+        energy: action.costPreview.energy,
+        powerCosts,
+      };
     }
-    if (costs.length > 0) details.push(`Cost: ${costs.join(" + ")}`);
   }
-  return details.length > 0 ? details.join(" · ") : undefined;
+  return details;
 }
 
 function mapActiveCardDecision({

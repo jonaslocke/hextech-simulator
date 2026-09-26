@@ -512,7 +512,11 @@ test("maps a staged effect play to an explicit decision using only projected pla
         actionId: "game:1:action:play:base:staged-unit:optional",
         id: "game:1:action:play:base:staged-unit:optional",
         label: "Play Test Unit to Base",
-        description: "Pay the optional cost · Cost: 2 Energy + 1 Calm Power",
+        description: "Pay the optional cost",
+        resourceCost: {
+          energy: 2,
+          powerCosts: [{ amount: 1, domains: ["Calm"] }],
+        },
         kind: "play",
       },
       {

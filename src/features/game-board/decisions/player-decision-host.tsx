@@ -5,6 +5,7 @@ import { DecisionInspectionTrigger } from "../components/decision-inspection-tri
 import { CardSelectionPrompt } from "./card-selection-prompt";
 import { CombatDamagePrompt } from "./combat-damage-prompt";
 import { OptionDecisionPrompt } from "./option-decision-prompt";
+import { ResourceCost } from "../components/resource-cost";
 import { OrderedDecisionPrompt } from "./ordered-decision-prompt";
 import { PendingDecisionStatus } from "./pending-decision-status";
 import { TokenPlacementPrompt } from "./token-placement-prompt";
@@ -146,7 +147,17 @@ export function PlayerDecisionHost({
             options: decision.options.map((option) => ({
               id: option.id,
               label: option.label,
-              description: option.description,
+              description: option.resourceCost ? (
+                <>
+                  {option.description && <>{option.description} · </>}
+                  <span className="inline-flex items-center gap-1">
+                    Cost: <ResourceCost
+                      energy={option.resourceCost.energy}
+                      powerCosts={option.resourceCost.powerCosts}
+                    />
+                  </span>
+                </>
+              ) : option.description,
             })),
             revealedCards: [decision.stagedCard],
             title: "Play a card from this effect?",

@@ -18,7 +18,8 @@ export type PlayerDecisionCard = {
   disabled?: boolean;
 };
 
-export type PlayerDecisionOption = PlayerDecisionCard & {
+export type PlayerDecisionOption = Omit<PlayerDecisionCard, "description"> & {
+  description?: ReactNode;
   imageOrientation?: "auto" | "portrait" | "landscape";
 };
 
@@ -111,6 +112,7 @@ export type EffectPlayDecisionRequest = DecisionInspectionCapability & {
     kind: "play" | "decline" | "continue";
     label: string;
     description?: string;
+    resourceCost?: { energy: number; powerCosts: Array<{ amount: number; domains: string[] }> };
   }>;
 };
 
