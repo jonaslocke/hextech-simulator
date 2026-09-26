@@ -20,12 +20,18 @@ export const projectedTargetRequirementSchema = z
     kind: z.enum(["card", "battlefield", "location", "player", "chainItem"]),
     label: z.string().min(1).optional(),
     selectionKey: z.string().min(1).optional(),
+    // A play declaration can contain independent target selections for more
+    // than one execution. Each group remains a separate server-issued slot.
+    selectionGroup: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
-    sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+    sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).optional(),
     // A later location choice can be constrained by an earlier selected
     // object (for example, a unit's legal move destinations).
     legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
     optionLabels: z.record(z.string().min(1)).optional(),
+    maximumPerLocation: z.number().int().positive().optional(),
+    mustShareLocation: z.boolean().optional(),
+    locationKeysById: z.record(z.string().min(1)).optional(),
     legalIds: z.array(z.string().min(1)),
     minimum: z.number().int().nonnegative(),
     maximum: z.number().int().nonnegative(),
@@ -33,6 +39,73 @@ export const projectedTargetRequirementSchema = z
   .refine((value) => value.minimum <= value.maximum, {
     message: "Target minimum cannot exceed maximum.",
   });
+
+type TargetSelectionConstraint = {
+  legalIds: readonly string[];
+  minimum: number;
+  maximum: number;
+  maximumPerLocation?: number;
+  mustShareLocation?: boolean;
+  locationKeysById?: Readonly<Record<string, string>>;
+};
+
+export function targetSelectionSatisfiesRequirements(
+  requirements: readonly TargetSelectionConstraint[],
+  selectedIds: readonly string[],
+): boolean {
+  if (requirements.length === 0) return selectedIds.length === 0;
+  const legalIds = new Set(requirements.flatMap((requirement) => [...requirement.legalIds]));
+  const minimum = requirements.reduce((sum, requirement) => sum + requirement.minimum, 0);
+  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
+  return selectedIds.length >= minimum &&
+    selectedIds.length <= maximum &&
+    new Set(selectedIds).size === selectedIds.length &&
+    selectedIds.every((id) => legalIds.has(id)) &&
+    requirements.every((requirement) => {
+      const selected = selectedIds.filter((id) => requirement.legalIds.includes(id));
+      if (selected.length < requirement.minimum || selected.length > requirement.maximum) return false;
+      const locations = selected.map((id) => requirement.locationKeysById?.[id]);
+      if (requirement.maximumPerLocation !== undefined) {
+        if (locations.some((location) => location === undefined)) return false;
+        const countByLocation = new Map<string, number>();
+        for (const location of locations as string[]) {
+          const count = (countByLocation.get(location) ?? 0) + 1;
+          if (count > requirement.maximumPerLocation) return false;
+          countByLocation.set(location, count);
+        }
+      }
+      return !requirement.mustShareLocation ||
+        new Set(locations).size <= 1;
+    });
+}
+
+export function targetSelectionCanAddToRequirements(
+  requirements: readonly TargetSelectionConstraint[],
+  selectedIds: readonly string[],
+  candidateId: string,
+): boolean {
+  if (
+    selectedIds.includes(candidateId) ||
+    !requirements.some((requirement) => requirement.legalIds.includes(candidateId))
+  ) return false;
+  const proposed = [...selectedIds, candidateId];
+  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
+  return proposed.length <= maximum && requirements.every((requirement) => {
+    const selected = proposed.filter((id) => requirement.legalIds.includes(id));
+    if (selected.length > requirement.maximum) return false;
+    const locations = selected.map((id) => requirement.locationKeysById?.[id]);
+    if (requirement.maximumPerLocation !== undefined) {
+      if (locations.some((location) => location === undefined)) return false;
+      const countByLocation = new Map<string, number>();
+      for (const location of locations as string[]) {
+        const count = (countByLocation.get(location) ?? 0) + 1;
+        if (count > requirement.maximumPerLocation) return false;
+        countByLocation.set(location, count);
+      }
+    }
+    return !requirement.mustShareLocation || new Set(locations).size <= 1;
+  });
+}
 
 export const projectedActionSchema = z.object({
   id: z.string().min(1),
@@ -62,6 +135,7 @@ export const projectedActionSchema = z.object({
       targetAdditionalPower: z.array(
         z.object({
           targetId: z.string().min(1),
+          selectionGroup: z.string().min(1).optional(),
           amount: z.number().int().positive(),
         }),
       ),
@@ -116,6 +190,11 @@ export const projectedActionSchema = z.object({
     .nullable()
     .optional(),
   presentation: z.object({
+    resourceOutput: z.object({
+      energy: z.number().int().nonnegative(),
+      power: z.number().int().nonnegative(),
+      powerDomains: z.array(z.string().min(1)),
+    }).optional(),
     resourceCost: z.object({
       energy: z.number().int().nonnegative(),
       powerCosts: z.array(z.object({
@@ -127,6 +206,7 @@ export const projectedActionSchema = z.object({
       label: z.string(),
       destinationLabel: z.string().optional(),
       paymentMode: z.enum(["standard", "additional-cost"]).optional(),
+      declarationLabel: z.string().optional(),
       showCost: z.boolean(),
       modifierSources: z.array(z.string()),
     }).optional(),
@@ -158,6 +238,7 @@ export const gameActionIntentSchema = z.object({
   payload: z.object({
     actionId: z.string().min(1),
     selectedIds: z.array(z.string().min(1)).default([]),
+    targetSelections: z.record(z.array(z.string().min(1))).default({}),
     allocations: z
       .array(
         z.object({
@@ -195,6 +276,7 @@ export const deckIdSchema = z.enum([
   "master-yi-s",
   "garen-s",
   "ornn",
+  "jayce",
   "ornn-hidden-test",
 ]);
 export type DeckId = z.infer<typeof deckIdSchema>;
@@ -304,6 +386,7 @@ export const projectedChainItemSchema = z.object({
   controllerPlayerId: z.string().min(1),
   sourceCardInstanceId: z.string().min(1).nullable(),
   targetCardInstanceIds: z.array(z.string().min(1)),
+  targetCardInstanceIdGroups: z.array(z.array(z.string().min(1))).optional(),
   kind: z.enum(["spell", "ability", "trigger", "unit"]),
   card: projectedCardViewSchema.nullable(),
 });
@@ -360,6 +443,11 @@ export const gameProjectionSchema = z.object({
       passedPlayerIds: z.array(z.string().min(1)),
     })
     .nullable(),
+  effectPlayDecision: z.object({
+    playerId: z.string().min(1),
+    stagedCardInstanceId: z.string().min(1).nullable(),
+    canDecline: z.boolean(),
+  }).nullable().optional(),
   showdown: z
     .object({
       kind: z.enum(["nonCombat", "combat"]),
@@ -411,7 +499,7 @@ export const gameProjectionSchema = z.object({
         prompt: z.string().min(1),
         title: z.string().min(1),
         waitingMessage: z.string().min(1),
-        sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
+        sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).nullable(),
         presentation: z.enum(["cardSelection", "vision"]),
         revealedCards: z.array(projectedCardViewSchema),
         visibleCards: z.array(projectedCardViewSchema).default([]).optional(),

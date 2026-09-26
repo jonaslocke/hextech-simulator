@@ -15,6 +15,8 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { ChainItem, GameDocument } from "./state";
 import { beginEffectResolution } from "./effect-resolution";
 import { behaviorModelForChainItem, behaviorModelForRuntimeCard } from "./runtime-behaviors";
+import { targetSelectionSatisfiesRequirements } from "../../shared/game";
+import { ignoresDeflect, payAnyPowerAdditionalCost, targetDeflectCost } from "./payment";
 
 export function dispatchBehaviorEvent(
   game: GameDocument,
@@ -145,6 +147,13 @@ export function queueChainItemsForTargets(
   const queuedItems = options.chainOrigin
     ? items.map((item) => ({ ...item, chainOrigin: options.chainOrigin }))
     : items;
+  if (game.state.effectPlayQueue?.some((entry) => entry.deferTriggeredItems)) {
+    game.state.deferredChainItems = [
+      ...(game.state.deferredChainItems ?? []),
+      ...queuedItems,
+    ];
+    return;
+  }
   if (!options.preserveOrder && queuedItems.length > 1) {
     const controllerPlayerId = queuedItems[0]?.controllerPlayerId;
     if (controllerPlayerId) {
@@ -180,40 +189,50 @@ export function submitChainTargetSelection(
     throw new Error("Chain target selection is not available.");
   }
   const requirements = pending.targetRequirements ?? [];
-  const legal = new Set(requirements.flatMap((target) => target.legalIds));
-  const minimum = requirements.reduce(
-    (sum, target) => sum + target.minimum,
-    0,
-  );
-  const maximum = requirements.reduce(
-    (sum, target) => sum + target.maximum,
-    0,
-  );
-  if (
-    selectedIds.length < minimum ||
-    selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    requirements.some((target) => {
-      const selectedForTarget = selectedIds.filter((id) =>
-        target.legalIds.includes(id),
-      ).length;
-      return (
-        selectedForTarget < target.minimum ||
-        selectedForTarget > target.maximum
-      );
-    })
-  ) {
+  if (!targetSelectionSatisfiesRequirements(requirements, selectedIds)) {
     throw new Error("Selected chain targets are not legal.");
   }
   const item = pending.chainItem;
-  item.targetCardInstanceIds = [...selectedIds];
-  item.targetObjectVersions = Object.fromEntries(
+  if (item.sourceCardInstanceId) {
+    const index = createRuntimeCardIndex(decks, game);
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const deflectTargets = requirements
+      .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+      .flatMap((requirement) =>
+        selectedIds.filter((id) => requirement.legalIds.includes(id)),
+      );
+    const cost = targetDeflectCost(
+      playerId,
+      deflectTargets,
+      index,
+      game,
+      ignoresDeflect(definition),
+    );
+    payAnyPowerAdditionalCost(
+      game,
+      playerId,
+      definition,
+      cost,
+      item.kind === "spell"
+        ? { kind: "card", cardType: definition.card.classification.type }
+        : { kind: "ability", sourceCardType: definition.card.classification.type },
+      index,
+    );
+  }
+  const targetVersions = Object.fromEntries(
     selectedIds.map((id) => [
       id,
       game.state.cardStates[id]?.objectVersion ?? 0,
     ]),
   );
+  if (item.repeatTargetSelections) {
+    item.repeatTargetSelections.push([...selectedIds]);
+    item.repeatTargetObjectVersions ??= [];
+    item.repeatTargetObjectVersions.push(targetVersions);
+  } else {
+    item.targetCardInstanceIds = [...selectedIds];
+    item.targetObjectVersions = targetVersions;
+  }
   const queuedForOrdering = updateQueuedTriggerItem(game, item);
   game.state.pendingChoice = null;
   if (!queuedForOrdering) appendChainItem(game, item, item.chainOrigin);
@@ -509,7 +528,6 @@ function activeSourceIds(
   const player = game.state.players[controllerPlayerId]!;
   return [...new Set([
     ...(player.zones.legend ? [player.zones.legend] : []),
-    ...(player.zones.champion ? [player.zones.champion] : []),
     ...player.zones.base,
     ...game.state.battlefields
       .filter((battlefield) =>

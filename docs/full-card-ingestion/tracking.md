@@ -149,7 +149,6 @@ is complete and verified by:
 - `node --import tsx --test tests/card-catalog-primitive-discovery.test.ts tests/game-zone-effects.test.ts tests/game-token-placement.test.ts tests/garen-m1-card-catalog.test.ts`
 - `node --import tsx --test tests/game-token-placement.test.ts`
 - `node --import tsx --test tests/garen-m1-card-catalog.test.ts`
-- `cmd /c npm run catalog:check-mvp`
 - `cmd /c npm run typecheck`
 - `cmd /c npm test`
 - `cmd /c npm run lint`

@@ -14,6 +14,8 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { behaviorModelWithGrantedClause } from "./runtime-behaviors";
 import type { BehaviorClause } from "./schemas";
+import { targetSelectionSatisfiesRequirements } from "../../shared/game";
+import { ignoresDeflect, payAnyPowerAdditionalCost, targetDeflectCost } from "./payment";
 
 export type TokenPlacement = {
   destinationId: string;
@@ -31,6 +33,7 @@ export function beginEffectResolution(input: {
   event?: BehaviorEvent | null;
   selectedIds?: string[];
   selectionOverrides?: Record<string, string[]>;
+  prepaidCostSelectionKeys?: string[];
   targetsLocked?: boolean;
   decks: readonly DeckSnapshotDocument[];
 }): boolean {
@@ -47,6 +50,9 @@ export function beginEffectResolution(input: {
     event: input.event ?? null,
     initialSelectedIds: input.selectedIds ?? [],
     initialSelectionOverrides: input.selectionOverrides ?? {},
+    ...(input.prepaidCostSelectionKeys?.length
+      ? { prepaidCostSelectionKeys: input.prepaidCostSelectionKeys }
+      : {}),
     targetsLocked: input.targetsLocked ?? input.selectedIds !== undefined,
     selectionsByBinding: {},
     effectOutcomes: {},
@@ -71,18 +77,73 @@ export function submitEffectSelection(
   if (!pending.resolutionId) {
     throw new Error("Effect resolution is unavailable.");
   }
-  if (
-    selectedIds.length < pending.minimum ||
-    selectedIds.length > pending.maximum ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    selectedIds.some((id) => !pending.legalCardIds.includes(id))
-  ) {
+  if (!targetSelectionSatisfiesRequirements(
+    pending.targetRequirements ?? [{
+      kind: pending.optionKind,
+      legalIds: pending.legalCardIds,
+      minimum: pending.minimum,
+      maximum: pending.maximum,
+    }],
+    selectedIds,
+  )) {
     throw new Error("Effect selection does not satisfy its requirements.");
   }
   const frame = game.state.effectResolutions.find(
     (candidate) => candidate.id === pending.resolutionId,
   );
   if (!frame) throw new Error("Effect resolution is unavailable.");
+  const index = createRuntimeCardIndex(decks, game);
+  const handlers = createPrimitiveHandlers(index);
+  const definition = definitionForInstance(frame.sourceCardInstanceId, index);
+  const clause = compileBehaviorModel(
+    behaviorModelWithGrantedClause(definition.behaviorModel, frame.grantedBehaviorClauseSnapshot, frame.clauseId),
+    handlers,
+  ).clauses.find((candidate) => candidate.id === frame.clauseId);
+  const effectBindingOrder = Number(pending.bindingKey.split(":effects:")[1]?.split(":")[0]);
+  const selectedEffect = clause?.orderedEffects.find((binding) => binding.order === effectBindingOrder);
+  if (selectedEffect && pending.bindingKey.includes(":player:")) {
+    handlers.get(selectedEffect.behaviorId)?.selectionSubmitted?.(
+      selectedEffect,
+      createBehaviorContext(
+        game,
+        frame.controllerPlayerId,
+        frame.sourceCardInstanceId,
+        frame.event,
+        selectedIds,
+        frame.effectOutcomes,
+        frame.initialSelectionOverrides ?? {},
+        frame.id,
+      ),
+    );
+  }
+  const deflectTargets = (pending.targetRequirements ?? [])
+    .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+    .flatMap((requirement) =>
+      selectedIds.filter((id) => requirement.legalIds.includes(id)),
+    );
+  const resolvingItem = game.state.chain?.items.find(
+    (item) => item.id === game.state.chain?.resolvingItemId,
+  );
+  if (deflectTargets.length > 0 && resolvingItem?.sourceCardInstanceId) {
+    const resolvingDefinition = definitionForInstance(resolvingItem.sourceCardInstanceId, index);
+    const cost = targetDeflectCost(
+      playerId,
+      deflectTargets,
+      index,
+      game,
+      ignoresDeflect(resolvingDefinition),
+    );
+    payAnyPowerAdditionalCost(
+      game,
+      playerId,
+      resolvingDefinition,
+      cost,
+      resolvingItem.kind === "spell"
+        ? { kind: "card", cardType: resolvingDefinition.card.classification.type }
+        : { kind: "ability", sourceCardType: resolvingDefinition.card.classification.type },
+      index,
+    );
+  }
   frame.selectionsByBinding[pending.bindingKey] = [...selectedIds];
   game.state.pendingChoice = null;
   return resumeEffectResolution(game, frame.id, decks);
@@ -180,8 +241,28 @@ export function resumeEffectResolution(
   )) {
     const bindingKey = `${clause.id}:selectors:${binding.order}`;
     if (frame.selectionsByBinding[bindingKey]) continue;
-    if (frame.targetsLocked) {
-      const selectionKey = binding.parameters.selectionKey;
+    const selectionKey = binding.parameters.selectionKey;
+    if (
+      typeof selectionKey === "string" &&
+      frame.prepaidCostSelectionKeys?.includes(selectionKey)
+    ) {
+      const committedSelections =
+        frame.initialSelectionOverrides?.[selectionKey] ?? [];
+      if (
+        committedSelections.length < requirement.minimum ||
+        committedSelections.length > requirement.maximum ||
+        new Set(committedSelections).size !== committedSelections.length
+      ) {
+        finishResolutionFrame(game, frame.id, frame.delayedEffectId);
+        return true;
+      }
+      // Activated costs may move their selected cards before effect
+      // resolution. Preserve that committed choice instead of checking the
+      // objects against their pre-cost location again.
+      frame.selectionsByBinding[bindingKey] = committedSelections;
+      continue;
+    }
+    if (frame.targetsLocked && requirement.sourceZone !== "mainDeck") {
       const lockedSelections =
         typeof selectionKey === "string" &&
         Object.hasOwn(initialSelectionOverrides, selectionKey)
@@ -201,6 +282,10 @@ export function resumeEffectResolution(
     if (requirement.legalIds.length < requirement.minimum) {
       finishResolutionFrame(game, frame.id, frame.delayedEffectId);
       return true;
+    }
+    if (requirement.minimum === 0 && requirement.legalIds.length === 0) {
+      frame.selectionsByBinding[bindingKey] = [];
+      continue;
     }
     game.state.pendingChoice = {
       id: `choice:${frame.id}:${binding.order}`,
@@ -260,6 +345,8 @@ export function resumeEffectResolution(
           ? { automaticTargets: true }
           : {}),
       },
+      initialSelectionOverrides,
+      frame.id,
     );
     for (const selector of clause.selectors) {
       const selected =
@@ -270,7 +357,12 @@ export function resumeEffectResolution(
         `${clause.id}:selectors:${selector.order}`
       ] = selected;
       if (typeof selector.parameters.selectionKey === "string") {
-        context.selectedBySelector[selector.parameters.selectionKey] = selected;
+        context.selectedBySelector[selector.parameters.selectionKey] = [
+          ...new Set([
+            ...(context.selectedBySelector[selector.parameters.selectionKey] ?? []),
+            ...selected,
+          ]),
+        ];
       }
     }
     const handler = handlers.get(binding.behaviorId);
@@ -284,7 +376,7 @@ export function resumeEffectResolution(
       if (requirement.kind === "option") {
         game.state.pendingChoice = {
           id: `choice:${frame.id}:${binding.order}`,
-          playerId: frame.controllerPlayerId,
+          playerId: requirement.playerId ?? frame.controllerPlayerId,
           type: "effectOption",
           resolutionId: frame.id,
           bindingKey: choiceBindingKey,
@@ -296,7 +388,7 @@ export function resumeEffectResolution(
       if (requirement.kind === "tokenPlacement") {
         game.state.pendingChoice = {
           id: `choice:${frame.id}:${binding.order}`,
-          playerId: frame.controllerPlayerId,
+          playerId: requirement.playerId ?? frame.controllerPlayerId,
           type: "tokenPlacement",
           resolutionId: frame.id,
           bindingKey: choiceBindingKey,
@@ -315,7 +407,7 @@ export function resumeEffectResolution(
       }
       game.state.pendingChoice = {
         id: `choice:${frame.id}:${binding.order}`,
-        playerId: frame.controllerPlayerId,
+        playerId: requirement.playerId ?? frame.controllerPlayerId,
         type: "effectSelection",
         resolutionId: frame.id,
         bindingKey: choiceBindingKey,
@@ -333,6 +425,11 @@ export function resumeEffectResolution(
     handler.execute(binding, context);
     frame.effectOutcomes = context.effectOutcomes;
     frame.nextEffectIndex += 1;
+    if ((game.state.effectPlayQueue ?? []).some((entry) =>
+      entry.resolutionId === frame.id && entry.resumeResolutionAfterPlay !== false && !entry.awaitParentResolution,
+    )) {
+      return false;
+    }
   }
 
   finishResolutionFrame(game, frame.id, frame.delayedEffectId);

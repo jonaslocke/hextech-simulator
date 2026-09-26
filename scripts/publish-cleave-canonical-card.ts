@@ -5,14 +5,14 @@ import {
   publishCanonicalCard,
 } from "../src/server/card-catalog";
 import { buildCleaveCanonicalPublication } from "../src/server/card-catalog/cleave-canonical-publication";
-import { loadSourceCardCatalog } from "../src/server/catalog";
+import { loadCardCatalog } from "../src/server/catalog";
 import { inspectCanonicalDeckReadiness } from "../src/server/game/catalog-readiness";
 
 if (!process.argv.includes("--confirm")) {
   throw new Error("Refusing to publish Cleave without --confirm.");
 }
 
-const catalog = await loadSourceCardCatalog();
+const catalog = await loadCardCatalog();
 const card = catalog.byPublicCode.get("OGN-004/298");
 if (!card) throw new Error("Missing local source card: OGN-004/298.");
 

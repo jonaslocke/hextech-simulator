@@ -23,6 +23,7 @@ test("groups projected play actions by payment mode and preserves every destinat
         enabled: true,
         id: `${paymentMode}:${label}`,
         label: `Play Clockwork Keeper to ${label}`,
+        targets: [],
         costPreview: null,
         playCost: {
           destinationLabel: label,
@@ -60,6 +61,7 @@ test("keeps single-payment play choices in the existing flat menu", () => {
     enabled: true,
     id: "standard:Base",
     label: "Play Unit to Base",
+    targets: [],
     costPreview: null,
     playCost: {
       label: "Play Unit to Base",

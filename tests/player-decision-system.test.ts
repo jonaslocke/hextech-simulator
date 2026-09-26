@@ -397,6 +397,178 @@ test("maps pending non-board effect selections to the dialog", () => {
   );
 });
 
+test("keeps pending public board-card selections in the board-target flow", () => {
+  const rune = card("base-rune", "Rune");
+  const projection = projectionWith({
+    actions: [
+      effectSelectionAction(
+        "base-choice",
+        "Choose a Rune to recycle",
+        [rune.instanceId],
+        "base",
+      ),
+    ],
+    pendingChoice: effectSelectionChoice({
+      id: "base-choice",
+      maximum: 1,
+      minimum: 1,
+      prompt: "Choose a Rune to recycle",
+      sourceZone: "base",
+    }),
+  });
+  const base = projection.players[0]!.zones.find(
+    (zone) => zone.kind === "base",
+  )!;
+  base.cards = [rune];
+  base.count = 1;
+
+  const decision = buildPlayerDecisionRequest({
+    activeTargetSelection: {
+      actionId: "base-choice-action",
+      legalTargetIds: [rune.instanceId],
+      maxTargets: 1,
+      minTargets: 1,
+      targetKind: "card",
+    },
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision, null);
+});
+
+test("maps a staged effect play to an explicit decision using only projected play actions", () => {
+  const projection = projectionWith({ actions: [], pendingChoice: null });
+  Object.assign(projection, {
+    effectPlayDecision: {
+      playerId: "player-1",
+      stagedCardInstanceId: "staged-unit",
+      canDecline: true,
+    },
+  });
+  projection.actions.push(
+    {
+      ...cardTargetAction({ id: "play-base", label: "target", legalIds: [] }),
+      id: "game:1:action:play:base:staged-unit",
+      label: "Play Test Unit to Base",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+      presentation: {
+        ...cardTargetAction({ id: "play-base-presentation", label: "target", legalIds: [] }).presentation,
+        playCost: {
+          label: "Play Test Unit to Base",
+          showCost: false,
+          modifierSources: [],
+        },
+      },
+    },
+    {
+      ...cardTargetAction({ id: "play-base-optional", label: "target", legalIds: [] }),
+      id: "game:1:action:play:base:staged-unit:optional",
+      label: "Play Test Unit to Base",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+      costPreview: {
+        energy: 2,
+        basePower: 0,
+        effectivePower: 1,
+        printedEnergy: 2,
+        printedPower: 0,
+        availableAnyPower: 0,
+        targetAdditionalPower: [],
+      },
+      poolPayment: {
+        energy: 2,
+        power: 1,
+        powerDomains: ["Calm"],
+        availableEnergy: 2,
+        availablePower: 1,
+        canPay: true,
+        powerCosts: [{ amount: 1, domains: ["Calm"] }],
+      },
+      presentation: {
+        ...cardTargetAction({ id: "play-base-optional-presentation", label: "target", legalIds: [] }).presentation,
+        playCost: {
+          label: "Play Test Unit to Base",
+          declarationLabel: "Pay the optional cost",
+          showCost: true,
+          modifierSources: [],
+        },
+      },
+    },
+    {
+      ...cardTargetAction({ id: "disabled-play", label: "target", legalIds: [] }),
+      id: "game:1:action:play:unavailable:staged-unit",
+      enabled: false,
+      label: "Unavailable mode",
+      sourceCardInstanceId: "staged-unit",
+      targets: [],
+    },
+    {
+      ...cardTargetAction({ id: "skip-play", label: "target", legalIds: [] }),
+      id: "game:1:action:skipEffectPlay:staged-unit",
+      label: "Don't play",
+      sourceCardInstanceId: null,
+      targets: [],
+    },
+  );
+  const cardView = card("staged-unit", "Unit");
+  cardView.name = "Test Unit";
+  projection.players[0]!.zones.find((zone) => zone.kind === "hand")!.cards = [cardView];
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {
+      "staged-unit": {
+        attributes: { energy: 2, might: 3, power: 1 },
+        classification: { domain: [], supertype: null, type: "Unit" },
+        media: { image_url: "/test-unit.png" },
+        metadata: {},
+        name: "Test Unit",
+        ownerPlayerId: "player-1",
+        public_code: "TEST-001",
+        set: { label: "Test" },
+        text: { plain: "" },
+      },
+    },
+    sourceProjection: projection,
+  });
+
+  assert.deepEqual(decision, {
+    kind: "effectPlay",
+    decisionKey: "effect-play:player-1:staged-unit",
+    stagedCard: {
+      id: "staged-unit",
+      label: "Test Unit",
+      imageUrl: "/test-unit.png",
+    },
+    options: [
+      {
+        actionId: "game:1:action:play:base:staged-unit",
+        id: "game:1:action:play:base:staged-unit",
+        label: "Play Test Unit to Base",
+        kind: "play",
+      },
+      {
+        actionId: "game:1:action:play:base:staged-unit:optional",
+        id: "game:1:action:play:base:staged-unit:optional",
+        label: "Play Test Unit to Base",
+        description: "Pay the optional cost",
+        resourceCost: {
+          energy: 2,
+          powerCosts: [{ amount: 1, domains: ["Calm"] }],
+        },
+        kind: "play",
+      },
+      {
+        actionId: "game:1:action:skipEffectPlay:staged-unit",
+        id: "game:1:action:skipEffectPlay:staged-unit",
+        label: "Don't play",
+        kind: "decline",
+      },
+    ],
+  });
+});
+
 function projectionWith(
   overrides: Pick<GameProjection, "actions" | "pendingChoice">,
 ): GameProjection {
@@ -440,7 +612,7 @@ function effectSelectionAction(
   choiceId: string,
   prompt: string,
   legalIds: string[],
-  sourceZone?: "hand" | "trash" | "mainDeck",
+  sourceZone?: "hand" | "trash" | "mainDeck" | "base",
 ): GameProjection["actions"][number] {
   return {
     choice: {
@@ -475,7 +647,7 @@ function effectSelectionChoice(input: {
   maximum: number;
   minimum: number;
   prompt: string;
-  sourceZone: "hand" | "trash" | "mainDeck" | null;
+  sourceZone: "hand" | "trash" | "mainDeck" | "base" | null;
 }): Extract<
   NonNullable<GameProjection["pendingChoice"]>,
   { type: "effectSelection" }

@@ -96,6 +96,7 @@ export const cardStateSchema = z.object({
   hiddenAtTurnNumber: z.number().int().positive().nullable().optional(),
   empowered: z.boolean().default(false).optional(),
   damage: z.number().int().nonnegative(),
+  damageByPlayerId: z.record(z.number().int().nonnegative()).optional(),
   computedMight: z.number().nullable(),
   // Changes only when a zone transition creates a new game object. Unlike
   // objectVersion, ordinary state changes such as taking damage do not affect
@@ -128,6 +129,15 @@ export const chainItemSchema = z.object({
   // independently from card targets so a later Chain resolution uses the
   // exact committed mode.
   initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+  // Flow replaces the normal post-resolution move to Trash with banishment.
+  flowPlayed: z.boolean().optional(),
+  // Repeat commits one target set for each execution while the card is played.
+  repeatTargetSelections: z.array(z.array(z.string())).optional(),
+  repeatTargetObjectVersions: z.array(z.record(z.number().int().nonnegative())).optional(),
+  repeatResolutionIndex: z.number().int().nonnegative().optional(),
+  // Choice modes marked commitAtPlay are retained alongside each execution.
+  // Each record is keyed by the canonical option binding's selection key.
+  preplayOptionSelections: z.array(z.record(z.array(z.string()))).optional(),
   targetObjectVersions: z.record(z.number().int().nonnegative()).default({}),
   behaviorClauseId: z.string().nullable().default(null),
   grantedBehaviorClauseSnapshot: behaviorClauseSchema.optional(),
@@ -183,7 +193,7 @@ const effectSelectionChoiceSchema = z.object({
   bindingKey: z.string().min(1),
   prompt: z.string().min(1),
   optionKind: z.enum(["card", "battlefield", "location", "chainItem"]).default("card"),
-  sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable().default(null),
+  sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).nullable().default(null),
   presentation: z.enum(["cardSelection", "vision"]).default("cardSelection"),
   legalCardIds: z.array(z.string().min(1)),
   visibleCardIds: z.array(z.string().min(1)).optional(),
@@ -197,9 +207,12 @@ const effectSelectionChoiceSchema = z.object({
         label: z.string().min(1).optional(),
         selectionKey: z.string().min(1).optional(),
         selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
-        sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+        sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).optional(),
         legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
         optionLabels: z.record(z.string().min(1)).optional(),
+        maximumPerLocation: z.number().int().positive().optional(),
+        mustShareLocation: z.boolean().optional(),
+        locationKeysById: z.record(z.string().min(1)).optional(),
         legalIds: z.array(z.string().min(1)),
         minimum: z.number().int().nonnegative(),
         maximum: z.number().int().nonnegative(),
@@ -370,6 +383,7 @@ export const gameStateSchema = z.object({
         controllerPlayerId: z.string().min(1),
         sourceCardInstanceId: z.string().min(1),
         targetCardInstanceIds: z.array(z.string()),
+        parameters: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}).optional(),
         duration: z.string().min(1),
         createdAtTurn: z.number().int().nonnegative(),
       }),
@@ -408,6 +422,7 @@ export const gameStateSchema = z.object({
         .default(null),
       initialSelectedIds: z.array(z.string()).default([]),
       initialSelectionOverrides: z.record(z.array(z.string())).optional(),
+      prepaidCostSelectionKeys: z.array(z.string()).optional(),
       targetsLocked: z.boolean().optional(),
       selectionsByBinding: z.record(z.array(z.string())),
       effectOutcomes: z.record(
@@ -415,6 +430,27 @@ export const gameStateSchema = z.object({
       ).default({}),
     }),
   ),
+  // A resolving effect may instruct a player to play identified cards. Cards
+  // are temporarily staged in their owners' hands solely to reuse the normal
+  // server-authoritative play declaration and payment path.
+  effectPlayQueue: z.array(
+    z.object({
+      resolutionId: z.string().min(1),
+      sourceCardInstanceId: z.string().min(1),
+      playerId: z.string().min(1),
+      cardInstanceId: z.string().min(1),
+      mayDecline: z.boolean().default(false),
+      resumeResolutionAfterPlay: z.boolean().default(true),
+      awaitParentResolution: z.boolean().default(false),
+      deferTriggeredItems: z.boolean().default(false),
+      ignoreBaseEnergy: z.boolean(),
+      ignoreBasePower: z.boolean().default(false),
+      returnZone: z.enum(["mainDeck", "banishment"]).default("mainDeck"),
+      forcedDestinationId: z.string().min(1).nullable().default(null),
+      destinationBasePlayerId: z.string().min(1).nullable().default(null),
+    }),
+  ).default([]).optional(),
+  deferredChainItems: z.array(chainItemSchema).optional(),
   pendingChoice: z
     .discriminatedUnion("type", [
       triggerOrderChoiceSchema,
@@ -643,6 +679,7 @@ export function createInitialGame(input: {
         {
           exhausted: false,
           damage: 0,
+          damageByPlayerId: {},
           computedMight: cardByCode(deck, instance.cardCode).card.attributes
             .might,
           gameObjectIncarnation: 0,

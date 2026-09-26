@@ -6,6 +6,7 @@ export const cardKeywords = [
   "deathknell",
   "deflect",
   "equip",
+  "flow",
   "ganking",
   "hidden",
   "legion",

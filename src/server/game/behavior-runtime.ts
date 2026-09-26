@@ -1,4 +1,7 @@
-import type { ProjectedTargetRequirement } from "../../shared/game";
+import {
+  targetSelectionSatisfiesRequirements,
+  type ProjectedTargetRequirement,
+} from "../../shared/game";
 import type { BehaviorBinding, BehaviorClause, BehaviorModel } from "./schemas";
 import type { ChainItem, GameDocument } from "./state";
 
@@ -24,6 +27,9 @@ export type BehaviorExecutionContext = {
   selectionOverrides: Record<string, string[]>;
   hiddenBattlefieldId: string | null;
   effectOutcomes: Record<string, boolean | number | string | string[]>;
+  // Effect frames may need to pause while a card is played as part of an
+  // instruction, rather than as an ordinary priority action.
+  effectResolutionId?: string;
 };
 
 export type BehaviorHandler = {
@@ -31,6 +37,7 @@ export type BehaviorHandler = {
   matches?(binding: BehaviorBinding, context: BehaviorExecutionContext): boolean;
   targets?(binding: BehaviorBinding, context: BehaviorExecutionContext): ProjectedTargetRequirement;
   execute?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
+  selectionSubmitted?(binding: BehaviorBinding, context: BehaviorExecutionContext): void;
   choice?(
     binding: BehaviorBinding,
     context: BehaviorExecutionContext,
@@ -42,11 +49,12 @@ export type BehaviorHandler = {
     prompt: string;
     tokenName?: string;
     destinations?: Array<{ id: string; label: string }>;
-    sourceZone?: "hand" | "trash" | "mainDeck";
+    sourceZone?: "hand" | "trash" | "mainDeck" | "base";
     presentation?: "cardSelection" | "vision";
     visibleIds?: string[];
     options?: Array<{ id: string; label: string }>;
     choiceKey?: string;
+    playerId?: string;
   } | null;
 };
 
@@ -133,7 +141,12 @@ export function selectionRequirementsForClause(
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
     if (typeof binding.parameters.selectionKey === "string") {
-      selectorContext.selectedBySelector[binding.parameters.selectionKey] = selected;
+      selectorContext.selectedBySelector[binding.parameters.selectionKey] = [
+        ...new Set([
+          ...(selectorContext.selectedBySelector[binding.parameters.selectionKey] ?? []),
+          ...selected,
+        ]),
+      ];
     }
     return { binding, requirement };
   });
@@ -147,23 +160,54 @@ export function selectionRequirementsForClause(
   );
   return requirements
     .filter(({ requirement }) => requirement.maximum > 0)
-    .map(({ binding, requirement }) => ({
-      binding,
-      requirement:
-        requirement.kind === "battlefield" && automaticCardIds.size > 0
-          ? {
-              ...requirement,
-              legalIds: requirement.legalIds.filter((battlefieldId) =>
-                context.game.state.battlefields
-                  .find(
-                    (battlefield) =>
-                      battlefield.battlefieldId === battlefieldId,
-                  )
-                  ?.units.some((id) => automaticCardIds.has(id)),
-              ),
-            }
-          : requirement,
-    }));
+    .map(({ binding, requirement }) => {
+      let projected = requirement.kind === "battlefield" && automaticCardIds.size > 0
+        ? {
+            ...requirement,
+            legalIds: requirement.legalIds.filter((battlefieldId) =>
+              context.game.state.battlefields
+                .find((battlefield) => battlefield.battlefieldId === battlefieldId)
+                ?.units.some((id) => automaticCardIds.has(id)),
+            ),
+          }
+        : requirement;
+      const selectionKey = binding.parameters.selectionKey;
+      if (typeof selectionKey === "string" && projected.kind === "card") {
+        const matchingEffects = clause.orderedEffects.filter(
+          (effect) => effect.parameters.selectionKey === selectionKey,
+        );
+        const maximumPerLocation = matchingEffects.some(
+          (effect) => effect.parameters.atMostOnePerLocation === true,
+        ) ? 1 : undefined;
+        const mustShareLocation = matchingEffects.some(
+          (effect) => effect.parameters.selectedMustShareLocation === true,
+        ) || undefined;
+        if (maximumPerLocation !== undefined || mustShareLocation) {
+          const locationKeysById = Object.fromEntries(
+            projected.legalIds.flatMap((id) => {
+              const location = targetBoardLocationKey(context.game, id);
+              return location ? [[id, location]] : [];
+            }),
+          );
+          const locationCount = new Set(Object.values(locationKeysById)).size;
+          projected = {
+            ...projected,
+            ...(maximumPerLocation === undefined ? {} : { maximumPerLocation }),
+            ...(mustShareLocation ? { mustShareLocation: true } : {}),
+            locationKeysById,
+            ...(maximumPerLocation === undefined
+              ? {}
+              : {
+                  maximum: Math.max(
+                    projected.minimum,
+                    Math.min(projected.maximum, locationCount * maximumPerLocation),
+                  ),
+                }),
+          };
+        }
+      }
+      return { binding, requirement: projected };
+    });
 }
 
 export function clauseHasAutomaticAffectedGroup(
@@ -214,7 +258,12 @@ export function executeBehaviorClause(input: {
       `${clause.id}:selectors:${binding.order}`
     ] = selected;
     if (typeof binding.parameters.selectionKey === "string") {
-      context.selectedBySelector[binding.parameters.selectionKey] = selected;
+      context.selectedBySelector[binding.parameters.selectionKey] = [
+        ...new Set([
+          ...(context.selectedBySelector[binding.parameters.selectionKey] ?? []),
+          ...selected,
+        ]),
+      ];
     }
   });
   const delayed = clause.timings.find((binding) => binding.behaviorId === "timing.delayed");
@@ -307,7 +356,7 @@ export function collectTriggeredClauses(input: {
       typeof input.event.values.hiddenBattlefieldId === "string"
       ? input.event.values.hiddenBattlefieldId
       : null;
-    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, [], {}, {}, hiddenBattlefieldId);
+    const context = createBehaviorContext(input.game, input.controllerPlayerId, source.sourceCardInstanceId, input.event, [], {}, {}, undefined, hiddenBattlefieldId);
     if (!clause.triggers.every((binding) => matches(binding, context, input.handlers))) return [];
     if (!clause.conditions.every((binding) => matches(binding, context, input.handlers))) return [];
     return [{
@@ -374,6 +423,7 @@ export function createBehaviorContext(
   selectedIds: string[],
   effectOutcomes: Record<string, boolean | number | string | string[]> = {},
   selectionOverrides: Record<string, string[]> = {},
+  effectResolutionId?: string,
   hiddenBattlefieldId: string | null = null,
 ): BehaviorExecutionContext {
   return {
@@ -390,6 +440,7 @@ export function createBehaviorContext(
         : null
     ),
     effectOutcomes,
+    effectResolutionId,
   };
 }
 
@@ -442,16 +493,18 @@ function bindingGroups(clause: BehaviorClause) {
   };
 }
 function validateSelections(requirements: ProjectedTargetRequirement[], selectedIds: string[]) {
-  if (requirements.length === 0) {
-    if (selectedIds.length) throw new Error("Behavior clause does not accept selected targets.");
-    return;
-  }
-  const legal = new Set(requirements.flatMap((requirement) => requirement.legalIds));
-  const minimum = requirements.reduce((sum, requirement) => sum + requirement.minimum, 0);
-  const maximum = requirements.reduce((sum, requirement) => sum + requirement.maximum, 0);
-  if (selectedIds.length < minimum || selectedIds.length > maximum || selectedIds.some((id) => !legal.has(id)) || new Set(selectedIds).size !== selectedIds.length) {
+  if (!targetSelectionSatisfiesRequirements(requirements, selectedIds)) {
     throw new Error("Behavior selections do not satisfy selector requirements.");
   }
+}
+
+function targetBoardLocationKey(game: GameDocument, unitId: string): string | null {
+  const battlefield = game.state.battlefields.find((candidate) => candidate.units.includes(unitId));
+  if (battlefield) return `battlefield:${battlefield.battlefieldId}`;
+  const basePlayerId = game.state.setup.playerIds.find((playerId) =>
+    game.state.players[playerId]?.zones.base.includes(unitId),
+  );
+  return basePlayerId ? `base:${basePlayerId}` : null;
 }
 function selectedForRequirement(requirement: ProjectedTargetRequirement, selectedIds: string[]) {
   return selectedIds.filter((id) => requirement.legalIds.includes(id)).slice(0, requirement.maximum);

@@ -5,6 +5,7 @@ import type { GameCardDefinition } from "./schemas";
 import type { GameDocument } from "./state";
 import { effectiveKeywordAmount } from "./effective-keywords";
 import { numericBindingMatchesCardType } from "./numeric-modifiers";
+import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 import {
   advanceGameObjectIncarnation,
   definitionForInstance,
@@ -49,7 +50,30 @@ type PaymentRequest = {
   context: PaymentContext;
   additionalAnyPower: number;
   poolOnly?: boolean;
+  allowReadyRuneRecycling?: boolean;
 };
+
+export function payAnyPowerAdditionalCost(
+  game: GameDocument,
+  playerId: string,
+  definition: GameCardDefinition,
+  amount: number,
+  context: PaymentContext,
+  index: RuntimeCardIndex,
+): void {
+  if (amount <= 0) return;
+  const player = game.state.players[playerId]!;
+  const plan = buildPaymentPlanForRequest(game, playerId, definition, index, {
+    energyCost: 0,
+    powerCost: 0,
+    allowedPowerDomains: [...anyPowerDomains(player, index)],
+    context,
+    additionalAnyPower: amount,
+    poolOnly: true,
+  });
+  if (!plan) throw new Error("Additional Any-Power cost cannot be paid.");
+  applyPaymentPlan(game, playerId, plan, index);
+}
 
 export function buildPaymentPlan(
   game: GameDocument,
@@ -59,16 +83,18 @@ export function buildPaymentPlan(
   index: RuntimeCardIndex,
   additionalAnyPower = 0,
   cardInstanceId?: string,
-  basePowerCost?: number,
+  basePowerOverride?: number,
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, definition, index, {
     energyCost,
-    powerCost: basePowerCost ?? effectivePowerCost(
+    powerCost: effectivePowerCost(
       game,
       playerId,
       definition,
       index,
       cardInstanceId,
+      undefined,
+      basePowerOverride,
     ),
     allowedPowerDomains: definition.card.classification.domain.filter(
       (domain) => domain !== "Colorless",
@@ -85,7 +111,7 @@ export function buildAnyPowerPaymentPlan(
   playerId: string,
   definition: GameCardDefinition,
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; allowReadyRuneRecycling?: boolean } = {},
 ): PaymentPlan | null {
   const player = game.state.players[playerId]!;
   const domains = anyPowerDomains(player, index);
@@ -96,6 +122,7 @@ export function buildAnyPowerPaymentPlan(
     context: { kind: "hide" },
     additionalAnyPower: 0,
     poolOnly: options.poolOnly,
+    allowReadyRuneRecycling: options.allowReadyRuneRecycling,
   });
 }
 
@@ -113,6 +140,12 @@ function anyPowerDomains(player: GameDocument["state"]["players"][string], index
 
 export function canPayAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
   return buildAnyPowerPaymentPlan(game, playerId, definition, index) !== null;
+}
+
+/** A Hide action may be prepared by explicitly recycling a ready Rune first.
+ * This is projection eligibility only; actual Hide payment remains pool-only. */
+export function canPrepareAnyPowerCost(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
+  return buildAnyPowerPaymentPlan(game, playerId, definition, index, { allowReadyRuneRecycling: true }) !== null;
 }
 
 export function anyPowerPoolPaymentPreview(game: GameDocument, playerId: string, definition: GameCardDefinition, index: RuntimeCardIndex) {
@@ -145,7 +178,7 @@ export function buildAbilityPaymentPlan(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; additionalAnyPower?: number } = {},
 ): PaymentPlan | null {
   return buildPaymentPlanForRequest(game, playerId, sourceDefinition, index, {
     energyCost: costs.energy,
@@ -157,7 +190,7 @@ export function buildAbilityPaymentPlan(
       kind: "ability",
       sourceCardType: sourceDefinition.card.classification.type,
     },
-    additionalAnyPower: 0,
+    additionalAnyPower: options.additionalAnyPower ?? 0,
     poolOnly: options.poolOnly,
   });
 }
@@ -274,7 +307,9 @@ function buildPaymentPlanForRequest(
   for (const id of sourceIds) {
     if (game.state.cardStates[id]?.exhausted) continue;
     for (const kind of ["energy", "power"] as const) {
-      const ability = kind === "energy" ? exhaustForEnergyAbility(id, request.context, index) : exhaustForPowerAbility(id, request.context, index);
+      const ability = kind === "energy"
+        ? exhaustForEnergyAbility(id, request.context, index, game)
+        : exhaustForPowerAbility(id, request.context, index, game);
       if (!ability) continue;
       generated.push({ ...ability, kind, sourceId: id, acquisition: "exhaust",
         restriction: normalizeResourceRestriction(ability.usage), order: generated.length });
@@ -301,7 +336,12 @@ function buildPaymentPlanForRequest(
         runeState: game.state.cardStates[id]?.exhausted ? "exhausted" : result.energySourceIds.includes(id) ? "exhausted-by-plan" : "ready" });
     }
     let remainingPower = request.powerCost;
-    for (const source of orderPaymentCandidates(candidates.filter((candidate) => candidateIsEligible(candidate, request.context, request.allowedPowerDomains)))) {
+    for (const source of orderPaymentCandidates(candidates.filter((candidate) => candidateIsEligible(
+      candidate,
+      request.context,
+      request.allowedPowerDomains,
+      { allowReadyRuneRecycling: request.allowReadyRuneRecycling },
+    )))) {
       if (remainingPower === 0) break;
       const spend = Math.min(source.amount, remainingPower);
       if (source.acquisition === "pool") recordPoolSpend(result, source, spend);
@@ -336,7 +376,33 @@ function buildPaymentPlanForRequest(
     }
     return null;
   };
-  return chooseEnergy(0, remainingEnergy, plan);
+  const preferredPlan = chooseEnergy(0, remainingEnergy, plan);
+  if (preferredPlan || request.context.kind !== "ability" || request.poolOnly || request.energyCost === 0) {
+    return preferredPlan;
+  }
+
+  // Activated abilities may retain pooled Energy when spending it would leave
+  // their combined Energy-and-Power cost incomplete. Search lower-priority
+  // pooled allocations before rejecting the action; ready Runes still qualify
+  // for Power only when this same plan exhausts them for Energy.
+  const pooledEnergy = energy.filter((candidate) => candidate.acquisition === "pool");
+  const maximumPooledSpend = Math.min(request.energyCost,
+    pooledEnergy.reduce((sum, source) => sum + source.amount, 0));
+  const minimumPooledSpend = Math.max(0, request.energyCost -
+    energySources.reduce((sum, source) => sum + source.amount, 0));
+  for (let pooledSpend = maximumPooledSpend - 1; pooledSpend >= minimumPooledSpend; pooledSpend--) {
+    const selected = emptyPaymentPlan();
+    let remainingPool = pooledSpend;
+    for (const source of pooledEnergy) {
+      const spend = Math.min(source.amount, remainingPool);
+      if (spend > 0) recordPoolSpend(selected, source, spend);
+      remainingPool -= spend;
+      if (remainingPool === 0) break;
+    }
+    const complete = chooseEnergy(0, request.energyCost - pooledSpend, selected);
+    if (complete) return complete;
+  }
+  return null;
 }
 
 export function payCardCost(
@@ -375,10 +441,10 @@ export function canPayCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
-  basePowerCost?: number,
+  basePowerOverride?: number,
 ) {
   return cardPaymentPlans(game, playerId, definition, energyCost, index,
-    additionalAnyPower, additionalCosts, cardInstanceId, basePowerCost) !== null;
+    additionalAnyPower, additionalCosts, cardInstanceId, basePowerOverride) !== null;
 }
 
 /** A necessary capacity check, never a payment plan or a proof of legality.
@@ -393,6 +459,7 @@ export function cardPaymentExceedsResourceCapacity(
   energyCost: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId: string,
+  basePowerOverride?: number,
 ) {
   const context: PaymentContext = { kind: "card", cardType: definition.card.classification.type };
   const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
@@ -432,7 +499,7 @@ export function cardPaymentExceedsResourceCapacity(
         })))));
   const minimumEnergy = (mutableCost("energyCost") ? 0 : energyCost) + additionalCosts.reduce((sum, cost) => sum + cost.energy, 0);
   const powerCosts = [
-    { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    { amount: mutableCost("powerCost") ? 0 : effectivePowerCost(game, playerId, definition, index, cardInstanceId, undefined, basePowerOverride), domains },
     ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
   ].filter((cost) => cost.amount > 0);
   const capacity = pooledCandidates(game.state.players[playerId]!, []);
@@ -451,8 +518,12 @@ export function cardPaymentExceedsResourceCapacity(
         add("power", 1, "unrestricted", source.card.classification.domain[0] ?? "Rainbow");
       }
       if (ability.behaviorId !== "ability.exhaust_for_resource" || game.state.cardStates[id]?.exhausted) continue;
-      const { amount, usage, resourceType, domain, poolResource } = ability.parameters;
-      if (typeof amount !== "number" || amount <= 0 || typeof usage !== "string") continue;
+      const { usage, resourceType, domain, poolResource } = ability.parameters;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
+      if (amount === null || typeof usage !== "string") continue;
       if (resourceType !== "power") add("energy", amount, usage);
       else {
         const producedDomain = domain === "sourceDomain"
@@ -483,16 +554,17 @@ export function cardPaymentPreview(
   index: RuntimeCardIndex,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId: string,
+  basePowerOverride?: number,
 ) {
   const domains = definition.card.classification.domain.filter((domain) => domain !== "Colorless");
   const powerCosts = [
-    { amount: effectivePowerCost(game, playerId, definition, index, cardInstanceId), domains },
+    { amount: effectivePowerCost(game, playerId, definition, index, cardInstanceId, undefined, basePowerOverride), domains },
     ...additionalCosts.map((cost) => ({ amount: cost.power, domains: cost.powerDomain ? [normalizedDomain(cost.powerDomain)] : domains })),
   ].filter((cost) => cost.amount > 0);
   const powerDomains = [...new Set(powerCosts.flatMap((cost) => cost.domains))];
   const eligible = pooledCandidates(game.state.players[playerId]!, powerDomains).filter((candidate) =>
     candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }, powerDomains));
-  const canPay = canPayCardCosts(game, playerId, definition, energyCost, index, 0, additionalCosts, cardInstanceId);
+  const canPay = canPayCardCosts(game, playerId, definition, energyCost, index, 0, additionalCosts, cardInstanceId, basePowerOverride);
   let availableAnyPower = 0;
   let upper = pooledCandidates(game.state.players[playerId]!, []).filter((candidate) => candidate.kind === "power" &&
     candidateIsEligible(candidate, { kind: "card", cardType: definition.card.classification.type }))
@@ -501,7 +573,7 @@ export function cardPaymentPreview(
   // before advertising how much additional target Power can safely be paid.
   if (canPay) while (availableAnyPower < upper) {
     const amount = Math.ceil((availableAnyPower + upper) / 2);
-    if (canPayCardCosts(game, playerId, definition, energyCost, index, amount, additionalCosts, cardInstanceId)) availableAnyPower = amount;
+    if (canPayCardCosts(game, playerId, definition, energyCost, index, amount, additionalCosts, cardInstanceId, basePowerOverride)) availableAnyPower = amount;
     else upper = amount - 1;
   }
   return {
@@ -526,13 +598,13 @@ function cardPaymentPlans(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
-  basePowerCost?: number,
+  basePowerOverride?: number,
 ): PaymentPlan[] | null {
   const preview = structuredClone(game);
   const plans: PaymentPlan[] = [];
   try {
     const base = buildPaymentPlan(preview, playerId, definition, energyCost, index,
-      additionalAnyPower, cardInstanceId, basePowerCost);
+      additionalAnyPower, cardInstanceId, basePowerOverride);
     if (!base) return null;
     plans.push(base);
     applyPaymentPlan(preview, playerId, base, index);
@@ -563,10 +635,10 @@ export function payCardCosts(
   additionalAnyPower: number,
   additionalCosts: readonly AdditionalCardCost[],
   cardInstanceId?: string,
-  basePowerCost?: number,
+  basePowerOverride?: number,
 ) {
   const plans = cardPaymentPlans(game, playerId, definition, energyCost, index,
-    additionalAnyPower, additionalCosts, cardInstanceId, basePowerCost);
+    additionalAnyPower, additionalCosts, cardInstanceId, basePowerOverride);
   if (!plans) {
     throw new Error("Card costs cannot be paid.");
   }
@@ -579,7 +651,7 @@ export function payAbilityCost(
   sourceDefinition: GameCardDefinition,
   costs: { energy: number; power: number },
   index: RuntimeCardIndex,
-  options: { poolOnly?: boolean } = {},
+  options: { poolOnly?: boolean; additionalAnyPower?: number } = {},
 ) {
   const plan = buildAbilityPaymentPlan(
     game,
@@ -697,6 +769,7 @@ function applyPaymentPlan(
     const state = game.state.cardStates[id];
     if (state) {
       state.damage = 0;
+      state.damageByPlayerId = {};
       state.exhausted = false;
     }
   }
@@ -739,6 +812,14 @@ export function targetDeflectCost(
   }, 0);
 }
 
+export function ignoresDeflect(definition: GameCardDefinition) {
+  return definition.behaviorModel.clauses.some((clause) =>
+    clause.effects.some(
+      (binding) => binding.behaviorId === "modifier.ignore_deflect",
+    ),
+  );
+}
+
 function hasAbility(id: string, behaviorId: string, index: RuntimeCardIndex) {
   return definitionForInstance(id, index).behaviorModel.clauses.some((clause) =>
     clause.abilities.some((ability) => ability.behaviorId === behaviorId),
@@ -749,6 +830,7 @@ function exhaustForEnergyAbility(
   id: string,
   paymentContext: PaymentContext,
   index: RuntimeCardIndex,
+  game: GameDocument,
 ): { amount: number; usage: string } | null {
   for (const clause of definitionForInstance(id, index).behaviorModel.clauses) {
     for (const ability of clause.abilities) {
@@ -758,11 +840,13 @@ function exhaustForEnergyAbility(
       ) {
         continue;
       }
-      const amount = ability.parameters.amount;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
       const usage = ability.parameters.usage;
       if (
-        typeof amount !== "number" ||
-        amount <= 0 ||
+        amount === null ||
         typeof usage !== "string" ||
         !resourceUsageAllowsPayment(usage, paymentContext)
       ) {
@@ -778,6 +862,7 @@ function exhaustForPowerAbility(
   id: string,
   paymentContext: PaymentContext,
   index: RuntimeCardIndex,
+  game: GameDocument,
 ): Omit<PowerSourceUse, "id"> | null {
   const definition = definitionForInstance(id, index);
   for (const clause of definition.behaviorModel.clauses) {
@@ -788,7 +873,10 @@ function exhaustForPowerAbility(
       ) {
         continue;
       }
-      const amount = ability.parameters.amount;
+      const amount = effectiveExhaustForResourceAmount(
+        ability,
+        game.state.cardStates[id]?.empowered === true,
+      );
       const usage = ability.parameters.usage;
       const requestedDomain = ability.parameters.domain;
       const domain =
@@ -800,8 +888,7 @@ function exhaustForPowerAbility(
             ? normalizedDomain(requestedDomain)
             : null;
       if (
-        typeof amount !== "number" ||
-        amount <= 0 ||
+        amount === null ||
         typeof usage !== "string" ||
         !domain ||
         !resourceUsageAllowsPayment(usage, paymentContext)

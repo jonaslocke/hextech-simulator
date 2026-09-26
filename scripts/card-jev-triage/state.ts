@@ -9,10 +9,7 @@ import {
 } from "../../src/server/card-catalog";
 import { deriveCardCodeFromCard } from "../../src/server/card-catalog/identity";
 import { hashCardRulesText } from "../../src/server/card-catalog/import-preview";
-import {
-  loadSourceCardCatalog,
-  type Card,
-} from "../../src/server/catalog";
+import { loadCardCatalog, type Card } from "../../src/server/catalog";
 import { inspectCanonicalDeckReadiness } from "../../src/server/game/catalog-readiness";
 import {
   getRuntimeCoverageStatus,
@@ -142,11 +139,11 @@ export async function buildCardJevTriageState(input: {
   target: CardTriageTarget;
   db?: Db | null;
 }): Promise<CardJevTriageState> {
-  const [sourceCatalog, primitiveCatalog] = await Promise.all([
-    loadSourceCardCatalog(),
+  const [catalog, primitiveCatalog] = await Promise.all([
+    loadCardCatalog(),
     buildCurrentBehaviorCatalog(),
   ]);
-  const card = resolveTargetCard(sourceCatalog, input.target);
+  const card = resolveTargetCard(catalog, input.target);
   const cardCode = deriveCardCodeFromCard(card);
   const sourceTextHash = hashCardRulesText(card);
   const suggestionReport = analyzeCardBehaviorSuggestions(
@@ -163,7 +160,7 @@ export async function buildCardJevTriageState(input: {
     sourceTextHash,
     primitiveCatalog,
   });
-  const tokenCatalog = sourceCatalog.cards
+  const tokenCatalog = catalog.cards
     .filter((candidate) => candidate.classification.supertype === "Token")
     .map(toJevTokenDefinition)
     .sort((left, right) =>
@@ -196,8 +193,8 @@ export async function buildCardJevTriageState(input: {
     tokenCatalog,
     behaviorCatalog: primitiveCatalog.map(toJevBehaviorCapability),
     catalogMetadata: {
-      sourceCatalogVersionHash: sourceCatalog.versionHash,
-      sourceSetFiles: sourceCatalog.setFiles,
+      sourceCatalogVersionHash: catalog.versionHash,
+      sourceSetFiles: catalog.setFiles,
       behaviorPrimitiveCount: primitiveCatalog.length,
       tokenDefinitionCount: tokenCatalog.length,
     },
@@ -225,7 +222,7 @@ export function buildJevCardRequestState(
 }
 
 function resolveTargetCard(
-  catalog: Awaited<ReturnType<typeof loadSourceCardCatalog>>,
+  catalog: Awaited<ReturnType<typeof loadCardCatalog>>,
   target: CardTriageTarget,
 ): Card {
   if (target.publicCode !== undefined) {
@@ -386,12 +383,13 @@ function toJevBehaviorCapability(
   };
 }
 
-function collectCanonicalBehaviorIds(
+export function collectCanonicalBehaviorIds(
   document: CanonicalCardDocument,
 ): string[] {
   const ids = new Set<string>();
 
   for (const model of [document.behaviorModel, document.effectBehaviorModel]) {
+    if (!model) continue;
     for (const binding of model.playTimings) ids.add(binding.behaviorId);
     for (const clause of model.clauses) {
       for (const bindings of [

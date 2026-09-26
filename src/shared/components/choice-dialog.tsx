@@ -8,7 +8,7 @@ import { GameActionButton } from "@/features/game-board/components/game-action-b
 
 export type ChoiceDialogOption = {
   labelContent?: ReactNode;
-  description?: string;
+  description?: ReactNode;
   diagnosticCardInstanceId?: string;
   disabled?: boolean;
   id: string;

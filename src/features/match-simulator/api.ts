@@ -35,6 +35,7 @@ export async function loadProjectionClient(
 export async function performActionClient(input: {
   matchId: string; playerToken: string; stateVersion: number;
   actionId: string; selectedIds: string[];
+  targetSelections?: Record<string, string[]>;
   allocations?: Array<{ targetUnitId: string; amount: number }>;
   tokenPlacements?: Array<{ destinationId: string; count: number }>;
 }): Promise<{ accepted: true; projection: MatchProjection } | ApiFailure> {
@@ -49,6 +50,7 @@ export async function performActionClient(input: {
         payload: {
           actionId: input.actionId,
           selectedIds: input.selectedIds,
+          targetSelections: input.targetSelections ?? {},
           allocations: input.allocations ?? [],
           tokenPlacements: input.tokenPlacements ?? []
         }

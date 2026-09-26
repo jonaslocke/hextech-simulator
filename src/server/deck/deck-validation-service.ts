@@ -4,7 +4,7 @@ import {
   type DeckValidationReason, type RegisteredDeckValidationRequest, type DeckValidationResponse,
   type DeckValidationSection,
 } from "@/shared/deck-validation";
-import { loadSourceCardCatalog, type Card, type CardCatalog } from "@/server/catalog";
+import { loadCardCatalog, type Card, type CardCatalog } from "@/server/catalog";
 import { hashCardRulesText } from "@/server/card-catalog";
 import { deriveCardCodeFromCard } from "@/server/card-catalog/identity";
 import type { DeckConfiguration } from "@/shared/game";
@@ -121,7 +121,7 @@ export async function validateDeckText(input: {
   sourceText: string;
   catalog?: CardCatalog;
 } & ({ db: Db } | { loadDatabase: () => Promise<Db> })): Promise<DeckValidationResponse> {
-  const catalog = input.catalog ?? await loadSourceCardCatalog();
+  const catalog = input.catalog ?? await loadCardCatalog();
   const resolution = resolveDeckText(input.sourceText, catalog);
   const codes = resolution.entries.flatMap((entry) => entry.cardCode ? [entry.cardCode] : []);
   const readiness = codes.length
@@ -140,7 +140,7 @@ export async function loadRegisteredDeckReadiness(
   db: Db, registeredDeck: DeckSnapshotDocument,
 ): Promise<DeckValidationReason[]> {
   const [catalog, readiness] = await Promise.all([
-    loadSourceCardCatalog(),
+    loadCardCatalog(),
     loadCanonicalDeckReadiness(db, registeredDeck.snapshot.cards.map((card) => card.cardCode)),
   ]);
   const reasons = [...readiness.reasons];

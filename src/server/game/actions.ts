@@ -1,4 +1,7 @@
-import type { ProjectedAction } from "../../shared/game";
+import {
+  targetSelectionSatisfiesRequirements,
+  type ProjectedAction,
+} from "../../shared/game";
 import type { NumericContribution } from "./numeric-modifiers";
 import { hasEffectiveKeyword, reconcileAllRuntimeKeywordActivations } from "./effective-keywords";
 import { behaviorModelForChainItem } from "./runtime-behaviors";
@@ -21,6 +24,7 @@ import {
   advanceGameObjectIncarnation,
   moveCardToTrash,
   recomputeAllMight,
+  recycleCards,
   submitDeathReplacementOrder,
   type RuntimeCardIndex,
 } from "./primitive-handlers";
@@ -62,7 +66,7 @@ import {
   type GameTransition,
 } from "./transitions";
 import {
-  canPayAnyPowerCost,
+  canPrepareAnyPowerCost,
   buildAbilityPaymentPlan,
   abilityPoolPaymentPreview,
   anyPowerPoolPaymentPreview,
@@ -73,10 +77,13 @@ import {
   payAbilityCost,
   payCardCosts,
   targetDeflectCost,
+  ignoresDeflect,
   type AdditionalCardCost,
 } from "./payment";
+import { effectiveExhaustForResourceAmount } from "./resource-ability-amount";
 import {
   beginEffectResolution,
+  resumeEffectResolution,
   submitEffectOption,
   submitEffectSelection,
   submitTokenPlacement,
@@ -104,6 +111,33 @@ export function gameplayActions(
   const actions: ProjectedAction[] = [
     action(game, "concede", "Concede Game", null),
   ];
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (stagedPlay) {
+    if (stagedPlay.playerId !== actorPlayerId) return actions;
+    addPlayableCardActions(actions, game, actorPlayerId, decks, index, "neutralOpen", {
+      stagedCardInstanceId: stagedPlay.cardInstanceId,
+      ignoreBaseEnergy: stagedPlay.ignoreBaseEnergy,
+      ignoreBasePower: stagedPlay.ignoreBasePower,
+      forcedDestinationId: stagedPlay.forcedDestinationId,
+      destinationBasePlayerId: stagedPlay.destinationBasePlayerId,
+    });
+    addAbilityActions(actions, game, actorPlayerId, index, handlers, "neutralOpen", true);
+    const hasPlayableMode = actions.some(
+      (candidate) => candidate.id.split(":")[3] === "play",
+    );
+    // Rule 128.6 lets a player decline an effect-driven play from a private
+    // zone. If the staged card has no legal play, the instruction is
+    // impossible and the parent effect simply continues.
+    if (stagedPlay.mayDecline || !hasPlayableMode) {
+      actions.push(action(
+        game,
+        "skipEffectPlay",
+        stagedPlay.mayDecline ? "Don't play" : "Continue",
+        null,
+      ));
+    }
+    return actions;
+  }
   // Debug intents still pass through normal authorization, versioning, and logging.
   if (process.env.NODE_ENV === "development") {
     const disabledReason = game.state.pendingChoice
@@ -483,6 +517,7 @@ export function performGameplayAction(input: {
   actorPlayerId: string;
   actionId: string;
   selectedIds: string[];
+  targetSelections?: Record<string, string[]>;
   allocations?: DamageAssignment[];
   tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
@@ -494,7 +529,7 @@ export function performGameplayAction(input: {
     throw new Error("Action is not legal for the current game state.");
   if (projected.poolPayment?.mode === "card" && projected.poolPayment.canPay === false)
     throw new Error("Add enough resources before confirming this action.");
-  validateActionTargets(projected, input.selectedIds);
+  validateActionTargets(projected, input.selectedIds, input.targetSelections ?? {});
   const game = structuredClone(input.game);
   // Public card reveals are an informational presentation, not a decision.
   // A later accepted game action replaces the transient presentation.
@@ -520,10 +555,14 @@ export function performGameplayAction(input: {
         source,
         extra,
         input.selectedIds,
+        input.targetSelections ?? {},
         index,
         handlers,
         input.decks,
       );
+      break;
+    case "skipEffectPlay":
+      skipEffectPlay(game, input.actorPlayerId, index, input.decks);
       break;
     case "hide":
       hideCard(game, input.actorPlayerId, source, extra, index);
@@ -573,6 +612,12 @@ export function performGameplayAction(input: {
           input.selectedIds,
           input.decks,
         );
+        completeChainResolution(game, index, input.decks);
+        queueChainItemsForTargets(game, [], input.decks);
+        drainQueuedBehaviorEvents(game, input.decks);
+        resetChainPriorityToTopItem(game);
+        openPendingShowdown(game, index, input.decks);
+        finishTurnProgressionIfReady(game, index, input.decks);
       } else if (game.state.pendingChoice?.type === "effectOption") {
         submitEffectOption(
           game,
@@ -733,6 +778,7 @@ export function performGameplayTransition(input: {
   actorPlayerId: string;
   actionId: string;
   selectedIds: string[];
+  targetSelections?: Record<string, string[]>;
   allocations?: DamageAssignment[];
   tokenPlacements?: TokenPlacement[];
   decks: readonly DeckSnapshotDocument[];
@@ -761,13 +807,29 @@ function playCard(
   cardId: string,
   playExtra: string,
   selectedIds: string[],
+  targetSelections: Record<string, string[]>,
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   decks: readonly DeckSnapshotDocument[],
 ) {
   const player = game.state.players[playerId]!;
   const definition = definitionForInstance(cardId, index);
-  const { destinationId, optionalCostKeys } = decodePlayExtra(playExtra);
+  const { destinationId, optionalCostKeys, flow, repeat, effectPlay, preplayOptionSelections } = decodePlayExtra(playExtra);
+  const stagedPlay = effectPlay ? game.state.effectPlayQueue?.[0] : null;
+  if (
+    effectPlay &&
+    (!stagedPlay || stagedPlay.playerId !== playerId || stagedPlay.cardInstanceId !== cardId)
+  ) {
+    throw new Error("Effect-driven card play is not available for this card.");
+  }
+  const flowEnergyCost = flowEnergyCostFor(definition);
+  if (
+    flow
+      ? !player.zones.trash.includes(cardId) || flowEnergyCost === null
+      : !player.zones.hand.includes(cardId) && player.zones.champion !== cardId
+  ) {
+    throw new Error("Card play origin is not legal.");
+  }
   const optionalSourceCosts = optionalSourcePlayCosts(definition);
   const optionalSourceCostKeys = new Set(
     optionalSourceCosts.map((payment) => payment.selectionKey),
@@ -778,7 +840,9 @@ function playCard(
   const optionalCosts = optionalSourceCosts
     .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
     .flatMap((payment) => payment.costs);
-  const selectionOverrides = Object.fromEntries(
+  const repeatCost = repeat ? repeatAdditionalCostFor(definition) : null;
+  if (repeat && !repeatCost) throw new Error("Repeat is not available for this card.");
+  const optionalSelectionOverrides = Object.fromEntries(
     optionalSourceCosts.map((payment) => [
       payment.selectionKey,
       optionalCostKeys.includes(payment.selectionKey) ? [cardId] : [],
@@ -786,8 +850,26 @@ function playCard(
   );
   // The source id permits canonical selector validation while the keyed
   // overrides retain which individual optional costs were actually chosen.
-  const allSelectedIds =
-    optionalCostKeys.length > 0 ? [...selectedIds, cardId] : selectedIds;
+  const executionTargetSelections = repeat
+    ? [
+        targetSelections["repeat:0"] ?? [],
+        targetSelections["repeat:1"] ?? [],
+      ]
+    : [targetSelections["play:0"] ?? selectedIds];
+  const firstExecutionTargets = executionTargetSelections[0] ?? [];
+  const selectionOverrides = selectionOverridesForPlayExecution({
+    game,
+    playerId,
+    cardId,
+    definition,
+    handlers,
+    targetIds: firstExecutionTargets,
+    optionalSelectionOverrides,
+    preplayOptionSelections: preplayOptionSelections[0] ?? {},
+  });
+  const allSelectedIds = optionalCostKeys.length > 0
+    ? [...firstExecutionTargets, cardId]
+    : firstExecutionTargets;
   const isUnit = definition.card.classification.type === "Unit";
   const isGear = definition.card.classification.type === "Gear";
   const showdownAtPlayStart = game.state.showdown;
@@ -799,7 +881,10 @@ function playCard(
       : null;
   if (
     isUnit &&
-    !isLegalUnitDestination(game, playerId, definition, destinationId)
+    (stagedPlay?.forcedDestinationId
+      ? destinationId !== stagedPlay.forcedDestinationId ||
+        (destinationId !== "base" && !destinationBattlefield)
+      : !isLegalUnitDestination(game, playerId, definition, destinationId))
   ) {
     throw new Error("Unit play destination is not legal for this card.");
   }
@@ -808,9 +893,13 @@ function playCard(
     handlers, selectionOverrides,
   });
   if (dynamicTargets.some((target) => target.kind === "location")) {
-    validateTargetRequirements(dynamicTargets, selectedIds);
+    validateTargetRequirements(dynamicTargets, firstExecutionTargets);
   }
-  const energyCost = effectiveEnergyCost(game, playerId, definition, index, cardId);
+  const energyCost = effectPlay
+    ? effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, stagedPlay?.ignoreBaseEnergy ? 0 : undefined)
+    : flow
+    ? effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, flowEnergyCost!)
+    : effectiveEnergyCost(game, playerId, definition, index, cardId);
   const playEvent = {
     type: "card.played",
     actorPlayerId: playerId,
@@ -822,7 +911,7 @@ function playCard(
   };
   const additionalAnyPower = targetDeflectCost(
     playerId,
-    selectedIds,
+    executionTargetSelections.flat(),
     index,
     game,
     ignoresDeflect(definition),
@@ -834,14 +923,15 @@ function playCard(
     energyCost,
     index,
     additionalAnyPower,
-    optionalCosts,
+    [...optionalCosts, ...(repeatCost ? [repeatCost] : [])],
     cardId,
+    stagedPlay?.ignoreBasePower ? 0 : undefined,
   );
   payOptionalNonResourcePlayCosts(
     game,
     playerId,
     definition,
-    selectedIds,
+    executionTargetSelections.flat(),
     index,
   );
   if (game.state.turn) {
@@ -850,6 +940,7 @@ function playCard(
   }
   if (game.state.showdown) game.state.showdown.passedPlayerIds = [];
   player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  if (flow) player.zones.trash = player.zones.trash.filter((id) => id !== cardId);
   if (player.zones.champion === cardId) player.zones.champion = null;
   if (isGear) {
     // Rules 143.1.a.1, 144.1, and 563.1.d: Gear enters ready at its
@@ -869,11 +960,17 @@ function playCard(
     );
     dispatchBehaviorEvent(game, playEvent, decks, { chainOrigin: "cardPlay" });
     cleanupBoard(game, index);
+    completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
     return;
   }
   if (isUnit) {
     if (destinationBattlefield) destinationBattlefield.units.push(cardId);
-    else player.zones.base.push(cardId);
+    else {
+      const destinationBasePlayerId = stagedPlay?.destinationBasePlayerId ?? playerId;
+      const destinationBase = game.state.players[destinationBasePlayerId]?.zones.base;
+      if (!destinationBase) throw new Error("Unit play Base destination is unavailable.");
+      destinationBase.push(cardId);
+    }
     advanceGameObjectIncarnation(game, cardId);
     if (
       destinationBattlefield &&
@@ -912,6 +1009,7 @@ function playCard(
       );
       game.state.showdown.passedPlayerIds = [];
     }
+    completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
     return;
   }
   advanceGameObjectIncarnation(game, cardId);
@@ -923,6 +1021,15 @@ function playCard(
     sourceCardInstanceId: cardId,
     targetCardInstanceIds: allSelectedIds,
     initialSelectionOverrides: selectionOverrides,
+    flowPlayed: flow,
+    ...(repeat ? {
+      repeatTargetSelections: executionTargetSelections,
+      repeatTargetObjectVersions: executionTargetSelections.map((targets) =>
+        captureTargetObjectVersions(game, targets),
+      ),
+      repeatResolutionIndex: 0,
+      preplayOptionSelections,
+    } : {}),
     targetObjectVersions: captureTargetObjectVersions(game, allSelectedIds),
     behaviorClauseId: spellResolutionClauseId(definition, handlers),
     activatedBehaviorId: null,
@@ -942,6 +1049,77 @@ function playCard(
       passedPlayerIds: [],
     };
   }
+  completeEffectPlayIfReady(game, playerId, cardId, effectPlay, index, decks);
+}
+
+function completeEffectPlayIfReady(
+  game: GameDocument,
+  playerId: string,
+  cardId: string,
+  effectPlay: boolean,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  if (!effectPlay) return;
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay || stagedPlay.playerId !== playerId || stagedPlay.cardInstanceId !== cardId) {
+    throw new Error("Effect-driven card play queue is unavailable.");
+  }
+  game.state.effectPlayQueue!.shift();
+  if (game.state.effectPlayQueue!.length > 0) {
+    activateEffectPlayQueueHead(game);
+    return;
+  }
+  const deferredItems = game.state.deferredChainItems ?? [];
+  game.state.deferredChainItems = [];
+  if (deferredItems.length) queueChainItemsForTargets(game, deferredItems, decks);
+  if (stagedPlay.resumeResolutionAfterPlay !== false) {
+    resumeEffectResolution(game, stagedPlay.resolutionId, decks);
+  }
+  completeChainResolution(game, index, decks);
+  finishTurnProgressionIfReady(game, index, decks);
+}
+
+function activateEffectPlayQueueHead(game: GameDocument) {
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay?.awaitParentResolution) return;
+  const player = game.state.players[stagedPlay.playerId];
+  if (!player) throw new Error("Effect-driven play owner is unavailable.");
+  player.zones.banishment = player.zones.banishment.filter(
+    (id) => id !== stagedPlay.cardInstanceId,
+  );
+  if (!player.zones.hand.includes(stagedPlay.cardInstanceId)) {
+    player.zones.hand.push(stagedPlay.cardInstanceId);
+  }
+  advanceGameObjectIncarnation(game, stagedPlay.cardInstanceId);
+  stagedPlay.awaitParentResolution = false;
+}
+
+function skipEffectPlay(
+  game: GameDocument,
+  playerId: string,
+  index: RuntimeCardIndex,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const stagedPlay = game.state.effectPlayQueue?.[0];
+  if (!stagedPlay || stagedPlay.playerId !== playerId) {
+    throw new Error("Effect-driven card play queue is unavailable.");
+  }
+  const player = game.state.players[playerId]!;
+  const cardId = stagedPlay.cardInstanceId;
+  if (!player.zones.hand.includes(cardId)) {
+    throw new Error("The staged card is no longer available to play.");
+  }
+  // Temporary hand staging is an implementation detail. A card which cannot
+  // be played returns to the zone from which this effect staged it.
+  player.zones.hand = player.zones.hand.filter((id) => id !== cardId);
+  if (stagedPlay.returnZone === "banishment") {
+    if (!player.zones.banishment.includes(cardId)) player.zones.banishment.push(cardId);
+  } else {
+    player.zones.mainDeck.unshift(cardId);
+  }
+  advanceGameObjectIncarnation(game, cardId);
+  completeEffectPlayIfReady(game, playerId, cardId, true, index, decks);
 }
 
 function spellResolutionClauseId(
@@ -953,6 +1131,73 @@ function spellResolutionClauseId(
       (clause) => clause.triggers.length === 0 && clause.abilities.length === 0,
     );
   return clauses.length === 1 ? clauses[0]!.id : null;
+}
+
+function flowEnergyCostFor(definition: GameCardDefinition): number | null {
+  const flow = definition.behaviorModel.clauses
+    .flatMap((clause) => clause.keywords)
+    .find((binding) => binding.behaviorId === "keyword.flow");
+  const energyCost = flow?.parameters.energyCost;
+  return typeof energyCost === "number" && energyCost >= 0
+    ? energyCost
+    : null;
+}
+
+function repeatAdditionalCostFor(definition: GameCardDefinition): AdditionalCardCost | null {
+  const repeat = definition.behaviorModel.clauses
+    .flatMap((clause) => clause.keywords)
+    .find((binding) => binding.behaviorId === "keyword.repeat");
+  const energy = repeat?.parameters.energyCost;
+  const power = repeat?.parameters.powerCost;
+  return typeof energy === "number" && energy >= 0 &&
+    typeof power === "number" && power >= 0
+    ? { energy, power }
+    : null;
+}
+
+function selectionOverridesForPlayExecution(input: {
+  game: GameDocument;
+  playerId: string;
+  cardId: string;
+  definition: GameCardDefinition;
+  handlers: ReturnType<typeof createPrimitiveHandlers>;
+  targetIds: readonly string[];
+  optionalSelectionOverrides: Record<string, string[]>;
+  preplayOptionSelections: Record<string, string[]>;
+}) {
+  const base = {
+    ...input.optionalSelectionOverrides,
+    ...input.preplayOptionSelections,
+  };
+  const requirements = compileBehaviorModel(input.definition.behaviorModel, input.handlers)
+    .clauses
+    .filter((clause) => clauseCanRequirePlaySelections(input.definition, clause))
+    .flatMap((clause) => targetRequirementsForClause(
+      clause,
+      createBehaviorContext(
+        input.game,
+        input.playerId,
+        input.cardId,
+        null,
+        [...input.targetIds],
+        {},
+        base,
+      ),
+      input.handlers,
+    )).filter((requirement) => requirement.sourceZone !== "mainDeck");
+  return {
+    ...base,
+    ...Object.fromEntries(requirements.flatMap((requirement) =>
+      requirement.maximum > 0 &&
+      requirement.selectionPurpose !== "optionalCost" &&
+      typeof requirement.selectionKey === "string"
+        ? [[
+            requirement.selectionKey,
+            input.targetIds.filter((id) => requirement.legalIds.includes(id)),
+          ]]
+        : [],
+    )),
+  };
 }
 
 function playTargetRequirements(input: {
@@ -971,11 +1216,62 @@ function playTargetRequirements(input: {
     .flatMap((clause) => targetRequirementsForClause(
       clause,
       createBehaviorContext(
-        input.game, input.playerId, input.cardId, null, input.selectedIds,
-        {}, input.selectionOverrides ?? {}, input.hiddenBattlefieldId ?? null,
+        input.game,
+        input.playerId,
+        input.cardId,
+        null,
+        input.selectedIds,
+        {},
+        input.selectionOverrides ?? {},
+        undefined,
+        input.hiddenBattlefieldId ?? null,
       ),
       input.handlers,
-    ));
+    ))
+    .filter((requirement) => requirement.sourceZone !== "mainDeck");
+}
+
+function selectionOverridesForChainExecution(
+  game: GameDocument,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  item: NonNullable<GameDocument["state"]["chain"]>["items"][number],
+  controllerPlayerId: string,
+  targetIds: readonly string[],
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+) {
+  const executionIndex = item.repeatResolutionIndex ?? 0;
+  const base = {
+    ...(item.initialSelectionOverrides ?? {}),
+    ...(item.preplayOptionSelections?.[executionIndex] ?? {}),
+  };
+  const requirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(
+      game,
+      controllerPlayerId,
+      item.sourceCardInstanceId!,
+      item.behaviorEvent,
+      [...targetIds],
+      {},
+      base,
+      undefined,
+      item.hiddenBattlefieldId ?? null,
+    ),
+    handlers,
+  ).filter((requirement) => requirement.sourceZone !== "mainDeck");
+  return {
+    ...base,
+    ...Object.fromEntries(requirements.flatMap((requirement) =>
+      requirement.maximum > 0 &&
+      requirement.selectionPurpose !== "optionalCost" &&
+      typeof requirement.selectionKey === "string"
+        ? [[
+            requirement.selectionKey,
+            targetIds.filter((id) => requirement.legalIds.includes(id)),
+          ]]
+        : [],
+    )),
+  };
 }
 
 function addHiddenCardActions(
@@ -997,7 +1293,7 @@ function addHiddenCardActions(
     for (const cardId of [...player.zones.hand, ...(player.zones.champion ? [player.zones.champion] : [])]) {
       if (!hasEffectiveKeyword(game, cardId, "keyword.hidden", index)) continue;
       const definition = definitionForInstance(cardId, index);
-      const canPay = canPayAnyPowerCost(game, playerId, definition, index);
+      const canPrepare = canPrepareAnyPowerCost(game, playerId, definition, index);
       for (const battlefield of availableBattlefields) {
         const battlefieldName = definitionForInstance(battlefield.cardInstanceId, index).card.name;
         const hideAction = action(
@@ -1005,8 +1301,8 @@ function addHiddenCardActions(
           "hide",
           `Hide at ${battlefieldName}`,
           cardId,
-          canPay,
-          canPay ? null : "A Power rune is required to hide this card.",
+          canPrepare,
+          canPrepare ? null : "A Power rune is required to hide this card.",
           battlefield.battlefieldId,
         );
         hideAction.presentation.resourceCost = {
@@ -1216,13 +1512,50 @@ function completeChainResolution(
   if (!chain?.resolvingItemId || game.state.effectResolutions.length || game.state.pendingChoice) return;
   const item = chain.items.find((candidate) => candidate.id === chain.resolvingItemId);
   if (!item) throw new Error("Resolving Chain item is unavailable.");
+  const repeatSelections = item.repeatTargetSelections;
+  const repeatIndex = item.repeatResolutionIndex ?? 0;
+  if (repeatSelections && repeatIndex + 1 < repeatSelections.length) {
+    item.repeatResolutionIndex = repeatIndex + 1;
+    if (!item.sourceCardInstanceId || !item.behaviorClauseId) {
+      throw new Error("Repeat chain item is unavailable.");
+    }
+    const definition = definitionForInstance(item.sourceCardInstanceId, index);
+    const clause = compileBehaviorModel(definition.behaviorModel, createPrimitiveHandlers(index))
+      .clauses.find((candidate) => candidate.id === item.behaviorClauseId);
+    if (!clause) throw new Error("Repeat behavior clause is unavailable.");
+    const lockedTargets = validLockedTargets(game, clause, item, item.controllerPlayerId, createPrimitiveHandlers(index));
+    beginEffectResolution({
+      game,
+      controllerPlayerId: item.controllerPlayerId,
+      sourceCardInstanceId: item.sourceCardInstanceId,
+      clauseId: clause.id,
+      selectedIds: lockedTargets,
+      selectionOverrides: selectionOverridesForChainExecution(
+        game,
+        clause,
+        item,
+        item.controllerPlayerId,
+        lockedTargets,
+        createPrimitiveHandlers(index),
+      ),
+      targetsLocked: true,
+      event: item.behaviorEvent,
+      decks,
+    });
+    if (!game.state.effectResolutions.length && !game.state.pendingChoice) {
+      completeChainResolution(game, index, decks);
+    }
+    return;
+  }
   chain.items = chain.items.filter((candidate) => candidate.id !== item.id);
   delete chain.resolvingItemId;
   if (item.kind === "spell" && item.sourceCardInstanceId) {
     const definition = definitionForInstance(item.sourceCardInstanceId, index);
     const owner = index.instances.get(item.sourceCardInstanceId)!.ownerPlayerId;
     if (item.hiddenBattlefieldId) clearHiddenCardLocation(game, item.sourceCardInstanceId, item.hiddenBattlefieldId);
-    game.state.players[owner]!.zones.trash.push(item.sourceCardInstanceId);
+    game.state.players[owner]!.zones[item.flowPlayed ? "banishment" : "trash"].push(
+      item.sourceCardInstanceId,
+    );
     advanceGameObjectIncarnation(game, item.sourceCardInstanceId);
     dispatchBehaviorEvent(game, item.behaviorEvent?.type === "card.played"
       ? item.behaviorEvent
@@ -1249,6 +1582,7 @@ function completeChainResolution(
       game.state.showdown.passedPlayerIds = [];
     }
   }
+  activateEffectPlayQueueHead(game);
 }
 
 function passPriority(
@@ -1324,6 +1658,7 @@ function passPriority(
                 handlers,
               ),
               selectionOverrides: item.initialSelectionOverrides,
+              prepaidCostSelectionKeys: activatedCostSelectionKeys(clause),
               targetsLocked: true,
               decks,
             });
@@ -1352,6 +1687,21 @@ function passPriority(
             (candidate) => candidate.id === item.behaviorClauseId,
           );
           if (clause) {
+            const lockedTargets = validLockedTargets(
+              game,
+              clause,
+              item,
+              controller,
+              handlers,
+            );
+            const executionOverrides = selectionOverridesForChainExecution(
+              game,
+              clause,
+              item,
+              controller,
+              lockedTargets,
+              handlers,
+            );
             if (
               clause.timings.some(
                 (timing) => timing.behaviorId === "timing.delayed",
@@ -1364,9 +1714,9 @@ function passPriority(
                   controller,
                   item.sourceCardInstanceId,
                   item.behaviorEvent,
-                  item.targetCardInstanceIds,
+                  lockedTargets,
                   {},
-                  item.initialSelectionOverrides ?? {},
+                  executionOverrides,
                 ),
                 handlers,
               });
@@ -1377,14 +1727,8 @@ function passPriority(
                 sourceCardInstanceId: item.sourceCardInstanceId,
                 clauseId: clause.id,
                 grantedBehaviorClauseSnapshot: item.grantedBehaviorClauseSnapshot,
-                selectedIds: validLockedTargets(
-                  game,
-                  clause,
-                  item,
-                  controller,
-                  handlers,
-                ),
-                selectionOverrides: item.initialSelectionOverrides,
+                selectedIds: lockedTargets,
+                selectionOverrides: executionOverrides,
                 targetsLocked: true,
                 event: item.behaviorEvent,
                 decks,
@@ -1513,7 +1857,13 @@ function finishTurnProgressionIfReady(
   decks: readonly DeckSnapshotDocument[],
 ) {
   const turn = game.state.turn;
-  if (!turn || game.state.chain || game.state.pendingChoice) return;
+  if (
+    !turn ||
+    game.state.chain ||
+    game.state.pendingChoice ||
+    game.state.effectResolutions.length > 0 ||
+    (game.state.effectPlayQueue?.length ?? 0) > 0
+  ) return;
   if (turn.phase === "end") {
     continueEndTurn(game, turn.activePlayerId, index, decks);
   } else if (isStartOfTurnPhase(turn.phase)) {
@@ -1533,6 +1883,7 @@ function action(
   choice?: ProjectedAction["choice"],
   costPreview?: ProjectedAction["costPreview"],
   poolPayment?: ProjectedAction["poolPayment"],
+  resourceOutput?: NonNullable<ProjectedAction["presentation"]["resourceOutput"]>,
 ): ProjectedAction {
   const parts = [
     "game",
@@ -1563,6 +1914,7 @@ function action(
     poolPayment,
     choice,
     presentation: {
+      resourceOutput,
       surface,
       style:
         kind === "concede"
@@ -1745,20 +2097,32 @@ function optionalPlayCostModes(
 function encodePlayExtra(
   destinationId: string | undefined,
   optionalCostKeys: readonly string[],
+  flow = false,
+  repeat = false,
+  effectPlay = false,
+  preplayOptionSelections: readonly Record<string, string[]>[] = [],
 ) {
-  if (optionalCostKeys.length === 0) return destinationId;
+  if (optionalCostKeys.length === 0 && !flow && !repeat && !effectPlay && preplayOptionSelections.length === 0) return destinationId;
   return `play:${JSON.stringify({
     destinationId: destinationId ?? null,
     optionalCostKeys,
+    flow,
+    repeat,
+    effectPlay,
+    preplayOptionSelections,
   })}`;
 }
 
 function decodePlayExtra(extra: string): {
   destinationId: string;
   optionalCostKeys: string[];
+  flow: boolean;
+  repeat: boolean;
+  effectPlay: boolean;
+  preplayOptionSelections: Record<string, string[]>[];
 } {
   if (!extra.startsWith("play:")) {
-    return { destinationId: extra, optionalCostKeys: [] };
+    return { destinationId: extra, optionalCostKeys: [], flow: false, repeat: false, effectPlay: false, preplayOptionSelections: [] };
   }
   try {
     const parsed: unknown = JSON.parse(extra.slice("play:".length));
@@ -1772,16 +2136,31 @@ function decodePlayExtra(extra: string): {
     const destinationId = (parsed as { destinationId?: unknown }).destinationId;
     const optionalCostKeys = (parsed as { optionalCostKeys: unknown[] })
       .optionalCostKeys;
+    const flow = (parsed as { flow?: unknown }).flow;
+    const repeat = (parsed as { repeat?: unknown }).repeat;
+    const effectPlay = (parsed as { effectPlay?: unknown }).effectPlay;
+    const preplayOptionSelections = (parsed as { preplayOptionSelections?: unknown }).preplayOptionSelections;
     if (
       (destinationId !== null && typeof destinationId !== "string") ||
+      (flow !== undefined && typeof flow !== "boolean") ||
+      (repeat !== undefined && typeof repeat !== "boolean") ||
+      (effectPlay !== undefined && typeof effectPlay !== "boolean") ||
       optionalCostKeys.some((key) => typeof key !== "string") ||
-      new Set(optionalCostKeys).size !== optionalCostKeys.length
+      new Set(optionalCostKeys).size !== optionalCostKeys.length ||
+      (preplayOptionSelections !== undefined && (!Array.isArray(preplayOptionSelections) ||
+        preplayOptionSelections.some((selection) => !selection || typeof selection !== "object" ||
+          Object.entries(selection as Record<string, unknown>).some(([key, values]) =>
+            !key || !Array.isArray(values) || values.some((value) => typeof value !== "string")))))
     ) {
       throw new Error();
     }
     return {
       destinationId: destinationId ?? "",
       optionalCostKeys: optionalCostKeys as string[],
+      flow: flow === true,
+      repeat: repeat === true,
+      effectPlay: effectPlay === true,
+      preplayOptionSelections: (preplayOptionSelections ?? []) as Record<string, string[]>[],
     };
   } catch {
     throw new Error("Play mode is malformed.");
@@ -1819,8 +2198,115 @@ function playActionLabel(input: {
   return `${base} (${costs.join(" + ")})`;
 }
 
+function committedPlayDeclarationLabel(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  selections: readonly Record<string, string[]>[],
+) {
+  return selections.flatMap((selection) => compiled.clauses.flatMap((clause) =>
+    clause.effects.flatMap((binding) => {
+      const key = binding.parameters.selectionKey;
+      if (binding.behaviorId !== "action.optional" ||
+        binding.parameters.commitAtPlay !== true ||
+        typeof key !== "string") return [];
+      const selected = selection[key]?.[0];
+      const label = selected === "yes"
+        ? binding.parameters.yesLabel
+        : selected === "no"
+          ? binding.parameters.noLabel
+          : null;
+      return typeof label === "string" && label.length > 0 ? [label] : [];
+    }),
+  )).join(" → ");
+}
+
 function displayPowerDomain(domain: string) {
   return `${domain.slice(0, 1).toUpperCase()}${domain.slice(1).toLowerCase()}`;
+}
+
+function readyGearAbilityLabel(
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+) {
+  if (!clause.effects.some((binding) => binding.behaviorId === "action.ready_cards")) {
+    return null;
+  }
+  const selector = clause.selectors.find(
+    (binding) => binding.behaviorId === "selector.gear",
+  );
+  if (!selector) return null;
+  const minimum = selector.parameters.minimumCount;
+  const maximum = selector.parameters.maximumCount;
+  if (typeof maximum !== "number" || maximum < 1) return null;
+  if (minimum === 1 && maximum === 1) return "Ready a Gear";
+  if (minimum === maximum) return `Ready ${maximum} Gears`;
+  return `Ready up to ${maximum} Gears`;
+}
+
+function committedPlayOptionModes(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+): Record<string, string[]>[] {
+  const bindings = compiled.clauses.flatMap((clause) => clause.effects).filter(
+    (binding) => binding.behaviorId === "action.optional" &&
+      binding.parameters.commitAtPlay === true &&
+      typeof binding.parameters.selectionKey === "string",
+  );
+  return bindings.reduce<Record<string, string[]>[]>(
+    (modes, binding) => [
+      ...modes.map((mode) => ({
+        ...mode,
+        [binding.parameters.selectionKey as string]: ["yes"],
+      })),
+      ...modes.map((mode) => ({
+        ...mode,
+        [binding.parameters.selectionKey as string]: ["no"],
+      })),
+    ],
+    [{}],
+  );
+}
+
+function declarationsForPlay(
+  compiled: ReturnType<typeof compileBehaviorModel>,
+  repeat: boolean,
+): Record<string, string[]>[][] {
+  const modes = committedPlayOptionModes(compiled);
+  return repeat
+    ? modes.flatMap((first) => modes.map((second) => [first, second]))
+    : modes.map((mode) => [mode]);
+}
+
+function targetSelectionsForPlayDeclaration(input: {
+  definition: GameCardDefinition;
+  compiled: ReturnType<typeof compileBehaviorModel>;
+  game: GameDocument;
+  playerId: string;
+  cardId: string;
+  handlers: ReturnType<typeof createPrimitiveHandlers>;
+  optionalSelectionOverrides: Record<string, string[]>;
+  optionSelections: readonly Record<string, string[]>[];
+  repeat: boolean;
+}) {
+  return input.optionSelections.flatMap((options, executionIndex) => {
+    const requirements = input.compiled.clauses
+      .filter((clause) => clauseCanRequirePlaySelections(input.definition, clause))
+      .flatMap((clause) => targetRequirementsForClause(
+        clause,
+        createBehaviorContext(
+          input.game,
+          input.playerId,
+          input.cardId,
+          null,
+          [],
+          {},
+          { ...input.optionalSelectionOverrides, ...options },
+        ),
+        input.handlers,
+      ))
+      .filter((requirement) => requirement.sourceZone !== "mainDeck");
+    return requirements.map((requirement) => ({
+      ...requirement,
+      ...(input.repeat ? { selectionGroup: `repeat:${executionIndex}` } : {}),
+    }));
+  });
 }
 
 function addPlayableCardActions(
@@ -1830,13 +2316,30 @@ function addPlayableCardActions(
   decks: readonly DeckSnapshotDocument[],
   index: RuntimeCardIndex,
   timing: TurnTiming,
+  stagedPlay?: {
+    stagedCardInstanceId: string;
+    ignoreBaseEnergy: boolean;
+    ignoreBasePower: boolean;
+    forcedDestinationId: string | null;
+    destinationBasePlayerId: string | null;
+  },
 ) {
   const player = game.state.players[playerId]!;
   const handlers = createPrimitiveHandlers(index);
-  for (const cardId of [
+  const playableCards = [
     ...player.zones.hand,
     ...(player.zones.champion ? [player.zones.champion] : []),
-  ]) {
+  ].map((cardId) => ({ cardId, flow: false })).concat(
+    player.zones.trash
+      .filter((cardId) => {
+        const definition = definitionForInstance(cardId, index);
+        return definition.card.classification.type === "Spell" &&
+          flowEnergyCostFor(definition) !== null;
+      })
+      .map((cardId) => ({ cardId, flow: true })),
+  );
+  for (const { cardId, flow } of playableCards) {
+    if (stagedPlay && cardId !== stagedPlay.stagedCardInstanceId) continue;
     const definition = definitionForInstance(cardId, index);
     if (!["Unit", "Spell", "Gear"].includes(definition.card.classification.type))
       continue;
@@ -1846,24 +2349,24 @@ function addPlayableCardActions(
     const hasReaction =
       timings.includes("timing.reaction") ||
       hasEffectiveKeyword(game, cardId, "keyword.quick_draw", index);
-    if (timing === "showdownOpen" && !hasAction && !hasReaction) continue;
+    if (!stagedPlay && timing === "showdownOpen" && !hasAction && !hasReaction) continue;
     if (
+      !stagedPlay &&
       (timing === "neutralClosed" || timing === "showdownClosed") &&
       !hasReaction
     )
       continue;
-    const context = createBehaviorContext(game, playerId, cardId, null, []);
     const optionalSourceCosts = optionalSourcePlayCosts(definition);
+    const repeatCost = repeatAdditionalCostFor(definition);
     const optionalSourceCostKeys = new Set(
       optionalSourceCosts.map((payment) => payment.selectionKey),
     );
-    const projectedTargets = compiled.clauses
-      .filter((clause) => clauseCanRequirePlaySelections(definition, clause))
-      .flatMap((clause) =>
-        targetRequirementsForClause(clause, context, handlers),
-      );
     const costContributions: NumericContribution[] = [];
-    const cost = effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
+    const cost = stagedPlay?.ignoreBaseEnergy
+      ? effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry), 0)
+      : flow
+      ? effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry), flowEnergyCostFor(definition)!)
+      : effectiveEnergyCost(game, playerId, definition, index, cardId, (entry) => costContributions.push(entry));
     const effectivePower = effectivePowerCost(
       game,
       playerId,
@@ -1871,64 +2374,92 @@ function addPlayableCardActions(
       index,
       cardId,
       (entry) => costContributions.push(entry),
+      stagedPlay?.ignoreBasePower ? 0 : undefined,
     );
-    // Source-selected resource costs are committed by a play mode, not a
-    // target prompt. Other optional selectors (for example, exhaust a unit)
-    // stay as their existing player-decision flow.
-    const targets = projectedTargets.filter(
-      (target) =>
-        !(
-          target.selectionPurpose === "optionalCost" &&
-          target.selectionKey &&
-          optionalSourceCostKeys.has(target.selectionKey)
-        ),
-    );
-    const hasLegalTargets = canSatisfyTargetRequirements(targets);
-    const targetAdditionalPower = targets
-      .flatMap((requirement) => requirement.legalIds)
-      .filter((id, position, ids) => ids.indexOf(id) === position)
-      .map((targetId) => ({
-        targetId,
-        amount: targetDeflectCost(
-          playerId,
-          [targetId],
-          index,
-          game,
-          ignoresDeflect(definition),
-        ),
-      }))
-      .filter((entry) => entry.amount > 0);
-    // This is projection only: payment remains server-owned. Publishing both
-    // printed and evaluated costs lets the client explain modifiers before a
-    // player commits a play, including for disabled actions.
-    const costPreview = {
-      energy: cost,
-      basePower: definition.card.attributes.power ?? 0,
-      effectivePower,
-      printedEnergy: definition.card.attributes.energy ?? 0,
-      printedPower: definition.card.attributes.power ?? 0,
-      targetAdditionalPower,
-    };
     const unitDestinations =
       definition.card.classification.type === "Unit"
-        ? legalUnitDestinationIds(game, playerId, definition).map((id) => ({
-            id,
-            name:
-              id === "base"
+        ? stagedPlay?.forcedDestinationId
+          ? [{
+              id: stagedPlay.forcedDestinationId,
+              name: stagedPlay.forcedDestinationId === "base"
                 ? "Base"
                 : definitionForInstance(
                     game.state.battlefields.find(
-                      (battlefield) => battlefield.battlefieldId === id,
+                      (battlefield) => battlefield.battlefieldId === stagedPlay.forcedDestinationId,
                     )!.cardInstanceId,
                     index,
                   ).card.name,
-          }))
+            }]
+          : legalUnitDestinationIds(game, playerId, definition).map((id) => ({
+              id,
+              name:
+                id === "base"
+                  ? "Base"
+                  : definitionForInstance(
+                      game.state.battlefields.find(
+                        (battlefield) => battlefield.battlefieldId === id,
+                      )!.cardInstanceId,
+                      index,
+                    ).card.name,
+            }))
         : null;
     for (const destination of unitDestinations ?? [{ id: undefined, name: "" }]) {
       for (const optionalCostKeys of optionalPlayCostModes(optionalSourceCosts)) {
+        for (const repeat of repeatCost ? [false, true] : [false]) {
+        for (const preplayOptionSelections of declarationsForPlay(compiled, repeat)) {
+        const projectedTargets = targetSelectionsForPlayDeclaration({
+          definition,
+          compiled,
+          game,
+          playerId,
+          cardId,
+          handlers,
+          optionalSelectionOverrides: Object.fromEntries(optionalSourceCosts.map((payment) => [
+            payment.selectionKey,
+            optionalCostKeys.includes(payment.selectionKey) ? [cardId] : [],
+          ])),
+          optionSelections: preplayOptionSelections,
+          repeat,
+        });
+        // Source-selected resource costs are committed by a play mode, not a
+        // target prompt. Other optional selectors stay in their existing flow.
+        const targets = projectedTargets.filter(
+          (target) => !(
+            target.selectionPurpose === "optionalCost" &&
+            target.selectionKey &&
+            optionalSourceCostKeys.has(target.selectionKey)
+          ),
+        );
+        const hasLegalTargets = canSatisfyPlayDeclarationTargets(targets);
+        const targetAdditionalPower = targets.flatMap((requirement) =>
+          requirement.legalIds.map((targetId) => ({
+            targetId,
+            ...(requirement.selectionGroup
+              ? { selectionGroup: requirement.selectionGroup }
+              : {}),
+            amount: targetDeflectCost(
+              playerId,
+              [targetId],
+              index,
+              game,
+              ignoresDeflect(definition),
+            ),
+          })),
+        ).filter((entry) => entry.amount > 0);
+        // This is projection only: payment remains server-owned. Publishing
+        // evaluated costs lets the client explain the currently legal mode.
+        const costPreview = {
+          energy: cost,
+          basePower: definition.card.attributes.power ?? 0,
+          effectivePower,
+          printedEnergy: definition.card.attributes.energy ?? 0,
+          printedPower: definition.card.attributes.power ?? 0,
+          targetAdditionalPower,
+        };
         const additionalCosts = optionalSourceCosts
           .filter((payment) => optionalCostKeys.includes(payment.selectionKey))
-          .flatMap((payment) => payment.costs);
+          .flatMap((payment) => payment.costs)
+          .concat(repeat && repeatCost ? [repeatCost] : []);
         const { availableAnyPower, ...payment } = cardPaymentPreview(
           game,
           playerId,
@@ -1937,10 +2468,13 @@ function addPlayableCardActions(
           index,
           additionalCosts,
           cardId,
+          stagedPlay?.ignoreBasePower ? 0 : undefined,
         );
         const costsPayable = payment.canPay;
         const preparable = !costsPayable && hasLegalTargets && canPrepareCardPayment(
           game, playerId, decks, definition, additionalCosts, cardId, timing,
+          stagedPlay?.ignoreBaseEnergy ? 0 : undefined,
+          stagedPlay?.ignoreBasePower ? 0 : undefined,
         );
         const enabled = (costsPayable || preparable) && hasLegalTargets;
         const disabledReason = !hasLegalTargets
@@ -1948,35 +2482,52 @@ function addPlayableCardActions(
           : costsPayable || preparable
             ? null
             : "Card costs cannot be paid.";
+        if (!enabled) continue;
         actions.push(
           action(
             game,
             "play",
-            playActionLabel({
+            `${flow ? "[Flow] " : ""}${repeat ? "[Repeat] " : ""}${playActionLabel({
               definition,
               destinationName: destination.name,
               energyCost: cost,
               effectivePower,
               additionalCosts,
-              hasOptionalModes: optionalSourceCosts.length > 0,
-            }),
+              hasOptionalModes: optionalSourceCosts.length > 0 || repeat,
+            })}`,
             cardId,
             enabled,
             disabledReason,
-            encodePlayExtra(destination.id, optionalCostKeys),
+            encodePlayExtra(
+              destination.id,
+              optionalCostKeys,
+              flow,
+              repeat,
+              Boolean(stagedPlay),
+              preplayOptionSelections.some((selection) => Object.keys(selection).length > 0)
+                ? preplayOptionSelections
+                : [],
+            ),
             targets,
             undefined,
             { ...costPreview, energy: payment.energy, effectivePower: payment.power, availableAnyPower },
             payment,
           ),
         );
+        const declarationLabel = committedPlayDeclarationLabel(
+          compiled,
+          preplayOptionSelections,
+        );
         actions[actions.length - 1]!.presentation.playCost = {
-          label: destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`,
+          label: `${flow ? "[Flow] " : ""}${repeat ? "[Repeat] " : ""}${destination.name ? `Play ${definition.card.name} to ${destination.name}` : `Play ${definition.card.name}`}`,
           destinationLabel: destination.name || "Play",
           paymentMode: optionalCostKeys.length > 0 ? "additional-cost" : "standard",
+          ...(declarationLabel ? { declarationLabel } : {}),
           showCost: optionalCostKeys.length > 0 || cost !== costPreview.printedEnergy || effectivePower !== costPreview.printedPower,
           modifierSources: [...new Set(presentNumericContributions(game, index, costContributions).map((entry) => entry.sourceName))],
         };
+        }
+        }
       }
     }
   }
@@ -1993,10 +2544,12 @@ function canPrepareCardPayment(
   additionalCosts: readonly AdditionalCardCost[],
   cardId: string,
   timing: TurnTiming,
+  baseEnergyOverride?: number,
+  basePowerOverride?: number,
 ) {
   const index = createRuntimeCardIndex(decks, game);
   if (cardPaymentExceedsResourceCapacity(game, playerId, definition, index,
-    effectiveEnergyCost(game, playerId, definition, index, cardId), additionalCosts, cardId)) return false;
+    effectiveEnergyCost(game, playerId, definition, index, cardId, undefined, baseEnergyOverride), additionalCosts, cardId, basePowerOverride)) return false;
   // Supported Add handlers change resource/board state, not runtime card
   // definitions or instances. Reuse their index throughout this local search.
   const handlers = createPrimitiveHandlers(index);
@@ -2010,7 +2563,7 @@ function canPrepareCardPayment(
     if (visited.has(key)) return false;
     visited.add(key);
     if (canPayCardCosts(state, playerId, definition,
-      effectiveEnergyCost(state, playerId, definition, index, cardId), index, 0, additionalCosts, cardId)) return true;
+      effectiveEnergyCost(state, playerId, definition, index, cardId, undefined, baseEnergyOverride), index, 0, additionalCosts, cardId, basePowerOverride)) return true;
     const abilities: ProjectedAction[] = [];
     addAbilityActions(abilities, state, playerId, index, handlers, timing);
     // Try combined Add first: it often supplies both missing resources in one
@@ -2064,6 +2617,7 @@ function addAbilityActions(
   index: RuntimeCardIndex,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
   timing: TurnTiming,
+  onlyAddAbilities = false,
 ) {
   const player = game.state.players[playerId]!;
   const controlled = [
@@ -2092,6 +2646,7 @@ function addAbilityActions(
       ) ?? "Universal";
     for (const clause of compiled.clauses) {
       for (const ability of clause.abilities) {
+        if (onlyAddAbilities && !isAddResourceAbility(ability.behaviorId)) continue;
         if (!abilityAvailableAtTiming(compiled, clause, ability, timing))
           continue;
         const targets = targetRequirementsForClause(
@@ -2099,6 +2654,13 @@ function addAbilityActions(
           createBehaviorContext(game, playerId, sourceId, null, []),
           handlers,
         );
+        const conditionsMet = clause.conditions.every((condition) => {
+          const handler = handlers.get(condition.behaviorId);
+          return handler?.matches?.(
+            condition,
+            createBehaviorContext(game, playerId, sourceId, null, []),
+          ) ?? true;
+        });
         const sourceReady =
           ability.behaviorId === "ability.recycle_for_power" ||
           !game.state.cardStates[sourceId]!.exhausted;
@@ -2114,8 +2676,25 @@ function addAbilityActions(
         const alreadyEmpowered =
           ability.behaviorId === "ability.empower" &&
           game.state.cardStates[sourceId]?.empowered === true;
+        const resourceAmount = ability.behaviorId === "ability.exhaust_for_resource"
+          ? effectiveExhaustForResourceAmount(
+              ability,
+              game.state.cardStates[sourceId]?.empowered === true,
+            )
+          : null;
+        const resourceOutput = ability.behaviorId === "ability.exhaust_for_resource"
+          ? ability.parameters.resourceType === "power"
+            ? { energy: 0, power: resourceAmount ?? 0, powerDomains: [String(ability.parameters.domain ?? powerDomain)] }
+            : { energy: resourceAmount ?? 0, power: 0, powerDomains: [] as string[] }
+          : ability.behaviorId === "ability.recycle_for_power"
+            ? { energy: 0, power: 1, powerDomains: [powerDomain] }
+            : undefined;
+        const amountPrefix = resourceAmount && resourceAmount !== 1
+          ? `${resourceAmount} `
+          : "";
         const enabled =
           sourceReady &&
+          conditionsMet &&
           !alreadyEmpowered &&
           costsPayable &&
           canSatisfyTargetRequirements(targets);
@@ -2124,16 +2703,16 @@ function addAbilityActions(
             ? `Add Power [${powerDomain}]`
             : ability.behaviorId === "ability.exhaust_for_resource"
               ? ability.parameters.resourceType === "power"
-                ? `Add Power [${String(ability.parameters.domain ?? powerDomain)}]`
+                ? `Add ${amountPrefix}Power [${String(ability.parameters.domain ?? powerDomain)}]`
                 : ability.parameters.usage === "spellsOnly" ||
                     ability.parameters.usage === "card:Spell"
-                ? "Add spell Energy"
-                : "Add Energy"
+                ? `Add ${amountPrefix}spell Energy`
+                : `Add ${amountPrefix}Energy`
               : ability.behaviorId === "ability.equip"
                 ? "Equip"
               : ability.behaviorId === "ability.empower"
                 ? "Empower"
-                : `${definition.card.name} ability`;
+                : readyGearAbilityLabel(clause) ?? `${definition.card.name} ability`;
         actions.push(
           action(
             game,
@@ -2144,7 +2723,9 @@ function addAbilityActions(
             enabled
               ? null
                 : sourceReady
-                ? alreadyEmpowered
+                ? !conditionsMet
+                  ? "Ability condition is not satisfied."
+                  : alreadyEmpowered
                   ? "Source is already Empowered."
                   : costsPayable
                   ? "No legal targets are available."
@@ -2157,6 +2738,7 @@ function addAbilityActions(
             ability.behaviorId === "ability.equip"
               ? abilityPoolPaymentPreview(game, playerId, definition, abilityCosts, index)
               : undefined,
+            resourceOutput,
           ),
         );
       }
@@ -2166,6 +2748,12 @@ function addAbilityActions(
         ability.behaviorId === "ability.exhaust_for_resource" &&
         ability.parameters.resourceType === "energy",
     );
+    const combinedEnergyAmount = energyActivation
+      ? effectiveExhaustForResourceAmount(
+          energyActivation.ability,
+          game.state.cardStates[sourceId]?.empowered === true,
+        )
+      : null;
     const powerActivation = activations.find(
       ({ ability }) => ability.behaviorId === "ability.recycle_for_power",
     );
@@ -2190,7 +2778,7 @@ function addAbilityActions(
         action(
           game,
           "activateMany",
-          "Add Energy and Power",
+          `Add ${combinedEnergyAmount && combinedEnergyAmount !== 1 ? `${combinedEnergyAmount} ` : ""}Energy and Power`,
           sourceId,
           enabled,
           enabled ? null : "Source is exhausted.",
@@ -2204,6 +2792,11 @@ function addAbilityActions(
               behaviorId: powerActivation.ability.behaviorId,
             },
           ]),
+          [],
+          undefined,
+          undefined,
+          undefined,
+          { energy: combinedEnergyAmount ?? 0, power: 1, powerDomains: [powerDomain] },
         ),
       );
     }
@@ -2264,7 +2857,7 @@ function executeActivatedAbility(
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
   const definition = definitionForInstance(sourceId, index);
-  const clause = definition.behaviorModel.clauses.find(
+  const clause = compileBehaviorModel(definition.behaviorModel, handlers).clauses.find(
     (item) => item.id === clauseId,
   );
   const binding = clause?.abilities.find(
@@ -2291,6 +2884,29 @@ function executeActivatedAbility(
     return;
   }
   const costs = activationCosts(clause);
+  const targetRequirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(game, actorPlayerId, sourceId, null, []),
+    handlers,
+  );
+  const deflectTargets = targetRequirements
+    .filter((requirement) => requirement.selectionPurpose !== "optionalCost")
+    .flatMap((requirement) => selectedIds.filter((id) => requirement.legalIds.includes(id)));
+  const additionalAnyPower = targetDeflectCost(
+    actorPlayerId,
+    deflectTargets,
+    index,
+    game,
+    ignoresDeflect(definition),
+  );
+  const costSelectionOverrides = activatedCostSelectionOverrides(
+    game,
+    actorPlayerId,
+    sourceId,
+    clause,
+    selectedIds,
+    handlers,
+  );
   if (
     clause.costs.some((cost) => cost.behaviorId === "cost.exhaust_source")
   ) {
@@ -2300,9 +2916,16 @@ function executeActivatedAbility(
     }
     state.exhausted = true;
   }
+  payActivatedNonResourceCosts(game, clause, sourceId, selectedIds, index);
   if (costs.energy > 0 || costs.power > 0) {
     payAbilityCost(game, actorPlayerId, definition, costs, index, {
       poolOnly: binding.behaviorId === "ability.equip",
+      additionalAnyPower,
+    });
+  } else if (additionalAnyPower > 0) {
+    payAbilityCost(game, actorPlayerId, definition, costs, index, {
+      poolOnly: binding.behaviorId === "ability.equip",
+      additionalAnyPower,
     });
   }
   const item = {
@@ -2312,6 +2935,9 @@ function executeActivatedAbility(
     controllerPlayerId: actorPlayerId,
     sourceCardInstanceId: sourceId,
     targetCardInstanceIds: selectedIds,
+    ...(Object.keys(costSelectionOverrides).length
+      ? { initialSelectionOverrides: costSelectionOverrides }
+      : {}),
     targetObjectVersions: captureTargetObjectVersions(game, selectedIds),
     behaviorClauseId: clauseId,
     activatedBehaviorId: behaviorId,
@@ -2328,6 +2954,104 @@ function executeActivatedAbility(
   game.state.chain.items.push(item);
   game.state.chain.priorityPlayerId = actorPlayerId;
   game.state.chain.passedPlayerIds = [];
+}
+
+function canSatisfyPlayDeclarationTargets(
+  targets: readonly ProjectedAction["targets"][number][],
+) {
+  const grouped = new Map<string, ProjectedAction["targets"]>();
+  for (const target of targets) {
+    const group = target.selectionGroup ?? "default";
+    grouped.set(group, [...(grouped.get(group) ?? []), target]);
+  }
+  return [...grouped.values()].every((requirements) =>
+    canSatisfyTargetRequirements(requirements),
+  );
+}
+
+function payActivatedNonResourceCosts(
+  game: GameDocument,
+  clause: BehaviorClause,
+  sourceId: string,
+  selectedIds: readonly string[],
+  index: RuntimeCardIndex,
+) {
+  for (const cost of clause.costs) {
+    if (cost.behaviorId === "cost.discard_selected_cards") {
+      const count = cost.parameters.count;
+      if (typeof count !== "number" || !Number.isInteger(count) || count < 1 || selectedIds.length < count) {
+        throw new Error("Activated discard cost cannot be paid.");
+      }
+      const owner = index.instances.get(sourceId)?.ownerPlayerId;
+      if (!owner) throw new Error("Activated discard source is unavailable.");
+      const player = game.state.players[owner]!;
+      const discarded = selectedIds.slice(0, count);
+      if (discarded.some((id) => !player.zones.hand.includes(id))) {
+        throw new Error("Activated discard cost must use cards from hand.");
+      }
+      player.zones.hand = player.zones.hand.filter((id) => !discarded.includes(id));
+      player.zones.trash.push(...discarded);
+      continue;
+    }
+    if (cost.behaviorId !== "cost.recycle_selected_cards") continue;
+    const count = cost.parameters.count;
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 1) {
+      throw new Error("Activated recycle cost is malformed.");
+    }
+    if (selectedIds.length < count) {
+      throw new Error("Activated recycle cost cannot be paid.");
+    }
+    recycleCards(game, index, sourceId, selectedIds.slice(0, count));
+  }
+}
+
+function activatedCostSelectionKeys(
+  clause: Pick<BehaviorClause, "costs">,
+): string[] {
+  const paidCostIds = new Set([
+    "cost.recycle_selected_cards",
+    "cost.discard_selected_cards",
+  ]);
+  return [...new Set(clause.costs.flatMap((cost) => {
+    const key = cost.parameters.selectionKey;
+    return paidCostIds.has(cost.behaviorId) && typeof key === "string"
+      ? [key]
+      : [];
+  }))];
+}
+
+function activatedCostSelectionOverrides(
+  game: GameDocument,
+  controllerPlayerId: string,
+  sourceCardInstanceId: string,
+  clause: ReturnType<typeof compileBehaviorModel>["clauses"][number],
+  selectedIds: readonly string[],
+  handlers: ReturnType<typeof createPrimitiveHandlers>,
+): Record<string, string[]> {
+  const keys = activatedCostSelectionKeys(clause);
+  if (keys.length === 0) return {};
+  const requirements = targetRequirementsForClause(
+    clause,
+    createBehaviorContext(
+      game,
+      controllerPlayerId,
+      sourceCardInstanceId,
+      null,
+      [...selectedIds],
+    ),
+    handlers,
+  );
+  return Object.fromEntries(keys.map((key) => {
+    const requirement = requirements.find((candidate) => candidate.selectionKey === key);
+    return [
+      key,
+      requirement
+        ? selectedIds
+            .filter((id) => requirement.legalIds.includes(id))
+            .slice(0, requirement.maximum)
+        : [],
+    ];
+  }));
 }
 
 function activationCosts(clause: BehaviorClause) {
@@ -2390,6 +3114,7 @@ function executeImmediateClauses(
         clauseSelections,
         effectOutcomes,
         selectionOverrides,
+        undefined,
         hiddenBattlefieldId,
       ),
       handlers,
@@ -2539,6 +3264,15 @@ function validLockedTargets(
   controllerPlayerId: string,
   handlers: ReturnType<typeof createPrimitiveHandlers>,
 ) {
+  const selectedTargets = item.repeatTargetSelections?.[item.repeatResolutionIndex ?? 0]
+    ?? item.targetCardInstanceIds;
+  const targetVersions = item.repeatTargetObjectVersions?.[item.repeatResolutionIndex ?? 0]
+    ?? item.targetObjectVersions;
+  const executionIndex = item.repeatResolutionIndex ?? 0;
+  const selectionOverrides = {
+    ...(item.initialSelectionOverrides ?? {}),
+    ...(item.preplayOptionSelections?.[executionIndex] ?? {}),
+  };
   const requirements = targetRequirementsForClause(
     clause,
     createBehaviorContext(
@@ -2546,9 +3280,10 @@ function validLockedTargets(
       controllerPlayerId,
       item.sourceCardInstanceId!,
       item.behaviorEvent,
-      item.targetCardInstanceIds,
+      selectedTargets,
       {},
-      item.initialSelectionOverrides ?? {},
+      selectionOverrides,
+      undefined,
       item.hiddenBattlefieldId ?? null,
     ),
     handlers,
@@ -2559,59 +3294,56 @@ function validLockedTargets(
       .filter((requirement) => requirement.kind === "chainItem")
       .flatMap((requirement) => requirement.legalIds),
   );
-  return item.targetCardInstanceIds.filter(
+  return selectedTargets.filter(
     (id) =>
       currentlyLegal.has(id) &&
       (chainItemTargets.has(id) ||
         (game.state.cardStates[id]?.objectVersion ?? 0) ===
-          item.targetObjectVersions[id]),
+          targetVersions[id]),
   );
 }
 
-function ignoresDeflect(definition: GameCardDefinition) {
-  return definition.behaviorModel.clauses.some((clause) =>
-    clause.effects.some(
-      (binding) => binding.behaviorId === "modifier.ignore_deflect",
-    ),
-  );
-}
-
-function validateActionTargets(action: ProjectedAction, selectedIds: string[]) {
-  validateTargetRequirements(action.targets, selectedIds);
+function validateActionTargets(
+  action: ProjectedAction,
+  selectedIds: string[],
+  targetSelections: Record<string, string[]>,
+) {
+  const grouped = action.targets.some((target) => target.selectionGroup);
+  if (!grouped) {
+    if (Object.keys(targetSelections).length) {
+      throw new Error("This action does not accept grouped target selections.");
+    }
+    validateTargetRequirements(action.targets, selectedIds);
+    return;
+  }
+  if (selectedIds.length) {
+    throw new Error("This action requires grouped target selections.");
+  }
+  const requirementsByGroup = new Map<string, ProjectedAction["targets"]>();
+  for (const target of action.targets) {
+    const group = target.selectionGroup;
+    if (!group) throw new Error("Grouped target declaration is malformed.");
+    requirementsByGroup.set(group, [
+      ...(requirementsByGroup.get(group) ?? []),
+      target,
+    ]);
+  }
+  if (
+    Object.keys(targetSelections).some((group) => !requirementsByGroup.has(group)) ||
+    [...requirementsByGroup.keys()].some((group) => !Object.hasOwn(targetSelections, group))
+  ) {
+    throw new Error("Target declaration does not match this action.");
+  }
+  for (const [group, requirements] of requirementsByGroup) {
+    validateTargetRequirements(requirements, targetSelections[group] ?? []);
+  }
 }
 
 function validateTargetRequirements(
   targets: readonly ProjectedAction["targets"][number][],
   selectedIds: string[],
 ) {
-  if (targets.length === 0) {
-    if (selectedIds.length)
-      throw new Error("This action does not accept selected targets.");
-    return;
-  }
-  const legal = new Set(targets.flatMap((target) => target.legalIds));
-  const minimum = targets.reduce(
-    (sum, target) => sum + target.minimum,
-    0,
-  );
-  const maximum = targets.reduce(
-    (sum, target) => sum + target.maximum,
-    0,
-  );
-  if (
-    selectedIds.length < minimum ||
-    selectedIds.length > maximum ||
-    selectedIds.some((id) => !legal.has(id)) ||
-    new Set(selectedIds).size !== selectedIds.length ||
-    targets.some((target) => {
-      const selectedForTarget = selectedIds.filter((id) =>
-        target.legalIds.includes(id),
-      ).length;
-      return (
-        selectedForTarget < target.minimum || selectedForTarget > target.maximum
-      );
-    })
-  ) {
+  if (!targetSelectionSatisfiesRequirements(targets, selectedIds)) {
     throw new Error("Selected targets are not legal for this action.");
   }
 }

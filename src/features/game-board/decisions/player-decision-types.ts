@@ -18,7 +18,8 @@ export type PlayerDecisionCard = {
   disabled?: boolean;
 };
 
-export type PlayerDecisionOption = PlayerDecisionCard & {
+export type PlayerDecisionOption = Omit<PlayerDecisionCard, "description"> & {
+  description?: ReactNode;
   imageOrientation?: "auto" | "portrait" | "landscape";
 };
 
@@ -32,7 +33,8 @@ type DecisionInspectionCapability = {
    * Controls whether the active gameplay decision may temporarily expose a
    * read-only game-state inspection surface.
    *
-   * Omitted values are treated as "none" so older callers remain compatible.
+   * Interactive prompts default to public game-state inspection. Pending
+   * statuses are non-interactive and do not expose inspection.
    */
   inspection?: DecisionInspectionPolicy;
 };
@@ -101,10 +103,25 @@ export type TokenPlacementDecisionRequest = DecisionInspectionCapability & {
   confirmLabel?: string;
 };
 
+export type EffectPlayDecisionRequest = DecisionInspectionCapability & {
+  kind: "effectPlay";
+  decisionKey: string;
+  stagedCard: PlayerDecisionCard;
+  options: Array<{
+    actionId: string;
+    id: string;
+    kind: "play" | "decline" | "continue";
+    label: string;
+    description?: string;
+    resourceCost?: { energy: number; powerCosts: Array<{ amount: number; domains: string[] }> };
+  }>;
+};
+
 export type PlayerDecisionRequest =
   | CardSelectionDecisionRequest
   | OptionDecisionRequest
   | OrderedDecisionRequest
   | CombatDamageDecisionRequest
   | TokenPlacementDecisionRequest
+  | EffectPlayDecisionRequest
   | PendingDecisionRequest;

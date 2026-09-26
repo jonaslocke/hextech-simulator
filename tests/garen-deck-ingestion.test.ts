@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { loadSourceCardCatalog } from "../src/server/catalog";
+import { loadCardCatalog } from "../src/server/catalog";
 import { validateDeckConstruction } from "../src/server/deck";
 
 test("validates the normalized Garen ingestion deck against local set data", async () => {
-  const catalog = await loadSourceCardCatalog();
+  const catalog = await loadCardCatalog();
   const result = validateDeckConstruction(
     await readFile(path.join(process.cwd(), "data", "decks", "garen.dec.txt"), "utf8"),
     catalog,

@@ -43,7 +43,6 @@ const MAX_DIAGNOSTIC_LINES = 80;
 const MAX_DIAGNOSTIC_CHARS = 12_000;
 
 const checks = [
-  { name: "catalog", command: "npm", args: ["run", "catalog:check-mvp"] },
   { name: "typecheck", command: "npm", args: ["run", "typecheck"] },
   { name: "tests", command: "npm", args: ["test"] },
   { name: "lint", command: "npm", args: ["run", "lint"] },

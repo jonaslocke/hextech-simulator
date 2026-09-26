@@ -63,7 +63,8 @@ export const deckSnapshotSchema = z.object({
   sourceText: z.string(),
   catalogDigest: z.string().min(1),
   entries: z.array(deckEntrySchema),
-  cards: z.array(gameCardDefinitionSchema)
+  cards: z.array(gameCardDefinitionSchema),
+  tokenCards: z.array(cardSchema).optional()
 }).strict();
 
 export type BehaviorBinding = z.infer<typeof behaviorBindingSchema>;

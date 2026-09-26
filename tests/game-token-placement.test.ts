@@ -9,6 +9,7 @@ import { beginEffectResolution } from "../src/server/game/effect-resolution";
 import {
   createPrimitiveHandlers,
   createRuntimeCardIndex,
+  definitionForInstance,
   moveUnitToTrash,
 } from "../src/server/game/primitive-handlers";
 import { gameplayActions, performGameplayAction, projectGame } from "../src/server/game";
@@ -192,6 +193,240 @@ test("token projections retain generated keyword text", () => {
   assert.equal(sprite?.rulesText, "Temporary");
 });
 
+test("token media from a catalog definition reaches the projected battlefield card", () => {
+  const source = unit("SOURCE", "Source", [
+    clause("play-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Catalogued Unit",
+        count: 1,
+        placement: "sourceLocation",
+      })],
+    }),
+  ]);
+  const token = unit("CATALOGUED_TOKEN", "Catalogued Unit");
+  token.card.classification.supertype = "Token";
+  token.card.media.image_url = "https://assets.example.test/catalogued-token.png";
+  const { game, decks } = fixture([source, token, battlefield("BF", "Training Yard")]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  decks[0]!.instances.push(instance("bf-card", "p1", "BF", "battlefield"));
+  game.state.cardStates.source = cardState(1);
+  game.state.cardStates["bf-card"] = cardState(null);
+  game.state.battlefields.push({
+    battlefieldId: "field",
+    cardInstanceId: "bf-card",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: ["source"],
+  });
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-token",
+    decks,
+  }), true);
+  const createdId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(createdId);
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .battlefields.flatMap((item) => item.units)
+    .find((item) => item.instanceId === createdId);
+  assert.equal(projected?.imageUrl, "https://assets.example.test/catalogued-token.png");
+});
+
+test("source token metadata supplies media and printed keywords to generated tokens", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("play-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "1 :rb_might: Scout unit token with Deflect",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const sourceToken = unit("TST-T01", "Scout", []).card;
+  sourceToken.public_code = "TST-T01";
+  sourceToken.classification.supertype = "Token";
+  sourceToken.tags = ["Scout"];
+  sourceToken.text.plain = "[Deflect]";
+  sourceToken.media.image_url = "https://assets.example.test/scout-token.png";
+  const { game, decks } = fixture([source]);
+  decks[0]!.snapshot.tokenCards = [sourceToken];
+  decks[1]!.snapshot.tokenCards = [sourceToken];
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "play-token",
+    decks,
+  }), true);
+
+  const tokenInstanceId = game.state.createdCardInstances?.[0]?.instanceId;
+  const definition = game.state.createdCardDefinitions?.[0];
+  assert.ok(tokenInstanceId);
+  assert.equal(definition?.cardCode, "TST-T01");
+  assert.deepEqual(definition?.card.tags, ["Scout"]);
+  assert.ok(definition?.behaviorModel.clauses.some((clause) =>
+    clause.keywords.some((keyword) => keyword.behaviorId === "keyword.deflect"),
+  ));
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .players.find((player) => player.playerId === "p1")
+    ?.zones.find((zone) => zone.kind === "base")?.cards
+    .find((card) => card.instanceId === tokenInstanceId);
+  assert.equal(projected?.imageUrl, "https://assets.example.test/scout-token.png");
+});
+
+test("non-Unit token creation preserves the absence of Might", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("gear-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Gold Gear",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "gear-token",
+    decks,
+  }), true);
+  const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenId);
+  assert.equal(game.state.cardStates[tokenId]?.computedMight, null);
+  const projected = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .players.find((player) => player.playerId === "p1")
+    ?.zones.find((zone) => zone.kind === "base")?.cards.find((card) => card.instanceId === tokenId);
+  assert.equal(projected?.type, "Gear");
+  assert.equal(projected?.computedMight, null);
+});
+
+test("runtime-created cards stay visible to an index held across effect resolution", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("generated-gear", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Construct",
+        count: 1,
+        placement: "base",
+        entryState: "exhausted",
+      })],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  const transitionIndex = createRuntimeCardIndex(decks, game);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "generated-gear",
+    decks,
+  }), true);
+
+  const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
+  assert.ok(tokenId);
+  assert.equal(definitionForInstance(tokenId, transitionIndex).card.name, "Construct");
+  assert.equal(game.state.cardStates[tokenId]?.exhausted, true);
+  assert.doesNotThrow(() => moveUnitToTrash(game, tokenId, transitionIndex));
+});
+
+test("token wording resolves to a matching authoritative Token definition", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("gear-token", {
+      effects: [binding("action.play_token", 0, {
+        tokenName: "Gold Gear",
+        count: 1,
+        placement: "base",
+      })],
+    }),
+  ]);
+  const authoritativeToken = unit("CORPUS_GEAR_TOKEN", "Gold");
+  authoritativeToken.card.classification.type = "Gear";
+  authoritativeToken.card.classification.supertype = "Token";
+  authoritativeToken.card.attributes.might = null;
+  authoritativeToken.card.media.image_url = "https://assets.example.test/corpus-gear.png";
+  const { game, decks } = fixture([source, authoritativeToken]);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+
+  assert.equal(beginEffectResolution({
+    game,
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: "source",
+    clauseId: "gear-token",
+    decks,
+  }), true);
+
+  const token = game.state.createdCardInstances?.[0];
+  assert.equal(token?.cardCode, "CORPUS_GEAR_TOKEN");
+  assert.equal(
+    (game.state.createdCardDefinitions ?? []).some((definition) => definition.cardCode === "TOKEN-gold-gear"),
+    false,
+  );
+  assert.equal(
+    projectGame({ game, decks, viewerPlayerId: "p1" }).players
+      .find((player) => player.playerId === "p1")?.zones
+      .find((zone) => zone.kind === "base")?.cards
+      .find((card) => card.instanceId === token?.instanceId)?.imageUrl,
+    "https://assets.example.test/corpus-gear.png",
+  );
+});
+
+test("generated Bird units retain their tag and Deflect keyword", () => {
+  const source = unit("SOURCE", "Token Creator", [
+    clause("bird", {
+      effects: [
+        binding("action.play_token", 0, {
+          tokenName: "1 :rb_might: Bird unit with Deflect",
+          count: 1,
+          placement: "base",
+        }),
+      ],
+    }),
+  ]);
+  const { game, decks } = fixture([source]);
+  game.state.players.p1!.zones.base.push("source");
+  game.state.cardStates.source = cardState(1);
+  decks[0]!.instances.push(instance("source", "p1", "SOURCE"));
+
+  assert.equal(
+    beginEffectResolution({
+      game,
+      controllerPlayerId: "p1",
+      sourceCardInstanceId: "source",
+      clauseId: "bird",
+      decks,
+    }),
+    true,
+  );
+
+  const bird = game.state.createdCardDefinitions?.find(
+    (definition) => definition.card.name === "Bird",
+  );
+  assert.ok(bird);
+  assert.deepEqual(bird.card.tags, ["Bird"]);
+  assert.ok(
+    bird.behaviorModel.clauses.some((clause) =>
+      clause.keywords.some((keyword) => keyword.behaviorId === "keyword.deflect"),
+    ),
+  );
+});
+
 test("fixed-location token creation plays token at source location", () => {
   const source = unit("SOURCE", "Faithful Manufactor", [
     clause("token-here", {
@@ -230,6 +465,13 @@ test("fixed-location token creation plays token at source location", () => {
   assert.equal(game.state.battlefields[0]!.units.length, 2);
   assert.equal(
     game.state.createdCardDefinitions?.[0]?.card.media.image_url,
+    "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
+  );
+  const projectedToken = projectGame({ game, decks, viewerPlayerId: "p1" })
+    .battlefields.flatMap((item) => item.units)
+    .find((item) => item.instanceId === game.state.createdCardInstances?.[0]?.instanceId);
+  assert.equal(
+    projectedToken?.imageUrl,
     "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/c168ca334739090a060710dfc440982c3462ac8c-744x1039.png",
   );
 });

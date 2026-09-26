@@ -1,6 +1,7 @@
 "use client";
 
 import type { Card, GameLogEntry, TemporaryZone, ZoneData } from "../types";
+import type { MouseEvent } from "react";
 import {
   FloatingOverlayPanel,
   type FloatingOverlayPlacement,
@@ -16,6 +17,8 @@ export function TemporaryZoneOverlay({
   interactionSuspended = false,
   logEntries,
   onClose,
+  onCardContextAction,
+  onCardPrimaryAction,
   openZone,
   opponentBanishment,
   opponentTrash,
@@ -27,6 +30,8 @@ export function TemporaryZoneOverlay({
   interactionSuspended?: boolean;
   logEntries: GameLogEntry[];
   onClose: () => void;
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onCardPrimaryAction?: (card: Card, event?: MouseEvent<HTMLDivElement>) => void;
   openZone: TemporaryZoneOverlayZone;
   opponentBanishment: ZoneData;
   opponentTrash: ZoneData;
@@ -69,7 +74,12 @@ export function TemporaryZoneOverlay({
       ) : openZone === "log" ? (
         <LogList entries={logEntries} />
       ) : openZone === "playerTrash" ? (
-        <ZoneCards emptyLabel="No cards in trash" cards={playerTrash.cards} />
+        <ZoneCards
+          emptyLabel="No cards in trash"
+          cards={playerTrash.cards}
+          onCardContextAction={onCardContextAction}
+          onCardPrimaryAction={onCardPrimaryAction}
+        />
       ) : openZone === "opponentTrash" ? (
         <ZoneCards emptyLabel="No cards in trash" cards={opponentTrash.cards} />
       ) : (
@@ -82,9 +92,13 @@ export function TemporaryZoneOverlay({
 export function ZoneCards({
   cards,
   emptyLabel,
+  onCardContextAction,
+  onCardPrimaryAction,
 }: {
   cards: Card[];
   emptyLabel: string;
+  onCardContextAction?: (card: Card, event: MouseEvent<HTMLDivElement>) => void;
+  onCardPrimaryAction?: (card: Card, event?: MouseEvent<HTMLDivElement>) => void;
 }) {
   if (cards.length === 0) {
     return <EmptyState label={emptyLabel} />;
@@ -97,8 +111,14 @@ export function ZoneCards({
           enableZoneAnimation={false}
           enableHoverPreview
           key={card.instanceId ?? `${card.name}-${index}`}
+          onContextAction={onCardContextAction ? (event) => onCardContextAction(card, event) : undefined}
           showMight={false}
           {...card}
+          onPrimaryAction={
+            onCardPrimaryAction
+              ? (event) => onCardPrimaryAction(card, event)
+              : undefined
+          }
         />
       ))}
     </div>

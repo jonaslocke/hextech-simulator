@@ -480,6 +480,11 @@ Automatic payment rules:
   For example, with ready Mind then Calm Runes and a cost of 1 Energy + 1 Calm
   Power, exhaust Calm for Energy and recycle that same Rune for Power. If no safe
   complete plan exists, the player must prepare the Rune Pool manually.
+- For a non-pool-only activated ability, if spending pooled Energy first cannot
+  complete the combined Energy-and-Power cost, search lower-priority Energy
+  allocations before declaring the action unavailable. This can preserve pooled
+  Energy while exhausting a Rune for Energy and recycling that same Rune for
+  Power. Card-play costs keep the pooled-first allocation contract above.
 - Any simultaneous recycle of 2 or more Runes places those Runes on the bottom
   of the Rune Deck in seeded random order and logs the random operation. This
   intentional simulator rule applies beyond auto-payment and diverges from the

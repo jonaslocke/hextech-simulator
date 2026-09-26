@@ -18,9 +18,10 @@ import type { BoardPlayerProjection } from "../board-view-model";
 import { PlayableCardMenuLabel, ResourceCostMenuLabel } from "../components/playable-card-menu-label";
 import type { CardActionMenuGroup, CardActionMenuItem } from "../components/card-action-menu";
 import { groupPlayPaymentModes } from "../play-from-hand-menu";
-import { combineTargetRequirements, simultaneousMoveAction } from "../model";
+import { combineTargetRequirements, groupedTargetRequirements, simultaneousMoveAction } from "../model";
 import type { Card } from "../types";
 import { createCardPaymentPreparation, type BoardTargetSelection } from "./use-board-target-selection";
+import { availableBoardCardActions, availablePlayableCardModes } from "./available-board-card-actions";
 
 type PaymentMode =
   BoardPlayerProjection["availablePaymentModes"][string][number];
@@ -34,6 +35,7 @@ type SubmitProjectedAction = (
   actionId: string | undefined,
   selectedIds?: string[],
   allocations?: Array<{ targetUnitId: string; amount: number }>,
+  targetSelections?: Record<string, string[]>,
 ) => Promise<boolean>;
 
 type OpenCardActionMenu = (
@@ -184,21 +186,29 @@ export function useGameBoardActions({
             ? "location"
             : "battlefield";
       const requirement = combineTargetRequirements(actionToSubmit, targetKind);
+      const targetGroups = groupedTargetRequirements(actionToSubmit, targetKind);
+      const initialTargetGroup = targetGroups[0];
       const followUpLocationRequirement =
         targetKind !== "location"
           ? combineTargetRequirements(actionToSubmit, "location") ?? undefined
           : undefined;
 
-      if (requirement && requirement.maximum > 0) {
+      if ((initialTargetGroup?.requirement ?? requirement)?.maximum > 0) {
+        const activeRequirement = initialTargetGroup?.requirement ?? requirement!;
         setTargetSelection({
           actionId: actionToSubmit.id,
           followUpLocationRequirement,
-          legalTargetIds: requirement.legalIds,
-          maxTargets: requirement.maximum,
-          minTargets: requirement.minimum,
+          legalTargetIds: activeRequirement.legalIds,
+          maxTargets: activeRequirement.maximum,
+          minTargets: activeRequirement.minimum,
           purpose: stagedMoveAction ? "move" : "play",
-          requirement,
+          requirement: activeRequirement,
           selectedTargetIds: stagedMoveAction ? [card.instanceId] : [],
+          ...(initialTargetGroup ? {
+            activeTargetGroupIndex: 0,
+            selectedTargetIdsByGroup: {},
+            targetGroups,
+          } : {}),
           targetKind,
           preparingPayment,
         });
@@ -308,7 +318,8 @@ export function useGameBoardActions({
         return;
       }
 
-      const modes = (viewerState.availablePaymentModes[card.instanceId] ?? []).filter((mode) => mode.enabled);
+      const modes = availablePlayableCardModes(viewerState.availablePaymentModes[card.instanceId] ?? []);
+      if (modes.length === 0) return;
 
       const menuItems = modes.map((mode) => ({
         boardLocation: mode.boardLocation,
@@ -350,15 +361,7 @@ export function useGameBoardActions({
 
       openCardActionMenu(
         event,
-        menuItems.length > 0
-          ? menuItems
-          : [
-              {
-                disabled: true,
-                id: `${card.instanceId}:not-playable`,
-                label: "Not playable",
-              },
-            ],
+        menuItems,
       );
     },
     [beginPlayOrTargetSelection, openCardActionMenu, targetSelection, viewerState],
@@ -393,8 +396,9 @@ export function useGameBoardActions({
       if (!card.instanceId || !event) {
         return;
       }
-      const cardActions = sourceActions(card.instanceId).filter(
-        (action) => !targetSelection || action.label.startsWith("Add "),
+      const cardActions = availableBoardCardActions(
+        sourceActions(card.instanceId),
+        Boolean(targetSelection),
       );
       if (cardActions.length === 0) return;
       const powerDomain = cardActions
@@ -626,6 +630,21 @@ function resourceActionMenuLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ): ReactNode {
+  const output = action.presentation.resourceOutput;
+  if (output) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span>Add</span>
+        {output.energy > 0 && <EnergyResource compact value={output.energy} />}
+        {output.energy > 0 && output.power > 0 && <span>and</span>}
+        {output.power > 0 && <>
+          <span>{output.power > 1 ? output.power : ""}</span>
+          <DomainIcon decorative domain={output.powerDomains[0] ?? powerDomain ?? "Rainbow"} />
+          <span>Power</span>
+        </>}
+      </span>
+    );
+  }
   let content: ReactNode = action.label;
   if (action.label === "Add Energy") {
     content = (
@@ -666,6 +685,14 @@ function resourceActionAccessibleLabel(
   action: GameProjection["actions"][number],
   powerDomain: string | undefined,
 ) {
+  const output = action.presentation.resourceOutput;
+  if (output) {
+    const parts = [
+      ...(output.energy > 0 ? [`${output.energy} Energy`] : []),
+      ...(output.power > 0 ? [`${output.power} ${formatDomain(output.powerDomains[0] ?? powerDomain ?? "Rainbow")} Power`] : []),
+    ];
+    return parts.length ? `Add ${parts.join(" and ")}` : action.label;
+  }
   const domain = powerDomain ? formatDomain(powerDomain) : "Power";
   if (action.label === "Add Energy") return "Add 1 Energy";
   if (action.label.startsWith("Add Power [")) return `Add 1 ${domain} Power`;

@@ -26,6 +26,7 @@ export const PERMANENT_DECK_DEFINITIONS = [
     label: "Ornn, Fire Below the Mountain",
     sourcePath: "data/decks/Ornn, Fire Below the Mountain , a deck by MICE TheMаnLаnd.txt",
   },
+  { id: "jayce", label: "Jayce", sourcePath: "data/decks/jayce.dec.txt" },
   { id: "ornn-hidden-test", label: "Ornn - Hidden Test", sourcePath: "data/decks/ornn-hidden-test.dec.txt" },
 ] as const satisfies readonly { id: DeckId; label: string; sourcePath: string }[];
 export type CoreDeckId = (typeof PERMANENT_DECK_DEFINITIONS)[number]["id"];

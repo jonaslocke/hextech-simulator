@@ -5,9 +5,11 @@ import { DecisionInspectionTrigger } from "../components/decision-inspection-tri
 import { CardSelectionPrompt } from "./card-selection-prompt";
 import { CombatDamagePrompt } from "./combat-damage-prompt";
 import { OptionDecisionPrompt } from "./option-decision-prompt";
+import { ResourceCost } from "../components/resource-cost";
 import { OrderedDecisionPrompt } from "./ordered-decision-prompt";
 import { PendingDecisionStatus } from "./pending-decision-status";
 import { TokenPlacementPrompt } from "./token-placement-prompt";
+import { decisionInspectionPolicyForPrompt } from "./decision-inspection-policy";
 import {
   createCombatDamageIntent,
   createSelectionIntent,
@@ -25,6 +27,7 @@ export function PlayerDecisionHost({
   isPromptVisible = true,
   isSubmitting,
   onCancel,
+  onBeginEffectPlay,
   onInspect,
   onIntent,
 }: {
@@ -34,6 +37,7 @@ export function PlayerDecisionHost({
   isPromptVisible?: boolean;
   isSubmitting: boolean;
   onCancel?: () => void;
+  onBeginEffectPlay?: (actionId: string) => void;
   onInspect?: () => void;
   onIntent: (intent: PlayerDecisionIntent) => Promise<boolean>;
 }) {
@@ -41,8 +45,9 @@ export function PlayerDecisionHost({
     return null;
   }
 
+  const inspectionPolicy = decisionInspectionPolicyForPrompt(decision);
   const headerAction =
-    onInspect && (decision.inspection ?? "none") !== "none" ? (
+    onInspect && inspectionPolicy !== "none" ? (
       <DecisionInspectionTrigger onInspect={onInspect} />
     ) : undefined;
 
@@ -119,6 +124,7 @@ export function PlayerDecisionHost({
       return (
         <TokenPlacementPrompt
           decision={decision}
+          headerAction={headerAction}
           interactionSuspended={interactionSuspended}
           isSubmitting={isSubmitting}
           isVisible={isPromptVisible}
@@ -127,6 +133,59 @@ export function PlayerDecisionHost({
           }
         />
       );
+    case "effectPlay": {
+      const firstOption = decision.options[0];
+      if (!firstOption) return null;
+      return (
+        <OptionDecisionPrompt
+          decision={{
+            actionId: firstOption.actionId,
+            canCancel: false,
+            confirmLabel: "Continue",
+            decisionKey: decision.decisionKey,
+            description:
+              "Choose a legal play declaration. You can then complete its destination, targets, and payment.",
+            inspection: inspectionPolicy,
+            kind: "optionDecision",
+            options: decision.options.map((option) => ({
+              id: option.id,
+              label: option.label,
+              description: option.resourceCost ? (
+                <>
+                  {option.description && <>{option.description} · </>}
+                  <span className="inline-flex items-center gap-1">
+                    Cost: <ResourceCost
+                      energy={option.resourceCost.energy}
+                      powerCosts={option.resourceCost.powerCosts}
+                    />
+                  </span>
+                </>
+              ) : option.description,
+            })),
+            revealedCards: [decision.stagedCard],
+            title: "Play a card from this effect?",
+          }}
+          interactionSuspended={interactionSuspended}
+          headerAction={headerAction}
+          isSubmitting={isSubmitting}
+          isVisible={isPromptVisible}
+          onSubmit={(selectedIds) => {
+            const selected = decision.options.find(
+              (option) => option.id === selectedIds[0],
+            );
+            if (!selected) return;
+            if (selected.kind === "play") {
+              onBeginEffectPlay?.(selected.actionId);
+            } else {
+              void onIntent({
+                actionId: selected.actionId,
+                selectedIds: [],
+              });
+            }
+          }}
+        />
+      );
+    }
     case "pendingDecision":
       return (
         <PendingDecisionStatus

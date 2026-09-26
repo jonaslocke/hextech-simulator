@@ -51,7 +51,9 @@ export type BoardPlayerProjection = {
       enabled: boolean;
       id: string;
       label: string;
+      targets: ProjectedAction["targets"];
       costPreview: ProjectedAction["costPreview"];
+      resourceOutput?: ProjectedAction["presentation"]["resourceOutput"];
       resourceCost?: ProjectedAction["presentation"]["resourceCost"];
       playCost?: ProjectedAction["presentation"]["playCost"];
       poolPayment?: ProjectedAction["poolPayment"];
@@ -125,7 +127,7 @@ export type BoardProjection = {
         prompt: string;
         title: string;
         waitingMessage: string;
-        sourceZone: "hand" | "trash" | "mainDeck" | null;
+        sourceZone: "hand" | "trash" | "mainDeck" | "base" | null;
         presentation: "cardSelection" | "vision";
         revealedCards: ProjectedCardView[];
         minimum: number;
@@ -237,7 +239,9 @@ export function adaptProjectionToBoard(projection: GameProjection): {
             enabled: action.enabled,
             id: action.id,
             label: action.label,
+            targets: action.targets,
             costPreview: action.costPreview,
+            resourceOutput: action.presentation.resourceOutput,
             resourceCost: action.presentation.resourceCost,
             playCost: action.presentation.playCost,
             poolPayment: action.poolPayment,

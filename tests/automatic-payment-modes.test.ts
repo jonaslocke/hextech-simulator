@@ -101,6 +101,29 @@ test("restriction priority preserves a shared Energy source for an optional cost
   assert.equal(after.state.cardStates[restrictedSourceId]!.exhausted, true);
 });
 
+test("combined resource actions project and produce the empowered Energy amount", async () => {
+  const { game, decks, unrestricted } = await paymentSourceFixture();
+  unrestricted.behaviorModel.clauses[0]!.abilities = [
+    { behaviorId: "ability.exhaust_for_resource", order: 0, confidence: "high",
+      parameters: { resourceType: "energy", amount: 1, empoweredAmount: 2, usage: "unrestricted" } },
+    { behaviorId: "ability.recycle_for_power", order: 1, confidence: "high",
+      parameters: { amount: 1, resourceType: "power" } },
+  ];
+  game.state.cardStates[unrestrictedSourceId]!.empowered = true;
+  const combined = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === unrestrictedSourceId && action.label === "Add 2 Energy and Power",
+  );
+  assert.ok(combined);
+  assert.deepEqual(combined.presentation.resourceOutput, {
+    energy: 2,
+    power: 1,
+    powerDomains: ["Calm"],
+  });
+  const next = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: combined.id, selectedIds: [], now: "combined-empowered-resource" });
+  assert.equal(next.state.players.p1!.energy, 2);
+  assert.ok(next.state.players.p1!.zones.runeDeck.includes(unrestrictedSourceId));
+});
+
 test("automatic payment preserves Unit destinations and target-specific Deflect requirements", async () => {
   const { game, decks, card, restricted } = await paymentSourceFixture();
   card.card.classification.type = "Unit";

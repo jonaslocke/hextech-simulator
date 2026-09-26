@@ -7,6 +7,7 @@ import { cardSchema } from "../src/server/catalog";
 import { createRuntimeCardIndex, definitionForInstance } from "../src/server/game/primitive-handlers";
 import { applyStartOfTurn } from "../src/server/game/turns";
 import { gameFixture } from "./helpers/game-fixture";
+import { paymentCardId, paymentSourceFixture, restrictedSourceId, unrestrictedSourceId } from "./helpers/payment-source-fixture";
 
 test("manual Add keeps restricted and unrestricted Power pools distinct", async () => {
   const fixture = await gameFixture();
@@ -64,6 +65,45 @@ test("automatic payment exhausts its resource source without losing or restricti
   assert.equal(game.state.cardStates[seal]!.exhausted, true);
   assert.deepEqual(game.state.players.p1!.power, {});
   assert.deepEqual(game.state.players.p1!.restrictedResources, undefined);
+});
+
+test("activated action projection finds a complete mixed-resource payment with pooled Energy", async () => {
+  const { game, decks, card, unrestricted, restricted } = await paymentSourceFixture();
+  const player = game.state.players.p1!;
+  player.energy = 2;
+  player.zones.hand = [];
+  player.zones.base = [paymentCardId, unrestrictedSourceId, restrictedSourceId];
+  player.zones.legend = null;
+  card.card.attributes.power = 2;
+  card.behaviorModel.clauses = [{
+    id: "mixed-resource-activation", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [{ behaviorId: "ability.empower", order: 0, confidence: "high", parameters: {} }],
+    triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [
+      { behaviorId: "cost.pay", order: 0, confidence: "high", parameters: { amount: 2, resource: "energy" } },
+      { behaviorId: "cost.pay", order: 1, confidence: "high", parameters: { amount: 2, resource: "rune" } },
+    ],
+    timings: [], effects: [], keywords: [],
+  }];
+  for (const source of [unrestricted, restricted]) {
+    source.card.classification.type = "Rune";
+    source.behaviorModel.clauses[0]!.abilities = [
+      { behaviorId: "ability.exhaust_for_resource", order: 0, confidence: "high",
+        parameters: { resourceType: "energy", amount: 1, usage: "unrestricted" } },
+      { behaviorId: "ability.recycle_for_power", order: 1, confidence: "high", parameters: {} },
+    ];
+  }
+
+  const action = gameplayActions(game, "p1", decks).find((candidate) =>
+    candidate.sourceCardInstanceId === paymentCardId && candidate.label === "Empower");
+
+  assert.equal(action?.enabled, true, "the activated action remains available when a complete safe plan exists");
+  assert.equal(buildPaymentPlan(game, "p1", card, 2, createRuntimeCardIndex(decks, game)), null,
+    "the existing card-play preference for pooled Energy remains unchanged");
+  const after = performGameplayAction({ game, decks, actorPlayerId: "p1", actionId: action!.id, selectedIds: [], now: "mixed-cost" });
+  assert.equal(after.state.players.p1!.energy, 2);
+  assert.ok(after.state.players.p1!.zones.runeDeck.includes(unrestrictedSourceId));
+  assert.ok(after.state.players.p1!.zones.runeDeck.includes(restrictedSourceId));
 });
 
 test("spells-only Add remains restricted in manual and automatic payment and readies at Awaken", async () => {

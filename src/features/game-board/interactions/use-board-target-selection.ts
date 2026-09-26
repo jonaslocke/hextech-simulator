@@ -10,13 +10,16 @@ import {
 } from "react";
 import {
   combineTargetRequirements,
+  groupedTargetRequirements,
   targetSelectionCanAdd,
   targetSelectionIsLegal,
   type CombinedTargetRequirement,
+  type GroupedTargetRequirement,
 } from "../model";
 import type { Card } from "../types";
 
 export type BoardTargetSelection = {
+  activeTargetGroupIndex?: number;
   actionId: string;
   carriedSelectedTargetIds?: string[];
   followUpLocationRequirement?: CombinedTargetRequirement;
@@ -26,6 +29,8 @@ export type BoardTargetSelection = {
   purpose: "choice" | "move" | "play";
   requirement: CombinedTargetRequirement;
   selectedTargetIds: string[];
+  selectedTargetIdsByGroup?: Record<string, string[]>;
+  targetGroups?: GroupedTargetRequirement[];
   targetKind: "battlefield" | "card" | "location" | "chainItem" | "payment";
   preparingPayment?: boolean;
 };
@@ -34,6 +39,7 @@ type SubmitProjectedAction = (
   actionId: string | undefined,
   selectedIds?: string[],
   allocations?: Array<{ targetUnitId: string; amount: number }>,
+  targetSelections?: Record<string, string[]>,
 ) => Promise<boolean>;
 
 type UseBoardTargetSelectionArgs = {
@@ -53,6 +59,28 @@ export function createCardPaymentPreparation(action: GameProjection["actions"][n
     legalTargetIds: [], minTargets: 0, maxTargets: 0, selectedTargetIds: [],
     // No gameplay target exists; this is an empty selection aggregate.
     requirement: { requirements: [], legalIds: [], minimum: 0, maximum: 0 },
+  };
+}
+
+export function withSelectedTargetIds(
+  selection: BoardTargetSelection,
+  selectedTargetIds: string[],
+): BoardTargetSelection {
+  const activeTargetGroup = selection.targetGroups?.[
+    selection.activeTargetGroupIndex ?? 0
+  ];
+
+  return {
+    ...selection,
+    selectedTargetIds,
+    ...(activeTargetGroup
+      ? {
+          selectedTargetIdsByGroup: {
+            ...selection.selectedTargetIdsByGroup,
+            [activeTargetGroup.groupId]: selectedTargetIds,
+          },
+        }
+      : {}),
   };
 }
 
@@ -122,7 +150,12 @@ export function useBoardTargetSelection({
 
   const selectedDeflectSources =
     targetSelectionAction?.costPreview?.targetAdditionalPower.filter((source) =>
-      [...(targetSelection?.carriedSelectedTargetIds ?? []), ...(targetSelection?.selectedTargetIds ?? [])].includes(source.targetId),
+      source.selectionGroup
+        ? (targetSelection?.selectedTargetIdsByGroup?.[source.selectionGroup] ??
+          (targetSelection?.targetGroups?.[targetSelection.activeTargetGroupIndex ?? 0]?.groupId === source.selectionGroup
+            ? targetSelection.selectedTargetIds
+            : [])).includes(source.targetId)
+        : [...(targetSelection?.carriedSelectedTargetIds ?? []), ...(targetSelection?.selectedTargetIds ?? [])].includes(source.targetId),
     ) ?? [];
   const selectedDeflectPower = selectedDeflectSources.reduce(
     (total, source) => total + source.amount,
@@ -177,6 +210,29 @@ export function useBoardTargetSelection({
         return false;
       }
 
+      const targetSelections = selection.targetGroups
+        ? {
+            ...(selection.selectedTargetIdsByGroup ?? {}),
+            [selection.targetGroups[selection.activeTargetGroupIndex ?? 0]!.groupId]: selection.selectedTargetIds,
+          }
+        : undefined;
+      const nextTargetGroup = selection.targetGroups?.[
+        (selection.activeTargetGroupIndex ?? 0) + 1
+      ];
+      if (nextTargetGroup) {
+        setTargetSelection({
+          ...selection,
+          activeTargetGroupIndex: (selection.activeTargetGroupIndex ?? 0) + 1,
+          legalTargetIds: nextTargetGroup.requirement.legalIds,
+          maxTargets: nextTargetGroup.requirement.maximum,
+          minTargets: nextTargetGroup.requirement.minimum,
+          requirement: nextTargetGroup.requirement,
+          selectedTargetIds: targetSelections?.[nextTargetGroup.groupId] ?? [],
+          selectedTargetIdsByGroup: targetSelections,
+        });
+        return false;
+      }
+
       if (
         selection.followUpLocationRequirement &&
         selection.targetKind !== "location"
@@ -203,13 +259,14 @@ export function useBoardTargetSelection({
         return false;
       }
 
-      const selectedIds = [
+      const selectedIds = selection.targetGroups ? [] : [
         ...(selection.carriedSelectedTargetIds ?? []),
         ...selection.selectedTargetIds,
       ];
       const selectedAdditionalPower = additionalPowerForTargets(
         targetSelectionAction,
         selectedIds,
+        targetSelections,
       );
       const missingAdditionalPower = Math.max(
         0,
@@ -245,6 +302,8 @@ export function useBoardTargetSelection({
       const accepted = await submitProjectedAction(
         targetSelectionAction?.id ?? selection.actionId,
         selectedIds,
+        undefined,
+        targetSelections,
       );
 
       if (!accepted) {
@@ -297,10 +356,10 @@ export function useBoardTargetSelection({
             (id) => id !== cardInstanceId,
           )
         : [...targetSelection.selectedTargetIds, cardInstanceId];
-      const nextSelection = {
-        ...targetSelection,
+      const nextSelection = withSelectedTargetIds(
+        targetSelection,
         selectedTargetIds,
-      };
+      );
 
       if (
         nextSelection.purpose === "move" &&
@@ -433,6 +492,35 @@ function actionIdsHaveSameIdentity(left: string, right: string) {
  * current projection. Selection legality never comes from a stale target list. */
 export function rebindStagedSelection(selection: BoardTargetSelection, action: GameProjection["actions"][number] | undefined): BoardTargetSelection {
   if (!action) return selection;
+  if (selection.targetGroups) {
+    const targetGroups = groupedTargetRequirements(
+      action,
+      selection.targetKind === "payment" ? "card" : selection.targetKind,
+    );
+    const activeTargetGroupIndex = Math.min(
+      selection.activeTargetGroupIndex ?? 0,
+      Math.max(0, targetGroups.length - 1),
+    );
+    const active = targetGroups[activeTargetGroupIndex];
+    if (!active) return { ...selection, targetGroups: [], legalTargetIds: [], requirement: { ...selection.requirement, legalIds: [] } };
+    const selectedTargetIdsByGroup = Object.fromEntries(targetGroups.map((group) => [
+      group.groupId,
+      (selection.selectedTargetIdsByGroup?.[group.groupId] ?? []).filter((id) => group.requirement.legalIds.includes(id)),
+    ]));
+    const selectedTargetIds = selectedTargetIdsByGroup[active.groupId] ?? [];
+    return {
+      ...selection,
+      actionId: action.id,
+      activeTargetGroupIndex,
+      targetGroups,
+      selectedTargetIdsByGroup,
+      requirement: active.requirement,
+      legalTargetIds: active.requirement.legalIds,
+      minTargets: active.requirement.minimum,
+      maxTargets: active.requirement.maximum,
+      selectedTargetIds,
+    };
+  }
   const requirement = selection.targetKind === "payment" ? selection.requirement
     : combineTargetRequirements(action, selection.targetKind);
   if (!requirement) return { ...selection, legalTargetIds: [], requirement: { ...selection.requirement, legalIds: [] } };
@@ -448,6 +536,15 @@ export function rebindStagedSelection(selection: BoardTargetSelection, action: G
 
 export function stagedTargetsAreCurrent(selection: BoardTargetSelection, action: GameProjection["actions"][number] | undefined) {
   if (!action) return false;
+  if (selection.targetGroups) {
+    const selectedByGroup = {
+      ...(selection.selectedTargetIdsByGroup ?? {}),
+      [selection.targetGroups[selection.activeTargetGroupIndex ?? 0]!.groupId]: selection.selectedTargetIds,
+    };
+    return selection.targetGroups.every((group) =>
+      targetSelectionIsLegal(group.requirement, selectedByGroup[group.groupId] ?? []),
+    );
+  }
   const selected = [...(selection.carriedSelectedTargetIds ?? []), ...selection.selectedTargetIds];
   return new Set(selected).size === selected.length &&
     selected.every((id) => action.targets.some((target) => target.legalIds.includes(id))) &&
@@ -460,10 +557,13 @@ export function stagedTargetsAreCurrent(selection: BoardTargetSelection, action:
 function additionalPowerForTargets(
   action: GameProjection["actions"][number] | undefined,
   targetIds: readonly string[],
+  targetSelections?: Record<string, string[]>,
 ) {
   return (
     action?.costPreview?.targetAdditionalPower
-      .filter((source) => targetIds.includes(source.targetId))
+      .filter((source) => source.selectionGroup
+        ? (targetSelections?.[source.selectionGroup] ?? []).includes(source.targetId)
+        : targetIds.includes(source.targetId))
       .reduce((total, source) => total + source.amount, 0) ?? 0
   );
 }

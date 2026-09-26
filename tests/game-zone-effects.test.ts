@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   createBehaviorContext,
   buildPaymentPlan,
+  cleanupLethalDamage,
   createPrimitiveHandlers,
   legalUnitDestinationIds,
   recomputeMight,
@@ -32,6 +33,114 @@ test("returns selected trash cards and moves battlefield units generically", () 
   assert.deepEqual(game.state.battlefields[0]!.units, []);
   assert.deepEqual(game.state.players.p2!.zones.base, ["unit"]);
   assert.equal(game.state.cardStates.unit!.exhausted, true);
+});
+
+test("channel-or-draw falls back when fewer than its required channel count move", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const rune = structuredClone(index.definitions.get("UNIT")!);
+  rune.cardCode = "RUNE";
+  rune.card = {
+    ...rune.card,
+    id: "RUNE",
+    name: "RUNE",
+    public_code: "RUNE/1",
+    classification: { ...rune.card.classification, type: "Rune" },
+  };
+  index.definitions.set("RUNE", rune);
+  index.instances.set("rune", {
+    instanceId: "rune", ownerPlayerId: "p1", source: "runeDeck", cardCode: "RUNE",
+  });
+  index.instances.set("draw", {
+    instanceId: "draw", ownerPlayerId: "p1", source: "mainDeck", cardCode: "SPELL",
+  });
+  game.state.cardStates.rune = { exhausted: false, damage: 0, computedMight: null };
+  game.state.cardStates.draw = { exhausted: false, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.runeDeck.push("rune");
+  game.state.players.p1!.zones.mainDeck.push("draw");
+
+  createPrimitiveHandlers(index).get("action.channel_or_draw")!.execute!(
+    binding("action.channel_or_draw", {
+      channelCount: 2,
+      entryState: "exhausted",
+      fallbackDrawCount: 1,
+      fallbackWhenFewerThan: 2,
+    }),
+    createBehaviorContext(game, "p1", "spell", null, []),
+  );
+
+  assert.deepEqual(game.state.players.p1!.zones.base, ["rune"]);
+  assert.deepEqual(game.state.players.p1!.zones.hand, ["draw"]);
+});
+
+test("recycle moves selected runes to their owner's rune deck", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const rune = structuredClone(index.definitions.get("UNIT")!);
+  rune.cardCode = "RUNE";
+  rune.card = {
+    ...rune.card,
+    id: "RUNE",
+    name: "RUNE",
+    public_code: "RUNE/1",
+    classification: { ...rune.card.classification, type: "Rune" },
+  };
+  index.definitions.set("RUNE", rune);
+  index.instances.set("rune", {
+    instanceId: "rune", ownerPlayerId: "p1", source: "runeDeck", cardCode: "RUNE",
+  });
+  game.state.cardStates.rune = { exhausted: true, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.base.push("rune");
+
+  createPrimitiveHandlers(index).get("action.recycle_cards")!.execute!(
+    binding("action.recycle_cards", { target: "rune" }),
+    createBehaviorContext(game, "p1", "bf", null, ["rune"]),
+  );
+
+  assert.deepEqual(game.state.players.p1!.zones.base, []);
+  assert.deepEqual(game.state.players.p1!.zones.runeDeck, ["rune"]);
+  assert.equal(game.state.cardStates.rune?.exhausted, false);
+});
+
+test("entry exhaustion and empowered resource abilities use the source's current state", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const egg = structuredClone(index.definitions.get("UNIT")!);
+  egg.cardCode = "EGG";
+  egg.card = {
+    ...egg.card,
+    id: "EGG",
+    name: "Platewyrm Egg",
+    public_code: "EGG/1",
+    classification: { ...egg.card.classification, type: "Gear" },
+  };
+  index.definitions.set("EGG", egg);
+  index.instances.set("egg", {
+    instanceId: "egg", ownerPlayerId: "p1", source: "mainDeck", cardCode: "EGG",
+  });
+  game.state.cardStates.egg = { exhausted: false, empowered: true, damage: 0, computedMight: null };
+  game.state.players.p1!.zones.base.push("egg");
+  const handlers = createPrimitiveHandlers(index);
+
+  handlers.get("modifier.enter_exhausted")!.execute!(
+    binding("modifier.enter_exhausted", { target: "source" }),
+    createBehaviorContext(game, "p1", "egg", null, []),
+  );
+  assert.equal(game.state.cardStates.egg!.exhausted, true);
+  game.state.cardStates.egg!.exhausted = false;
+
+  handlers.get("ability.exhaust_for_resource")!.execute!(
+    binding("ability.exhaust_for_resource", {
+      resourceType: "energy",
+      amountSource: "constant",
+      amount: 1,
+      empoweredAmount: 2,
+      usage: "unrestricted",
+    }),
+    createBehaviorContext(game, "p1", "egg", null, []),
+  );
+  assert.equal(game.state.players.p1!.energy, 2);
+  assert.equal(game.state.cardStates.egg!.exhausted, true);
 });
 
 test("applies controller Bonus Damage and records whether it killed", () => {
@@ -82,6 +191,149 @@ test("applies controller Bonus Damage and records whether it killed", () => {
 
   assert.ok(game.state.players.p2!.zones.trash.includes("unit"));
   assert.equal(context.effectOutcomes.lastDamageKilled, true);
+});
+
+test("Lethal resolves positive damage against a zero-Might enemy unit", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: false, damage: 0, computedMight: null };
+
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  const context = createBehaviorContext(game, "p1", "lethal-source", null, ["zero-might-unit"]);
+  createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(
+    binding("action.deal_damage", { amount: 1, target: "unit" }),
+    context,
+  );
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("zero-might-unit"));
+});
+
+test("fight preserves its actual damage value while applying the Lethal threshold", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: true, damage: 0, computedMight: 2 };
+
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  const context = createBehaviorContext(game, "p1", "lethal-source", null, []);
+  context.selectedBySelector.first = ["lethal-source"];
+  context.selectedBySelector.second = ["zero-might-unit"];
+  createPrimitiveHandlers(index).get("action.fight")!.execute!(
+    binding("action.fight", { firstUnitSelectionKey: "first", secondUnitSelectionKey: "second" }),
+    context,
+  );
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("zero-might-unit"));
+});
+
+test("zero-Might units need positive damage and ordinary damage remains unchanged", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const zeroMight = structuredClone(index.definitions.get("UNIT")!);
+  zeroMight.cardCode = "ZERO_MIGHT_UNIT";
+  zeroMight.card.attributes.might = 0;
+  index.definitions.set(zeroMight.cardCode, zeroMight);
+  index.instances.set("zero-might-unit", {
+    instanceId: "zero-might-unit", ownerPlayerId: "p2", source: "mainDeck", cardCode: zeroMight.cardCode,
+  });
+  game.state.battlefields[0]!.units.push("zero-might-unit");
+  game.state.cardStates["zero-might-unit"] = { exhausted: true, damage: 0, computedMight: 0 };
+
+  cleanupLethalDamage(game, ["zero-might-unit"], index);
+  assert.ok(game.state.battlefields[0]!.units.includes("zero-might-unit"));
+
+  const context = createBehaviorContext(game, "p1", "spell", null, ["unit"]);
+  createPrimitiveHandlers(index).get("action.deal_damage")!.execute!(
+    binding("action.deal_damage", { amount: 1, target: "unit" }),
+    context,
+  );
+  assert.equal(game.state.cardStates.unit!.damage, 1);
+  assert.deepEqual(game.state.cardStates.unit!.damageByPlayerId, { p1: 1 });
+  assert.ok(game.state.battlefields[0]!.units.includes("unit"));
+});
+
+test("cleanup applies a controller's lethal modifier to positive damage already marked by them", () => {
+  const game = fixture();
+  const index = cardIndex();
+  const source = structuredClone(index.definitions.get("UNIT")!);
+  source.cardCode = "LETHAL_SOURCE";
+  source.behaviorModel.clauses = [{
+    id: "lethal", sequence: 0, sourceText: "", normalizedText: "",
+    abilities: [], triggers: [], conditions: [], selectors: [], choices: [],
+    costs: [], timings: [], effects: [],
+    keywords: [binding("keyword.lethal_damage", {})],
+  }];
+  index.definitions.set(source.cardCode, source);
+  index.instances.set("lethal-source", {
+    instanceId: "lethal-source", ownerPlayerId: "p1", source: "mainDeck", cardCode: source.cardCode,
+  });
+  game.state.players.p1!.zones.base.push("lethal-source");
+  game.state.cardStates["lethal-source"] = { exhausted: false, damage: 0, computedMight: null };
+
+  for (const id of ["marked-by-controller", "marked-by-opponent"]) {
+    const unit = structuredClone(index.definitions.get("UNIT")!);
+    unit.cardCode = id;
+    unit.card.attributes.might = 3;
+    index.definitions.set(id, unit);
+    index.instances.set(id, {
+      instanceId: id, ownerPlayerId: "p2", source: "mainDeck", cardCode: id,
+    });
+    game.state.battlefields[0]!.units.push(id);
+    game.state.cardStates[id] = {
+      exhausted: true,
+      damage: 1,
+      damageByPlayerId: { [id === "marked-by-controller" ? "p1" : "p2"]: 1 },
+      computedMight: 3,
+    };
+  }
+
+  cleanupLethalDamage(game, ["marked-by-controller", "marked-by-opponent"], index);
+
+  assert.ok(game.state.players.p2!.zones.trash.includes("marked-by-controller"));
+  assert.ok(game.state.battlefields[0]!.units.includes("marked-by-opponent"));
 });
 
 test("derives Deflect as an atomic any-domain Power cost", () => {

@@ -236,6 +236,7 @@ export function MatchSimulator({
   async function performAction(input: {
     actionId: string;
     selectedIds: string[];
+    targetSelections?: Record<string, string[]>;
     allocations?: Array<{ targetUnitId: string; amount: number }>;
     tokenPlacements?: Array<{ destinationId: string; count: number }>;
   }): Promise<boolean> {

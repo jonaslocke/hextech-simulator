@@ -50,12 +50,14 @@ test("parser represents parenthetical content and nested friendly elements", () 
 });
 
 test("parser recognizes keywords and optional counts", () => {
-  const [paragraph] = parseCardText("[Quick-Draw] [Repeat 3] [Unknown 2]");
+  const [paragraph] = parseCardText("[Quick-Draw] [Repeat 3] [Flow] [Unknown 2]");
 
   assert.deepEqual(paragraph.segments, [
     { count: undefined, keyword: "quick-draw", kind: "keyword" },
     { kind: "text", value: " " },
     { count: "3", keyword: "repeat", kind: "keyword" },
+    { kind: "text", value: " " },
+    { count: undefined, keyword: "flow", kind: "keyword" },
     { kind: "text", value: " " },
     { kind: "text", value: "[Unknown 2]" },
   ]);

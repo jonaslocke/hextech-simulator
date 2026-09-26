@@ -8,7 +8,7 @@ import {
   buildCurrentBehaviorCatalog,
   hashCardRulesText,
 } from "../src/server/card-catalog";
-import { cardSetFileSchema } from "../src/server/catalog";
+import { loadCardCatalog } from "../src/server/catalog";
 import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import { buildDeckSnapshot } from "../src/server/game";
 
@@ -56,17 +56,15 @@ const EXPECTED_COMPLEX_PRIMITIVES: Record<string, string[]> = {
 };
 
 test("Master Yi deck has exact publishable executable behavior models", async () => {
-  const [rawCatalog, deckText, behaviorCatalog] = await Promise.all([
-    readFile("data/catalog/mvp.json", "utf8"),
+  const [catalog, deckText, behaviorCatalog] = await Promise.all([
+    loadCardCatalog(),
     readFile("data/decks/masteryi.dec.txt", "utf8"),
     buildCurrentBehaviorCatalog(),
   ]);
-  const allCards = cardSetFileSchema.parse(JSON.parse(rawCatalog));
-  const byName = new Map(allCards.map((card) => [card.name, card]));
   const cards = [
     ...new Map(
       parseDeckList(deckText).entries.flatMap((entry) => {
-        const card = resolveDeckCard({ byName, cards: allCards }, entry);
+        const card = resolveDeckCard(catalog, entry);
         return card ? [[card.public_code, card] as const] : [];
       }),
     ).values(),

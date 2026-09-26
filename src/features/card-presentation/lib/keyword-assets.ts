@@ -12,6 +12,8 @@ import deflect64 from "../assets/keywords/deflect-64.webp";
 import deflect128 from "../assets/keywords/deflect-128.webp";
 import equip64 from "../assets/keywords/equip-64.webp";
 import equip128 from "../assets/keywords/equip-128.webp";
+import flow64 from "../assets/keywords/flow-64.webp";
+import flow128 from "../assets/keywords/flow-128.webp";
 import ganking64 from "../assets/keywords/ganking-64.webp";
 import ganking128 from "../assets/keywords/ganking-128.webp";
 import hidden64 from "../assets/keywords/hidden-64.webp";
@@ -52,6 +54,7 @@ const keywordAssets: Partial<Record<
   deathknell: { md: deathknell64, lg: deathknell128 },
   deflect: { md: deflect64, lg: deflect128 },
   equip: { md: equip64, lg: equip128 },
+  flow: { md: flow64, lg: flow128 },
   ganking: { md: ganking64, lg: ganking128 },
   hidden: { md: hidden64, lg: hidden128 },
   legion: { md: legion64, lg: legion128 },

@@ -8,7 +8,7 @@ import {
   hashCardRulesText,
   previewCardCatalogImport,
 } from "../src/server/card-catalog";
-import type { Card } from "../src/server/catalog";
+import { loadCardCatalog, type Card } from "../src/server/catalog";
 import { parseDeckList, resolveDeckCard } from "../src/server/deck";
 import { buildDeckSnapshot } from "../src/server/game";
 
@@ -44,14 +44,15 @@ const EXPECTED_ANNIE_PRIMITIVES: Record<string, string[]> = {
   Tibbers: ["action.deal_damage", "selector.unit", "trigger.on_play"],
 };
 
-test("combined MVP preview produces publishable Annie behavior contracts", async () => {
-  const rawJson = await readFile("data/catalog/mvp.json", "utf8");
-  const behaviorCatalog = await buildCurrentBehaviorCatalog();
-  const luxDeck = parseDeckList(await readFile("data/decks/lux.dec.txt", "utf8"));
-  const allUploaded = JSON.parse(rawJson) as Card[];
-  const cardsByName = new Map(allUploaded.map((card) => [card.name, card]));
+test("playable deck preview produces publishable Annie behavior contracts", async () => {
+  const [catalog, behaviorCatalog, luxDeckText] = await Promise.all([
+    loadCardCatalog(),
+    buildCurrentBehaviorCatalog(),
+    readFile("data/decks/lux.dec.txt", "utf8"),
+  ]);
+  const luxDeck = parseDeckList(luxDeckText);
   const luxCodes = new Set(luxDeck.entries.map((entry) =>
-    resolveDeckCard({ byName: cardsByName, cards: allUploaded }, entry)!.public_code));
+    resolveDeckCard(catalog, entry)!.public_code));
   const uploaded = [
     ...new Map(
       (
@@ -60,7 +61,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
             async (filename) =>
               parseDeckList(await readFile(`data/decks/${filename}`, "utf8"))
                 .entries
-                .map((entry) => resolveDeckCard({ byName: cardsByName }, entry))
+                .map((entry) => resolveDeckCard(catalog, entry))
                 .filter((card): card is Card => Boolean(card)),
           ),
         )
@@ -85,7 +86,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
       }),
   );
   const preview = await previewCardCatalogImport({
-    sourceLabel: "data/catalog/mvp.json",
+    sourceLabel: "combined-playable-deck-cards.json",
     rawJson: JSON.stringify(uploaded),
     behaviorCatalog,
     existingCardLookup: async () => persistedLux,
@@ -165,7 +166,7 @@ test("combined MVP preview produces publishable Annie behavior contracts", async
   assert.equal(snapshot.entries.length, parseDeckList(annieDeckText).entries.length);
 
   const reupload = await previewCardCatalogImport({
-    sourceLabel: "data/catalog/mvp.json",
+    sourceLabel: "combined-playable-deck-cards.json",
     rawJson: JSON.stringify(uploaded),
     behaviorCatalog,
     existingCardLookup: async () =>

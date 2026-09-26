@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { loadSourceCardCatalog, type CardCatalog } from "../src/server/catalog";
+import { loadCardCatalog, type CardCatalog } from "../src/server/catalog";
 import { parseDeckList, validateDeckConstruction } from "../src/server/deck";
 import { CORE_DECK_IDS, PERMANENT_DECK_DEFINITIONS } from "../src/server/game/deck-definition";
 
@@ -12,7 +12,7 @@ async function loadDeck(filename: string) {
   return readFile(path.join(deckDirectory, filename), "utf8");
 }
 
-async function permanentCatalog(): Promise<CardCatalog> { return loadSourceCardCatalog(); }
+async function permanentCatalog(): Promise<CardCatalog> { return loadCardCatalog(); }
 
 test("validates every permanent deck source through the shared pipeline", async () => {
   assert.deepEqual(

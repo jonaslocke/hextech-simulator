@@ -261,6 +261,7 @@ export const tokenKinds = [
   "1 :rb_might: Recruit unit",
   "2 :rb_might: Sand Soldier unit",
   "3 :rb_might: Mech unit",
+  "1 :rb_might: Bird unit with Deflect",
   "Gold gear",
   "ready 3 :rb_might: Sprite unit"
 ] as const;
@@ -278,6 +279,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       required("resourceType", "resource", "The produced rune-pool resource.", runeResourceTypes),
       required("amountSource", "string", "How the produced amount is determined.", resourceAmountSources),
       optional("amount", "number", "The produced amount when amountSource is constant."),
+      optional("empoweredAmount", "number", "The produced amount while the source is Empowered."),
       optional("domain", "string", "The produced Power domain.", resourceDomainKinds),
       required("usage", "string", "What the generated resource may pay for.", resourceUsageKinds),
       optional("poolResource", "boolean", "Whether the produced resource is added directly to the normal Rune Pool.")
@@ -603,6 +605,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ,optional("readyOnly", "boolean", "Whether only ready units are legal.")
       ,optional("selectionKey", "string", "Stable key used to route this selection.")
       ,optional("selectionPurpose", "string", "Selection purpose.", ["target", "optionalCost"])
+      ,optional("onlyIfSelectionKey", "string", "Only offers this selection for a committed mode.")
+      ,optional("onlyIfSelectionValue", "string", "Committed mode value that enables this selection.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a unit"]
@@ -626,6 +630,8 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       ,optional("requiredDomain", "string", "Required card domain.", resourceDomainKinds)
       ,optional("inCombatWithEnemyDomain", "string", "Requires combat with an enemy unit of this domain.", resourceDomainKinds)
       ,optional("targetedByEnemySpellDomain", "string", "Requires being chosen by an enemy spell of this domain.", resourceDomainKinds)
+      ,optional("onlyIfSelectionKey", "string", "Only offers this selection for a committed mode.")
+      ,optional("onlyIfSelectionValue", "string", "Committed mode value that enables this selection.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be a controlled unit"]
@@ -644,7 +650,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("excludesSource", "boolean", "Whether the selected unit cannot be the behavior source."),
       optional("automatic", "boolean", "Whether affected units are derived automatically."),
       optional("selectionKey", "string", "Stable key used to route this selection."),
-      optional("requiredDomain", "string", "Required card domain.", resourceDomainKinds)
+      optional("requiredDomain", "string", "Required card domain.", resourceDomainKinds),
+      optional("onlyIfSelectionKey", "string", "Only offers this selection for a committed mode."),
+      optional("onlyIfSelectionValue", "string", "Committed mode value that enables this selection."),
+      optional("topCount", "number", "Restricts a Main Deck selection to this many top cards.")
     ],
     engineSupport: supported("Declared as a foundational selector primitive for the catalog pipeline."),
     targetingRequirements: ["target must be an opponent-controlled unit"]
@@ -669,10 +678,13 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Selects cards from a specified owner zone.",
     parameters: [
       required("zone", "zone", "The zone containing legal cards."),
-      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit", "Gear"]),
+      required("cardType", "string", "The required card type.", ["any", "Spell", "Unit", "Gear", "Rune"]),
       required("owner", "player", "The required owner relationship."),
       required("minimumCount", "number", "The minimum selection count."),
-      required("maximumCount", "number", "The maximum selection count.")
+      required("maximumCount", "number", "The maximum selection count."),
+      optional("selectionKey", "string", "Stable key used to route this selection."),
+      optional("onlyIfSelectionKey", "string", "Only offers this selection for a committed mode."),
+      optional("onlyIfSelectionValue", "string", "Committed mode value that enables this selection.")
     ],
     engineSupport: requiresEngineSupport("Zone-aware selection requires stable runtime targets.")
   }),
@@ -746,6 +758,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("maximumEnergyCost", "number", "Maximum printed Energy cost for an eligible spell."),
       optional("maximumPowerCost", "number", "Maximum printed Power cost for an eligible spell."),
       optional("choosesControlledCardType", "string", "Requires the item to choose a controlled card of this type.", ["Unit", "Gear", "UnitOrGear"]),
+      optional("onlyTargetSelectedBy", "string", "Requires the item to choose exactly the cards selected by this selector."),
       required("minimumCount", "number", "The minimum selection count."),
       required("maximumCount", "number", "The maximum selection count."),
       optional("selectionKey", "string", "Stable key used to route this selection.")
@@ -776,7 +789,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Moves cards from a player's main deck to hand.",
     parameters: [
       required("player", "player", "The player who draws cards."),
-      required("count", "number", "The number of cards drawn.")
+      required("count", "number", "The number of cards drawn."),
+      optional("onlyIfEffectKey", "string", "Outcome key required for this branch."),
+      optional("onlyIfEffectValue", "boolean", "Required value of the preceding effect outcome.")
     ],
     emitsEvents: ["card.drawn"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -814,7 +829,12 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("player", "player", "The controller of the cards to ready."),
       required("target", "target", "The cards to ready."),
-      optional("count", "number", "The number of cards to ready.")
+      optional("count", "number", "The number of cards to ready."),
+      optional("selectExhaustedCards", "boolean", "Prompt to choose exhausted controlled board cards."),
+      optional("excludesSource", "boolean", "Exclude the source card from the ready choice."),
+      optional("minimumCount", "number", "Minimum cards to ready when prompting."),
+      optional("maximumCount", "number", "Maximum cards to ready when prompting."),
+      optional("prompt", "string", "Prompt shown for the ready choice.")
     ],
     emitsEvents: ["card.readied"],
     engineSupport: requiresEngineSupport("Ready effects are recurring in the corpus and need generalized card-driven execution.")
@@ -871,7 +891,9 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
         "The unit receiving damage.",
         unitTargetReferenceKinds
       ),
-      optional("selectionKey", "string", "Selector key supplying affected units.")
+      optional("selectionKey", "string", "Selector key supplying affected units."),
+      optional("atMostOnePerLocation", "boolean", "Requires selected targets to be at different locations."),
+      optional("selectedMustShareLocation", "boolean", "Requires selected targets to share one location.")
     ],
     emitsEvents: ["unit.damaged"],
     engineSupport: supported("Selected as an initial executable action primitive for the new catalog pipeline.")
@@ -892,13 +914,14 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     id: "action.channel_or_draw",
     family: "action",
     name: "Channel or draw",
-    description: "Channels runes and draws only when none can be channeled.",
+    description: "Channels runes and draws when fewer than the required number can be channeled.",
     parameters: [
       required("channelCount", "number", "Runes to channel."),
       required("entryState", "string", "Rune entry state.", runeEntryStates),
-      required("fallbackDrawCount", "number", "Fallback cards drawn.")
+      required("fallbackDrawCount", "number", "Fallback cards drawn."),
+      optional("fallbackWhenFewerThan", "number", "Draw when fewer than this many runes were channeled. Defaults to one to preserve existing models.")
     ],
-    engineSupport: supported("The runtime records whether channeling completed.")
+    engineSupport: supported("The runtime records how many runes were channeled.")
   }),
   "action.fight": primitiveSeed({
     id: "action.fight",
@@ -945,6 +968,18 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     emitsEvents: ["card.drawn", "card.recycled"],
     engineSupport: supported("The private looked-card set, optional public reveal acknowledgement, and selection are retained in the canonical effect frame."),
+  }),
+  "action.reveal_until_card_type_and_play": primitiveSeed({
+    id: "action.reveal_until_card_type_and_play",
+    family: "action",
+    name: "Reveal until a card type, then play it",
+    description: "Publicly reveals cards from the controller's Main Deck through the first matching card, plays that card with the declared base costs ignored, and recycles the other revealed cards.",
+    parameters: [
+      required("cardType", "string", "The first revealed card type to play.", ["Unit", "Spell", "Gear"]),
+      optional("ignoreBaseCosts", "boolean", "Whether the played card's base Energy and Power costs are set to zero."),
+    ],
+    emitsEvents: ["card.revealed", "card.recycled", "card.played"],
+    engineSupport: supported("The resolving effect owns the public reveal and stages the identified card through the server-authoritative effect-play declaration queue."),
   }),
   "action.gain_xp": primitiveSeed({
     id: "action.gain_xp",
@@ -998,8 +1033,26 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     family: "action",
     name: "Banish card",
     description: "Moves a card to banishment.",
-    parameters: [required("target", "target", "The card to banish.")],
-    emitsEvents: ["card.banished"]
+    parameters: [
+      required("target", "target", "The card to banish."),
+      optional("selectionKey", "string", "Selector key supplying the card or permanent to banish."),
+      optional("captureLocationAs", "string", "Effect outcome key that records the selected objects' locations before banishment."),
+    ],
+    emitsEvents: ["card.banished"],
+    engineSupport: supported("Banishment is a direct owner-zone transfer, separate from Kill and Discard; optional location capture supports a later linked effect-play."),
+  }),
+  "action.play_banished_card": primitiveSeed({
+    id: "action.play_banished_card",
+    family: "action",
+    name: "Play a banished card at its captured location",
+    description: "Plays selected Units that were banished earlier in the same effect at the locations captured before banishment.",
+    parameters: [
+      required("selectionKey", "string", "Selector key supplying the previously banished Units."),
+      required("capturedLocationsKey", "string", "Effect outcome key containing locations captured by the linked banish action."),
+      optional("ignoreBaseCosts", "boolean", "Whether the played card's base Energy and Power costs are set to zero."),
+    ],
+    emitsEvents: ["card.played"],
+    engineSupport: supported("The banished card's owner uses the normal server-authoritative effect-play queue with its pre-banish location as the granted Unit destination; an ineligible play returns to Banishment."),
   }),
   "action.return_to_hand": primitiveSeed({
     id: "action.return_to_hand",
@@ -1016,7 +1069,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     description: "Moves cards to the bottom of a deck.",
     parameters: [
       required("target", "target", "The cards to recycle."),
-      optional("count", "number", "The number of cards recycled.")
+      optional("count", "number", "The number of cards recycled."),
+      optional("selectFromZone", "string", "Zone from which to choose cards.", ["trash", "hand", "mainDeck", "base"]),
+      optional("owner", "player", "Relationship of the card owner.", playerReferenceKinds),
+      optional("cardType", "string", "Card type restriction for the choice.", ["any", "Spell", "Unit", "Gear", "Rune"]),
+      optional("excludesCardType", "string", "Excluded card type for the choice.", ["Spell", "Unit", "Gear", "Rune"]),
+      optional("requiredDomain", "string", "Required Domain for the chosen cards.", resourceDomainKinds),
+      optional("minimumCount", "number", "Minimum chosen cards."),
+      optional("maximumCount", "number", "Maximum chosen cards."),
+      optional("prompt", "string", "Prompt shown for the choice."),
+      optional("onlyIfEffectKey", "string", "Outcome key required for this branch."),
+      optional("onlyIfEffectValue", "boolean", "Required value of the preceding effect outcome.")
     ],
     emitsEvents: ["card.recycled"],
     engineSupport: requiresEngineSupport("Recycle effects are recurring in the corpus and need generalized card-driven execution.")
@@ -1196,6 +1259,65 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     ],
     engineSupport: partiallySupported("Entry-state changes are recurring in the corpus; target/source variants require additional validation.")
   }),
+  "action.each_player_choose_top_deck_card_and_play": primitiveSeed({
+    id: "action.each_player_choose_top_deck_card_and_play",
+    family: "action",
+    name: "Each player chooses and plays a top-deck card",
+    description: "Each player in turn privately chooses and banishes one card from the top of their Main Deck, recycling the rest. After the parent effect resolves, the chosen cards are played in next-player order while ignoring their base Energy costs.",
+    parameters: [required("count", "number", "Maximum number of Main Deck cards each player looks at.")],
+    emitsEvents: ["card.recycled", "card.played"],
+    engineSupport: supported("The effect frame commits private per-player choices and the server-authoritative staged-play queue reuses normal card declarations and Power payment."),
+  }),
+  "trigger.stored_target_death": primitiveSeed({
+    id: "trigger.stored_target_death",
+    family: "trigger",
+    name: "Stored target death trigger",
+    description: "Triggers when a target retained by a delayed effect dies.",
+    listensToEvents: ["card.died"],
+    engineSupport: supported("Target-specific delayed death effects are stored server-side until the target dies or the turn ends."),
+  }),
+  "trigger.beginning_phase": primitiveSeed({
+    id: "trigger.beginning_phase",
+    family: "trigger",
+    name: "Beginning Phase trigger",
+    description: "Creates an effect at the start of its controller's Beginning Phase.",
+    listensToEvents: ["turn.beginning"],
+    engineSupport: supported("Beginning-phase triggers are queued before scoring."),
+  }),
+  "keyword.flow": primitiveSeed({
+    id: "keyword.flow",
+    family: "keyword",
+    name: "Flow",
+    description: "Allows a Spell to be played from its controller's Trash for an alternate Energy cost, then banishes it after resolution.",
+    parameters: [required("energyCost", "number", "Alternate Flow Energy cost.")],
+    engineSupport: supported("Flow play origin, alternate cost, and post-resolution banishment are server-authoritative.")
+  }),
+  "keyword.lethal_damage": primitiveSeed({
+    id: "keyword.lethal_damage",
+    family: "keyword",
+    name: "Lethal damage",
+    description: "Any positive damage dealt by this controller kills enemy units.",
+    engineSupport: supported("Damage and combat resolution consult controlled board sources before lethal cleanup."),
+  }),
+  "keyword.repeat": primitiveSeed({
+    id: "keyword.repeat",
+    family: "keyword",
+    name: "Repeat",
+    description: "An optional additional cost that executes a spell or ability's instructions one additional time.",
+    parameters: [
+      required("energyCost", "number", "Additional Energy cost."),
+      required("powerCost", "number", "Additional Power cost."),
+    ],
+    engineSupport: supported("Repeat costs and target choices are committed before priority; each committed execution resolves in order.")
+  }),
+  "modifier.enter_exhausted": primitiveSeed({
+    id: "modifier.enter_exhausted",
+    family: "modifier",
+    name: "Enter exhausted",
+    description: "Makes the source card enter exhausted instead of ready.",
+    parameters: [required("target", "target", "The card that enters exhausted.")],
+    engineSupport: supported("Entry-state changes are applied during server-authoritative card entry.")
+  }),
   "modifier.targeting_restriction": primitiveSeed({
     id: "modifier.targeting_restriction",
     family: "modifier",
@@ -1289,6 +1411,10 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("onlyIfSelectedBy", "string", "Only offers the choice when this selector chose a card."),
       optional("onlyIfSelectedHasTag", "string", "Only offers the choice when a selected card has this tag."),
       optional("onlyIfSelectedAttached", "boolean", "Only offers the choice when a selected card is currently attached."),
+      optional("yesLabel", "string", "Label for the affirmative option."),
+      optional("noLabel", "string", "Label for the negative option."),
+      optional("selectionKey", "string", "Stable key for a choice committed as a card-play mode."),
+      optional("commitAtPlay", "boolean", "Whether this mode is committed before the card enters the Chain."),
     ],
     engineSupport: supported("The decision is a server-authoritative pending effect choice."),
   }),
@@ -1298,6 +1424,32 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     name: "Ignore Deflect while paying",
     description: "Causes the controller to ignore Deflect for this card's payment procedure.",
     engineSupport: supported("Target payment is computed server-side from the card's canonical behavior model."),
+  }),
+  "modifier.prevent_scoring_until_turn": primitiveSeed({
+    id: "modifier.prevent_scoring_until_turn",
+    family: "modifier",
+    name: "Prevent scoring until turn",
+    description: "Prevents a battlefield from being scored until each player's specified turn.",
+    parameters: [required("turn", "number", "First player turn on which scoring is allowed.")],
+    engineSupport: supported("Scoring is checked at the common Hold and Conquer scoring boundary."),
+  }),
+  "action.win_game": primitiveSeed({
+    id: "action.win_game",
+    family: "action",
+    name: "Win game",
+    description: "Makes the effect controller win the game.",
+    engineSupport: supported("Game completion remains server-authoritative."),
+  }),
+  "action.play_token_on_next_death": primitiveSeed({
+    id: "action.play_token_on_next_death",
+    family: "action",
+    name: "Play token on next death",
+    description: "Stores a target-specific this-turn death trigger that plays a token.",
+    parameters: [
+      required("selectionKey", "string", "Selected target key."),
+      required("tokenName", "string", "Token to play when the target dies."),
+    ],
+    engineSupport: supported("The trigger is retained only until the target dies or the current turn ends."),
   }),
   "condition.card_type_presence": primitiveSeed({
     id: "condition.card_type_presence",
@@ -1310,6 +1462,17 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("excludesSource", "boolean", "Whether the source is excluded from the count."),
     ],
     engineSupport: supported("Board card types are evaluated from canonical runtime definitions."),
+  }),
+  "condition.controller_hand_and_battlefield_unit_counts": primitiveSeed({
+    id: "condition.controller_hand_and_battlefield_unit_counts",
+    family: "condition",
+    name: "Controller card and unit counts",
+    description: "Checks exact hand and battlefield-unit counts for the controller.",
+    parameters: [
+      required("handCount", "number", "Exact cards in hand."),
+      required("battlefieldUnitCount", "number", "Exact controlled units at battlefields."),
+    ],
+    engineSupport: supported("Counts are evaluated from authoritative zones and battlefield state."),
   }),
   "condition.event_subject_combat_alone": primitiveSeed({
     id: "condition.event_subject_combat_alone",
@@ -1416,6 +1579,42 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
       optional("optional", "boolean", "Whether the cost may be declined.")
     ],
     engineSupport: supported("Paid during the card-play process before resolution.")
+  }),
+  "condition.source_empowered": primitiveSeed({
+    id: "condition.source_empowered",
+    family: "condition",
+    name: "Source is Empowered",
+    description: "Requires the source permanent to be Empowered.",
+    engineSupport: supported("Empower status is server-authoritative on the source card state.")
+  }),
+  "condition.first_non_token_gear_play_this_turn": primitiveSeed({
+    id: "condition.first_non_token_gear_play_this_turn",
+    family: "condition",
+    name: "First non-token Gear played this turn",
+    description: "Requires the current play event to be its controller's first non-token Gear play this turn.",
+    engineSupport: supported("The turn's server-authoritative play history identifies the first qualifying Gear.")
+  }),
+  "cost.recycle_selected_cards": primitiveSeed({
+    id: "cost.recycle_selected_cards",
+    family: "cost",
+    name: "Recycle selected cards cost",
+    description: "Recycles selected cards as an activated ability cost.",
+    parameters: [
+      required("count", "number", "Number of selected cards to recycle."),
+      required("selectionKey", "string", "Cost selector key."),
+    ],
+    engineSupport: supported("Selected cards recycle before the activated ability enters the Chain.")
+  }),
+  "cost.discard_selected_cards": primitiveSeed({
+    id: "cost.discard_selected_cards",
+    family: "cost",
+    name: "Discard selected cards cost",
+    description: "Discards selected cards from the controller's hand as an activated ability cost.",
+    parameters: [
+      required("count", "number", "Number of selected cards to discard."),
+      required("selectionKey", "string", "Cost selector key."),
+    ],
+    engineSupport: supported("Selected cards move from hand to trash before the activated ability enters the Chain."),
   }),
   "replacement.recall_on_next_death": primitiveSeed({
     id: "replacement.recall_on_next_death",

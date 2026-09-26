@@ -2,7 +2,7 @@ import type { DeckSnapshotDocument } from "./repositories";
 import type { GameDocument } from "./state";
 import { dispatchBehaviorEvent } from "./triggers";
 import { victoryRequirement } from "./victory";
-import { advanceGameObjectIncarnation } from "./primitive-handlers";
+import { advanceGameObjectIncarnation, createRuntimeCardIndex, definitionForInstance } from "./primitive-handlers";
 
 export function applyHoldScoring(
   game: GameDocument,
@@ -27,6 +27,7 @@ export function scoreBattlefield(
   decks: readonly DeckSnapshotDocument[],
 ): void {
   const player = game.state.players[playerId]!;
+  if (scoringBlockedByBattlefield(game, playerId, battlefieldId, decks)) return;
   const scored = player.scoredBattlefieldIdsThisTurn ?? [];
   if (scored.includes(battlefieldId)) return;
   player.scoredBattlefieldIdsThisTurn = [...scored, battlefieldId];
@@ -58,6 +59,28 @@ export function scoreBattlefield(
     game.winnerPlayerId = playerId;
     game.status = "complete";
   }
+}
+
+function scoringBlockedByBattlefield(
+  game: GameDocument,
+  playerId: string,
+  battlefieldId: string,
+  decks: readonly DeckSnapshotDocument[],
+) {
+  const battlefield = requireBattlefield(game, battlefieldId);
+  const index = createRuntimeCardIndex(decks, game);
+  const requiredTurn = definitionForInstance(battlefield.cardInstanceId, index)
+    .behaviorModel.clauses
+    .flatMap((clause) => clause.effects)
+    .find((binding) => binding.behaviorId === "modifier.prevent_scoring_until_turn")
+    ?.parameters.turn;
+  if (typeof requiredTurn !== "number") return false;
+  const turn = game.state.turn;
+  if (!turn) return true;
+  const position = game.state.setup.playerIds.indexOf(playerId);
+  if (position < 0) return true;
+  const playerTurn = Math.floor((turn.turnNumber - 1 - position) / game.state.setup.playerIds.length) + 1;
+  return playerTurn < requiredTurn;
 }
 
 function drawOne(game: GameDocument, playerId: string) {
