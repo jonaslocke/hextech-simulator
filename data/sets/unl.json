@@ -11758,5 +11758,189 @@
       "signature": false
     },
     "public_code": "UNL-238/219"
+  },
+  {
+    "id": "2ce8c747-38ef-439a-914e-58e81aa56664",
+    "name": "Baron Pit",
+    "riftbound_id": "unl-t01",
+    "collector_number": 1,
+    "attributes": { "energy": null, "might": null, "power": null },
+    "classification": {
+      "type": "Battlefield",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>(You can't start the game with a token battlefield.)<br />Units can move here from anywhere.</p>",
+      "plain": "(You can't start the game with a token battlefield.) Units can move here from anywhere."
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T01.webp",
+      "artist": "Fish Art Studio",
+      "accessibility_text": "Riftbound Battlefield token: Baron Pit. Units can move here from anywhere."
+    },
+    "tags": [],
+    "metadata": { "clean_name": "Baron Pit", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T01"
+  },
+  {
+    "id": "10f35023-c7e3-4a64-abe3-3a490bf26213",
+    "name": "Bird",
+    "riftbound_id": "unl-t02",
+    "collector_number": 2,
+    "attributes": { "energy": null, "might": 1, "power": null },
+    "classification": {
+      "type": "Unit",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>[Deflect] (Opponents must pay :rb_rune_rainbow: to choose me with a spell or ability.)</p>",
+      "plain": "[Deflect] (Opponents must pay :rb_rune_rainbow: to choose me with a spell or ability.)",
+      "flavour": "Cloudy with a chance of talons."
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T02.webp",
+      "artist": "Six More Vodka",
+      "accessibility_text": "Riftbound Unit token: Bird. 1 [S]. [Deflect] (Opponents must pay [A] to choose me with a spell or ability.)"
+    },
+    "tags": ["Bird"],
+    "metadata": { "clean_name": "Bird", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T02"
+  },
+  {
+    "id": "77503a10-93af-4842-97d2-706286e1caa3",
+    "name": "Brush",
+    "riftbound_id": "unl-t03",
+    "collector_number": 3,
+    "attributes": { "energy": null, "might": null, "power": null },
+    "classification": {
+      "type": "Battlefield",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>Bird, Cat, Dog, Poro, and Ivern units here have +1 :rb_might:.<br />When you score here, you may replace this with the battlefield it replaced.</p>",
+      "plain": "Bird, Cat, Dog, Poro, and Ivern units here have +1 :rb_might:. When you score here, you may replace this with the battlefield it replaced."
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T03.webp",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Battlefield token: Brush. Bird, Cat, Dog, Poro, and Ivern units here have +1 [S]. When you score here, you may replace this with the battlefield it replaced."
+    },
+    "tags": [],
+    "metadata": { "clean_name": "Brush", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T03"
+  },
+  {
+    "id": "459cc639-ec7d-47c2-9773-46d025f189e9",
+    "name": "Gold",
+    "riftbound_id": "unl-t05",
+    "collector_number": 5,
+    "attributes": { "energy": null, "might": null, "power": null },
+    "classification": {
+      "type": "Gear",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>Kill this, :rb_exhaust:: [Reaction] — [Add] :rb_rune_rainbow:. <em>(Abilities that add resources can't be reacted to.)</em></p>",
+      "plain": "Kill this, :rb_exhaust:: [Reaction] — [Add] :rb_rune_rainbow:. (Abilities that add resources can't be reacted to.)"
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T05.webp",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Gear token: Gold. Kill this, [T]: [Reaction] — [Add] [A]. (Abilities that add resources can't be reacted to.)"
+    },
+    "tags": [],
+    "metadata": { "clean_name": "Gold", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T05"
+  },
+  {
+    "id": "b98e610d-f1ed-481f-b0f8-f5aafdc7bb07",
+    "name": "Reflection",
+    "riftbound_id": "unl-t06",
+    "collector_number": 6,
+    "attributes": { "energy": null, "might": 0, "power": null },
+    "classification": {
+      "type": "Unit",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>(I become a copy of something when played. I don't get that card's play effects.)</p>",
+      "plain": "(I become a copy of something when played. I don't get that card's play effects.)"
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T06.webp",
+      "artist": "Kudos Productions",
+      "accessibility_text": "Riftbound Unit token: Reflection. I become a copy of something when played. I don't get that card's play effects."
+    },
+    "tags": [],
+    "metadata": { "clean_name": "Reflection", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T06"
+  },
+  {
+    "id": "a342d560-66f8-4036-979f-d8d935d3655b",
+    "name": "Sprite",
+    "riftbound_id": "unl-t07",
+    "collector_number": 7,
+    "attributes": { "energy": null, "might": 3, "power": null },
+    "classification": {
+      "type": "Unit",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>[Temporary] (Kill me at the start of your Beginning Phase, before scoring.)</p>",
+      "plain": "[Temporary] (Kill me at the start of your Beginning Phase, before scoring.)",
+      "flavour": "Dreams rarely linger, but the dreamer is still changed."
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T07.webp",
+      "artist": "Envar Studio",
+      "accessibility_text": "Riftbound Unit token: Sprite. 3 [S]. [Temporary] (Kill me at the start of your Beginning Phase, before scoring.)"
+    },
+    "tags": ["Fae"],
+    "metadata": { "clean_name": "Sprite", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T07"
+  },
+  {
+    "id": "46f90222-e322-4a4d-b03c-40bad935a0bb",
+    "name": "XP Tracker",
+    "riftbound_id": "unl-t08",
+    "collector_number": 8,
+    "attributes": { "energy": null, "might": null, "power": null },
+    "classification": {
+      "type": "Card",
+      "supertype": "Token",
+      "rarity": "Common",
+      "domain": ["Colorless"]
+    },
+    "text": {
+      "rich": "<p>Track gained XP here.<br />Some cards get bonuses based on your [Level].<br />Some cards can spend XP for powerful effects.</p>",
+      "plain": "Track gained XP here. Some cards get bonuses based on your [Level]. Some cards can spend XP for powerful effects."
+    },
+    "set": { "set_id": "UNL", "label": "Unleashed" },
+    "media": {
+      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T08.webp",
+      "artist": "Rafael Zanchetin",
+      "accessibility_text": "XP Tracker token. Track gained XP here. Some cards get bonuses based on your [Level]. Some cards can spend XP for powerful effects."
+    },
+    "tags": [],
+    "metadata": { "clean_name": "XP Tracker", "alternate_art": false, "overnumbered": false, "signature": false },
+    "public_code": "UNL-T08"
   }
 ]

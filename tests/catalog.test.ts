@@ -32,6 +32,10 @@ test("loads every card from the local Riftbound set corpus", async () => {
   assert.equal(requireCardByName(catalog, "Lady of Luminosity - Starter").classification.type, "Legend");
   assert.equal(requireCardByName(catalog, "Annie, Stubborn").classification.supertype, "Champion");
   assert.equal(requireCardByName(catalog, "Lux, Crownguard").classification.supertype, "Champion");
+  for (const code of ["UNL-T01", "UNL-T02", "UNL-T03", "UNL-T05", "UNL-T06", "UNL-T07", "UNL-T08"]) {
+    assert.equal(catalog.byPublicCode.get(code)?.classification.supertype, "Token", `${code} should resolve as a token printing`);
+  }
+  assert.equal(catalog.byPublicCode.get("UNL-T08")?.classification.type, "Card");
   assert.match(catalog.versionHash, /^[a-f0-9]{64}$/);
 });
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const cardTypeSchema = z.enum([
   "Battlefield",
+  "Card",
   "Gear",
   "Legend",
   "Rune",
