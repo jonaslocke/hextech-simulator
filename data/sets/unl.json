@@ -11777,7 +11777,8 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T01.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e44f173629322a4e0c32d3f8902c294d4482ef42-1039x744.png",
+      
       "artist": "Fish Art Studio",
       "accessibility_text": "Riftbound Battlefield token: Baron Pit. Units can move here from anywhere."
     },
@@ -11804,7 +11805,7 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T02.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/949a2e43263a9fe0d957595325c7e2ebe06bf85f-744x1039.png",
       "artist": "Six More Vodka",
       "accessibility_text": "Riftbound Unit token: Bird. 1 [S]. [Deflect] (Opponents must pay [A] to choose me with a spell or ability.)"
     },
@@ -11830,7 +11831,7 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T03.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/fad09d6bd9bf38e376f430ecb0b400762420d061-1039x744.png",
       "artist": "Kudos Productions",
       "accessibility_text": "Riftbound Battlefield token: Brush. Bird, Cat, Dog, Poro, and Ivern units here have +1 [S]. When you score here, you may replace this with the battlefield it replaced."
     },
@@ -11856,7 +11857,7 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T05.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e566605fa989e12e91cd3d3e0b7985f7a8be8e74-744x1039.png",
       "artist": "Kudos Productions",
       "accessibility_text": "Riftbound Gear token: Gold. Kill this, [T]: [Reaction] — [Add] [A]. (Abilities that add resources can't be reacted to.)"
     },
@@ -11882,7 +11883,7 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T06.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/80327b196c59841a67a65327974a93223a3c541a-744x1039.png",
       "artist": "Kudos Productions",
       "accessibility_text": "Riftbound Unit token: Reflection. I become a copy of something when played. I don't get that card's play effects."
     },
@@ -11909,7 +11910,7 @@
     },
     "set": { "set_id": "UNL", "label": "Unleashed" },
     "media": {
-      "image_url": "https://cdn.piltoverarchive.com/cards/UNL-T07.webp",
+      "image_url": "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/1a90578f055e01515ebfb069dc3dbdba08d24da0-744x1039.png",
       "artist": "Envar Studio",
       "accessibility_text": "Riftbound Unit token: Sprite. 3 [S]. [Temporary] (Kill me at the start of your Beginning Phase, before scoring.)"
     },
