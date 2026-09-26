@@ -37,31 +37,44 @@ export type RuntimeCardIndex = {
   tokenCards?: Card[];
 };
 
+const runtimeCardIndexes = new WeakMap<GameDocument, RuntimeCardIndex>();
+
 export function createRuntimeCardIndex(
   decks: readonly DeckSnapshotDocument[],
   game?: GameDocument,
 ): RuntimeCardIndex {
-  return {
-    definitions: new Map([
-      ...decks.flatMap((deck) =>
-        deck.snapshot.cards.map((item) => [item.cardCode, item] as const),
-      ),
-      ...((game?.state.createdCardDefinitions ?? []).map(
-        (item) => [item.cardCode, item] as const,
-      )),
-    ]),
-    instances: new Map([
-      ...decks.flatMap((deck) =>
-        deck.instances.map((item) => [item.instanceId, item] as const),
-      ),
-      ...((game?.state.createdCardInstances ?? []).map(
-        (item) => [item.instanceId, item] as const,
-      )),
-    ]),
-    tokenCards: [...new Map(decks.flatMap((deck) =>
-      (deck.snapshot.tokenCards ?? []).map((card) => [card.public_code, card] as const),
-    )).values()],
-  };
+  // A transition can resume a nested effect which creates runtime cards while
+  // its caller still holds an index. Reuse that index for the mutable game
+  // document so every layer of the transition sees the same runtime registry.
+  const index = game ? runtimeCardIndexes.get(game) : undefined;
+  const definitions = index?.definitions ?? new Map<string, GameCardDefinition>();
+  const instances = index?.instances ?? new Map<string, CardInstance>();
+  definitions.clear();
+  instances.clear();
+  for (const deck of decks) {
+    for (const definition of deck.snapshot.cards) {
+      definitions.set(definition.cardCode, definition);
+    }
+    for (const instance of deck.instances) {
+      instances.set(instance.instanceId, instance);
+    }
+  }
+  for (const definition of game?.state.createdCardDefinitions ?? []) {
+    definitions.set(definition.cardCode, definition);
+  }
+  for (const instance of game?.state.createdCardInstances ?? []) {
+    instances.set(instance.instanceId, instance);
+  }
+  const tokenCards = [...new Map(decks.flatMap((deck) =>
+    (deck.snapshot.tokenCards ?? []).map((card) => [card.public_code, card] as const),
+  )).values()];
+  if (index) {
+    index.tokenCards = tokenCards;
+    return index;
+  }
+  const createdIndex = { definitions, instances, tokenCards };
+  if (game) runtimeCardIndexes.set(game, createdIndex);
+  return createdIndex;
 }
 
 export function definitionForInstance(id: string, index: RuntimeCardIndex): GameCardDefinition {

@@ -312,11 +312,11 @@ test("non-Unit token creation preserves the absence of Might", () => {
   assert.equal(projected?.computedMight, null);
 });
 
-test("runtime-created fallback tokens stay visible to an index held across effect resolution", () => {
+test("runtime-created cards stay visible to an index held across effect resolution", () => {
   const source = unit("SOURCE", "Token Creator", [
     clause("generated-gear", {
       effects: [binding("action.play_token", 0, {
-        tokenName: "Gold Gear",
+        tokenName: "Construct",
         count: 1,
         placement: "base",
         entryState: "exhausted",
@@ -339,7 +339,7 @@ test("runtime-created fallback tokens stay visible to an index held across effec
 
   const tokenId = game.state.createdCardInstances?.[0]?.instanceId;
   assert.ok(tokenId);
-  assert.equal(definitionForInstance(tokenId, transitionIndex).card.name, "Gold Gear");
+  assert.equal(definitionForInstance(tokenId, transitionIndex).card.name, "Construct");
   assert.equal(game.state.cardStates[tokenId]?.exhausted, true);
   assert.doesNotThrow(() => moveUnitToTrash(game, tokenId, transitionIndex));
 });
