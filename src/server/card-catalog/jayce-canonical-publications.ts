@@ -428,6 +428,10 @@ export function hasJayceCanonicalPublication(cardCode: string): boolean {
   return Object.hasOwn(models, cardCode);
 }
 
+export function jayceCanonicalPublicationCodes(): string[] {
+  return Object.keys(models);
+}
+
 /** Approved executable models for cards required by the Jayce deck. */
 export function buildJayceCanonicalPublication(
   card: Card,

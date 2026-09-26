@@ -4,7 +4,10 @@ import {
   buildCanonicalCardDocument,
   buildCurrentBehaviorCatalog,
 } from "../src/server/card-catalog";
-import { buildJayceCanonicalPublication } from "../src/server/card-catalog/jayce-canonical-publications";
+import {
+  buildJayceCanonicalPublication,
+  jayceCanonicalPublicationCodes,
+} from "../src/server/card-catalog/jayce-canonical-publications";
 import { loadCardCatalog } from "../src/server/catalog";
 import { gameFixture } from "./helpers/game-fixture";
 import {
@@ -16,17 +19,17 @@ import { createPrimitiveHandlers, createRuntimeCardIndex } from "../src/server/g
 import { gameplayActions, performGameplayAction } from "../src/server/game/actions";
 import { dispatchBehaviorEvent } from "../src/server/game/triggers";
 
-test("Jayce deck reusable publications compile their current supported cards", async () => {
+test("registered canonical publications compile and retain their supported contracts", async () => {
   const [catalog, behaviors] = await Promise.all([
     loadCardCatalog(),
     buildCurrentBehaviorCatalog(),
   ]);
 
-  for (const code of ["VEN-149/166", "VEN-068/166", "OGN-099/298", "OGN-138/298", "OGN-133/298", "OGN-156/298", "OGN-160/298", "OGN-115/298", "UNL-069/219", "UNL-088/219", "UNL-103/219", "UNL-106/219", "UNL-118/219", "VEN-049/166", "VEN-075/166", "VEN-085/166", "OGN-287/298", "VEN-066/166"]) {
-    const card = catalog.byPublicCode.get(code);
-    assert.ok(card, `Missing source card ${code}`);
+  for (const code of jayceCanonicalPublicationCodes()) {
+    const card = catalog.cards.find((candidate) => candidate.public_code.split("/")[0] === code);
+    assert.ok(card, `Missing source card for canonical publication ${code}`);
     const publication = buildJayceCanonicalPublication(card);
-    if (code === "UNL-103/219") {
+    if (code === "UNL-103") {
       const assignments = publication.clauses.flatMap((clause) => clause.assignments);
       assert.equal(
         assignments.find((assignment) => assignment.primitiveId === "action.optional")?.parameters.commitAtPlay,
@@ -38,7 +41,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
         assignment.parameters.onlyIfSelectionKey === "mode",
       ));
     }
-    if (code === "UNL-118/219") {
+    if (code === "UNL-118") {
       const selector = publication.clauses.flatMap((clause) => clause.assignments).find(
         (assignment) => assignment.primitiveId === "selector.enemy_unit",
       );
@@ -58,7 +61,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
       "updated",
     );
     assert.equal(document.runtimeSupportStatus, "supported");
-    if (code === "OGN-160/298") {
+    if (code === "OGN-160") {
       assert.deepEqual(
         document.behaviorModel.clauses.map((clause) => ({
           triggers: clause.triggers.map((binding) => binding.behaviorId),
@@ -70,7 +73,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
         }],
       );
     }
-    if (code === "OGN-115/298") {
+    if (code === "OGN-115") {
       assert.deepEqual(
         document.behaviorModel.clauses.map((clause) =>
           clause.effects.map((binding) => binding.behaviorId),
@@ -78,7 +81,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
         [["action.each_player_choose_top_deck_card_and_play"]],
       );
     }
-    if (code === "VEN-066/166") {
+    if (code === "VEN-066") {
       assert.ok(document.behaviorModel.clauses.some((clause) =>
         clause.keywords.some((binding) => binding.behaviorId === "keyword.hidden"),
       ));
@@ -134,13 +137,13 @@ test("Jayce deck reusable publications compile their current supported cards", a
       assert.ok(actions.some((action) => action.enabled && action.id.split(":")[3] === "hide"));
       assert.ok(actions.some((action) => action.enabled && action.id.split(":")[3] === "play"));
     }
-    if (code === "VEN-075/166") {
+    if (code === "VEN-075") {
       const resource = document.behaviorModel.clauses.flatMap((clause) => clause.abilities)
         .find((binding) => binding.behaviorId === "ability.exhaust_for_resource");
       assert.equal(resource?.parameters.amount, 1);
       assert.equal(resource?.parameters.empoweredAmount, 2);
     }
-    if (code === "OGN-099/298") {
+    if (code === "OGN-099") {
       const ability = document.behaviorModel.clauses[0]!;
       assert.ok(ability.selectors.some((binding) =>
         binding.behaviorId === "selector.card" &&
@@ -155,7 +158,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
         ["action.draw_cards"],
       );
     }
-    if (code === "UNL-088/219") {
+    if (code === "UNL-088") {
       const ability = document.behaviorModel.clauses.find((clause) =>
         clause.abilities.some((binding) =>
           binding.behaviorId === "ability.activated_effect",
