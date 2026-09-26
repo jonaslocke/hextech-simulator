@@ -372,7 +372,33 @@ function buildPaymentPlanForRequest(
     }
     return null;
   };
-  return chooseEnergy(0, remainingEnergy, plan);
+  const preferredPlan = chooseEnergy(0, remainingEnergy, plan);
+  if (preferredPlan || request.context.kind !== "ability" || request.poolOnly || request.energyCost === 0) {
+    return preferredPlan;
+  }
+
+  // Activated abilities may retain pooled Energy when spending it would leave
+  // their combined Energy-and-Power cost incomplete. Search lower-priority
+  // pooled allocations before rejecting the action; ready Runes still qualify
+  // for Power only when this same plan exhausts them for Energy.
+  const pooledEnergy = energy.filter((candidate) => candidate.acquisition === "pool");
+  const maximumPooledSpend = Math.min(request.energyCost,
+    pooledEnergy.reduce((sum, source) => sum + source.amount, 0));
+  const minimumPooledSpend = Math.max(0, request.energyCost -
+    energySources.reduce((sum, source) => sum + source.amount, 0));
+  for (let pooledSpend = maximumPooledSpend - 1; pooledSpend >= minimumPooledSpend; pooledSpend--) {
+    const selected = emptyPaymentPlan();
+    let remainingPool = pooledSpend;
+    for (const source of pooledEnergy) {
+      const spend = Math.min(source.amount, remainingPool);
+      if (spend > 0) recordPoolSpend(selected, source, spend);
+      remainingPool -= spend;
+      if (remainingPool === 0) break;
+    }
+    const complete = chooseEnergy(0, request.energyCost - pooledSpend, selected);
+    if (complete) return complete;
+  }
+  return null;
 }
 
 export function payCardCost(
