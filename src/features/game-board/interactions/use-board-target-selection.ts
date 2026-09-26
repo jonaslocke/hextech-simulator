@@ -62,6 +62,28 @@ export function createCardPaymentPreparation(action: GameProjection["actions"][n
   };
 }
 
+export function withSelectedTargetIds(
+  selection: BoardTargetSelection,
+  selectedTargetIds: string[],
+): BoardTargetSelection {
+  const activeTargetGroup = selection.targetGroups?.[
+    selection.activeTargetGroupIndex ?? 0
+  ];
+
+  return {
+    ...selection,
+    selectedTargetIds,
+    ...(activeTargetGroup
+      ? {
+          selectedTargetIdsByGroup: {
+            ...selection.selectedTargetIdsByGroup,
+            [activeTargetGroup.groupId]: selectedTargetIds,
+          },
+        }
+      : {}),
+  };
+}
+
 export function useBoardTargetSelection({
   actions,
   capturePendingAnimationSnapshot,
@@ -334,10 +356,10 @@ export function useBoardTargetSelection({
             (id) => id !== cardInstanceId,
           )
         : [...targetSelection.selectedTargetIds, cardInstanceId];
-      const nextSelection = {
-        ...targetSelection,
+      const nextSelection = withSelectedTargetIds(
+        targetSelection,
         selectedTargetIds,
-      };
+      );
 
       if (
         nextSelection.purpose === "move" &&

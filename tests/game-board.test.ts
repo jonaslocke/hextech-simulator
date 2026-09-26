@@ -6,6 +6,7 @@ import {
   actionsForSource,
   chainOverlayOpen,
   combineTargetRequirements,
+  groupedTargetRequirements,
   moveSelectionTitle,
   showdownPromptState,
   simultaneousMoveAction,
@@ -13,6 +14,11 @@ import {
   targetSelectionIsLegal
 } from "../src/features/game-board/model";
 import { responsiveCardHeight } from "../src/features/game-board/card-sizing";
+import {
+  rebindStagedSelection,
+  type BoardTargetSelection,
+  withSelectedTargetIds,
+} from "../src/features/game-board/interactions/use-board-target-selection";
 import type { ProjectedAction } from "../src/shared/game";
 
 test("groups opaque projected actions without card-specific rules", () => {
@@ -370,6 +376,66 @@ test("keeps large rune rows inside a horizontally scrollable zone", async () => 
   assert.match(
     playerBoard,
     /layout === "scroll"[\s\S]*?overflow-x-auto overflow-y-hidden/,
+  );
+});
+
+test("preserves the active grouped target selection when rebinding projected actions", () => {
+  const action: ProjectedAction = {
+    id: "state:1:play:grouped",
+    label: "Play grouped spell",
+    sourceCardInstanceId: "spell",
+    enabled: true,
+    disabledReason: null,
+    targets: [
+      {
+        kind: "card",
+        legalIds: ["unit-a", "unit-b"],
+        minimum: 0,
+        maximum: 3,
+        selectionGroup: "execution:0",
+      },
+      {
+        kind: "card",
+        legalIds: ["unit-a", "unit-b"],
+        minimum: 0,
+        maximum: 3,
+        selectionGroup: "execution:1",
+      },
+    ],
+    presentation: {
+      surface: "card-menu",
+      style: "primary",
+      prompt: null,
+    },
+  };
+  const targetGroups = groupedTargetRequirements(action, "card");
+  const initialSelection: BoardTargetSelection = {
+    actionId: action.id,
+    activeTargetGroupIndex: 0,
+    legalTargetIds: ["unit-a", "unit-b"],
+    maxTargets: 3,
+    minTargets: 0,
+    purpose: "play",
+    requirement: targetGroups[0]!.requirement,
+    selectedTargetIds: [],
+    selectedTargetIdsByGroup: {},
+    targetGroups,
+    targetKind: "card",
+  };
+
+  const selectionAfterBoardClick = withSelectedTargetIds(
+    initialSelection,
+    ["unit-a"],
+  );
+  const rebound = rebindStagedSelection(selectionAfterBoardClick, action);
+
+  assert.deepEqual(rebound.selectedTargetIds, ["unit-a"]);
+  assert.equal(targetSelectionIsLegal(rebound.requirement, rebound.selectedTargetIds), true);
+
+  const selectionAfterDeselect = withSelectedTargetIds(rebound, []);
+  assert.deepEqual(
+    rebindStagedSelection(selectionAfterDeselect, action).selectedTargetIds,
+    [],
   );
 });
 
