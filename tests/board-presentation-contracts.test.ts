@@ -185,6 +185,33 @@ test("Chain relationships distinguish object, location and Chain identities", as
   assert.ok(result.labels.includes("Targets Chain: Target spell"));
 });
 
+test("Chain relationships keep repeated targets visible for each execution", async () => {
+  const { game, decks, place } = await gameFixture();
+  const unit = place("OGN-044", "base");
+  const projection = projectGame({ game, decks, viewerPlayerId: "p1" });
+  const card = projection.players[0]!.zones
+    .flatMap((zone) => zone.cards)
+    .find((candidate) => candidate.instanceId === unit)!;
+  const item = {
+    id: "repeat-source",
+    label: "Repeated spell",
+    controllerPlayerId: "p1",
+    sourceCardInstanceId: null,
+    targetCardInstanceIds: [unit],
+    targetCardInstanceIdGroups: [[unit], [unit]],
+    kind: "spell" as const,
+    card: null,
+  };
+
+  const relationships = chainRelationships(projection, item);
+
+  assert.deepEqual(relationships.cardIds, [unit, unit]);
+  assert.deepEqual(relationships.labels, [
+    `Execution 1 · Target: ${card.name}`,
+    `Execution 2 · Target: ${card.name}`,
+  ]);
+});
+
 test("projected Might lists separate attachment instances and removes detached contributions", async () => {
   const { game, decks, place } = await gameFixture();
   const unit = place("OGN-044", "base");

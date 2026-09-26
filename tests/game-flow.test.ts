@@ -2433,6 +2433,15 @@ test("Repeat commits independent execution targets before priority and resolves 
   });
   assert.equal(next.state.pendingChoice, null);
   assert.equal(next.state.chain?.items.at(-1)?.repeatTargetSelections?.length, 2);
+  const projectedRepeat = projectGame({
+    game: next,
+    decks,
+    viewerPlayerId: "p1",
+  }).chain!.items.at(-1)!;
+  assert.deepEqual(projectedRepeat.targetCardInstanceIdGroups, [
+    ["p2:mover"],
+    ["p2:mover"],
+  ]);
   assert.equal(next.state.players.p1!.energy, 1);
   assert.equal(next.state.players.p1!.power.Mind, 1);
   for (const playerId of ["p1", "p2"]) {

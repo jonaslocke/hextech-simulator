@@ -368,7 +368,9 @@ export const GameBoard: FC<GameBoardProps> = ({
             controllerPlayerId: item.controllerPlayerId,
             ...controllerDetails,
             sourceCardInstanceId: item.sourceCardInstanceId,
-            targetCardInstanceIds: item.targetCardInstanceIds,
+            targetCardInstanceIds:
+              item.targetCardInstanceIdGroups?.flat() ??
+              item.targetCardInstanceIds,
             relationships: chainRelationships(sourceProjection, item),
           }));
         }
@@ -385,7 +387,9 @@ export const GameBoard: FC<GameBoardProps> = ({
           controllerPlayerId: item.controllerPlayerId,
           ...controllerDetails,
           sourceCardInstanceId: item.sourceCardInstanceId,
-          targetCardInstanceIds: item.targetCardInstanceIds,
+          targetCardInstanceIds:
+            item.targetCardInstanceIdGroups?.flat() ??
+            item.targetCardInstanceIds,
           relationships: chainRelationships(sourceProjection, item),
         },
       ];

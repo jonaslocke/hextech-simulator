@@ -383,6 +383,7 @@ export const projectedChainItemSchema = z.object({
   controllerPlayerId: z.string().min(1),
   sourceCardInstanceId: z.string().min(1).nullable(),
   targetCardInstanceIds: z.array(z.string().min(1)),
+  targetCardInstanceIdGroups: z.array(z.array(z.string().min(1))).optional(),
   kind: z.enum(["spell", "ability", "trigger", "unit"]),
   card: projectedCardViewSchema.nullable(),
 });

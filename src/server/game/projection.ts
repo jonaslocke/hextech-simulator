@@ -439,6 +439,9 @@ function projectChainItem(
     controllerPlayerId: item.controllerPlayerId,
     sourceCardInstanceId: item.sourceCardInstanceId,
     targetCardInstanceIds: item.targetCardInstanceIds,
+    ...(item.repeatTargetSelections
+      ? { targetCardInstanceIdGroups: item.repeatTargetSelections }
+      : {}),
     kind:
       item.kind === "activatedAbility"
         ? ("ability" as const)
