@@ -12,6 +12,7 @@ type Clause = Assignment[];
 
 const models: Record<string, Clause[]> = {
   "VEN-066": [[
+    ["keyword", "keyword.hidden", {}],
     ["selector", "selector.unit", {
       area: "board",
       locationRelation: "any",

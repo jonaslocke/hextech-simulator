@@ -125,7 +125,7 @@ test("Jayce deck reusable publications compile their current supported cards", a
         facedownCardInstanceId: null,
       }];
       game.state.players.p1!.energy = 20;
-      game.state.players.p1!.power = { Fury: 5 };
+      game.state.players.p1!.power = { Fury: 5, Mind: 1 };
 
       const actions = gameplayActions(game, "p1", decks).filter(
         (action) => action.sourceCardInstanceId === hiddenCardId,
