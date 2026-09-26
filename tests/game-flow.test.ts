@@ -313,6 +313,118 @@ test("resolves generic optional effect choices through the canonical pending-dec
   assert.equal(next.state.cardStates["p1:bf"]!.exhausted, false);
 });
 
+test("mandatory recycling chooses eligible board cards during effect resolution", () => {
+  const { game, decks } = fixture();
+  const source = definition("SOURCE", "Source", "Gear", 0, 0) as GameCardDefinition;
+  source.behaviorModel.clauses.push(clause("recycle-effect", {
+    triggers: [binding("trigger.on_play", 0, { actor: "controller", subject: "source" })],
+    effects: [binding("action.recycle_cards", 1, {
+      target: "card",
+      selectFromZone: "base",
+      owner: "controller",
+      cardType: "Rune",
+      minimumCount: 1,
+      maximumCount: 1,
+      count: 1,
+      prompt: "Choose a Rune to recycle",
+    })],
+  }));
+  decks[0]!.snapshot.cards.push(source);
+  decks[0]!.instances.push({
+    instanceId: "p1:source",
+    ownerPlayerId: "p1",
+    source: "mainDeck",
+    cardCode: "SOURCE",
+  });
+  game.state.players.p1!.zones.base.push("p1:source");
+  game.state.cardStates["p1:source"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  dispatchBehaviorEvent(game, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "p1:source",
+    values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.chain?.items.at(-1)?.targetCardInstanceIds, []);
+  assert.ok(game.state.chain?.items.at(-1));
+
+  const recycleRuneForPower = gameplayActions(game, "p1", decks).find(
+    (action) => action.sourceCardInstanceId === "p1:rune" && action.label.startsWith("Add Power"),
+  );
+  assert.ok(recycleRuneForPower);
+  let next = performGameplayAction({
+    game,
+    actorPlayerId: "p1",
+    actionId: recycleRuneForPower.id,
+    selectedIds: [],
+    decks,
+    now: "use-rune-before-resolution",
+  });
+  assert.ok(next.state.players.p1!.zones.runeDeck.includes("p1:rune"));
+
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass);
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `resolve-recycle-${playerId}`,
+    });
+  }
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.deepEqual(next.state.pendingChoice?.legalCardIds, ["p1:rune-b"]);
+  assert.equal(next.state.pendingChoice?.sourceZone, "base");
+
+  const chooseRune = gameplayActions(next, "p1", decks).find(
+    (action) => action.choice?.kind === "effectSelection",
+  );
+  assert.ok(chooseRune);
+  next = performGameplayAction({
+    game: next,
+    actorPlayerId: "p1",
+    actionId: chooseRune.id,
+    selectedIds: ["p1:rune-b"],
+    decks,
+    now: "choose-rune-on-resolution",
+  });
+  assert.ok(next.state.players.p1!.zones.runeDeck.includes("p1:rune-b"));
+  assert.equal(next.state.pendingChoice, null);
+
+  dispatchBehaviorEvent(next, {
+    type: "card.played",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "p1:source",
+    values: {},
+  }, decks);
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass);
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `resolve-empty-recycle-${playerId}`,
+    });
+  }
+  assert.equal(next.state.pendingChoice, null);
+  assert.equal(next.state.chain, null);
+});
+
 test("replaces a non-final Conquer point with a draw, then awards the final point", () => {
   const { game, decks } = fixture();
   decks[0]!.instances.push({

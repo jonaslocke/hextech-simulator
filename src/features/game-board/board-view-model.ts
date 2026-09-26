@@ -127,7 +127,7 @@ export type BoardProjection = {
         prompt: string;
         title: string;
         waitingMessage: string;
-        sourceZone: "hand" | "trash" | "mainDeck" | null;
+        sourceZone: "hand" | "trash" | "mainDeck" | "base" | null;
         presentation: "cardSelection" | "vision";
         revealedCards: ProjectedCardView[];
         minimum: number;

@@ -24,7 +24,7 @@ export const projectedTargetRequirementSchema = z
     // than one execution. Each group remains a separate server-issued slot.
     selectionGroup: z.string().min(1).optional(),
     selectionPurpose: z.enum(["target", "optionalCost"]).optional(),
-    sourceZone: z.enum(["hand", "trash", "mainDeck"]).optional(),
+    sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).optional(),
     // A later location choice can be constrained by an earlier selected
     // object (for example, a unit's legal move destinations).
     legalIdsBySelectedId: z.record(z.array(z.string().min(1))).optional(),
@@ -495,7 +495,7 @@ export const gameProjectionSchema = z.object({
         prompt: z.string().min(1),
         title: z.string().min(1),
         waitingMessage: z.string().min(1),
-        sourceZone: z.enum(["hand", "trash", "mainDeck"]).nullable(),
+        sourceZone: z.enum(["hand", "trash", "mainDeck", "base"]).nullable(),
         presentation: z.enum(["cardSelection", "vision"]),
         revealedCards: z.array(projectedCardViewSchema),
         visibleCards: z.array(projectedCardViewSchema).default([]).optional(),

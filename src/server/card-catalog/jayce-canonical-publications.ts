@@ -411,18 +411,15 @@ const models: Record<string, Clause[]> = {
   ]],
   "OGN-287": [[
     ["trigger", "trigger.conquer_battlefield", {}],
-    ["selector", "selector.card", {
-      zone: "base",
+    ["action", "action.recycle_cards", {
+      target: "card",
+      selectFromZone: "base",
       cardType: "Rune",
       owner: "controller",
       minimumCount: 1,
       maximumCount: 1,
-      selectionKey: "rune",
-    }],
-    ["action", "action.recycle_cards", {
-      target: "rune",
-      selectionKey: "rune",
       count: 1,
+      prompt: "Choose one of your Runes to recycle",
     }],
   ]],
 };

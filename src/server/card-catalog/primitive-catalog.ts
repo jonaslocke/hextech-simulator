@@ -1070,7 +1070,7 @@ const CATALOG_SEEDS: Record<string, PrimitiveCatalogSeed> = {
     parameters: [
       required("target", "target", "The cards to recycle."),
       optional("count", "number", "The number of cards recycled."),
-      optional("selectFromZone", "string", "Zone from which to choose cards.", ["trash", "hand", "mainDeck"]),
+      optional("selectFromZone", "string", "Zone from which to choose cards.", ["trash", "hand", "mainDeck", "base"]),
       optional("owner", "player", "Relationship of the card owner.", playerReferenceKinds),
       optional("cardType", "string", "Card type restriction for the choice.", ["any", "Spell", "Unit", "Gear", "Rune"]),
       optional("excludesCardType", "string", "Excluded card type for the choice.", ["Spell", "Unit", "Gear", "Rune"]),

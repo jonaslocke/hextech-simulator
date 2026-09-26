@@ -397,6 +397,42 @@ test("maps pending non-board effect selections to the dialog", () => {
   );
 });
 
+test("maps pending public board-card selections to the dialog", () => {
+  const rune = card("base-rune", "Rune");
+  const projection = projectionWith({
+    actions: [
+      effectSelectionAction(
+        "base-choice",
+        "Choose a Rune to recycle",
+        [rune.instanceId],
+        "base",
+      ),
+    ],
+    pendingChoice: effectSelectionChoice({
+      id: "base-choice",
+      maximum: 1,
+      minimum: 1,
+      prompt: "Choose a Rune to recycle",
+      sourceZone: "base",
+    }),
+  });
+  const base = projection.players[0]!.zones.find(
+    (zone) => zone.kind === "base",
+  )!;
+  base.cards = [rune];
+  base.count = 1;
+
+  const decision = buildPlayerDecisionRequest({
+    cardsByInstanceId: {},
+    sourceProjection: projection,
+  });
+
+  assert.equal(decision?.kind, "cardSelection");
+  if (decision?.kind !== "cardSelection") return;
+  assert.equal(decision.title, "Choose from Base");
+  assert.deepEqual(decision.cards.map((item) => item.id), ["base-rune"]);
+});
+
 test("maps a staged effect play to an explicit decision using only projected play actions", () => {
   const projection = projectionWith({ actions: [], pendingChoice: null });
   Object.assign(projection, {
@@ -572,7 +608,7 @@ function effectSelectionAction(
   choiceId: string,
   prompt: string,
   legalIds: string[],
-  sourceZone?: "hand" | "trash" | "mainDeck",
+  sourceZone?: "hand" | "trash" | "mainDeck" | "base",
 ): GameProjection["actions"][number] {
   return {
     choice: {
@@ -607,7 +643,7 @@ function effectSelectionChoice(input: {
   maximum: number;
   minimum: number;
   prompt: string;
-  sourceZone: "hand" | "trash" | "mainDeck" | null;
+  sourceZone: "hand" | "trash" | "mainDeck" | "base" | null;
 }): Extract<
   NonNullable<GameProjection["pendingChoice"]>,
   { type: "effectSelection" }

@@ -49,7 +49,7 @@ export type BehaviorHandler = {
     prompt: string;
     tokenName?: string;
     destinations?: Array<{ id: string; label: string }>;
-    sourceZone?: "hand" | "trash" | "mainDeck";
+    sourceZone?: "hand" | "trash" | "mainDeck" | "base";
     presentation?: "cardSelection" | "vision";
     visibleIds?: string[];
     options?: Array<{ id: string; label: string }>;

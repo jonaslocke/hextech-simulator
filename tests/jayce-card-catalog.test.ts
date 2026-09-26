@@ -14,6 +14,7 @@ import {
 } from "../src/server/game/behavior-runtime";
 import { createPrimitiveHandlers, createRuntimeCardIndex } from "../src/server/game/primitive-handlers";
 import { gameplayActions, performGameplayAction } from "../src/server/game/actions";
+import { dispatchBehaviorEvent } from "../src/server/game/triggers";
 
 test("Jayce deck reusable publications compile their current supported cards", async () => {
   const [catalog, behaviors] = await Promise.all([
@@ -172,6 +173,82 @@ test("Jayce deck reusable publications compile their current supported cards", a
       assert.equal(ability.effects[0]?.behaviorId, "action.play_token");
     }
   }
+});
+
+test("canonical mandatory board recycling enters the Chain without a target and selects on resolution", async () => {
+  const [catalog, behaviors, fixture] = await Promise.all([
+    loadCardCatalog(),
+    buildCurrentBehaviorCatalog(),
+    gameFixture(),
+  ]);
+  const card = catalog.byPublicCode.get("OGN-287/298");
+  assert.ok(card, "Missing source card OGN-287/298");
+  const model = buildCanonicalCardDocument(
+    buildJayceCanonicalPublication(card),
+    behaviors,
+    "created",
+    "updated",
+  );
+  const { game, decks } = fixture;
+  decks[0]!.snapshot.cards.push(model);
+  const runes = decks[0]!.instances.filter((instance) => instance.source === "runeDeck").slice(0, 2);
+  assert.equal(runes.length, 2);
+  for (const rune of runes) {
+    game.state.players.p1!.zones.runeDeck = game.state.players.p1!.zones.runeDeck.filter(
+      (id) => id !== rune.instanceId,
+    );
+    game.state.players.p1!.zones.base.push(rune.instanceId);
+  }
+  decks[0]!.instances.push({
+    instanceId: "p1:canonical-battlefield-effect",
+    ownerPlayerId: "p1",
+    source: "battlefield",
+    cardCode: model.cardCode,
+  });
+  game.state.battlefields.push({
+    battlefieldId: "p1:canonical-battlefield-effect",
+    cardInstanceId: "p1:canonical-battlefield-effect",
+    selectedByPlayerId: "p1",
+    controllerPlayerId: "p1",
+    units: [],
+  });
+  game.state.cardStates["p1:canonical-battlefield-effect"] = {
+    exhausted: false,
+    damage: 0,
+    computedMight: null,
+  };
+
+  dispatchBehaviorEvent(game, {
+    type: "battlefield.conquered",
+    actorPlayerId: "p1",
+    subjectCardInstanceId: "p1:canonical-battlefield-effect",
+    values: {},
+  }, decks);
+
+  assert.equal(game.state.pendingChoice, null);
+  assert.deepEqual(game.state.chain?.items.at(-1)?.targetCardInstanceIds, []);
+  let next = game;
+  for (const playerId of ["p1", "p2"]) {
+    const pass = gameplayActions(next, playerId, decks).find(
+      (action) => action.label === "Pass priority",
+    );
+    assert.ok(pass);
+    next = performGameplayAction({
+      game: next,
+      actorPlayerId: playerId,
+      actionId: pass.id,
+      selectedIds: [],
+      decks,
+      now: `canonical-recycle-${playerId}`,
+    });
+  }
+  assert.equal(next.state.pendingChoice?.type, "effectSelection");
+  assert.equal(next.state.pendingChoice?.sourceZone, "base");
+  const index = createRuntimeCardIndex(decks, next);
+  const legalRunes = next.state.players.p1!.zones.base.filter(
+    (id) => index.definitions.get(index.instances.get(id)!.cardCode)?.card.classification.type === "Rune",
+  );
+  assert.deepEqual(next.state.pendingChoice?.legalCardIds, legalRunes);
 });
 
 test("canonical selector publications project compiled target constraints", async () => {

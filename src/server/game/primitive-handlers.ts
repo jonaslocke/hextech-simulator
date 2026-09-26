@@ -1195,7 +1195,7 @@ export function createPrimitiveHandlers(
       if (typeof committedCardsKey === "string" &&
         Object.hasOwn(context.selectionOverrides, committedCardsKey)) return null;
       const zone = binding.parameters.selectFromZone;
-      if (zone !== "trash" && zone !== "hand" && zone !== "mainDeck") return null;
+      if (zone !== "trash" && zone !== "hand" && zone !== "mainDeck" && zone !== "base") return null;
       const owner = binding.parameters.owner;
       const playerIds = Object.keys(context.game.state.players).filter((playerId) =>
         owner === "opponent"
@@ -1219,6 +1219,7 @@ export function createPrimitiveHandlers(
             )),
         ),
       );
+      if (legalIds.length === 0) return null;
       return {
         kind: "card" as const,
         legalIds,

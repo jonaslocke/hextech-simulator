@@ -161,6 +161,8 @@ export function buildPlayerDecisionRequest({
               ? "Discard from Hand"
               : pendingChoice.sourceZone === "trash"
                 ? "Choose from Trash"
+                : pendingChoice.sourceZone === "base"
+                  ? "Choose from Base"
                 : pendingChoice.title,
         };
       }
