@@ -59,7 +59,7 @@ export function ActionRail({
   setOpenZone: (zone: OpenableActionRailZone | null) => void;
 }) {
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const canPassTurn = Boolean(onPassTurn) && !passTurnDisabled && !disabled;
   const canConcede = Boolean(onConcede) && !concedeDisabled && !disabled;
