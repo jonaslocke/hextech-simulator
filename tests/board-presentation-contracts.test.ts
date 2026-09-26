@@ -26,6 +26,57 @@ test("location selection supports board inspection without changing the selectio
   assert.deepEqual(targetSelection.selectedTargetIds, []);
 });
 
+test("play-mode dialogs expose public-state inspection", () => {
+  const request = resolveDecisionInspectionRequest({
+    playerDecision: null,
+    targetSelection: null,
+    unitPlayChoice: {
+      card: { instanceId: "card-1", name: "Test Unit" },
+    },
+  });
+
+  assert.equal(request?.source, "unitPlayChoice");
+  assert.equal(request?.policy, "publicGameState");
+  assert.equal(request?.decisionKey, "publicGameState:unitPlayChoice:card-1");
+});
+
+test("interactive decision prompts default to public game inspection", () => {
+  const effectPlay = {
+    decisionKey: "effect-play:player:staged-card",
+    kind: "effectPlay" as const,
+    inspection: "none" as const,
+    options: [],
+    stagedCard: { id: "staged-card", label: "Test Unit" },
+  };
+  const tokenPlacement = {
+    actionId: "place-token",
+    count: 1,
+    decisionKey: "token-placement:choice",
+    destinations: [{ id: "base", label: "Base" }],
+    kind: "tokenPlacement" as const,
+    title: "Place a token",
+    tokenName: "Test token",
+  };
+  const pending = {
+    kind: "pendingDecision" as const,
+    message: "Waiting for the other player.",
+    title: "Pending choice",
+  };
+
+  for (const playerDecision of [effectPlay, tokenPlacement]) {
+    const request = resolveDecisionInspectionRequest({
+      playerDecision,
+      targetSelection: null,
+    });
+    assert.equal(request?.policy, "publicGameState");
+    assert.equal(request?.source, "playerDecision");
+  }
+  assert.equal(
+    resolveDecisionInspectionRequest({ playerDecision: pending, targetSelection: null }),
+    null,
+  );
+});
+
 test("board card menus omit unavailable projected actions", () => {
   const actions = [
     { id: "ready", enabled: true, label: "Ready a Gear" },

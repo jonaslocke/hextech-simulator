@@ -9,6 +9,7 @@ import { ResourceCost } from "../components/resource-cost";
 import { OrderedDecisionPrompt } from "./ordered-decision-prompt";
 import { PendingDecisionStatus } from "./pending-decision-status";
 import { TokenPlacementPrompt } from "./token-placement-prompt";
+import { decisionInspectionPolicyForPrompt } from "./decision-inspection-policy";
 import {
   createCombatDamageIntent,
   createSelectionIntent,
@@ -44,8 +45,9 @@ export function PlayerDecisionHost({
     return null;
   }
 
+  const inspectionPolicy = decisionInspectionPolicyForPrompt(decision);
   const headerAction =
-    onInspect && (decision.inspection ?? "none") !== "none" ? (
+    onInspect && inspectionPolicy !== "none" ? (
       <DecisionInspectionTrigger onInspect={onInspect} />
     ) : undefined;
 
@@ -122,6 +124,7 @@ export function PlayerDecisionHost({
       return (
         <TokenPlacementPrompt
           decision={decision}
+          headerAction={headerAction}
           interactionSuspended={interactionSuspended}
           isSubmitting={isSubmitting}
           isVisible={isPromptVisible}
@@ -142,7 +145,7 @@ export function PlayerDecisionHost({
             decisionKey: decision.decisionKey,
             description:
               "Choose a legal play declaration. You can then complete its destination, targets, and payment.",
-            inspection: "none",
+            inspection: inspectionPolicy,
             kind: "optionDecision",
             options: decision.options.map((option) => ({
               id: option.id,
@@ -163,6 +166,7 @@ export function PlayerDecisionHost({
             title: "Play a card from this effect?",
           }}
           interactionSuspended={interactionSuspended}
+          headerAction={headerAction}
           isSubmitting={isSubmitting}
           isVisible={isPromptVisible}
           onSubmit={(selectedIds) => {

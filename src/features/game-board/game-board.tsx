@@ -321,6 +321,7 @@ export const GameBoard: FC<GameBoardProps> = ({
   const decisionInspectionRequest = resolveDecisionInspectionRequest({
     playerDecision,
     targetSelection,
+    unitPlayChoice,
   });
   const decisionInspection = useDecisionInspection({
     request: decisionInspectionRequest,
@@ -577,7 +578,6 @@ export const GameBoard: FC<GameBoardProps> = ({
 
     closeCardActionMenu();
     setOpenZone(null);
-    setUnitPlayChoice(null);
 
     if (!isChainLockedOpen) {
       setIsChainOverlayOpen(false);
@@ -1307,6 +1307,13 @@ export const GameBoard: FC<GameBoardProps> = ({
         <ReportCardChoiceDialog
           confirmLabel="Play card"
           description="Choose a destination or payment option for this card."
+          headerAction={
+            decisionInspection.request?.source === "unitPlayChoice" ? (
+              <DecisionInspectionTrigger
+                onInspect={decisionInspection.inspectBoard}
+              />
+            ) : undefined
+          }
           isOpen
           isSubmitting={isSubmittingAction}
           onCancel={() => setUnitPlayChoice(null)}

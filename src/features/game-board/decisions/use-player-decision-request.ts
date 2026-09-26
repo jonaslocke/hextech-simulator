@@ -270,7 +270,6 @@ export function buildPlayerDecisionRequest({
             source: "effect-option",
           }),
           description: pendingChoice.prompt,
-          inspection: "none",
           kind: "optionDecision",
           options: pendingChoice.options.map((option) => ({
             id: option.id,

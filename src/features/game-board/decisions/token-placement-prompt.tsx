@@ -5,17 +5,19 @@ import { GameActionButton } from "@/features/game-board/components/game-action-b
 import { Button } from "@/shared/components/button";
 import { DialogPortal } from "@/shared/components/dialog-portal";
 import { cn } from "@/shared/utils/cn";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { TokenPlacementDecisionRequest } from "./player-decision-types";
 
 export function TokenPlacementPrompt({
   decision,
+  headerAction,
   interactionSuspended,
   isSubmitting,
   isVisible,
   onSubmit,
 }: {
   decision: TokenPlacementDecisionRequest;
+  headerAction?: ReactNode;
   interactionSuspended: boolean;
   isSubmitting: boolean;
   isVisible: boolean;
@@ -75,15 +77,18 @@ export function TokenPlacementPrompt({
           )}
           role="dialog"
         >
-          <header className="space-y-1">
-            <h2 className="font-semibold text-slate-50 text-lg leading-tight">
-              {decision.title}
-            </h2>
-            {decision.description && (
-              <div className="text-slate-400 text-sm leading-5">
-                <CardRulesText text={decision.description} />
-              </div>
-            )}
+          <header className="flex justify-between items-start gap-3">
+            <div className="space-y-1 min-w-0 flex-1">
+              <h2 className="font-semibold text-slate-50 text-lg leading-tight">
+                {decision.title}
+              </h2>
+              {decision.description && (
+                <div className="text-slate-400 text-sm leading-5">
+                  <CardRulesText text={decision.description} />
+                </div>
+              )}
+            </div>
+            {headerAction}
           </header>
 
           <div className="gap-2 grid">

@@ -33,7 +33,8 @@ type DecisionInspectionCapability = {
    * Controls whether the active gameplay decision may temporarily expose a
    * read-only game-state inspection surface.
    *
-   * Omitted values are treated as "none" so older callers remain compatible.
+   * Interactive prompts default to public game-state inspection. Pending
+   * statuses are non-interactive and do not expose inspection.
    */
   inspection?: DecisionInspectionPolicy;
 };
