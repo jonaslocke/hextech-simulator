@@ -11,6 +11,7 @@ export type BoardCatalogCard = {
     power: number | undefined;
   };
   classification: { domain: string[]; supertype: string | null; type: string };
+  tags?: string[];
   media: { image_url: string | null };
   metadata: Record<string, never>;
   name: string;
@@ -421,6 +422,7 @@ function toCatalogCard(card: ProjectedCardView): BoardCatalogCard {
       supertype: card.supertype,
       type: card.type,
     },
+    tags: card.tags ?? [],
     media: { image_url: card.imageUrl },
     metadata: {},
     name: card.name,

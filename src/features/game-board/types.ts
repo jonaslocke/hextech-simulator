@@ -54,6 +54,7 @@ export type Card = {
   setLabel?: string;
   supertype?: ProjectedCardView["supertype"];
   type?: ProjectedCardView["type"];
+  tags?: ProjectedCardView["tags"];
   isExhausted?: boolean;
   attachedToCardInstanceId?: string | null;
   damage?: number;

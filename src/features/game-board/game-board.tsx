@@ -756,7 +756,7 @@ export const GameBoard: FC<GameBoardProps> = ({
       {...reportCardSelection}
     >
     <main
-      className="relative grid h-dvh grid-rows-[auto_minmax(0,1fr)_7rem] overflow-hidden text-slate-100 game-board"
+      className="relative grid h-dvh grid-rows-[64px_minmax(0,1fr)_112px] overflow-hidden text-slate-100 game-board"
       onClickCapture={handleBoardClickCapture}
     >
       <div className="relative">
@@ -863,8 +863,8 @@ export const GameBoard: FC<GameBoardProps> = ({
             isInteractionSuspended ? () => undefined : handleLocationDragOver
           }
         >
-          <div className="flex-1 gap-2 grid grid-rows-[minmax(120px,0.9fr)_minmax(180px,1.4fr)_minmax(120px,0.9fr)] p-2 pb-0 min-w-0 min-h-0 overflow-hidden">
-            <div className="gap-1 grid grid-rows-2 min-h-0">
+          <div className="board-stage flex-1 gap-y-2 grid min-w-0 min-h-0 overflow-hidden">
+            <div className="min-h-0">
               <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}
@@ -880,7 +880,7 @@ export const GameBoard: FC<GameBoardProps> = ({
               />
             </div>
             <LayoutGroup id="battlefield-showdown-layout">
-              <div className="flex gap-2 min-h-0">
+              <div className="battlefield-surfaces min-h-0">
                 <BattlefieldBoard
                   battlefield={board.playerBattlefield}
                   highlightedCardInstanceIds={
@@ -941,7 +941,7 @@ export const GameBoard: FC<GameBoardProps> = ({
                 />
               </div>
             </LayoutGroup>
-            <div className="gap-1 grid grid-rows-2 min-h-0">
+            <div className="min-h-0">
               <PlayerBoard
               highlightedCardInstanceIds={displayedHighlightedCardInstanceIds}
               hiddenCardInstanceIds={hiddenBoardCardInstanceIds}

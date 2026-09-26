@@ -299,6 +299,7 @@ export const projectedCardViewSchema = z.object({
   type: z.string().min(1),
   supertype: z.string().nullable(),
   domains: z.array(z.string()),
+  tags: z.array(z.string()).optional(),
   energy: z.number().nullable(),
   might: z.number().nullable(),
   power: z.number().nullable(),

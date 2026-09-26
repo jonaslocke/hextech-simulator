@@ -5,6 +5,7 @@ import { useLayoutEffect, useState, type MouseEvent } from "react";
 import { DraggableLocationCard } from "../drag-and-drop/draggable-location-card";
 import type { MovementDraftView } from "../interactions/movement-draft";
 import type { Card } from "../types";
+import type { BoardCardSize } from "../board-geometry";
 import { AttachmentCardGroup } from "./attachment-card-group";
 import { CardTile } from "./card-tile";
 
@@ -50,6 +51,10 @@ export function MovementDraftStage({
   if (!movementDraft || !destinationElement) {
     return null;
   }
+  const destinationCardSize = isBoardCardSize(destinationElement.dataset.battlefieldCardSize)
+    ? destinationElement.dataset.battlefieldCardSize
+    : null;
+  if (!destinationCardSize) return null;
 
   return createPortal(
     <>
@@ -61,6 +66,7 @@ export function MovementDraftStage({
             <CardTile
               enableHoverPreview
               isStagedForMovement
+              size={destinationCardSize}
               isTransferHidden={
                 unitId ? hiddenCardInstanceIds?.has(unitId) : false
               }
@@ -115,13 +121,16 @@ export function MovementDraftStage({
                         : false
                     }
                     showMight
+                    size={destinationCardSize}
                     {...attachment}
                   />
                 ),
               }))}
               groupId={key}
               host={host}
+              hostExhausted={Boolean(stagedUnit.isExhausted)}
               key={key}
+              size={destinationCardSize}
             />
           );
         },
@@ -129,4 +138,8 @@ export function MovementDraftStage({
     </>,
     destinationElement,
   );
+}
+
+function isBoardCardSize(value: string | undefined): value is BoardCardSize {
+  return value === "md" || value === "lg" || value === "xl";
 }

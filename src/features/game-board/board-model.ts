@@ -284,6 +284,7 @@ export function buildCard(
   return [
     {
       domains: card.classification.domain,
+      tags: card.tags ?? [],
       damage: cardStates[cardInstanceId]?.damage,
       mightModifiers: cardStates[cardInstanceId]?.mightModifiers,
       keywordAnnotations: cardStates[cardInstanceId]?.keywordAnnotations,
