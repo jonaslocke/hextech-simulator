@@ -1354,7 +1354,12 @@ export const GameBoard: FC<GameBoardProps> = ({
             if (actionId) beginPlayOrTargetSelection(card, actionId);
           }}
           options={unitPlayChoice.modes.map((mode) => ({
-            labelContent: <PlayableCardMenuLabel mode={mode} />,
+            labelContent: (
+              <PlayableCardMenuLabel
+                mode={mode}
+                showDeclaration={unitPlayChoice.modes.length > 1}
+              />
+            ),
             disabled: !mode.enabled,
             id: mode.id,
             label: mode.enabled

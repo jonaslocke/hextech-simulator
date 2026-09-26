@@ -326,7 +326,7 @@ export function useGameBoardActions({
         disabled: !mode.enabled,
         id: mode.id,
         label: mode.enabled
-          ? <PlayableCardMenuLabel mode={mode} />
+          ? <PlayableCardMenuLabel mode={mode} showDeclaration={modes.length > 1} />
           : `${mode.label} (${mode.disabledReason ?? "unavailable"})`,
         onSelect: () => beginPlayOrTargetSelection(card, mode.id),
       }));
@@ -342,6 +342,7 @@ export function useGameBoardActions({
               <PlayableCardMenuLabel
                 label={mode.playCost?.destinationLabel ?? mode.playCost?.label ?? mode.label}
                 mode={mode}
+                showDeclaration={modes.length > 1}
               />
             ),
             onSelect: () => beginPlayOrTargetSelection(card, mode.id),

@@ -7,9 +7,11 @@ import { getKeywordImagePath } from "@/features/card-presentation/lib/keyword-as
 export function PlayableCardMenuLabel({
   label: labelOverride,
   mode,
+  showDeclaration = true,
 }: {
   label?: string;
   mode: BoardPlayerProjection["availablePaymentModes"][string][number];
+  showDeclaration?: boolean;
 }) {
   if (mode.resourceCost) {
     return <ResourceCostMenuLabel label={mode.label} cost={mode.resourceCost} />;
@@ -17,18 +19,20 @@ export function PlayableCardMenuLabel({
   const preview = mode.costPreview;
   const presentation = mode.playCost;
   const label = labelOverride ?? presentation?.label ?? mode.label;
-  const declaration = [presentation?.declarationLabel, ...mode.targets
-    .filter((target) => target.maximum > 0)
-    .map((target) => target.label)
-    .filter((label): label is string => Boolean(label))]
-    .filter((entry): entry is string => Boolean(entry));
-  if (!preview || !presentation?.showCost) return <>
+  const declaration = showDeclaration
+    ? [presentation?.declarationLabel, ...mode.targets
+        .filter((target) => target.maximum > 0)
+        .map((target) => target.label)
+        .filter((label): label is string => Boolean(label))]
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+  if (!preview || !presentation?.showCost) return <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
     <span>{renderPlayLabel(label)}</span>
-    {declaration.length > 0 && <span className="block text-slate-400 text-[11px]">{declaration.join(" → ")}</span>}
-  </>;
-  return <span className="flex flex-col gap-0.5">
+    {declaration.length > 0 && <span className="text-slate-400 text-[11px] leading-snug">{declaration.join(" → ")}</span>}
+  </span>;
+  return <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
     <span>{renderPlayLabel(label)}</span>
-    {declaration.length > 0 && <span className="text-slate-400 text-[11px]">{declaration.join(" → ")}</span>}
+    {declaration.length > 0 && <span className="text-slate-400 text-[11px] leading-snug">{declaration.join(" → ")}</span>}
     <span className="inline-flex flex-wrap items-center gap-1 text-slate-300 text-[11px]">
       Cost: <ResourceCost energy={preview.energy} powerCosts={mode.poolPayment?.powerCosts ?? [{ amount: preview.effectivePower, domains: mode.poolPayment?.powerDomains ?? [] }]} />
     </span>
