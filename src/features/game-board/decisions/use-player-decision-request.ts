@@ -111,7 +111,8 @@ export function buildPlayerDecisionRequest({
       if (
         action &&
         pendingChoice.presentation === "cardSelection" &&
-        pendingChoice.sourceZone
+        pendingChoice.sourceZone &&
+        pendingChoice.sourceZone !== "base"
       ) {
         const requirement = action.targets.find(
           (target) => target.kind === "card",
@@ -161,8 +162,6 @@ export function buildPlayerDecisionRequest({
               ? "Discard from Hand"
               : pendingChoice.sourceZone === "trash"
                 ? "Choose from Trash"
-                : pendingChoice.sourceZone === "base"
-                  ? "Choose from Base"
                 : pendingChoice.title,
         };
       }

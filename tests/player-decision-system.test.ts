@@ -397,7 +397,7 @@ test("maps pending non-board effect selections to the dialog", () => {
   );
 });
 
-test("maps pending public board-card selections to the dialog", () => {
+test("keeps pending public board-card selections in the board-target flow", () => {
   const rune = card("base-rune", "Rune");
   const projection = projectionWith({
     actions: [
@@ -423,14 +423,18 @@ test("maps pending public board-card selections to the dialog", () => {
   base.count = 1;
 
   const decision = buildPlayerDecisionRequest({
+    activeTargetSelection: {
+      actionId: "base-choice-action",
+      legalTargetIds: [rune.instanceId],
+      maxTargets: 1,
+      minTargets: 1,
+      targetKind: "card",
+    },
     cardsByInstanceId: {},
     sourceProjection: projection,
   });
 
-  assert.equal(decision?.kind, "cardSelection");
-  if (decision?.kind !== "cardSelection") return;
-  assert.equal(decision.title, "Choose from Base");
-  assert.deepEqual(decision.cards.map((item) => item.id), ["base-rune"]);
+  assert.equal(decision, null);
 });
 
 test("maps a staged effect play to an explicit decision using only projected play actions", () => {

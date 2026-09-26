@@ -386,7 +386,22 @@ test("mandatory recycling chooses eligible board cards during effect resolution"
   assert.deepEqual(next.state.pendingChoice?.legalCardIds, ["p1:rune-b"]);
   assert.equal(next.state.pendingChoice?.sourceZone, "base");
 
-  const chooseRune = gameplayActions(next, "p1", decks).find(
+  const actionsWhileChoosing = gameplayActions(next, "p1", decks);
+  assert.equal(
+    actionsWhileChoosing.some(
+      (action) =>
+        action.label.startsWith("Add Energy") ||
+        action.label.startsWith("Add Power"),
+    ),
+    false,
+  );
+  assert.ok(
+    actionsWhileChoosing
+      .filter((action) => action.enabled && action.label !== "Concede Game")
+      .every((action) => action.choice?.kind === "effectSelection"),
+  );
+
+  const chooseRune = actionsWhileChoosing.find(
     (action) => action.choice?.kind === "effectSelection",
   );
   assert.ok(chooseRune);
